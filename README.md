@@ -108,6 +108,7 @@ Completion, Toys, Codex Pages, Weapon Mods, Sentinel Batteries, Sentinel Crystal
 
 ## To-Do
 - [x] **AP Dummy Design:** Implemented V22 (idTrigger Mutation) to strip vanilla items and emit clean `Activate` telemetry.
+- **Flame Belch Fix:** Test Zapony's theory for fixing the Flame Belch via RPC commands: `give equipmentlauncher/equipmentlauncherleft;give weapon/player/equipment_flame_belch;give weapon/player/equipment_flame_belch_right`. The `_right` version is typically given directly via default loadouts, but the player might need the underlying `equipmentlauncher` prerequisite first.
 - [ ] **Trap Entity Injection:** Update the Python `.entities` Map Generator to inject `idTarget_Spawn` trap entities into maps, so they can be triggered safely via RPC without crashing the engine.
 - [ ] **Python Client Refactor:** Refactor the Python client to stop using the `clear; listInventory; condump` loop, and instead simply parse `condump` once per cycle for `idBloatedEntity::Activate` lines.
 - [ ] Upgrade the IPC from a text file to a local Socket or Named Pipe for instantaneous item delivery.

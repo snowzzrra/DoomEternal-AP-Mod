@@ -5,23 +5,44 @@ import glob
 import time
 import re
 
-sys.path.append("/run/media/system/Eris/DoomEAP/Archipelago")
-
-#IMPORTANT TO-DO: use the visual client for this instead of a simple console, as is default with archipelago clients
-import Utils
-import colorama
-from CommonClient import CommonContext, server_loop, gui_enabled, ClientCommandProcessor, get_base_parser
 import json
 
 CONFIG_FILE = "ap_config.json"
+config = {}
 
 if os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE, "r") as f:
         config = json.load(f)
-        DOOM_BASE_DIR = config.get("doom_base_dir", "")
-        SAVE_GAMES_DIR = config.get("save_games_dir", DOOM_BASE_DIR)
+
+AP_PATH = config.get("archipelago_path", "")
+if not AP_PATH or not os.path.exists(os.path.join(AP_PATH, "CommonClient.py")):
+    print("\n=== DOOM Eternal AP Client Setup ===")
+    print("Please enter the path to your Archipelago installation folder (where CommonClient.py is).")
+    print("Example: /path/to/Archipelago")
+    while True:
+        AP_PATH = input("Archipelago Path: ").strip()
+        if os.path.exists(os.path.join(AP_PATH, "CommonClient.py")):
+            break
+        print("Validation Error: Could not find CommonClient.py there.")
+    config["archipelago_path"] = AP_PATH
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=4)
+
+sys.path.append(os.path.abspath(AP_PATH))
+
+# IMPORTANT TO-DO: use the visual client for this instead of a simple console, as is default with archipelago clients
+import Utils
+import colorama
+from CommonClient import CommonContext, server_loop, gui_enabled, ClientCommandProcessor, get_base_parser
+
+if "doom_base_dir" in config and "save_games_dir" in config:
+    DOOM_BASE_DIR = config["doom_base_dir"]
+    SAVE_GAMES_DIR = config["save_games_dir"]
 else:
-    print(colorama.Fore.CYAN + "\n=== DOOM Eternal AP Client Setup ===" + colorama.Style.RESET_ALL)
+    if "colorama" in sys.modules:
+        print(colorama.Fore.CYAN + "\n=== DOOM Eternal AP Client Setup ===" + colorama.Style.RESET_ALL)
+    else:
+        print("\n=== DOOM Eternal AP Client Setup ===")
     print("The client needs to know where your game is installed and where it saves files (condump).")
     print("\n1. Game Base Directory (Where DOOMEternalx64vk.exe and ap_client.exe are located)")
     print("Windows Example: C:\\Program Files (x86)\\Steam\\steamapps\\common\\DOOMEternal\\base")
@@ -44,8 +65,10 @@ else:
             break
         print(colorama.Fore.RED + "Validation Error: The 'id Software' folder doesn't exist in this path. Are you sure this is the root directory for your Saves?" + colorama.Style.RESET_ALL)
         
+    config["doom_base_dir"] = DOOM_BASE_DIR
+    config["save_games_dir"] = SAVE_GAMES_DIR
     with open(CONFIG_FILE, "w") as f:
-        json.dump({"doom_base_dir": DOOM_BASE_DIR, "save_games_dir": SAVE_GAMES_DIR}, f, indent=4)
+        json.dump(config, f, indent=4)
     print(colorama.Fore.GREEN + "Configuration saved to ap_config.json!\n" + colorama.Style.RESET_ALL)
 
 # makes sure the path is correct for save files
