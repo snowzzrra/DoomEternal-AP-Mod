@@ -4,6 +4,11 @@ import re
 # you don't need to use this to play the mod
 # i'm making this file available simply for transparency and for anyone who wants to generate the AP targets in other maps by themselves, since the process is a bit tedious to do manually and this automates it
 # you could just do the changes by hand, but why??
+
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from bridge_client import ITEM_ID_TO_COMMAND
+
 def remove_balanced_entity_blocks(content, name_prefix):
     pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w+\s*\{', re.IGNORECASE)
     result = []
@@ -43,6 +48,26 @@ def generate_target_relay(ap_check_id, spawn_pos_text):
 	}}
 }}
 """
+
+def generate_rpc_command_entities():
+    blocks = []
+    for item_id, cmd_string in ITEM_ID_TO_COMMAND.items():
+        entity_str = f"""entity {{
+	entityDef ap_cmd_{item_id} {{
+		class = "idTarget_Command";
+		expandInheritance = false;
+		poolCount = 0;
+		poolGranularity = 2;
+		networkReplicated = false;
+		disableAIPooling = false;
+		edit = {{
+			commandText = "{cmd_string}";
+		}}
+	}}
+}}
+"""
+        blocks.append(entity_str)
+    return "".join(blocks)
 
 def generate_map(input_file, output_file):
     with open(input_file, "r", encoding="utf-8") as f:
@@ -163,7 +188,7 @@ def generate_map(input_file, output_file):
 
         new_blocks.append("entity {" + block)
 
-    final_content = "".join(new_blocks)
+    final_content = "".join(new_blocks) + "\n" + generate_rpc_command_entities()
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:

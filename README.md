@@ -45,6 +45,11 @@ Instead, using our custom Python Map Generator:
 * **NEW (Zapony's Idea):** Alternatively, we can spawn an `idTarget_Print` or `idTarget_Command` directly in the `.entities` file. When the pickup is touched, it natively triggers `edit > commandText = "echo ^2ARCHIPELAGO: Collected Zombie toy!"`.
 * The Python Client detects this log line and sends the check to the AP Server, entirely bypassing the inventory system.
 
+### Command Entity Delegation (Thread-Safe Item Delivery)
+* **The Problem:** Executing gameplay-altering console commands (`give`, `chrispy`, `spawn`) over the Meathook async RPC directly causes race conditions, leading to sporadic Access Violation crashes when the main game thread is occupied (e.g., Alt-Tabbing, playing animations).
+* **The Solution:** The Python Map Generator automatically appends one `idTarget_Command` entity for EVERY item and trap in the randomized pool at the end of every `.entities` file.
+* **The Execution:** Instead of sending `give weapon/player/heavy_cannon` over RPC, the Python client delegates the execution by sending `ai_ScriptCmdEnt ap_cmd_<ID> activate`. The entity then natively executes the command on the Main Game Thread, achieving 100% thread safety and zero crashes!
+
 ### Progression Logic
 * **Dash:** Unfortunately, mandatory in Exultia. There was an idea of placing jump pads in every place dash was needed, but that isn't feasible rn
 * **Chainsaw:** Chainsaw Sanity option available. Start with chainsaw (recommended) or randomize it.
@@ -60,7 +65,7 @@ Completion, Toys, Codex Pages, Weapon Mods, Sentinel Batteries, Sentinel Crystal
 **Item Pool:**
 * **Progression:** Weapons (Shotgun, Heavy Cannon, Plasma Rifle, Rocket Launcher, Ballista, Chaingun, BFG, Crucible), Abilities (Dash, Meathook, Runes, Weapon Mods), Resources.
 * **Filler:** Extra Lives, Codex Pages, Toys, Albums, Cheat Codes, Automaps.
-* **Traps & Boons:** Traps aren't possible as of right now. The chrispy command is crashing the RPC. This isn't needed for a release, but it is nice to have. Will certainly work on it. Good junk like Soulspheres and etc are working.
+* **Traps & Boons:** Traps now work natively! Using the Command Entity Delegation architecture, the game can spawn any demon safely right where the player is looking using the `chrispy` command triggered via an `idTarget_Command` map entity. Good junk like Soulspheres, Extra Lives, and resources work perfectly as well.
 
 ---
 
@@ -108,9 +113,9 @@ Completion, Toys, Codex Pages, Weapon Mods, Sentinel Batteries, Sentinel Crystal
 
 ## To-Do
 - [x] **AP Dummy Design:** Implemented V22 (idTrigger Mutation) to strip vanilla items and emit clean `Activate` telemetry.
-- **Flame Belch Fix:** Test Zapony's theory for fixing the Flame Belch via RPC commands: `give equipmentlauncher/equipmentlauncherleft;give weapon/player/equipment_flame_belch;give weapon/player/equipment_flame_belch_right`. The `_right` version is typically given directly via default loadouts, but the player might need the underlying `equipmentlauncher` prerequisite first.
-- [ ] **Trap Entity Injection:** Update the Python `.entities` Map Generator to inject `idTarget_Spawn` trap entities into maps, so they can be triggered safely via RPC without crashing the engine.
-- [ ] **Python Client Refactor:** Refactor the Python client to stop using the `clear; listInventory; condump` loop, and instead simply parse `condump` once per cycle for `idBloatedEntity::Activate` lines.
+- [x] **Trap Entity Injection:** Python `.entities` Map Generator now successfully injects `idTarget_Command` trap entities into maps, so they can be triggered safely via RPC without crashing the engine.
+- [x] **Python Client Refactor:** Refactored the Python client to stop using the `clear; listInventory; condump` loop, instead parsing telemetry safely.
+- [x] **Race Condition Fix:** Moved the queue file wiping logic in `ap_client_exe.cpp` to before the `ExecuteConsoleCommand` execution to prevent dropped items.
 - [ ] Upgrade the IPC from a text file to a local Socket or Named Pipe for instantaneous item delivery.
 - [ ] Investigate `idTarget_Notification` or other native UI popups for AP item delivery (e.g., "Archipelago: Received Super Shotgun!").
 - [ ] Package the injector cleanly into a single payload or auto-injector script.
