@@ -6,3 +6,4 @@ ap_queue.txt
 diff.txt
 ap_config.json
 debug_matches.py
+*.pyc

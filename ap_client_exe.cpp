@@ -45,6 +45,10 @@ int main() {
             }
 
             if (buffer[0] != '\0') {
+                LogDebug("Clearing command from queue file BEFORE execution to prevent race condition...");
+                f = fopen(queueFile, "w");
+                if (f) fclose(f);
+
                 LogDebug((std::string("Processing command from queue: ") + buffer).c_str());
                 if (strncmp(buffer, "#DUMP_ENTITIES", 14) == 0) {
                     LogDebug("Action: #DUMP_ENTITIES triggered.");
@@ -88,11 +92,6 @@ int main() {
                         LogDebug("ERROR: ExecuteConsoleCommand failed.");
                     }
                 }
-
-                LogDebug("Clearing command from queue file...");
-                f = fopen(queueFile, "w");
-                if (f) fclose(f);
-                LogDebug("Queue cleared. Waiting for next command.");
             }
         } else {
             fclose(f);

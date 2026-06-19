@@ -92,7 +92,7 @@ ITEM_ID_TO_COMMAND = {
     7770009: "give weapon/player/hammer",
     7770010: "give weapon/player/chainsaw",
     7770011: "give throwable/player/frag_grenade",
-    7770012: "give weapon/player/equipment_flame_belch_right",
+    7770012: "give equipmentlauncher/equipmentlauncherleft ; give weapon/player/equipment_flame_belch",
     7770013: "give throwable/player/ice_bomb",
     7770014: "give abilities/blood_punch",
     7770015: "give ability_dash",
@@ -111,7 +111,7 @@ ITEM_ID_TO_COMMAND = {
     7770026: "give armor",
     7770027: "give ammo/sharedammopool/fuel 1",
     7770028: "give ammo/sharedammopool/bfg 1",
-    7770029: "give health 200\ngive armor 200", # Soulsphere
+    7770029: "give health 200 ; give armor 200", # Soulsphere
     7770030: "chrispy pickup/powerup/berserk",
     
     # Filler. As of now, all of these work fine.
@@ -128,18 +128,18 @@ ITEM_ID_TO_COMMAND = {
     7770041: "give armor 5",
     7770042: "give ammo",
     
-    # Traps. THOSE AREN'T WORKING. ATTEMPTS TO FIX THEM ARE IN PROGRESS
-    7770043: "spawn ai/fodder/imp",
-    7770044: "spawn ai/fodder/carcass",
-    7770045: "spawn ai/heavy/revenant",
-    7770046: "spawn ai/heavy/arachnotron",
-    7770047: "spawn ai/heavy/hellknight",
-    7770048: "spawn ai/heavy/dreadknight",
-    7770049: "spawn ai/superheavy/baron",
-    7770050: "spawn ai/superheavy/tyrant",
-    7770051: "spawn ai/superheavy/marauder",
-    7770052: "spawn ai/superheavy/archvile",
-    7770053: "spawn ai/ambient/zombie_cueball",
+    # Traps! These now work safely via the idTarget_Command delegation!
+    7770043: "chrispy ai/fodder/imp",
+    7770044: "chrispy ai/fodder/carcass",
+    7770045: "chrispy ai/heavy/revenant",
+    7770046: "chrispy ai/heavy/arachnotron",
+    7770047: "chrispy ai/heavy/hellknight",
+    7770048: "chrispy ai/heavy/dreadknight",
+    7770049: "chrispy ai/superheavy/baron",
+    7770050: "chrispy ai/superheavy/tyrant",
+    7770051: "chrispy ai/superheavy/marauder",
+    7770052: "chrispy ai/superheavy/archvile",
+    7770053: "chrispy ai/ambient/zombie_cueball",
     7770054: "give ammo 0",
     7770055: "give ammo/sharedammopool/fuel 0",
     7770056: "give ammo/sharedammopool/bfg 0",
@@ -259,12 +259,9 @@ class DoomEternalContext(CommonContext):
                     
                     if item_id in ITEM_ID_TO_COMMAND:
                         cmd = ITEM_ID_TO_COMMAND[item_id]
-                        print(colorama.Fore.CYAN + f"[To Game] Item received! Queuing command: {cmd}" + colorama.Style.RESET_ALL)
-                        # Instead of appending with semicolons, we extend the batch with individual commands
-                        if " ; " in cmd:
-                            commands_batch.extend(cmd.split(" ; "))
-                        else:
-                            commands_batch.append(cmd)
+                        print(colorama.Fore.CYAN + f"[To Game] Item received! Delegating command to map entity ap_cmd_{item_id}: {cmd}" + colorama.Style.RESET_ALL)
+                        # Delegate the execution to the map's idTarget_Command entity
+                        commands_batch.append(f"ai_ScriptCmdEnt ap_cmd_{item_id} activate")
                         
                 if commands_batch:
                     # Send each command individually, waiting for the C++ injector to clear the queue
@@ -278,6 +275,8 @@ class DoomEternalContext(CommonContext):
                 
                 # Wait a bit for the game to process the entire batch and create the condump
                 await asyncio.sleep(1.5)
+                
+                checks = read_telemetry_dump()
                 if checks:
                     new_locs = []
                     for check_decl in checks:
