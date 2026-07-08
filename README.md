@@ -338,7 +338,6 @@ Notes:
 
 The build expects a sibling Archipelago checkout by default, but can be pointed
 explicitly at your local fork.
-```
 
 ## Roadmap
 
