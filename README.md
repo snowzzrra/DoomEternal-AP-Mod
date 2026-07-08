@@ -214,7 +214,7 @@ paths.
 Set DOOM Eternal's Steam launch options to:
 
 ```text
-AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %command%
+WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %command%
 ```
 
 Use the absolute path to the extracted `client/run_bridge.sh`. Keep
