@@ -1,9 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Native build
 *.o
-ap_queue.txt
+*.obj
+*.exe
 *.dll
+*.pdb
+
+# Generated builds/releases
+build/
+dist/
+release/
+*.apworld
+DoomEternalArchipelago*.zip
 *.entities
-*.log
-diff.txt
+
+# Runtime configuration/state
 ap_config.json
+client_state.json
+*.log
+bridge_debug.log
+*.evt
+ap_queue/
+*.cmd
+*.processing
+*.failed
+ap_rpc_enabled
+ap_event_*.txt
+ap_telemetry*.txt
+ap_transition_*.evt
+
+# Game resources and backups
+*.backup
+
+# Local investigation
 debug_matches.py
-*.pyc
+battery.txt
+*_dump*.txt
+.death-probe-*/
+.death-probe-compat/
+Archive.zip
+.serena/
+
+# Local project memory, caso decida nao publicar
+.local/

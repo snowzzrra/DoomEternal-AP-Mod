@@ -1,3 +1,1 @@
-websockets
-colorama
-aioconsole
+# The release client runs inside Archipelago 0.6.7 and has no pip dependencies.

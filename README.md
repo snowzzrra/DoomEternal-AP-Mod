@@ -1,162 +1,402 @@
-# Doom Eternal Archipelago Mod
+# Doom Eternal Archipelago Playable Test
 
-The official game mod, Python client, C++ memory hooking, and Inter-Process Communication (IPC) layer for the Doom Eternal Archipelago Randomizer.
+Game-side repository for the DOOM Eternal Archipelago integration.
+
+This repo owns the playable-test mod package, the Python bridge, the external
+RPC client, runtime manifests, map-generation scripts, validation scripts, and
+release packaging. The APWorld source does **not** live here; it stays in the
+sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
+`doometernal.apworld` during release builds.
 
 > [!CAUTION]
-> I personally work using Linux, so this may not work for everyone.
+> This project is a playable test build, not a finished 1.0 release. Windows is
+> the primary target for public testing, while Linux/Proton remains supported
+> for development and early validation.
 
-## Project Status
-This project is currently a prototype moving toward a playable pre-alpha test build.
+## Project status
 
-**Current target:** package the first three campaign levels as a controlled Archipelago test release for the AP After Dark Discord.
+Current PTB scope:
 
-The goal for the first public test is not full campaign support yet. It is to prove that map checks, item delivery, DeathLink receive, and the APWorld can work reliably across multiple early-game levels.
+- Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
+- Content: `78` map checks + `1` runtime goal
+- Goal: report completion when the runtime sees
+  `ap_transition_e1m3_cult_to_e1m4_boss.evt`
+- Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
+  Archipelago balancing are future milestones.
 
-## Vision & Project Overview
-Bring full Archipelago support to DOOM Eternal using native `.entities` map modifications and Meathook RPC integration.
-The goal is to create a stable, multiworld-friendly randomizer experience without relying on memory editing or offsets.
+The goal of this PTB is to prove that map checks, item delivery, DeathLink,
+runtime gating, and the APWorld can work reliably across multiple early-game
+levels.
 
-**Core philosophy:**
-* Native map modifications for location checks and traps (via Python `.entities` patching)
-* Meathook RPC for item delivery and telemetry
-* No pymem or memory scanning required
-* Campaign remains largely vanilla
-* Progression is randomized while preserving gameplay
+## Project vision
 
----
+Bring full Archipelago support to DOOM Eternal using native `.entities` map
+modifications plus Meathook RPC integration.
 
-## Architecture & Decisions
-Doom Eternal runs on idTech 7, which is notoriously difficult to hook into externally using high-level languages like Python. Furthermore, running a Randomizer on Linux (via Proton/Steam) means that Python scripts running on the host OS cannot easily access the memory space of the Windows game running inside the Wine container.
+Core philosophy:
 
-**The Mod Structure:**
-This repository serves as the ultimate "Client Package" distributed to the player. It includes:
-1. **The APWorld (`doometernal/`):** The Archipelago world definition containing items, locations, regions, options, rules, and generation logic.
-2. **The Map Mod:** A custom Python Map Generator that parses and modifies dumped `.entities` files directly to inject AP dummy items and Trap spawners.
-> [!WARNING]
-> **Why not idStudio?** idStudio saves the ENTIRE map with modifications, resulting in gigabytes of data per level. This is unviable for an Archipelago multiworld distribution. All map modifications MUST be done via `.entities` patching.
-3. **Per-Level Manifests:** Planned generated metadata that maps injected `AP_CHECK_*` entities back to APWorld location IDs.
-4. **The Injector (`ap_client.exe`):** A minimal C++ application that attaches to the game using **Meathook**. It runs inside the game environment and executes queued commands.
-5. **The Python Client (`bridge_client.py`):** The logic handler that acts as the Archipelago `CommonClient`. It receives items from the server, parses telemetry, and pushes commands to the Injector via IPC.
+- Use native map modifications for location checks and item/trap command
+  entities.
+- Avoid idStudio full-map packaging, because idStudio saves entire map payloads
+  and would make multiworld distribution unreasonably large.
+- Preserve the campaign’s normal feel wherever possible.
+- Randomize progression, resources, and optional rewards without corrupting
+  save files or the vanilla inventory.
+- Prefer durable native events over console-log polling.
+- Keep the APWorld source in the Archipelago fork and the game-side runtime in
+  this repository.
 
-For pre-alpha, the release package is expected to include the APWorld, client, injector, generated manifests, and patched mod files for the supported levels.
+## Repository split
 
----
+This repository:
 
-## Design & Logic
+- owns the game-side runtime;
+- builds the mod package;
+- contains the Python bridge;
+- contains the external C++ RPC client;
+- contains runtime manifests and item delivery data;
+- contains map generator and validation scripts;
+- creates the final PTB release ZIP.
 
-### Map Modification Strategy (V22 Strategy: idTrigger Mutation)
-Do NOT modify vanilla pickup inherits directly via text editors, to avoid crashes and savegame corruption.
-Instead, using our custom Python Map Generator:
-* Hunt for progression items (Toys, Codex, Modbots, Weapons).
-* Smash their original classes (e.g., `idProp2`, `idInteractable_WeaponModBot`) and transform them into `idTrigger`.
-* Strip all inventory rewards and inject `art/pickups/question_mark_a.lwo` to standardize the AP aesthetic.
-* Inject an `idTarget_Count` relay that listens to the trigger.
-* **NEW (Zapony's Idea):** Alternatively, we can spawn an `idTarget_Print` or `idTarget_Command` directly in the `.entities` file. When the pickup is touched, it natively triggers `edit > commandText = "echo ^2ARCHIPELAGO: Collected Zombie toy!"`.
-* The Python Client detects this log line and sends the check to the AP Server, entirely bypassing the inventory system.
+Sibling repository:
 
-Each level must be dumped and patched separately. The generator is being moved toward a multi-level workflow where each patched `.entities` file also produces a manifest describing the AP checks it contains.
+```text
+Archipelago/worlds/doometernal/
+```
 
-### Command Entity Delegation (Thread-Safe Item Delivery)
-* **The Problem:** Executing gameplay-altering console commands (`give`, `chrispy`, `spawn`) over the Meathook async RPC directly causes race conditions, leading to sporadic Access Violation crashes when the main game thread is occupied (e.g., Alt-Tabbing, playing animations).
-* **The Solution:** The Python Map Generator automatically appends one `idTarget_Command` entity for EVERY item and trap in the randomized pool at the end of every `.entities` file.
-* **The Execution:** Instead of sending `give weapon/player/heavy_cannon` over RPC, the Python client delegates the execution by sending `ai_ScriptCmdEnt ap_cmd_<ID> activate`. The entity then natively executes the command on the Main Game Thread, achieving 100% thread safety and zero crashes!
+- owns the APWorld source;
+- defines item IDs, location IDs, regions, options, rules, and generation logic;
+- is compiled into `doometernal.apworld` during release builds;
+- is **not** copied into this repository.
 
-The next command delivery improvement is a safer queue/state gate. Commands received during loading, menus, cutscenes, or checkpoint transitions should wait until the game appears ready before being executed.
+## Runtime summary
 
-### DeathLink
-* **Receive:** Implemented. Incoming DeathLinks can be turned into a queued in-game kill command.
-* **Send:** Planned for Alpha. Sending DeathLinks requires reliable death detection from game telemetry, logs, or checkpoint/death-state investigation.
+- `ap_client.exe` is an external RPC client, not an injector embedded into the
+  game process.
+- Meathook remains an external dependency that provides the in-game RPC server.
+- Safe command execution is protected by a versioned, read-only memory gate.
+  Unknown game versions and failed reads stay fail-closed.
+- Physical checks are detected by native `ap_event_*` files, not by telemetry
+  polling.
+- The runtime goal uses the native transition event above, with the old
+  autosave path kept only as fallback behavior.
+- `g_debugTriggers` is no longer required for normal check detection.
 
-### Enemy Randomizer
-Enemy randomization is planned for post-1.0. Since the map generator already mutates `.entities`, the long-term direction is to optionally replace enemy entities by tier-based presets rather than relying on external memory editing.
+## Architecture overview
 
-### Progression Logic
-* **Dash:** Unfortunately, mandatory in Exultia. There was an idea of placing jump pads in every place dash was needed, but that isn't feasible rn
-* **Chainsaw:** Chainsaw Sanity option available. Start with chainsaw (recommended) or randomize it.
-* **Non-Progression:** Everything else.
+### Map modification strategy
 
----
+The map generator patches dumped `.entities` files directly.
 
-## Item & Location Pools
+For supported pickups, the generator:
 
-**Location Pool (300-350 checks):**
-Completion, Toys, Codex Pages, Weapon Mods, Sentinel Batteries, Sentinel Crystals, Secret Encounters, Slayer Keys, Empyrean Keys, Extra Lives, Cheat Codes, Albums, Automaps.
+1. locates vanilla pickup entities selected in `level_configs/*.json`;
+2. strips or bypasses vanilla inventory rewards;
+3. converts the interaction into an AP check path;
+4. standardizes the visible AP pickup presentation where possible;
+5. injects an `AP_CHECK_*` relay;
+6. injects native notification feedback;
+7. injects an `ap_event_<location_id>` command entity that writes a durable
+   event file for the bridge.
 
-**Item Pool:**
-* **Progression:** Weapons (Shotgun, Heavy Cannon, Plasma Rifle, Rocket Launcher, Ballista, Chaingun, BFG, Crucible), Abilities (Dash, Meathook, Runes, Weapon Mods), Resources.
-* **Filler:** Extra Lives, Codex Pages, Toys, Albums, Cheat Codes, Automaps.
-* **Traps & Boons:** Traps now work natively! Using the Command Entity Delegation architecture, the game can spawn any demon safely right where the player is looking using the `chrispy` command triggered via an `idTarget_Command` map entity. Good junk like Soulspheres, Extra Lives, and resources work perfectly as well.
+This avoids inventory polling and avoids relying on `g_debugTriggers`.
 
----
+### Command entity delegation
 
-## Suggested AP Options
-* Include Master Levels / DLC (TAG1 & TAG2)
-* Randomize Weapon Mods / Runes / Suit Upgrades / Sentinel Crystals / Slayer Gates
-* Include Codex / Albums / Cheat Codes / Extra Lives
-* Chainsaw Sanity
-* Starting Dash / Starting Chainsaw
-* DeathLink
-* **Goal options:** Defeat Icon of Sin, Defeat The Dark Lord (Requires DLC), Collect Unmaykr.
-* **Slayer Gate Progression:** Use Slayer Gate Keys as a way to gate global progress or access to the Unmaykr.
-* **Hard Mode:** Disable mid-level checkpoints (dying restarts the entire level).
-* **Horde Mode:** Include Horde Mode checks and rewards.
+Directly executing gameplay-changing commands over asynchronous RPC can be
+unsafe during loading, menus, cutscenes, and other busy game states.
 
----
+Instead, every supported item/trap delivery is represented by map-side
+`idTarget_Command` / relay entities. The Python bridge sends a safe activation
+request such as:
 
-## Limitations
-* **Prototype Scope:** The current working target is a three-level pre-alpha, not the full campaign.
-* **Polling Delay:** The python client reading `condump` loop adds a slight delay to check detection.
-* **Command Timing:** Item delivery is safe through map command entities, but a stronger queue/state gate is planned for loading/menu/cutscene cases.
-* **No Memory Reading:** Currently, this injector only *sends* commands. It does not read memory to check the player's inventory, but thanks to V22 telemetry, memory reading and inventory polling are no longer necessary for checks.
-* **Platform Support:** Windows testing is required before a public playable test build. Linux/Proton remains experimental until retested.
+```text
+ai_ScriptCmdEnt ap_rpc_v3_<item_id> activate
+```
 
----
+The entity then executes the actual in-game command natively.
+
+The external `ap_client.exe` imports queued commands and only consumes them when:
+
+1. the bridge has armed RPC execution, and
+2. the read-only memory gate confirms safe gameplay.
+
+### Check flow
+
+```text
+AP-mutated pickup
+  -> AP_CHECK_* relay
+  -> native pickup notification
+  -> ap_event_<location_id>.txt
+  -> bridge_client.py
+  -> LocationChecks
+  -> server ack
+  -> event file removed
+```
+
+Event files are kept until the Archipelago server confirms the location in
+`checked_locations`.
+
+### Goal flow
+
+```text
+ap_client.exe detects:
+game/sp/e1m3_cult/e1m3_cult -> game/sp/e1m4_boss/e1m4_boss
+
+  -> writes ap_transition_e1m3_cult_to_e1m4_boss.evt
+  -> bridge_client.py consumes it durably
+  -> sends Cultist Base - Mission Complete
+  -> sends CLIENT_GOAL
+```
+
+## Release package
+
+`build_playable_test.sh` produces:
+
+```text
+DoomEternalArchipelagoPlayableTest-v0.1.0-ptb.zip
+├── README.md
+├── RELEASE_MANIFEST.json
+├── DoomEternalArchipelagoPreAlpha.zip
+├── doometernal.apworld
+└── client/
+    ├── ap_client.exe
+    ├── ap_logger.exe
+    ├── bridge_client.py
+    ├── dinput8.dll
+    ├── dxgi.dll
+    ├── version.dll
+    ├── xinput1_4.dll
+    ├── save_death_probe.exe
+    ├── save_decrypt.py
+    ├── run_bridge.sh
+    ├── start_injector_windows.bat
+    ├── validate_runtime_install.sh
+    ├── ap_config.example.json
+    ├── data/
+    ├── manifests/
+    └── player_templates/
+```
+
+The release intentionally excludes:
+
+- APWorld source code;
+- C++ source;
+- map generator source;
+- tests;
+- `level_configs/`;
+- extraction/compression tooling;
+- project memory files;
+- personal config.
+
+The bundled Meathook runtime DLLs are included only for convenience in this PTB
+package. Upstream credit remains with the original Meathook project listed in
+the credits.
+
+## Install from the PTB ZIP
+
+1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.0-ptb.zip` to a permanent
+   directory.
+2. Open `doometernal.apworld` with `ArchipelagoLauncher`, then restart the
+   launcher.
+3. Copy `DoomEternalArchipelagoPreAlpha.zip` into DOOM Eternal's `Mods`
+   directory and install it with EternalModInjector.
+4. Keep the ZIP intact. Do not install loose `.entities` files.
+5. Open `DOOM Eternal Client` from Archipelago Launcher and configure the game
+   base path plus the save-games path on first launch.
+
+Do not reuse someone else's `ap_config.json`. Use the setup wizard or copy
+`client/ap_config.example.json` to `client/ap_config.json` and fill your own
+paths.
+
+### Linux / Proton
+
+Set DOOM Eternal's Steam launch options to:
+
+```text
+AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %command%
+```
+
+Use the absolute path to the extracted `client/run_bridge.sh`. Keep
+`run_bridge.sh` beside `ap_client.exe`. If Proton shader compilation is slow on
+your machine, raise the delay to `20`.
+
+Typical first-run paths:
+
+```text
+Game Base Path: /path/to/steamapps/common/DOOMEternal/base
+Saved Games Path: /path/to/steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base
+```
+
+### Windows
+
+Typical first-run paths:
+
+```text
+Game Base Path: C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
+Saved Games Path: C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
+```
+
+Start DOOM normally through Steam, then run:
+
+```text
+client\start_injector_windows.bat
+```
+
+That helper starts the external RPC client `ap_client.exe` with the correct
+working directory. Only one `ap_client.exe` should exist at a time.
+
+## PTB smoke test
+
+1. Reach gameplay in Hell on Earth and confirm item delivery works.
+2. Confirm `/doom_status` shows RPC armed and connected to the expected
+   seed/team/slot.
+3. Confirm the read-only memory gate opens only after safe gameplay is
+   detected.
+4. Collect at least one AP check and verify the corresponding native
+   `SECRET FOUND` feedback appears once.
+5. Restart only the visual bridge and confirm consumables do not replay.
+6. Return to menu, reload the save, and confirm the memory gate pauses during
+   non-gameplay states and reopens after gameplay resumes.
+7. Send a DeathLink from another client and confirm one in-game death without a
+   DeathLink echo loop.
+8. Complete the supported route through Cultist Base and confirm the runtime
+   goal triggers on the `e1m3_cult -> e1m4_boss` transition.
+
+## Current PTB logic
+
+- `randomize_chainsaw` defaults to `false`.
+- `randomize_dash` defaults to `false` and remains experimental.
+- `randomize_first_battery` defaults to `false` and remains experimental.
+- Super Shotgun is currently kept vanilla/scripted in Cultist Base.
+- Meat Hook is not a separate PTB item because Super Shotgun grants it by
+  default.
+- Empyrean Key reward chest is outside PTB scope; Exultia uses the physical
+  `Slayer Gate Key` pickup instead.
+- Rocket Launcher is in PTB scope, but Cultist Base’s scripted route can still
+  require checkpoint recovery if the player already owns it.
+
+## Known issues
+
+- DeathLink can currently burn through all available Extra Lives before the
+  run stabilizes.
+- Dash and Blood Punch pickups are functional, but their presentation can be
+  partially buried in world geometry.
+- Part of the Sentinel Crystal pedestal visuals still remains even when the
+  pickup is randomized.
+- `randomize_dash` and `randomize_first_battery` should still be treated as
+  experimental when exposed.
+- Runes received mid-map may only become equipable after a map load or
+  checkpoint reload.
+- Restarting only the game can leave the read-only memory gate unable to
+  reopen. Relaunch the full stack if that happens.
+- AP pickups currently disappear from the automap.
+- If Ice Bomb exists without Frag Grenade, the HUD slot can disappear even
+  though the item still functions.
+- Sentinel Battery socket feedback is not trustworthy for validation.
+- The Cultist Base Super Shotgun sequence is still effectively vanilla and not
+  part of the PTB randomization path.
+- The Cultist Base Rocket Launcher route can still stall a scripted door if the
+  player already owns the weapon early; checkpoint restart is the current
+  recovery.
+- Secret Encounters and Mission Challenges are not AP checks in the PTB.
+
+## Source checkout usage
+
+This section is for working from the repository instead of the packaged PTB
+zip.
+
+1. Keep this repo beside the Archipelago checkout:
+
+```text
+DoomEternal-AP-Mod/
+Archipelago/
+```
+
+2. Copy `ap_config.example.json` to `ap_config.json` and fill your own paths.
+3. Install Python requirements for this repo:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+4. Rebuild the external RPC client with `./build_client.sh` when needed.
+5. Run `./validate_all.sh` before packaging.
+6. Build the playable test with `./build_playable_test.sh`.
+
+Notes:
+
+- `ap_config.json` only needs the local DOOM base path and save-games path.
+- Older local configs may still carry `archipelago_path`; the current bridge
+  does not require it.
+- The release bundle is produced from this repo plus the sibling Archipelago
+  checkout, but it does not ship either source tree.
+
+### APWorld source path
+
+The build expects a sibling Archipelago checkout by default, but can be pointed
+explicitly at your local fork.
+```
 
 ## Roadmap
 
-### Pre-Alpha / Playable Test Build
-* Package Hell on Earth, Exultia, and Cultist Base as the first controlled test release.
-* Add per-level manifests and make the bridge load checks from those manifests.
-* Improve command queuing so received items wait for safe in-game states when necessary.
-* Test the package on Windows and collect structured bug reports from Discord testers.
+### PTB
+
+- Finalize the first controlled playable package.
+- Validate the four-map route and runtime goal.
+- Validate Windows smoke testing.
+- Collect structured bug reports from Discord testers.
 
 ### Alpha
-* Full campaign playable.
-* Stable item delivery and checks.
-* Windows Support Guarantee
-* Save/load support.
-* DeathLink send investigation and implementation.
+
+- Full base campaign playable.
+- More stable item delivery and map coverage.
+- Broader Windows validation.
+- More complete save/load and DeathLink behavior.
 
 ### Beta
-* DLC support and Master Levels.
-* More options and balance passes.
+
+- DLC support.
+- More options and balance passes.
+- Slayer Seal goal logic.
+- More complete optional-content check support.
 
 ### 1.0
-* Installer, Documentation, Public release, and AP community announcement.
 
----
+- Base-game Unmaykr Protocol goal:
+  `Slayer Gate Keys -> Slayer Gates -> Empyrean Keys -> Unmaykr -> Final Sin`.
+- DLC Seal Hunt goal.
+- Automap marker/discoverability improvements.
+- Secret Encounters and Mission Challenges as AP checks.
+- More complete weapon upgrade/mastery model.
+- Public release and AP community announcement.
 
-## To-Do
-- [x] Implement Hell on Earth prototype end-to-end.
-- [x] Implement safe item delivery through `idTarget_Command`.
-- [x] Implement DeathLink receive.
-- [ ] Map and package Exultia.
-- [ ] Map and package Cultist Base.
-- [ ] Add per-level manifests for AP checks.
-- [ ] Make the bridge load manifests instead of hardcoded checks.
-- [ ] Add safer command queue/state gate for loading/menu/cutscene situations.
-- [ ] Test full three-level pre-alpha on Windows.
-- [ ] Prepare Discord test package and bug report instructions.
+### Post-1.0 / 2.0
 
-## Post-1.0 / 2.0 Features
-- [ ] **AP Dummy Design (Zapony's Update):** Update Map Generator to inject `idTarget_Command` or `idTarget_Print` entities instead of bloated triggers, so the game natively echoes `ARCHIPELAGO: CHECK_ID` without needing `g_debugTriggers 1`.
-- [ ] **Starting Inventory:** Changes the starting weapon in E1M1.
-- [ ] **Enemy Randomizer:** Add optional `.entities` enemy mutation presets after the core randomizer is stable.
-- [ ] **Native UI Notifications:** Investigate `idTarget_Notification` or other native UI popups for AP item delivery.
+- Mission Access items.
+- Horde Mode support.
+- Master Levels.
+- Enemy randomizer.
+- Hard Mode / checkpoint removal.
+- Starting inventory and starting weapon options.
 
-## Credits & Acknowledgments
-This project would not be possible without the incredible support and existing tools from the modding community:
-* **tastyfresh** (from the AP After Dark Discord) for providing the comprehensive list of checks.
-* **zwip zwap zapony** (from the Doom 2016+ Modding Discord) for their immense help, pinned messages and documentation, which provided immense help in understanding how to interface with the game.
-* **alby** (from the Doom 2016+ Modding Discord) for basically making this possible with the g_debugTriggers suggestion and overall help.
-* **chrispy** for creating [Meathook](https://github.com/brongo/meathook), the foundational tool that makes modding Doom Eternal's engine possible.
+## Credits
+
+- The Archipelago project and contributors for the multiworld framework,
+  protocol, server, and `CommonClient`.
+- tastyfresh for the original large check list used to bootstrap the project.
+- zwip zwap zapony for direct technical guidance and map/runtime research.
+- alby for technical help, runtime investigation, and safe-native-behavior
+  guidance.
+- chrispy for creating
+  [Meathook](https://github.com/brongo/meathook), the RPC foundation this
+  project builds on.
+- PowerBall253 / brunoanc for
+  [EternalResourceExtractor](https://github.com/brunoanc/EternalResourceExtractor)
+  and `idFileDeCompressor`.
+- FlavorfulGecko5 and the EntitySlayer contributors for
+  [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
+- The DOOM 2016+ Modding community for EternalModInjector, wiki material, and
+  reverse-engineering knowledge that made the map patches possible.

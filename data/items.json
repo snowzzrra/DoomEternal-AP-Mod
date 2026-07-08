@@ -1,0 +1,258 @@
+{
+    "7770000": "give weapon/player/heavy_cannon",
+    "7770001": "give weapon/player/plasma_rifle",
+    "7770002": "give weapon/player/rocket_launcher",
+    "7770003": "give weapon/player/double_barrel",
+    "7770004": "give weapon/player/gauss_rifle",
+    "7770005": "give weapon/player/chaingun",
+    "7770006": [
+        "give weapon/player/bfg",
+        "give ammo/sharedammopool/bfg 30"
+    ],
+    "7770007": [
+        "give weapon/player/crucible",
+        "give ammo/sharedammopool/crucible 3"
+    ],
+    "7770008": "give weapon/player/unmaykr",
+    "7770009": "give weapon/player/hammer",
+    "7770010": "give weapon/player/chainsaw",
+    "7770011": "give throwable/player/frag_grenade",
+    "7770012": [
+        "give equipmentlauncher/equipmentlauncherleft",
+        "give weapon/player/equipment_flame_belch"
+    ],
+    "7770013": "give throwable/player/ice_bomb",
+    "7770014": "give abilities/blood_punch",
+    "7770015": "give ability_dash",
+    "7770016": {
+        "type": "currency",
+        "currency": "CURRENCY_SENTINEL_BATTERY",
+        "count": 1
+    },
+    "7770017": {
+        "type": "progressive_perk",
+        "perks": [
+            "perk/player/argent/health_capacity_0",
+            "perk/player/argent/health_capacity_1",
+            "perk/player/argent/health_capacity_2",
+            "perk/player/argent/health_capacity_3"
+        ]
+    },
+    "7770018": "give inventory/key",
+    
+    "7770019": {
+        "type": "currency",
+        "currency": "CURRENCY_WEAPON_MASTERY",
+        "count": 1
+    },
+    "7770020": "give inventory/rune",
+    "7770021": {
+        "type": "progressive_perk",
+        "perks": [
+            "perk/player/suit/fundamentals/weapon_change_speed",
+            "perk/player/suit/dash/dash_regen_delay",
+            "perk/player/suit/fundamentals/ledge_grab_speed",
+            "perk/player/suit/fundamentals/increase_pickup_radius",
+            "perk/player/suit/self_preservation/reduce_hazard_damage",
+            "perk/player/suit/self_preservation/reduce_self_weapon_damage"
+        ]
+    },
+    "7770022": "g_giveExtraLives 1",
+    "7770023": "g_giveExtraLives 3",
+    "7770024": "give ammo",
+    "7770025": "give health",
+    "7770026": "give armor",
+    "7770027": "give ammo/sharedammopool/fuel 1",
+    "7770028": "give ammo/sharedammopool/bfg 1",
+    "7770029": [
+        "give health 200",
+        "give armor 200"
+    ],
+    "7770030": "chrispy pickup/powerup/berserk",
+    
+    "7770031": "give health 25",
+    "7770032": "give health 100",
+    "7770033": "give armor 25",
+    "7770034": "give armor 100",
+    "7770035": "give ammo/sharedammopool/shells 10",
+    "7770036": "give ammo/sharedammopool/bullets 30",
+    "7770037": "give ammo/sharedammopool/cells 50",
+    "7770038": "give ammo/sharedammopool/rockets 3",
+    "7770039": "give ammo/sharedammopool/fuel 1",
+    "7770040": "give extra_life",
+    "7770041": "give armor 5",
+    "7770042": "give ammo",
+    
+    "7770043": "chrispy ai/fodder/imp",
+    "7770044": "chrispy ai/fodder/carcass",
+    "7770045": "chrispy ai/heavy/revenant",
+    "7770046": "chrispy ai/heavy/arachnotron",
+    "7770047": "chrispy ai/heavy/hellknight",
+    "7770048": "chrispy ai/heavy/dreadknight",
+    "7770049": "chrispy ai/superheavy/baron",
+    "7770050": "chrispy ai/superheavy/tyrant",
+    "7770051": "chrispy ai/superheavy/marauder",
+    "7770052": "chrispy ai/superheavy/archvile",
+    "7770053": "chrispy ai/ambient/zombie_cueball",
+    "7770054": "give ammo 0",
+    "7770055": "give ammo/sharedammopool/fuel 0",
+    "7770056": "give ammo/sharedammopool/bfg 0",
+    "7770057": "give armor 0",
+    
+    "7770058": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/pop_rocket",
+    "7770059": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/secondary_full_auto",
+    "7770060": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/heavy_cannon/bolt_action",
+    "7770061": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/heavy_cannon/burst_detonate",
+    "7770062": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/plasma_rifle/secondary_aoe",
+    "7770063": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/plasma_rifle/secondary_aoe_mastery",
+    "7770064": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/plasma_rifle/secondary_microwave",
+    "7770065": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/plasma_rifle/secondary_microwave_mastery",
+    "7770067": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades",
+    "7770068": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/heavy_cannon/burst_detonate_mastery",
+    "7770069": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
+    "7770070": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/pop_rocket_more_bombs",
+    "7770071": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/detonate",
+    "7770072": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
+    "7770073": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/lock_on",
+    "7770074": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/lockon_mastery",
+    "7770075": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/ballista",
+    "7770076": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/ballista_mastery",
+    "7770077": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/destroyer",
+    "7770078": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/destroyer_charge_levels",
+    "7770079": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/energy_shell",
+    "7770080": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/energy_shell_mastery",
+    "7770081": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/turret",
+    "7770082": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/turret_mastery",
+    "7770083": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/double_barrel/meat_hook",
+    "7770084": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/double_barrel/meat_hook_mastery",
+    "7770085": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_speed",
+    "7770086": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_dash",
+    "7770087": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/speed_boost_on_glory_kill",
+    "7770088": {
+        "type": "progressive_perk",
+        "perks": [
+            "perk/player/argent/armor_capacity_0",
+            "perk/player/argent/armor_capacity_1",
+            "perk/player/argent/armor_capacity_2",
+            "perk/player/argent/armor_capacity_3"
+        ]
+    },
+    "7770089": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/double_jump_air_control",
+    "7770090": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/modify_enemy_stagger_duration",
+    "7770091": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/activate_focus_on_death_blow",
+    "7770092": {
+        "type": "progressive_perk",
+        "perks": [
+            "perk/player/argent/ammo_capacity_0",
+            "perk/player/argent/ammo_capacity_1",
+            "perk/player/argent/ammo_capacity_2",
+            "perk/player/argent/ammo_capacity_3"
+        ]
+    },
+    "7770093": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/target_strike",
+    "7770094": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/decrease_equipment_recharge",
+    "7770095": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/blood_punch_loot_on_damage",
+    "7770096": {
+        "type": "no_op"
+    },
+    "7770097": {
+        "type": "perk",
+        "perk": "perk/player/suit/fundamentals/ledge_grab_speed"
+    },
+    "7770098": {
+        "type": "perk",
+        "perk": "perk/player/suit/fundamentals/weapon_change_speed"
+    },
+    "7770099": {
+        "type": "perk",
+        "perk": "perk/player/suit/dash/dash_regen_delay"
+    },
+    "7770100": {
+        "type": "perk",
+        "perk": "perk/player/suit/dash/dash_gk_restore_dash"
+    },
+    "7770101": {
+        "type": "perk",
+        "perk": "perk/player/suit/exploration/automap_shows_map_station"
+    },
+    "7770102": {
+        "type": "perk",
+        "perk": "perk/player/suit/exploration/automap_shows_progression_items"
+    },
+    "7770103": {
+        "type": "perk",
+        "perk": "perk/player/suit/exploration/automap_increased_fog_radius"
+    },
+    "7770104": {
+        "type": "perk",
+        "perk": "perk/player/suit/exploration/dossier_shows_progression_items"
+    },
+    "7770105": {
+        "type": "perk",
+        "perk": "perk/player/suit/fundamentals/increase_pickup_radius"
+    },
+    "7770106": {
+        "type": "perk",
+        "perk": "perk/player/suit/self_preservation/reduce_hazard_damage"
+    },
+    "7770107": {
+        "type": "perk",
+        "perk": "perk/player/suit/self_preservation/reduce_self_weapon_damage"
+    },
+    "7770108": {
+        "type": "perk",
+        "perk": "perk/player/suit/extermination/barrels_respawn"
+    },
+    "7770109": {
+        "type": "perk",
+        "perk": "perk/player/suit/extermination/barrels_drop_ammo"
+    },
+    "7770110": {
+        "type": "perk",
+        "perk": "perk/player/suit/powerup/powerup_duration"
+    },
+    "7770111": {
+        "type": "perk",
+        "perk": "perk/player/equipment/frag_reduce_cooldown"
+    },
+    "7770112": {
+        "type": "perk",
+        "perk": "perk/player/equipment/frag_concussive_blast"
+    },
+    "7770113": {
+        "type": "perk",
+        "perk": "perk/player/equipment/frag_cluster_bombs"
+    },
+    "7770114": {
+        "type": "perk",
+        "perk": "perk/player/equipment/frag_max_capacity"
+    },
+    "7770115": {
+        "type": "perk",
+        "perk": "perk/player/equipment/ice_reduce_cooldown"
+    },
+    "7770116": {
+        "type": "perk",
+        "perk": "perk/player/equipment/ice_extend_duration"
+    },
+    "7770117": {
+        "type": "perk",
+        "perk": "perk/player/equipment/ice_health_drops"
+    },
+    "7770118": {
+        "type": "perk",
+        "perk": "perk/player/equipment/ice_melee_shatter"
+    },
+    "7770119": {
+        "type": "perk",
+        "perk": "perk/player/equipment/flame_reduce_cooldown"
+    },
+    "7770120": {
+        "type": "perk",
+        "perk": "perk/player/equipment/flame_extend_duration"
+    },
+    "7770121": {
+        "type": "perk",
+        "perk": "perk/player/equipment/flame_more_loot"
+    }
+}

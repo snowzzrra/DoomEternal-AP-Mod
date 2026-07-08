@@ -3,6 +3,7 @@ NEW_CMD=()
 SKIP_NEXT=0
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+AP_CLIENT_DELAY="${AP_CLIENT_DELAY:-12}"
 
 for arg in "$@"; do
     if [[ $SKIP_NEXT -eq 1 ]]; then
@@ -26,8 +27,16 @@ done
 
 echo "Starting AP Client: ${NEW_CMD[@]}" >> "$DIR/bridge_debug.log"
 
-# 1. Start the C++ background client in the same Proton prefix
-"${NEW_CMD[@]}" &
+# Remove injector processes left behind by an earlier game session. They can
+# reconnect to a new Meathook server and create multiple competing RPC clients.
+pkill -f '[/\\]ap_client\.exe' 2>/dev/null || true
 
-# 2. Start the game
+# Let DOOM and Meathook finish their initial startup before opening the RPC
+# client. AP_CLIENT_DELAY can be overridden in Steam launch options.
+(
+    sleep "$AP_CLIENT_DELAY"
+    "${NEW_CMD[@]}"
+) &
+
+# Start the game immediately.
 exec "$@"
