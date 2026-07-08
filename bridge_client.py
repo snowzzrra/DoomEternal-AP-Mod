@@ -154,7 +154,7 @@ else:
     def prompt_for_dir(title, validation_func, error_msg):
         path = None
         has_tty = sys.stdin and sys.stdin.isatty()
-        
+
         while True:
             try:
                 import tkinter as tk
@@ -166,21 +166,21 @@ else:
                 root.destroy()
             except Exception:
                 pass
-                
+
             if not path and has_tty:
                 print(f"\n{title}")
                 path = input("Enter Path: ").strip()
-                
+
             if not path:
                 raise RuntimeError(f"DOOM Eternal Client Setup cancelled. Please create ap_config.json manually with 'doom_base_dir' and 'save_games_dir'.")
-                
+
             try:
                 normalized = validation_func(path)
             except ValueError:
                 normalized = None
             if normalized:
                 return normalized
-            
+
             if has_tty:
                 print(f"Validation Error: {error_msg}")
             else:
@@ -194,11 +194,16 @@ else:
                     pass
 
     DOOM_BASE_DIR = prompt_for_dir(
-        "Select DOOM Eternal Base Directory (the base folder containing DOOMEternalx64vk.exe)",
+        "Select the DOOM Eternal installation folder or its base folder",
         lambda p: normalize_doom_base_dir(p) if p else None,
-        "Could not find DOOMEternalx64vk.exe and classicwads. Select .../DOOMEternal/base, not .../common/base."
+        (
+            "Could not validate the DOOM Eternal installation. Select either "
+            ".../DOOMEternal or .../DOOMEternal/base. "
+            "DOOMEternalx64vk.exe must be in DOOMEternal and classicwads "
+            "must be inside DOOMEternal/base."
+        ),
     )
-    
+
     SAVE_GAMES_DIR = prompt_for_dir(
         "Select DOOM Saved Games Directory (.../Saved Games/id Software/DOOMEternal/base)",
         lambda p: normalize_save_games_dir(p) if p else None,
@@ -287,63 +292,433 @@ def save_client_state(state):
         os.fsync(file.fileno())
     os.replace(temporary, CLIENT_STATE_FILE)
 
-def discover_steam_remote():
-    configured = config.get("steam_remote_dir")
-    if configured:
-        path = Path(configured).expanduser()
-        inferred_id = 0
-        try:
-            inferred_id = int(path.parents[1].name)
-        except (IndexError, ValueError):
-            pass
-        return path, parse_int(config.get("steam_id3"), inferred_id)
+DOOM_STEAM_APP_ID = "782330"
 
-    def add_remote_glob(candidate_root, discovered):
-        if candidate_root:
-            discovered.extend(Path(candidate_root).joinpath("userdata").glob("*/782330/remote"))
+
+def _unique_existing_paths(paths):
+    unique = []
+    seen = set()
+    for raw_path in paths:
+        if not raw_path:
+            continue
+        try:
+            path = Path(raw_path).expanduser()
+            key = os.path.normcase(os.path.abspath(str(path)))
+        except (OSError, TypeError, ValueError):
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def _windows_steam_roots():
+    """Return likely Steam installation roots on Windows.
+
+    The game library and the Steam installation are often on different drives.
+    Steam userdata normally lives beside the Steam client, so the registry is
+    the primary source instead of the DOOM installation path.
+    """
+    if os.name != "nt":
+        return []
+
+    roots = []
+
+    try:
+        import winreg
+
+        registry_values = [
+            (
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Valve\Steam",
+                "SteamPath",
+            ),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Valve\Steam",
+                "InstallPath",
+            ),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Valve\Steam",
+                "InstallPath",
+            ),
+        ]
+
+        for hive, key_name, value_name in registry_values:
+            try:
+                with winreg.OpenKey(hive, key_name) as key:
+                    value, _ = winreg.QueryValueEx(key, value_name)
+                if value:
+                    roots.append(Path(value))
+            except (FileNotFoundError, OSError):
+                continue
+    except ImportError:
+        pass
+
+    for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES", "PROGRAMW6432"):
+        value = os.environ.get(variable)
+        if value:
+            roots.append(Path(value) / "Steam")
+
+    configured_root = config.get("steam_root_dir")
+    if configured_root:
+        roots.append(Path(configured_root).expanduser())
+
+    return _unique_existing_paths(roots)
+
+
+def _linux_steam_roots():
+    if os.name == "nt":
+        return []
 
     home = Path.home()
     homes = [home]
-    if os.name != "nt" and home.is_absolute():
-        var_home = Path("/var") / home.relative_to("/")
-        if var_home != home:
-            homes.append(var_home)
-    candidates = [
-        path
-        for candidate_home in homes
-        for path in candidate_home.joinpath(
-            ".local/share/Steam/userdata"
-        ).glob("*/782330/remote")
-    ]
-    steam_roots = []
-    program_files = os.environ.get("PROGRAMFILES(X86)")
-    if program_files:
-        steam_roots.append(Path(program_files) / "Steam")
-    program_files_w6432 = os.environ.get("PROGRAMW6432")
-    if program_files_w6432:
-        steam_roots.append(Path(program_files_w6432) / "Steam")
-    configured_steam_root = config.get("steam_root_dir")
-    if configured_steam_root:
-        steam_roots.append(Path(configured_steam_root).expanduser())
+    if home.is_absolute():
+        try:
+            var_home = Path("/var") / home.relative_to("/")
+            if var_home != home:
+                homes.append(var_home)
+        except ValueError:
+            pass
+
+    roots = []
+    for candidate_home in homes:
+        roots.extend(
+            [
+                candidate_home / ".local/share/Steam",
+                candidate_home / ".steam/steam",
+                candidate_home
+                / ".var/app/com.valvesoftware.Steam/data/Steam",
+            ]
+        )
+
+    configured_root = config.get("steam_root_dir")
+    if configured_root:
+        roots.append(Path(configured_root).expanduser())
+
+    return _unique_existing_paths(roots)
+
+
+def _game_library_steam_root():
+    """Return the Steam-library root inferred from the DOOM installation."""
     try:
         doom_base = Path(DOOM_BASE_DIR)
-        for parent in [doom_base, *doom_base.parents]:
-            if parent.name.lower() == "steamapps":
-                steam_roots.append(parent.parent)
-                break
     except NameError:
-        pass
-    for steam_root in steam_roots:
-        add_remote_glob(steam_root, candidates)
+        return None
 
-    for path in candidates:
-        if path.is_dir():
-            return path, int(path.parents[1].name)
-    return Path(), parse_int(config.get("steam_id3"), 0)
+    for parent in [doom_base, *doom_base.parents]:
+        if parent.name.lower() == "steamapps":
+            return parent.parent
+    return None
+
+
+def _steam_roots():
+    roots = []
+    roots.extend(_windows_steam_roots())
+    roots.extend(_linux_steam_roots())
+
+    library_root = _game_library_steam_root()
+    if library_root is not None:
+        roots.append(library_root)
+
+    return _unique_existing_paths(roots)
+
+
+def normalize_steam_remote_dir(path):
+    """Accept remote, 782330, account, userdata, or Steam-root selections."""
+    selected = Path(path).expanduser()
+
+    direct_candidates = [selected]
+    name = selected.name.lower()
+
+    if name == "782330":
+        direct_candidates.insert(0, selected / "remote")
+    elif name.isdigit():
+        direct_candidates.insert(
+            0,
+            selected / DOOM_STEAM_APP_ID / "remote",
+        )
+    elif name == "userdata":
+        direct_candidates.extend(
+            selected.glob(f"*/{DOOM_STEAM_APP_ID}/remote")
+        )
+    else:
+        direct_candidates.extend(
+            (selected / "userdata").glob(
+                f"*/{DOOM_STEAM_APP_ID}/remote"
+            )
+        )
+
+    valid = []
+    for candidate in direct_candidates:
+        try:
+            candidate = candidate.resolve()
+        except OSError:
+            candidate = candidate.absolute()
+
+        if not candidate.is_dir():
+            continue
+        if candidate.name.lower() != "remote":
+            continue
+        if candidate.parent.name != DOOM_STEAM_APP_ID:
+            continue
+
+        try:
+            steam_id3 = int(candidate.parents[1].name)
+        except (IndexError, ValueError):
+            continue
+
+        valid.append((candidate, steam_id3))
+
+    if not valid:
+        raise ValueError(
+            "Expected a DOOM Eternal Steam remote directory such as "
+            "C:/Program Files (x86)/Steam/userdata/<ACCOUNT_ID>/782330/remote"
+        )
+
+    valid.sort(
+        key=lambda pair: _steam_remote_candidate_score(pair[0]),
+        reverse=True,
+    )
+    return valid[0]
+
+
+def _steam_remote_candidate_score(remote):
+    duration_files = list(
+        remote.glob("GAME-AUTOSAVE*/game_duration.dat")
+    )
+    details_files = list(remote.glob("GAME-AUTOSAVE*/game.details"))
+    save_files = duration_files + details_files
+
+    newest_mtime = 0
+    for save_file in save_files:
+        try:
+            newest_mtime = max(
+                newest_mtime,
+                save_file.stat().st_mtime_ns,
+            )
+        except OSError:
+            continue
+
+    return (
+        bool(duration_files),
+        bool(details_files),
+        newest_mtime,
+    )
+
+
+def _discover_steam_remote_candidates():
+    discovered = []
+    seen = set()
+
+    for steam_root in _steam_roots():
+        userdata = steam_root / "userdata"
+        if not userdata.is_dir():
+            continue
+
+        for remote in userdata.glob(
+            f"*/{DOOM_STEAM_APP_ID}/remote"
+        ):
+            try:
+                normalized, steam_id3 = normalize_steam_remote_dir(remote)
+            except ValueError:
+                continue
+
+            key = os.path.normcase(
+                os.path.abspath(str(normalized))
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            discovered.append((normalized, steam_id3))
+
+    discovered.sort(
+        key=lambda pair: _steam_remote_candidate_score(pair[0]),
+        reverse=True,
+    )
+    return discovered
+
+
+def _describe_steam_remote_candidate(remote, steam_id3):
+    duration_files = list(
+        remote.glob("GAME-AUTOSAVE*/game_duration.dat")
+    )
+    details_files = list(remote.glob("GAME-AUTOSAVE*/game.details"))
+    save_files = duration_files + details_files
+
+    newest = None
+    for save_file in save_files:
+        try:
+            mtime = save_file.stat().st_mtime
+        except OSError:
+            continue
+        newest = mtime if newest is None else max(newest, mtime)
+
+    if newest is None:
+        save_description = "no autosave files found yet"
+    else:
+        save_description = time.strftime(
+            "%Y-%m-%d %H:%M:%S",
+            time.localtime(newest),
+        )
+
+    return (
+        f"{remote} (Steam account {steam_id3}; "
+        f"latest save: {save_description})"
+    )
+
+
+def prompt_for_steam_remote(candidates):
+    """Ask only when automatic discovery cannot choose a usable directory."""
+    has_tty = bool(sys.stdin and sys.stdin.isatty())
+
+    if candidates and has_tty:
+        print("\nFound DOOM Eternal Steam save directories:")
+        for index, (remote, steam_id3) in enumerate(candidates, start=1):
+            print(
+                f"  {index}. "
+                f"{_describe_steam_remote_candidate(remote, steam_id3)}"
+            )
+
+        while True:
+            answer = input(
+                f"Choose the active Steam account [1-{len(candidates)}] "
+                "(default 1): "
+            ).strip()
+            if not answer:
+                return candidates[0]
+            try:
+                index = int(answer)
+            except ValueError:
+                index = 0
+            if 1 <= index <= len(candidates):
+                return candidates[index - 1]
+            print("Invalid selection.")
+
+    while True:
+        selected = None
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            selected = filedialog.askdirectory(
+                title=(
+                    "Select Steam userdata account or "
+                    "DOOM Eternal 782330 remote folder"
+                )
+            )
+            root.destroy()
+        except Exception:
+            selected = None
+
+        if not selected and has_tty:
+            print(
+                "\nSelect the Steam directory that contains "
+                "userdata/<ACCOUNT_ID>/782330/remote."
+            )
+            print(
+                "Windows example: "
+                "C:/Program Files (x86)/Steam"
+            )
+            selected = input("Steam path: ").strip()
+
+        if not selected:
+            return None, 0
+
+        try:
+            return normalize_steam_remote_dir(selected)
+        except ValueError as error:
+            if has_tty:
+                print(f"Validation error: {error}")
+                continue
+
+            try:
+                import tkinter as tk
+                import tkinter.messagebox as messagebox
+
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror(
+                    "DOOM Eternal Steam save directory",
+                    str(error),
+                )
+                root.destroy()
+            except Exception:
+                return None, 0
+
+
+def discover_steam_remote():
+    configured = config.get("steam_remote_dir")
+    configured_id = parse_int(config.get("steam_id3"), 0)
+
+    if configured is not None:
+        configured_text = str(configured).strip()
+        if configured_text in ("", ".") or configured_id < 0:
+            logger.warning(
+                "[Setup] Invalid legacy Steam remote configuration "
+                f"detected: {configured_text!r} / ID {configured_id}. "
+                "Running auto-discovery again."
+            )
+            config.pop("steam_remote_dir", None)
+            config.pop("steam_id3", None)
+            save_config()
+            configured = None
+            configured_id = 0
+        else:
+            try:
+                remote, inferred_id = normalize_steam_remote_dir(
+                    configured_text
+                )
+                if configured_id not in (0, inferred_id):
+                    logger.warning(
+                        "[Setup] steam_id3 did not match the userdata "
+                        f"directory; using inferred ID {inferred_id}."
+                    )
+                return remote, inferred_id
+            except ValueError as error:
+                logger.warning(
+                    "[Setup] Stored steam_remote_dir is invalid: "
+                    f"{error}. Running auto-discovery again."
+                )
+                config.pop("steam_remote_dir", None)
+                config.pop("steam_id3", None)
+                save_config()
+
+    candidates = _discover_steam_remote_candidates()
+    if candidates:
+        chosen = candidates[0]
+        if len(candidates) > 1:
+            logger.info(
+                "[Setup] Multiple Steam save directories found. "
+                "Selected the candidate with the newest DOOM Eternal "
+                f"autosave: {_describe_steam_remote_candidate(*chosen)}"
+            )
+        else:
+            logger.info(
+                "[Setup] Steam save directory discovered automatically: "
+                f"{_describe_steam_remote_candidate(*chosen)}"
+            )
+        return chosen
+
+    logger.warning(
+        "[Setup] Could not discover a DOOM Eternal Steam save directory "
+        "automatically. Manual selection is required for DeathLink SEND "
+        "and save-based goal fallback."
+    )
+    return prompt_for_steam_remote(candidates)
 
 
 STEAM_REMOTE_DIR, STEAM_ID3 = discover_steam_remote()
-if STEAM_REMOTE_DIR and STEAM_REMOTE_DIR.is_dir():
+if (
+    STEAM_REMOTE_DIR is not None
+    and STEAM_ID3 > 0
+    and STEAM_REMOTE_DIR.is_dir()
+):
     remote_path = str(STEAM_REMOTE_DIR)
     if (
         config.get("steam_remote_dir") != remote_path
@@ -352,6 +727,19 @@ if STEAM_REMOTE_DIR and STEAM_REMOTE_DIR.is_dir():
         config["steam_remote_dir"] = remote_path
         config["steam_id3"] = STEAM_ID3
         save_config()
+        logger.info(
+            "[Setup] Saved Steam remote configuration: "
+            f"{remote_path} / Steam account {STEAM_ID3}."
+        )
+else:
+    STEAM_REMOTE_DIR = None
+    STEAM_ID3 = 0
+    logger.warning(
+        "[Setup] Steam remote directory is unavailable. "
+        "DeathLink SEND and save-based goal fallback are disabled "
+        "until the path is configured."
+    )
+
 
 DEATH_PROBE = Path(__file__).with_name("save_death_probe.exe")
 DEATH_PROBE_RUNTIME = Path(__file__).parent / f".death-probe-{os.getpid()}"
@@ -388,6 +776,9 @@ def discover_compat_data():
 
 
 def discover_steam_install():
+    if STEAM_REMOTE_DIR is None:
+        return Path()
+
     for parent in STEAM_REMOTE_DIR.parents:
         if parent.name == "userdata":
             return parent.parent
@@ -419,21 +810,38 @@ atexit.register(cleanup_death_probe_runtime)
 
 
 def newest_save_file(filename):
-    if not STEAM_ID3 or not STEAM_REMOTE_DIR.is_dir():
+    if (
+        STEAM_REMOTE_DIR is None
+        or STEAM_ID3 <= 0
+        or not STEAM_REMOTE_DIR.is_dir()
+    ):
         return None
-    candidates = sorted(
-        STEAM_REMOTE_DIR.glob(f"GAME-AUTOSAVE*/{filename}"),
-        key=lambda path: path.stat().st_mtime_ns,
-        reverse=True,
-    )
-    return candidates[0] if candidates else None
+
+    candidates = []
+    for path in STEAM_REMOTE_DIR.glob(f"GAME-AUTOSAVE*/{filename}"):
+        try:
+            mtime = path.stat().st_mtime_ns
+        except OSError:
+            continue
+        candidates.append((mtime, path))
+
+    candidates.sort(key=lambda pair: pair[0], reverse=True)
+    return candidates[0][1] if candidates else None
 
 
 def death_probe_available():
-    if not DEATH_PROBE.is_file() or not OODLE_DLL.is_file():
+    if (
+        STEAM_REMOTE_DIR is None
+        or STEAM_ID3 <= 0
+        or not STEAM_REMOTE_DIR.is_dir()
+        or not DEATH_PROBE.is_file()
+        or not OODLE_DLL.is_file()
+    ):
         return False
+
     if os.name == "nt":
         return True
+
     return (
         PROTON_PATH.is_file()
         and STEAM_COMPAT_DATA.is_dir()
@@ -487,8 +895,9 @@ def probe_checkpoint_death(path):
         command,
         cwd=DEATH_PROBE_RUNTIME,
         env=environment,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
         timeout=10,
         check=False,
     )
@@ -496,7 +905,13 @@ def probe_checkpoint_death(path):
         return True
     if result.returncode == 0:
         return False
-    raise RuntimeError(f"save_death_probe exited with code {result.returncode}")
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    raise RuntimeError(
+        "save_death_probe exited with code "
+        f"{result.returncode}; stdout={stdout!r}; stderr={stderr!r}"
+    )
 
 
 # Load item definitions
@@ -689,10 +1104,10 @@ def rpc_execution_enabled():
 
 def read_telemetry_dump():
     files = telemetry_dump_files()
-    
+
     if not files:
         return [], None
-        
+
     latest_file = max(files, key=os.path.getmtime)
     try:
         if time.time() - os.path.getmtime(latest_file) < 0.5:
@@ -702,7 +1117,7 @@ def read_telemetry_dump():
 
     checks_found = set()
     map_name = None
-    
+
     try:
         with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
@@ -715,7 +1130,7 @@ def read_telemetry_dump():
                     match = re.search(r'(ap_check_[a-z0-9_]+)', lower_line)
                     if match:
                         checks_found.add(match.group(1).upper())
-                        
+
         cleanup_telemetry_dumps()
 
         return list(checks_found), map_name
@@ -864,7 +1279,25 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output(f"Telemetry directory: {INV_DUMP_DIR}")
         self.output(f"Check event files: {len(check_event_files())}")
         self.output(f"Telemetry dump files: {len(telemetry_dump_files())}")
-        self.output(f"Steam remote directory: {STEAM_REMOTE_DIR}")
+        remote_display = (
+            str(STEAM_REMOTE_DIR)
+            if STEAM_REMOTE_DIR is not None
+            else "NOT FOUND"
+        )
+        self.output(f"Steam remote directory: {remote_display}")
+        self.output(f"Steam account ID: {STEAM_ID3 or 'NOT FOUND'}")
+        duration_path = newest_save_file("game_duration.dat")
+        self.output(
+            "Active game_duration.dat: "
+            f"{duration_path if duration_path else 'NOT FOUND'}"
+        )
+        self.output(
+            f"Death probe executable: "
+            f"{DEATH_PROBE if DEATH_PROBE.is_file() else 'NOT FOUND'}"
+        )
+        self.output(
+            f"Oodle DLL: {OODLE_DLL if OODLE_DLL.is_file() else 'NOT FOUND'}"
+        )
         self.output(f"DeathLink enabled: {getattr(self.ctx, 'death_link_enabled', False)}")
         self.output(
             f"Received DeathLink pending: "
@@ -1453,7 +1886,7 @@ class DoomEternalContext(CommonContext):
                 if not self.repair_item_mappings():
                     await asyncio.sleep(0.25)
                     continue
-                    
+
                 # Auto-RPC Resume Check
                 if not rpc_execution_enabled():
                     ready_path = os.path.join(INV_DUMP_DIR, "ap_telemetry_ready.txt")
@@ -1552,7 +1985,7 @@ async def amain(launch_args=None):
         )
     else:
         logger.info(f"Auto-connecting to {args.connect} as {args.name}...")
-    
+
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
 
     if gui_enabled:
