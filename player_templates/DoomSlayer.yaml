@@ -1,0 +1,7 @@
+name: DoomSlayer
+game: Doom Eternal
+Doom Eternal:
+  randomize_chainsaw: true
+  randomize_dash: true
+  randomize_first_battery: true
+  death_link: true

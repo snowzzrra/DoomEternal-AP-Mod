@@ -1,0 +1,7 @@
+name: Marine
+game: Doom Eternal
+Doom Eternal:
+  randomize_chainsaw: false
+  randomize_dash: false
+  randomize_first_battery: false
+  death_link: true
