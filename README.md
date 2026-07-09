@@ -176,7 +176,7 @@ registry.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip
+DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha-dev.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -217,7 +217,7 @@ the credits.
 
 ## Install from the PTB ZIP
 
-1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip` to a permanent
+1. Extract `DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha-dev.zip` to a permanent
    directory.
 2. Open `doometernal.apworld` with `ArchipelagoLauncher`, then restart the
    launcher.
