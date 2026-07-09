@@ -4,11 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
-GAME_BASE="${DOOM_GAME_BASE:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base}"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
+MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
+VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
 RELEASE_VERSION="v0.1.1-ptb"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
+GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
+GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
+BUILD_LOG="$OUTPUT_DIR/build/build.log"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
@@ -17,76 +21,110 @@ if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json
 fi
 
 extract_and_build() {
-    local resource_path="$1"
-    local relative_entities_path="$2"
-    local config_name="$3"
+    local map_key="$1"
+    local source_file="$2"
+    local source_sha256="$3"
+    local config_path="$4"
+    local manifest_path="$5"
+    local resource_path="$6"
+    local relative_entities_path="$7"
+    local supported_game_revision="$8"
     local resource_name
     resource_name="$(basename "$resource_path" .resources)"
-    local source_resource="$GAME_BASE/$resource_path"
-    if [[ -f "${source_resource}.backup" ]]; then
-        source_resource="${source_resource}.backup"
-    fi
-
-    local extract_dir="$TEMP_DIR/extracted/$config_name"
-    local extracted_file="$extract_dir/maps/$relative_entities_path"
-    local decompressed_file="$TEMP_DIR/decompressed/$config_name.entities"
-    local generated_file="$TEMP_DIR/generated/$config_name.entities"
-    local generated_manifest="$TEMP_DIR/manifests/$config_name.json"
+    local source_map="$VANILLA_MAPS_DIR/$source_file"
+    local generated_file="$GENERATED_MAPS_DIR/$map_key.entities"
+    local generated_manifest="$GENERATED_MANIFESTS_DIR/$map_key.json"
     local packaged_file="$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
+    local source_hash_before
+    local source_hash_after
+    local generated_hash
+    local source_size
 
-    mkdir -p "$extract_dir" "$(dirname "$decompressed_file")" \
-        "$(dirname "$generated_file")" "$(dirname "$generated_manifest")" \
-        "$(dirname "$packaged_file")"
+    mkdir -p "$(dirname "$generated_file")" "$(dirname "$generated_manifest")" \
+        "$(dirname "$packaged_file")" "$(dirname "$BUILD_LOG")"
 
-    "$TOOLS_DIR/EternalResourceExtractor" \
-        "$source_resource" "$extract_dir" --quiet --filter='*.entities'
-
-    if [[ ! -f "$extracted_file" ]]; then
-        echo "Expected entities file was not extracted: $extracted_file" >&2
+    if [[ ! -f "$source_map" ]]; then
+        echo "Missing vanilla source for $map_key: $source_map" >&2
         return 1
     fi
 
-    "$TOOLS_DIR/idFileDeCompressor" --decompress \
-        "$extracted_file" "$decompressed_file"
+    source_hash_before="$(sha256sum "$source_map" | awk '{print $1}')"
+    source_size="$(stat -c %s "$source_map")"
+    if [[ "$source_hash_before" != "$source_sha256" ]]; then
+        echo "Vanilla source hash mismatch for $map_key: expected $source_sha256, got $source_hash_before. Supported revision: $supported_game_revision" >&2
+        return 1
+    fi
+
+    echo "[$map_key] source=$source_map size=$source_size sha256=$source_hash_before revision=$supported_game_revision" | tee -a "$BUILD_LOG"
 
     python3 "$SCRIPT_DIR/ap_map_generator.py" \
-        --input "$decompressed_file" \
+        --input "$source_map" \
         --output "$generated_file" \
-        --config "$SCRIPT_DIR/level_configs/$config_name.json" \
+        --config "$SCRIPT_DIR/$config_path" \
         --manifest "$generated_manifest" \
         --items "$SCRIPT_DIR/data/items.json"
+
+    source_hash_after="$(sha256sum "$source_map" | awk '{print $1}')"
+    if [[ "$source_hash_after" != "$source_hash_before" ]]; then
+        echo "Vanilla source was modified during build for $map_key: $source_map" >&2
+        return 1
+    fi
+
+    generated_hash="$(sha256sum "$generated_file" | awk '{print $1}')"
+    echo "[$map_key] generated=$generated_file sha256=$generated_hash" | tee -a "$BUILD_LOG"
 
     python3 -c \
         'import json,sys; expected=json.load(open(sys.argv[1])); actual=json.load(open(sys.argv[2])); \
 only_expected=sorted(set(expected)-set(actual)); only_actual=sorted(set(actual)-set(expected)); \
 value_mismatch=[(k, expected[k], actual[k]) for k in sorted(set(expected)&set(actual)) if expected[k]!=actual[k]]; \
 assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_expected={only_expected} | only_actual={only_actual} | value_mismatch={value_mismatch}"' \
-        "$SCRIPT_DIR/manifests/$config_name.json" "$generated_manifest"
+        "$SCRIPT_DIR/$manifest_path" "$generated_manifest"
 
     "$TOOLS_DIR/idFileDeCompressor" --compress \
         "$generated_file" "$packaged_file"
 }
 
 rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds"
+mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
+    "$GENERATED_MAPS_DIR"
 cp -R "$SCRIPT_DIR/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 
-extract_and_build \
-    "game/sp/e1m1_intro/e1m1_intro_patch3.resources" \
-    "game/sp/e1m1_intro/e1m1_intro.entities" \
-    "e1m1_intro"
-extract_and_build \
-    "game/sp/e1m2_battle/e1m2_battle_patch3.resources" \
-    "game/sp/e1m2_battle/e1m2_battle.entities" \
-    "e1m2_war"
-extract_and_build \
-    "game/hub/hub_patch2.resources" \
-    "game/hub/hub.entities" \
-    "hub"
-extract_and_build \
-    "game/sp/e1m3_cult/e1m3_cult_patch3.resources" \
-    "game/sp/e1m3_cult/e1m3_cult.entities" \
-    "e1m3_cult"
+mapfile -t MAP_ROWS < <(
+    python3 - "$MAP_SOURCES_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as file:
+    map_sources = json.load(file).get("maps", {})
+
+for map_key, source in map_sources.items():
+    if not source.get("enabled", True):
+        continue
+    print("\t".join([
+        map_key,
+        source["source_file"],
+        source["source_sha256"],
+        source["level_config"],
+        source["manifest"],
+        source["resource_path"],
+        source["relative_entities_path"],
+        source["supported_game_revision"],
+    ]))
+PY
+)
+
+for map_row in "${MAP_ROWS[@]}"; do
+    IFS=$'\t' read -r map_key source_file source_sha256 config_path manifest_path resource_path relative_entities_path supported_game_revision <<< "$map_row"
+    extract_and_build \
+        "$map_key" \
+        "$source_file" \
+        "$source_sha256" \
+        "$config_path" \
+        "$manifest_path" \
+        "$resource_path" \
+        "$relative_entities_path" \
+        "$supported_game_revision"
+done
 
 cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
@@ -163,3 +201,4 @@ chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
 echo "Playable test build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
 echo "Linux/Windows test bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
+echo "Build log: $BUILD_LOG"

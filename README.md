@@ -18,7 +18,7 @@ sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
 Current PTB scope:
 
 - Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
-- Content: `78` map checks + `1` runtime goal
+- Content: `82` map checks + `1` runtime goal
 - Goal: report completion when the runtime sees
   `ap_transition_e1m3_cult_to_e1m4_boss.evt`
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
@@ -150,6 +150,28 @@ game/sp/e1m3_cult/e1m3_cult -> game/sp/e1m4_boss/e1m4_boss
 ```
 
 ## Release package
+
+## Vanilla map sources
+
+Official builds now use `vanillamaps/*.map` as the canonical local input for
+the supported maps. `build_playable_test.sh` reads `data/map_sources.json`,
+verifies the expected SHA-256 for each enabled dump, generates fresh
+`build/generated-maps/*.entities`, and only then compresses those outputs into
+the release ZIP.
+
+When the installed game revision changes:
+
+1. Extract the relevant `*.resources` or `*.resources.backup` files again.
+2. Decompress them into `vanillamaps/<map>.map`.
+3. Confirm the dump does not contain `AP_CHECK_`, `ap_rpc_v3_`, `ap_notify_`,
+   `ap_event_`, or `ap_rpc_auto_enable`.
+4. Update `data/map_sources.json` with the new `source_sha256` and
+   `supported_game_revision`.
+5. Re-run `./validate_all.sh` and `./build_playable_test.sh`.
+
+If the installed resource is already contaminated by a previous AP patch, use
+the clean `*.backup` variant or another known-vanilla dump before updating the
+registry.
 
 `build_playable_test.sh` produces:
 
@@ -290,6 +312,9 @@ working directory. Only one `ap_client.exe` should exist at a time.
   `Slayer Gate Key` pickup instead.
 - Rocket Launcher is in PTB scope, but Cultist Base’s scripted route can still
   require checkpoint recovery if the player already owns it.
+- Secret Encounters are AP checks in Exultia and Cultist Base.
+- Mission Complete remains a runtime location only for Cultist Base.
+- The first Fortress Suit Point remains vanilla pending safer validation.
 
 ## Known issues
 
@@ -314,21 +339,29 @@ working directory. Only one `ap_client.exe` should exist at a time.
 - The Cultist Base Rocket Launcher route can still stall a scripted door if the
   player already owns the weapon early; checkpoint restart is the current
   recovery.
-- Secret Encounters and Mission Challenges are not AP checks in the PTB.
+- Secret Encounter hooks still need directed playtest for timeout, retry,
+  checkpoint reload, and Mission Select duplication behavior.
+- Mission Challenges are still not AP checks in the PTB.
 
 ## Roadmap
 
 ### 0.1.1 PTB — Runtime stabilization
 
-- Freeze the current route through Cultist Base: `78` map checks plus `1`
+- Freeze the current route through Cultist Base: `82` map checks plus `1`
   runtime goal.
 - Pin the validated Meathook and mod-installation versions and improve local
   diagnostic logs.
 - Prevent silent item loss on RPC failure, add recovery behavior, and complete
   Windows/Linux smoke testing.
 
-### 0.2.x Pre-Alpha — Campaign expansion
+### 0.2.x Pre-Alpha — Campaign expansion & Optional systems foundation
 
+- Keep the same route and avoid adding new maps during inicial stages.
+- Expand Secret Encounters, mission-completion plumbing, and optional reward
+  systems only where native hooks are trustworthy.
+- Investigate Suit Points, Suit Upgrades, Sentinel Batteries, and future
+  Slayer Gate/Empyrean Key support without freezing their final balance model
+  yet.
 - Add the remaining base-game missions incrementally using the existing
   `.entities` condumps.
 - Generalize manifests, mission-completion checks, region rules, and per-map
