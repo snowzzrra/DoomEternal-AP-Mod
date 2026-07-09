@@ -187,7 +187,7 @@ def main() -> int:
                     errors.append(
                         f"Progressive perk command {item_id} must define unique player perks"
                     )
-                if item_id in {7770017, 7770088, 7770092} and (
+                if item_id in {7770017, 7770088, 7770125} and (
                     not isinstance(perks, list)
                     or len(perks) != 4
                     or not all(
