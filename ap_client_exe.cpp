@@ -1,16 +1,22 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <io.h>
+#include <tlhelp32.h>
+#include <winver.h>
+#include <cstdlib>
 #include <stdio.h>
 #include <algorithm>
 #include <array>
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
+#include "ap_client_path_utils.h"
 #include "game_state_probe.h"
 #include "mhclient.h"
 
@@ -21,9 +27,13 @@ static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kGoalEventPath = "base\\ap_transition_e1m3_cult_to_e1m4_boss.evt";
 static const char* kCultistBaseMap = "game/sp/e1m3_cult/e1m3_cult";
 static const char* kDoomHunterBaseMap = "game/sp/e1m4_boss/e1m4_boss";
+static const char* kReleaseVersion = "v0.1.1-ptb";
+static const char* kRpcEntityPrefix = "ap_rpc_v3";
+static const int kItemMappingRevision = 3;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kGoalMonitorPollMs = 1000;
+static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 struct CommandJob {
     std::string path;
@@ -34,6 +44,31 @@ struct SaveSnapshot {
     std::string path;
     std::string mapName;
     long long mtimeToken = 0;
+};
+
+struct QueueSnapshot {
+    size_t pending = 0;
+    size_t processing = 0;
+    size_t failed = 0;
+};
+
+struct MeathookPreflightResult {
+    bool xinputPresent = false;
+    bool hashValidated = false;
+    bool deliveryAllowed = false;
+    bool multipleSuspiciousLoaders = false;
+    bool probableProton = false;
+    XinputDllMode dllMode = XinputDllMode::Missing;
+    std::string xinputPath;
+    std::string gameRootCandidate;
+    std::string clientCandidate;
+    std::string sha256;
+    std::string fileVersion;
+    std::string productVersion;
+    unsigned long long sizeBytes = 0;
+    std::string lastWriteLocal;
+    std::vector<std::string> suspiciousLoaders;
+    std::vector<std::string> protonSignals;
 };
 
 void LogDebug(const std::string& message) {
@@ -218,6 +253,362 @@ bool ComputeSha256(
     return CryptoSucceeded(status);
 }
 
+std::string DigestToHex(const std::array<unsigned char, 32>& digest) {
+    std::ostringstream output;
+    output << std::hex << std::setfill('0');
+    for (unsigned char byte : digest) {
+        output << std::setw(2) << static_cast<int>(byte);
+    }
+    return output.str();
+}
+
+std::string ReadBinaryFile(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return {};
+    }
+    return std::string(
+        (std::istreambuf_iterator<char>(input)),
+        std::istreambuf_iterator<char>()
+    );
+}
+
+std::string FormatLocalFileTime(const FILETIME& fileTime) {
+    FILETIME localFileTime = {};
+    SYSTEMTIME localSystemTime = {};
+    if (!FileTimeToLocalFileTime(&fileTime, &localFileTime)
+            || !FileTimeToSystemTime(&localFileTime, &localSystemTime)) {
+        return "UNKNOWN";
+    }
+    char buffer[32] = {};
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%04u-%02u-%02u %02u:%02u:%02u",
+        localSystemTime.wYear,
+        localSystemTime.wMonth,
+        localSystemTime.wDay,
+        localSystemTime.wHour,
+        localSystemTime.wMinute,
+        localSystemTime.wSecond
+    );
+    return buffer;
+}
+
+std::string FormatVersionNumber(DWORD ms, DWORD ls) {
+    std::ostringstream output;
+    output
+        << HIWORD(ms) << '.'
+        << LOWORD(ms) << '.'
+        << HIWORD(ls) << '.'
+        << LOWORD(ls);
+    return output.str();
+}
+
+std::string GetFixedFileVersion(const std::filesystem::path& path, bool productVersion) {
+    DWORD handle = 0;
+    const DWORD infoSize = GetFileVersionInfoSizeA(path.string().c_str(), &handle);
+    if (infoSize == 0) {
+        return "UNKNOWN";
+    }
+
+    std::vector<char> info(infoSize);
+    if (!GetFileVersionInfoA(path.string().c_str(), 0, infoSize, info.data())) {
+        return "UNKNOWN";
+    }
+
+    VS_FIXEDFILEINFO* fixedInfo = nullptr;
+    UINT fixedInfoSize = 0;
+    if (!VerQueryValueA(info.data(), "\\", reinterpret_cast<LPVOID*>(&fixedInfo), &fixedInfoSize)
+            || fixedInfo == nullptr
+            || fixedInfoSize < sizeof(VS_FIXEDFILEINFO)) {
+        return "UNKNOWN";
+    }
+
+    return productVersion
+        ? FormatVersionNumber(fixedInfo->dwProductVersionMS, fixedInfo->dwProductVersionLS)
+        : FormatVersionNumber(fixedInfo->dwFileVersionMS, fixedInfo->dwFileVersionLS);
+}
+
+QueueSnapshot CountQueueFiles() {
+    QueueSnapshot snapshot;
+    std::error_code error;
+    const std::filesystem::path queueDir(kQueueDirectory);
+    if (!std::filesystem::is_directory(queueDir, error)) {
+        return snapshot;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(queueDir, error)) {
+        if (error || !entry.is_regular_file(error)) {
+            continue;
+        }
+        const std::string extension = entry.path().extension().string();
+        if (extension == ".cmd") {
+            ++snapshot.pending;
+        } else if (extension == ".processing") {
+            ++snapshot.processing;
+        } else if (extension == ".failed") {
+            ++snapshot.failed;
+        }
+    }
+    return snapshot;
+}
+
+DWORD CountProcessesNamed(const char* executableName) {
+    DWORD count = 0;
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    PROCESSENTRY32 entry = {};
+    entry.dwSize = sizeof(entry);
+    if (Process32First(snapshot, &entry)) {
+        do {
+            if (_stricmp(entry.szExeFile, executableName) == 0) {
+                ++count;
+            }
+        } while (Process32Next(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    return count;
+}
+
+std::string CurrentWorkingDirectory() {
+    std::error_code error;
+    const std::filesystem::path current = std::filesystem::current_path(error);
+    return error ? "UNKNOWN" : current.string();
+}
+
+std::string CommandIdFromPath(const std::string& path) {
+    return std::filesystem::path(path).stem().string();
+}
+
+const char* RpcCallResultName(RpcCallResult result) {
+    switch (result) {
+    case PIPE_NOT_FOUND:
+        return "PIPE_NOT_FOUND";
+    case PIPE_BUSY:
+        return "PIPE_BUSY";
+    case WAIT_NAMED_PIPE_TIMEOUT:
+        return "WAIT_NAMED_PIPE_TIMEOUT";
+    case RPC_CALL_DELIVERED:
+        return "RPC_CALL_DELIVERED";
+    case RPC_EXCEPTION:
+        return "RPC_EXCEPTION";
+    case UNKNOWN_TRANSPORT_ERROR:
+        return "UNKNOWN_TRANSPORT_ERROR";
+    case RPC_CALL_RESULT_NONE:
+    default:
+        return "RPC_CALL_RESULT_NONE";
+    }
+}
+
+MeathookPreflightResult InspectMeathookInstallation(const RuntimePathInfo& runtimePaths) {
+    MeathookPreflightResult result;
+    result.probableProton = runtimePaths.probableProton;
+    result.protonSignals = runtimePaths.protonSignals;
+    result.gameRootCandidate = runtimePaths.gameRootDllCandidate.string();
+    result.clientCandidate = runtimePaths.clientDllCandidate.string();
+
+    const XinputDllSelection selectedDll = SelectXinputDllCandidate(runtimePaths);
+    result.dllMode = selectedDll.mode;
+    result.xinputPath = selectedDll.selectedPath.string();
+    if (selectedDll.mode == XinputDllMode::Missing) {
+        return result;
+    }
+
+    WIN32_FILE_ATTRIBUTE_DATA attributes = {};
+    if (!GetFileAttributesExA(
+            selectedDll.selectedPath.string().c_str(),
+            GetFileExInfoStandard,
+            &attributes
+        )) {
+        return result;
+    }
+
+    result.xinputPresent = true;
+    result.sizeBytes =
+        (static_cast<unsigned long long>(attributes.nFileSizeHigh) << 32)
+        | attributes.nFileSizeLow;
+    result.lastWriteLocal = FormatLocalFileTime(attributes.ftLastWriteTime);
+    result.fileVersion = GetFixedFileVersion(selectedDll.selectedPath, false);
+    result.productVersion = GetFixedFileVersion(selectedDll.selectedPath, true);
+
+    const std::string contents = ReadBinaryFile(selectedDll.selectedPath);
+    if (!contents.empty()) {
+        std::array<unsigned char, 32> digest = {};
+        if (ComputeSha256(contents, digest)) {
+            result.sha256 = DigestToHex(digest);
+        }
+    }
+
+    for (const char* candidate : { "xinput1_4.dll", "dinput8.dll", "dxgi.dll", "version.dll" }) {
+        const std::filesystem::path candidatePath = runtimePaths.gameRootDir / candidate;
+        if (std::filesystem::exists(candidatePath)) {
+            result.suspiciousLoaders.push_back(candidatePath.string());
+        }
+    }
+    result.multipleSuspiciousLoaders = result.suspiciousLoaders.size() > 1;
+
+    if (!result.sha256.empty()) {
+        for (const char* validatedHash : kValidatedXinputSha256) {
+            if (result.sha256 == validatedHash) {
+                result.hashValidated = true;
+                break;
+            }
+        }
+    }
+
+    result.deliveryAllowed =
+        result.xinputPresent && (result.hashValidated || kValidatedXinputSha256.empty());
+    return result;
+}
+
+void LogStartupHeader(
+    const std::string& executablePath,
+    const std::string& workingDirectory,
+    const std::string& doomExecutablePath,
+    const QueueSnapshot& queueSnapshot,
+    const MeathookPreflightResult& preflight,
+    const RuntimePathInfo& runtimePaths
+) {
+    SYSTEMTIME utcNow = {};
+    SYSTEMTIME localNow = {};
+    GetSystemTime(&utcNow);
+    GetLocalTime(&localNow);
+
+    char utcTimestamp[40] = {};
+    char localTimestamp[40] = {};
+    snprintf(
+        utcTimestamp,
+        sizeof(utcTimestamp),
+        "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",
+        utcNow.wYear,
+        utcNow.wMonth,
+        utcNow.wDay,
+        utcNow.wHour,
+        utcNow.wMinute,
+        utcNow.wSecond,
+        utcNow.wMilliseconds
+    );
+    snprintf(
+        localTimestamp,
+        sizeof(localTimestamp),
+        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+        localNow.wYear,
+        localNow.wMonth,
+        localNow.wDay,
+        localNow.wHour,
+        localNow.wMinute,
+        localNow.wSecond,
+        localNow.wMilliseconds
+    );
+
+    OSVERSIONINFOEXA versionInfo = {};
+    versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
+    GetVersionExA(reinterpret_cast<OSVERSIONINFOA*>(&versionInfo));
+
+    const std::string architecture =
+#if defined(_WIN64)
+        "x86_64";
+#else
+        "x86";
+#endif
+
+    LogDebug("=== AP Client startup header ===");
+    LogDebug(std::string("PTB version: ") + kReleaseVersion);
+    LogDebug(std::string("Build ID: ") + __DATE__ + " " + __TIME__);
+    LogDebug(std::string("UTC time: ") + utcTimestamp);
+    LogDebug(std::string("Local time: ") + localTimestamp);
+    LogDebug(std::string("Executable architecture: ") + architecture);
+    LogDebug(
+        "Windows version: "
+        + std::to_string(versionInfo.dwMajorVersion) + "."
+        + std::to_string(versionInfo.dwMinorVersion) + "."
+        + std::to_string(versionInfo.dwBuildNumber)
+    );
+    LogDebug("PID: " + std::to_string(GetCurrentProcessId()));
+    LogDebug("Working directory: " + workingDirectory);
+    LogDebug("Executable path: " + executablePath);
+    LogDebug("Client directory: " + runtimePaths.clientDir.string());
+    LogDebug("DOOMEternalx64vk.exe path: " + doomExecutablePath);
+    LogDebug("base path: " + std::filesystem::absolute(workingDirectory).string());
+    LogDebug(
+        "queue path: "
+        + std::filesystem::absolute(std::filesystem::path(kQueueDirectory)).string()
+    );
+    LogDebug(
+        "gate path: "
+        + std::filesystem::absolute(std::filesystem::path(kRpcGatePath)).string()
+    );
+    LogDebug(
+        "Queue snapshot: pending=" + std::to_string(queueSnapshot.pending)
+        + " processing=" + std::to_string(queueSnapshot.processing)
+        + " failed=" + std::to_string(queueSnapshot.failed)
+    );
+    LogDebug("Another ap_client.exe instance detected: no (single-instance mutex acquired).");
+    LogDebug(
+        "Other DOOM processes detected: "
+        + std::to_string(CountProcessesNamed("DOOMEternalx64vk.exe"))
+    );
+    LogDebug("Offset profile: steam-6.66-rev-3.1");
+    LogDebug(std::string("RPC_ENTITY_PREFIX: ") + kRpcEntityPrefix);
+    LogDebug("ITEM_MAPPING_REVISION: " + std::to_string(kItemMappingRevision));
+    LogDebug(
+        std::string("Runtime mode: ")
+        + (preflight.probableProton ? "Proton-compatible/client-local DLL allowed" : "Windows-native/game-root DLL required")
+    );
+    LogDebug("Game root DLL candidate: " + preflight.gameRootCandidate);
+    LogDebug("Client DLL candidate: " + preflight.clientCandidate);
+    if (!preflight.protonSignals.empty()) {
+        for (const std::string& signal : preflight.protonSignals) {
+            LogDebug("Proton signal: " + signal);
+        }
+    }
+    for (const std::filesystem::path& configPath : runtimePaths.configCandidates) {
+        LogDebug("Config candidate: " + configPath.string());
+    }
+    LogDebug(std::string("Meathook XINPUT1_3.dll path: ") + preflight.xinputPath);
+    LogDebug(
+        "Meathook XINPUT1_3.dll present: "
+        + std::string(preflight.xinputPresent ? "yes" : "no")
+    );
+    if (preflight.xinputPresent) {
+        LogDebug(
+            std::string("Meathook XINPUT1_3.dll source: ")
+            + (preflight.dllMode == XinputDllMode::GameRoot
+                ? "game-root candidate"
+                : "client-local Proton candidate")
+        );
+    }
+    if (preflight.xinputPresent) {
+        LogDebug("Meathook XINPUT1_3.dll size: " + std::to_string(preflight.sizeBytes));
+        LogDebug("Meathook XINPUT1_3.dll last write: " + preflight.lastWriteLocal);
+        LogDebug("Meathook XINPUT1_3.dll SHA-256: " + preflight.sha256);
+        LogDebug("Meathook XINPUT1_3.dll FileVersion: " + preflight.fileVersion);
+        LogDebug("Meathook XINPUT1_3.dll ProductVersion: " + preflight.productVersion);
+    }
+    LogDebug(
+        "Meathook XINPUT1_3.dll hash validated: "
+        + std::string(preflight.hashValidated ? "yes" : "no")
+    );
+    if (kValidatedXinputSha256.empty()) {
+        LogDebug("Validated Meathook hash list: not configured in this build.");
+    } else {
+        LogDebug("Validated Meathook hash list: configured.");
+    }
+    if (!preflight.suspiciousLoaders.empty()) {
+        for (const std::string& loaderPath : preflight.suspiciousLoaders) {
+            LogDebug("Suspicious proxy DLL present: " + loaderPath);
+        }
+    }
+    if (preflight.multipleSuspiciousLoaders) {
+        LogDebug("WARNING: multiple proxy DLL candidates are present in the DOOM root.");
+    }
+    LogDebug("=== End startup header ===");
+}
+
 bool Aes128GcmDecrypt(
     const std::array<unsigned char, 16>& key,
     const std::vector<unsigned char>& nonce,
@@ -336,8 +727,8 @@ bool Aes128GcmDecrypt(
 
 class GoalTransitionMonitor {
 public:
-    explicit GoalTransitionMonitor(const std::filesystem::path& executableDirectory)
-        : executableDirectory_(executableDirectory) {}
+    explicit GoalTransitionMonitor(const RuntimePathInfo& runtimePaths)
+        : runtimePaths_(runtimePaths) {}
 
     void Poll() {
         const DWORD now = GetTickCount();
@@ -368,21 +759,47 @@ public:
 
 private:
     bool EnsureConfigured() {
+        const DWORD now = GetTickCount();
         if (configured_) {
-            return !steamRemoteDir_.empty() && steamId3_ != 0;
+            return true;
         }
+        if (now < nextConfigRetryTick_) {
+            return false;
+        }
+        nextConfigRetryTick_ = now + 5000;
 
-        configured_ = true;
-        const std::filesystem::path configPath = executableDirectory_ / "ap_config.json";
-        const std::string configContents = ReadTextFile(configPath);
-        if (configContents.empty()) {
+        const std::optional<std::filesystem::path> configPath =
+            FindFirstExistingPath(runtimePaths_.configCandidates);
+        if (!configPath.has_value()) {
+            std::ostringstream message;
+            message
+                << "[Goal] Config not found yet. Run/setup the DOOM Eternal Client "
+                << "once, then restart ap_client.exe if needed. Tried:";
+            for (const std::filesystem::path& path : runtimePaths_.configCandidates) {
+                message << " " << path.string();
+            }
             if (!loggedConfigurationFailure_) {
-                LogDebug("[Goal] Goal transition monitor disabled: ap_config.json not found next to ap_client.exe.");
+                LogDebug(message.str());
                 loggedConfigurationFailure_ = true;
             }
             return false;
         }
 
+        const std::string configContents = ReadTextFile(*configPath);
+        if (configContents.empty()) {
+            if (!loggedConfigurationFailure_) {
+                LogDebug(
+                    "[Goal] Config file exists but could not be read: "
+                    + configPath->string()
+                );
+                loggedConfigurationFailure_ = true;
+            }
+            return false;
+        }
+        loggedConfigurationFailure_ = false;
+
+        steamRemoteDir_.clear();
+        steamId3_ = 0;
         if (const auto configuredRemote = ExtractJsonString(configContents, "steam_remote_dir")) {
             steamRemoteDir_ = *configuredRemote;
         }
@@ -392,7 +809,11 @@ private:
 
         if (steamRemoteDir_.empty()) {
             if (!loggedConfigurationFailure_) {
-                LogDebug("[Goal] Goal transition monitor disabled: steam_remote_dir missing from ap_config.json.");
+                LogDebug(
+                    "[Goal] steam_remote_dir missing from " + configPath->string()
+                    + ". Complete setup in the DOOM Eternal Client, then restart "
+                    + "ap_client.exe if needed."
+                );
                 loggedConfigurationFailure_ = true;
             }
             return false;
@@ -409,12 +830,16 @@ private:
 
         if (steamId3_ == 0) {
             if (!loggedConfigurationFailure_) {
-                LogDebug("[Goal] Goal transition monitor disabled: steam_id3 missing and could not be inferred.");
+                LogDebug(
+                    "[Goal] steam_id3 missing and could not be inferred from "
+                    + configPath->string() + "."
+                );
                 loggedConfigurationFailure_ = true;
             }
             return false;
         }
 
+        configured_ = true;
         LogDebug(
             "[Goal] Monitoring encrypted game.details for Cultist Base transition via "
             + steamRemoteDir_ + "."
@@ -605,7 +1030,7 @@ private:
         );
     }
 
-    std::filesystem::path executableDirectory_;
+    RuntimePathInfo runtimePaths_;
     bool configured_ = false;
     bool loggedConfigurationFailure_ = false;
     bool loggedRemoteFailure_ = false;
@@ -614,6 +1039,7 @@ private:
     SaveSnapshot lastSnapshot_;
     unsigned long long sequence_ = 0;
     DWORD nextPollTick_ = 0;
+    DWORD nextConfigRetryTick_ = 0;
 };
 
 bool ReadCommandFile(const std::string& path, std::string& command) {
@@ -676,7 +1102,10 @@ void ImportSpoolFiles(std::deque<CommandJob>& queue) {
         std::string command;
         if (ReadCommandFile(processingPath, command)) {
             queue.push_back({processingPath, command});
-            LogDebug("Queued command: " + command);
+            LogDebug(
+                "Queued command: command_id=" + CommandIdFromPath(processingPath)
+                + " command=" + command
+            );
         } else {
             LogDebug("Discarding unreadable/empty queue file: " + processingPath);
             DeleteFileA(processingPath.c_str());
@@ -781,9 +1210,32 @@ int main(int argc, char** argv) {
         printf("Failed to resolve ap_client.exe path.\n");
         return 1;
     }
-    GoalTransitionMonitor goalTransitionMonitor(
-        std::filesystem::path(executablePath).parent_path()
+    const std::string workingDirectory = CurrentWorkingDirectory();
+    RuntimeEnvSignals envSignals;
+    if (const char* value = getenv("WINEDLLOVERRIDES")) {
+        envSignals.wineDllOverrides = value;
+    }
+    if (const char* value = getenv("WINEPREFIX")) {
+        envSignals.winePrefix = value;
+    }
+    if (const char* value = getenv("STEAM_COMPAT_DATA_PATH")) {
+        envSignals.steamCompatDataPath = value;
+    }
+    if (const char* value = getenv("STEAM_COMPAT_CLIENT_INSTALL_PATH")) {
+        envSignals.steamCompatClientInstallPath = value;
+    }
+    if (const char* value = getenv("PROTON_LOG")) {
+        envSignals.protonLog = value;
+    }
+
+    const RuntimePathInfo runtimePaths = ResolveRuntimePathInfo(
+        executablePath,
+        workingDirectory,
+        envSignals
     );
+    const std::string doomExecutablePath =
+        (runtimePaths.gameRootDir / "DOOMEternalx64vk.exe").string();
+    GoalTransitionMonitor goalTransitionMonitor(runtimePaths);
 
     HANDLE singleInstance = CreateMutexA(nullptr, TRUE, "DoomEternalArchipelagoClient");
     if (!singleInstance || GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -792,19 +1244,40 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    LogDebug("Starting AP Client EXE with atomic command spool...");
     EnsureQueueDirectory();
     DeleteFileA(kRpcGatePath);
+    const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
+    const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
+    LogStartupHeader(
+        executablePath,
+        workingDirectory,
+        doomExecutablePath,
+        startupQueueSnapshot,
+        preflight,
+        runtimePaths
+    );
     LogDebug("RPC command execution is PAUSED. Use /doom_rpc_on inside a loaded level.");
 
     GameStateProbe gameStateProbe(LogDebug);
-    g_MhInterface = new MeathookInterface();
-    LogDebug("Waiting for Meathook RPC to initialize...");
-    while (!g_MhInterface || !g_MhInterface->m_Initialized) {
-        gameStateProbe.Poll();
-        Sleep(100);
+    const bool meathookPreflightPassed = preflight.deliveryAllowed;
+    if (!meathookPreflightPassed) {
+        LogDebug(
+            "Meathook preflight failed. No valid XINPUT1_3.dll candidate was accepted. "
+            "Queued commands will remain pending until the client is restarted "
+            "with a valid install."
+        );
+    } else {
+        g_MhInterface = new MeathookInterface();
+        LogDebug(
+            "Meathook RPC client binding initialized. Waiting for the in-game "
+            "Meathook server..."
+        );
+        while (!g_MhInterface || !g_MhInterface->m_Initialized) {
+            gameStateProbe.Poll();
+            Sleep(100);
+        }
+        LogDebug("Meathook RPC server verified.");
     }
-    LogDebug("Connected to Meathook RPC.");
 
     std::deque<CommandJob> queue;
     DWORD lastExecution = 0;
@@ -824,7 +1297,10 @@ int main(int argc, char** argv) {
                 LogDebug("RPC command execution auto-armed because commands are pending.");
             }
         }
-        const bool rpcEnabled = rpcArmed && gameStateProbe.IsSafeForRpc();
+        const bool rpcTransportReady =
+            meathookPreflightPassed && g_MhInterface && g_MhInterface->m_Initialized;
+        const bool rpcEnabled =
+            rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
         if (rpcArmed != lastRpcArmed) {
             LogDebug(rpcArmed
                 ? "RPC command execution ARMED; waiting for safe gameplay."
@@ -852,12 +1328,19 @@ int main(int argc, char** argv) {
             }
             if (ExecuteCommand(job.command)) {
                 DeleteFileA(job.path.c_str());
-                LogDebug("Command completed and acknowledged: " + job.command);
+                LogDebug(
+                    "Command completed and acknowledged: command_id="
+                    + CommandIdFromPath(job.path) + " command=" + job.command
+                );
                 queue.pop_front();
             } else {
-                QuarantineFailedJob(job);
-                LogDebug("Command failed and was quarantined without retry: " + job.command);
-                queue.pop_front();
+                LogDebug(
+                    "Command deferred for retry: command_id="
+                    + CommandIdFromPath(job.path)
+                    + " command=" + job.command
+                    + " result=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
+                    + " wait_error=" + std::to_string(g_MhInterface->m_LastTransportError)
+                );
                 DeleteFileA(kRpcGatePath);
             }
             lastExecution = now;

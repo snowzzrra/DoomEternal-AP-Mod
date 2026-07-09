@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 
 _CONFIG_TEMP_DIR = tempfile.TemporaryDirectory()
 _CONFIG_ROOT = Path(_CONFIG_TEMP_DIR.name)
+_FAKE_DOOM_ROOT = _CONFIG_ROOT / "DOOMEternal"
 _FAKE_DOOM_BASE = _CONFIG_ROOT / "DOOMEternal" / "base"
 _FAKE_SAVE_BASE = (
     _CONFIG_ROOT / "Saved Games" / "id Software" / "DOOMEternal" / "base"
@@ -22,7 +23,7 @@ _FAKE_SAVE_BASE = (
 _FAKE_DOOM_BASE.mkdir(parents=True)
 _FAKE_SAVE_BASE.mkdir(parents=True)
 (_FAKE_DOOM_BASE / "classicwads").mkdir()
-(_FAKE_DOOM_BASE / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
+(_FAKE_DOOM_ROOT / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
 _CONFIG_FILE = _CONFIG_ROOT / "ap_config.json"
 _CONFIG_FILE.write_text(
     json.dumps(
@@ -77,6 +78,23 @@ bridge_client = _load_bridge_client()
 
 
 class CheckEventTests(unittest.TestCase):
+    def test_doom_status_is_user_facing_only(self):
+        outputs = []
+
+        class FakeProcessor:
+            def output(self, message):
+                outputs.append(message)
+
+        bridge_client.DoomCommandProcessor._cmd_doom_status(FakeProcessor())
+
+        self.assertEqual(
+            outputs,
+            [
+                "DOOM integration: running",
+                f"Detailed diagnostics: {bridge_client.BRIDGE_LOG_DIR}",
+            ],
+        )
+
     def test_extract_location_id_from_filename(self):
         location_id = bridge_client.extract_location_id_from_event(
             "/tmp/ap_event_7770123.txt"
@@ -262,6 +280,9 @@ class CheckEventTests(unittest.TestCase):
                     def persist_session_state(self):
                         persisted.append(True)
 
+                    def output(self, message):
+                        pass
+
                     async def send_campaign_goal(self, source_description):
                         return await bridge_client.DoomEternalContext.send_campaign_goal(
                             self, source_description
@@ -326,6 +347,9 @@ class CheckEventTests(unittest.TestCase):
                         raise AssertionError(
                             "persist_session_state should not be called"
                         )
+
+                    def output(self, message):
+                        pass
 
                     async def send_campaign_goal(self, source_description):
                         return await bridge_client.DoomEternalContext.send_campaign_goal(

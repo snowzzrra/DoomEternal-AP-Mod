@@ -154,7 +154,7 @@ game/sp/e1m3_cult/e1m3_cult -> game/sp/e1m4_boss/e1m4_boss
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.1.0-ptb.zip
+DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -195,19 +195,31 @@ the credits.
 
 ## Install from the PTB ZIP
 
-1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.0-ptb.zip` to a permanent
+1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip` to a permanent
    directory.
 2. Open `doometernal.apworld` with `ArchipelagoLauncher`, then restart the
    launcher.
-3. Copy `DoomEternalArchipelagoPreAlpha.zip` into DOOM Eternal's `Mods`
-   directory and install it with EternalModInjector.
-4. Keep the ZIP intact. Do not install loose `.entities` files.
-5. Open `DOOM Eternal Client` from Archipelago Launcher and configure the game
+3. Open `DOOM Eternal Client` from Archipelago Launcher and configure the game
    base path plus the save-games path on first launch.
+4. If `ap_client.exe` or `run_bridge.sh` was started before that config
+   existed, close the external client after setup and restart it later with the
+   game.
+5. Certify you installed the correct Meathook DLL version [here](https://github.com/brongo/m3337ho0o0ok/releases/tag/v7.2).
+6. Copy `DoomEternalArchipelagoPreAlpha.zip` into DOOM Eternal's `Mods`
+   directory and install it with EternalModInjector [Windows](https://gamebanana.com/tools/7475) or [Linux](https://github.com/leveste/EternalBasher/releases/tag/v6.66-rev3.12).
+7. Keep the ZIP intact. Do not install loose `.entities` files.
 
 Do not reuse someone else's `ap_config.json`. Use the setup wizard or copy
 `client/ap_config.example.json` to `client/ap_config.json` and fill your own
 paths.
+
+If the native client starts before `ap_config.json` exists, the log now emits
+an actionable warning instead of treating that first run as a permanent
+failure:
+
+```text
+Config not found yet. Run/setup the DOOM Eternal Client once, then restart ap_client.exe if needed.
+```
 
 ### Linux / Proton
 
@@ -217,9 +229,26 @@ Set DOOM Eternal's Steam launch options to:
 WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %command%
 ```
 
-Use the absolute path to the extracted `client/run_bridge.sh`. Keep
-`run_bridge.sh` beside `ap_client.exe`. If Proton shader compilation is slow on
-your machine, raise the delay to `20`.
+Use the absolute path to the extracted `client/run_bridge.sh`. Place the
+validated `XINPUT1_3.dll` beside `run_bridge.sh` and `ap_client.exe` in the
+extracted `client/` directory. If Proton shader compilation is slow on your
+machine, raise the delay to `20`.
+
+For Linux/Proton, the validated layout is:
+
+```text
+<extracted PTB>/client/run_bridge.sh
+<extracted PTB>/client/ap_client.exe
+<extracted PTB>/client/XINPUT1_3.dll
+```
+
+The Proton-compatible preflight now logs both DLL candidates:
+
+- game-root candidate: `<DOOM root>/XINPUT1_3.dll`
+- client-local candidate: `<PTB client dir>/XINPUT1_3.dll`
+
+If the game-root DLL is missing, a client-local DLL is accepted when Proton
+mode is detected from `WINEDLLOVERRIDES` or related Wine/Proton signals.
 
 Typical first-run paths:
 
@@ -229,6 +258,9 @@ Saved Games Path: /path/to/steamapps/compatdata/782330/pfx/drive_c/users/steamus
 ```
 
 ### Windows
+
+For Windows/native installs, keep `XINPUT1_3.dll` beside
+`DOOMEternalx64vk.exe` in the real DOOM Eternal game directory.
 
 Typical first-run paths:
 
@@ -390,7 +422,7 @@ explicitly at your local fork.
 - alby for technical help, runtime investigation, and safe-native-behavior
   guidance.
 - chrispy for creating
-  [Meathook](https://github.com/brongo/meathook), the RPC foundation this
+  [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation this
   project builds on.
 - PowerBall253 / brunoanc for
   [EternalResourceExtractor](https://github.com/brunoanc/EternalResourceExtractor)

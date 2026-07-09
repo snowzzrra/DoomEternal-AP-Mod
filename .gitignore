@@ -36,6 +36,7 @@ ap_transition_*.evt
 
 # Game resources and backups
 *.backup
+vanillamaps/
 
 # Local investigation
 debug_matches.py
