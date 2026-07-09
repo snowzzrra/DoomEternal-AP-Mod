@@ -7,7 +7,7 @@ TOOLS_DIR="$WORKSPACE/Tools"
 GAME_BASE="${DOOM_GAME_BASE:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base}"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
-RELEASE_VERSION="v0.1.1-ptb"
+RELEASE_VERSION="v0.1.2-ptb"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
@@ -90,42 +90,7 @@ extract_and_build \
 
 cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
-cat > "$OUTPUT_DIR/RELEASE_MANIFEST.json" <<EOF
-{
-  "name": "Doom Eternal Archipelago Playable Test",
-  "version": "${RELEASE_VERSION}",
-  "files": [
-    "README.md",
-    "RELEASE_MANIFEST.json",
-    "DoomEternalArchipelagoPreAlpha.zip",
-    "doometernal.apworld",
-    "client/ap_client.exe",
-    "client/ap_logger.exe",
-    "client/bridge_client.py",
-    "client/dinput8.dll",
-    "client/dxgi.dll",
-    "client/version.dll",
-    "client/xinput1_4.dll",
-    "client/save_death_probe.exe",
-    "client/save_decrypt.py",
-    "client/run_bridge.sh",
-    "client/start_injector_windows.bat",
-    "client/validate_runtime_install.sh",
-    "client/ap_config.example.json",
-    "client/data/items.json",
-    "client/data/runtime_locations.json",
-    "client/manifests/e1m1_intro.json",
-    "client/manifests/e1m2_war.json",
-    "client/manifests/e1m3_cult.json",
-    "client/manifests/hub.json",
-    "client/player_templates/DoomSlayer.yaml",
-    "client/player_templates/Marine.yaml"
-  ]
-}
-EOF
 cp "$SCRIPT_DIR/ap_client.exe" "$SCRIPT_DIR/ap_logger.exe" \
-    "$SCRIPT_DIR/dinput8.dll" "$SCRIPT_DIR/dxgi.dll" \
-    "$SCRIPT_DIR/version.dll" "$SCRIPT_DIR/xinput1_4.dll" \
     "$SCRIPT_DIR/save_death_probe.exe" \
     "$SCRIPT_DIR/bridge_client.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
@@ -148,6 +113,85 @@ python3 "$SCRIPT_DIR/build_apworld.py" \
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
 
+VALIDATION_JSON="$TEMP_DIR/validate-client.json"
+python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
+    "$OUTPUT_DIR/client" \
+    --forbid-local version.dll \
+    --forbid-local dinput8.dll \
+    --forbid-local dxgi.dll \
+    --forbid-local xinput1_4.dll \
+    --json-output "$VALIDATION_JSON"
+
+TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
+
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+output_dir = Path(sys.argv[1])
+release_version = sys.argv[2]
+validation_path = Path(sys.argv[3])
+toolchain_compiler = sys.argv[4]
+
+validation = json.loads(validation_path.read_text(encoding="utf-8"))
+
+manifest = {
+    "name": "Doom Eternal Archipelago Playable Test",
+    "version": release_version,
+    "files": [
+        "README.md",
+        "RELEASE_MANIFEST.json",
+        "DoomEternalArchipelagoPreAlpha.zip",
+        "doometernal.apworld",
+        "client/ap_client.exe",
+        "client/ap_logger.exe",
+        "client/bridge_client.py",
+        "client/save_death_probe.exe",
+        "client/save_decrypt.py",
+        "client/run_bridge.sh",
+        "client/start_injector_windows.bat",
+        "client/validate_runtime_install.sh",
+        "client/ap_config.example.json",
+        "client/data/items.json",
+        "client/data/runtime_locations.json",
+        "client/manifests/e1m1_intro.json",
+        "client/manifests/e1m2_war.json",
+        "client/manifests/e1m3_cult.json",
+        "client/manifests/hub.json",
+        "client/player_templates/DoomSlayer.yaml",
+        "client/player_templates/Marine.yaml",
+    ],
+    "ap_client": {
+        "sha256": validation["exe_sha256"],
+        "size": validation["exe_size"],
+        "direct_imports": validation["exe_direct_imports"],
+        "compiler": toolchain_compiler,
+        "linker_flags": [
+            "-static",
+            "-static-libgcc",
+            "-static-libstdc++",
+            "-lversion",
+        ],
+    },
+    "validator": {
+        "status": validation["status"],
+        "errors": validation["errors"],
+        "forbidden_local_dlls_absent": [
+            "version.dll",
+            "dinput8.dll",
+            "dxgi.dll",
+            "xinput1_4.dll",
+        ],
+    },
+}
+
+(output_dir / "RELEASE_MANIFEST.json").write_text(
+    json.dumps(manifest, indent=2) + "\n",
+    encoding="utf-8",
+)
+PY
+
 (
     cd "$OUTPUT_DIR/mod"
     zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" .
@@ -159,6 +203,16 @@ chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
         README.md RELEASE_MANIFEST.json client doometernal.apworld \
         DoomEternalArchipelagoPreAlpha.zip
 )
+
+EXTRACTED_AUDIT_DIR="$TEMP_DIR/extracted-final"
+mkdir -p "$EXTRACTED_AUDIT_DIR"
+unzip -q "$OUTPUT_DIR/$PTB_ZIP_NAME" -d "$EXTRACTED_AUDIT_DIR"
+python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
+    "$EXTRACTED_AUDIT_DIR/client" \
+    --forbid-local version.dll \
+    --forbid-local dinput8.dll \
+    --forbid-local dxgi.dll \
+    --forbid-local xinput1_4.dll
 
 echo "Playable test build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"

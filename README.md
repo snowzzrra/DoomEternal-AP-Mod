@@ -154,7 +154,7 @@ game/sp/e1m3_cult/e1m3_cult -> game/sp/e1m4_boss/e1m4_boss
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip
+DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -163,10 +163,6 @@ DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip
     ├── ap_client.exe
     ├── ap_logger.exe
     ├── bridge_client.py
-    ├── dinput8.dll
-    ├── dxgi.dll
-    ├── version.dll
-    ├── xinput1_4.dll
     ├── save_death_probe.exe
     ├── save_decrypt.py
     ├── run_bridge.sh
@@ -189,13 +185,13 @@ The release intentionally excludes:
 - project memory files;
 - personal config.
 
-The bundled Meathook runtime DLLs are included only for convenience in this PTB
-package. Upstream credit remains with the original Meathook project listed in
-the credits.
+The PTB client directory intentionally does **not** bundle Meathook proxy DLL
+aliases such as `version.dll`, `dxgi.dll`, `dinput8.dll`, or `xinput1_4.dll`.
+Those names can shadow Windows system DLL imports for `ap_client.exe`.
 
 ## Install from the PTB ZIP
 
-1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.1-ptb.zip` to a permanent
+1. Extract `DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip` into a brand-new
    directory.
 2. Open `doometernal.apworld` with `ArchipelagoLauncher`, then restart the
    launcher.
@@ -208,6 +204,10 @@ the credits.
 6. Copy `DoomEternalArchipelagoPreAlpha.zip` into DOOM Eternal's `Mods`
    directory and install it with EternalModInjector [Windows](https://gamebanana.com/tools/7475) or [Linux](https://github.com/leveste/EternalBasher/releases/tag/v6.66-rev3.12).
 7. Keep the ZIP intact. Do not install loose `.entities` files.
+
+Hotfix note for `v0.1.2-ptb`:
+
+`Fixed a Windows startup failure caused by a bundled proxy DLL shadowing the system VERSION.dll required by ap_client.exe.`
 
 Do not reuse someone else's `ap_config.json`. Use the setup wizard or copy
 `client/ap_config.example.json` to `client/ap_config.json` and fill your own
@@ -230,25 +230,17 @@ WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %co
 ```
 
 Use the absolute path to the extracted `client/run_bridge.sh`. Place the
-validated `XINPUT1_3.dll` beside `run_bridge.sh` and `ap_client.exe` in the
-extracted `client/` directory. If Proton shader compilation is slow on your
-machine, raise the delay to `20`.
+validated `XINPUT1_3.dll` beside `DOOMEternalx64vk.exe` in the real game root.
+If Proton shader compilation is slow on your machine, raise the delay to `20`.
 
 For Linux/Proton, the validated layout is:
 
 ```text
+<DOOM root>/DOOMEternalx64vk.exe
+<DOOM root>/XINPUT1_3.dll
 <extracted PTB>/client/run_bridge.sh
 <extracted PTB>/client/ap_client.exe
-<extracted PTB>/client/XINPUT1_3.dll
 ```
-
-The Proton-compatible preflight now logs both DLL candidates:
-
-- game-root candidate: `<DOOM root>/XINPUT1_3.dll`
-- client-local candidate: `<PTB client dir>/XINPUT1_3.dll`
-
-If the game-root DLL is missing, a client-local DLL is accepted when Proton
-mode is detected from `WINEDLLOVERRIDES` or related Wine/Proton signals.
 
 Typical first-run paths:
 
@@ -277,6 +269,9 @@ client\start_injector_windows.bat
 
 That helper starts the external RPC client `ap_client.exe` with the correct
 working directory. Only one `ap_client.exe` should exist at a time.
+
+The extracted `client/` directory must not contain proxy/loader aliases such
+as `version.dll`, `dxgi.dll`, `dinput8.dll`, or `xinput1_4.dll`.
 
 ## Current PTB logic
 
