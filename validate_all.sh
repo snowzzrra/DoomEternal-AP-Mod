@@ -13,7 +13,10 @@ python3 -m py_compile \
     save_inspector.py \
     validate_data.py \
     validate_windows_runtime_deps.py
-python3 -m unittest tests.test_ap_map_generator tests.test_check_events
+python3 -m unittest \
+    tests.test_ap_map_generator \
+    tests.test_check_events \
+    tests.test_validate_data
 python3 validate_data.py
 g++ -std=c++17 tests/test_ap_client_path_utils.cpp ap_client_path_utils.cpp \
     -o /tmp/test_ap_client_path_utils

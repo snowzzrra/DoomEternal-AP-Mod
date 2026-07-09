@@ -45,6 +45,31 @@ def extract_namedtuple_table(path: Path, variable: str) -> dict[str, int]:
     raise RuntimeError(f"Could not find {variable} in {path}")
 
 
+def collect_duplicate_ids(values: dict[str, int]) -> dict[int, list[str]]:
+    grouped: dict[int, list[str]] = {}
+    for name, value in values.items():
+        grouped.setdefault(value, []).append(name)
+    return {
+        value: names for value, names in grouped.items() if len(names) > 1
+    }
+
+
+def validate_id_namespaces(
+    item_ids: dict[str, int], location_ids: dict[str, int]
+) -> list[str]:
+    errors: list[str] = []
+
+    duplicate_item_ids = collect_duplicate_ids(item_ids)
+    for item_id, item_names in sorted(duplicate_item_ids.items()):
+        errors.append(f"Duplicate AP item ID {item_id}: {item_names}")
+
+    duplicate_location_ids = collect_duplicate_ids(location_ids)
+    for location_id, location_names in sorted(duplicate_location_ids.items()):
+        errors.append(f"Duplicate AP location ID {location_id}: {location_names}")
+
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
@@ -55,6 +80,7 @@ def main() -> int:
     runtime_locations = set(
         read_json(ROOT / "data" / "runtime_locations.json").values()
     )
+    errors.extend(validate_id_namespaces(item_ids, location_ids))
 
     manifests: dict[str, int] = {}
     for path in sorted((ROOT / "manifests").glob("*.json")):
@@ -187,7 +213,7 @@ def main() -> int:
                     errors.append(
                         f"Progressive perk command {item_id} must define unique player perks"
                     )
-                if item_id in {7770017, 7770088, 7770125} and (
+                if item_id in {7770017, 7770088, 7770092} and (
                     not isinstance(perks, list)
                     or len(perks) != 4
                     or not all(
