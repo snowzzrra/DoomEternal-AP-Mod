@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import uuid
+import logging
 
 import json
 from pathlib import Path
@@ -133,7 +134,6 @@ from CommonClient import (
     gui_enabled,
     ClientCommandProcessor,
     get_base_parser,
-    logger,
 )
 from NetUtils import ClientStatus
 
@@ -228,7 +228,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 2
+ITEM_MAPPING_REVISION = 3
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -258,6 +258,63 @@ def discover_client_state_file():
 
 
 CLIENT_STATE_FILE = discover_client_state_file()
+
+
+def discover_bridge_log_dir():
+    candidates = []
+    configured = config.get("bridge_log_dir")
+    if configured:
+        candidates.append(Path(configured))
+    if os.name == "nt":
+        root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    else:
+        root = Path(
+            os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")
+        )
+    candidates.append(root / "doom-eternal-ap" / "logs")
+    candidates.append(CONFIG_FILE.parent / "logs")
+
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            probe = candidate / ".write-test"
+            with probe.open("a", encoding="utf-8"):
+                pass
+            probe.unlink(missing_ok=True)
+            return candidate
+        except OSError:
+            continue
+
+    return Path.cwd() / "logs"
+
+
+BRIDGE_LOG_DIR = discover_bridge_log_dir()
+BRIDGE_LOG_PATH = BRIDGE_LOG_DIR / "bridge.log"
+
+
+def configure_bridge_logger():
+    BRIDGE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    bridge_logger = logging.getLogger("doom_eternal_ap.bridge")
+    bridge_logger.setLevel(logging.DEBUG)
+    bridge_logger.propagate = False
+    if not any(
+        isinstance(handler, logging.FileHandler)
+        and Path(getattr(handler, "baseFilename", "")) == BRIDGE_LOG_PATH
+        for handler in bridge_logger.handlers
+    ):
+        handler = logging.FileHandler(BRIDGE_LOG_PATH, encoding="utf-8")
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(
+            logging.Formatter(
+                "[%(asctime)s] %(levelname)s %(message)s",
+                "%Y-%m-%d %H:%M:%S",
+            )
+        )
+        bridge_logger.addHandler(handler)
+    return bridge_logger
+
+
+logger = configure_bridge_logger()
 
 
 def load_client_state():
@@ -1255,75 +1312,9 @@ class DoomCommandProcessor(ClientCommandProcessor):
         )
 
     def _cmd_doom_status(self):
-        """Show command-spool, save-monitor, and DeathLink status."""
-        details = read_game_details()
-        self.output(f"Queue directory: {QUEUE_DIR}")
-        queue_path = Path(QUEUE_DIR)
-        pending_commands = list(queue_path.glob("*.cmd")) if queue_path.is_dir() else []
-        processing_commands = (
-            list(queue_path.glob("*.processing")) if queue_path.is_dir() else []
-        )
-        failed_commands = list(queue_path.glob("*.failed")) if queue_path.is_dir() else []
-        self.output(
-            f"Queued commands: pending={len(pending_commands)} "
-            f"processing={len(processing_commands)} failed={len(failed_commands)}"
-        )
-        self.output(
-            f"RPC intent: {'ARMED' if rpc_execution_enabled() else 'DISARMED'}"
-        )
-        self.output("RPC safety gate: native read-only memory probe")
-        self.output(
-            "ap_client.exe must log: RPC memory gate OPEN -> "
-            "Executing queued command -> Command completed"
-        )
-        self.output(f"Telemetry directory: {INV_DUMP_DIR}")
-        self.output(f"Check event files: {len(check_event_files())}")
-        self.output(f"Telemetry dump files: {len(telemetry_dump_files())}")
-        remote_display = (
-            str(STEAM_REMOTE_DIR)
-            if STEAM_REMOTE_DIR is not None
-            else "NOT FOUND"
-        )
-        self.output(f"Steam remote directory: {remote_display}")
-        self.output(f"Steam account ID: {STEAM_ID3 or 'NOT FOUND'}")
-        duration_path = newest_save_file("game_duration.dat")
-        self.output(
-            "Active game_duration.dat: "
-            f"{duration_path if duration_path else 'NOT FOUND'}"
-        )
-        self.output(
-            f"Death probe executable: "
-            f"{DEATH_PROBE if DEATH_PROBE.is_file() else 'NOT FOUND'}"
-        )
-        self.output(
-            f"Oodle DLL: {OODLE_DLL if OODLE_DLL.is_file() else 'NOT FOUND'}"
-        )
-        self.output(f"DeathLink enabled: {getattr(self.ctx, 'death_link_enabled', False)}")
-        self.output(
-            f"Received DeathLink pending: "
-            f"{getattr(self.ctx, 'deathlinked', False)}"
-        )
-        if getattr(self.ctx, "item_state_ready", False):
-            self.output(
-                f"Item state: {self.ctx.items_processed}/"
-                f"{len(self.ctx.items_received)} processed "
-                f"key={self.ctx.state_key}"
-            )
-            self.output(
-                f"Cultist Base goal sent: {self.ctx.session_state.get('goal_sent', False)}"
-            )
-        else:
-            self.output("Item state: waiting for slot connection")
-        self.output(
-            f"Death detector: {'game_duration.dat' if death_probe_available() else 'game.details fallback'}"
-        )
-        if details:
-            self.output(
-                f"Save: map={details.get('mapName')} diedLastGame={details.get('diedLastGame')} "
-                f"time={details.get('time')} path={details.get('_path')}"
-            )
-        else:
-            self.output("Save monitor: no readable game.details found")
+        """Show only the user-facing integration status."""
+        self.output("DOOM integration: running")
+        self.output(f"Detailed diagnostics: {BRIDGE_LOG_DIR}")
 
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
@@ -1651,6 +1642,7 @@ class DoomEternalContext(CommonContext):
             "[Goal] Cultist Base completed. Goal reported to Archipelago via "
             f"{source_description}."
         )
+        self.output("Goal sent.")
         return True
 
     async def check_campaign_goal_event(self):
@@ -1914,6 +1906,10 @@ class DoomEternalContext(CommonContext):
                             f"[To Game] No command mapping for item {item_id}; "
                             "delivery paused. The seed/APWorld and bridge build "
                             "are out of sync."
+                        )
+                        self.output(
+                            f"Missing item mapping for DOOM Eternal item {item_id}. "
+                            "Check the local bridge logs."
                         )
                         break
 

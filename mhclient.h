@@ -5,6 +5,17 @@
 #include "meathook_interface.h" 
 #include <windows.h>
 
+enum RpcCallResult
+{
+    RPC_CALL_RESULT_NONE = 0,
+    PIPE_NOT_FOUND,
+    PIPE_BUSY,
+    WAIT_NAMED_PIPE_TIMEOUT,
+    RPC_CALL_DELIVERED,
+    RPC_EXCEPTION,
+    UNKNOWN_TRANSPORT_ERROR,
+};
+
 class MeathookInterface
 {
     HANDLE m_UnInitialized;
@@ -15,6 +26,8 @@ class MeathookInterface
 
 public:
     bool m_Initialized;
+    RpcCallResult m_LastRpcCallResult = RPC_CALL_RESULT_NONE;
+    DWORD m_LastTransportError = ERROR_SUCCESS;
     MeathookInterface() { StartKeepAliveThread(); }
     ~MeathookInterface() {}
     bool DestroyRpcInterface();

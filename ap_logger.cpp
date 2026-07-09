@@ -30,10 +30,10 @@ void LogWarn(const char* msg)  { Log("WARN ", msg); }
 void LogError(const char* msg) { Log("ERROR", msg); }
 
 // -----------------------------------------------------------------------
-// Probe: tenta uma chamada real para confirmar que o RPC está funcional.
-// m_Initialized apenas diz que o construtor conectou ao named pipe —
-// não garante que o jogo está pronto para receber chamadas.
-// Usa SEH (__try/__except) para capturar access violations sem crashar.
+// Probe: attempt a real call to confirm that the RPC is functional.
+// m_Initialized only says that the constructor connected to the named pipe.
+// It does not guarantee that the game is ready to receive calls.
+// Use SEH (__try/__except) to catch access violations without crashing.
 // -----------------------------------------------------------------------
 
 bool ProbeRPC(MeathookInterface* mh) {
@@ -49,8 +49,8 @@ bool ProbeRPC(MeathookInterface* mh) {
 }
 
 // -----------------------------------------------------------------------
-// Conexão com retry. Reconstrói MeathookInterface a cada tentativa porque
-// o construtor pode deixar estado inválido se o RPC não estava disponível.
+// Retry connection. Rebuild MeathookInterface on each attempt because the
+// constructor can leave invalid state behind when RPC is unavailable.
 // -----------------------------------------------------------------------
 
 MeathookInterface* ConnectToMeathook(int timeout_seconds) {
@@ -72,7 +72,7 @@ MeathookInterface* ConnectToMeathook(int timeout_seconds) {
             return mh;
         }
 
-        // não está pronto ainda — descarta e tenta de novo
+        // The server is not ready yet. Discard this instance and retry.
         delete mh;
 
         if (elapsed % 5000 == 0) {
@@ -87,7 +87,7 @@ MeathookInterface* ConnectToMeathook(int timeout_seconds) {
 }
 
 // -----------------------------------------------------------------------
-// Snapshot de estado do jogo
+// Game-state snapshot
 // -----------------------------------------------------------------------
 
 struct GameSnapshot {
@@ -137,7 +137,7 @@ bool SnapshotChanged(const GameSnapshot& prev, const GameSnapshot& curr) {
 }
 
 // -----------------------------------------------------------------------
-// Loop principal
+// Main loop
 // -----------------------------------------------------------------------
 
 void RunLogger(MeathookInterface* mh) {
@@ -146,7 +146,7 @@ void RunLogger(MeathookInterface* mh) {
 
     GameSnapshot prev = {};
     int tick = 0;
-    const int FORCED_LOG_INTERVAL = 20;  // log forçado a cada 10s (20 x 500ms)
+    const int FORCED_LOG_INTERVAL = 20;  // forced log every 10s (20 x 500ms)
 
     while (true) {
         Sleep(500);

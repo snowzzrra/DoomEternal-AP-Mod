@@ -7,7 +7,7 @@ TOOLS_DIR="$WORKSPACE/Tools"
 GAME_BASE="${DOOM_GAME_BASE:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base}"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
-RELEASE_VERSION="v0.1.0-ptb"
+RELEASE_VERSION="v0.1.1-ptb"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT

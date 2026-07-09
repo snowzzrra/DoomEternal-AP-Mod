@@ -5,6 +5,20 @@
 #include <windows.h>
 #include "mhclient.h"
 
+static RpcCallResult ClassifyWaitNamedPipeFailure(DWORD error)
+{
+    switch (error) {
+    case ERROR_FILE_NOT_FOUND:
+        return PIPE_NOT_FOUND;
+    case ERROR_PIPE_BUSY:
+        return PIPE_BUSY;
+    case ERROR_SEM_TIMEOUT:
+        return WAIT_NAMED_PIPE_TIMEOUT;
+    default:
+        return UNKNOWN_TRANSPORT_ERROR;
+    }
+}
+
 // struct idMat3 {
 //     idVec3			mat[3];
 // };
@@ -47,6 +61,11 @@ DWORD WINAPI MeathookInterface::KeepAlive(LPVOID Data)
         }
         
         if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
+            pthis->m_LastTransportError = GetLastError();
+            pthis->m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(
+                pthis->m_LastTransportError
+            );
+            pthis->m_Initialized = false;
             Sleep(1000);
             continue;
         }
@@ -58,13 +77,17 @@ DWORD WINAPI MeathookInterface::KeepAlive(LPVOID Data)
             int x;
             ::KeepAlive(meathook_interface_v1_0_c_ifspec, &x);
             pthis->m_Initialized = true;
+            pthis->m_LastTransportError = ERROR_SUCCESS;
+            pthis->m_LastRpcCallResult = RPC_CALL_DELIVERED;
         }
         } catch(...) {
         {
             int ulCode = 1;
             printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
             pthis->m_Initialized = false;
-    Sleep(2000);
+            pthis->m_LastTransportError = ERROR_GEN_FAILURE;
+            pthis->m_LastRpcCallResult = RPC_EXCEPTION;
+            Sleep(2000);
         }
         }
         Sleep(5000);
@@ -127,6 +150,8 @@ bool MeathookInterface::GetEntitiesFile(unsigned char* pBuffer, size_t *Size)
 bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Size)
 {
     if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
+        m_LastTransportError = GetLastError();
+        m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(m_LastTransportError);
         return false;
     }
     try {
@@ -144,12 +169,16 @@ bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Siz
         // }
         // 
         // ::PushEntitiesFile(meathook_interface_v1_0_c_ifspec, (unsigned char*)pFileName, false, Size);
+        m_LastTransportError = ERROR_SUCCESS;
+        m_LastRpcCallResult = RPC_CALL_DELIVERED;
         return true;
     }
     } catch(...) {
     {
         int ulCode = 1;
         printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
+        m_LastTransportError = ERROR_GEN_FAILURE;
+        m_LastRpcCallResult = RPC_EXCEPTION;
         return false;
     }
     }
@@ -159,18 +188,24 @@ bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Siz
 bool MeathookInterface::ExecuteConsoleCommand(unsigned char* pszString)
 {
     if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
+        m_LastTransportError = GetLastError();
+        m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(m_LastTransportError);
         return false;
     }
     try {
 
     {
         ::ExecuteConsoleCommand(meathook_interface_v1_0_c_ifspec, pszString);
+        m_LastTransportError = ERROR_SUCCESS;
+        m_LastRpcCallResult = RPC_CALL_DELIVERED;
         return true;
     }
     } catch(...) {
     {
         int ulCode = 1;
         printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
+        m_LastTransportError = ERROR_GEN_FAILURE;
+        m_LastRpcCallResult = RPC_EXCEPTION;
         return false;
     }
     }
