@@ -3,20 +3,80 @@ import re
 import sys
 import json
 import argparse
+import hashlib
+from pathlib import Path
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
 NOTIFICATION_ENTITY_PREFIX = "ap_notify_"
 EVENT_ENTITY_PREFIX = "ap_event_"
+GENERATED_NAME_PREFIXES = (
+    "AP_CHECK_",
+    RPC_ENTITY_PREFIX,
+    NOTIFICATION_ENTITY_PREFIX,
+    EVENT_ENTITY_PREFIX,
+    "ap_rpc_auto_enable",
+)
 TARGETS_REPLACED_PICKUPS = {
     "pickup_equipment_flame_belch_1",
     "pickup_equipment_ice_bomb",
 }
+SECRET_ENCOUNTER_ARG_LABEL = ""
 
 # you don't need to use this to play the mod
 # i'm making this file available simply for transparency and for anyone who wants to generate the AP targets in other maps by themselves, since the process is a bit tedious to do manually and this automates it
 # you could just do the changes by hand, but why??
+
+
+def compute_file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def normalize_path(path):
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def ensure_distinct_input_output_paths(input_file, output_file):
+    input_path = normalize_path(input_file)
+    output_path = normalize_path(output_file)
+    if input_path == output_path:
+        raise ValueError(
+            f"Input and output must be different files: {input_path}"
+        )
+
+
+def find_generated_prefixes(content):
+    matches = []
+    for prefix in GENERATED_NAME_PREFIXES:
+        if prefix in content:
+            matches.append(prefix)
+    return matches
+
+
+def validate_source_file(input_file, output_file):
+    ensure_distinct_input_output_paths(input_file, output_file)
+
+    input_path = Path(input_file).expanduser().resolve(strict=True)
+    source_hash_before = compute_file_sha256(input_path)
+    content = input_path.read_text(encoding="utf-8")
+    injected_prefixes = find_generated_prefixes(content)
+    if injected_prefixes:
+        prefix_list = ", ".join(injected_prefixes)
+        raise ValueError(
+            f"Input source already contains generated AP prefixes: {prefix_list}"
+        )
+
+    return {
+        "input_path": input_path,
+        "size": input_path.stat().st_size,
+        "sha256_before": source_hash_before,
+        "content": content,
+    }
 
 def remove_balanced_entity_blocks(content, name_prefix):
     pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w*\s*\{', re.IGNORECASE)
@@ -60,6 +120,37 @@ def remove_property_blocks(content, property_name):
         pos = i
     result.append(content[pos:])
     return ''.join(result)
+
+
+def find_matching_brace(content, open_brace_index):
+    depth = 1
+    i = open_brace_index + 1
+    while depth > 0 and i < len(content):
+        if content[i] == "{":
+            depth += 1
+        elif content[i] == "}":
+            depth -= 1
+        i += 1
+    if depth != 0:
+        raise ValueError("Unbalanced braces while parsing entities content")
+    return i
+
+
+def find_entity_block_bounds(content, entity_name):
+    entity_match = re.search(
+        r"entityDef\s+" + re.escape(entity_name) + r"\s*\{",
+        content,
+    )
+    if not entity_match:
+        return None
+
+    block_start = content.rfind("entity {", 0, entity_match.start())
+    if block_start == -1:
+        raise ValueError(f"Could not locate enclosing entity block for {entity_name}")
+
+    open_brace_index = content.find("{", block_start)
+    block_end = find_matching_brace(content, open_brace_index)
+    return block_start, block_end
 
 
 def replace_targets_block(block, target_names):
@@ -106,9 +197,16 @@ def add_ap_check_target(block, entity_name, ap_check_id):
     target_names.append(ap_check_id)
     return replace_targets_block(block, target_names)
 
-def generate_target_relay(ap_check_id, location_id, spawn_pos_text):
-    notification_name = f"{NOTIFICATION_ENTITY_PREFIX}{ap_check_id}"
+def generate_event_relay(ap_check_id, location_id, spawn_pos_text, include_notification=True):
     event_name = f"{EVENT_ENTITY_PREFIX}{location_id}"
+    target_lines = []
+    if include_notification:
+        notification_name = f"{NOTIFICATION_ENTITY_PREFIX}{ap_check_id}"
+        target_lines.append(f'\t\t\t\titem[0] = "{notification_name}";')
+        target_lines.append(f'\t\t\t\titem[1] = "{event_name}";')
+    else:
+        target_lines.append(f'\t\t\t\titem[0] = "{event_name}";')
+
     return f"""entity {{
 	entityDef {ap_check_id} {{
 		inherit = "target/relay";
@@ -121,14 +219,19 @@ def generate_target_relay(ap_check_id, location_id, spawn_pos_text):
 		edit = {{
 			count = 1;
 			targets = {{
-				num = 2;
-				item[0] = "{notification_name}";
-				item[1] = "{event_name}";
+				num = {len(target_lines)};
+{chr(10).join(target_lines)}
 			}}
 {spawn_pos_text}		}}
 	}}
 }}
 """
+
+
+def generate_target_relay(ap_check_id, location_id, spawn_pos_text):
+    return generate_event_relay(
+        ap_check_id, location_id, spawn_pos_text, include_notification=True
+    )
 
 
 def generate_check_event(location_id):
@@ -174,6 +277,78 @@ def generate_pickup_notification(ap_check_id):
 	}}
 }}
 """
+
+
+def inject_secret_encounter_completion(
+    content,
+    manager_name,
+    ap_check_id,
+    expected_last_event_index,
+):
+    bounds = find_entity_block_bounds(content, manager_name)
+    if bounds is None:
+        raise ValueError(f"Secret encounter manager not found: {manager_name}")
+
+    block_start, block_end = bounds
+    block = content[block_start:block_end]
+    if f'entity = "{ap_check_id}";' in block:
+        return content
+
+    manager_marker = f'entity = "{manager_name}";'
+    manager_marker_index = block.find(manager_marker)
+    if manager_marker_index == -1:
+        raise ValueError(
+            f"Secret encounter manager self-reference not found: {manager_name}"
+        )
+
+    events_match = re.search(
+        r"events\s*=\s*\{\s*num\s*=\s*(\d+);",
+        block[manager_marker_index:],
+    )
+    if not events_match:
+        raise ValueError(f"Events block not found for manager {manager_name}")
+
+    events_num = int(events_match.group(1))
+    if events_num == expected_last_event_index + 1:
+        pass
+    else:
+        raise ValueError(
+            f"Manager {manager_name} has {events_num} events, expected "
+            f"{expected_last_event_index + 1} before AP hook insertion"
+        )
+
+    events_header_start = manager_marker_index + events_match.start()
+    events_num_start = manager_marker_index + events_match.start(1)
+    events_num_end = manager_marker_index + events_match.end(1)
+
+    updated_block = block[:events_num_start] + str(events_num + 1) + block[events_num_end:]
+
+    updated_events_open_brace = updated_block.find("{", events_header_start)
+    updated_events_close_brace = find_matching_brace(
+        updated_block, updated_events_open_brace
+    )
+    insertion = f"""
+						item[{events_num}] = {{
+							eventCall = {{
+								eventDef = "activateTarget";
+								args = {{
+									num = 2;
+									item[0] = {{
+										entity = "{ap_check_id}";
+									}}
+									item[1] = {{
+										string = "{SECRET_ENCOUNTER_ARG_LABEL}";
+									}}
+								}}
+							}}
+						}}
+"""
+    updated_block = (
+        updated_block[: updated_events_close_brace - 1]
+        + insertion
+        + updated_block[updated_events_close_brace - 1 :]
+    )
+    return content[:block_start] + updated_block + content[block_end:]
 
 def generate_rpc_command_entities(items_dict):
     blocks = []
@@ -358,10 +533,11 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         level_config = json.load(f)
 
     config_entities = level_config.get("entities", {})
+    secret_encounters = level_config.get("secret_encounters", [])
     manifest_data = {}
 
-    with open(input_file, "r", encoding="utf-8") as f:
-        content = f.read()
+    source_metadata = validate_source_file(input_file, output_file)
+    content = source_metadata["content"]
 
     content = remove_balanced_entity_blocks(content, "ap_logic_")
     content = remove_balanced_entity_blocks(content, "AP_CHECK_")
@@ -515,9 +691,34 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
         new_blocks.append("entity {" + block)
 
+    map_content = "".join(new_blocks)
+    secret_blocks = []
+    for secret_hook in secret_encounters:
+        ap_check_id = secret_hook["ap_check"]
+        location_id = secret_hook["location_id"]
+        manager_name = secret_hook.get("manager", secret_hook.get("manager_entity"))
+        if not manager_name:
+            raise ValueError(
+                f"Secret encounter {ap_check_id} is missing a manager entity name"
+            )
+        expected_last_event_index = secret_hook["after_event_index"]
+        map_content = inject_secret_encounter_completion(
+            map_content,
+            manager_name,
+            ap_check_id,
+            expected_last_event_index,
+        )
+        manifest_data[ap_check_id] = location_id
+        secret_blocks.append(
+            generate_event_relay(ap_check_id, location_id, "", include_notification=False)
+        )
+        secret_blocks.append(generate_check_event(location_id))
+        modified_count += 1
+
     final_content = (
-        "".join(new_blocks)
+        map_content
         + "\n"
+        + "".join(secret_blocks)
         + generate_rpc_command_entities(items_dict)
         + generate_system_command_entities()
     )
@@ -525,6 +726,12 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:
         f.write(final_content)
+
+    source_hash_after = compute_file_sha256(source_metadata["input_path"])
+    if source_hash_after != source_metadata["sha256_before"]:
+        raise ValueError(
+            f"Input source was modified during generation: {source_metadata['input_path']}"
+        )
 
     os.makedirs(os.path.dirname(manifest_file), exist_ok=True)
     with open(manifest_file, "w", encoding="utf-8") as f:

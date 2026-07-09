@@ -27,5 +27,19 @@
         "AP_CHECK_CAPITOL_PROGRESS_DASH_1": 7770083,
         "AP_CHECK_CAPITOL_PROGRESS_SENTINEL_BATTERY_1_E1M2": 7770084,
         "AP_CHECK_SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770045
-    }
+    },
+    "secret_encounters": [
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_CAPITOL_ARENA",
+            "location_id": 7770089,
+            "manager_entity": "capitol_encounter_manager_4",
+            "after_event_index": 3
+        },
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_GORE_NEST_ARENA",
+            "location_id": 7770090,
+            "manager_entity": "battle_encounter_manager_3",
+            "after_event_index": 11
+        }
+    ]
 }

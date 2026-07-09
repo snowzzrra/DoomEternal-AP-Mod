@@ -28,5 +28,19 @@
         "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_3_E1M3": 7770063,
         "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_2_E1M3": 7770069,
         "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_3_E1M3": 7770070
-    }
+    },
+    "secret_encounters": [
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_CAVE_MANCUBUS",
+            "location_id": 7770091,
+            "manager": "game_encounter_manager_crusher_15",
+            "after_event_index": 8
+        },
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_TORTURE_PIT",
+            "location_id": 7770092,
+            "manager": "game_encounter_manager_crusher_21",
+            "after_event_index": 12
+        }
+    ]
 }

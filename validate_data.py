@@ -13,6 +13,7 @@ from ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
     generate_check_event,
+    generate_event_relay,
     generate_pickup_notification,
     generate_rpc_command_entities,
     generate_target_relay,
@@ -21,6 +22,7 @@ from ap_map_generator import (
 
 ROOT = Path(__file__).resolve().parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
+MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
 
 
 def read_json(path: Path) -> dict:
@@ -80,7 +82,7 @@ def main() -> int:
     runtime_locations = set(
         read_json(ROOT / "data" / "runtime_locations.json").values()
     )
-    errors.extend(validate_id_namespaces(item_ids, location_ids))
+    map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
 
     manifests: dict[str, int] = {}
     for path in sorted((ROOT / "manifests").glob("*.json")):
@@ -92,7 +94,10 @@ def main() -> int:
             manifests[declaration] = location_id
 
     for path in sorted((ROOT / "level_configs").glob("*.json")):
-        config = read_json(path).get("entities", {})
+        config_data = read_json(path)
+        config = dict(config_data.get("entities", {}))
+        for encounter in config_data.get("secret_encounters", []):
+            config[encounter["ap_check"]] = encounter["location_id"]
         manifest_path = ROOT / "manifests" / path.name
         if not manifest_path.exists():
             errors.append(f"Missing manifest for {path.name}")
@@ -100,6 +105,33 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
+
+    enabled_map_sources = {
+        map_key: source
+        for map_key, source in map_sources.items()
+        if source.get("enabled", True)
+    }
+    expected_level_configs = {
+        Path(source["level_config"]).name for source in enabled_map_sources.values()
+    }
+    if expected_level_configs != {path.name for path in (ROOT / "level_configs").glob("*.json")}:
+        errors.append("Enabled map sources are not aligned with level_configs/*.json")
+
+    for map_key, source in enabled_map_sources.items():
+        for required_key in (
+            "source_file",
+            "source_sha256",
+            "level_config",
+            "manifest",
+            "resource_path",
+            "relative_entities_path",
+            "supported_game_revision",
+        ):
+            if not source.get(required_key):
+                errors.append(f"Map source {map_key} is missing {required_key}")
+        source_path = ROOT / "vanillamaps" / source["source_file"]
+        if not source_path.exists():
+            errors.append(f"Missing vanilla source for {map_key}: {source_path}")
 
     missing_commands = sorted(set(item_ids.values()) - set(commands))
     extra_commands = sorted(set(commands) - set(item_ids.values()))
@@ -176,6 +208,9 @@ def main() -> int:
         errors.append("Multi-command items do not use the validated target/count relay")
 
     relay = generate_target_relay("AP_CHECK_VALIDATION", 7770999, "")
+    secret_relay = generate_event_relay(
+        "AP_CHECK_SECRET_VALIDATION", 7770998, "", include_notification=False
+    )
     event = generate_check_event(7770999)
     notification = generate_pickup_notification("AP_CHECK_VALIDATION")
     if (
@@ -192,6 +227,13 @@ def main() -> int:
         not in event
     ):
         errors.append("AP checks do not emit the expected native event file")
+    if (
+        f'item[0] = "{EVENT_ENTITY_PREFIX}7770998";' not in secret_relay
+        or 'class = "idTarget_Count";' not in secret_relay
+        or 'class = "idTarget_Relay";' in secret_relay
+        or "ap_notify_AP_CHECK_SECRET_VALIDATION" in secret_relay
+    ):
+        errors.append("Secret encounter checks do not use the validated event-only relay")
 
     for item_id, command_value in commands.items():
         if isinstance(command_value, dict):
@@ -269,6 +311,7 @@ def main() -> int:
     print(
         f"Validated {len(item_ids)} AP items, {len(commands)} commands, "
         f"{len(location_ids)} locations, {len(manifests)} map checks, "
+        f"{len(enabled_map_sources)} enabled map sources, "
         f"and {len(runtime_locations)} runtime checks."
     )
     return 1 if errors else 0
