@@ -1,0 +1,44 @@
+{
+    "maps": {
+        "e1m1_intro": {
+            "enabled": true,
+            "source_file": "e1m1_intro.map",
+            "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+            "level_config": "level_configs/e1m1_intro.json",
+            "manifest": "manifests/e1m1_intro.json",
+            "resource_path": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+            "relative_entities_path": "game/sp/e1m1_intro/e1m1_intro.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1"
+        },
+        "e1m2_war": {
+            "enabled": true,
+            "source_file": "e1m2_war.map",
+            "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+            "level_config": "level_configs/e1m2_war.json",
+            "manifest": "manifests/e1m2_war.json",
+            "resource_path": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+            "relative_entities_path": "game/sp/e1m2_battle/e1m2_battle.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1"
+        },
+        "hub": {
+            "enabled": true,
+            "source_file": "hub.map",
+            "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b",
+            "level_config": "level_configs/hub.json",
+            "manifest": "manifests/hub.json",
+            "resource_path": "game/hub/hub_patch2.resources",
+            "relative_entities_path": "game/hub/hub.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1"
+        },
+        "e1m3_cult": {
+            "enabled": true,
+            "source_file": "e1m3_cult.map",
+            "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+            "level_config": "level_configs/e1m3_cult.json",
+            "manifest": "manifests/e1m3_cult.json",
+            "resource_path": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+            "relative_entities_path": "game/sp/e1m3_cult/e1m3_cult.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1"
+        }
+    }
+}
