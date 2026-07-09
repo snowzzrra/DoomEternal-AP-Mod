@@ -97,15 +97,15 @@ class CheckEventTests(unittest.TestCase):
 
     def test_extract_location_id_from_filename(self):
         location_id = bridge_client.extract_location_id_from_event(
-            "/tmp/ap_event_7770123.txt"
+            "/tmp/ap_event_7770090.txt"
         )
-        self.assertEqual(location_id, 7770123)
+        self.assertEqual(location_id, 7770090)
 
     def test_extract_location_id_from_suffixed_filename(self):
         location_id = bridge_client.extract_location_id_from_event(
-            "/tmp/ap_event_7770123_1.txt"
+            "/tmp/ap_event_7770090_1.txt"
         )
-        self.assertEqual(location_id, 7770123)
+        self.assertEqual(location_id, 7770090)
 
     def test_extract_location_id_from_file_contents_fallback(self):
         with tempfile.TemporaryDirectory() as tmpdir:

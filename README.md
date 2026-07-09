@@ -185,10 +185,6 @@ DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha-dev.zip
     ├── ap_client.exe
     ├── ap_logger.exe
     ├── bridge_client.py
-    ├── dinput8.dll
-    ├── dxgi.dll
-    ├── version.dll
-    ├── xinput1_4.dll
     ├── save_death_probe.exe
     ├── save_decrypt.py
     ├── run_bridge.sh
@@ -211,94 +207,452 @@ The release intentionally excludes:
 - project memory files;
 - personal config.
 
-The bundled Meathook runtime DLLs are included only for convenience in this PTB
-package. Upstream credit remains with the original Meathook project listed in
-the credits.
+The PTB client directory intentionally does **not** bundle Meathook proxy DLL
+aliases such as `version.dll`, `dxgi.dll`, `dinput8.dll`, or `xinput1_4.dll`.
+Those names can shadow Windows system DLL imports for `ap_client.exe`.
 
-## Install from the PTB ZIP
+## Installation
 
-1. Extract `DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha-dev.zip` to a permanent
-   directory.
-2. Open `doometernal.apworld` with `ArchipelagoLauncher`, then restart the
-   launcher.
-3. Open `DOOM Eternal Client` from Archipelago Launcher and configure the game
-   base path plus the save-games path on first launch.
-4. If `ap_client.exe` or `run_bridge.sh` was started before that config
-   existed, close the external client after setup and restart it later with the
-   game.
-5. Certify you installed the correct Meathook DLL version [here](https://github.com/brongo/m3337ho0o0ok/releases/tag/v7.2).
-6. Copy `DoomEternalArchipelagoPreAlpha.zip` into DOOM Eternal's `Mods`
-   directory and install it with EternalModInjector [Windows](https://gamebanana.com/tools/7475) or [Linux](https://github.com/leveste/EternalBasher/releases/tag/v6.66-rev3.12).
-7. Keep the ZIP intact. Do not install loose `.entities` files.
+> [!IMPORTANT]
+> The Archipelago client directory, the DOOM Eternal game directory, and the
+> DOOM Eternal save directory are three different paths. Do not point all
+> settings to the DOOM Eternal installation folder.
 
-Do not reuse someone else's `ap_config.json`. Use the setup wizard or copy
-`client/ap_config.example.json` to `client/ap_config.json` and fill your own
-paths.
+> [!WARNING]
+> Extract every new release into a brand-new empty directory. Do not copy a new
+> version over an older extracted PTB.
 
-If the native client starts before `ap_config.json` exists, the log now emits
-an actionable warning instead of treating that first run as a permanent
-failure:
+Hotfix note for `v0.1.2-ptb`:
+
+`Fixed a Windows startup failure caused by a bundled proxy DLL shadowing the system VERSION.dll required by ap_client.exe.`
+
+### Before you begin
+
+You need three separate things:
+
+- the extracted PTB release directory;
+- the real DOOM Eternal game installation;
+- the real DOOM Eternal save directory.
+
+You will also install:
+
+- the APWorld file `doometernal.apworld`;
+- Meathook `v7.2`;
+- the mod ZIP `DoomEternalArchipelagoPreAlpha.zip`.
+
+### The three paths are different
+
+| Setting or file | What it must point to | Typical Windows example |
+| --- | --- | --- |
+| `doom_eternal_options.client_directory` | Extracted PTB `client/` folder containing `bridge_client.py` and `ap_client.exe` | `C:\Games\DoomEternalArchipelago-v0.1.2\client` |
+| Game Base Path | DOOM Eternal `base/` folder containing `classicwads` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base` |
+| Saved Games Path | DOOM Eternal save `base/` folder | `C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base` |
+| `XINPUT1_3.dll` | Real game root, beside `DOOMEternalx64vk.exe` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\XINPUT1_3.dll` |
+| `DoomEternalArchipelagoPreAlpha.zip` | DOOM Eternal `Mods/` folder, still zipped | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\Mods\DoomEternalArchipelagoPreAlpha.zip` |
+
+Examples:
+
+```text
+CLIENT DIRECTORY:
+C:\Games\DoomEternalArchipelago-v0.1.2\client
+
+GAME BASE PATH:
+C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
+
+SAVED GAMES PATH:
+C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
+```
+
+**These paths are not interchangeable.**
+
+### 1. Extract the PTB
+
+Locate:
+
+```text
+DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip
+```
+
+Extract it into a brand-new empty directory.
+
+Do not:
+
+- run files directly from inside the ZIP;
+- extract the PTB over an older PTB directory;
+- copy a new PTB on top of an older extracted PTB;
+- extract `DoomEternalArchipelagoPreAlpha.zip`.
+
+Expected layout after extraction:
+
+```text
+DoomEternalArchipelago-v0.1.2/
+├── doometernal.apworld
+├── DoomEternalArchipelagoPreAlpha.zip
+├── README.md
+└── client/
+    ├── bridge_client.py
+    ├── ap_client.exe
+    ├── start_injector_windows.bat
+    ├── run_bridge.sh
+    └── ap_config.example.json
+```
+
+The `client/` directory in `v0.1.2-ptb` must not contain:
+
+- `version.dll`
+- `dinput8.dll`
+- `dxgi.dll`
+- `xinput1_4.dll`
+
+### 2. Install the APWorld
+
+1. Open `doometernal.apworld` with `ArchipelagoLauncher`.
+2. Close the launcher completely.
+3. Start `ArchipelagoLauncher` again.
+4. Confirm that `DOOM Eternal Client` now appears in the launcher.
+
+### 3. Set the Archipelago client directory
+
+When you start `DOOM Eternal Client`, Archipelago needs the location of the
+external PTB client files.
+
+The correct path ends with:
+
+```text
+\client
+```
+
+The selected directory must contain:
+
+- `bridge_client.py`
+- `ap_client.exe`
+- `start_injector_windows.bat`
+
+Correct example:
+
+```text
+C:\Games\DoomEternalArchipelago-v0.1.2\client
+```
+
+Incorrect examples:
+
+```text
+C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal
+C:\Games\DoomEternalArchipelago-v0.1.2
+```
+
+Why those are wrong:
+
+- the first path is the game installation directory;
+- the second path is the parent PTB directory;
+- neither one is the extracted `client/` directory.
+
+### 4. Configure the game and save paths
+
+On first launch, `DOOM Eternal Client` will ask for:
+
+- Game Base Path
+- Saved Games Path
+
+Game Base Path must end with:
+
+```text
+DOOMEternal\base
+```
+
+That directory must contain `classicwads`.
+`DOOMEternalx64vk.exe` is one level above it.
+
+Valid Windows example:
+
+```text
+C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
+```
+
+Saved Games Path example:
+
+```text
+C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
+```
+
+To open the Windows Saved Games directory quickly:
+
+1. Press `Win + R`.
+2. Type `shell:SavedGames`.
+3. Open `id Software`.
+4. Open `DOOMEternal`.
+5. Open `base`.
+
+The setup writes:
+
+```text
+client/ap_config.json
+```
+
+Do not:
+
+- reuse someone else's `ap_config.json`;
+- copy a config from another computer;
+- assume an old config is valid after moving folders.
+
+If `ap_client.exe` was started before setup completed, close it and restart it
+after `client/ap_config.json` exists.
+
+If the native client starts before `ap_config.json` exists, the expected
+warning is:
 
 ```text
 Config not found yet. Run/setup the DOOM Eternal Client once, then restart ap_client.exe if needed.
 ```
 
-### Linux / Proton
+Example `ap_config.json`:
+
+```json
+{
+  "doom_base_dir": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\DOOMEternal\\base",
+  "save_games_dir": "C:\\Users\\YOUR_NAME\\Saved Games\\id Software\\DOOMEternal\\base"
+}
+```
+
+### 5. Install Meathook
+
+Use exactly this release:
+
+https://github.com/brongo/m3337ho0o0ok/releases/tag/v7.2
+
+On Windows, `XINPUT1_3.dll` must be placed beside:
+
+```text
+DOOMEternalx64vk.exe
+```
+
+Correct Windows layout:
+
+```text
+DOOMEternal/
+├── DOOMEternalx64vk.exe
+├── XINPUT1_3.dll
+├── base/
+└── Mods/
+```
+
+Do not place `XINPUT1_3.dll` in:
+
+- `DOOMEternal\base`
+- the extracted PTB `client/` directory on Windows
+
+### 6. Install the map mod
+
+Windows injector:
+
+https://gamebanana.com/tools/7475
+
+Linux injector:
+
+https://github.com/leveste/EternalBasher/releases/tag/v6.66-rev3.12
+
+Copy:
+
+```text
+DoomEternalArchipelagoPreAlpha.zip
+```
+
+into:
+
+```text
+DOOMEternal/Mods/
+```
+
+Keep it as a ZIP.
+
+Do not:
+
+- extract `DoomEternalArchipelagoPreAlpha.zip`;
+- install loose `.entities` files;
+- leave an older mod ZIP active without reinjecting after updates.
+
+Run the injector again whenever you update the mod ZIP.
+
+### 7. Start the clients on Windows
+
+Startup order:
+
+1. Open `Archipelago Launcher`.
+2. Open `DOOM Eternal Client`.
+3. Connect to the Archipelago server.
+4. Start DOOM Eternal through Steam.
+5. Run:
+
+```text
+client\start_injector_windows.bat
+```
+
+6. Enter normal gameplay.
+7. Wait for the memory gate to open.
+8. Play.
+
+Only one `ap_client.exe` should be running at a time.
+
+### 8. Start the clients on Linux / Proton
 
 Set DOOM Eternal's Steam launch options to:
 
 ```text
-WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/path/to/run_bridge.sh" %command%
+WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/absolute/path/to/client/run_bridge.sh" %command%
 ```
 
-Use the absolute path to the extracted `client/run_bridge.sh`. Place the
-validated `XINPUT1_3.dll` beside `run_bridge.sh` and `ap_client.exe` in the
-extracted `client/` directory. If Proton shader compilation is slow on your
-machine, raise the delay to `20`.
+Requirements:
 
-For Linux/Proton, the validated layout is:
+- use an absolute path;
+- do not use only `~/...`;
+- raise `AP_CLIENT_DELAY` to `20` if shader startup is slow;
+- place `XINPUT1_3.dll` beside `DOOMEternalx64vk.exe`.
 
-```text
-<extracted PTB>/client/run_bridge.sh
-<extracted PTB>/client/ap_client.exe
-<extracted PTB>/client/XINPUT1_3.dll
-```
-
-The Proton-compatible preflight now logs both DLL candidates:
-
-- game-root candidate: `<DOOM root>/XINPUT1_3.dll`
-- client-local candidate: `<PTB client dir>/XINPUT1_3.dll`
-
-If the game-root DLL is missing, a client-local DLL is accepted when Proton
-mode is detected from `WINEDLLOVERRIDES` or related Wine/Proton signals.
-
-Typical first-run paths:
+Typical Linux / Proton paths:
 
 ```text
 Game Base Path: /path/to/steamapps/common/DOOMEternal/base
 Saved Games Path: /path/to/steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base
 ```
 
-### Windows
-
-For Windows/native installs, keep `XINPUT1_3.dll` beside
-`DOOMEternalx64vk.exe` in the real DOOM Eternal game directory.
-
-Typical first-run paths:
+Typical Bazzite-style examples:
 
 ```text
-Game Base Path: C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
-Saved Games Path: C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
+Game Base Path: /var/home/YOUR_NAME/.local/share/Steam/steamapps/common/DOOMEternal/base
+Saved Games Path: /var/home/YOUR_NAME/.local/share/Steam/steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base
 ```
 
-Start DOOM normally through Steam, then run:
+### Correct directory layouts
+
+Windows:
 
 ```text
-client\start_injector_windows.bat
+C:\Games\DoomEternalArchipelago-v0.1.2\
+├── doometernal.apworld
+├── DoomEternalArchipelagoPreAlpha.zip
+├── README.md
+└── client/
+    ├── bridge_client.py
+    ├── ap_client.exe
+    ├── start_injector_windows.bat
+    ├── run_bridge.sh
+    └── ap_config.example.json
+
+C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\
+├── DOOMEternalx64vk.exe
+├── XINPUT1_3.dll
+├── base/
+└── Mods/
+    └── DoomEternalArchipelagoPreAlpha.zip
 ```
 
-That helper starts the external RPC client `ap_client.exe` with the correct
-working directory. Only one `ap_client.exe` should exist at a time.
+### How to verify the installation
+
+Native log path:
+
+```text
+<DOOM Eternal>\base\ap_client.log
+```
+
+Expected lines:
+
+```text
+PTB version: v0.1.2-ptb
+Meathook RPC server verified.
+RPC memory gate OPEN
+```
+
+`Memory state unavailable` can appear temporarily in menus, loading screens, or
+transitions. It should not remain stuck during normal gameplay.
+
+### Troubleshooting
+
+#### DOOM Eternal Client files not found
+
+If the message says it searched in:
+
+```text
+C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal
+```
+
+then the game directory was configured as the client directory.
+
+Fix:
+
+1. Open `Archipelago Launcher` and open its Settings menu.
+2. Find:
+
+```text
+doom_eternal_options.client_directory
+```
+
+3. Point it to the extracted PTB `client/` directory.
+4. Save the settings.
+5. Close `Archipelago Launcher` completely.
+6. Start it again.
+7. Launch `DOOM Eternal Client`.
+
+If you cannot find the setting in the UI, search for `Open host.yaml` in the
+Launcher and edit:
+
+```yaml
+doom_eternal_options:
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.1.2/client"
+```
+
+Correct fallback in `host.yaml`:
+
+```yaml
+doom_eternal_options:
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.1.2/client"
+```
+
+Forward slashes are valid in Windows YAML paths.
+
+Do not use:
+
+```yaml
+doom_eternal_options:
+  client_directory: "C:/Program Files (x86)/Steam/steamapps/common/DOOMEternal"
+```
+
+#### Missing `libstdc++-6.dll` or `libgcc_s_seh-1.dll`
+
+Do not download random DLLs.
+
+If these errors appear, the installation probably mixed files from different
+PTB versions or reused an old extracted directory.
+
+Fix:
+
+1. Delete the extracted PTB directory.
+2. Extract `DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip` again into a
+   brand-new empty directory.
+3. Confirm that `client/` does not contain:
+   - `version.dll`
+   - `dinput8.dll`
+   - `dxgi.dll`
+   - `xinput1_4.dll`
+
+### Final checklist
+
+- [ ] PTB extracted into a brand-new directory
+- [ ] `doometernal.apworld` installed
+- [ ] Launcher restarted
+- [ ] `client_directory` ends in `/client`
+- [ ] client directory contains `bridge_client.py`
+- [ ] client directory contains `ap_client.exe`
+- [ ] Game Base Path ends in `DOOMEternal/base`
+- [ ] Saved Games Path ends in `DOOMEternal/base`
+- [ ] Meathook `v7.2` installed
+- [ ] `XINPUT1_3.dll` is beside `DOOMEternalx64vk.exe`
+- [ ] mod ZIP is inside `Mods/`
+- [ ] mod ZIP was not extracted
+- [ ] injector was executed
+- [ ] only one `ap_client.exe` is open
+- [ ] log shows `v0.1.2-ptb`
+- [ ] log shows `Meathook RPC server verified`
+- [ ] during gameplay, log shows `RPC memory gate OPEN`
 
 ## Current PTB logic
 
@@ -353,6 +707,13 @@ working directory. Only one `ap_client.exe` should exist at a time.
   diagnostic logs.
 - Prevent silent item loss on RPC failure, add recovery behavior, and complete
   Windows/Linux smoke testing.
+
+### 0.1.2 PTB — Windows client hotfix
+
+- Removed bundled proxy DLL aliases from the external client directory.
+- Fixed the Windows `ap_client.exe` startup failure.
+- Added PE dependency and DLL-shadowing validation to release builds.
+- Preserved the existing `v0.1.x` gameplay scope and item IDs.
 
 ### 0.2.x Pre-Alpha — Campaign expansion & Optional systems foundation
 
