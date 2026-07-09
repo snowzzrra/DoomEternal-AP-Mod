@@ -137,10 +137,10 @@
             "perk/player/argent/armor_capacity_3"
         ]
     },
-    "7770089": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/double_jump_air_control",
-    "7770090": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/modify_enemy_stagger_duration",
-    "7770091": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/activate_focus_on_death_blow",
-    "7770092": {
+    "7770122": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/double_jump_air_control",
+    "7770123": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/modify_enemy_stagger_duration",
+    "7770124": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/activate_focus_on_death_blow",
+    "7770125": {
         "type": "progressive_perk",
         "perks": [
             "perk/player/argent/ammo_capacity_0",
