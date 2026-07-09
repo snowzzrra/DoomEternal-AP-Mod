@@ -1,4 +1,4 @@
-# Doom Eternal Archipelago Playable Test
+# Doom Eternal Archipelago
 
 Game-side repository for the DOOM Eternal Archipelago integration.
 
@@ -278,23 +278,6 @@ client\start_injector_windows.bat
 That helper starts the external RPC client `ap_client.exe` with the correct
 working directory. Only one `ap_client.exe` should exist at a time.
 
-## PTB smoke test
-
-1. Reach gameplay in Hell on Earth and confirm item delivery works.
-2. Confirm `/doom_status` shows RPC armed and connected to the expected
-   seed/team/slot.
-3. Confirm the read-only memory gate opens only after safe gameplay is
-   detected.
-4. Collect at least one AP check and verify the corresponding native
-   `SECRET FOUND` feedback appears once.
-5. Restart only the visual bridge and confirm consumables do not replay.
-6. Return to menu, reload the save, and confirm the memory gate pauses during
-   non-gameplay states and reopens after gameplay resumes.
-7. Send a DeathLink from another client and confirm one in-game death without a
-   DeathLink echo loop.
-8. Complete the supported route through Cultist Base and confirm the runtime
-   goal triggers on the `e1m3_cult -> e1m4_boss` transition.
-
 ## Current PTB logic
 
 - `randomize_chainsaw` defaults to `false`.
@@ -333,82 +316,61 @@ working directory. Only one `ap_client.exe` should exist at a time.
   recovery.
 - Secret Encounters and Mission Challenges are not AP checks in the PTB.
 
-## Source checkout usage
-
-This section is for working from the repository instead of the packaged PTB
-zip.
-
-1. Keep this repo beside the Archipelago checkout:
-
-```text
-DoomEternal-AP-Mod/
-Archipelago/
-```
-
-2. Copy `ap_config.example.json` to `ap_config.json` and fill your own paths.
-3. Install Python requirements for this repo:
-
-```bash
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-```
-
-4. Rebuild the external RPC client with `./build_client.sh` when needed.
-5. Run `./validate_all.sh` before packaging.
-6. Build the playable test with `./build_playable_test.sh`.
-
-Notes:
-
-- `ap_config.json` only needs the local DOOM base path and save-games path.
-- Older local configs may still carry `archipelago_path`; the current bridge
-  does not require it.
-- The release bundle is produced from this repo plus the sibling Archipelago
-  checkout, but it does not ship either source tree.
-
-### APWorld source path
-
-The build expects a sibling Archipelago checkout by default, but can be pointed
-explicitly at your local fork.
-
 ## Roadmap
 
-### PTB
+### 0.1.1 PTB — Runtime stabilization
 
-- Finalize the first controlled playable package.
-- Validate the four-map route and runtime goal.
-- Validate Windows smoke testing.
-- Collect structured bug reports from Discord testers.
+- Freeze the current route through Cultist Base: `78` map checks plus `1`
+  runtime goal.
+- Pin the validated Meathook and mod-installation versions and improve local
+  diagnostic logs.
+- Prevent silent item loss on RPC failure, add recovery behavior, and complete
+  Windows/Linux smoke testing.
 
-### Alpha
+### 0.2.x Pre-Alpha — Campaign expansion
 
-- Full base campaign playable.
-- More stable item delivery and map coverage.
-- Broader Windows validation.
-- More complete save/load and DeathLink behavior.
+- Add the remaining base-game missions incrementally using the existing
+  `.entities` condumps.
+- Generalize manifests, mission-completion checks, region rules, and per-map
+  validation.
+- Expand location and item coverage without treating balance or compatibility
+  as final.
 
-### Beta
+### 0.3.x–0.5.x Alpha — Full base campaign
 
-- DLC support.
-- More options and balance passes.
-- Slayer Seal goal logic.
-- More complete optional-content check support.
+- Make all `13` base-game missions playable end to end.
+- Complete progression logic, persistent upgrades, optional checks, and the
+  base-game Unmaykr Protocol goal.
+- Reach feature-complete base-game scope by `0.5.x`, with no known progression
+  blockers in the default configuration.
+
+### 0.7.x Beta — Content freeze and polish
+
+- Freeze the planned `1.0` scope and stabilize IDs and data formats where
+  possible.
+- Focus on balance, installation, compatibility, save/reconnect behavior,
+  discoverability, and broader community testing.
+- Finish documentation, diagnostics, and support tooling.
+
+### 0.9.x Release Candidate
+
+- Ship the intended `1.0` feature set for final validation.
+- Accept only blocker and regression fixes; no major systems or content
+  expansion.
 
 ### 1.0
 
+- Stable public release of the complete base campaign.
 - Base-game Unmaykr Protocol goal:
   `Slayer Gate Keys -> Slayer Gates -> Empyrean Keys -> Unmaykr -> Final Sin`.
-- DLC Seal Hunt goal.
-- Automap marker/discoverability improvements.
-- Secret Encounters and Mission Challenges as AP checks.
-- More complete weapon upgrade/mastery model.
-- Public release and AP community announcement.
+- Public documentation, release packaging, and Archipelago community
+  announcement.
 
 ### Post-1.0 / 2.0
 
+- The Ancient Gods campaigns and Seal Hunt goal.
 - Mission Access items.
-- Horde Mode support.
-- Master Levels.
+- Horde Mode and Master Levels.
 - Enemy randomizer.
 - Hard Mode / checkpoint removal.
 - Starting inventory and starting weapon options.
