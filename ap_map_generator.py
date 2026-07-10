@@ -149,6 +149,27 @@ def find_entity_block_bounds(content, entity_name):
     return block_start, block_end
 
 
+def neutralize_conditional_pickup(content, entity_name):
+    """Keep a script-addressable entity name while removing pickup behavior."""
+    bounds = find_entity_block_bounds(content, entity_name)
+    if bounds is None:
+        raise ValueError(f"Conditional pickup not found: {entity_name}")
+    start, end = bounds
+    block = content[start:end]
+    block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "info/null";', block, count=1)
+    block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idInfo";', block, count=1)
+    block = remove_property_blocks(block, "renderModelInfo")
+    block = remove_property_blocks(block, "clipModelInfo")
+    for property_name in (
+        "useableComponentDecl", "triggerDef", "equipOnPickup", "lootStyle",
+        "forceEquip", "canBePossessed",
+    ):
+        block = re.sub(
+            rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block
+        )
+    return content[:start] + block + content[end:]
+
+
 def replace_targets_block(block, target_names):
     targets_lines = [
         "targets = {",
@@ -574,11 +595,15 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
+    neutralize_pickups = level_config.get("neutralize_pickups", [])
     secret_encounters = level_config.get("secret_encounters", [])
     manifest_data = {}
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
+
+    for entity_name in neutralize_pickups:
+        content = neutralize_conditional_pickup(content, entity_name)
 
     content = remove_balanced_entity_blocks(content, "ap_logic_")
     content = remove_balanced_entity_blocks(content, "AP_CHECK_")
@@ -646,12 +671,33 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     spawn_pos_text = pos_fallback.group(1) + "\n"
 
             if "edit = {" in block:
+                target_policy = target_policies.get(entity_name)
                 block = add_ap_check_target(
                     block,
                     entity_name,
                     ap_check_id,
-                    target_policies.get(entity_name),
+                    target_policy,
                 )
+
+                preserve_scripted_pickup = bool(
+                    target_policy
+                    and target_policy.get("preserve_scripted_pickup", False)
+                )
+
+                if preserve_scripted_pickup:
+                    # Scripted onboarding pickups rely on their original
+                    # identity, render/visibility hooks, interaction component,
+                    # and reverse relay graph. Only their vanilla grant target
+                    # is removed; the AP relay is appended above.
+                    location_id = config_entities[ap_check_id]
+                    new_blocks.append(generate_target_relay(
+                        ap_check_id, location_id, spawn_pos_text
+                    ))
+                    new_blocks.append(generate_pickup_notification(ap_check_id))
+                    new_blocks.append(generate_check_event(location_id))
+                    modified_count += 1
+                    new_blocks.append("entity {" + block)
+                    continue
 
                 # gravity stuff
                 block = re.sub(r'physicsAttributes\s*=\s*"[^"]+";', "", block)

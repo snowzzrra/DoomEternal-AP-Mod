@@ -385,6 +385,63 @@ class CheckEventTests(unittest.TestCase):
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
 
+    def test_existing_progressive_activation_keeps_stage_and_bytes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                processing = Path(
+                    tmpdir, "recv-000020-item-7770092-cmd-00.processing"
+                )
+                payload = "ai_ScriptCmdEnt ap_rpc_v3_7770092_3 activate\n"
+                processing.write_bytes(payload.encode("utf-8"))
+
+                bridge_client.migrate_direct_item_command_jobs()
+                queued = processing.with_suffix(".cmd")
+                self.assertEqual(queued.read_bytes(), payload.encode("utf-8"))
+
+                bridge_client.migrate_direct_item_command_jobs()
+                self.assertEqual(queued.read_bytes(), payload.encode("utf-8"))
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+
+    def test_valid_map_side_activation_is_not_rewritten_from_filename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                queued = Path(tmpdir, "recv-000021-item-7770012-cmd-00.cmd")
+                payload = "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n"
+                queued.write_text(payload, encoding="utf-8")
+                bridge_client.migrate_direct_item_command_jobs()
+                self.assertEqual(queued.read_text(encoding="utf-8"), payload)
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+
+    def test_frag_and_ice_spool_launcher_then_equipment(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "state.json")
+                ctx = self._make_item_context()
+                for receive_index, item_id in enumerate((7770011, 7770013)):
+                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index)[0])
+                payloads = [
+                    path.read_text(encoding="utf-8").strip()
+                    for path in sorted(Path(tmpdir).glob("*.cmd"))
+                ]
+                self.assertEqual(payloads, [
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011_1 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate",
+                ])
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
     def test_named_weapon_items_spool_expected_entities(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             original_queue_dir = bridge_client.QUEUE_DIR
@@ -708,6 +765,52 @@ class CheckEventTests(unittest.TestCase):
 
                 self.assertTrue(event_path.exists())
                 self.assertEqual(ctx.session_state["goal_sent"], False)
+            finally:
+                bridge_client.DOOM_BASE_DIR = original_base_dir
+
+    def test_goal_ui_failure_does_not_retry_or_undo_commit(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_base_dir = bridge_client.DOOM_BASE_DIR
+            try:
+                bridge_client.DOOM_BASE_DIR = tmpdir
+                event_path = Path(tmpdir, bridge_client.GOAL_EVENT_FILENAME)
+                event_path.write_text(
+                    "from_map=game/sp/e1m3_cult/e1m3_cult\n"
+                    "to_map=game/sp/e1m4_boss/e1m4_boss\n",
+                    encoding="utf-8",
+                )
+                sent = []
+
+                class FakeContext:
+                    def __init__(self):
+                        self.session_state = {"goal_sent": False}
+                        self.locations_checked = set()
+                        self.server = types.SimpleNamespace(
+                            socket=types.SimpleNamespace(closed=False)
+                        )
+                    async def send_msgs(self, messages):
+                        sent.extend(messages)
+                    def persist_session_state(self):
+                        pass
+                    def output(self, message):
+                        raise AttributeError("output unavailable")
+                    async def send_campaign_goal(self, source_description):
+                        return await bridge_client.DoomEternalContext.send_campaign_goal(
+                            self, source_description
+                        )
+
+                ctx = FakeContext()
+                asyncio.run(
+                    bridge_client.DoomEternalContext.check_campaign_goal_event(ctx)
+                )
+                self.assertTrue(ctx.session_state["goal_sent"])
+                self.assertFalse(event_path.exists())
+                self.assertEqual(len(sent), 2)
+
+                asyncio.run(
+                    bridge_client.DoomEternalContext.check_campaign_goal_event(ctx)
+                )
+                self.assertEqual(len(sent), 2)
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
 

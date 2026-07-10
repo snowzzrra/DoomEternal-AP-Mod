@@ -9,6 +9,7 @@ from ap_map_generator import (
     command_requires_map_side_rpc,
     compute_file_sha256,
     ensure_distinct_input_output_paths,
+    find_entity_block_bounds,
     find_generated_prefixes,
     generate_check_event,
     generate_event_relay,
@@ -21,6 +22,8 @@ from ap_map_generator import (
     remove_property_blocks,
     validate_source_file,
 )
+
+ROOT = Path(__file__).parents[1]
 
 
 class MapGeneratorTests(unittest.TestCase):
@@ -246,6 +249,28 @@ entity {
                     "drop_targets": ["target_give_item_ice_bomb"],
                 },
             )
+
+    def test_hub_ice_bomb_preserves_scripted_pickup_contract(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "hub.entities")
+            manifest = Path(tmpdir, "hub.json")
+            generate_map(
+                ROOT / "vanillamaps" / "hub.map",
+                output,
+                ROOT / "level_configs" / "hub.json",
+                manifest,
+                json.loads((ROOT / "data" / "items.json").read_text()),
+            )
+            generated = output.read_text(encoding="utf-8")
+            bounds = find_entity_block_bounds(generated, "pickup_equipment_ice_bomb")
+            self.assertIsNotNone(bounds)
+            block = generated[bounds[0]:bounds[1]]
+            self.assertIn('inherit = "pickup/equipment/ice_bomb";', block)
+            self.assertIn('class = "idProp2";', block)
+            self.assertIn('useableComponentDecl = "propitem/equipment/ice_bomb";', block)
+            self.assertIn('model = "art/weapons/equipmentlauncher/equipmentlauncher_ice_pickup.lwo";', block)
+            self.assertIn('item[1] = "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB";', block)
+            self.assertNotIn("target_give_item_ice_bomb", block)
 
     def test_non_problem_pickups_preserve_existing_targets(self):
         content = """

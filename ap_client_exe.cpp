@@ -1092,7 +1092,20 @@ std::optional<std::string> MigratedDirectItemCommand(
     const std::string& filename,
     const std::string& command
 ) {
-    if (StartsWith(command, std::string("ai_ScriptCmdEnt ") + kRpcEntityPrefix + "_")) {
+    static const std::regex validMapActivation(
+        std::string(R"(^ai_ScriptCmdEnt )") + kRpcEntityPrefix
+        + R"(_[0-9]+(?:_[0-9]+)? activate$)"
+    );
+    if (std::regex_match(command, validMapActivation)) {
+        return std::nullopt;
+    }
+
+    const bool legacyRawEffect =
+        StartsWith(command, "give ")
+        || StartsWith(command, "chrispy ")
+        || StartsWith(command, "g_giveExtraLives ")
+        || StartsWith(command, "ai_ScriptCmdEnt player1 givePlayerPerk ");
+    if (!legacyRawEffect) {
         return std::nullopt;
     }
 

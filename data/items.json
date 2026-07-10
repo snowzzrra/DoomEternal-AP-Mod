@@ -16,12 +16,18 @@
     "7770008": "give weapon/player/unmaykr",
     "7770009": "give weapon/player/hammer",
     "7770010": "give weapon/player/chainsaw",
-    "7770011": "give throwable/player/frag_grenade",
+    "7770011": [
+        "give equipmentlauncher/equipmentlauncherleft",
+        "give throwable/player/frag_grenade"
+    ],
     "7770012": [
         "give equipmentlauncher/equipmentlauncherleft",
         "give weapon/player/equipment_flame_belch"
     ],
-    "7770013": "give throwable/player/ice_bomb",
+    "7770013": [
+        "give equipmentlauncher/equipmentlauncherleft",
+        "give throwable/player/ice_bomb"
+    ],
     "7770014": "give abilities/blood_punch",
     "7770015": "give ability_dash",
     "7770016": {
