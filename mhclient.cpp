@@ -4,6 +4,7 @@
 #include "meathook_interface.h" 
 #include <windows.h>
 #include "mhclient.h"
+#include <sstream>
 
 static RpcCallResult ClassifyWaitNamedPipeFailure(DWORD error)
 {
@@ -17,6 +18,90 @@ static RpcCallResult ClassifyWaitNamedPipeFailure(DWORD error)
     default:
         return UNKNOWN_TRANSPORT_ERROR;
     }
+}
+
+MeathookInterface::MeathookInterface()
+{
+    InitializeCriticalSection(&m_RpcMutex);
+    m_RpcMutexInitialized = true;
+    StartKeepAliveThread();
+}
+
+MeathookInterface::~MeathookInterface()
+{
+    if (m_RpcMutexInitialized) {
+        DeleteCriticalSection(&m_RpcMutex);
+        m_RpcMutexInitialized = false;
+    }
+}
+
+void MeathookInterface::LogRpc(const std::string& message)
+{
+    if (m_LogCallback) {
+        m_LogCallback(message);
+    } else {
+        printf("%s\n", message.c_str());
+    }
+}
+
+DWORD MeathookInterface::LastSuccessfulKeepAliveAgeMs() const
+{
+    if (m_LastSuccessfulKeepAliveTick == 0) {
+        return 0xFFFFFFFF;
+    }
+    return GetTickCount() - m_LastSuccessfulKeepAliveTick;
+}
+
+void MeathookInterface::MarkBindingInvalid()
+{
+    m_Initialized = false;
+    InterlockedIncrement(&m_BindingGeneration);
+}
+
+bool MeathookInterface::EnterRpcCall(
+    const char* operation,
+    unsigned long long& callId,
+    DWORD& waitMs
+) {
+    const DWORD waitStart = GetTickCount();
+    EnterCriticalSection(&m_RpcMutex);
+    waitMs = GetTickCount() - waitStart;
+    callId = ++m_RpcCallSequence;
+    std::ostringstream message;
+    message
+        << "RPC_CALL_START"
+        << " rpc_call_id=" << callId
+        << " command_id=" << m_CurrentCommandId
+        << " thread_id=" << GetCurrentThreadId()
+        << " operation=" << operation
+        << " mutex_wait_ms=" << waitMs
+        << " start_tick_ms=" << GetTickCount()
+        << " last_successful_keepalive_age_ms=" << LastSuccessfulKeepAliveAgeMs()
+        << " binding_generation=" << m_BindingGeneration;
+    LogRpc(message.str());
+    return true;
+}
+
+void MeathookInterface::LeaveRpcCall(
+    const char* operation,
+    unsigned long long callId,
+    DWORD waitMs,
+    DWORD startTick
+) {
+    std::ostringstream message;
+    message
+        << "RPC_CALL_END"
+        << " rpc_call_id=" << callId
+        << " command_id=" << m_CurrentCommandId
+        << " thread_id=" << GetCurrentThreadId()
+        << " operation=" << operation
+        << " mutex_wait_ms=" << waitMs
+        << " duration_ms=" << (GetTickCount() - startTick)
+        << " last_successful_keepalive_age_ms=" << LastSuccessfulKeepAliveAgeMs()
+        << " binding_generation=" << m_BindingGeneration
+        << " result=" << m_LastRpcCallResult;
+    LogRpc(message.str());
+    LeaveCriticalSection(&m_RpcMutex);
 }
 
 // struct idMat3 {
@@ -56,16 +141,22 @@ DWORD WINAPI MeathookInterface::KeepAlive(LPVOID Data)
     Sleep(2000);
     while (1) {
 
+        unsigned long long callId = 0;
+        DWORD waitMs = 0;
+        pthis->EnterRpcCall("KeepAlive", callId, waitMs);
+        const DWORD startTick = GetTickCount();
+
         if (pthis->m_Initialized == false) {
             pthis->InitializeRpcInterface();
         }
-        
+
         if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
             pthis->m_LastTransportError = GetLastError();
             pthis->m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(
                 pthis->m_LastTransportError
             );
-            pthis->m_Initialized = false;
+            pthis->MarkBindingInvalid();
+            pthis->LeaveRpcCall("KeepAlive", callId, waitMs, startTick);
             Sleep(1000);
             continue;
         }
@@ -77,6 +168,7 @@ DWORD WINAPI MeathookInterface::KeepAlive(LPVOID Data)
             int x;
             ::KeepAlive(meathook_interface_v1_0_c_ifspec, &x);
             pthis->m_Initialized = true;
+            pthis->m_LastSuccessfulKeepAliveTick = GetTickCount();
             pthis->m_LastTransportError = ERROR_SUCCESS;
             pthis->m_LastRpcCallResult = RPC_CALL_DELIVERED;
         }
@@ -84,11 +176,14 @@ DWORD WINAPI MeathookInterface::KeepAlive(LPVOID Data)
         {
             int ulCode = 1;
             printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
-            pthis->m_Initialized = false;
+            pthis->MarkBindingInvalid();
             pthis->m_LastTransportError = ERROR_GEN_FAILURE;
             pthis->m_LastRpcCallResult = RPC_EXCEPTION;
-            Sleep(2000);
         }
+        }
+        pthis->LeaveRpcCall("KeepAlive", callId, waitMs, startTick);
+        if (pthis->m_LastRpcCallResult == RPC_EXCEPTION) {
+            Sleep(2000);
         }
         Sleep(5000);
     }
@@ -149,9 +244,15 @@ bool MeathookInterface::GetEntitiesFile(unsigned char* pBuffer, size_t *Size)
 
 bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Size)
 {
+    unsigned long long callId = 0;
+    DWORD waitMs = 0;
+    EnterRpcCall("PushEntitiesFile", callId, waitMs);
+    const DWORD startTick = GetTickCount();
     if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
         m_LastTransportError = GetLastError();
         m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(m_LastTransportError);
+        MarkBindingInvalid();
+        LeaveRpcCall("PushEntitiesFile", callId, waitMs, startTick);
         return false;
     }
     try {
@@ -171,6 +272,7 @@ bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Siz
         // ::PushEntitiesFile(meathook_interface_v1_0_c_ifspec, (unsigned char*)pFileName, false, Size);
         m_LastTransportError = ERROR_SUCCESS;
         m_LastRpcCallResult = RPC_CALL_DELIVERED;
+        LeaveRpcCall("PushEntitiesFile", callId, waitMs, startTick);
         return true;
     }
     } catch(...) {
@@ -179,6 +281,8 @@ bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Siz
         printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
         m_LastTransportError = ERROR_GEN_FAILURE;
         m_LastRpcCallResult = RPC_EXCEPTION;
+        MarkBindingInvalid();
+        LeaveRpcCall("PushEntitiesFile", callId, waitMs, startTick);
         return false;
     }
     }
@@ -187,9 +291,15 @@ bool MeathookInterface::PushEntitiesFile(char* pFileName, char *pBuffer, int Siz
 
 bool MeathookInterface::ExecuteConsoleCommand(unsigned char* pszString)
 {
+    unsigned long long callId = 0;
+    DWORD waitMs = 0;
+    EnterRpcCall("ExecuteConsoleCommand", callId, waitMs);
+    const DWORD startTick = GetTickCount();
     if (!WaitNamedPipeA("\\\\.\\pipe\\meathook_interface_rpc", 100)) {
         m_LastTransportError = GetLastError();
         m_LastRpcCallResult = ClassifyWaitNamedPipeFailure(m_LastTransportError);
+        MarkBindingInvalid();
+        LeaveRpcCall("ExecuteConsoleCommand", callId, waitMs, startTick);
         return false;
     }
     try {
@@ -198,6 +308,7 @@ bool MeathookInterface::ExecuteConsoleCommand(unsigned char* pszString)
         ::ExecuteConsoleCommand(meathook_interface_v1_0_c_ifspec, pszString);
         m_LastTransportError = ERROR_SUCCESS;
         m_LastRpcCallResult = RPC_CALL_DELIVERED;
+        LeaveRpcCall("ExecuteConsoleCommand", callId, waitMs, startTick);
         return true;
     }
     } catch(...) {
@@ -206,6 +317,8 @@ bool MeathookInterface::ExecuteConsoleCommand(unsigned char* pszString)
         printf("Runtime reported exception 0x%lx = %ld\n", ulCode, ulCode);
         m_LastTransportError = ERROR_GEN_FAILURE;
         m_LastRpcCallResult = RPC_EXCEPTION;
+        MarkBindingInvalid();
+        LeaveRpcCall("ExecuteConsoleCommand", callId, waitMs, startTick);
         return false;
     }
     }

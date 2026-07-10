@@ -78,6 +78,341 @@ bridge_client = _load_bridge_client()
 
 
 class CheckEventTests(unittest.TestCase):
+    def _make_item_context(self):
+        ctx = bridge_client.DoomEternalContext(None, None)
+        ctx.session_state = {}
+        ctx.client_state = {"version": 1, "sessions": {}}
+        ctx.item_state_ready = True
+        ctx.items_received = []
+        return ctx
+
+    def test_string_mapping_spools_one_map_side_activation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+
+                spooled, description = ctx.spool_item_commands(7770010, 3)
+
+                self.assertTrue(spooled)
+                self.assertEqual(description, "give weapon/player/chainsaw")
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual([path.name for path in files], [
+                    "recv-000003-item-7770010-cmd-00.cmd"
+                ])
+                self.assertEqual(
+                    files[0].read_text(encoding="utf-8"),
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770010 activate\n",
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_chrispy_string_mapping_spools_map_side_activation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+
+                spooled, description = ctx.spool_item_commands(7770045, 11)
+
+                self.assertTrue(spooled)
+                self.assertEqual(description, "chrispy ai/heavy/revenant")
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual(
+                    [path.name for path in files],
+                    ["recv-000011-item-7770045-cmd-00.cmd"],
+                )
+                self.assertEqual(
+                    files[0].read_text(encoding="utf-8"),
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770045 activate\n",
+                )
+                self.assertNotIn(
+                    "chrispy ai/heavy/revenant",
+                    files[0].read_text(encoding="utf-8"),
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_all_current_item_mappings_delegate_map_side(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+                item_ids = [
+                    item_id
+                    for item_id, command in bridge_client.ITEM_ID_TO_COMMAND.items()
+                    if not (isinstance(command, dict) and command.get("type") == "no_op")
+                ]
+
+                self.assertIn(7770000, item_ids)
+                self.assertIn(7770045, item_ids)
+                ctx.items_received = [
+                    types.SimpleNamespace(item=item_id) for item_id in item_ids
+                ]
+                for receive_index, item_id in enumerate(item_ids):
+                    spooled, _ = ctx.spool_item_commands(item_id, receive_index)
+                    self.assertTrue(spooled)
+
+                for path in Path(tmpdir).glob("*.cmd"):
+                    command = path.read_text(encoding="utf-8")
+                    self.assertTrue(command.startswith("ai_ScriptCmdEnt ap_rpc_v3_"))
+                    self.assertNotIn("chrispy ", command)
+                    self.assertNotIn("give ", command)
+                    self.assertNotIn("g_giveExtraLives", command)
+                    self.assertNotIn("givePlayerPerk", command)
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_multi_command_mapping_spools_ordered_child_activations(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+
+                spooled, description = ctx.spool_item_commands(7770012, 7)
+
+                self.assertTrue(spooled)
+                self.assertEqual(
+                    description,
+                    "give equipmentlauncher/equipmentlauncherleft -> "
+                    "give weapon/player/equipment_flame_belch",
+                )
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual(
+                    [path.name for path in files],
+                    [
+                        "recv-000007-item-7770012-cmd-00.cmd",
+                        "recv-000007-item-7770012-cmd-01.cmd",
+                    ],
+                )
+                self.assertEqual(
+                    [path.read_text(encoding="utf-8") for path in files],
+                    [
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770012_0 activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n",
+                    ],
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_multi_command_chrispy_element_uses_child_entity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            original_mapping = bridge_client.ITEM_ID_TO_COMMAND.get(7770997)
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                bridge_client.ITEM_ID_TO_COMMAND[7770997] = [
+                    "give ammo",
+                    "chrispy ai/fodder/imp",
+                ]
+                ctx = self._make_item_context()
+
+                spooled, _ = ctx.spool_item_commands(7770997, 12)
+
+                self.assertTrue(spooled)
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual(
+                    [path.name for path in files],
+                    [
+                        "recv-000012-item-7770997-cmd-00.cmd",
+                        "recv-000012-item-7770997-cmd-01.cmd",
+                    ],
+                )
+                self.assertEqual(
+                    [path.read_text(encoding="utf-8") for path in files],
+                    [
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770997_0 activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770997_1 activate\n",
+                    ],
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+                if original_mapping is None:
+                    bridge_client.ITEM_ID_TO_COMMAND.pop(7770997, None)
+                else:
+                    bridge_client.ITEM_ID_TO_COMMAND[7770997] = original_mapping
+
+    def test_multi_command_reconnect_does_not_duplicate_existing_spools(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+
+                self.assertTrue(ctx.spool_item_commands(7770012, 7)[0])
+                self.assertTrue(ctx.spool_item_commands(7770012, 7)[0])
+
+                self.assertEqual(len(list(Path(tmpdir).glob("*.cmd"))), 2)
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_multi_command_partial_crash_spools_remaining_command(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+                first = Path(tmpdir, "recv-000007-item-7770012-cmd-00.cmd")
+                first.write_text(
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770012_0 activate\n",
+                    encoding="utf-8",
+                )
+                ctx.session_state["item_command_groups"] = {
+                    "7": {
+                        "item_id": 7770012,
+                        "next_command": 1,
+                        "total_commands": 2,
+                    }
+                }
+
+                spooled, _ = ctx.spool_item_commands(7770012, 7)
+
+                self.assertTrue(spooled)
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual(
+                    [path.name for path in files],
+                    [
+                        "recv-000007-item-7770012-cmd-00.cmd",
+                        "recv-000007-item-7770012-cmd-01.cmd",
+                    ],
+                )
+                self.assertNotIn("item_command_groups", ctx.session_state)
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_empty_list_mapping_fails_closed_without_spool(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_mapping = bridge_client.ITEM_ID_TO_COMMAND.get(7770998)
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.ITEM_ID_TO_COMMAND[7770998] = []
+                ctx = self._make_item_context()
+
+                spooled, description = ctx.spool_item_commands(7770998, 9)
+
+                self.assertFalse(spooled)
+                self.assertEqual(description, "mapping list is empty")
+                self.assertEqual(list(Path(tmpdir).glob("*.cmd")), [])
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                if original_mapping is None:
+                    bridge_client.ITEM_ID_TO_COMMAND.pop(7770998, None)
+                else:
+                    bridge_client.ITEM_ID_TO_COMMAND[7770998] = original_mapping
+
+    def test_legacy_processing_direct_item_job_is_migrated_to_cmd(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                processing = Path(tmpdir, "recv-000016-item-7770000-cmd-00.processing")
+                processing.write_text(
+                    "give weapon/player/heavy_cannon\n", encoding="utf-8"
+                )
+
+                bridge_client.migrate_direct_item_command_jobs()
+
+                migrated = Path(tmpdir, "recv-000016-item-7770000-cmd-00.cmd")
+                self.assertTrue(migrated.exists())
+                self.assertFalse(processing.exists())
+                self.assertEqual(
+                    migrated.read_text(encoding="utf-8"),
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770000 activate\n",
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+
+    def test_legacy_cmd_list_item_job_uses_child_entity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                queued = Path(tmpdir, "recv-000007-item-7770012-cmd-01.cmd")
+                queued.write_text(
+                    "give weapon/player/equipment_flame_belch\n", encoding="utf-8"
+                )
+
+                bridge_client.migrate_direct_item_command_jobs()
+
+                self.assertTrue(queued.exists())
+                self.assertEqual(
+                    queued.read_text(encoding="utf-8"),
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n",
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+
+    def test_manual_diagnostic_command_is_not_migrated(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                manual = Path(tmpdir, "manual-test.cmd")
+                manual.write_text("give weapon/player/heavy_cannon\n", encoding="utf-8")
+
+                bridge_client.migrate_direct_item_command_jobs()
+
+                self.assertEqual(
+                    manual.read_text(encoding="utf-8"),
+                    "give weapon/player/heavy_cannon\n",
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+
+    def test_named_weapon_items_spool_expected_entities(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+
+                expectations = {
+                    7770000: "ai_ScriptCmdEnt ap_rpc_v3_7770000 activate\n",
+                    7770001: "ai_ScriptCmdEnt ap_rpc_v3_7770001 activate\n",
+                    7770004: "ai_ScriptCmdEnt ap_rpc_v3_7770004 activate\n",
+                    7770045: "ai_ScriptCmdEnt ap_rpc_v3_7770045 activate\n",
+                }
+                for receive_index, item_id in enumerate(expectations):
+                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index)[0])
+
+                for receive_index, (item_id, expected) in enumerate(expectations.items()):
+                    path = Path(
+                        tmpdir,
+                        f"recv-{receive_index:06d}-item-{item_id}-cmd-00.cmd",
+                    )
+                    self.assertEqual(path.read_text(encoding="utf-8"), expected)
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
     def test_doom_status_is_user_facing_only(self):
         outputs = []
 

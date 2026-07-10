@@ -12,6 +12,7 @@ from pathlib import Path
 from ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
+    command_requires_map_side_rpc,
     generate_check_event,
     generate_event_relay,
     generate_pickup_notification,
@@ -206,6 +207,34 @@ def main() -> int:
         or 'class = "idTarget_Relay";' in generated_commands
     ):
         errors.append("Multi-command items do not use the validated target/count relay")
+
+    generated_real_commands = generate_rpc_command_entities(commands)
+    for item_id, command_value in commands.items():
+        if isinstance(command_value, str):
+            if re.search(r"sharedammopool/(?:fuel|bfg)\s+0(?:\s|$)", command_value):
+                errors.append(f"Drain trap {item_id} must not use a zero amount")
+            if (
+                command_requires_map_side_rpc(command_value)
+                and f"entityDef {RPC_ENTITY_PREFIX}_{item_id} {{" not in generated_real_commands
+            ):
+                errors.append(
+                    f"Item command {item_id} lacks map-side RPC entity"
+                )
+        elif isinstance(command_value, list):
+            for command_index, command in enumerate(command_value):
+                if re.search(r"sharedammopool/(?:fuel|bfg)\s+0(?:\s|$)", command):
+                    errors.append(
+                        f"Drain trap {item_id}[{command_index}] must not use a zero amount"
+                    )
+                if (
+                    command_requires_map_side_rpc(command)
+                    and f"entityDef {RPC_ENTITY_PREFIX}_{item_id}_{command_index} {{"
+                    not in generated_real_commands
+                ):
+                    errors.append(
+                        f"Item command {item_id}[{command_index}] lacks "
+                        "map-side RPC entity"
+                    )
 
     relay = generate_target_relay("AP_CHECK_VALIDATION", 7770999, "")
     secret_relay = generate_event_relay(

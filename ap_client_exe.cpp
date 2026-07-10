@@ -29,15 +29,23 @@ static const char* kCultistBaseMap = "game/sp/e1m3_cult/e1m3_cult";
 static const char* kDoomHunterBaseMap = "game/sp/e1m4_boss/e1m4_boss";
 static const char* kReleaseVersion = "v0.1.2-ptb";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
-static const int kItemMappingRevision = 3;
+static const int kItemMappingRevision = 4;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kGoalMonitorPollMs = 1000;
+static const DWORD kRpcStallWarnMs = 15000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 struct CommandJob {
     std::string path;
     std::string command;
+};
+
+struct RpcWatchdogContext {
+    volatile LONG completed = 0;
+    DWORD startTick = 0;
+    std::string commandId;
+    std::string operation;
 };
 
 struct SaveSnapshot {
@@ -88,6 +96,19 @@ void LogDebug(const std::string& message) {
         fprintf(file, "[%s] %s\n", timestamp, message.c_str());
         fclose(file);
     }
+}
+
+DWORD WINAPI RpcCallWatchdog(LPVOID data) {
+    RpcWatchdogContext* context = static_cast<RpcWatchdogContext*>(data);
+    Sleep(kRpcStallWarnMs);
+    if (InterlockedCompareExchange(&context->completed, 0, 0) == 0) {
+        LogDebug(
+            "RPC_CALL_STALLED command_id=" + context->commandId
+            + " operation=" + context->operation
+            + " elapsed_ms=" + std::to_string(GetTickCount() - context->startTick)
+        );
+    }
+    return 0;
 }
 
 std::string TrimLine(std::string value) {
@@ -1053,6 +1074,50 @@ bool ReadCommandFile(const std::string& path, std::string& command) {
     return !command.empty();
 }
 
+bool WriteCommandFile(const std::string& path, const std::string& command) {
+    FILE* file = fopen(path.c_str(), "wb");
+    if (!file) return false;
+    const std::string line = command + "\n";
+    const size_t written = fwrite(line.data(), 1, line.size(), file);
+    const bool ok = written == line.size() && fflush(file) == 0;
+    fclose(file);
+    return ok;
+}
+
+bool StartsWith(const std::string& value, const std::string& prefix) {
+    return value.rfind(prefix, 0) == 0;
+}
+
+std::optional<std::string> MigratedDirectItemCommand(
+    const std::string& filename,
+    const std::string& command
+) {
+    if (StartsWith(command, std::string("ai_ScriptCmdEnt ") + kRpcEntityPrefix + "_")) {
+        return std::nullopt;
+    }
+
+    static const std::regex commandIdPattern(
+        R"(recv-\d+-item-(\d+)-cmd-(\d+)\.processing)"
+    );
+    std::smatch match;
+    if (!std::regex_match(filename, match, commandIdPattern)) {
+        LogDebug(
+            "Direct item command left untouched; cannot parse deterministic "
+            "command id: " + filename
+        );
+        return std::nullopt;
+    }
+
+    const std::string itemId = match[1].str();
+    const std::string commandIndex = match[2].str();
+    if (commandIndex == "00") {
+        return std::string("ai_ScriptCmdEnt ") + kRpcEntityPrefix + "_" + itemId
+            + " activate";
+    }
+    return std::string("ai_ScriptCmdEnt ") + kRpcEntityPrefix + "_" + itemId
+        + "_" + std::to_string(std::stoi(commandIndex)) + " activate";
+}
+
 void EnsureQueueDirectory() {
     CreateDirectoryA(kQueueDirectory, nullptr);
     // Telemetry is a disposable poll, not a gameplay command. Never recover a
@@ -1069,6 +1134,26 @@ void EnsureQueueDirectory() {
             const std::string processingPath = std::string(kQueueDirectory) + "\\" + data.cFileName;
             const std::string queuedPath =
                 processingPath.substr(0, processingPath.size() - std::string(".processing").size()) + ".cmd";
+            std::string command;
+            if (ReadCommandFile(processingPath, command)) {
+                const std::optional<std::string> migrated =
+                    MigratedDirectItemCommand(data.cFileName, command);
+                if (migrated.has_value()) {
+                    if (WriteCommandFile(processingPath, migrated.value())) {
+                        LogDebug(
+                            "MIGRATED_DIRECT_ITEM_COMMAND_TO_MAP_ENTITY command_id="
+                            + CommandIdFromPath(processingPath)
+                            + " old=" + command
+                            + " new=" + migrated.value()
+                        );
+                    } else {
+                        LogDebug(
+                            "Failed to rewrite unsafe direct command before "
+                            "requeue: " + processingPath
+                        );
+                    }
+                }
+            }
             MoveFileExA(processingPath.c_str(), queuedPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
         }
     } while (FindNextFileA(find, &data));
@@ -1166,13 +1251,28 @@ void QuarantineFailedJob(const CommandJob& job) {
     );
 }
 
-bool ExecuteCommand(const std::string& command) {
+bool ExecuteCommand(const CommandJob& job) {
+    const std::string commandId = CommandIdFromPath(job.path);
+    const std::string& command = job.command;
     LogDebug("Executing queued command: " + command);
+    if (g_MhInterface) {
+        g_MhInterface->SetCurrentCommandId(commandId);
+    }
+
+    RpcWatchdogContext* watchdog = new RpcWatchdogContext();
+    watchdog->startTick = GetTickCount();
+    watchdog->commandId = commandId;
+    watchdog->operation = "ExecuteConsoleCommand";
+    HANDLE watchdogThread = CreateThread(nullptr, 0, RpcCallWatchdog, watchdog, 0, nullptr);
 
     if (command.rfind("#DUMP_ENTITIES", 0) == 0) {
         const size_t bufferSize = 128 * 1024 * 1024;
         unsigned char* buffer = static_cast<unsigned char*>(malloc(bufferSize));
-        if (!buffer) return false;
+        if (!buffer) {
+            InterlockedExchange(&watchdog->completed, 1);
+            if (watchdogThread) CloseHandle(watchdogThread);
+            return false;
+        }
         size_t actualSize = bufferSize;
         const bool success = g_MhInterface->GetEntitiesFile(buffer, &actualSize);
         if (success) {
@@ -1182,21 +1282,31 @@ bool ExecuteCommand(const std::string& command) {
                 fclose(output);
             } else {
                 free(buffer);
+                InterlockedExchange(&watchdog->completed, 1);
+                if (watchdogThread) CloseHandle(watchdogThread);
                 return false;
             }
         }
         free(buffer);
+        InterlockedExchange(&watchdog->completed, 1);
+        if (watchdogThread) CloseHandle(watchdogThread);
         return success;
     }
 
     if (command.rfind("#PUSH_ENTITIES ", 0) == 0) {
         std::string path = command.substr(15);
-        return g_MhInterface->PushEntitiesFile(path.data(), nullptr, 0);
+        const bool success = g_MhInterface->PushEntitiesFile(path.data(), nullptr, 0);
+        InterlockedExchange(&watchdog->completed, 1);
+        if (watchdogThread) CloseHandle(watchdogThread);
+        return success;
     }
 
-    return g_MhInterface->ExecuteConsoleCommand(
+    const bool success = g_MhInterface->ExecuteConsoleCommand(
         reinterpret_cast<unsigned char*>(const_cast<char*>(command.c_str()))
     );
+    InterlockedExchange(&watchdog->completed, 1);
+    if (watchdogThread) CloseHandle(watchdogThread);
+    return success;
 }
 
 int main(int argc, char** argv) {
@@ -1268,6 +1378,7 @@ int main(int argc, char** argv) {
         );
     } else {
         g_MhInterface = new MeathookInterface();
+        g_MhInterface->SetLogCallback(LogDebug);
         LogDebug(
             "Meathook RPC client binding initialized. Waiting for the in-game "
             "Meathook server..."
@@ -1326,10 +1437,10 @@ int main(int argc, char** argv) {
                 queue.pop_front();
                 continue;
             }
-            if (ExecuteCommand(job.command)) {
+            if (ExecuteCommand(job)) {
                 DeleteFileA(job.path.c_str());
                 LogDebug(
-                    "Command completed and acknowledged: command_id="
+                    "RPC_DELIVERED_EFFECT_UNKNOWN: command_id="
                     + CommandIdFromPath(job.path) + " command=" + job.command
                 );
                 queue.pop_front();

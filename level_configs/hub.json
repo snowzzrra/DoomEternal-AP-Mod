@@ -7,5 +7,23 @@
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848": 7770086,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_750400652": 7770087,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_2075197287": 7770088
+    },
+    "target_policies": {
+        "pickup_equipment_flame_belch_1": {
+            "preserve_targets": [
+                "target_relay_pickup_flame_belch"
+            ],
+            "drop_targets": [
+                "target_give_item_flame_belch"
+            ]
+        },
+        "pickup_equipment_ice_bomb": {
+            "preserve_targets": [
+                "target_relay_pickup_ice_bomb"
+            ],
+            "drop_targets": [
+                "target_give_item_ice_bomb"
+            ]
+        }
     }
 }

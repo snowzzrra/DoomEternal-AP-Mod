@@ -228,7 +228,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 3
+ITEM_MAPPING_REVISION = 4
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -242,6 +242,7 @@ REVISION_ONE_RUNE_IDS = {
     7770095,
 }
 REVISION_TWO_SUIT_IDS = {7770021}
+REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
 
 
 def discover_client_state_file():
@@ -999,7 +1000,24 @@ if os.path.exists(MANIFESTS_DIR):
 
 poll_counter = 0
 
-def send_command(cmd, coalesce_key=None, arm_rpc=True):
+def command_spool_exists(command_id):
+    queued_path = os.path.join(QUEUE_DIR, f"{command_id}.cmd")
+    processing_path = os.path.join(QUEUE_DIR, f"{command_id}.processing")
+    return os.path.exists(queued_path) or os.path.exists(processing_path)
+
+
+def is_item_delivery_activation(command):
+    return command.strip().startswith(f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_")
+
+
+def delegated_rpc_command(item_id, command_index=None):
+    entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
+    if command_index is not None:
+        entity_name = f"{entity_name}_{command_index}"
+    return f"ai_ScriptCmdEnt {entity_name} activate"
+
+
+def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
     """Atomically enqueue one command without overwriting another command.
 
     A coalesced command has at most one queued or in-flight spool file. This is
@@ -1010,10 +1028,8 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True):
         os.makedirs(QUEUE_DIR, exist_ok=True)
         command_id = coalesce_key or f"{time.time_ns():020d}-{uuid.uuid4().hex}"
         if coalesce_key:
-            queued_path = os.path.join(QUEUE_DIR, f"{coalesce_key}.cmd")
-            processing_path = os.path.join(QUEUE_DIR, f"{coalesce_key}.processing")
-            if os.path.exists(queued_path) or os.path.exists(processing_path):
-                return False
+            if command_spool_exists(coalesce_key):
+                return already_queued_ok
 
         temporary_path = os.path.join(
             QUEUE_DIR, f".{command_id}-{uuid.uuid4().hex}.tmp"
@@ -1027,18 +1043,19 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True):
             try:
                 os.link(temporary_path, command_path)
             except FileExistsError:
-                return False
+                return already_queued_ok
             finally:
                 try:
                     os.remove(temporary_path)
                 except FileNotFoundError:
                     pass
+            processing_path = os.path.join(QUEUE_DIR, f"{coalesce_key}.processing")
             if os.path.exists(processing_path):
                 try:
                     os.remove(command_path)
                 except FileNotFoundError:
                     pass
-                return False
+                return already_queued_ok
         else:
             os.replace(temporary_path, command_path)
         if arm_rpc:
@@ -1047,6 +1064,101 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True):
     except Exception as e:
         logger.error(f"[Error] Failed to enqueue game command: {e}")
         return False
+
+
+def expected_item_job_activation(item_id, command_index):
+    definition = ITEM_ID_TO_COMMAND.get(item_id)
+    if isinstance(definition, str):
+        if command_index != 0:
+            return None, f"command index {command_index} exceeds string mapping"
+        return delegated_rpc_command(item_id), None
+    if isinstance(definition, list):
+        if command_index >= len(definition):
+            return None, f"command index {command_index} exceeds list mapping"
+        return delegated_rpc_command(item_id, command_index), None
+    if isinstance(definition, dict):
+        if definition.get("type") == "progressive_perk":
+            return delegated_rpc_command(item_id, command_index), None
+        if command_index != 0:
+            return None, f"command index {command_index} exceeds structured mapping"
+        return delegated_rpc_command(item_id), None
+    return None, f"item {item_id} has no supported mapping"
+
+
+def migrate_direct_item_command_jobs():
+    """Rewrite old queued item jobs to map-side RPC activations.
+
+    This keeps a stale .processing job from crash-looping the native RPC path
+    after a bridge update.
+    """
+    try:
+        os.makedirs(QUEUE_DIR, exist_ok=True)
+    except Exception as error:
+        logger.error(f"[Queue] Could not create queue directory for migration: {error}")
+        return
+
+    for pattern in ("*.cmd", "*.processing"):
+        for source_path in sorted(glob.glob(os.path.join(QUEUE_DIR, pattern))):
+            path = Path(source_path)
+            try:
+                command = path.read_text(encoding="utf-8").strip()
+            except Exception as error:
+                logger.error(f"[Queue] Could not read queued job for migration: {path}: {error}")
+                continue
+            match = re.match(
+                r"recv-(\d+)-item-(\d+)-cmd-(\d+)\.(cmd|processing)$",
+                path.name,
+            )
+            if not match:
+                continue
+
+            receive_index = int(match.group(1))
+            item_id = int(match.group(2))
+            command_index = int(match.group(3))
+            replacement, error = expected_item_job_activation(item_id, command_index)
+            if replacement is None:
+                logger.error(
+                    f"[Queue] Direct item command left untouched; {error}: {path.name}"
+                )
+                continue
+            if command == replacement:
+                if path.suffix == ".processing":
+                    command_id = (
+                        f"recv-{receive_index:06d}-item-{item_id}-cmd-{command_index:02d}"
+                    )
+                    target_path = Path(QUEUE_DIR) / f"{command_id}.cmd"
+                    try:
+                        os.replace(path, target_path)
+                    except Exception as error:
+                        logger.error(f"[Queue] Failed to requeue {path}: {error}")
+                continue
+
+            command_id = (
+                f"recv-{receive_index:06d}-item-{item_id}-cmd-{command_index:02d}"
+            )
+            target_path = Path(QUEUE_DIR) / f"{command_id}.cmd"
+            temporary_path = Path(QUEUE_DIR) / f".{command_id}-{uuid.uuid4().hex}.tmp"
+            try:
+                with temporary_path.open("x", encoding="utf-8", newline="\n") as file:
+                    file.write(replacement + "\n")
+                    file.flush()
+                    os.fsync(file.fileno())
+                os.replace(temporary_path, target_path)
+                if path != target_path:
+                    try:
+                        path.unlink()
+                    except FileNotFoundError:
+                        pass
+                logger.warning(
+                    "MIGRATED_DIRECT_ITEM_COMMAND_TO_MAP_ENTITY "
+                    f"command_id={command_id} old={command!r} new={replacement!r}"
+                )
+            except Exception as error:
+                try:
+                    temporary_path.unlink()
+                except FileNotFoundError:
+                    pass
+                logger.error(f"[Queue] Failed to migrate unsafe command {path}: {error}")
 
 def telemetry_dump_files():
     files = set()
@@ -1254,7 +1366,24 @@ class DoomCommandProcessor(ClientCommandProcessor):
                 "Use /doom_progressive_item <item id> <stage index>."
             )
             return
-        send_command(f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{parsed_id} activate")
+        if isinstance(command, str):
+            commands = [delegated_rpc_command(parsed_id)]
+        elif isinstance(command, list):
+            if not command:
+                self.output(f"Cannot queue item {parsed_id}: mapping list is empty")
+                return
+            commands = [
+                delegated_rpc_command(parsed_id, command_index)
+                for command_index, _ in enumerate(command)
+            ]
+        else:
+            commands = [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{parsed_id} activate"]
+        for command_index, command_text in enumerate(commands):
+            send_command(
+                command_text,
+                coalesce_key=f"manual-item-{parsed_id}-cmd-{command_index:02d}",
+                already_queued_ok=True,
+            )
         self.output(f"Queued AP item test: {parsed_id} -> {command}")
 
     def _cmd_doom_direct_chainsaw(self):
@@ -1424,6 +1553,7 @@ class DoomEternalContext(CommonContext):
         self.session_state["processed_items"] = 0
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
+        self.session_state.pop("item_command_groups", None)
         save_client_state(self.client_state)
 
     def repair_item_mappings(self):
@@ -1443,6 +1573,8 @@ class DoomEternalContext(CommonContext):
             repair_ids.update(REVISION_ONE_RUNE_IDS)
         if revision < 2:
             repair_ids.update(REVISION_TWO_SUIT_IDS)
+        if revision < 4:
+            repair_ids.update(REVISION_FOUR_FLAME_BELCH_IDS)
 
         repair_indices = [
             index
@@ -1455,10 +1587,10 @@ class DoomEternalContext(CommonContext):
             if item_index in repaired:
                 continue
             network_item = self.items_received[item_index]
-            activation, description = self.item_activation_command(
+            spooled, description = self.spool_item_commands(
                 network_item.item, item_index
             )
-            if activation is None or not send_command(activation):
+            if not spooled:
                 return False
             repaired.add(item_index)
             self.session_state["mapping_repair_indices"] = sorted(repaired)
@@ -1482,16 +1614,23 @@ class DoomEternalContext(CommonContext):
             if received.item == item_id
         )
 
-    def item_activation_command(self, item_id, item_index):
+    def item_activation_commands(self, item_id, item_index):
         definition = ITEM_ID_TO_COMMAND.get(item_id)
+        if isinstance(definition, str):
+            return [delegated_rpc_command(item_id)], definition
+        if isinstance(definition, list):
+            if not definition:
+                return None, "mapping list is empty"
+            commands = [
+                delegated_rpc_command(item_id, command_index)
+                for command_index, _ in enumerate(definition)
+            ]
+            return commands, " -> ".join(definition)
         if not isinstance(definition, dict):
-            return (
-                f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id} activate",
-                definition,
-            )
+            return None, f"unsupported command mapping: {definition!r}"
         if definition.get("type") != "progressive_perk":
             return (
-                f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id} activate",
+                [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id} activate"],
                 definition,
             )
 
@@ -1500,9 +1639,52 @@ class DoomEternalContext(CommonContext):
         if stage >= len(perks):
             return None, f"progressive stage {stage} exceeds {len(perks)} stages"
         return (
-            f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id}_{stage} activate",
+            [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id}_{stage} activate"],
             f"stage {stage}: {perks[stage]}",
         )
+
+    def item_command_id(self, item_id, item_index, command_index):
+        return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
+
+    def spool_item_commands(self, item_id, item_index):
+        commands, description = self.item_activation_commands(item_id, item_index)
+        if commands is None:
+            return False, description
+
+        groups = self.session_state.setdefault("item_command_groups", {})
+        group_key = str(item_index)
+        group = groups.setdefault(
+            group_key,
+            {
+                "item_id": item_id,
+                "next_command": 0,
+                "total_commands": len(commands),
+            },
+        )
+        if group.get("item_id") != item_id:
+            return False, "stored command group belongs to a different item"
+
+        next_command = int(group.get("next_command", 0))
+        if next_command < 0 or next_command > len(commands):
+            return False, "stored command group index is invalid"
+
+        for command_index in range(next_command, len(commands)):
+            command_id = self.item_command_id(item_id, item_index, command_index)
+            if not send_command(
+                commands[command_index],
+                coalesce_key=command_id,
+                already_queued_ok=True,
+            ):
+                return False, description
+            group["next_command"] = command_index + 1
+            group["total_commands"] = len(commands)
+            save_client_state(self.client_state)
+
+        groups.pop(group_key, None)
+        if not groups:
+            self.session_state.pop("item_command_groups", None)
+        save_client_state(self.client_state)
+        return True, description
 
     def on_deathlink(self, data: dict):
         super().on_deathlink(data)
@@ -1875,6 +2057,7 @@ class DoomEternalContext(CommonContext):
         )
         while not self.exit_event.is_set():
             if self.server and self.server.socket and not self.server.socket.closed:
+                migrate_direct_item_command_jobs()
                 if not self.repair_item_mappings():
                     await asyncio.sleep(0.25)
                     continue
@@ -1925,17 +2108,14 @@ class DoomEternalContext(CommonContext):
                         self.persist_session_state()
                         continue
 
-                    activation, description = self.item_activation_command(
+                    spooled, description = self.spool_item_commands(
                         item_id, item_index
                     )
-                    if activation is None:
+                    if not spooled and description:
                         logger.error(
                             f"[To Game] Cannot deliver item {item_id}: {description}"
                         )
-                        self.items_processed += 1
-                        self.persist_session_state()
-                        continue
-                    if not send_command(activation):
+                    if not spooled:
                         logger.error(
                             f"[To Game] Failed to spool item {item_id}; "
                             "will retry without advancing item state."

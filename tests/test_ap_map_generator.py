@@ -6,6 +6,7 @@ from pathlib import Path
 from ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     add_ap_check_target,
+    command_requires_map_side_rpc,
     compute_file_sha256,
     ensure_distinct_input_output_paths,
     find_generated_prefixes,
@@ -15,6 +16,7 @@ from ap_map_generator import (
     generate_rpc_command_entities,
     generate_target_relay,
     inject_secret_encounter_completion,
+    extract_target_names,
     remove_balanced_entity_blocks,
     remove_property_blocks,
     validate_source_file,
@@ -139,6 +141,41 @@ entity {
         with self.assertRaisesRegex(ValueError, "has no commands"):
             generate_rpc_command_entities({"7770006": []})
 
+    def test_item_commands_have_required_map_side_entities(self):
+        entities = generate_rpc_command_entities(
+            {
+                "7770000": "give weapon/player/heavy_cannon",
+                "7770045": "chrispy ai/heavy/revenant",
+                "7770997": ["give ammo", "chrispy ai/fodder/imp"],
+            }
+        )
+
+        self.assertTrue(command_requires_map_side_rpc("give weapon/player/heavy_cannon"))
+        self.assertTrue(command_requires_map_side_rpc("chrispy ai/heavy/revenant"))
+        self.assertIn("entityDef ap_rpc_v3_7770000 {", entities)
+        self.assertIn('commandText = "give weapon/player/heavy_cannon";', entities)
+        self.assertIn("entityDef ap_rpc_v3_7770045 {", entities)
+        self.assertIn('commandText = "chrispy ai/heavy/revenant";', entities)
+        self.assertIn("entityDef ap_rpc_v3_7770997_0 {", entities)
+        self.assertIn('commandText = "give ammo";', entities)
+        self.assertIn("entityDef ap_rpc_v3_7770997_1 {", entities)
+        self.assertIn('commandText = "chrispy ai/fodder/imp";', entities)
+
+    def test_all_current_item_mappings_have_generated_map_side_entities(self):
+        items_path = Path(__file__).parents[1] / "data" / "items.json"
+        items = json.loads(items_path.read_text(encoding="utf-8"))
+
+        entities = generate_rpc_command_entities(items)
+        for item_id, command_value in items.items():
+            if isinstance(command_value, str):
+                self.assertIn(f"entityDef ap_rpc_v3_{item_id} {{", entities)
+            elif isinstance(command_value, list):
+                for command_index, command in enumerate(command_value):
+                    self.assertIn(
+                        f"entityDef ap_rpc_v3_{item_id}_{command_index} {{",
+                        entities,
+                    )
+
     def test_nested_clip_model_block_is_removed(self):
         content = """
         clipModelInfo = {
@@ -159,30 +196,56 @@ entity {
         self.assertNotIn("forceObstacle", content)
         self.assertIn('triggerDef = "trigger/props/weapons/flame_belch";', content)
 
-    def test_known_problem_pickups_replace_vanilla_targets(self):
+    def test_target_policy_drops_reward_and_preserves_objective_target(self):
         content = """
         edit = {
             targets = {
                 num = 2;
-                item[0] = "vanilla_reward";
-                item[1] = "tutorial_sequence";
+                item[0] = "target_relay_pickup_ice_bomb";
+                item[1] = "target_give_item_ice_bomb";
             }
         }
         """
 
         content = add_ap_check_target(
             content,
-            "pickup_equipment_flame_belch_1",
-            "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1",
+            "pickup_equipment_ice_bomb",
+            "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
+            {
+                "preserve_targets": ["target_relay_pickup_ice_bomb"],
+                "drop_targets": ["target_give_item_ice_bomb"],
+            },
         )
 
-        self.assertIn("num = 1;", content)
-        self.assertIn(
-            'item[0] = "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1";',
-            content,
+        self.assertEqual(
+            extract_target_names(content),
+            [
+                "target_relay_pickup_ice_bomb",
+                "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
+            ],
         )
-        self.assertNotIn("vanilla_reward", content)
-        self.assertNotIn("tutorial_sequence", content)
+        self.assertNotIn("target_give_item_ice_bomb", content)
+
+    def test_target_policy_fails_when_expected_target_is_missing(self):
+        content = """
+        edit = {
+            targets = {
+                num = 1;
+                item[0] = "target_relay_pickup_ice_bomb";
+            }
+        }
+        """
+
+        with self.assertRaisesRegex(ValueError, "target_give_item_ice_bomb"):
+            add_ap_check_target(
+                content,
+                "pickup_equipment_ice_bomb",
+                "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
+                {
+                    "preserve_targets": ["target_relay_pickup_ice_bomb"],
+                    "drop_targets": ["target_give_item_ice_bomb"],
+                },
+            )
 
     def test_non_problem_pickups_preserve_existing_targets(self):
         content = """

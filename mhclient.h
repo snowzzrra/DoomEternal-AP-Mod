@@ -4,6 +4,9 @@
 #include <ctype.h>
 #include "meathook_interface.h" 
 #include <windows.h>
+#include <string>
+
+typedef void (*RpcLogCallback)(const std::string& message);
 
 enum RpcCallResult
 {
@@ -23,13 +26,34 @@ class MeathookInterface
     void StartKeepAliveThread();
     DWORD m_ThreadId;
     unsigned char* pszStringBinding = NULL;
+    CRITICAL_SECTION m_RpcMutex;
+    bool m_RpcMutexInitialized = false;
+    unsigned long long m_RpcCallSequence = 0;
+    LONG m_BindingGeneration = 0;
+    DWORD m_LastSuccessfulKeepAliveTick = 0;
+    std::string m_CurrentCommandId = "-";
+    RpcLogCallback m_LogCallback = nullptr;
+
+    void LogRpc(const std::string& message);
+    void MarkBindingInvalid();
+    bool EnterRpcCall(const char* operation, unsigned long long& callId, DWORD& waitMs);
+    void LeaveRpcCall(
+        const char* operation,
+        unsigned long long callId,
+        DWORD waitMs,
+        DWORD startTick
+    );
 
 public:
     bool m_Initialized;
     RpcCallResult m_LastRpcCallResult = RPC_CALL_RESULT_NONE;
     DWORD m_LastTransportError = ERROR_SUCCESS;
-    MeathookInterface() { StartKeepAliveThread(); }
-    ~MeathookInterface() {}
+    MeathookInterface();
+    ~MeathookInterface();
+    void SetLogCallback(RpcLogCallback callback) { m_LogCallback = callback; }
+    void SetCurrentCommandId(const std::string& commandId) { m_CurrentCommandId = commandId; }
+    LONG BindingGeneration() const { return m_BindingGeneration; }
+    DWORD LastSuccessfulKeepAliveAgeMs() const;
     bool DestroyRpcInterface();
     bool InitializeRpcInterface();
 

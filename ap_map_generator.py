@@ -18,10 +18,6 @@ GENERATED_NAME_PREFIXES = (
     EVENT_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
 )
-TARGETS_REPLACED_PICKUPS = {
-    "pickup_equipment_flame_belch_1",
-    "pickup_equipment_ice_bomb",
-}
 SECRET_ENCOUNTER_ARG_LABEL = ""
 
 # you don't need to use this to play the mod
@@ -180,19 +176,42 @@ def replace_targets_block(block, target_names):
     )
 
 
-def add_ap_check_target(block, entity_name, ap_check_id):
-    target_names = []
-    preserve_existing_targets = entity_name not in TARGETS_REPLACED_PICKUPS
-    if preserve_existing_targets:
-        match = re.search(
-            r'targets\s*=\s*\{\s*num\s*=\s*\d+;\s*(.*?)\s*\}',
-            block,
-            re.DOTALL,
+def extract_target_names(block):
+    match = re.search(
+        r'targets\s*=\s*\{\s*num\s*=\s*\d+;\s*(.*?)\s*\}',
+        block,
+        re.DOTALL,
+    )
+    if not match:
+        return []
+    return re.findall(r'item\[\d+\]\s*=\s*"([^"]+)";', match.group(1))
+
+
+def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
+    existing_targets = extract_target_names(block)
+    target_policy = target_policy or {}
+    preserve_targets = target_policy.get("preserve_targets")
+    drop_targets = set(target_policy.get("drop_targets", []))
+
+    required_targets = set(drop_targets)
+    if preserve_targets is not None:
+        required_targets.update(preserve_targets)
+    missing_targets = sorted(required_targets - set(existing_targets))
+    if missing_targets:
+        missing = ", ".join(missing_targets)
+        raise ValueError(
+            f"{entity_name} target policy expected missing target(s): {missing}"
         )
-        if match:
-            target_names.extend(
-                re.findall(r'item\[\d+\]\s*=\s*"([^"]+)";', match.group(1))
-            )
+
+    if preserve_targets is None:
+        target_names = [
+            target for target in existing_targets if target not in drop_targets
+        ]
+    else:
+        preserve_set = set(preserve_targets)
+        target_names = [
+            target for target in existing_targets if target in preserve_set
+        ]
 
     target_names.append(ap_check_id)
     return replace_targets_block(block, target_names)
@@ -350,8 +369,13 @@ def inject_secret_encounter_completion(
     )
     return content[:block_start] + updated_block + content[block_end:]
 
+
+def command_requires_map_side_rpc(command):
+    return isinstance(command, str) and bool(command.strip())
+
 def generate_rpc_command_entities(items_dict):
     blocks = []
+    required_entities = []
     for item_id, command_value in items_dict.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
@@ -444,6 +468,8 @@ def generate_rpc_command_entities(items_dict):
             command_blocks = []
             for idx, cmd in enumerate(command_value):
                 cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
+                if command_requires_map_side_rpc(cmd):
+                    required_entities.append(cmd_entity_name)
                 relay_targets.append(cmd_entity_name)
                 command_blocks.append(f"""entity {{
 	entityDef {cmd_entity_name} {{
@@ -482,8 +508,11 @@ def generate_rpc_command_entities(items_dict):
 """)
             blocks.extend(command_blocks)
         else:
+            entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
+            if command_requires_map_side_rpc(command_value):
+                required_entities.append(entity_name)
             blocks.append(f"""entity {{
-	entityDef {RPC_ENTITY_PREFIX}_{item_id} {{
+	entityDef {entity_name} {{
 		class = "idTarget_Command";
 		expandInheritance = false;
 		poolCount = 0;
@@ -497,7 +526,18 @@ def generate_rpc_command_entities(items_dict):
 }}
 """)
 
-    return "".join(blocks)
+    generated = "".join(blocks)
+    missing_entities = [
+        entity_name
+        for entity_name in required_entities
+        if f"entityDef {entity_name} {{" not in generated
+    ]
+    if missing_entities:
+        raise ValueError(
+            "Map-side RPC entity missing for unsafe command(s): "
+            + ", ".join(sorted(missing_entities))
+        )
+    return generated
 
 def generate_system_command_entities():
     return """entity {
@@ -533,6 +573,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         level_config = json.load(f)
 
     config_entities = level_config.get("entities", {})
+    target_policies = level_config.get("target_policies", {})
     secret_encounters = level_config.get("secret_encounters", [])
     manifest_data = {}
 
@@ -605,7 +646,12 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     spawn_pos_text = pos_fallback.group(1) + "\n"
 
             if "edit = {" in block:
-                block = add_ap_check_target(block, entity_name, ap_check_id)
+                block = add_ap_check_target(
+                    block,
+                    entity_name,
+                    ap_check_id,
+                    target_policies.get(entity_name),
+                )
 
                 # gravity stuff
                 block = re.sub(r'physicsAttributes\s*=\s*"[^"]+";', "", block)
