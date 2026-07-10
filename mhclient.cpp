@@ -22,6 +22,8 @@ static RpcCallResult ClassifyWaitNamedPipeFailure(DWORD error)
 
 MeathookInterface::MeathookInterface()
 {
+    const char* trace = getenv("DOOM_AP_RPC_TRACE");
+    m_RpcTrace = trace && trace[0] != '\0' && trace[0] != '0';
     InitializeCriticalSection(&m_RpcMutex);
     m_RpcMutexInitialized = true;
     StartKeepAliveThread();
@@ -71,14 +73,16 @@ bool MeathookInterface::EnterRpcCall(
     message
         << "RPC_CALL_START"
         << " rpc_call_id=" << callId
-        << " command_id=" << m_CurrentCommandId
+        << " command_id=" << (std::string(operation) == "KeepAlive" ? "-" : m_CurrentCommandId)
         << " thread_id=" << GetCurrentThreadId()
         << " operation=" << operation
         << " mutex_wait_ms=" << waitMs
         << " start_tick_ms=" << GetTickCount()
         << " last_successful_keepalive_age_ms=" << LastSuccessfulKeepAliveAgeMs()
         << " binding_generation=" << m_BindingGeneration;
-    LogRpc(message.str());
+    if (m_RpcTrace || waitMs >= 100) {
+        LogRpc(message.str());
+    }
     return true;
 }
 
@@ -92,7 +96,7 @@ void MeathookInterface::LeaveRpcCall(
     message
         << "RPC_CALL_END"
         << " rpc_call_id=" << callId
-        << " command_id=" << m_CurrentCommandId
+        << " command_id=" << (std::string(operation) == "KeepAlive" ? "-" : m_CurrentCommandId)
         << " thread_id=" << GetCurrentThreadId()
         << " operation=" << operation
         << " mutex_wait_ms=" << waitMs
@@ -100,7 +104,9 @@ void MeathookInterface::LeaveRpcCall(
         << " last_successful_keepalive_age_ms=" << LastSuccessfulKeepAliveAgeMs()
         << " binding_generation=" << m_BindingGeneration
         << " result=" << m_LastRpcCallResult;
-    LogRpc(message.str());
+    if (m_RpcTrace || waitMs >= 100 || m_LastRpcCallResult != RPC_CALL_DELIVERED) {
+        LogRpc(message.str());
+    }
     LeaveCriticalSection(&m_RpcMutex);
 }
 

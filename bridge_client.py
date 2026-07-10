@@ -228,7 +228,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 4
+ITEM_MAPPING_REVISION = 5
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -243,6 +243,7 @@ REVISION_ONE_RUNE_IDS = {
 }
 REVISION_TWO_SUIT_IDS = {7770021}
 REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
+REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
 
 
 def discover_client_state_file():
@@ -1112,6 +1113,28 @@ def migrate_direct_item_command_jobs():
             if not match:
                 continue
 
+            # A map-side activation is already the safe canonical payload.
+            # Its suffix is authoritative (not the cmd-NN filename), so keep
+            # the file contents byte-for-byte unchanged.
+            if re.fullmatch(
+                rf"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_[0-9]+(?:_[0-9]+)? activate",
+                command,
+            ):
+                if path.suffix == ".processing":
+                    target_path = path.with_suffix(".cmd")
+                    try:
+                        os.replace(path, target_path)
+                    except Exception as error:
+                        logger.error(f"[Queue] Failed to requeue {path}: {error}")
+                continue
+
+            legacy_effect_prefixes = (
+                "give ", "chrispy ", "g_giveExtraLives ",
+                "ai_ScriptCmdEnt player1 givePlayerPerk ",
+            )
+            if not command.startswith(legacy_effect_prefixes):
+                continue
+
             receive_index = int(match.group(1))
             item_id = int(match.group(2))
             command_index = int(match.group(3))
@@ -1575,6 +1598,8 @@ class DoomEternalContext(CommonContext):
             repair_ids.update(REVISION_TWO_SUIT_IDS)
         if revision < 4:
             repair_ids.update(REVISION_FOUR_FLAME_BELCH_IDS)
+        if revision < 5:
+            repair_ids.update(REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS)
 
         repair_indices = [
             index
@@ -1824,7 +1849,6 @@ class DoomEternalContext(CommonContext):
             "[Goal] Cultist Base completed. Goal reported to Archipelago via "
             f"{source_description}."
         )
-        self.output("Goal sent.")
         return True
 
     async def check_campaign_goal_event(self):
@@ -1904,6 +1928,13 @@ class DoomEternalContext(CommonContext):
                 logger.warning(
                     "[Goal] Goal sent but transition event file "
                     f"{os.path.basename(path)} could not be removed yet: {error}"
+                )
+            try:
+                self.output("Goal sent.")
+            except Exception as error:
+                logger.warning(
+                    "[Goal] Goal committed; non-critical UI notification failed: "
+                    f"{error}"
                 )
             return True
 

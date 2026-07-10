@@ -3,7 +3,6 @@
         "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
         "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,
         "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB": 7770074,
-        "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": 7770081,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848": 7770086,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_750400652": 7770087,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_2075197287": 7770088
@@ -18,6 +17,7 @@
             ]
         },
         "pickup_equipment_ice_bomb": {
+            "preserve_scripted_pickup": true,
             "preserve_targets": [
                 "target_relay_pickup_ice_bomb"
             ],

@@ -33,6 +33,7 @@ class MeathookInterface
     DWORD m_LastSuccessfulKeepAliveTick = 0;
     std::string m_CurrentCommandId = "-";
     RpcLogCallback m_LogCallback = nullptr;
+    bool m_RpcTrace = false;
 
     void LogRpc(const std::string& message);
     void MarkBindingInvalid();
