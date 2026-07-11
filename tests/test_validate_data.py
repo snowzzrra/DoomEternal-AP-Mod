@@ -92,6 +92,35 @@ class ValidateDataNamespaceTests(unittest.TestCase):
         self.assertNotIn("sharedammopool/fuel 0", items)
         self.assertNotIn("sharedammopool/bfg 0", items)
 
+    def test_reserved_location_ids_are_not_reused(self):
+        locations = extract_namedtuple_table(
+            APWORLD / "locations.py", "location_data_table"
+        )
+        for reserved_id in (7770055, 7770068):
+            self.assertNotIn(reserved_id, locations.values())
+        for directory in (ROOT / "level_configs", ROOT / "manifests"):
+            for path in directory.glob("*.json"):
+                values = (__import__("json").loads(path.read_text()).get("entities", {}).values()
+                          if directory.name == "level_configs" else __import__("json").loads(path.read_text()).values())
+                self.assertNotIn(7770055, values)
+                self.assertNotIn(7770068, values)
+
+    def test_scripted_pickups_have_no_decl_overrides(self):
+        hub = (ROOT / "level_configs" / "hub.json").read_text(encoding="utf-8")
+        cult = (ROOT / "level_configs" / "e1m3_cult.json").read_text(encoding="utf-8")
+        generator = (ROOT / "ap_map_generator.py").read_text(encoding="utf-8")
+        packaged = "\n".join(
+            str(path.relative_to(ROOT))
+            for path in (ROOT / "packaging" / "mod_assets").rglob("*")
+            if path.is_file()
+        )
+        self.assertNotIn("propitem/ap/", hub + cult + generator + packaged)
+        self.assertFalse((ROOT / "packaging" / "mod_assets" / "hub_patch2" /
+                          "generated" / "decls" / "propitem" / "propitem" /
+                          "equipment" / "ice_bomb.decl").exists())
+        self.assertFalse((ROOT / "packaging" / "mod_assets" / "e1m3_cult_patch3" /
+                          "generated" / "decls" / "propitem" / "propitem" /
+                          "weapon" / "rocket_launcher" / "base.decl").exists())
 
 if __name__ == "__main__":
     unittest.main()

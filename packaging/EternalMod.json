@@ -1,7 +1,7 @@
 {
     "name": "DoomEternalArchipelagoPreAlpha",
-    "author": "Doom Eternal Archipelago contributors",
+    "author": "snow",
     "description": "Archipelago playable test build for E1M1 through E1M3",
-    "version": "0.1.2",
+    "version": "0.2.0-pre-alpha",
     "loadPriority": 0
 }

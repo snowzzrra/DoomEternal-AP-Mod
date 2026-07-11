@@ -79,11 +79,38 @@ def main() -> int:
 
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
+    reserved_location_ids = {7770055, 7770068}
+    reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
+    if reused_location_ids:
+        errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
     runtime_locations = set(
         read_json(ROOT / "data" / "runtime_locations.json").values()
     )
     map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
+
+    forbidden_decl_path = "propitem/ap/"
+    for path in (
+        ROOT / "level_configs" / "hub.json",
+        ROOT / "level_configs" / "e1m3_cult.json",
+        ROOT / "ap_map_generator.py",
+    ):
+        if forbidden_decl_path in path.read_text(encoding="utf-8"):
+            errors.append(f"Scripted pickup uses forbidden custom DECL path: {path}")
+    for path in (ROOT / "packaging" / "mod_assets").rglob("*"):
+        if path.is_file() and forbidden_decl_path in path.as_posix():
+            errors.append(f"Forbidden custom scripted-pickup DECL is packaged: {path}")
+
+    forbidden_decl_overrides = (
+        ROOT / "packaging" / "mod_assets" / "hub_patch2" / "generated" /
+        "decls" / "propitem" / "propitem" / "equipment" / "ice_bomb.decl",
+        ROOT / "packaging" / "mod_assets" / "e1m3_cult_patch3" / "generated" /
+        "decls" / "propitem" / "propitem" / "weapon" /
+        "rocket_launcher" / "base.decl",
+    )
+    for override_path in forbidden_decl_overrides:
+        if override_path.exists():
+            errors.append(f"Forbidden scripted-pickup DECL override remains packaged: {override_path}")
 
     manifests: dict[str, int] = {}
     for path in sorted((ROOT / "manifests").glob("*.json")):
@@ -97,6 +124,9 @@ def main() -> int:
     for path in sorted((ROOT / "level_configs").glob("*.json")):
         config_data = read_json(path)
         config = dict(config_data.get("entities", {}))
+        reused_config_ids = sorted(reserved_location_ids & set(config.values()))
+        if reused_config_ids:
+            errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
         for encounter in config_data.get("secret_encounters", []):
             config[encounter["ap_check"]] = encounter["location_id"]
         manifest_path = ROOT / "manifests" / path.name
@@ -158,6 +188,9 @@ def main() -> int:
     overlap = runtime_locations & set(manifests.values())
     if overlap:
         errors.append(f"Runtime location IDs also present in map manifests: {sorted(overlap)}")
+    reused_manifest_ids = sorted(reserved_location_ids & set(manifests.values()))
+    if reused_manifest_ids:
+        errors.append(f"Reserved location IDs remain in manifests: {reused_manifest_ids}")
 
     generated_commands = generate_rpc_command_entities(
         {

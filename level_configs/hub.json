@@ -17,12 +17,28 @@
             ]
         },
         "pickup_equipment_ice_bomb": {
-            "preserve_scripted_pickup": true,
             "preserve_targets": [
                 "target_relay_pickup_ice_bomb"
             ],
             "drop_targets": [
                 "target_give_item_ice_bomb"
+            ],
+            "safe_target_graph": {
+                "target_relay_pickup_ice_bomb": [
+                    "target_relay_complete_ice_bomb_obj"
+                ],
+                "target_relay_complete_ice_bomb_obj": [
+                    "target_objective_complete_ice_bomb"
+                ],
+                "target_objective_complete_ice_bomb": []
+            },
+            "forbidden_target_terms": [
+                "target_give_item_ice_bomb",
+                "equipment/ice_bomb",
+                "throwable/player/ice_bomb",
+                "inventory",
+                "give",
+                "equip"
             ]
         }
     }

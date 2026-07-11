@@ -250,7 +250,7 @@ entity {
                 },
             )
 
-    def test_hub_ice_bomb_preserves_scripted_pickup_contract(self):
+    def test_hub_ice_bomb_is_one_shot_ap_trigger_with_safe_objective_chain(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output = Path(tmpdir, "hub.entities")
             manifest = Path(tmpdir, "hub.json")
@@ -265,12 +265,48 @@ entity {
             bounds = find_entity_block_bounds(generated, "pickup_equipment_ice_bomb")
             self.assertIsNotNone(bounds)
             block = generated[bounds[0]:bounds[1]]
-            self.assertIn('inherit = "pickup/equipment/ice_bomb";', block)
-            self.assertIn('class = "idProp2";', block)
-            self.assertIn('useableComponentDecl = "propitem/equipment/ice_bomb";', block)
-            self.assertIn('model = "art/weapons/equipmentlauncher/equipmentlauncher_ice_pickup.lwo";', block)
+            self.assertIn('inherit = "trigger/trigger";', block)
+            self.assertIn('class = "idTrigger";', block)
+            self.assertIn('triggerOnce = true;', block)
+            self.assertIn('item[0] = "target_relay_pickup_ice_bomb";', block)
             self.assertIn('item[1] = "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB";', block)
+            self.assertNotIn('useableComponentDecl', block)
+            self.assertNotIn('equipment/ice_bomb', block)
+            self.assertNotIn('throwable/player/ice_bomb', block)
             self.assertNotIn("target_give_item_ice_bomb", block)
+            self.assertEqual(block.count("AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB"), 1)
+            self.assertIn('entityDef target_relay_complete_ice_bomb_obj', generated)
+            self.assertIn('entityDef target_objective_complete_ice_bomb', generated)
+
+    def test_cultist_rocket_is_one_shot_ap_trigger_with_safe_relay(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "cult.entities")
+            manifest = Path(tmpdir, "cult.json")
+            generate_map(
+                ROOT / "vanillamaps" / "e1m3_cult.map",
+                output,
+                ROOT / "level_configs" / "e1m3_cult.json",
+                manifest,
+                json.loads((ROOT / "data" / "items.json").read_text()),
+            )
+            generated = output.read_text(encoding="utf-8")
+            bounds = find_entity_block_bounds(generated, "game_pickup_weapon_rocket_launcher_1")
+            self.assertIsNotNone(bounds)
+            block = generated[bounds[0]:bounds[1]]
+            self.assertIn('inherit = "trigger/trigger";', block)
+            self.assertIn('class = "idTrigger";', block)
+            self.assertIn('triggerOnce = true;', block)
+            self.assertNotIn('useableComponentDecl', block)
+            self.assertNotIn('useableComponentDecl', block)
+            self.assertNotIn('equipOnPickup', block)
+            self.assertNotIn('forceEquip', block)
+            self.assertNotIn('ammo/rocket', block)
+            self.assertIn('item[0] = "game_target_relay_1244";', block)
+            self.assertIn('AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1', block)
+            self.assertEqual(block.count("AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"), 1)
+            alternate = find_entity_block_bounds(generated, "game_trigger_trigger_994")
+            self.assertIsNotNone(alternate)
+            self.assertIn('item[0] = "game_target_relay_1244";', generated[alternate[0]:alternate[1]])
 
     def test_non_problem_pickups_preserve_existing_targets(self):
         content = """

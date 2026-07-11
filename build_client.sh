@@ -2,6 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR="$SCRIPT_DIR/build/client"
+
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
 
 distrobox enter doom-cpp -- bash -lc "
     set -euo pipefail
@@ -16,11 +20,11 @@ distrobox enter doom-cpp -- bash -lc "
         save_death_probe.cpp -o /tmp/save_death_probe.exe \
         -Wl,--subsystem,windows \
         -static -static-libgcc -static-libstdc++
-    cp /tmp/ap_client.exe '$SCRIPT_DIR/ap_client.exe'
-    cp /tmp/save_death_probe.exe '$SCRIPT_DIR/save_death_probe.exe'
-    x86_64-w64-mingw32-strip '$SCRIPT_DIR/ap_client.exe'
-    x86_64-w64-mingw32-strip '$SCRIPT_DIR/save_death_probe.exe'
+    cp /tmp/ap_client.exe '$BUILD_DIR/ap_client.exe'
+    cp /tmp/save_death_probe.exe '$BUILD_DIR/save_death_probe.exe'
+    x86_64-w64-mingw32-strip '$BUILD_DIR/ap_client.exe'
+    x86_64-w64-mingw32-strip '$BUILD_DIR/save_death_probe.exe'
 "
 
-file "$SCRIPT_DIR/ap_client.exe"
-file "$SCRIPT_DIR/save_death_probe.exe"
+file "$BUILD_DIR/ap_client.exe"
+file "$BUILD_DIR/save_death_probe.exe"
