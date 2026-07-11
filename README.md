@@ -18,7 +18,7 @@ sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
 Current PTB scope:
 
 - Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
-- Content: `82` map checks + `1` runtime goal
+- Content: `79` map checks + `1` runtime goal
 - Goal: report completion when the runtime sees
   `ap_transition_e1m3_cult_to_e1m4_boss.evt`
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
@@ -176,14 +176,13 @@ registry.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha-dev.zip
+DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
 ├── doometernal.apworld
 └── client/
     ├── ap_client.exe
-    ├── ap_logger.exe
     ├── bridge_client.py
     ├── save_death_probe.exe
     ├── save_decrypt.py
@@ -664,44 +663,31 @@ Fix:
   default.
 - Empyrean Key reward chest is outside PTB scope; Exultia uses the physical
   `Slayer Gate Key` pickup instead.
-- Rocket Launcher is in PTB scope, but Cultist Base’s scripted route can still
-  require checkpoint recovery if the player already owns it.
+- Rocket Launcher is an AP trigger location in Cultist Base; only
+  `game_target_relay_1244` is preserved, with no propitem DECL override.
 - Secret Encounters are AP checks in Exultia and Cultist Base.
 - Mission Complete remains a runtime location only for Cultist Base.
 - The first Fortress Suit Point remains vanilla pending safer validation.
 
-## Known issues
+## Known probable issues
 
-- DeathLink can currently burn through all available Extra Lives before the
-  run stabilizes.
-- Dash and Blood Punch pickups are functional, but their presentation can be
-  partially buried in world geometry.
-- Part of the Sentinel Crystal pedestal visuals still remains even when the
-  pickup is randomized.
-- `randomize_dash` and `randomize_first_battery` should still be treated as
-  experimental when exposed.
-- Runes received mid-map may only become equipable after a map load or
-  checkpoint reload.
-- Restarting only the game can leave the read-only memory gate unable to
-  reopen. Relaunch the full stack if that happens.
-- AP pickups currently disappear from the automap.
-- If Ice Bomb exists without Frag Grenade, the HUD slot can disappear even
-  though the item still functions.
-- Sentinel Battery socket feedback is not trustworthy for validation.
-- The Cultist Base Super Shotgun sequence is still effectively vanilla and not
-  part of the PTB randomization path.
-- The Cultist Base Rocket Launcher route can still stall a scripted door if the
-  player already owns the weapon early; checkpoint restart is the current
-  recovery.
-- Secret Encounter hooks still need directed playtest for timeout, retry,
-  checkpoint reload, and Mission Select duplication behavior.
-- Mission Challenges are still not AP checks in the PTB.
+- Rune slots and equipped-state visuals may occasionally appear inconsistent,
+  even when Rune effects are active. Planned for v0.2.1.
+- Sentinel Battery grants and socket consumption work, but the balance may not
+  update clearly in the Dossier/HUD before socket interaction.
+- The static audit found `7770055` physically distinct, but that Cultist Base
+  Extra Life check remains a probable runtime reliability risk.
+- This pre-alpha build has not received another complete campaign regression
+  after the final targeted fixes. Ice Bomb and Rocket Launcher require only
+  directed checkpoint tests.
+- Reloading a checkpoint may still recover rare vanilla scripting desyncs.
+- AP-mutated pickups may have reduced automap discoverability.
 
 ## Roadmap
 
 ### 0.1.1 PTB — Runtime stabilization
 
-- Freeze the current route through Cultist Base: `82` map checks plus `1`
+- Freeze the current route through Cultist Base: `80` map checks plus `1`
   runtime goal.
 - Pin the validated Meathook and mod-installation versions and improve local
   diagnostic logs.

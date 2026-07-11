@@ -3,7 +3,7 @@
     "region": "Cultist Base",
     "entities": {
         "AP_CHECK_GAME_PROGRESS_ARGENT_CELL_1_1313774949": 7770058,
-        "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_43_E1M3": 7770055,
+        "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1": 7770056,
         "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10_E1M3": 7770052,
         "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_5_E1M3": 7770065,
         "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11_E1M3": 7770053,
@@ -17,7 +17,6 @@
         "AP_CHECK_GAME_PROGRESS_RUNE_1_E1M3": 7770067,
         "AP_CHECK_GAME_PROGRESS_MOD_BOT_2_E1M3": 7770061,
         "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_6_E1M3": 7770066,
-        "AP_CHECK_MASTERLEVEL_PROGRESS_CHEATS_SENTINEL_ARMOR_1": 7770068,
         "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E1M3": 7770046,
         "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E1M3": 7770048,
         "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M3": 7770047,
@@ -29,9 +28,31 @@
         "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_3_E1M3": 7770070
     },
     "neutralize_pickups": [
-        "pickups_pickup_weapon_plasma_rifle_1",
-        "game_pickup_weapon_rocket_launcher_1"
+        "pickups_pickup_weapon_plasma_rifle_1"
     ],
+    "target_policies": {
+        "game_pickup_weapon_rocket_launcher_1": {
+            "preserve_targets": [
+                "game_target_relay_1244"
+            ],
+            "drop_targets": [],
+            "safe_target_graph": {
+                "game_target_relay_1244": [
+                    "movers_func_mover_162",
+                    "movers_func_mover_163"
+                ],
+                "movers_func_mover_162": [],
+                "movers_func_mover_163": []
+            },
+            "forbidden_target_terms": [
+                "rocket_launcher",
+                "ammo/rocket",
+                "inventory",
+                "give",
+                "equip"
+            ]
+        }
+    },
     "secret_encounters": [
         {
             "ap_check": "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_CAVE_MANCUBUS",

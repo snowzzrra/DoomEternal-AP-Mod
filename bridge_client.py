@@ -1929,13 +1929,7 @@ class DoomEternalContext(CommonContext):
                     "[Goal] Goal sent but transition event file "
                     f"{os.path.basename(path)} could not be removed yet: {error}"
                 )
-            try:
-                self.output("Goal sent.")
-            except Exception as error:
-                logger.warning(
-                    "[Goal] Goal committed; non-critical UI notification failed: "
-                    f"{error}"
-                )
+            logger.info("[Goal] Goal sent.")
             return True
 
         return True

@@ -193,10 +193,6 @@
         "type": "perk",
         "perk": "perk/player/suit/exploration/dossier_shows_progression_items"
     },
-    "7770105": {
-        "type": "perk",
-        "perk": "perk/player/suit/fundamentals/increase_pickup_radius"
-    },
     "7770106": {
         "type": "perk",
         "perk": "perk/player/suit/self_preservation/reduce_hazard_damage"
@@ -248,17 +244,5 @@
     "7770118": {
         "type": "perk",
         "perk": "perk/player/equipment/ice_melee_shatter"
-    },
-    "7770119": {
-        "type": "perk",
-        "perk": "perk/player/equipment/flame_reduce_cooldown"
-    },
-    "7770120": {
-        "type": "perk",
-        "perk": "perk/player/equipment/flame_extend_duration"
-    },
-    "7770121": {
-        "type": "perk",
-        "perk": "perk/player/equipment/flame_more_loot"
     }
 }

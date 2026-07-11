@@ -237,6 +237,54 @@ def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
     target_names.append(ap_check_id)
     return replace_targets_block(block, target_names)
 
+
+def audit_preserved_target_graph(content, entity_name, target_policy):
+    """Fail closed when a pickup's retained vanilla branch can grant a reward.
+
+    Scripted tutorial pickups are converted to ordinary AP triggers.  Their
+    retained targets therefore need an explicit, source-verified graph rather
+    than relying on a propitem DECL to suppress a hidden idProp2 reward.
+    """
+    if not target_policy:
+        return
+    roots = target_policy.get("preserve_targets", [])
+    expected_graph = target_policy.get("safe_target_graph")
+    forbidden_terms = target_policy.get("forbidden_target_terms", [])
+    if not roots or expected_graph is None or not forbidden_terms:
+        return
+
+    pending = list(roots)
+    visited = set()
+    while pending:
+        target_name = pending.pop()
+        if target_name in visited:
+            continue
+        bounds = find_entity_block_bounds(content, target_name)
+        if bounds is None:
+            raise ValueError(
+                f"{entity_name} preserved target graph is missing: {target_name}"
+            )
+        block = content[bounds[0]:bounds[1]]
+        for term in forbidden_terms:
+            if term.lower() in block.lower():
+                raise ValueError(
+                    f"{entity_name} preserved target graph reaches forbidden reward "
+                    f"term {term!r} in {target_name}"
+                )
+        actual_targets = extract_target_names(block)
+        if target_name not in expected_graph:
+            raise ValueError(
+                f"{entity_name} preserved target graph has unexpected node: {target_name}"
+            )
+        expected_targets = expected_graph[target_name]
+        if actual_targets != expected_targets:
+            raise ValueError(
+                f"{entity_name} preserved target graph drift at {target_name}: "
+                f"expected {expected_targets}, got {actual_targets}"
+            )
+        pending.extend(actual_targets)
+        visited.add(target_name)
+
 def generate_event_relay(ap_check_id, location_id, spawn_pos_text, include_notification=True):
     event_name = f"{EVENT_ENTITY_PREFIX}{location_id}"
     target_lines = []
@@ -672,32 +720,13 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             if "edit = {" in block:
                 target_policy = target_policies.get(entity_name)
+                audit_preserved_target_graph(content, entity_name, target_policy)
                 block = add_ap_check_target(
                     block,
                     entity_name,
                     ap_check_id,
                     target_policy,
                 )
-
-                preserve_scripted_pickup = bool(
-                    target_policy
-                    and target_policy.get("preserve_scripted_pickup", False)
-                )
-
-                if preserve_scripted_pickup:
-                    # Scripted onboarding pickups rely on their original
-                    # identity, render/visibility hooks, interaction component,
-                    # and reverse relay graph. Only their vanilla grant target
-                    # is removed; the AP relay is appended above.
-                    location_id = config_entities[ap_check_id]
-                    new_blocks.append(generate_target_relay(
-                        ap_check_id, location_id, spawn_pos_text
-                    ))
-                    new_blocks.append(generate_pickup_notification(ap_check_id))
-                    new_blocks.append(generate_check_event(location_id))
-                    modified_count += 1
-                    new_blocks.append("entity {" + block)
-                    continue
 
                 # gravity stuff
                 block = re.sub(r'physicsAttributes\s*=\s*"[^"]+";', "", block)
@@ -738,9 +767,15 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
                 # necessary for this architecture
                 block = re.sub(r'\s*useableComponentDecl\s*=\s*"[^"]*";', '', block)
+                block = re.sub(r'\s*equipOnPickup\s*=\s*\w+;', '', block)
+                block = re.sub(r'\s*forceEquip\s*=\s*\w+;', '', block)
 
                 block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "trigger/trigger";', block)
                 block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idTrigger";', block)
+                if not re.search(r'\btriggerOnce\s*=', block):
+                    block = block.replace("edit = {", "edit = {\n\t\t\ttriggerOnce = true;", 1)
+                else:
+                    block = re.sub(r'\btriggerOnce\s*=\s*\w+;', 'triggerOnce = true;', block)
 
                 location_id = config_entities[ap_check_id]
                 relay_entity_str = generate_target_relay(

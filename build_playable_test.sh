@@ -8,12 +8,13 @@ OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-0.2.0-pre-alpha-dev}"
+PTB_VERSION="${PTB_VERSION:-v0.2.0-pre-alpha}"
 RELEASE_VERSION="v${PTB_VERSION#v}"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
+CLIENT_BUILD_DIR="$SCRIPT_DIR/build/client"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
@@ -88,6 +89,15 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
     "$GENERATED_MAPS_DIR"
+"$SCRIPT_DIR/build_client.sh"
+if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
+    echo "Fresh client build is missing required executable(s)" >&2
+    exit 1
+fi
+if [[ -f "$SCRIPT_DIR/ap_client.exe" ]]; then
+    echo "Refusing to package ap_client.exe from the source tree" >&2
+    exit 1
+fi
 cp -R "$SCRIPT_DIR/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 
 mapfile -t MAP_ROWS < <(
@@ -129,8 +139,7 @@ done
 
 cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
-cp "$SCRIPT_DIR/ap_client.exe" "$SCRIPT_DIR/ap_logger.exe" \
-    "$SCRIPT_DIR/save_death_probe.exe" \
+cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$SCRIPT_DIR/bridge_client.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
     "$SCRIPT_DIR/start_injector_windows.bat" \
@@ -184,7 +193,6 @@ manifest = {
         "DoomEternalArchipelagoPreAlpha.zip",
         "doometernal.apworld",
         "client/ap_client.exe",
-        "client/ap_logger.exe",
         "client/bridge_client.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
@@ -231,6 +239,10 @@ manifest = {
 )
 PY
 
+PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{print $1}')"
+FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print $1}')"
+[[ "$PACKAGED_CLIENT_SHA256" == "$FRESH_CLIENT_SHA256" ]] || { echo "Packaged ap_client.exe is not the fresh build" >&2; exit 1; }
+
 (
     cd "$OUTPUT_DIR/mod"
     zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" .
@@ -246,12 +258,27 @@ PY
 EXTRACTED_AUDIT_DIR="$TEMP_DIR/extracted-final"
 mkdir -p "$EXTRACTED_AUDIT_DIR"
 unzip -q "$OUTPUT_DIR/$PTB_ZIP_NAME" -d "$EXTRACTED_AUDIT_DIR"
+MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
+mkdir -p "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoPreAlpha.zip" -d "$MOD_AUDIT_DIR"
+if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
+    -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
+    -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' | grep -q .; then
+    echo "Forbidden propitem DECL override found in final mod ZIP" >&2
+    exit 1
+fi
 python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
     "$EXTRACTED_AUDIT_DIR/client" \
     --forbid-local version.dll \
     --forbid-local dinput8.dll \
     --forbid-local dxgi.dll \
     --forbid-local xinput1_4.dll
+[[ "$(find "$EXTRACTED_AUDIT_DIR" -name ap_client.exe -type f | wc -l)" == "1" ]] || { echo "Final ZIP must contain exactly one ap_client.exe" >&2; exit 1; }
+[[ "$(sha256sum "$EXTRACTED_AUDIT_DIR/client/ap_client.exe" | awk '{print $1}')" == "$FRESH_CLIENT_SHA256" ]] || { echo "ZIP ap_client.exe hash mismatch" >&2; exit 1; }
+if unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -q '(^|/)(build|staging|__pycache__|.*\.log)$|^/|^[A-Za-z]:/'; then
+    echo "Final ZIP contains a generated/runtime artifact or absolute path" >&2
+    exit 1
+fi
 
 echo "Playable test build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"

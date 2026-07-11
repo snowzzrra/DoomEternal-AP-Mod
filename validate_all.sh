@@ -24,7 +24,8 @@ g++ -std=c++17 tests/test_ap_client_path_utils.cpp ap_client_path_utils.cpp \
 
 RUNTIME_AUDIT_DIR="$(mktemp -d /tmp/doom-eap-runtime-audit.XXXXXX)"
 trap 'rm -rf "$RUNTIME_AUDIT_DIR"' EXIT
-cp ap_client.exe ap_logger.exe save_death_probe.exe "$RUNTIME_AUDIT_DIR/"
+./build_client.sh
+cp build/client/ap_client.exe build/client/save_death_probe.exe "$RUNTIME_AUDIT_DIR/"
 python3 validate_windows_runtime_deps.py \
     "$RUNTIME_AUDIT_DIR" \
     --forbid-local version.dll \
