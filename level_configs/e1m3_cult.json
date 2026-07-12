@@ -30,8 +30,27 @@
     "neutralize_pickups": [
         "pickups_pickup_weapon_plasma_rifle_1"
     ],
+    "target_removals": {
+        "game_player_start_6": [
+            "game_target_give_item_1"
+        ]
+    },
+    "remove_entities": [
+        "game_target_give_item_1"
+    ],
+    "neutralize_entity_references": [
+        "game_pickup_weapon_rocket_launcher_1"
+    ],
     "target_policies": {
         "game_pickup_weapon_rocket_launcher_1": {
+            "independent_ap_trigger": true,
+            "independent_entity_name": "ap_independent_rocket_launcher_7770056",
+            "independent_targets": [
+                "game_target_relay_1244",
+                "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"
+            ],
+            "remove_original": true,
+            "preserve_layers": false,
             "preserve_targets": [
                 "game_target_relay_1244"
             ],

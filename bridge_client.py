@@ -1534,6 +1534,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
         allowed = allowed or entity.startswith("ap_test_")
         allowed = allowed or bool(re.fullmatch(r"ap_bootstrap_v[12]_[a-z_]+", entity))
         allowed = allowed or entity in set(DECL_TO_LOCATION)
+        allowed = allowed or entity == "ap_independent_rocket_launcher_7770056"
         if not allowed:
             self.output("Entity rejected by the directed-test allowlist.")
             return

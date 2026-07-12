@@ -248,8 +248,12 @@ manifest = {
 PY
 
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
-    [[ "$(rg -c '^\s*entityDef ap_bootstrap_v2_' "$generated_map")" == "4" ]] || {
-        echo "Normal build lacks four v2 bootstrap controls: $generated_map" >&2
+    [[ "$(rg -c '^\s*entityDef ap_bootstrap_v2_' "$generated_map")" == "3" ]] || {
+        echo "Normal build lacks the three active v2 bootstrap controls: $generated_map" >&2
+        exit 1
+    }
+    ! rg -q '^\s*entityDef ap_bootstrap_v2_suit_page' "$generated_map" || {
+        echo "Rejected Suit v2 control entered the normal build: $generated_map" >&2
         exit 1
     }
     if rg -q 'ap_bootstrap_v[13]_' "$generated_map"; then
