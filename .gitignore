@@ -47,6 +47,7 @@ battery.txt
 .death-probe-compat/
 Archive.zip
 .serena/
+tools/
 
 # Local project memory, caso decida nao publicar
 .local/

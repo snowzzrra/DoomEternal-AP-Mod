@@ -13,11 +13,25 @@ from ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
     command_requires_map_side_rpc,
+    generate_bootstrap_entities,
     generate_check_event,
     generate_event_relay,
     generate_pickup_notification,
     generate_rpc_command_entities,
     generate_target_relay,
+)
+from bootstrap_actions import (
+    BOOTSTRAP_ACTIONS,
+    BOOTSTRAP_ENTITY_PREFIXES,
+    BOOTSTRAP_STAT_ALLOWLIST,
+    BOOTSTRAP_STAT_PRIMITIVE,
+)
+from foundation import (
+    compile_all_item_plans,
+    load_foundation_contracts,
+    load_primitive_registry,
+    validate_entity_shape,
+    validate_primitive_registry,
 )
 
 
@@ -210,6 +224,58 @@ def main() -> int:
             "4": ["give first", "give second"],
         }
     )
+    registry = load_primitive_registry()
+    contracts = load_foundation_contracts()
+    try:
+        validate_primitive_registry(registry)
+    except ValueError as exc:
+        errors.append(f"Foundation primitive registry is invalid: {exc}")
+    if contracts.get("counts") != {
+        "items": 117,
+        "locations": 80,
+        "map_checks": 79,
+        "runtime_goals": 1,
+        "route_sentinel_batteries": 5,
+        "route_weapon_mastery_tokens": 1,
+    }:
+        errors.append("Foundation frozen counts changed")
+    try:
+        plans = compile_all_item_plans(commands)
+    except ValueError as exc:
+        errors.append(f"Item delivery plan compilation failed: {exc}")
+        plans = []
+    if len(plans) != 117:
+        errors.append(f"Expected 117 compiled item plans, found {len(plans)}")
+
+    generated_bootstrap = generate_bootstrap_entities()
+    for action_name, action in BOOTSTRAP_ACTIONS.items():
+        entity_start = f"entityDef {action['entity_name']} {{"
+        if entity_start not in generated_bootstrap:
+            errors.append(f"Bootstrap action {action_name} lacks its generated entity")
+            continue
+        entity_body = generated_bootstrap.split(entity_start, 1)[1].split("\n}\n", 1)[0]
+        if (
+            entity_body.count("gameStat = ") != 1
+            or f'gameStat = "{BOOTSTRAP_STAT_ALLOWLIST[action_name]}";' not in entity_body
+            or f'class = "{BOOTSTRAP_STAT_PRIMITIVE["class"]}";' not in entity_body
+            or "inherit =" in entity_body
+        ):
+            errors.append(f"Bootstrap action {action_name} violates the stat allowlist")
+        if any(term.lower() in entity_body.lower() for term in action["forbidden_effects"]):
+            errors.append(f"Bootstrap action {action_name} contains a forbidden effect")
+    if (
+        'inherit = "target/player_stat_modifier";' in generated_bootstrap
+        or "ap_bootstrap_v1_" in generated_bootstrap
+        or BOOTSTRAP_ENTITY_PREFIXES[-1] not in generated_bootstrap
+    ):
+        errors.append("Bootstrap output contains a runtime-invalid or stale v1 entityDef")
+    try:
+        validate_entity_shape(
+            "boolean_stat_modifier_direct", generated_bootstrap,
+            release=False,
+        )
+    except ValueError as exc:
+        errors.append(f"Experimental bootstrap primitive is invalid: {exc}")
     if (
         f"entityDef {RPC_ENTITY_PREFIX}_1_0" not in generated_commands
         or "givePlayerPerk perk/player/argent/health_capacity_0;"
@@ -242,6 +308,19 @@ def main() -> int:
         errors.append("Multi-command items do not use the validated target/count relay")
 
     generated_real_commands = generate_rpc_command_entities(commands)
+    battery_chain = (
+        f'entityDef {RPC_ENTITY_PREFIX}_7770016 {{',
+        'class = "idTarget_GiveItems";',
+        'currencyType = "CURRENCY_SENTINEL_BATTERY";',
+        "count = 1;",
+    )
+    if not all(fragment in generated_real_commands for fragment in battery_chain):
+        errors.append("Sentinel Battery lacks the restored direct currency primitive")
+    if (
+        'inherit = "target/give_item";' in generated_real_commands
+        or 'inherit = "target/player_stat_modifier";' in generated_real_commands
+    ):
+        errors.append("Generated item entities contain a rejected primitive")
     for item_id, command_value in commands.items():
         if isinstance(command_value, str):
             if re.search(r"sharedammopool/(?:fuel|bfg)\s+0(?:\s|$)", command_value):

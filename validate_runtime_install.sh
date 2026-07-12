@@ -60,6 +60,11 @@ for relative_path in "${resource_archives[@]}"; do
         echo "Steam may have restored the game files. Run EternalModInjectorShell.sh again." >&2
         exit 1
     fi
+    if [[ "$active" -ot "$MOD_ZIP" ]]; then
+        echo "Installed ZIP is newer than active resource: $relative_path" >&2
+        echo "The ZIP was replaced after injection. Run EternalModInjectorShell.sh again." >&2
+        exit 1
+    fi
 done
 
 echo "Runtime installation layout is valid."
