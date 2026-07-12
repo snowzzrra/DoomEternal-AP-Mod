@@ -76,7 +76,10 @@ DELIVERY_CONTRACTS: dict[str, Any] = {
     "counts": {"items": 117, "locations": 80, "map_checks": 79, "runtime_goals": 1, "route_sentinel_batteries": 5, "route_weapon_mastery_tokens": 1},
     "active_maps": {"e1m1_intro": "game/sp/e1m1_intro/e1m1_intro", "hub": "game/sp/hub/hub", "e1m2_war": "game/sp/e1m2_battle/e1m2_battle", "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult"},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
-    "location_entrypoints": {"7770074": {"map": "game/sp/hub/hub", "entity": "ap_independent_pickup_equipment_ice_bomb", "primitive_id": "independent_location_trigger", "destructive": True}},
+    "location_entrypoints": {
+        "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
+        "7770074": {"map": "game/sp/hub/hub", "entity": "ap_independent_pickup_equipment_ice_bomb", "primitive_id": "independent_location_trigger", "destructive": True},
+    },
     "bootstrap_test_entrypoints": {"rune_page": "ap_bootstrap_v2_rune_page", "frag_acquired": "ap_bootstrap_v2_frag_acquired", "ice_acquired": "ap_bootstrap_v2_ice_acquired"},
     "repeatability": {"7770016": "repeatable_runtime_proven", "7770019": "repeatable_runtime_proven"},
     "map_overrides": {},

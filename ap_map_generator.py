@@ -194,16 +194,25 @@ def neutralize_conditional_pickup_block(block):
     return replace_targets_block(block, [])
 
 
-def generate_independent_pickup_trigger(entity_name, ap_check_id, block):
+def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
     """Create an AP trigger independent from an ownership-hidden pickup."""
+    policy = policy or {}
     layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
-    layers = f"\t{layers_match.group(1).strip()}\n" if layers_match else ""
+    layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
     position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
     if not position_match:
         raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
     position = position_match.group(1)
+    independent_name = policy.get("independent_entity_name", f"ap_independent_{entity_name}")
+    targets = policy.get(
+        "independent_targets",
+        ["target_relay_pickup_ice_bomb", ap_check_id, "ap_ice_ripatorium_live_refresh"],
+    )
+    target_lines = "\n".join(
+        f'\t\t\t\titem[{index}] = "{target}";' for index, target in enumerate(targets)
+    )
     return f'''entity {{
-{layers}\tentityDef ap_independent_{entity_name} {{
+{layers}\tentityDef {independent_name} {{
 \t\tinherit = "trigger/trigger";
 \t\tclass = "idTrigger";
 \t\texpandInheritance = false;
@@ -226,10 +235,8 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block):
 \t\t\t\t}}
 \t\t\t}}
 \t\t\ttargets = {{
-\t\t\t\tnum = 3;
-\t\t\t\titem[0] = "target_relay_pickup_ice_bomb";
-\t\t\t\titem[1] = "{ap_check_id}";
-\t\t\t\titem[2] = "ap_ice_ripatorium_live_refresh";
+\t\t\t\tnum = {len(targets)};
+{target_lines}
 \t\t\t}}
 \t\t}}
 \t}}
@@ -687,6 +694,9 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
     neutralize_pickups = level_config.get("neutralize_pickups", [])
+    target_removals = level_config.get("target_removals", {})
+    remove_entities = level_config.get("remove_entities", [])
+    neutralize_entity_references = level_config.get("neutralize_entity_references", [])
     secret_encounters = level_config.get("secret_encounters", [])
     manifest_data = {}
 
@@ -695,6 +705,40 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
     for entity_name in neutralize_pickups:
         content = neutralize_conditional_pickup(content, entity_name)
+
+    for entity_name, removed_targets in target_removals.items():
+        bounds = find_entity_block_bounds(content, entity_name)
+        if bounds is None:
+            raise ValueError(f"Target-removal entity not found: {entity_name}")
+        start, end = bounds
+        block = content[start:end]
+        existing_targets = extract_target_names(block)
+        missing = sorted(set(removed_targets) - set(existing_targets))
+        if missing:
+            raise ValueError(
+                f"Target-removal entity {entity_name} is missing expected targets: "
+                + ", ".join(missing)
+            )
+        block = replace_targets_block(
+            block,
+            [target for target in existing_targets if target not in removed_targets],
+        )
+        content = content[:start] + block + content[end:]
+
+    for entity_name in remove_entities:
+        bounds = find_entity_block_bounds(content, entity_name)
+        if bounds is None:
+            raise ValueError(f"Configured removal entity not found: {entity_name}")
+        content = content[:bounds[0]] + content[bounds[1]:]
+
+    for entity_name in neutralize_entity_references:
+        reference = re.compile(rf'(\bentity\s*=\s*)"{re.escape(entity_name)}";')
+        content, replacements = reference.subn(r'\1"";', content)
+        if replacements != 1:
+            raise ValueError(
+                f"Expected exactly one neutralized entity reference for {entity_name}, "
+                f"found {replacements}"
+            )
 
     content = remove_balanced_entity_blocks(content, "ap_logic_")
     content = remove_balanced_entity_blocks(content, "AP_CHECK_")
@@ -774,13 +818,15 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     # reward carrier inert.
                     location_id = config_entities[ap_check_id]
                     manifest_data[ap_check_id] = location_id
+                    if not target_policy.get("remove_original", False):
+                        new_blocks.append(
+                            "entity {" + neutralize_conditional_pickup_block(block)
+                        )
                     new_blocks.append(
-                        "entity {" + neutralize_conditional_pickup_block(block)
+                        generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
-                    new_blocks.append(
-                        generate_independent_pickup_trigger(entity_name, ap_check_id, block)
-                    )
-                    new_blocks.append(generate_ice_ripatorium_live_refresh())
+                    if target_policy.get("live_refresh"):
+                        new_blocks.append(generate_ice_ripatorium_live_refresh())
                     new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
                     new_blocks.append(generate_pickup_notification(ap_check_id))
                     new_blocks.append(generate_check_event(location_id))
@@ -834,6 +880,17 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                 block = re.sub(r'\s*useableComponentDecl\s*=\s*"[^"]*";', '', block)
                 block = re.sub(r'\s*equipOnPickup\s*=\s*\w+;', '', block)
                 block = re.sub(r'\s*forceEquip\s*=\s*\w+;', '', block)
+                for property_name in (target_policy or {}).get("strip_properties", []):
+                    if property_name not in {"canBePossessed"}:
+                        raise ValueError(
+                            f"Unsupported pickup property strip for {entity_name}: "
+                            f"{property_name}"
+                        )
+                    block = re.sub(
+                        rf'\s*{re.escape(property_name)}\s*=\s*(?:"[^"]*"|[^;]+);',
+                        '',
+                        block,
+                    )
 
                 block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "trigger/trigger";', block)
                 block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idTrigger";', block)

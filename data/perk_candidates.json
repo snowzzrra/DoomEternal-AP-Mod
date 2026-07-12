@@ -37,7 +37,7 @@
         "Reduced Self Damage": "perk/player/suit/self_preservation/reduce_self_weapon_damage",
         "Barrels Respawn": "perk/player/suit/extermination/barrels_respawn",
         "Barrels Drop Ammo": "perk/player/suit/extermination/barrels_drop_ammo",
-        "Longer Powerups": "perk/player/suit/powerup/powerup_duration",
+        "Powerup Extender": "perk/player/suit/powerup/powerup_duration",
         "Frag Grenade Cooldown": "perk/player/equipment/frag_reduce_cooldown",
         "Frag Grenade Concussive Blast": "perk/player/equipment/frag_concussive_blast",
         "Frag Grenade Cluster Bombs": "perk/player/equipment/frag_cluster_bombs",
