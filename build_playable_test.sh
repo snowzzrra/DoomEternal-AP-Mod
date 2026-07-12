@@ -8,7 +8,7 @@ OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-v0.2.0-pre-alpha}"
+PTB_VERSION="${PTB_VERSION:-v0.2.1-pre-alpha-dev}"
 RELEASE_VERSION="v${PTB_VERSION#v}"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
@@ -140,7 +140,8 @@ done
 cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
-    "$SCRIPT_DIR/bridge_client.py" \
+    "$SCRIPT_DIR/bridge_client.py" "$SCRIPT_DIR/bootstrap_actions.py" \
+    "$SCRIPT_DIR/foundation.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
     "$SCRIPT_DIR/start_injector_windows.bat" \
     "$SCRIPT_DIR/ap_config.example.json" \
@@ -150,6 +151,9 @@ mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$SCRIPT_DIR/data/items.json" \
     "$SCRIPT_DIR/data/runtime_locations.json" \
     "$OUTPUT_DIR/client/data/"
+mkdir -p "$OUTPUT_DIR/tools"
+cp "$SCRIPT_DIR/tools/test_save_scenarios.py" \
+    "$SCRIPT_DIR/tools/generate_foundation_test_plan.py" "$OUTPUT_DIR/tools/"
 cp -R "$SCRIPT_DIR/manifests/." "$OUTPUT_DIR/client/manifests/"
 cp -R "$SCRIPT_DIR/player_templates" "$OUTPUT_DIR/client/"
 cp -R "$WORKSPACE/Archipelago/worlds/doometernal" \
@@ -194,6 +198,8 @@ manifest = {
         "doometernal.apworld",
         "client/ap_client.exe",
         "client/bridge_client.py",
+        "client/bootstrap_actions.py",
+        "client/foundation.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/run_bridge.sh",
@@ -208,6 +214,8 @@ manifest = {
         "client/manifests/hub.json",
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
+        "tools/test_save_scenarios.py",
+        "tools/generate_foundation_test_plan.py",
     ],
     "ap_client": {
         "sha256": validation["exe_sha256"],
@@ -239,6 +247,17 @@ manifest = {
 )
 PY
 
+for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
+    [[ "$(rg -c '^\s*entityDef ap_bootstrap_v2_' "$generated_map")" == "4" ]] || {
+        echo "Normal build lacks four v2 bootstrap controls: $generated_map" >&2
+        exit 1
+    }
+    if rg -q 'ap_bootstrap_v[13]_' "$generated_map"; then
+        echo "Generated map contains stale bootstrap revision: $generated_map" >&2
+        exit 1
+    fi
+done
+
 PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{print $1}')"
 FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print $1}')"
 [[ "$PACKAGED_CLIENT_SHA256" == "$FRESH_CLIENT_SHA256" ]] || { echo "Packaged ap_client.exe is not the fresh build" >&2; exit 1; }
@@ -251,7 +270,7 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
 (
     cd "$OUTPUT_DIR"
     zip -q -r "$PTB_ZIP_NAME" \
-        README.md RELEASE_MANIFEST.json client doometernal.apworld \
+        README.md RELEASE_MANIFEST.json client tools doometernal.apworld \
         DoomEternalArchipelagoPreAlpha.zip
 )
 
@@ -279,7 +298,6 @@ if unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -q '(^|/)(build|staging|__pycache_
     echo "Final ZIP contains a generated/runtime artifact or absolute path" >&2
     exit 1
 fi
-
 echo "Playable test build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
 echo "Linux/Windows test bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"

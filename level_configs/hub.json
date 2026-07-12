@@ -17,6 +17,7 @@
             ]
         },
         "pickup_equipment_ice_bomb": {
+            "independent_ap_trigger": true,
             "preserve_targets": [
                 "target_relay_pickup_ice_bomb"
             ],
@@ -31,6 +32,16 @@
                     "target_objective_complete_ice_bomb"
                 ],
                 "target_objective_complete_ice_bomb": []
+            },
+            "live_refresh": {
+                "delay": 7.25,
+                "targets": [
+                    "target_objective_prison_lift",
+                    "trigger_lift_poi_off",
+                    "target_poi_lift_door",
+                    "target_relay_enable_prison_lift"
+                ],
+                "door_controller": "target_relay_enable_toggle_1908522638"
             },
             "forbidden_target_terms": [
                 "target_give_item_ice_bomb",

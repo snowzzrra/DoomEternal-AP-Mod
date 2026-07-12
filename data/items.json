@@ -100,10 +100,10 @@
     "7770051": "chrispy ai/superheavy/marauder",
     "7770052": "chrispy ai/superheavy/archvile",
     "7770053": "chrispy ai/ambient/zombie_cueball",
-    "7770054": "give ammo 0",
+    "7770054": "give ammo -300",
     "7770055": "give ammo/sharedammopool/fuel -3",
     "7770056": "give ammo/sharedammopool/bfg -2",
-    "7770057": "give armor 0",
+    "7770057": "give armor -200",
     
     "7770058": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/pop_rocket",
     "7770059": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/secondary_full_auto",

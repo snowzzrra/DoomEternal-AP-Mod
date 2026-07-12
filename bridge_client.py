@@ -9,9 +9,22 @@ import shutil
 import subprocess
 import uuid
 import logging
+from foundation import (
+    compile_item_delivery_plan,
+    load_foundation_contracts,
+    load_primitive_registry,
+)
 
 import json
 from pathlib import Path
+from bootstrap_actions import (
+    BOOTSTRAP_ACTIONS,
+    BOOTSTRAP_ENTITY_PREFIX,
+    BOOTSTRAP_REVISION,
+    BOOTSTRAP_STAT_PRIMITIVE,
+    LEGACY_BOOTSTRAP_ENTITY_PREFIXES,
+    received_any_suit_upgrade,
+)
 
 try:
     from .save_decrypt import decrypt, steam_id64
@@ -21,8 +34,6 @@ except ImportError:
 CONFIG_FILE = Path(
     os.environ.get("DOOM_AP_CONFIG_FILE", Path(__file__).with_name("ap_config.json"))
 )
-
-
 def abort_setup(message):
     print(message, file=sys.stderr)
     if os.name == "nt":
@@ -1007,6 +1018,31 @@ def command_spool_exists(command_id):
     return os.path.exists(queued_path) or os.path.exists(processing_path)
 
 
+def hold_orphaned_dev_jobs():
+    """On bridge restart, keep dev jobs visible but require explicit resume."""
+    os.makedirs(QUEUE_DIR, exist_ok=True)
+    held = []
+    for pattern in ("devtest-*.cmd", "devtest-*.processing"):
+        for source_name in sorted(glob.glob(os.path.join(QUEUE_DIR, pattern))):
+            source = Path(source_name)
+            target = source.with_suffix(".held")
+            if target.exists():
+                target = source.with_name(source.name + ".held")
+            try:
+                os.replace(source, target)
+                held.append(target)
+            except OSError as error:
+                logger.error("[DevLab] Could not hold orphaned job %s: %s", source, error)
+    return held
+
+
+def dev_job_paths():
+    paths = []
+    for suffix in ("cmd", "processing", "held"):
+        paths.extend(Path(QUEUE_DIR).glob(f"devtest-*.{suffix}"))
+    return sorted(paths)
+
+
 def is_item_delivery_activation(command):
     return command.strip().startswith(f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_")
 
@@ -1016,6 +1052,11 @@ def delegated_rpc_command(item_id, command_index=None):
     if command_index is not None:
         entity_name = f"{entity_name}_{command_index}"
     return f"ai_ScriptCmdEnt {entity_name} activate"
+
+
+def bootstrap_activation(action_name):
+    action = BOOTSTRAP_ACTIONS[action_name]
+    return f"ai_ScriptCmdEnt {action['entity_name']} activate"
 
 
 def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
@@ -1069,21 +1110,18 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
 
 def expected_item_job_activation(item_id, command_index):
     definition = ITEM_ID_TO_COMMAND.get(item_id)
-    if isinstance(definition, str):
-        if command_index != 0:
-            return None, f"command index {command_index} exceeds string mapping"
-        return delegated_rpc_command(item_id), None
-    if isinstance(definition, list):
-        if command_index >= len(definition):
-            return None, f"command index {command_index} exceeds list mapping"
-        return delegated_rpc_command(item_id, command_index), None
-    if isinstance(definition, dict):
-        if definition.get("type") == "progressive_perk":
-            return delegated_rpc_command(item_id, command_index), None
-        if command_index != 0:
-            return None, f"command index {command_index} exceeds structured mapping"
-        return delegated_rpc_command(item_id), None
-    return None, f"item {item_id} has no supported mapping"
+    try:
+        if isinstance(definition, dict) and definition.get("type") == "progressive_perk":
+            plan = compile_item_delivery_plan(
+                item_id, ITEM_ID_TO_COMMAND, stage=command_index
+            )
+            return plan.commands[0].command, None
+        plan = compile_item_delivery_plan(item_id, ITEM_ID_TO_COMMAND)
+        if command_index >= len(plan.commands):
+            return None, f"command index {command_index} exceeds delivery plan"
+        return plan.commands[command_index].command, None
+    except ValueError as error:
+        return None, str(error)
 
 
 def migrate_direct_item_command_jobs():
@@ -1294,6 +1332,16 @@ def set_rpc_execution(enabled):
 def rpc_execution_enabled():
     return os.path.isfile(RPC_GATE_PATH)
 
+
+def canonical_map_name(name):
+    """Return the map identity used by contracts, logs and runtime checks."""
+    if not name:
+        return name
+    normalized = str(name).strip().replace("\\", "/").rstrip("/")
+    if normalized == "game/hub/hub":
+        return "game/sp/hub/hub"
+    return normalized
+
 def read_telemetry_dump():
     files = telemetry_dump_files()
 
@@ -1317,7 +1365,7 @@ def read_telemetry_dump():
                 lower_line = line.lower()
                 if lower_line.startswith("mapname:"):
                     _, value = line.split(":", 1)
-                    map_name = value.strip()
+                    map_name = canonical_map_name(value.strip())
                 if "idbloatedentity::activate" in lower_line and "ap_check_" in lower_line:
                     match = re.search(r'(ap_check_[a-z0-9_]+)', lower_line)
                     if match:
@@ -1345,6 +1393,8 @@ def read_game_details():
                 values[key] = value
         values["_path"] = str(path)
         values["_mtime_ns"] = path.stat().st_mtime_ns
+        if "mapName" in values:
+            values["mapName"] = canonical_map_name(values["mapName"])
         return values
     except Exception as error:
         logger.error(f"[Save] Failed to decrypt {path}: {error}")
@@ -1365,86 +1415,22 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output("RPC execution paused. Queued commands will be preserved.")
 
     def _cmd_doom_perk(self, perk_path: str = ""):
-        """Queue a givePlayerPerk command for a targeted in-game test."""
-        if not perk_path.startswith("perk/player/"):
-            self.output("Usage: /doom_perk perk/player/...")
-            return
-        send_command(f"ai_ScriptCmdEnt player1 givePlayerPerk {perk_path}")
-        self.output(f"Queued perk test: {perk_path}")
+        """Reject the legacy raw perk command in favor of registered AP items."""
+        self.output("Removed: use /doom_test_item <registered perk item ID>.")
 
     def _cmd_doom_item(self, item_id: str = ""):
-        """Activate an injected AP item command by numeric item ID."""
-        try:
-            parsed_id = int(item_id)
-        except ValueError:
-            self.output("Usage: /doom_item <numeric item id>")
-            return
-        if parsed_id not in ITEM_ID_TO_COMMAND:
-            self.output(f"Unknown Doom Eternal item ID: {parsed_id}")
-            return
-        command = ITEM_ID_TO_COMMAND[parsed_id]
-        if isinstance(command, dict) and command.get("type") == "progressive_perk":
-            self.output(
-                "Progressive items require a stage. "
-                "Use /doom_progressive_item <item id> <stage index>."
-            )
-            return
-        if isinstance(command, str):
-            commands = [delegated_rpc_command(parsed_id)]
-        elif isinstance(command, list):
-            if not command:
-                self.output(f"Cannot queue item {parsed_id}: mapping list is empty")
-                return
-            commands = [
-                delegated_rpc_command(parsed_id, command_index)
-                for command_index, _ in enumerate(command)
-            ]
-        else:
-            commands = [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{parsed_id} activate"]
-        for command_index, command_text in enumerate(commands):
-            send_command(
-                command_text,
-                coalesce_key=f"manual-item-{parsed_id}-cmd-{command_index:02d}",
-                already_queued_ok=True,
-            )
-        self.output(f"Queued AP item test: {parsed_id} -> {command}")
+        """Compatibility alias for the canonical directed-test item command."""
+        return self._cmd_doom_test_item(item_id)
 
     def _cmd_doom_direct_chainsaw(self):
         """Queue the raw chainsaw give command, bypassing injected AP entities."""
-        send_command("give weapon/player/chainsaw")
-        self.output(
-            "Queued direct chainsaw give command. If this works but "
-            "/doom_item 7770010 does not, the injected AP entity path is broken."
-        )
+        self.output("Removed: use /doom_test_item 7770010 through the map-side pipeline.")
 
     def _cmd_doom_progressive_item(
         self, item_id: str = "", stage: str = ""
     ):
-        """Activate one stage of a progressive AP item for a targeted test."""
-        try:
-            parsed_id = int(item_id)
-            parsed_stage = int(stage)
-        except ValueError:
-            self.output(
-                "Usage: /doom_progressive_item <item id> <stage index>"
-            )
-            return
-        command = ITEM_ID_TO_COMMAND.get(parsed_id)
-        perks = command.get("perks", []) if isinstance(command, dict) else []
-        if (
-            not isinstance(command, dict)
-            or command.get("type") != "progressive_perk"
-            or not 0 <= parsed_stage < len(perks)
-        ):
-            self.output("Unknown progressive item or invalid stage.")
-            return
-        if send_command(
-            f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{parsed_id}_{parsed_stage} activate"
-        ):
-            self.output(
-                f"Queued progressive item test: {parsed_id} stage {parsed_stage} "
-                f"-> {perks[parsed_stage]}"
-            )
+        """Compatibility alias for the canonical staged lab item command."""
+        return self._cmd_doom_test_item(item_id, "--stage", stage)
 
     def _cmd_doom_items_reset(self, confirmation: str = ""):
         """Reset exactly-once item history for the connected seed."""
@@ -1468,6 +1454,178 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output("DOOM integration: running")
         self.output(f"Detailed diagnostics: {BRIDGE_LOG_DIR}")
 
+    def _cmd_doom_onboarding_status(self):
+        """Show the compact, safe bootstrap onboarding state."""
+        for line in self.ctx.onboarding_status_lines():
+            self.output(line)
+
+    def _cmd_doom_test_plan(
+        self, item_id: str = "", stage_flag: str = "", stage_value: str = ""
+    ):
+        """Compile and display an item plan without creating a spool."""
+        if item_id == "location":
+            entry = load_foundation_contracts()["location_entrypoints"].get(stage_flag)
+            if not entry:
+                self.output("Usage: /doom_test_plan location <registered location id>")
+                return
+            record = load_primitive_registry()["primitives"][entry["primitive_id"]]
+            self.output(
+                f"location={stage_flag} primitive={entry['primitive_id']} "
+                f"evidence={record['status']} entity={entry['entity']} map={entry['map']} "
+                f"current_map={self.ctx.current_map_name or 'unknown'} destructive=yes"
+            )
+            return
+        try:
+            parsed_id = int(item_id)
+            stage = None
+            if stage_flag:
+                if stage_flag != "--stage":
+                    raise ValueError("expected --stage <index>")
+                stage = int(stage_value)
+            plan = compile_item_delivery_plan(
+                parsed_id, ITEM_ID_TO_COMMAND, stage=stage
+            )
+        except (ValueError, TypeError) as error:
+            self.output(f"Usage: /doom_test_plan <item id> [--stage N] ({error})")
+            return
+        record = load_primitive_registry()["primitives"][plan.primitive_id]
+        map_supported = canonical_map_name(self.ctx.current_map_name) in {
+            canonical_map_name(name)
+            for name in load_foundation_contracts()["active_maps"].values()
+        }
+        self.output(
+            f"item={plan.item_id} family={plan.family} primitive={plan.primitive_id} "
+            f"evidence={record['status']} map={self.ctx.current_map_name or 'unknown'} "
+            f"entities_expected={'yes' if map_supported else 'unknown'}"
+        )
+        for command in plan.commands:
+            self.output(
+                f"{command.index}: entity={command.entity} command={command.command}"
+            )
+        if not plan.commands:
+            self.output("No gameplay command: runtime-only/no-op item.")
+
+    def _cmd_doom_test_item(
+        self, item_id: str = "", stage_flag: str = "", stage_value: str = ""
+    ):
+        """Execute the canonical item plan without simulating a NetworkItem."""
+        try:
+            parsed_id = int(item_id)
+            stage = None
+            if stage_flag:
+                if stage_flag != "--stage":
+                    raise ValueError("expected --stage <index>")
+                stage = int(stage_value)
+            plan = compile_item_delivery_plan(
+                parsed_id, ITEM_ID_TO_COMMAND, stage=stage
+            )
+        except (ValueError, TypeError) as error:
+            self.output(f"Usage: /doom_test_item <item id> [--stage N] ({error})")
+            return
+        correlation = self.ctx.queue_dev_plan(plan, "item")
+        if correlation:
+            self.output(
+                f"Queued {len(plan.commands)} map-side command(s): {correlation}; effect unconfirmed."
+            )
+
+    def _cmd_doom_test_entity(self, entity: str = "", confirmation: str = ""):
+        """Activate one allowlisted AP/test entity."""
+        allowed = bool(re.fullmatch(r"ap_rpc_v3_[0-9]+(?:_[0-9]+)?", entity))
+        allowed = allowed or entity.startswith("ap_test_")
+        allowed = allowed or bool(re.fullmatch(r"ap_bootstrap_v[12]_[a-z_]+", entity))
+        allowed = allowed or entity in set(DECL_TO_LOCATION)
+        if not allowed:
+            self.output("Entity rejected by the directed-test allowlist.")
+            return
+        correlation = self.ctx.queue_dev_commands(
+            [f"ai_ScriptCmdEnt {entity} activate"], f"entity:{entity}"
+        )
+        self.output(f"Queued allowlisted entity: {correlation}; effect unconfirmed.")
+
+    def _cmd_doom_test_bootstrap(self, action_name: str = ""):
+        """Activate a historical bootstrap without touching persisted state."""
+        if action_name == "suit_page":
+            self.output("No active Suit Page bootstrap candidate.")
+            self.output("The v2 stat-only candidate failed runtime validation.")
+            return
+        contracts = load_foundation_contracts()
+        entity = contracts["bootstrap_test_entrypoints"].get(action_name)
+        if not entity or action_name not in BOOTSTRAP_ACTIONS:
+            self.output("Usage: /doom_test_bootstrap rune_page|frag_acquired|ice_acquired")
+            return
+        before = json.dumps(self.ctx.session_state.get("bootstrap", {}), sort_keys=True)
+        correlation = self.ctx.queue_dev_commands(
+            [f"ai_ScriptCmdEnt {entity} activate"], f"bootstrap:{action_name}"
+        )
+        after = json.dumps(self.ctx.session_state.get("bootstrap", {}), sort_keys=True)
+        if before != after:
+            raise RuntimeError("Dev bootstrap mutated production bootstrap state")
+        self.output(
+            f"Queued experimental {action_name}: {correlation}. Record menu state manually."
+        )
+
+    def _cmd_doom_test_location(
+        self, location_id: str = "", confirmation: str = ""
+    ):
+        """Activate a registered map entrypoint; never fabricate a LocationCheck."""
+        try:
+            parsed_id = int(location_id)
+        except ValueError:
+            parsed_id = -1
+        entry = load_foundation_contracts()["location_entrypoints"].get(str(parsed_id))
+        if not entry:
+            self.output("No registered directed-test entrypoint for that location.")
+            return
+        if confirmation != "--confirm":
+            self.output(
+                f"This can change the save/check. Re-run /doom_test_location {parsed_id} --confirm"
+            )
+            return
+        if canonical_map_name(self.ctx.current_map_name) != canonical_map_name(entry["map"]):
+            self.output(f"Wrong map: requires {entry['map']}, current={self.ctx.current_map_name}")
+            return
+        correlation = self.ctx.queue_dev_commands(
+            [f"ai_ScriptCmdEnt {entry['entity']} activate"],
+            f"location:{parsed_id}",
+        )
+        self.output(
+            f"Queued map-side location entrypoint: {correlation}; check/objective remain runtime evidence."
+        )
+
+    def _cmd_doom_test_status(self):
+        """Show isolated directed-test state."""
+        self.output(f"map={self.ctx.current_map_name or 'unknown'}")
+        self.output(f"last_action={self.ctx.dev_last_action or '-'}")
+        self.output(f"last_correlation={self.ctx.dev_last_correlation or '-'}")
+        self.output(f"pending_dev_jobs={len(dev_job_paths())}")
+        self.output("primitive_registry=foundation.py (embedded registry)")
+        self.output(f"logs={BRIDGE_LOG_DIR}")
+
+    def _cmd_doom_test_resume(self):
+        """Resume held jobs from a previous test process."""
+        resumed = 0
+        for source in list(Path(QUEUE_DIR).glob("devtest-*.held")):
+            target = source.with_suffix(".cmd")
+            if target.exists():
+                continue
+            os.replace(source, target)
+            resumed += 1
+        if resumed:
+            set_rpc_execution(True)
+        self.output(f"Resumed {resumed} held dev job(s).")
+
+    def _cmd_doom_test_discard(self, confirmation: str = ""):
+        """Archive, never delete, pending test jobs."""
+        if confirmation != "--confirm":
+            self.output("Usage: /doom_test_discard --confirm")
+            return
+        discarded = 0
+        for source in dev_job_paths():
+            target = source.with_name(source.name + ".discarded")
+            os.replace(source, target)
+            discarded += 1
+        self.output(f"Archived {discarded} dev job(s).")
+
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
     game = "Doom Eternal"
@@ -1475,6 +1633,13 @@ class DoomEternalContext(CommonContext):
 
     def __init__(self, server_address, password):
         super().__init__(server_address, password)
+        held_jobs = hold_orphaned_dev_jobs()
+        if held_jobs:
+            logger.warning("[Test] Held %d orphaned test job(s); use /doom_test_resume", len(held_jobs))
+        self.dev_session_id = uuid.uuid4().hex[:8]
+        self.dev_counter = 0
+        self.dev_last_action = None
+        self.dev_last_correlation = None
         self.tracking_task = None
         self.items_processed = 0
         self.item_state_ready = False
@@ -1495,6 +1660,31 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = None
         self.last_rpc_map_name = None
         self.room_seed_name = None
+        self.current_map_name = None
+
+    def queue_dev_commands(self, commands, action):
+        """Spool isolated dev commands without touching receipt/bootstrap state."""
+        self.dev_counter += 1
+        correlation = f"devtest-{self.dev_session_id}-{self.dev_counter:04d}"
+        for index, command in enumerate(commands):
+            if not re.fullmatch(r"ai_ScriptCmdEnt [A-Za-z0-9_]+ activate", command):
+                raise ValueError("Directed tests accept only map-side entity activation")
+            command_id = f"{correlation}-cmd-{index:02d}"
+            if not send_command(command, coalesce_key=command_id):
+                return None
+            logger.info(
+                "[Test] correlation=%s action=%s map=%s command_id=%s command=%s effect=unknown",
+                correlation, action, self.current_map_name, command_id, command,
+            )
+        self.dev_last_action = action
+        self.dev_last_correlation = correlation
+        return correlation
+
+    def queue_dev_plan(self, plan, action):
+        return self.queue_dev_commands(
+            [command.command for command in plan.commands],
+            f"{action}:{plan.item_id}:{plan.family}:{plan.primitive_id}",
+        )
 
     async def server_auth(self, password_requested: bool = False):
         if password_requested and not self.password:
@@ -1509,6 +1699,7 @@ class DoomEternalContext(CommonContext):
             self.initialize_item_state()
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
             asyncio.create_task(self.update_death_link(self.death_link_enabled))
+            self.onboard_bootstrap("on_connect")
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             if (
@@ -1557,6 +1748,7 @@ class DoomEternalContext(CommonContext):
         )
         self.deathlinked = bool(self.session_state.get("deathlinked", False))
         self.item_state_ready = True
+        self.session_state.setdefault("bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}})
         save_client_state(self.client_state)
         logger.info(
             f"[State] Loaded {self.items_processed} processed items for "
@@ -1578,6 +1770,174 @@ class DoomEternalContext(CommonContext):
         self.session_state.pop("mapping_repair_indices", None)
         self.session_state.pop("item_command_groups", None)
         save_client_state(self.client_state)
+
+    def received_rune_count(self):
+        return sum(item.item in REVISION_ONE_RUNE_IDS for item in self.items_received)
+
+    def received_item_ids(self):
+        return {item.item for item in self.items_received}
+
+    def bootstrap_actions(self):
+        bootstrap = self.session_state.setdefault(
+            "bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}}
+        )
+        actions = bootstrap.setdefault("actions", {})
+        # dev1 stored entries by bare action name. Preserve them as revision 1
+        # evidence rather than treating consumption as confirmation or replaying
+        # them under revision 2.
+        for action_name in (*BOOTSTRAP_ACTIONS, "suit_page"):
+            legacy = actions.pop(action_name, None)
+            if legacy is not None:
+                legacy.setdefault("revision", 1)
+                legacy.setdefault("action", action_name)
+                if legacy.get("status") == "applied":
+                    legacy["status"] = "delivered_effect_unknown"
+                    legacy["legacy_status"] = "applied"
+                actions.setdefault(f"v1:{action_name}", legacy)
+        bootstrap["revision"] = BOOTSTRAP_REVISION
+        return actions
+
+    def bootstrap_action_state(self, action_name, revision=None):
+        revision = BOOTSTRAP_REVISION if revision is None else revision
+        state_key = f"v{revision}:{action_name}"
+        state = self.bootstrap_actions().setdefault(state_key, {
+            "revision": revision,
+            "action": action_name, "trigger": None, "status": "pending",
+            "last_map": None, "timestamp": None,
+            "reapply_on_map_load": False,
+        })
+        return state
+
+    def bootstrap_eligible(self, action_name):
+        action = BOOTSTRAP_ACTIONS[action_name]
+        if action["required_ap_ownership"] == "at_least_one_rune":
+            return self.received_rune_count() > 0
+        if action["required_ap_ownership"] == "at_least_one_suit_page_unlocker":
+            return received_any_suit_upgrade(self.received_item_ids())
+        if action["required_ap_ownership"] == "frag_grenade":
+            return 7770011 in self.received_item_ids()
+        if action["required_ap_ownership"] == "ice_bomb":
+            return 7770013 in self.received_item_ids()
+        return False
+
+    def bootstrap_ineligibility_reason(self, action_name):
+        if self.bootstrap_eligible(action_name):
+            return "eligible"
+        return {
+            "rune_page": "needs AP Rune",
+            "suit_page": "needs AP Suit Upgrade",
+            "frag_acquired": "needs AP Frag Grenade",
+            "ice_acquired": "needs AP Ice Bomb",
+        }.get(action_name, "ownership predicate unmet")
+
+    def bootstrap_command_id(self, action_name):
+        action = BOOTSTRAP_ACTIONS[action_name]
+        return f"bootstrap-v{action['revision']}-{action_name}"
+
+    def quarantine_v1_bootstrap_spools(self):
+        """Archive stale dev1 jobs so an absent v1 entity is never invoked."""
+        for action_name in (*BOOTSTRAP_ACTIONS, "suit_page"):
+            command_id = f"bootstrap-v1-{action_name}"
+            for suffix in (".cmd", ".processing"):
+                source = Path(QUEUE_DIR, f"{command_id}{suffix}")
+                if not source.exists():
+                    continue
+                target = source.with_suffix(".quarantined")
+                try:
+                    os.replace(source, target)
+                    state = self.bootstrap_action_state(action_name, revision=1)
+                    state.update(status="quarantined_runtime_invalid", timestamp=time.time())
+                    self.persist_session_state()
+                    logger.warning("[Bootstrap] Quarantined v1 spool: %s", source.name)
+                except OSError as error:
+                    logger.error("[Bootstrap] Could not quarantine v1 spool %s: %s", source, error)
+
+    def enqueue_bootstrap(self, action_name, trigger):
+        """Persist the separate action state only after the durable spool exists."""
+        action = BOOTSTRAP_ACTIONS[action_name]
+        state = self.bootstrap_action_state(action_name)
+        non_replayable = {
+            "delivered_effect_unknown",
+            "delivered_effect_unknown_legacy",
+            "confirmed",
+            "skipped",
+        }
+        if state["status"] in non_replayable or not self.bootstrap_eligible(action_name):
+            return False
+        if canonical_map_name(self.current_map_name) not in {
+            canonical_map_name(name) for name in action["maps_supported"]
+        }:
+            state.update(status="pending", trigger=trigger, timestamp=time.time())
+            self.persist_session_state()
+            return False
+        command_id = self.bootstrap_command_id(action_name)
+        if not send_command(bootstrap_activation(action_name), coalesce_key=command_id,
+                            already_queued_ok=True):
+            state.update(status="retryable_failure", trigger=trigger, timestamp=time.time())
+            self.persist_session_state()
+            return False
+        state.update(status="queued", trigger=trigger, last_map=self.current_map_name,
+                     timestamp=time.time(), revision=action["revision"])
+        self.persist_session_state()
+        logger.info(
+            "[Bootstrap] v%s entity=%s primitive_class=%s inherit=%s map=%s spool=%s trigger=%s",
+            action["revision"], action["entity_name"],
+            BOOTSTRAP_STAT_PRIMITIVE["class"],
+            BOOTSTRAP_STAT_PRIMITIVE["inherit"] or "<none>",
+            self.current_map_name, command_id, trigger,
+        )
+        return True
+
+    def reconcile_bootstrap_spool(self):
+        self.quarantine_v1_bootstrap_spools()
+        for action_name in BOOTSTRAP_ACTIONS:
+            state = self.bootstrap_action_state(action_name)
+            if state["status"] == "queued" and not command_spool_exists(self.bootstrap_command_id(action_name)):
+                state["status"] = "delivered_effect_unknown"
+                state["timestamp"] = time.time()
+                logger.info("[Bootstrap] v2 spool consumed; effect remains unknown: %s", action_name)
+                self.persist_session_state()
+
+    def onboard_bootstrap(self, trigger):
+        # V1/V2 are retained as evidence, not foundations. All four actions are
+        # experimental and must only run through /doom_test_bootstrap in a lab.
+        if not any(action.get("automatic_enabled") for action in BOOTSTRAP_ACTIONS.values()):
+            return
+        if not self.item_state_ready or not rpc_execution_enabled():
+            return
+        self.reconcile_bootstrap_spool()
+        for action_name, action in BOOTSTRAP_ACTIONS.items():
+            if trigger in action["trigger_policy"]:
+                if (
+                    trigger == "on_supported_map_load"
+                    and self.bootstrap_action_state(action_name)["status"] != "pending"
+                ):
+                    continue
+                self.enqueue_bootstrap(action_name, trigger)
+
+    def onboarding_status_lines(self):
+        lines = [
+            f"Bootstrap revision: {BOOTSTRAP_REVISION}",
+            f"Current map: {self.current_map_name or 'unknown'}",
+        ]
+        for action_name in BOOTSTRAP_ACTIONS:
+            state = self.bootstrap_action_state(action_name)
+            status = state.get("status", "pending")
+            eligible = self.bootstrap_eligible(action_name)
+            reason = "eligible" if eligible else self.bootstrap_ineligibility_reason(action_name)
+            lines.append(
+                f"v2 {action_name}: eligible={'yes' if eligible else 'no'}, "
+                f"state={status}, trigger={state.get('trigger') or '-'}, "
+                f"map={state.get('last_map') or '-'}, reason={reason}"
+            )
+            legacy = self.bootstrap_actions().get(f"v1:{action_name}")
+            if legacy:
+                lines.append(
+                    f"v1 {action_name}: state={legacy.get('status', 'pending')} "
+                    "(delivered_effect_unknown)"
+                )
+        lines.append(f"Technical log: {BRIDGE_LOG_DIR}")
+        return lines
 
     def repair_item_mappings(self):
         """Deliver items skipped by older bridge mappings without replaying others."""
@@ -1641,32 +2001,19 @@ class DoomEternalContext(CommonContext):
 
     def item_activation_commands(self, item_id, item_index):
         definition = ITEM_ID_TO_COMMAND.get(item_id)
-        if isinstance(definition, str):
-            return [delegated_rpc_command(item_id)], definition
-        if isinstance(definition, list):
-            if not definition:
-                return None, "mapping list is empty"
-            commands = [
-                delegated_rpc_command(item_id, command_index)
-                for command_index, _ in enumerate(definition)
-            ]
-            return commands, " -> ".join(definition)
-        if not isinstance(definition, dict):
-            return None, f"unsupported command mapping: {definition!r}"
-        if definition.get("type") != "progressive_perk":
-            return (
-                [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id} activate"],
-                definition,
-            )
-
-        perks = definition.get("perks", [])
-        stage = self.progressive_stage(item_id, item_index)
-        if stage >= len(perks):
-            return None, f"progressive stage {stage} exceeds {len(perks)} stages"
-        return (
-            [f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_{item_id}_{stage} activate"],
-            f"stage {stage}: {perks[stage]}",
+        stage = (
+            self.progressive_stage(item_id, item_index)
+            if isinstance(definition, dict)
+            and definition.get("type") == "progressive_perk"
+            else None
         )
+        try:
+            plan = compile_item_delivery_plan(
+                item_id, ITEM_ID_TO_COMMAND, stage=stage
+            )
+        except ValueError as error:
+            return None, str(error)
+        return [command.command for command in plan.commands], plan.description
 
     def item_command_id(self, item_id, item_index, command_index):
         return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
@@ -1944,7 +2291,7 @@ class DoomEternalContext(CommonContext):
         self.last_goal_details_mtime = mtime
 
         details_path = details.get("_path")
-        map_name = details.get("mapName")
+        map_name = canonical_map_name(details.get("mapName"))
         if map_name == CULTIST_BASE_MAP:
             if self.cultist_autosave_path != details_path:
                 self.cultist_autosave_path = details_path
@@ -1983,9 +2330,11 @@ class DoomEternalContext(CommonContext):
             self.last_rpc_map_name = None
             return
 
-        map_name = details.get("mapName")
+        map_name = canonical_map_name(details.get("mapName"))
+        self.current_map_name = map_name
         if self.last_rpc_map_name is None:
             self.last_rpc_map_name = map_name
+            self.onboard_bootstrap("on_supported_map_load")
             return
 
         if map_name != self.last_rpc_map_name:
@@ -1996,6 +2345,7 @@ class DoomEternalContext(CommonContext):
                 "safe execution."
             )
             self.last_rpc_map_name = map_name
+            self.onboard_bootstrap("on_supported_map_load")
 
     async def death_monitor_loop(self):
         while not self.exit_event.is_set():
@@ -2083,6 +2433,7 @@ class DoomEternalContext(CommonContext):
         while not self.exit_event.is_set():
             if self.server and self.server.socket and not self.server.socket.closed:
                 migrate_direct_item_command_jobs()
+                self.onboard_bootstrap("on_reconnect")
                 if not self.repair_item_mappings():
                     await asyncio.sleep(0.25)
                     continue
@@ -2152,6 +2503,7 @@ class DoomEternalContext(CommonContext):
                     )
                     self.items_processed += 1
                     self.persist_session_state()
+                    self.onboard_bootstrap("on_item_received")
 
                 await self.flush_check_event_files()
 

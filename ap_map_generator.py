@@ -5,6 +5,15 @@ import json
 import argparse
 import hashlib
 from pathlib import Path
+from foundation import build_primitive, validate_primitive_registry
+from bootstrap_actions import (
+    BOOTSTRAP_ACTIONS,
+    BOOTSTRAP_ENTITY_PREFIX,
+    BOOTSTRAP_ENTITY_PREFIXES,
+    BOOTSTRAP_STAT_PRIMITIVE,
+    INVALID_BOOTSTRAP_INHERITS,
+    validate_bootstrap_catalogue,
+)
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -14,6 +23,7 @@ EVENT_ENTITY_PREFIX = "ap_event_"
 GENERATED_NAME_PREFIXES = (
     "AP_CHECK_",
     RPC_ENTITY_PREFIX,
+    *BOOTSTRAP_ENTITY_PREFIXES,
     NOTIFICATION_ENTITY_PREFIX,
     EVENT_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
@@ -168,6 +178,93 @@ def neutralize_conditional_pickup(content, entity_name):
             rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block
         )
     return content[:start] + block + content[end:]
+
+
+def neutralize_conditional_pickup_block(block):
+    """Leave a named vanilla pickup inert without preserving its targets."""
+    block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "info/null";', block, count=1)
+    block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idInfo";', block, count=1)
+    block = remove_property_blocks(block, "renderModelInfo")
+    block = remove_property_blocks(block, "clipModelInfo")
+    for property_name in (
+        "useableComponentDecl", "triggerDef", "equipOnPickup", "lootStyle",
+        "forceEquip", "canBePossessed",
+    ):
+        block = re.sub(rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block)
+    return replace_targets_block(block, [])
+
+
+def generate_independent_pickup_trigger(entity_name, ap_check_id, block):
+    """Create an AP trigger independent from an ownership-hidden pickup."""
+    layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
+    layers = f"\t{layers_match.group(1).strip()}\n" if layers_match else ""
+    position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
+    if not position_match:
+        raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
+    position = position_match.group(1)
+    return f'''entity {{
+{layers}\tentityDef ap_independent_{entity_name} {{
+\t\tinherit = "trigger/trigger";
+\t\tclass = "idTrigger";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\ttriggerOnce = true;
+\t\t\tflags = {{
+\t\t\t\tnoFlood = true;
+\t\t\t}}
+\t\t\t{position}
+\t\t\tclipModelInfo = {{
+\t\t\t\ttype = "CLIPMODEL_BOX";
+\t\t\t\tsize = {{
+\t\t\t\t\tx = {AP_PICKUP_HITBOX_SIZE};
+\t\t\t\t\ty = {AP_PICKUP_HITBOX_SIZE};
+\t\t\t\t\tz = {AP_PICKUP_HITBOX_SIZE};
+\t\t\t\t}}
+\t\t\t}}
+\t\t\ttargets = {{
+\t\t\t\tnum = 3;
+\t\t\t\titem[0] = "target_relay_pickup_ice_bomb";
+\t\t\t\titem[1] = "{ap_check_id}";
+\t\t\t\titem[2] = "ap_ice_ripatorium_live_refresh";
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+'''
+
+
+def generate_ice_ripatorium_live_refresh():
+    """Replay only the vanilla delayed live transition after Ice completion."""
+    return '''entity {
+\tentityDef ap_ice_ripatorium_live_refresh {
+\t\tinherit = "target/relay";
+\t\tclass = "idTarget_Count";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {
+\t\t\tflags = {
+\t\t\t\tnoFlood = true;
+\t\t\t}
+\t\t\tcount = 1;
+\t\t\tdelay = 7.25;
+\t\t\ttargets = {
+\t\t\t\tnum = 4;
+\t\t\t\titem[0] = "target_objective_prison_lift";
+\t\t\t\titem[1] = "trigger_lift_poi_off";
+\t\t\t\titem[2] = "target_poi_lift_door";
+\t\t\t\titem[3] = "target_relay_enable_prison_lift";
+\t\t\t}
+\t\t}
+\t}
+}
+'''
 
 
 def replace_targets_block(block, target_names):
@@ -443,6 +540,7 @@ def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
 def generate_rpc_command_entities(items_dict):
+    validate_primitive_registry()
     blocks = []
     required_entities = []
     for item_id, command_value in items_dict.items():
@@ -458,76 +556,30 @@ def generate_rpc_command_entities(items_dict):
                     )
                 for stage, perk in enumerate(perks):
                     entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"
-                    blocks.append(f"""entity {{
-	entityDef {entity_name} {{
-		class = "idTarget_Command";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			commandText = "ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}";
-		}}
-	}}
-}}
-""")
+                    blocks.append(build_primitive(
+                        "target_command", entity_name,
+                        {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}"},
+                    ))
                 continue
 
             if command_type == "perk":
                 perk = command_value.get("perk")
                 if not perk:
                     raise ValueError(f"Perk item {item_id} has no perk path")
-                blocks.append(f"""entity {{
-	entityDef {RPC_ENTITY_PREFIX}_{item_id} {{
-		class = "idTarget_Command";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			commandText = "ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}";
-		}}
-	}}
-}}
-""")
+                blocks.append(build_primitive(
+                    "target_command", f"{RPC_ENTITY_PREFIX}_{item_id}",
+                    {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}"},
+                ))
                 continue
 
             if command_type != "currency":
                 raise ValueError(f"Unsupported entity command type for item {item_id}: {command_value}")
             currency = command_value["currency"]
             count = int(command_value.get("count", 1))
-            blocks.append(f"""entity {{
-	entityDef {RPC_ENTITY_PREFIX}_{item_id} {{
-		inherit = "target/give_item";
-		class = "idTarget_GiveItems";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			flags = {{
-				noFlood = true;
-			}}
-			itemList = {{
-				num = 0;
-			}}
-			addUpToCount = false;
-			whenToSave = "SGT_NO_SAVE";
-			saveType = "SGS_NONE";
-			currencyList = {{
-				num = 1;
-				item[0] = {{
-					currencyType = "{currency}";
-					count = {count};
-				}}
-			}}
-		}}
-	}}
-}}
-""")
+            blocks.append(build_primitive(
+                "currency_grant_direct", f"{RPC_ENTITY_PREFIX}_{item_id}",
+                {"currency": currency, "count": count},
+            ))
             continue
 
         if isinstance(command_value, list):
@@ -540,60 +592,22 @@ def generate_rpc_command_entities(items_dict):
                 if command_requires_map_side_rpc(cmd):
                     required_entities.append(cmd_entity_name)
                 relay_targets.append(cmd_entity_name)
-                command_blocks.append(f"""entity {{
-	entityDef {cmd_entity_name} {{
-		class = "idTarget_Command";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			commandText = "{cmd}";
-		}}
-	}}
-}}
-""")
+                command_blocks.append(build_primitive(
+                    "target_command", cmd_entity_name, {"command": cmd}
+                ))
 
-            targets_block = "\n\t\t\t\t".join(f'item[{i}] = "{t}";' for i, t in enumerate(relay_targets))
-            blocks.append(f"""entity {{
-	entityDef {RPC_ENTITY_PREFIX}_{item_id} {{
-		inherit = "target/relay";
-		class = "idTarget_Count";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			count = 1;
-			targets = {{
-				num = {len(relay_targets)};
-				{targets_block}
-			}}
-		}}
-	}}
-}}
-""")
+            blocks.append(build_primitive(
+                "target_count_relay", f"{RPC_ENTITY_PREFIX}_{item_id}",
+                {"targets": relay_targets},
+            ))
             blocks.extend(command_blocks)
         else:
             entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
             if command_requires_map_side_rpc(command_value):
                 required_entities.append(entity_name)
-            blocks.append(f"""entity {{
-	entityDef {entity_name} {{
-		class = "idTarget_Command";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			commandText = "{command_value}";
-		}}
-	}}
-}}
-""")
+            blocks.append(build_primitive(
+                "target_command", entity_name, {"command": command_value}
+            ))
 
     generated = "".join(blocks)
     missing_entities = [
@@ -637,6 +651,35 @@ entity {
 }
 """
 
+
+def generate_bootstrap_entities():
+    """Emit historical v2 controls; bridge automation remains disabled."""
+    validate_bootstrap_catalogue()
+    blocks = []
+    for action in BOOTSTRAP_ACTIONS.values():
+        block = build_primitive(
+            "boolean_stat_modifier_direct",
+            action["entity_name"],
+            {"stat": action["stat"], "value": 1},
+            release=False,
+        )
+        lowered = block.lower()
+        if any(term.lower() in lowered for term in action["forbidden_effects"]):
+            raise ValueError(
+                f"Bootstrap entity contains forbidden effect: {action['action']}"
+            )
+        if (
+            block.count('class = "idTarget_PlayerStatModifier";') != 1
+            or block.count("gameStat = ") != 1
+            or block.count("value = 1;") != 1
+            or "item[" in lowered
+            or "inherit =" in lowered
+            or "target/player_stat_modifier" in lowered
+        ):
+            raise ValueError(f"Bootstrap entity is not a one-stat modifier: {action['action']}")
+        blocks.append(block)
+    return "".join(blocks)
+
 def generate_map(input_file, output_file, config_file, manifest_file, items_dict):
     with open(config_file, "r", encoding="utf-8") as f:
         level_config = json.load(f)
@@ -659,6 +702,8 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     content = remove_balanced_entity_blocks(content, EVENT_ENTITY_PREFIX)
     content = remove_balanced_entity_blocks(content, "ap_cmd_")
     content = remove_balanced_entity_blocks(content, RPC_ENTITY_PREFIX)
+    for bootstrap_prefix in BOOTSTRAP_ENTITY_PREFIXES:
+        content = remove_balanced_entity_blocks(content, bootstrap_prefix)
     for legacy_prefix in LEGACY_RPC_ENTITY_PREFIXES:
         content = remove_balanced_entity_blocks(content, legacy_prefix)
     content = remove_balanced_entity_blocks(content, "ap_deathlink")
@@ -721,6 +766,26 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
             if "edit = {" in block:
                 target_policy = target_policies.get(entity_name)
                 audit_preserved_target_graph(content, entity_name, target_policy)
+                if target_policy and target_policy.get("independent_ap_trigger"):
+                    # The Hub Ice pickup can be hidden/removed when Ice is
+                    # already owned. Its AP check must therefore not be a
+                    # mutation of that pickup. Keep its audited objective
+                    # branch on a separate trigger and leave the vanilla
+                    # reward carrier inert.
+                    location_id = config_entities[ap_check_id]
+                    manifest_data[ap_check_id] = location_id
+                    new_blocks.append(
+                        "entity {" + neutralize_conditional_pickup_block(block)
+                    )
+                    new_blocks.append(
+                        generate_independent_pickup_trigger(entity_name, ap_check_id, block)
+                    )
+                    new_blocks.append(generate_ice_ripatorium_live_refresh())
+                    new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
+                    new_blocks.append(generate_pickup_notification(ap_check_id))
+                    new_blocks.append(generate_check_event(location_id))
+                    modified_count += 1
+                    continue
                 block = add_ap_check_target(
                     block,
                     entity_name,
@@ -847,6 +912,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         + "\n"
         + "".join(secret_blocks)
         + generate_rpc_command_entities(items_dict)
+        + generate_bootstrap_entities()
         + generate_system_command_entities()
     )
 
