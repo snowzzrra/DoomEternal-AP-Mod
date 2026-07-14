@@ -1,0 +1,111 @@
+{
+  "locations": {
+    "7770056": {
+      "kind": "independent",
+      "strategy": "independent_trigger",
+      "entrypoint": "ap_independent_rocket_launcher_7770056",
+      "config": "level_configs/e1m3_cult.json",
+      "policy": "game_pickup_weapon_rocket_launcher_1",
+      "direct_targets": ["game_target_relay_1244", "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"],
+      "generated_entrypoint_sha256": "6c0bd39bce8b58e9efaff70a8a1edc82f50dd159484641c82e64fbd7550053cd",
+      "external_references": ["game_target_relay_1244"],
+      "classified_external_references": {
+        "game_target_relay_1244": "door_state_transition; runtime PASS pre-owned"
+      },
+      "forbidden_terms": ["useableComponentDecl", "canBePossessed", "game_target_give_item_1", "pickup/weapon/rocket_launcher"]
+    },
+    "7770074": {
+      "kind": "scripted",
+      "strategy": "logic_decl_patch",
+      "entrypoint": "ap_independent_pickup_equipment_ice_bomb",
+      "config": "level_configs/hub.json",
+      "policy": "pickup_equipment_ice_bomb",
+      "direct_targets": ["AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB", "ap_remove_location_visual_7770074"],
+      "generated_entrypoint_sha256": "f2cfae592652d9f5e7362956c74d99c347c8f0f0fce1523dcd0c6536af2d6a09",
+      "trigger": {
+        "position": [0.47, -22.27, -14.38],
+        "size": [4.0, 3.0, 3.5],
+        "one_shot": true
+      },
+      "visual": {
+        "entity": "ap_location_visual_7770074",
+        "inherit": "func/dynamic",
+        "class": "idDynamicEntity",
+        "model": "art/pickups/question_mark_a.lwo",
+        "position": [0.47, -22.27, -15.38],
+        "scale": [1.75, 1.75, 1.75],
+        "clip_type": "CLIPMODEL_NONE",
+        "targets": [],
+        "persists_after_check": false,
+        "generated_sha256": "ec886118c6d066a74bf9a1d1458088ecf36b40324a029c60c17423d534b16c16",
+        "evidence": [
+          "vanillamaps/hub.map: func_dynamic_shoot_symbol renders an LWO through func/dynamic + idDynamicEntity with CLIPMODEL_NONE",
+          "Tools/kaizo: art/pickups/question_mark_a.lwo renders through renderModelInfo with contributesToLightProbeGen=false",
+          "vanillamaps/e1m3_cult.map: game_target_remove_266 is idTarget_Remove and exclusively removes LWO func/dynamic game_func_dynamic_4907"
+        ]
+      },
+      "cleanup": {
+        "entity": "ap_remove_location_visual_7770074",
+        "inherit": "target/remove",
+        "class": "idTarget_Remove",
+        "targets": ["ap_location_visual_7770074"]
+      },
+      "internal_entities": ["ap_remove_location_visual_7770074"],
+      "forbidden_cleanup_references": [
+        "target_relay_pickup_ice_bomb",
+        "target_relay_complete_ice_bomb_obj",
+        "target_objective_complete_ice_bomb",
+        "target_objective_prison_lift",
+        "trigger_lift_poi_off",
+        "target_poi_lift_door",
+        "target_relay_enable_prison_lift",
+        "target_relay_enable_toggle_1908522638"
+      ],
+      "forbidden_generated_references": [
+        "target_relay_pickup_ice_bomb",
+        "target_relay_complete_ice_bomb_obj",
+        "target_relay_enable_prison_lift",
+        "target_relay_enable_toggle_1908522638"
+      ],
+      "post_ice_architecture": {
+        "owner": "Restore Ship Power / info_logic_hub_from_e1m2",
+        "entry_node": 2021323581,
+        "transaction_node": 1344507903,
+        "entry_count": 1,
+        "location_role": "check_only"
+      },
+      "logic_decl_patch": {
+        "container": "hub_patch2.resources",
+        "source_container": "hub_patch1.resources",
+        "source_path": "vanilla_decls/generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl",
+        "decl_path": "generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl",
+        "source_sha256": "f099cd81d004ca7eece7e0ac129e38eda551fd5db439ccff2f9e8b36e59950ca",
+        "override_sha256": "6444f3ef197a6cdad3e79638fec763248250309d4b1265656aa9f3c2902ddf07",
+        "logic_owner": "info_logic_hub_from_e1m2",
+        "observed_event": "target_relay_pickup_ice_bomb",
+        "inventory_check_node": 1252079672,
+        "inventory_decl": "throwable/player/ice_bomb",
+        "edge_id": 1193717636,
+        "bypassed_pin": 4,
+        "old_destination": 2191342619,
+        "preserved_destination": 1344507903,
+        "condition_removed": "owned Ice early-exit branch",
+        "branch_preserved": "unowned Ice full vanilla transaction",
+        "preserved_references": [
+          "cp_post_ice_bomb",
+          "target_objective_prison_lift",
+          "trigger_lift_poi_off",
+          "target_poi_lift_door",
+          "target_relay_enable_prison_lift"
+        ],
+        "forbidden_patch_references": [
+          "target_give_item_ice_bomb",
+          "ap_ice_post_collection_transaction"
+        ]
+      },
+      "external_references": [],
+      "classified_external_references": {},
+      "forbidden_terms": ["target_relay_pickup_ice_bomb", "target_relay_complete_ice_bomb_obj", "target_relay_enable_prison_lift", "target_relay_enable_toggle_1908522638", "target_give_item_ice_bomb", "useableComponentDecl", "throwable/player/ice_bomb", "equipment/ice_bomb", "canBePossessed", "ap_ice_post_collection_transaction"]
+    }
+  }
+}

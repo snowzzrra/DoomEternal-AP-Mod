@@ -22,6 +22,7 @@ DoomEternalArchipelago*.zip
 
 # Runtime configuration/state
 ap_config.json
+playtest.local.env
 client_state.json
 *.log
 bridge_debug.log
@@ -48,6 +49,9 @@ battery.txt
 Archive.zip
 .serena/
 tools/
+!tools/
+tools/*
+!tools/audit_scripted_location.py
 
 # Local project memory, caso decida nao publicar
 .local/

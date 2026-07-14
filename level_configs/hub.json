@@ -18,38 +18,21 @@
         },
         "pickup_equipment_ice_bomb": {
             "independent_ap_trigger": true,
-            "preserve_targets": [
-                "target_relay_pickup_ice_bomb"
+            "independent_targets": [
+                "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
+                "ap_remove_location_visual_7770074"
             ],
+            "independent_position": [0.47, -22.27, -14.38],
+            "independent_size": [4.0, 3.0, 3.5],
+            "independent_visual": {
+                "entity_name": "ap_location_visual_7770074",
+                "cleanup_entity": "ap_remove_location_visual_7770074",
+                "model": "art/pickups/question_mark_a.lwo",
+                "position": [0.47, -22.27, -15.38],
+                "scale": [1.75, 1.75, 1.75]
+            },
             "drop_targets": [
                 "target_give_item_ice_bomb"
-            ],
-            "safe_target_graph": {
-                "target_relay_pickup_ice_bomb": [
-                    "target_relay_complete_ice_bomb_obj"
-                ],
-                "target_relay_complete_ice_bomb_obj": [
-                    "target_objective_complete_ice_bomb"
-                ],
-                "target_objective_complete_ice_bomb": []
-            },
-            "live_refresh": {
-                "delay": 7.25,
-                "targets": [
-                    "target_objective_prison_lift",
-                    "trigger_lift_poi_off",
-                    "target_poi_lift_door",
-                    "target_relay_enable_prison_lift"
-                ],
-                "door_controller": "target_relay_enable_toggle_1908522638"
-            },
-            "forbidden_target_terms": [
-                "target_give_item_ice_bomb",
-                "equipment/ice_bomb",
-                "throwable/player/ice_bomb",
-                "inventory",
-                "give",
-                "equip"
             ]
         }
     }
