@@ -202,11 +202,29 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
     position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
     if not position_match:
         raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
-    position = position_match.group(1)
+    configured_position = policy.get("independent_position")
+    if configured_position is not None:
+        if not isinstance(configured_position, list) or len(configured_position) != 3:
+            raise ValueError(f"Independent AP trigger position must have three values: {entity_name}")
+        position = (
+            "spawnPosition = {\n"
+            f"\t\t\t\tx = {configured_position[0]};\n"
+            f"\t\t\t\ty = {configured_position[1]};\n"
+            f"\t\t\t\tz = {configured_position[2]};\n"
+            "\t\t\t}"
+        )
+    else:
+        position = position_match.group(1)
+    hitbox_size = policy.get(
+        "independent_size",
+        [AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE],
+    )
+    if not isinstance(hitbox_size, list) or len(hitbox_size) != 3:
+        raise ValueError(f"Independent AP trigger size must have three values: {entity_name}")
     independent_name = policy.get("independent_entity_name", f"ap_independent_{entity_name}")
     targets = policy.get(
         "independent_targets",
-        ["target_relay_pickup_ice_bomb", ap_check_id, "ap_ice_ripatorium_live_refresh"],
+        [ap_check_id],
     )
     target_lines = "\n".join(
         f'\t\t\t\titem[{index}] = "{target}";' for index, target in enumerate(targets)
@@ -229,9 +247,9 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 \t\t\tclipModelInfo = {{
 \t\t\t\ttype = "CLIPMODEL_BOX";
 \t\t\t\tsize = {{
-\t\t\t\t\tx = {AP_PICKUP_HITBOX_SIZE};
-\t\t\t\t\ty = {AP_PICKUP_HITBOX_SIZE};
-\t\t\t\t\tz = {AP_PICKUP_HITBOX_SIZE};
+\t\t\t\t\tx = {hitbox_size[0]};
+\t\t\t\t\ty = {hitbox_size[1]};
+\t\t\t\t\tz = {hitbox_size[2]};
 \t\t\t\t}}
 \t\t\t}}
 \t\t\ttargets = {{
@@ -244,34 +262,80 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 '''
 
 
-def generate_ice_ripatorium_live_refresh():
-    """Replay only the vanilla delayed live transition after Ice completion."""
-    return '''entity {
-\tentityDef ap_ice_ripatorium_live_refresh {
-\t\tinherit = "target/relay";
-\t\tclass = "idTarget_Count";
+def generate_inert_location_visual(block, policy):
+    """Create a rendered marker and its optional isolated cleanup target."""
+    visual = policy.get("independent_visual")
+    if not visual:
+        return ""
+    required = {"entity_name", "model", "position", "scale"}
+    missing = sorted(required - set(visual))
+    if missing:
+        raise ValueError(f"Independent AP visual is missing: {', '.join(missing)}")
+    if len(visual["position"]) != 3 or len(visual["scale"]) != 3:
+        raise ValueError("Independent AP visual position and scale require three values")
+    layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
+    layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
+    position = visual["position"]
+    scale = visual["scale"]
+    cleanup_name = visual.get("cleanup_entity")
+    cleanup = ""
+    if cleanup_name:
+        cleanup = f'''entity {{
+{layers}\tentityDef {cleanup_name} {{
+\t\tinherit = "target/remove";
+\t\tclass = "idTarget_Remove";
 \t\texpandInheritance = false;
 \t\tpoolCount = 0;
 \t\tpoolGranularity = 2;
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
-\t\tedit = {
-\t\t\tflags = {
+\t\tedit = {{
+\t\t\tflags = {{
 \t\t\t\tnoFlood = true;
-\t\t\t}
-\t\t\tcount = 1;
-\t\t\tdelay = 7.25;
-\t\t\ttargets = {
-\t\t\t\tnum = 4;
-\t\t\t\titem[0] = "target_objective_prison_lift";
-\t\t\t\titem[1] = "trigger_lift_poi_off";
-\t\t\t\titem[2] = "target_poi_lift_door";
-\t\t\t\titem[3] = "target_relay_enable_prison_lift";
-\t\t\t}
-\t\t}
-\t}
-}
+\t\t\t}}
+\t\t\ttargets = {{
+\t\t\t\tnum = 1;
+\t\t\t\titem[0] = "{visual["entity_name"]}";
+\t\t\t}}
+\t\t}}
+\t}}
+}}
 '''
+    return f'''entity {{
+{layers}\tentityDef {visual["entity_name"]} {{
+\t\tinherit = "func/dynamic";
+\t\tclass = "idDynamicEntity";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tspawnPosition = {{
+\t\t\t\tx = {position[0]};
+\t\t\t\ty = {position[1]};
+\t\t\t\tz = {position[2]};
+\t\t\t}}
+\t\t\trenderModelInfo = {{
+\t\t\t\tmodel = "{visual["model"]}";
+\t\t\t\tcontributesToLightProbeGen = false;
+\t\t\t\tignoreDesaturate = true;
+\t\t\t\tscale = {{
+\t\t\t\t\tx = {scale[0]};
+\t\t\t\t\ty = {scale[1]};
+\t\t\t\t\tz = {scale[2]};
+\t\t\t\t}}
+\t\t\t}}
+\t\t\tclipModelInfo = {{
+\t\t\t\ttype = "CLIPMODEL_NONE";
+\t\t\t}}
+\t\t\tdormancy = {{
+\t\t\t\tallowPvsDormancy = false;
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+''' + cleanup
 
 
 def replace_targets_block(block, target_names):
@@ -825,8 +889,9 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
-                    if target_policy.get("live_refresh"):
-                        new_blocks.append(generate_ice_ripatorium_live_refresh())
+                    visual = generate_inert_location_visual(block, target_policy)
+                    if visual:
+                        new_blocks.append(visual)
                     new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
                     new_blocks.append(generate_pickup_notification(ap_check_id))
                     new_blocks.append(generate_check_event(location_id))
@@ -853,9 +918,9 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                 clipModelInfo = {{
                         type = "CLIPMODEL_BOX";
                         size = {{
-                                x = {AP_PICKUP_HITBOX_SIZE};
-                                y = {AP_PICKUP_HITBOX_SIZE};
-                                z = {AP_PICKUP_HITBOX_SIZE};
+                        x = {AP_PICKUP_HITBOX_SIZE};
+                        y = {AP_PICKUP_HITBOX_SIZE};
+                        z = {AP_PICKUP_HITBOX_SIZE};
                         }}
                 }}"""
                 block = block.replace('edit = {', 'edit = {' + hitbox_injection, 1)

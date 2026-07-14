@@ -11,18 +11,23 @@ python3 -m py_compile \
     bootstrap_actions.py \
     bridge_client.py \
     foundation.py \
+    logic_decl_patcher.py \
     save_decrypt.py \
     save_inspector.py \
     validate_data.py \
     validate_windows_runtime_deps.py \
     tools/test_save_scenarios.py \
-    tools/generate_foundation_test_plan.py
+    tools/generate_foundation_test_plan.py \
+    tools/audit_scripted_location.py
+python3 tools/audit_scripted_location.py --contracts data/scripted_location_contracts.json
 python3 -m unittest \
     tests.test_check_events \
     tests.test_ap_map_generator \
     tests.test_validate_data \
-    tests.test_foundation \
-    tests.test_save_scenarios
+      tests.test_foundation \
+      tests.test_logic_decl_patcher \
+      tests.test_scripted_location_contracts \
+      tests.test_save_scenarios
 python3 validate_data.py
 g++ -std=c++17 tests/test_ap_client_path_utils.cpp ap_client_path_utils.cpp \
     -o /tmp/test_ap_client_path_utils

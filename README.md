@@ -2,7 +2,7 @@
 
 Game-side repository for the DOOM Eternal Archipelago integration.
 
-This repo owns the playable-test mod package, the Python bridge, the external
+This repo owns the public pre-alpha mod package, the Python bridge, the external
 RPC client, runtime manifests, map-generation scripts, validation scripts, and
 release packaging. The APWorld source does **not** live here; it stays in the
 sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
@@ -173,10 +173,14 @@ If the installed resource is already contaminated by a previous AP patch, use
 the clean `*.backup` variant or another known-vanilla dump before updating the
 registry.
 
+Playtests are manual. Build the playable bundle with `build_playable_test.sh`,
+then install and run it through the normal local workflow. Do not commit local
+paths, configuration, passwords, seeds, runtime output or logs.
+
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.2.0-pre-alpha.zip
+DoomEternalArchipelago-v0.2.1-pre-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -269,7 +273,7 @@ C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
 Locate:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip
+DoomEternalArchipelago-v0.1.2-ptb.zip
 ```
 
 Extract it into a brand-new empty directory.
@@ -625,7 +629,7 @@ PTB versions or reused an old extracted directory.
 Fix:
 
 1. Delete the extracted PTB directory.
-2. Extract `DoomEternalArchipelagoPlayableTest-v0.1.2-ptb.zip` again into a
+2. Extract `DoomEternalArchipelago-v0.1.2-ptb.zip` again into a
    brand-new empty directory.
 3. Confirm that `client/` does not contain:
    - `version.dll`
@@ -677,9 +681,15 @@ Fix:
   update clearly in the Dossier/HUD before socket interaction.
 - The static audit found `7770055` physically distinct, but that Cultist Base
   Extra Life check remains a probable runtime reliability risk.
-- This pre-alpha build has not received another complete campaign regression
-  after the final targeted fixes. Ice Bomb and Rocket Launcher require only
-  directed checkpoint tests.
+- Ice progression is runtime PASS both with and without prior ownership. Restore
+  Ship Power alone owns the patched one-edge logic path; `7770074` has exactly
+  `[AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB]`, and door/elevator worked before and
+  after collection. The rendered question mark moved from
+  `0.47 -22.27 -14.38` to `0.47 -22.27 -15.38`; a dedicated final
+  `idTarget_Remove` points only to it. After reload/checkpoint the model can
+  reappear until the trigger is crossed again; the collected AP location emits
+  no second check. This accepted visual-persistence issue is not a v0.2.1
+  blocker. Rocket remains unchanged PASS.
 - Reloading a checkpoint may still recover rare vanilla scripting desyncs.
 - AP-mutated pickups may have reduced automap discoverability.
 

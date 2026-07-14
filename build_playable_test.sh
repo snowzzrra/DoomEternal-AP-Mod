@@ -4,19 +4,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
-OUTPUT_DIR="${1:-$SCRIPT_DIR/build/playable-test}"
+OUTPUT_DIR="${1:-$SCRIPT_DIR/build/release}"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-v0.2.1-pre-alpha-dev}"
+PTB_VERSION="${PTB_VERSION:-v0.2.1-pre-alpha}"
 RELEASE_VERSION="v${PTB_VERSION#v}"
-PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
+PTB_ZIP_NAME="DoomEternalArchipelago-${RELEASE_VERSION}.zip"
 GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
 CLIENT_BUILD_DIR="$SCRIPT_DIR/build/client"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
+
+python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
+    --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json"
 
 if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json" ]]; then
     cp "$OUTPUT_DIR/client/ap_config.json" "$TEMP_DIR/ap_config.json"
@@ -137,6 +140,33 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$supported_game_revision"
 done
 
+python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
+    --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
+    --verify-generated-map "$OUTPUT_DIR/build/generated-maps/hub.entities" \
+    --location 7770074
+python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
+    --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
+    --verify-generated-map "$OUTPUT_DIR/build/generated-maps/e1m3_cult.entities" \
+    --location 7770056
+
+ICE_DECL_RELATIVE="generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl"
+python3 "$SCRIPT_DIR/logic_decl_patcher.py" \
+    --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
+    --location 7770074 \
+    --output "$OUTPUT_DIR/mod/hub_patch2/$ICE_DECL_RELATIVE" \
+    --snapshot "$TEMP_DIR/ice_logic_decl_patch.json"
+python3 - "$SCRIPT_DIR/data/snapshots/ice_logic_decl_patch.json" "$TEMP_DIR/ice_logic_decl_patch.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+expected = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+actual = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+actual.pop("changed_lines", None)
+if actual != expected:
+    raise SystemExit(f"Ice logic DECL structural snapshot drift: {actual!r}")
+PY
+
 cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
@@ -151,9 +181,6 @@ mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$SCRIPT_DIR/data/items.json" \
     "$SCRIPT_DIR/data/runtime_locations.json" \
     "$OUTPUT_DIR/client/data/"
-mkdir -p "$OUTPUT_DIR/tools"
-cp "$SCRIPT_DIR/tools/test_save_scenarios.py" \
-    "$SCRIPT_DIR/tools/generate_foundation_test_plan.py" "$OUTPUT_DIR/tools/"
 cp -R "$SCRIPT_DIR/manifests/." "$OUTPUT_DIR/client/manifests/"
 cp -R "$SCRIPT_DIR/player_templates" "$OUTPUT_DIR/client/"
 cp -R "$WORKSPACE/Archipelago/worlds/doometernal" \
@@ -189,7 +216,7 @@ toolchain_compiler = sys.argv[4]
 validation = json.loads(validation_path.read_text(encoding="utf-8"))
 
 manifest = {
-    "name": "Doom Eternal Archipelago Playable Test",
+    "name": "DOOM Eternal Archipelago",
     "version": release_version,
     "files": [
         "README.md",
@@ -214,8 +241,6 @@ manifest = {
         "client/manifests/hub.json",
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
-        "tools/test_save_scenarios.py",
-        "tools/generate_foundation_test_plan.py",
     ],
     "ap_client": {
         "sha256": validation["exe_sha256"],
@@ -274,7 +299,7 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
 (
     cd "$OUTPUT_DIR"
     zip -q -r "$PTB_ZIP_NAME" \
-        README.md RELEASE_MANIFEST.json client tools doometernal.apworld \
+        README.md RELEASE_MANIFEST.json client doometernal.apworld \
         DoomEternalArchipelagoPreAlpha.zip
 )
 
@@ -298,11 +323,30 @@ python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
     --forbid-local xinput1_4.dll
 [[ "$(find "$EXTRACTED_AUDIT_DIR" -name ap_client.exe -type f | wc -l)" == "1" ]] || { echo "Final ZIP must contain exactly one ap_client.exe" >&2; exit 1; }
 [[ "$(sha256sum "$EXTRACTED_AUDIT_DIR/client/ap_client.exe" | awk '{print $1}')" == "$FRESH_CLIENT_SHA256" ]] || { echo "ZIP ap_client.exe hash mismatch" >&2; exit 1; }
-if unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -q '(^|/)(build|staging|__pycache__|.*\.log)$|^/|^[A-Za-z]:/'; then
-    echo "Final ZIP contains a generated/runtime artifact or absolute path" >&2
+mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -v '/$' | sort)
+mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+for name in sorted(set(manifest["files"] + ["doometernal.apworld"])):
+    print(name)
+PY
+)
+if [[ "${PACKAGE_FILES[*]}" != "${ALLOWED_FILES[*]}" ]]; then
+    echo "Final ZIP violates the public package allowlist" >&2
+    printf 'actual:\n%s\nallowed:\n%s\n' "${PACKAGE_FILES[*]}" "${ALLOWED_FILES[*]}" >&2
     exit 1
 fi
-echo "Playable test build created at: $OUTPUT_DIR"
+if printf '%s\n' "${PACKAGE_FILES[@]}" | rg -i -q '(^|/)(playtests?|tests?|build|staging|__pycache__|\.git|todo|session|decisions|pitfalls|architecture)(/|$)|(^|/).*\.log$|(^|/).*\.pid$|(^|/)ap_config\.json$|(^|/)\.local\.env$|(^|/).*-(dev|debug)(\.|/|$)|AP_ICE_DIAG|(^|/).*(condump|seed|cache|output|diagnostic)'; then
+    echo "Final ZIP contains a forbidden internal or development artifact" >&2
+    exit 1
+fi
+if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | rg -n -i '(/run/media/system/Eris/|/var/home/guilherme/|[A-Z]:\\\\Users\\\\guilherme\\|ap_ice_diag)' >/dev/null; then
+    echo "Final ZIP text contains a personal path or diagnostic marker" >&2
+    exit 1
+fi
+echo "Public release build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
-echo "Linux/Windows test bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
+echo "Public bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"

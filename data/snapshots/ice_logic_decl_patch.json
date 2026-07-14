@@ -1,0 +1,23 @@
+{
+  "changed_edge": {
+    "after_destination": 1344507903,
+    "before_destination": 2191342619,
+    "edge": 1193717636,
+    "from_pin": 4
+  },
+  "event": "target_relay_pickup_ice_bomb",
+  "inventory_check": {
+    "decl": "throwable/player/ice_bomb",
+    "node": 1252079672
+  },
+  "location_id": 7770074,
+  "override_sha256": "6444f3ef197a6cdad3e79638fec763248250309d4b1265656aa9f3c2902ddf07",
+  "post_ice_architecture": {
+    "entry_count": 1,
+    "entry_node": 2021323581,
+    "location_role": "check_only",
+    "owner": "Restore Ship Power / info_logic_hub_from_e1m2",
+    "transaction_node": 1344507903
+  },
+  "source_sha256": "f099cd81d004ca7eece7e0ac129e38eda551fd5db439ccff2f9e8b36e59950ca"
+}
