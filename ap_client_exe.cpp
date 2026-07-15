@@ -24,17 +24,27 @@ MeathookInterface* g_MhInterface = nullptr;
 
 static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
-static const char* kGoalEventPath = "base\\ap_transition_e1m3_cult_to_e1m4_boss.evt";
-static const char* kCultistBaseMap = "game/sp/e1m3_cult/e1m3_cult";
-static const char* kDoomHunterBaseMap = "game/sp/e1m4_boss/e1m4_boss";
-static const char* kReleaseVersion = "v0.2.0-pre-alpha";
+static const char* kTransitionEventPrefix = "base\\ap_transition_";
+static const char* kReleaseVersion = "v0.2.2-pre-alpha-dev";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
-static const int kItemMappingRevision = 4;
+static const int kItemMappingRevision = 7;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
+
+std::string CanonicalMapName(std::string name) {
+    std::replace(name.begin(), name.end(), '\\', '/');
+    while (!name.empty() && (name.back() == '/' || name.back() == '\r'
+            || name.back() == '\n' || name.back() == ' ' || name.back() == '\t')) {
+        name.pop_back();
+    }
+    if (name == "game/hub/hub" || name == "game/sp/hub/hub") {
+        return "game/hub/hub";
+    }
+    return name;
+}
 
 struct CommandJob {
     std::string path;
@@ -746,9 +756,9 @@ bool Aes128GcmDecrypt(
     return true;
 }
 
-class GoalTransitionMonitor {
+class MissionTransitionMonitor {
 public:
-    explicit GoalTransitionMonitor(const RuntimePathInfo& runtimePaths)
+    explicit MissionTransitionMonitor(const RuntimePathInfo& runtimePaths)
         : runtimePaths_(runtimePaths) {}
 
     void Poll() {
@@ -770,8 +780,8 @@ public:
             return;
         }
 
-        if (lastSnapshot_.mapName == kCultistBaseMap
-                && latest->mapName == kDoomHunterBaseMap) {
+        if (!lastSnapshot_.mapName.empty()
+                && lastSnapshot_.mapName != latest->mapName) {
             WriteTransitionEvent(lastSnapshot_.mapName, latest->mapName, latest->path);
         }
 
@@ -862,7 +872,7 @@ private:
 
         configured_ = true;
         LogDebug(
-            "[Goal] Monitoring encrypted game.details for Cultist Base transition via "
+            "[Mission] Monitoring encrypted game.details transitions via "
             + steamRemoteDir_ + "."
         );
         return true;
@@ -979,7 +989,7 @@ private:
             }
             const std::string line = TrimLine(plaintext.substr(lineStart, lineEnd - lineStart));
             if (line.rfind("mapName=", 0) == 0) {
-                return line.substr(std::string("mapName=").size());
+                return CanonicalMapName(line.substr(std::string("mapName=").size()));
             }
             lineStart = lineEnd + 1;
         }
@@ -991,11 +1001,8 @@ private:
         const std::string& toMap,
         const std::string& sourcePath
     ) {
-        if (GetFileAttributesA(kGoalEventPath) != INVALID_FILE_ATTRIBUTES) {
-            LogDebug("[Goal] Transition detected but goal event file is still pending bridge consumption.");
-            return;
-        }
-
+        const std::string canonicalFrom = CanonicalMapName(fromMap);
+        const std::string canonicalTo = CanonicalMapName(toMap);
         ++sequence_;
         SYSTEMTIME now = {};
         GetSystemTime(&now);
@@ -1013,19 +1020,22 @@ private:
             now.wMilliseconds
         );
 
-        const std::string temporaryPath =
-            std::string(kGoalEventPath) + "." + std::to_string(GetCurrentProcessId()) + ".tmp";
+        const std::string eventPath =
+            std::string(kTransitionEventPrefix)
+            + std::to_string(GetCurrentProcessId()) + "_"
+            + std::to_string(sequence_) + ".evt";
+        const std::string temporaryPath = eventPath + ".tmp";
         FILE* output = fopen(temporaryPath.c_str(), "wb");
         if (!output) {
-            LogDebug("[Goal] Failed to create goal transition event file.");
+            LogDebug("[Mission] Failed to create transition event file.");
             return;
         }
 
         const std::string contents =
             "sequence=" + std::to_string(sequence_) + "\n"
             + "timestamp=" + isoTimestamp + "\n"
-            + "from_map=" + fromMap + "\n"
-            + "to_map=" + toMap + "\n"
+            + "from_map=" + canonicalFrom + "\n"
+            + "to_map=" + canonicalTo + "\n"
             + "source_file=" + sourcePath + "\n";
         fwrite(contents.data(), 1, contents.size(), output);
         fflush(output);
@@ -1037,17 +1047,17 @@ private:
 
         if (!MoveFileExA(
                 temporaryPath.c_str(),
-                kGoalEventPath,
+                eventPath.c_str(),
                 MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
             )) {
             DeleteFileA(temporaryPath.c_str());
-            LogDebug("[Goal] Failed to publish goal transition event file.");
+            LogDebug("[Mission] Failed to publish transition event file.");
             return;
         }
 
         LogDebug(
-            "[Goal] Published PTB goal transition event: "
-            + fromMap + " -> " + toMap + "."
+            "[Mission] Published native transition event: "
+            + canonicalFrom + " -> " + canonicalTo + "."
         );
     }
 
@@ -1358,7 +1368,7 @@ int main(int argc, char** argv) {
     );
     const std::string doomExecutablePath =
         (runtimePaths.gameRootDir / "DOOMEternalx64vk.exe").string();
-    GoalTransitionMonitor goalTransitionMonitor(runtimePaths);
+    MissionTransitionMonitor missionTransitionMonitor(runtimePaths);
 
     HANDLE singleInstance = CreateMutexA(nullptr, TRUE, "DoomEternalArchipelagoClient");
     if (!singleInstance || GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -1410,7 +1420,7 @@ int main(int argc, char** argv) {
 
     while (true) {
         gameStateProbe.Poll();
-        goalTransitionMonitor.Poll();
+        missionTransitionMonitor.Poll();
         ImportSpoolFiles(queue);
 
         const DWORD now = GetTickCount();
