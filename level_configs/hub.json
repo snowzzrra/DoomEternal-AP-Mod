@@ -1,11 +1,13 @@
 {
+  "map_key": "hub",
     "entities": {
         "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
         "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,
         "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB": 7770074,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848": 7770086,
         "AP_CHECK_PROGRESS_ARGENT_CELL_1_750400652": 7770087,
-        "AP_CHECK_PROGRESS_ARGENT_CELL_1_2075197287": 7770088
+        "AP_CHECK_PROGRESS_ARGENT_CELL_1_2075197287": 7770088,
+        "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": 7770081
     },
     "target_policies": {
         "pickup_equipment_flame_belch_1": {
@@ -34,6 +36,28 @@
             "drop_targets": [
                 "target_give_item_ice_bomb"
             ]
+        },
+        "progress_praetor_point_hub_1": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": ["target_relay_complete_praetor_obj"],
+                "required_snippets": [
+                    "\"game/sp/hub/from_e1m2\"",
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "model = \"md6def/objects/interact/praetor_suit_token/praetor_suit_token.md6\";",
+                    "stat = \"STAT_GAINED_FIRST_PRAETOR_TOKEN\";",
+                    "onUseCodexEntry = \"codex/tutorials/praetor_suit_perks\";",
+                    "progressionCategory = \"PROGRESSION_CATEGORY_ELITE\";",
+                    "useStat = \"STAT_SUIT_PAGE_UNLOCKED\";",
+                    "flags = {\n\t\t\thide = true;\n\t\t}"
+                ]
+            }
+        },
+        "progress_argent_cell_1_1072112848": {
+            "gate_relay": "target_relay_argent_cell_useable"
         }
     }
 }

@@ -1,4 +1,5 @@
 {
+  "map_key": "e1m2_war",
     "level": "e1m2_war",
     "region": "Exultia",
     "entities": {
@@ -41,5 +42,8 @@
             "manager_entity": "battle_encounter_manager_3",
             "after_event_index": 11
         }
+    ],
+    "remove_entities": [
+        "pickups_pickup_weapon_heavy_cannon_1"
     ]
 }

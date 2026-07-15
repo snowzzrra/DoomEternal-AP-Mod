@@ -6,14 +6,7 @@ import argparse
 import hashlib
 from pathlib import Path
 from foundation import build_primitive, validate_primitive_registry
-from bootstrap_actions import (
-    BOOTSTRAP_ACTIONS,
-    BOOTSTRAP_ENTITY_PREFIX,
-    BOOTSTRAP_ENTITY_PREFIXES,
-    BOOTSTRAP_STAT_PRIMITIVE,
-    INVALID_BOOTSTRAP_INHERITS,
-    validate_bootstrap_catalogue,
-)
+from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -29,6 +22,7 @@ GENERATED_NAME_PREFIXES = (
     "ap_rpc_auto_enable",
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
+FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
 
 # you don't need to use this to play the mod
 # i'm making this file available simply for transparency and for anyone who wants to generate the AP targets in other maps by themselves, since the process is a bit tedious to do manually and this automates it
@@ -83,6 +77,21 @@ def validate_source_file(input_file, output_file):
         "sha256_before": source_hash_before,
         "content": content,
     }
+
+
+def assert_no_weapon_mastery_token_currency(content, context):
+    """Reject any Token currency source in an AP-generated map.
+
+    Weapon Mastery Tokens are not an AP item and an AP run must have no
+    vanilla source of this currency.  Checking both the registered vanilla
+    source and the generated output also prevents a stripped pickup from
+    retaining a Token grant through an unreviewed target branch.
+    """
+    if FORBIDDEN_WEAPON_MASTERY_CURRENCY in content:
+        raise ValueError(
+            f"{context} contains forbidden vanilla Token currency "
+            f"{FORBIDDEN_WEAPON_MASTERY_CURRENCY}"
+        )
 
 def remove_balanced_entity_blocks(content, name_prefix):
     pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w*\s*\{', re.IGNORECASE)
@@ -403,7 +412,64 @@ def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
         ]
 
     target_names.append(ap_check_id)
-    return replace_targets_block(block, target_names)
+    block = replace_targets_block(block, target_names)
+    if target_policy.get("gate_relay"):
+        # First Fortress Crystal must remain inert until vanilla Flame Belch
+        # chain activates target_relay_argent_cell_useable.
+        if not re.search(r'flags\s*=\s*\{\s*hide\s*=\s*true;', block):
+            block = block.replace("edit = {", "edit = {\n\t\t\tflags = { hide = true; }", 1)
+    return block
+
+
+def append_target_to_named_entity(content, entity_name, target_name):
+    """Append a target to one vanilla relay without changing its other edges."""
+    marker = f"entityDef {entity_name} {{"
+    start = content.find(marker)
+    if start < 0:
+        raise ValueError(f"gated AP target relay missing: {entity_name}")
+    open_brace = content.find("{", start)
+    depth = 0
+    for end in range(open_brace, len(content)):
+        if content[end] == "{":
+            depth += 1
+        elif content[end] == "}":
+            depth -= 1
+            if depth == 0:
+                entity_block = content[start:end + 1]
+                targets = extract_target_names(entity_block)
+                if target_name not in targets:
+                    entity_block = replace_targets_block(entity_block, [*targets, target_name])
+                return content[:start] + entity_block + content[end + 1:]
+    raise ValueError(f"unterminated gated AP target relay: {entity_name}")
+
+
+def patch_native_reward_entity(block, entity_name, ap_check_id, policy):
+    """Preserve a proven native transaction, remove one reward, append AP last."""
+    contract = policy.get("native_entity_contract")
+    if not contract:
+        raise ValueError(f"{entity_name}: missing native entity contract")
+    for snippet in contract.get("required_snippets", []):
+        if block.count(snippet) != 1:
+            raise ValueError(f"{entity_name}: native contract drift for {snippet!r}")
+    original_targets = extract_target_names(block)
+    expected_targets = contract.get("original_targets")
+    if original_targets != expected_targets:
+        raise ValueError(
+            f"{entity_name}: native target order drift: expected {expected_targets}, got {original_targets}"
+        )
+    reward_block = contract.get("remove_block")
+    if not reward_block or len(re.findall(rf"(?m)^\s*{re.escape(reward_block)}\s*=\s*\{{", block)) != 1:
+        raise ValueError(f"{entity_name}: native reward block drift")
+    patched = remove_property_blocks(block, reward_block)
+    if reward_block in patched or "CURRENCY_PRAETOR_UPGRADE" in patched:
+        raise ValueError(f"{entity_name}: native currency removal failed")
+    patched = replace_targets_block(patched, [*original_targets, ap_check_id])
+    if extract_target_names(patched) != [*original_targets, ap_check_id]:
+        raise ValueError(f"{entity_name}: AP target must follow the functional native target")
+    for snippet in contract.get("required_snippets", []):
+        if snippet not in patched:
+            raise ValueError(f"{entity_name}: native field was not preserved: {snippet!r}")
+    return patched
 
 
 def audit_preserved_target_graph(content, entity_name, target_policy):
@@ -724,32 +790,8 @@ entity {
 
 
 def generate_bootstrap_entities():
-    """Emit historical v2 controls; bridge automation remains disabled."""
-    validate_bootstrap_catalogue()
-    blocks = []
-    for action in BOOTSTRAP_ACTIONS.values():
-        block = build_primitive(
-            "boolean_stat_modifier_direct",
-            action["entity_name"],
-            {"stat": action["stat"], "value": 1},
-            release=False,
-        )
-        lowered = block.lower()
-        if any(term.lower() in lowered for term in action["forbidden_effects"]):
-            raise ValueError(
-                f"Bootstrap entity contains forbidden effect: {action['action']}"
-            )
-        if (
-            block.count('class = "idTarget_PlayerStatModifier";') != 1
-            or block.count("gameStat = ") != 1
-            or block.count("value = 1;") != 1
-            or "item[" in lowered
-            or "inherit =" in lowered
-            or "target/player_stat_modifier" in lowered
-        ):
-            raise ValueError(f"Bootstrap entity is not a one-stat modifier: {action['action']}")
-        blocks.append(block)
-    return "".join(blocks)
+    """Historical stat-write bootstraps are intentionally absent from v0.2.2."""
+    return ""
 
 def generate_map(input_file, output_file, config_file, manifest_file, items_dict):
     with open(config_file, "r", encoding="utf-8") as f:
@@ -763,9 +805,15 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     neutralize_entity_references = level_config.get("neutralize_entity_references", [])
     secret_encounters = level_config.get("secret_encounters", [])
     manifest_data = {}
+    map_key = level_config.get("map_key")
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
+    for entity_name, policy in target_policies.items():
+        gate_relay = policy.get("gate_relay")
+        if gate_relay:
+            content = append_target_to_named_entity(content, gate_relay, entity_name)
+    assert_no_weapon_mastery_token_currency(content, f"Registered vanilla map {map_key}")
 
     for entity_name in neutralize_pickups:
         content = neutralize_conditional_pickup(content, entity_name)
@@ -823,7 +871,6 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     new_blocks = [blocks[0]]
 
     modified_count = 0
-
     trigger_conditions = [
         'inherit = "progress/codex"',
         'inherit = "pickup/collectible/',
@@ -874,13 +921,23 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
             if "edit = {" in block:
                 target_policy = target_policies.get(entity_name)
                 audit_preserved_target_graph(content, entity_name, target_policy)
+                location_id = config_entities[ap_check_id]
+                if target_policy and target_policy.get("native_entity_contract"):
+                    block = patch_native_reward_entity(
+                        block, entity_name, ap_check_id, target_policy
+                    )
+                    new_blocks.append("entity {" + block)
+                    new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
+                    new_blocks.append(generate_pickup_notification(ap_check_id))
+                    new_blocks.append(generate_check_event(location_id))
+                    modified_count += 1
+                    continue
                 if target_policy and target_policy.get("independent_ap_trigger"):
                     # The Hub Ice pickup can be hidden/removed when Ice is
                     # already owned. Its AP check must therefore not be a
                     # mutation of that pickup. Keep its audited objective
                     # branch on a separate trigger and leave the vanilla
                     # reward carrier inert.
-                    location_id = config_entities[ap_check_id]
                     manifest_data[ap_check_id] = location_id
                     if not target_policy.get("remove_original", False):
                         new_blocks.append(
@@ -1037,6 +1094,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         + generate_bootstrap_entities()
         + generate_system_command_entities()
     )
+    assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:

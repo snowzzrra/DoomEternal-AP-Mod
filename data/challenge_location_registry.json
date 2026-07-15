@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "mission_complete": [
+    {
+      "name": "Hell on Earth - Mission Complete",
+      "id": 7770122,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e1m1_intro/e1m1_intro",
+        "to": "game/hub/hub"
+      }
+    },
+    {
+      "name": "Exultia - Mission Complete",
+      "id": 7770123,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e1m2_battle/e1m2_battle",
+        "to": "game/hub/hub"
+      }
+    },
+    {
+      "name": "Cultist Base - Mission Complete",
+      "id": 7770124,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e1m3_cult/e1m3_cult",
+        "to": "game/sp/e1m4_boss/e1m4_boss"
+      }
+    }
+  ]
+}

@@ -9,11 +9,13 @@ import shutil
 import subprocess
 import uuid
 import logging
+import hashlib
 from foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
     load_primitive_registry,
 )
+from challenge_registry import canonical_map_name, load_challenge_registry
 
 import json
 from pathlib import Path
@@ -34,6 +36,11 @@ except ImportError:
 CONFIG_FILE = Path(
     os.environ.get("DOOM_AP_CONFIG_FILE", Path(__file__).with_name("ap_config.json"))
 )
+BRIDGE_FILE = Path(__file__).resolve()
+BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
+BRIDGE_PROTOCOL = 3
+BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
+TRANSITION_HANDLER = "unified"
 def abort_setup(message):
     print(message, file=sys.stderr)
     if os.name == "nt":
@@ -236,6 +243,7 @@ DEATHLINK_KILL_INTERVAL = 2.0
 DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
+# Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
@@ -999,7 +1007,14 @@ with open(RUNTIME_LOCATIONS_FILE, "r", encoding="utf-8") as f:
 CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Cultist Base - Mission Complete"
 ]
-
+CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
+MISSION_COMPLETE_TRANSITIONS = {
+    (
+        canonical_map_name(entry["signal"]["from"]),
+        canonical_map_name(entry["signal"]["to"]),
+    ): entry
+    for entry in CHALLENGE_LOCATION_REGISTRY["mission_complete"]
+}
 # Load ALL level manifests dynamically
 DECL_TO_LOCATION = {}
 MANIFESTS_DIR = os.path.join(os.path.dirname(__file__), "manifests")
@@ -1259,7 +1274,7 @@ def extract_location_id_from_event(path):
     return None
 
 
-def parse_goal_transition_event(path):
+def parse_goal_transition_event(path, include_raw=False):
     data = {}
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -1274,7 +1289,22 @@ def parse_goal_transition_event(path):
 
     if not data.get("from_map") or not data.get("to_map"):
         return None
+    raw_from_map = data["from_map"]
+    raw_to_map = data["to_map"]
+    data["from_map"] = canonical_map_name(data["from_map"])
+    data["to_map"] = canonical_map_name(data["to_map"])
+    if include_raw:
+        data["raw_from_map"] = raw_from_map
+        data["raw_to_map"] = raw_to_map
     return data
+
+
+def log_mission_bridge_identity():
+    logger.info("BRIDGE_REVISION=%s", BRIDGE_REVISION)
+    logger.info("BRIDGE_FILE=%s", BRIDGE_FILE)
+    logger.info("BRIDGE_SHA256=%s", BRIDGE_SHA256)
+    logger.info("BRIDGE_PROTOCOL=%s", BRIDGE_PROTOCOL)
+    logger.info("TRANSITION_HANDLER=%s", TRANSITION_HANDLER)
 
 
 def cleanup_telemetry_dumps():
@@ -1332,15 +1362,6 @@ def set_rpc_execution(enabled):
 def rpc_execution_enabled():
     return os.path.isfile(RPC_GATE_PATH)
 
-
-def canonical_map_name(name):
-    """Return the map identity used by contracts, logs and runtime checks."""
-    if not name:
-        return name
-    normalized = str(name).strip().replace("\\", "/").rstrip("/")
-    if normalized == "game/hub/hub":
-        return "game/sp/hub/hub"
-    return normalized
 
 def read_telemetry_dump():
     files = telemetry_dump_files()
@@ -1750,6 +1771,11 @@ class DoomEternalContext(CommonContext):
         self.deathlinked = bool(self.session_state.get("deathlinked", False))
         self.item_state_ready = True
         self.session_state.setdefault("bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}})
+        reconciliation = self.session_state.setdefault(
+            "perk_reconciliation", {"epoch": 0, "delivered": {}}
+        )
+        reconciliation["epoch"] = int(reconciliation.get("epoch", 0)) + 1
+        reconciliation.setdefault("delivered", {})
         save_client_state(self.client_state)
         logger.info(
             f"[State] Loaded {self.items_processed} processed items for "
@@ -1770,13 +1796,85 @@ class DoomEternalContext(CommonContext):
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
         self.session_state.pop("item_command_groups", None)
+        self.session_state["perk_reconciliation"] = {
+            "epoch": 1,
+            "delivered": {},
+        }
         save_client_state(self.client_state)
 
     def received_rune_count(self):
         return sum(item.item in REVISION_ONE_RUNE_IDS for item in self.items_received)
 
-    def received_item_ids(self):
-        return {item.item for item in self.items_received}
+    def received_item_ids(self, processed_only=False):
+        items = self.items_received[: self.items_processed] if processed_only else self.items_received
+        return {item.item for item in items}
+
+    def reconciliation_epoch(self):
+        state = self.session_state.setdefault(
+            "perk_reconciliation", {"epoch": 1, "delivered": {}}
+        )
+        return int(state.setdefault("epoch", 1))
+
+    def advance_reconciliation_epoch(self, trigger):
+        state = self.session_state.setdefault(
+            "perk_reconciliation", {"epoch": 0, "delivered": {}}
+        )
+        state["epoch"] = int(state.get("epoch", 0)) + 1
+        state["trigger"] = trigger
+        state["timestamp"] = time.time()
+        self.persist_session_state()
+        return state["epoch"]
+
+    def reconcile_owned_perks(self, trigger):
+        """Reapply desired Rune ownership once per connect/level epoch."""
+        if not self.item_state_ready or not self.current_map_name:
+            return False
+        supported = {
+            "game/sp/e1m1_intro/e1m1_intro",
+            "game/sp/e1m2_battle/e1m2_battle",
+            "game/hub/hub",
+            "game/sp/e1m3_cult/e1m3_cult",
+        }
+        if canonical_map_name(self.current_map_name) not in supported:
+            return False
+        received_ids = self.received_item_ids(processed_only=True)
+        state = self.session_state.setdefault(
+            "perk_reconciliation", {"epoch": 1, "delivered": {}}
+        )
+        delivered = state.setdefault("delivered", {})
+        epoch = self.reconciliation_epoch()
+        candidates = [
+            *(('rune', item_id) for item_id in sorted(received_ids & REVISION_ONE_RUNE_IDS)),
+        ]
+        changed = False
+        for kind, item_id in candidates:
+            key = f"{kind}:{item_id}"
+            if int(delivered.get(key, -1)) >= epoch:
+                continue
+            commands, description = self.item_activation_commands(item_id, 0)
+            if commands is None:
+                logger.error("[Reconcile] Cannot compile %s %s: %s", kind, item_id, description)
+                continue
+            queued = True
+            for command_index, command in enumerate(commands):
+                # Native queue order is lexical; keep reconciliations after
+                # recv-* prerequisite jobs created in the same pass.
+                command_id = f"zz-reconcile-{kind}-{item_id}-e{epoch}-c{command_index}"
+                if not send_command(command, coalesce_key=command_id, already_queued_ok=True):
+                    queued = False
+                    break
+            if not queued:
+                continue
+            delivered[key] = epoch
+            changed = True
+            logger.info(
+                "[Reconcile] %s %s queued for epoch %s (%s): %s",
+                kind, item_id, epoch, trigger, description,
+            )
+        state["last_trigger"] = trigger
+        state["timestamp"] = time.time()
+        self.persist_session_state()
+        return changed
 
     def bootstrap_actions(self):
         bootstrap = self.session_state.setdefault(
@@ -1961,7 +2059,6 @@ class DoomEternalContext(CommonContext):
             repair_ids.update(REVISION_FOUR_FLAME_BELCH_IDS)
         if revision < 5:
             repair_ids.update(REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS)
-
         repair_indices = [
             index
             for index, network_item in enumerate(
@@ -2173,52 +2270,60 @@ class DoomEternalContext(CommonContext):
 
         await self.send_death(f"{self.auth or 'The Doom Slayer'} was slain.")
 
-    async def send_campaign_goal(self, source_description):
+    async def send_mission_complete(
+        self, location_id, source_description, report_goal=False
+    ):
         if not self.server or not self.server.socket or self.server.socket.closed:
+            return False
+        if location_id not in self.server_locations:
+            logger.warning("[Mission] MISSION_LOCATION id=%s slot=absent", location_id)
             return False
 
         messages = []
-        if CULTIST_BASE_COMPLETE_LOCATION not in self.locations_checked:
-            self.locations_checked.add(CULTIST_BASE_COMPLETE_LOCATION)
+        location_is_new = location_id not in self.locations_checked
+        if location_is_new:
             messages.append(
                 {
                     "cmd": "LocationChecks",
-                    "locations": [CULTIST_BASE_COMPLETE_LOCATION],
+                    "locations": [location_id],
                 }
             )
-        messages.append(
-            {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
-        )
+        goal_is_new = report_goal and not self.session_state.get("goal_sent", False)
+        if goal_is_new:
+            messages.append(
+                {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
+            )
 
-        await self.send_msgs(messages)
-        self.session_state["goal_sent"] = True
-        self.persist_session_state()
-        logger.info(
-            "[Goal] Cultist Base completed. Goal reported to Archipelago via "
-            f"{source_description}."
-        )
+        if messages:
+            logger.info(
+                f"[Mission] LOCATION_CHECK_SEND id={location_id} "
+                f"source={source_description}"
+            )
+            await self.send_msgs(messages)
+        if location_is_new:
+            self.locations_checked.add(location_id)
+        if goal_is_new:
+            self.session_state["goal_sent"] = True
+            self.persist_session_state()
+        logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
         return True
 
+    async def send_campaign_goal(self, source_description):
+        return await DoomEternalContext.send_mission_complete(
+            self,
+            CULTIST_BASE_COMPLETE_LOCATION,
+            source_description,
+            report_goal=True,
+        )
+
     async def check_campaign_goal_event(self):
+        """Single native-transition consumer for Mission Complete and Cultist goal."""
         event_paths = goal_event_files()
         if not event_paths:
             return False
 
-        if self.session_state.get("goal_sent", False):
-            for path in event_paths:
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    logger.warning(
-                        "[Goal] Could not remove stale goal transition event "
-                        f"{os.path.basename(path)} yet: {error}"
-                    )
-            return True
-
         for path in event_paths:
-            event = parse_goal_transition_event(path)
+            event = parse_goal_transition_event(path, include_raw=True)
             if event is None:
                 logger.warning(
                     "[Goal] Malformed goal transition event "
@@ -2235,15 +2340,16 @@ class DoomEternalContext(CommonContext):
                     )
                 continue
 
-            if (
-                event.get("from_map") != CULTIST_BASE_MAP
-                or event.get("to_map") != DOOM_HUNTER_BASE_MAP
-            ):
-                logger.warning(
-                    "[Goal] Ignoring unexpected goal transition event "
-                    f"{os.path.basename(path)}: "
-                    f"{event.get('from_map')} -> {event.get('to_map')}"
-                )
+            transition = MISSION_COMPLETE_TRANSITIONS.get(
+                (event.get("from_map"), event.get("to_map"))
+            )
+            logger.info(
+                "[Mission] TRANSITION_EVENT raw=%s->%s canonical=%s->%s",
+                event.get("raw_from_map"), event.get("raw_to_map"),
+                event.get("from_map"), event.get("to_map"),
+            )
+            if transition is None:
+                logger.info("[Mission] TRANSITION_IGNORED reason=no_registry_match")
                 try:
                     os.remove(path)
                 except FileNotFoundError:
@@ -2256,16 +2362,20 @@ class DoomEternalContext(CommonContext):
                 continue
 
             try:
-                sent = await self.send_campaign_goal(
-                    "native transition event"
-                )
+                if transition["id"] == CULTIST_BASE_COMPLETE_LOCATION:
+                    sent = await self.send_campaign_goal("native transition event")
+                else:
+                    sent = await self.send_mission_complete(
+                        transition["id"], "native transition event"
+                    )
             except Exception as error:
                 logger.error(
-                    "[Goal] Failed to send goal from native transition event; "
-                    f"preserving file for retry: {error}"
+                    "[Mission] LOCATION_CHECK_RETRY id=%s error=%s",
+                    transition["id"], error,
                 )
                 return True
             if not sent:
+                logger.info("[Mission] LOCATION_CHECK_RETRY id=%s", transition["id"])
                 return True
 
             try:
@@ -2277,8 +2387,7 @@ class DoomEternalContext(CommonContext):
                     "[Goal] Goal sent but transition event file "
                     f"{os.path.basename(path)} could not be removed yet: {error}"
                 )
-            logger.info("[Goal] Goal sent.")
-            return True
+            logger.info("[Mission] MISSION_LOCATION id=%s name=%s", transition["id"], transition["name"])
 
         return True
 
@@ -2313,17 +2422,15 @@ class DoomEternalContext(CommonContext):
         await self.send_campaign_goal("legacy save fallback")
 
     async def check_campaign_goal(self):
-        if (
-            not self.item_state_ready
-            or self.session_state.get("goal_sent", False)
-        ):
+        if not self.item_state_ready:
             await self.check_campaign_goal_event()
             return
 
         if await self.check_campaign_goal_event():
             return
 
-        await self.check_campaign_goal_save_fallback()
+        if not self.session_state.get("goal_sent", False):
+            await self.check_campaign_goal_save_fallback()
 
     def check_rpc_autopause(self):
         details = read_game_details()
@@ -2435,23 +2542,28 @@ class DoomEternalContext(CommonContext):
             if self.server and self.server.socket and not self.server.socket.closed:
                 migrate_direct_item_command_jobs()
                 self.onboard_bootstrap("on_reconnect")
+                self.reconcile_owned_perks("connect_or_reconnect")
                 if not self.repair_item_mappings():
                     await asyncio.sleep(0.25)
                     continue
 
-                # Auto-RPC Resume Check
-                if not rpc_execution_enabled():
-                    ready_path = os.path.join(INV_DUMP_DIR, "ap_telemetry_ready.txt")
-                    if os.path.exists(ready_path):
-                        try:
-                            os.remove(ready_path)
+                # Every level-ready marker opens a fresh idempotent reapply
+                # epoch, even when RPC was already armed.
+                ready_path = os.path.join(INV_DUMP_DIR, "ap_telemetry_ready.txt")
+                if os.path.exists(ready_path):
+                    try:
+                        os.remove(ready_path)
+                        if not rpc_execution_enabled():
                             set_rpc_execution(True)
-                            logger.info(
-                                "[RPC] Level-ready signal received. RPC armed; "
-                                "waiting for the native memory safety gate."
-                            )
-                        except Exception as e:
-                            logger.error(f"[RPC] Auto-RPC failed to delete telemetry ready file: {e}")
+                        epoch = self.advance_reconciliation_epoch("level_ready")
+                        logger.info(
+                            "[RPC] Level-ready signal received. RPC armed; "
+                            "perk reconciliation epoch %s queued behind the native safety gate.",
+                            epoch,
+                        )
+                        self.reconcile_owned_perks("level_ready")
+                    except Exception as e:
+                        logger.error(f"[RPC] Auto-RPC failed to consume telemetry ready file: {e}")
 
                 # Persist each item only after its durable spool file exists.
                 while (
@@ -2505,6 +2617,9 @@ class DoomEternalContext(CommonContext):
                     self.items_processed += 1
                     self.persist_session_state()
                     self.onboard_bootstrap("on_item_received")
+                    self.reconcile_owned_perks("item_received")
+
+                self.reconcile_owned_perks("post_item_scan")
 
                 await self.flush_check_event_files()
 
@@ -2531,6 +2646,7 @@ async def amain(launch_args=None):
     ctx.tracking_task = asyncio.create_task(ctx.tracker_loop())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 
+    log_mission_bridge_identity()
     logger.info("=== DOOM ETERNAL ARCHIPELAGO CLIENT ===")
     if not args.connect or not args.name:
         logger.info(

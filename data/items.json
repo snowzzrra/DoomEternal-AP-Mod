@@ -45,12 +45,6 @@
         ]
     },
     "7770018": "give inventory/key",
-    
-    "7770019": {
-        "type": "currency",
-        "currency": "CURRENCY_WEAPON_MASTERY",
-        "count": 1
-    },
     "7770020": "give inventory/rune",
     "7770021": {
         "type": "progressive_perk",
@@ -103,7 +97,6 @@
     "7770054": "give ammo -300",
     "7770055": "give ammo/sharedammopool/fuel -3",
     "7770056": "give ammo/sharedammopool/bfg -2",
-    "7770057": "give armor -200",
     
     "7770058": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/pop_rocket",
     "7770059": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/secondary_full_auto",
@@ -117,14 +110,14 @@
     "7770068": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/heavy_cannon/burst_detonate_mastery",
     "7770069": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
     "7770070": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/shotgun/pop_rocket_more_bombs",
-    "7770071": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/detonate",
     "7770072": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
+    "7770071": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/detonate",
     "7770073": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/lock_on",
     "7770074": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/rocket_launcher/lockon_mastery",
     "7770075": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/ballista",
     "7770076": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/ballista_mastery",
-    "7770077": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/destroyer",
     "7770078": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/destroyer_charge_levels",
+    "7770077": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/gauss_cannon/destroyer",
     "7770079": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/energy_shell",
     "7770080": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/energy_shell_mastery",
     "7770081": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/turret",

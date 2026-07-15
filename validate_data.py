@@ -20,12 +20,7 @@ from ap_map_generator import (
     generate_rpc_command_entities,
     generate_target_relay,
 )
-from bootstrap_actions import (
-    BOOTSTRAP_ACTIONS,
-    BOOTSTRAP_ENTITY_PREFIXES,
-    BOOTSTRAP_STAT_ALLOWLIST,
-    BOOTSTRAP_STAT_PRIMITIVE,
-)
+from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
     compile_all_item_plans,
     load_foundation_contracts,
@@ -33,6 +28,7 @@ from foundation import (
     validate_entity_shape,
     validate_primitive_registry,
 )
+from challenge_registry import all_location_entries, load_challenge_registry
 
 
 ROOT = Path(__file__).resolve().parent
@@ -59,6 +55,21 @@ def extract_namedtuple_table(path: Path, variable: str) -> dict[str, int]:
                 for key, value in zip(node.value.keys, node.value.values)
                 if ast.literal_eval(value.args[0]) is not None
             }
+    raise RuntimeError(f"Could not find {variable} in {path}")
+
+
+def extract_frozenset_constant(path: Path, variable: str) -> set[int]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == variable for target in node.targets)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "frozenset"
+            and len(node.value.args) == 1
+        ):
+            return set(ast.literal_eval(node.value.args[0]))
     raise RuntimeError(f"Could not find {variable} in {path}")
 
 
@@ -93,14 +104,65 @@ def main() -> int:
 
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
+    reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
     reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
     if reused_location_ids:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
-    runtime_locations = set(
-        read_json(ROOT / "data" / "runtime_locations.json").values()
+    for deprecated_id in (7770019, 7770057):
+        if deprecated_id not in reserved_item_ids:
+            errors.append(f"Deprecated item ID {deprecated_id} is not reserved")
+        if deprecated_id in item_ids:
+            errors.append(f"Deprecated item ID {deprecated_id} reappeared as an active AP item")
+        if deprecated_id in commands:
+            errors.append(f"Deprecated item ID {deprecated_id} reappeared as an AP command")
+    if "Weapon Mastery Token" in item_ids:
+        errors.append("Weapon Mastery Token reappeared as an active AP item")
+    if "CURRENCY_WEAPON_MASTERY" in json.dumps(commands, sort_keys=True):
+        errors.append("An AP command grants forbidden CURRENCY_WEAPON_MASTERY")
+    runtime_location_mapping = read_json(ROOT / "data" / "runtime_locations.json")
+    runtime_locations = set(runtime_location_mapping.values())
+    challenge_registry = load_challenge_registry()
+    registry_locations = {
+        entry["name"]: entry["id"]
+        for entry in all_location_entries(challenge_registry)
+    }
+    if runtime_location_mapping != registry_locations:
+        errors.append("runtime_locations.json diverges from challenge registry")
+    for name, location_id in registry_locations.items():
+        if location_ids.get(name) != location_id:
+            errors.append(f"Mission registry/APWorld mapping drift: {name}={location_id}")
+    mission_item_collisions = sorted(
+        set(registry_locations.values()) & set(item_ids.values())
     )
+    if mission_item_collisions:
+        errors.append(
+            "Mission Complete IDs must not reuse item IDs: "
+            f"{mission_item_collisions}"
+        )
+    inactive_runtime_ids = set(range(7770095, 7770111))
+    if runtime_locations & inactive_runtime_ids:
+        errors.append("Challenge/Mastery runtime location returned before its dedicated round")
+    inactive_location_names = [
+        name for name in location_ids
+        if "Mission Challenge" in name or "Weapon Mastery Challenge" in name
+    ]
+    if inactive_location_names:
+        errors.append(f"Challenge/Mastery location returned before its dedicated round: {inactive_location_names}")
+    registry_text = json.dumps(challenge_registry, sort_keys=True)
+    if "mission_challenges" in registry_text or "weapon_masteries" in registry_text:
+        errors.append("Challenge/Mastery runtime registry returned before its dedicated round")
+    source_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT / "bridge_client.py", ROOT / "ap_map_generator.py", ROOT / "challenge_registry.py")
+    )
+    for forbidden in (
+        "append_graph_entries", "watchers_for_map", "AP_RUNTIME_CHECK_",
+        "3_900_000_000", "3_800_000_000", "give armor -200",
+    ):
+        if forbidden in source_text:
+            errors.append(f"Rejected watcher/Armor Drain source returned: {forbidden}")
     map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
 
     forbidden_decl_path = "propitem/ap/"
@@ -135,9 +197,13 @@ def main() -> int:
                 errors.append(f"Duplicate manifest location ID: {location_id}")
             manifests[declaration] = location_id
 
+    physical_location_count = 0
     for path in sorted((ROOT / "level_configs").glob("*.json")):
         config_data = read_json(path)
+        if config_data.get("map_key") != path.stem:
+            errors.append(f"Missing or divergent map_key in {path.name}")
         config = dict(config_data.get("entities", {}))
+        physical_location_count += len(config)
         reused_config_ids = sorted(reserved_location_ids & set(config.values()))
         if reused_config_ids:
             errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
@@ -150,6 +216,10 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
+    if physical_location_count != 76:
+        errors.append(
+            f"Expected 76 physical locations after the reused Suit check, found {physical_location_count}"
+        )
 
     enabled_map_sources = {
         map_key: source
@@ -231,12 +301,12 @@ def main() -> int:
     except ValueError as exc:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
-        "items": 117,
-        "locations": 80,
-        "map_checks": 79,
+        "items": 115,
+        "locations": 83,
+        "map_checks": 80,
+        "runtime_locations": 3,
         "runtime_goals": 1,
         "route_sentinel_batteries": 5,
-        "route_weapon_mastery_tokens": 1,
     }:
         errors.append("Foundation frozen counts changed")
     try:
@@ -244,38 +314,12 @@ def main() -> int:
     except ValueError as exc:
         errors.append(f"Item delivery plan compilation failed: {exc}")
         plans = []
-    if len(plans) != 117:
-        errors.append(f"Expected 117 compiled item plans, found {len(plans)}")
+    if len(plans) != 115:
+        errors.append(f"Expected 115 compiled item plans, found {len(plans)}")
 
     generated_bootstrap = generate_bootstrap_entities()
-    for action_name, action in BOOTSTRAP_ACTIONS.items():
-        entity_start = f"entityDef {action['entity_name']} {{"
-        if entity_start not in generated_bootstrap:
-            errors.append(f"Bootstrap action {action_name} lacks its generated entity")
-            continue
-        entity_body = generated_bootstrap.split(entity_start, 1)[1].split("\n}\n", 1)[0]
-        if (
-            entity_body.count("gameStat = ") != 1
-            or f'gameStat = "{BOOTSTRAP_STAT_ALLOWLIST[action_name]}";' not in entity_body
-            or f'class = "{BOOTSTRAP_STAT_PRIMITIVE["class"]}";' not in entity_body
-            or "inherit =" in entity_body
-        ):
-            errors.append(f"Bootstrap action {action_name} violates the stat allowlist")
-        if any(term.lower() in entity_body.lower() for term in action["forbidden_effects"]):
-            errors.append(f"Bootstrap action {action_name} contains a forbidden effect")
-    if (
-        'inherit = "target/player_stat_modifier";' in generated_bootstrap
-        or "ap_bootstrap_v1_" in generated_bootstrap
-        or BOOTSTRAP_ENTITY_PREFIXES[-1] not in generated_bootstrap
-    ):
-        errors.append("Bootstrap output contains a runtime-invalid or stale v1 entityDef")
-    try:
-        validate_entity_shape(
-            "boolean_stat_modifier_direct", generated_bootstrap,
-            release=False,
-        )
-    except ValueError as exc:
-        errors.append(f"Experimental bootstrap primitive is invalid: {exc}")
+    if generated_bootstrap or any(prefix in generated_bootstrap for prefix in BOOTSTRAP_ENTITY_PREFIXES):
+        errors.append("Rejected stat-write bootstrap entities reappeared")
     if (
         f"entityDef {RPC_ENTITY_PREFIX}_1_0" not in generated_commands
         or "givePlayerPerk perk/player/argent/health_capacity_0;"
@@ -308,6 +352,10 @@ def main() -> int:
         errors.append("Multi-command items do not use the validated target/count relay")
 
     generated_real_commands = generate_rpc_command_entities(commands)
+    if "give armor -200" in json.dumps(commands, sort_keys=True) or "give armor -200" in generated_real_commands:
+        errors.append("Armor Drain Trap command reappeared")
+    if "CURRENCY_WEAPON_MASTERY" in generated_real_commands:
+        errors.append("Generated item entities grant forbidden CURRENCY_WEAPON_MASTERY")
     battery_chain = (
         f'entityDef {RPC_ENTITY_PREFIX}_7770016 {{',
         'class = "idTarget_GiveItems";',

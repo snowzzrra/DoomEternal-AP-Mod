@@ -10,18 +10,22 @@ python3 -m py_compile \
     ap_map_generator.py \
     bootstrap_actions.py \
     bridge_client.py \
+    challenge_registry.py \
     foundation.py \
     logic_decl_patcher.py \
+    rune_decl_builder.py \
     save_decrypt.py \
     save_inspector.py \
     validate_data.py \
     validate_windows_runtime_deps.py \
     tools/test_save_scenarios.py \
     tools/generate_foundation_test_plan.py \
-    tools/audit_scripted_location.py
+    tools/audit_scripted_location.py \
+    tools/audit_packaged_transition_bridge.py
 python3 tools/audit_scripted_location.py --contracts data/scripted_location_contracts.json
 python3 -m unittest \
     tests.test_check_events \
+    tests.test_challenge_locations \
     tests.test_ap_map_generator \
     tests.test_validate_data \
       tests.test_foundation \
@@ -43,6 +47,12 @@ python3 validate_windows_runtime_deps.py \
     --forbid-local dinput8.dll \
     --forbid-local dxgi.dll \
     --forbid-local xinput1_4.dll
+
+distrobox enter doom-cpp -- bash -lc "
+    cd '$SCRIPT_DIR/../Archipelago'
+    python3.11 -m unittest discover \
+        -s worlds/doometernal/test -p 'test_*.py'
+"
 
 distrobox enter doom-cpp -- bash -lc "
     cd '$SCRIPT_DIR/../Archipelago'

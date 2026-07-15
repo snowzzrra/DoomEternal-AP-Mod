@@ -5,21 +5,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/build/release}"
+OUTPUT_DIR="$(realpath -m "$OUTPUT_DIR")"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-v0.2.1-pre-alpha}"
+PTB_VERSION="${PTB_VERSION:-v0.3.0-pre-alpha-dev-a}"
 RELEASE_VERSION="v${PTB_VERSION#v}"
-PTB_ZIP_NAME="DoomEternalArchipelago-${RELEASE_VERSION}.zip"
+PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
 CLIENT_BUILD_DIR="$SCRIPT_DIR/build/client"
+PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json"
+python3 "$SCRIPT_DIR/validate_data.py"
 
 if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json" ]]; then
     cp "$OUTPUT_DIR/client/ap_config.json" "$TEMP_DIR/ap_config.json"
@@ -92,6 +95,9 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
     "$GENERATED_MAPS_DIR"
+python3 "$SCRIPT_DIR/tools/generate_foundation_test_plan.py" \
+    --map e1m1_intro \
+    --output "$OUTPUT_DIR/build/focused-sticky-mastery-runtime.txt"
 "$SCRIPT_DIR/build_client.sh"
 if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
     echo "Fresh client build is missing required executable(s)" >&2
@@ -140,6 +146,10 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$supported_game_revision"
 done
 
+python3 "$SCRIPT_DIR/rune_decl_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/rune-menu-override.json"
+
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
     --verify-generated-map "$OUTPUT_DIR/build/generated-maps/hub.entities" \
@@ -171,6 +181,7 @@ cp "$SCRIPT_DIR/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$SCRIPT_DIR/README.md" "$OUTPUT_DIR/README.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$SCRIPT_DIR/bridge_client.py" "$SCRIPT_DIR/bootstrap_actions.py" \
+    "$SCRIPT_DIR/challenge_registry.py" \
     "$SCRIPT_DIR/foundation.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
     "$SCRIPT_DIR/start_injector_windows.bat" \
@@ -179,6 +190,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$OUTPUT_DIR/client/"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$SCRIPT_DIR/data/items.json" \
+    "$SCRIPT_DIR/data/challenge_location_registry.json" \
     "$SCRIPT_DIR/data/runtime_locations.json" \
     "$OUTPUT_DIR/client/data/"
 cp -R "$SCRIPT_DIR/manifests/." "$OUTPUT_DIR/client/manifests/"
@@ -192,6 +204,21 @@ python3 "$SCRIPT_DIR/build_apworld.py" \
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
 
+python3 - "$OUTPUT_DIR/client/bridge_client.py" "$OUTPUT_DIR/client/bridge_identity.json" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+bridge = Path(sys.argv[1])
+identity = {
+    "protocol": 3,
+    "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(),
+}
+identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
+Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+PY
+
 VALIDATION_JSON="$TEMP_DIR/validate-client.json"
 python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
     "$OUTPUT_DIR/client" \
@@ -204,6 +231,7 @@ python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
 TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
 
 python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" <<'PY'
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -214,6 +242,8 @@ validation_path = Path(sys.argv[3])
 toolchain_compiler = sys.argv[4]
 
 validation = json.loads(validation_path.read_text(encoding="utf-8"))
+bridge_path = output_dir / "client" / "bridge_client.py"
+bridge_sha256 = hashlib.sha256(bridge_path.read_bytes()).hexdigest()
 
 manifest = {
     "name": "DOOM Eternal Archipelago",
@@ -225,7 +255,9 @@ manifest = {
         "doometernal.apworld",
         "client/ap_client.exe",
         "client/bridge_client.py",
+        "client/bridge_identity.json",
         "client/bootstrap_actions.py",
+        "client/challenge_registry.py",
         "client/foundation.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
@@ -234,6 +266,7 @@ manifest = {
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
         "client/data/items.json",
+        "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
         "client/manifests/e1m1_intro.json",
         "client/manifests/e1m2_war.json",
@@ -254,6 +287,12 @@ manifest = {
             "-lversion",
         ],
     },
+    "mission_bridge": {
+        "protocol": 3,
+        "sha256": bridge_sha256,
+        "revision": f"mission-unified-{bridge_sha256[:12]}",
+        "transition_handler": "unified",
+    },
     "validator": {
         "status": validation["status"],
         "errors": validation["errors"],
@@ -273,19 +312,34 @@ manifest = {
 PY
 
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
-    [[ "$(rg -c '^\s*entityDef ap_bootstrap_v2_' "$generated_map")" == "3" ]] || {
-        echo "Normal build lacks the three active v2 bootstrap controls: $generated_map" >&2
-        exit 1
-    }
-    ! rg -q '^\s*entityDef ap_bootstrap_v2_suit_page' "$generated_map" || {
-        echo "Rejected Suit v2 control entered the normal build: $generated_map" >&2
-        exit 1
-    }
-    if rg -q 'ap_bootstrap_v[13]_' "$generated_map"; then
-        echo "Generated map contains stale bootstrap revision: $generated_map" >&2
+    if rg -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
+        echo "Rejected stat-write bootstrap entered the normal build: $generated_map" >&2
         exit 1
     fi
 done
+if rg -q 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"; then
+    echo "Exultia Heavy Cannon fallback reappeared" >&2
+    exit 1
+fi
+if rg -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+    "$OUTPUT_DIR/mod" "$GENERATED_MAPS_DIR" "$OUTPUT_DIR/client/data/items.json"; then
+    echo "Rejected Armor Drain or watcher architecture entered build" >&2
+    exit 1
+fi
+if rg -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_client.py"; then
+    echo "Old goal-only transition handler entered build" >&2
+    exit 1
+fi
+if find "$OUTPUT_DIR/mod" \( \
+    -path '*/generated/decls/unlockable/mission_challenge/*' -o \
+    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
+    -path '*/generated/decls/perks/perk/player/weapons/*' -o \
+    -path '*/generated/decls/perks/perk/ap/*' -o \
+    -path '*/generated/decls/logicentity/ap/*' \
+\) -print -quit | grep -q .; then
+    echo "Challenge/Mastery or rejected watcher DECL override entered build" >&2
+    exit 1
+fi
 
 PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{print $1}')"
 FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print $1}')"
@@ -311,8 +365,30 @@ mkdir -p "$MOD_AUDIT_DIR"
 unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoPreAlpha.zip" -d "$MOD_AUDIT_DIR"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
-    -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' | grep -q .; then
+    -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
+    -path '*/generated/decls/perks/perk/ap/*' -o \
+    -path '*/generated/decls/logicentity/ap/*' | grep -q .; then
     echo "Forbidden propitem DECL override found in final mod ZIP" >&2
+    exit 1
+fi
+if find "$MOD_AUDIT_DIR" \( \
+    -path '*/generated/decls/unlockable/mission_challenge/*' -o \
+    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
+    -path '*/generated/decls/perks/perk/player/weapons/*' -o \
+    -path '*/generated/decls/perks/perk/ap/*' -o \
+    -path '*/generated/decls/logicentity/ap/*' \
+\) -print -quit | grep -q .; then
+    echo "Final ZIP contains Challenge/Mastery or rejected watcher DECL override" >&2
+    exit 1
+fi
+if rg -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+    "$MOD_AUDIT_DIR" "$EXTRACTED_AUDIT_DIR/client/data/items.json"; then
+    echo "Final ZIP contains Armor Drain or rejected watcher architecture" >&2
+    exit 1
+fi
+if rg -q 'Ignoring unexpected goal transition event' \
+    "$EXTRACTED_AUDIT_DIR/client/bridge_client.py"; then
+    echo "Final ZIP contains old goal-only transition handler" >&2
     exit 1
 fi
 python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
@@ -323,6 +399,11 @@ python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
     --forbid-local xinput1_4.dll
 [[ "$(find "$EXTRACTED_AUDIT_DIR" -name ap_client.exe -type f | wc -l)" == "1" ]] || { echo "Final ZIP must contain exactly one ap_client.exe" >&2; exit 1; }
 [[ "$(sha256sum "$EXTRACTED_AUDIT_DIR/client/ap_client.exe" | awk '{print $1}')" == "$FRESH_CLIENT_SHA256" ]] || { echo "ZIP ap_client.exe hash mismatch" >&2; exit 1; }
+python3 "$SCRIPT_DIR/tools/audit_packaged_transition_bridge.py" \
+    "$EXTRACTED_AUDIT_DIR/client" \
+    "$SCRIPT_DIR/data/challenge_location_registry.json" \
+    "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
+    "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
 mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -v '/$' | sort)
 mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
 import json
@@ -346,7 +427,7 @@ if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | rg -n 
     echo "Final ZIP text contains a personal path or diagnostic marker" >&2
     exit 1
 fi
-echo "Public release build created at: $OUTPUT_DIR"
+echo "Playable development build created at: $OUTPUT_DIR"
 echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
-echo "Public bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
+echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"

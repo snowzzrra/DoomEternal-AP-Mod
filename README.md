@@ -18,9 +18,15 @@ sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
 Current PTB scope:
 
 - Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
-- Content: `79` map checks + `1` runtime goal
-- Goal: report completion when the runtime sees
-  `ap_transition_e1m3_cult_to_e1m4_boss.evt`
+- Content: `80` map checks + `3` runtime Mission Complete locations; the runtime goal is an
+  independent state paired only with Cultist Base completion.
+- Challenges/masteries: vanilla behavior is restored. No Challenge/Mastery AP
+  location or reward stripping is active until a real source event is proven.
+- Automap/Dossier: the failed generic `idInfo` carrier design was removed. A
+  family-specific native prototype remains blocked until a reward-free native
+  collection/used edge is proven.
+- Mission Complete: native publisher exists for Hell, Exultia and Cultist;
+  bundled bridge consumes exact pairs and has an integration fixture.
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
   Archipelago balancing are future milestones.
 
@@ -78,7 +84,7 @@ Archipelago/worlds/doometernal/
   Unknown game versions and failed reads stay fail-closed.
 - Physical checks are detected by native `ap_event_*` files, not by telemetry
   polling.
-- The runtime goal uses the native transition event above, with the old
+- Mission Complete and the runtime goal use native transition events, with the old
   autosave path kept only as fallback behavior.
 - `g_debugTriggers` is no longer required for normal check detection.
 
@@ -137,16 +143,15 @@ AP-mutated pickup
 Event files are kept until the Archipelago server confirms the location in
 `checked_locations`.
 
-### Goal flow
+### Mission completion flow
 
 ```text
-ap_client.exe detects:
-game/sp/e1m3_cult/e1m3_cult -> game/sp/e1m4_boss/e1m4_boss
+ap_client.exe detects a real map transition in encrypted `game.details`
 
-  -> writes ap_transition_e1m3_cult_to_e1m4_boss.evt
-  -> bridge_client.py consumes it durably
-  -> sends Cultist Base - Mission Complete
-  -> sends CLIENT_GOAL
+  -> writes a unique ap_transition_*.evt
+  -> bridge_client.py matches the registry's from/to pair
+  -> sends the corresponding Mission Complete location once
+  -> additionally sends CLIENT_GOAL only for Cultist Base
 ```
 
 ## Release package
@@ -180,7 +185,7 @@ paths, configuration, passwords, seeds, runtime output or logs.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelago-v0.2.1-pre-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev-a.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -188,6 +193,7 @@ DoomEternalArchipelago-v0.2.1-pre-alpha.zip
 └── client/
     ├── ap_client.exe
     ├── bridge_client.py
+    ├── bridge_identity.json
     ├── save_death_probe.exe
     ├── save_decrypt.py
     ├── run_bridge.sh
@@ -247,7 +253,7 @@ You will also install:
 
 | Setting or file | What it must point to | Typical Windows example |
 | --- | --- | --- |
-| `doom_eternal_options.client_directory` | Extracted PTB `client/` folder containing `bridge_client.py` and `ap_client.exe` | `C:\Games\DoomEternalArchipelago-v0.1.2\client` |
+| `doom_eternal_options.client_directory` | Extracted release `client/` folder containing `bridge_client.py`, `bridge_identity.json` and `ap_client.exe` | `C:\Games\DoomEternalArchipelago-v0.2.1\client` |
 | Game Base Path | DOOM Eternal `base/` folder containing `classicwads` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base` |
 | Saved Games Path | DOOM Eternal save `base/` folder | `C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base` |
 | `XINPUT1_3.dll` | Real game root, beside `DOOMEternalx64vk.exe` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\XINPUT1_3.dll` |
@@ -257,7 +263,7 @@ Examples:
 
 ```text
 CLIENT DIRECTORY:
-C:\Games\DoomEternalArchipelago-v0.1.2\client
+C:\Games\DoomEternalArchipelago-v0.2.1\client
 
 GAME BASE PATH:
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
@@ -589,7 +595,8 @@ Fix:
 doom_eternal_options.client_directory
 ```
 
-3. Point it to the extracted PTB `client/` directory.
+3. Point it to the extracted release `client/` directory. Do not point at a
+   checkout, Downloads, or `build/playable-test`; launcher does not fallback.
 4. Save the settings.
 5. Close `Archipelago Launcher` completely.
 6. Start it again.
@@ -600,14 +607,14 @@ Launcher and edit:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.1.2/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.2.1/client"
 ```
 
 Correct fallback in `host.yaml`:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.1.2/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.2.1/client"
 ```
 
 Forward slashes are valid in Windows YAML paths.
@@ -644,6 +651,7 @@ Fix:
 - [ ] Launcher restarted
 - [ ] `client_directory` ends in `/client`
 - [ ] client directory contains `bridge_client.py`
+- [ ] client directory contains `bridge_identity.json`
 - [ ] client directory contains `ap_client.exe`
 - [ ] Game Base Path ends in `DOOMEternal/base`
 - [ ] Saved Games Path ends in `DOOMEternal/base`
@@ -653,7 +661,9 @@ Fix:
 - [ ] mod ZIP was not extracted
 - [ ] injector was executed
 - [ ] only one `ap_client.exe` is open
-- [ ] log shows `v0.1.2-ptb`
+- [ ] startup shows `BRIDGE_REVISION=mission-unified-...`
+- [ ] startup shows extracted `BRIDGE_FILE=.../client/bridge_client.py`
+- [ ] startup shows `BRIDGE_SHA256=...` and `BRIDGE_PROTOCOL=3`
 - [ ] log shows `Meathook RPC server verified`
 - [ ] during gameplay, log shows `RPC memory gate OPEN`
 
@@ -670,15 +680,21 @@ Fix:
 - Rocket Launcher is an AP trigger location in Cultist Base; only
   `game_target_relay_1244` is preserved, with no propitem DECL override.
 - Secret Encounters are AP checks in Exultia and Cultist Base.
-- Mission Complete remains a runtime location only for Cultist Base.
-- The first Fortress Suit Point remains vanilla pending safer validation.
+- Mission Complete identity exists for Hell, Exultia and Cultist Base; only
+  Cultist also has independent goal. Native publisher is proven, bridge runtime
+  consumption awaits instrumented retest.
+- Mastery/Challenge runtime locations await a real hook. No watcher/marker
+  architecture is active. Weapon Mastery Token remains absent from pool,
+  starting inventory and commands; generated maps reject `CURRENCY_WEAPON_MASTERY`.
+- The first Fortress Praetor token keeps its native Suit bootstrap and AP
+  check, but grants zero vanilla Praetor currency.
 
 ## Known probable issues
 
 - Rune slots and equipped-state visuals may occasionally appear inconsistent,
   even when Rune effects are active. Planned for v0.2.1.
-- Sentinel Battery grants and socket consumption work, but the balance may not
-  update clearly in the Dossier/HUD before socket interaction.
+- Sentinel Battery counter may visually reset to 0 even while gameplay balance
+  remains available. Socket requirements are authoritative.
 - The static audit found `7770055` physically distinct, but that Cultist Base
   Extra Life check remains a probable runtime reliability risk.
 - Ice progression is runtime PASS both with and without prior ownership. Restore
