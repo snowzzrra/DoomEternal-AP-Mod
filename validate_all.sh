@@ -13,6 +13,7 @@ python3 -m py_compile \
     challenge_registry.py \
     foundation.py \
     logic_decl_patcher.py \
+    mastery_decl_builder.py \
     rune_decl_builder.py \
     save_decrypt.py \
     save_inspector.py \
@@ -40,6 +41,8 @@ g++ -std=c++17 tests/test_ap_client_path_utils.cpp ap_client_path_utils.cpp \
 RUNTIME_AUDIT_DIR="$(mktemp -d /tmp/doom-eap-runtime-audit.XXXXXX)"
 trap 'rm -rf "$RUNTIME_AUDIT_DIR"' EXIT
 ./build_client.sh
+python3 -m unittest \
+    tests.test_check_events.StickySaveMetricTests.test_parser_accepts_provided_24_and_25_snapshots
 cp build/client/ap_client.exe build/client/save_death_probe.exe "$RUNTIME_AUDIT_DIR/"
 python3 validate_windows_runtime_deps.py \
     "$RUNTIME_AUDIT_DIR" \
