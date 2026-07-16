@@ -23,6 +23,8 @@ GENERATED_NAME_PREFIXES = (
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
+AUTOMAP_FAMILY_REGISTRY_PATH = Path(__file__).resolve().parent / "data" / "automap_family_registry.json"
+AP_QUESTION_MARK_MODEL = "art/pickups/question_mark_a.lwo"
 
 # you don't need to use this to play the mod
 # i'm making this file available simply for transparency and for anyone who wants to generate the AP targets in other maps by themselves, since the process is a bit tedious to do manually and this automates it
@@ -92,6 +94,28 @@ def assert_no_weapon_mastery_token_currency(content, context):
             f"{context} contains forbidden vanilla Token currency "
             f"{FORBIDDEN_WEAPON_MASTERY_CURRENCY}"
         )
+
+
+def native_automap_carrier_family(block):
+    """Return the explicitly proven persistent idProp2 carrier family, if any."""
+    inherit_match = re.search(r'\binherit\s*=\s*"([^"]+)";', block)
+    inherit = inherit_match.group(1) if inherit_match else ""
+    registry = json.loads(AUTOMAP_FAMILY_REGISTRY_PATH.read_text(encoding="utf-8"))
+    for family_name, family in registry.get("families", {}).items():
+        if family.get("carrier_mode") != "persistent_native_idprop2":
+            continue
+        if any(inherit.startswith(prefix) for prefix in family["match"].get("inherit_prefixes", [])):
+            return family_name
+    return None
+
+
+def native_praetor_token_family(block):
+    """Recognize only the reviewed native Praetor currency transaction."""
+    return (
+        'inherit = "progress/praetor_token";' in block
+        and 'class = "idInteractable_GiveItems";' in block
+        and 'automapPropertiesDecl = "praetor_token";' in block
+    )
 
 def remove_balanced_entity_blocks(content, name_prefix):
     pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w*\s*\{', re.IGNORECASE)
@@ -200,6 +224,43 @@ def neutralize_conditional_pickup_block(block):
         "forceEquip", "canBePossessed",
     ):
         block = re.sub(rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block)
+    return replace_targets_block(block, [])
+
+
+def neutralize_native_automap_carrier_block(block):
+    """Keep a native Automap carrier, but make its world interaction reward-free.
+
+    The carrier deliberately remains after the AP trigger fires.  Its native
+    Automap lifecycle is what changes the question mark into the discovered
+    family marker; removing it is both non-vanilla and loses that state.
+    """
+    for property_name in (
+        "clipModelInfo", "spawn_statIncreases", "pickup_statIncreases",
+        "use_statIncreases", "itemList", "currencyList", "inventory",
+    ):
+        block = remove_property_blocks(block, property_name)
+    for property_name in (
+        "useableComponentDecl", "triggerDef", "equipOnPickup", "lootStyle",
+        "forceEquip", "canBePossessed", "progressionCategory", "useStat",
+        "onUseCodexEntry", "physicsAttributes",
+    ):
+        block = re.sub(
+            rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block
+        )
+    if "renderModelInfo" in block:
+        block = re.sub(
+            r'(renderModelInfo\s*=\s*\{[\s\S]*?model\s*=\s*)(?:"[^"]+"|NULL)',
+            r'\1"art/pickups/question_mark_a.lwo"',
+            block,
+            count=1,
+        )
+    else:
+        block = block.replace(
+            "edit = {",
+            'edit = {\n\t\t\trenderModelInfo = {\n'
+            '\t\t\t\tmodel = "art/pickups/question_mark_a.lwo";\n\t\t\t}',
+            1,
+        )
     return replace_targets_block(block, [])
 
 
@@ -464,9 +525,19 @@ def patch_native_reward_entity(block, entity_name, ap_check_id, policy):
     if reward_block in patched or "CURRENCY_PRAETOR_UPGRADE" in patched:
         raise ValueError(f"{entity_name}: native currency removal failed")
     patched = replace_targets_block(patched, [*original_targets, ap_check_id])
+    patched = re.sub(
+        r'(renderModelInfo\s*=\s*\{[\s\S]*?model\s*=\s*)(?:"[^"]+"|NULL)',
+        rf'\1"{AP_QUESTION_MARK_MODEL}"',
+        patched,
+        count=1,
+    )
     if extract_target_names(patched) != [*original_targets, ap_check_id]:
         raise ValueError(f"{entity_name}: AP target must follow the functional native target")
     for snippet in contract.get("required_snippets", []):
+        if snippet == "CURRENCY_PRAETOR_UPGRADE":
+            if snippet in patched:
+                raise ValueError(f"{entity_name}: native currency removal failed")
+            continue
         if snippet not in patched:
             raise ValueError(f"{entity_name}: native field was not preserved: {snippet!r}")
     return patched
@@ -920,6 +991,39 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             if "edit = {" in block:
                 target_policy = target_policies.get(entity_name)
+                carrier_family = native_automap_carrier_family(block)
+                if carrier_family and not (target_policy and target_policy.get("independent_ap_trigger")):
+                    # Keep native marker metadata on the original entity, while
+                    # forwarding its pre-existing, non-reward map edge through
+                    # the one-shot AP trigger.  The generated-map contract
+                    # checks this exact target order against the vanilla block.
+                    target_policy = {
+                        "independent_ap_trigger": True,
+                        "independent_targets": [
+                            *extract_target_names(block), ap_check_id,
+                        ],
+                        "native_automap_carrier": {
+                            "family": carrier_family,
+                            "persistent_marker": True,
+                        },
+                    }
+                if not target_policy and native_praetor_token_family(block):
+                    # This is deliberately the same narrow cut proven for the
+                    # Fortress token: retain the native interaction/category
+                    # transaction, remove only the Praetor currency, then emit
+                    # the AP event after its original targets.
+                    target_policy = {
+                        "native_entity_contract": {
+                            "remove_block": "currencyList",
+                            "original_targets": extract_target_names(block),
+                            "required_snippets": [
+                                'inherit = "progress/praetor_token";',
+                                'class = "idInteractable_GiveItems";',
+                                'automapPropertiesDecl = "praetor_token";',
+                                "CURRENCY_PRAETOR_UPGRADE",
+                            ],
+                        },
+                    }
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 location_id = config_entities[ap_check_id]
                 if target_policy and target_policy.get("native_entity_contract"):
@@ -940,9 +1044,15 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     # reward carrier inert.
                     manifest_data[ap_check_id] = location_id
                     if not target_policy.get("remove_original", False):
-                        new_blocks.append(
-                            "entity {" + neutralize_conditional_pickup_block(block)
-                        )
+                        native_carrier = target_policy.get("native_automap_carrier")
+                        if native_carrier:
+                            new_blocks.append(
+                                "entity {" + neutralize_native_automap_carrier_block(block)
+                            )
+                        else:
+                            new_blocks.append(
+                                "entity {" + neutralize_conditional_pickup_block(block)
+                            )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
@@ -960,7 +1070,6 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     ap_check_id,
                     target_policy,
                 )
-
                 # gravity stuff
                 block = re.sub(r'physicsAttributes\s*=\s*"[^"]+";', "", block)
 
@@ -1013,7 +1122,6 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                         '',
                         block,
                     )
-
                 block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "trigger/trigger";', block)
                 block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idTrigger";', block)
                 if not re.search(r'\btriggerOnce\s*=', block):

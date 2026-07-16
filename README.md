@@ -185,7 +185,7 @@ paths, configuration, passwords, seeds, runtime output or logs.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev-a.zip
+DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip

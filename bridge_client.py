@@ -19,6 +19,7 @@ from challenge_registry import canonical_map_name, load_challenge_registry
 
 import json
 from pathlib import Path
+from typing import NamedTuple
 from bootstrap_actions import (
     BOOTSTRAP_ACTIONS,
     BOOTSTRAP_ENTITY_PREFIX,
@@ -887,32 +888,71 @@ def cleanup_death_probe_runtime():
 atexit.register(cleanup_death_probe_runtime)
 
 
-def mastery_save_file():
-    """Return only Slot 2's game_duration save; never choose a newest slot."""
+class PrimarySaveSelection(NamedTuple):
+    slot_directory: str
+    path: Path
+    mtime_ns: int
+
+    @property
+    def cache_key(self):
+        return (self.slot_directory, str(self.path), self.mtime_ns)
+
+
+def active_primary_save(filename="game_duration.dat"):
+    """Return the newest valid primary campaign autosave, re-scanned per call."""
     if (
         STEAM_REMOTE_DIR is None
         or STEAM_ID3 <= 0
         or not STEAM_REMOTE_DIR.is_dir()
     ):
         return None
-    path = STEAM_REMOTE_DIR / "GAME-AUTOSAVE2" / "game_duration.dat"
-    return path if path.is_file() else None
+
+    candidates = []
+    for path in STEAM_REMOTE_DIR.glob(f"GAME-AUTOSAVE*/{filename}"):
+        if not re.fullmatch(r"GAME-AUTOSAVE\d+", path.parent.name):
+            continue
+        try:
+            stat = path.stat()
+            full_path = path.resolve()
+        except OSError:
+            continue
+        if not path.is_file() or stat.st_size <= 0:
+            continue
+        candidates.append(
+            PrimarySaveSelection(path.parent.name, full_path, stat.st_mtime_ns)
+        )
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda selected: (
+            selected.mtime_ns,
+            int(selected.slot_directory.removeprefix("GAME-AUTOSAVE")),
+        ),
+    )
+
+
+def mastery_save_selection():
+    return active_primary_save("game_duration.dat")
+
+
+def mastery_save_file():
+    """Compatibility path view of the dynamically selected primary save."""
+    selected = mastery_save_selection()
+    return selected.path if selected else None
 
 
 def sticky_mastery_save_file():
-    """Compatibility name for Sticky's already-proven fixed Slot 2 reader."""
+    """Compatibility name for Sticky's shared primary-save reader."""
     return mastery_save_file()
 
 
-def autosave_slot2_file(filename):
-    """Compatibility reader for non-Sticky save consumers; never scans slots."""
-    if (
-        STEAM_REMOTE_DIR is None
-        or STEAM_ID3 <= 0
-        or not STEAM_REMOTE_DIR.is_dir()
-    ):
+def active_slot_file(filename):
+    """Return a companion file from the newest game_duration primary slot."""
+    selected = mastery_save_selection()
+    if selected is None:
         return None
-    path = STEAM_REMOTE_DIR / "GAME-AUTOSAVE2" / filename
+    path = selected.path.parent / filename
     return path if path.is_file() else None
 
 
@@ -956,12 +996,12 @@ STICKY_UNLOCKABLE = b"weapon_mastery/shotgun/sticky_bomb"
 
 def _read_structured_bool(payload, offset, field):
     if not payload.startswith(field, offset):
-        raise ValueError(f"mastery record missing {field.decode('ascii').strip()}")
+        raise ValueError(f"unlockable record missing {field.decode('ascii').strip()}")
     value_offset = offset + len(field)
     try:
         value = {0x0B: False, 0x0C: True}[payload[value_offset]]
     except (IndexError, KeyError) as error:
-        raise ValueError(f"mastery record has invalid {field.decode('ascii').strip()}") from error
+        raise ValueError(f"unlockable record has invalid {field.decode('ascii').strip()}") from error
     return value, value_offset + 1
 
 
@@ -978,8 +1018,8 @@ def _mastery_manager_type_offset(payload):
     return manager_type_offset
 
 
-def read_weapon_mastery_record(payload, entry):
-    """Decode one exact unlockable record; global stat text is never considered."""
+def read_unlockable_record(payload, entry):
+    """Decode one exact native unlockable record; global stats are ignored."""
     signal = entry["signal"]
     unlockable = signal["unlockable"].encode("ascii")
     stat = signal["rule_0_statname"].encode("ascii")
@@ -1031,11 +1071,26 @@ def read_weapon_mastery_record(payload, entry):
     }
 
 
+def read_weapon_mastery_record(payload, entry):
+    """Compatibility wrapper for one exact Weapon Mastery record."""
+    return read_unlockable_record(payload, entry)
+
+
 def read_weapon_mastery_records(payload):
     """Return only structured records that exist in the fixed vanilla manager."""
     records = {}
     for entry in WEAPON_MASTERY_ENTRIES:
         record = read_weapon_mastery_record(payload, entry)
+        if record is not None:
+            records[entry["signal"]["unlockable"]] = record
+    return records
+
+
+def read_mission_challenge_records(payload):
+    """Return exact Cultist Base challenge records from the native manager."""
+    records = {}
+    for entry in MISSION_CHALLENGE_ENTRIES:
+        record = read_unlockable_record(payload, entry)
         if record is not None:
             records[entry["signal"]["unlockable"]] = record
     return records
@@ -1056,7 +1111,7 @@ def read_sticky_mastery_record(payload):
 
 
 def probe_game_duration(path):
-    """Return checkpoint-death and native mastery records from fixed Slot 2."""
+    """Return checkpoint-death and native unlockable records from one save."""
     DEATH_PROBE_RUNTIME.mkdir(parents=True, exist_ok=True)
     runtime_probe = DEATH_PROBE_RUNTIME / DEATH_PROBE.name
     runtime_oodle = DEATH_PROBE_RUNTIME / OODLE_DLL.name
@@ -1113,8 +1168,12 @@ def probe_game_duration(path):
         check=False,
     )
     if result.returncode in {0, 20}:
-        mastery_records = read_weapon_mastery_records(runtime_unpacked.read_bytes())
-        snapshot = {"mastery_records": mastery_records}
+        unpacked = runtime_unpacked.read_bytes()
+        mastery_records = read_weapon_mastery_records(unpacked)
+        snapshot = {
+            "mastery_records": mastery_records,
+            "mission_challenge_records": read_mission_challenge_records(unpacked),
+        }
         sticky_record = mastery_records.get(STICKY_UNLOCKABLE.decode("ascii"))
         if sticky_record is not None:
             snapshot.update({
@@ -1161,6 +1220,16 @@ WEAPON_MASTERY_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
     for entry in WEAPON_MASTERY_ENTRIES
 }
+MISSION_CHALLENGE_ENTRIES = tuple(
+    CHALLENGE_LOCATION_REGISTRY["mission_challenges"]
+)
+MISSION_CHALLENGE_BY_UNLOCKABLE = {
+    entry["signal"]["unlockable"]: entry
+    for entry in MISSION_CHALLENGE_ENTRIES
+}
+ALL_MISSION_CHALLENGES_ENTRY = CHALLENGE_LOCATION_REGISTRY[
+    "all_mission_challenges"
+]
 STICKY_MASTERY_ENTRY = WEAPON_MASTERY_BY_UNLOCKABLE[
     "weapon_mastery/shotgun/sticky_bomb"
 ]
@@ -1557,7 +1626,7 @@ def read_telemetry_dump():
         return [], None
 
 def read_game_details():
-    path = autosave_slot2_file("game.details")
+    path = active_slot_file("game.details")
     if not path:
         return None
 
@@ -1827,11 +1896,19 @@ class DoomEternalContext(CommonContext):
         self.session_state = {}
         self.death_link_enabled = False
         self.previous_checkpoint_death = None
+        self.checkpoint_death_by_save_slot = {}
         self.last_duration_cache_key = None
         self.death_probe_warning = None
+        self.active_save_slot = None
+        self.active_save_path = None
+        self.save_slot_observations = {}
         self.last_mastery_records = {}
         self.weapon_masteries_observed = {}
         self.mastery_slot_warnings = set()
+        self.last_mission_challenge_records = {}
+        self.mission_challenges_observed = {}
+        self.all_mission_challenges_observed = False
+        self.mission_challenge_slot_warnings = set()
         self.last_sticky_record = None
         self.sticky_mastery_observed = False
         self.sticky_mastery_slot_warning = False
@@ -1894,6 +1971,60 @@ class DoomEternalContext(CommonContext):
                 logger.info("[DeathLink] Server received and echoed the death.")
                 self.confirmed_death_echo = data.get("time")
 
+    def observation_slot_for_source(self, source):
+        if isinstance(source, PrimarySaveSelection):
+            return source.slot_directory
+        try:
+            parent = Path(source).parent.name
+        except (TypeError, ValueError):
+            parent = ""
+        if re.fullmatch(r"GAME-AUTOSAVE\d+", parent):
+            return parent
+        return self.active_save_slot or "<synthetic>"
+
+    def select_save_observation_slot(self, slot_directory):
+        state = self.save_slot_observations.setdefault(slot_directory, {})
+        masteries = state.get("weapon_masteries", {})
+        challenges = state.get("mission_challenges", {})
+        if not isinstance(masteries, dict):
+            masteries = {}
+        if not isinstance(challenges, dict):
+            challenges = {}
+        self.weapon_masteries_observed = {
+            unlockable: bool(masteries.get(unlockable, False))
+            for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE
+        }
+        self.mission_challenges_observed = {
+            unlockable: bool(challenges.get(unlockable, False))
+            for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE
+        }
+        state["weapon_masteries"] = self.weapon_masteries_observed
+        state["mission_challenges"] = self.mission_challenges_observed
+        self.all_mission_challenges_observed = all(
+            self.mission_challenges_observed.get(entry["signal"]["unlockable"], False)
+            for entry in MISSION_CHALLENGE_ENTRIES
+        )
+        self.sticky_mastery_observed = self.weapon_masteries_observed.get(
+            STICKY_UNLOCKABLE.decode("ascii"), False
+        )
+
+    def activate_save_selection(self, selected):
+        old_slot = self.active_save_slot
+        path_changed = str(selected.path) != self.active_save_path
+        if old_slot != selected.slot_directory or path_changed:
+            logger.info(
+                "SAVE_SLOT_ACTIVE old=%s new=%s path=%s",
+                old_slot or "<none>",
+                selected.slot_directory,
+                selected.path,
+            )
+        self.active_save_slot = selected.slot_directory
+        self.active_save_path = str(selected.path)
+        self.select_save_observation_slot(selected.slot_directory)
+        self.previous_checkpoint_death = self.checkpoint_death_by_save_slot.get(
+            selected.slot_directory
+        )
+
     def initialize_item_state(self):
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
@@ -1921,8 +2052,7 @@ class DoomEternalContext(CommonContext):
                 "goal_sent": False,
                 "cultist_autosave_path": None,
                 "deathlinked": False,
-                "sticky_mastery_observed": False,
-                "weapon_masteries_observed": {},
+                "save_slot_observations": {},
             },
         )
         processed = self.session_state.get("processed_items", 0)
@@ -1934,20 +2064,22 @@ class DoomEternalContext(CommonContext):
             "cultist_autosave_path"
         )
         self.deathlinked = bool(self.session_state.get("deathlinked", False))
-        observed = self.session_state.get("weapon_masteries_observed", {})
-        if not isinstance(observed, dict):
-            observed = {}
-        self.weapon_masteries_observed = {
-            unlockable: bool(observed.get(unlockable, False))
-            for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE
+        raw_save_observations = self.session_state.get("save_slot_observations", {})
+        if not isinstance(raw_save_observations, dict):
+            raw_save_observations = {}
+        self.save_slot_observations = {
+            slot_directory: state
+            for slot_directory, state in raw_save_observations.items()
+            if re.fullmatch(r"GAME-AUTOSAVE\d+", str(slot_directory))
+            and isinstance(state, dict)
         }
-        if self.session_state.get("sticky_mastery_observed", False):
-            self.weapon_masteries_observed[STICKY_UNLOCKABLE.decode("ascii")] = True
-        self.sticky_mastery_observed = self.weapon_masteries_observed[
-            STICKY_UNLOCKABLE.decode("ascii")
-        ]
-        self.session_state["sticky_mastery_observed"] = self.sticky_mastery_observed
-        self.session_state["weapon_masteries_observed"] = self.weapon_masteries_observed
+        self.session_state["save_slot_observations"] = self.save_slot_observations
+        self.session_state.pop("sticky_mastery_observed", None)
+        self.session_state.pop("weapon_masteries_observed", None)
+        self.weapon_masteries_observed = {}
+        self.mission_challenges_observed = {}
+        self.all_mission_challenges_observed = False
+        self.sticky_mastery_observed = False
         self.item_state_ready = True
         self.session_state.setdefault("bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}})
         reconciliation = self.session_state.setdefault(
@@ -1967,8 +2099,9 @@ class DoomEternalContext(CommonContext):
         self.session_state["processed_items"] = self.items_processed
         self.session_state["cultist_autosave_path"] = self.cultist_autosave_path
         self.session_state["deathlinked"] = self.deathlinked
-        self.session_state["sticky_mastery_observed"] = self.sticky_mastery_observed
-        self.session_state["weapon_masteries_observed"] = self.weapon_masteries_observed
+        self.session_state["save_slot_observations"] = self.save_slot_observations
+        self.session_state.pop("sticky_mastery_observed", None)
+        self.session_state.pop("weapon_masteries_observed", None)
         save_client_state(self.client_state)
 
     def reset_item_state(self):
@@ -2368,14 +2501,12 @@ class DoomEternalContext(CommonContext):
             )
 
     async def check_game_duration_death(self):
-        path = mastery_save_file()
-        if not path:
+        selected = mastery_save_selection()
+        if not selected:
             return False
-
-        try:
-            cache_key = (str(path), path.stat().st_mtime_ns)
-        except OSError:
-            return False
+        self.activate_save_selection(selected)
+        path = selected.path
+        cache_key = selected.cache_key
         if cache_key == self.last_duration_cache_key:
             return True
 
@@ -2393,16 +2524,22 @@ class DoomEternalContext(CommonContext):
 
         self.death_probe_warning = None
         self.last_duration_cache_key = cache_key
-        self.observe_weapon_masteries(snapshot["mastery_records"], path)
+        self.observe_weapon_masteries(snapshot["mastery_records"], selected)
+        self.observe_mission_challenges(
+            snapshot["mission_challenge_records"], selected
+        )
         died = snapshot["checkpoint_death"]
-        if self.previous_checkpoint_death is None:
+        previous = self.checkpoint_death_by_save_slot.get(selected.slot_directory)
+        if previous is None:
+            self.checkpoint_death_by_save_slot[selected.slot_directory] = died
             self.previous_checkpoint_death = died
             logger.info(
                 f"[Save] Monitoring {path} numCheckpointDeaths for DeathLink."
             )
             return True
 
-        transitioned_to_dead = died and not self.previous_checkpoint_death
+        transitioned_to_dead = died and not previous
+        self.checkpoint_death_by_save_slot[selected.slot_directory] = died
         self.previous_checkpoint_death = died
         if transitioned_to_dead:
             logger.info("[DeathLink] numCheckpointDeaths changed 0 -> 1.")
@@ -2411,6 +2548,8 @@ class DoomEternalContext(CommonContext):
 
     def observe_weapon_masteries(self, records, path):
         """Observe only each mastery record's own native completion predicate."""
+        slot_directory = self.observation_slot_for_source(path)
+        self.select_save_observation_slot(slot_directory)
         for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE:
             self.weapon_masteries_observed.setdefault(unlockable, False)
         for unlockable, record in records.items():
@@ -2426,15 +2565,17 @@ class DoomEternalContext(CommonContext):
                 bool(record["rule_0_satisfied"]),
                 bool(record["unlockableIsUnlocked"]),
             )
-            if observed_record != self.last_mastery_records.get(unlockable):
+            record_key = (slot_directory, unlockable)
+            if observed_record != self.last_mastery_records.get(record_key):
                 logger.info(
                     "[Mastery] RECORD unlockable=%s rules=%s stat=%s count=%s "
-                    "duration=%s satisfied=%s unlocked=%s source=%s",
+                    "duration=%s satisfied=%s unlocked=%s save_slot=%s source=%s",
                     unlockable,
                     *observed_record,
+                    slot_directory,
                     path,
                 )
-                self.last_mastery_records[unlockable] = observed_record
+                self.last_mastery_records[record_key] = observed_record
 
             natural_complete = (
                 observed_record[0] == signal["numUnlockableRules"]
@@ -2457,9 +2598,75 @@ class DoomEternalContext(CommonContext):
                 self.persist_session_state()
             logger.info(
                 "[Mastery] NATURAL_COMPLETE unlockable=%s location_id=%s "
-                "predicate=unlockable_record",
+                "predicate=unlockable_record save_slot=%s",
                 unlockable,
                 entry["location_id"],
+                slot_directory,
+            )
+
+    def observe_mission_challenges(self, records, path):
+        """Observe durable native records and derive the all-challenges check."""
+        slot_directory = self.observation_slot_for_source(path)
+        self.select_save_observation_slot(slot_directory)
+        for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE:
+            self.mission_challenges_observed.setdefault(unlockable, False)
+        for unlockable, record in records.items():
+            entry = MISSION_CHALLENGE_BY_UNLOCKABLE.get(unlockable)
+            if entry is None:
+                continue
+            signal = entry["signal"]
+            observed_record = (
+                int(record["numUnlockableRules"]),
+                record["rule_0_statname"],
+                int(record["rule_0_statCount"]),
+                int(record["rule_0_statDuration"]),
+                bool(record["rule_0_satisfied"]),
+                bool(record["unlockableIsUnlocked"]),
+            )
+            record_key = (slot_directory, unlockable)
+            if observed_record != self.last_mission_challenge_records.get(record_key):
+                logger.info(
+                    "[Challenge] RECORD unlockable=%s rules=%s stat=%s count=%s "
+                    "duration=%s satisfied=%s unlocked=%s save_slot=%s source=%s",
+                    unlockable,
+                    *observed_record,
+                    slot_directory,
+                    path,
+                )
+                self.last_mission_challenge_records[record_key] = observed_record
+
+            natural_complete = (
+                observed_record[0] == signal["numUnlockableRules"]
+                and observed_record[1] == signal["rule_0_statname"]
+                and observed_record[3] == signal["rule_0_statDuration"]
+                and observed_record[4] is signal["rule_0_satisfied"]
+                and observed_record[5] is signal["unlockableIsUnlocked"]
+            )
+            if not natural_complete or self.mission_challenges_observed.get(unlockable):
+                continue
+            self.mission_challenges_observed[unlockable] = True
+            if self.item_state_ready:
+                self.persist_session_state()
+            logger.info(
+                "[Challenge] NATURAL_COMPLETE unlockable=%s location_id=%s "
+                "predicate=unlockable_record save_slot=%s",
+                unlockable,
+                entry["location_id"],
+                slot_directory,
+            )
+        was_all_complete = self.all_mission_challenges_observed
+        self.all_mission_challenges_observed = all(
+            self.mission_challenges_observed.get(entry["signal"]["unlockable"], False)
+            for entry in MISSION_CHALLENGE_ENTRIES
+        )
+        if self.all_mission_challenges_observed and not was_all_complete:
+            if self.item_state_ready:
+                self.persist_session_state()
+            logger.info(
+                "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
+                "predicate=all_unlockable_records save_slot=%s",
+                ALL_MISSION_CHALLENGES_ENTRY["location_id"],
+                slot_directory,
             )
 
     def observe_sticky_mastery(self, snapshot, path):
@@ -2517,6 +2724,89 @@ class DoomEternalContext(CommonContext):
     async def check_weapon_mastery_locations(self):
         for entry in WEAPON_MASTERY_ENTRIES:
             await self.check_weapon_mastery_location(entry)
+
+    async def check_mission_challenge_location(self, entry):
+        if not self.item_state_ready:
+            return
+        unlockable = entry["signal"]["unlockable"]
+        if not self.mission_challenges_observed.get(unlockable):
+            return
+        location_id = entry["location_id"]
+        if location_id in self.checked_locations or location_id in self.locations_checked:
+            return
+        if location_id not in self.server_locations:
+            if location_id not in self.mission_challenge_slot_warnings:
+                logger.warning(
+                    "[Challenge] LOCATION id=%s unlockable=%s slot=absent",
+                    location_id,
+                    unlockable,
+                )
+                self.mission_challenge_slot_warnings.add(location_id)
+            return
+        if not self.server or not self.server.socket or self.server.socket.closed:
+            return
+        try:
+            logger.info(
+                "[Challenge] LOCATION_CHECK_SEND id=%s unlockable=%s "
+                "source=vanilla_save_predicate save_slot=%s",
+                location_id,
+                unlockable,
+                self.active_save_slot or "<synthetic>",
+            )
+            await self.send_msgs([
+                {"cmd": "LocationChecks", "locations": [location_id]}
+            ])
+        except Exception as error:
+            logger.error(
+                "[Challenge] LOCATION_CHECK_RETRY id=%s unlockable=%s error=%s",
+                location_id,
+                unlockable,
+                error,
+            )
+            return
+        self.locations_checked.add(location_id)
+        logger.info("[Challenge] LOCATION_CHECK_ACK id=%s", location_id)
+
+    async def check_mission_challenge_locations(self):
+        for entry in MISSION_CHALLENGE_ENTRIES:
+            await self.check_mission_challenge_location(entry)
+        await self.check_all_mission_challenges_location()
+
+    async def check_all_mission_challenges_location(self):
+        """Check the aggregate only after all three durable native records match."""
+        if not self.item_state_ready or not self.all_mission_challenges_observed:
+            return
+        location_id = ALL_MISSION_CHALLENGES_ENTRY["location_id"]
+        if location_id in self.checked_locations or location_id in self.locations_checked:
+            return
+        if location_id not in self.server_locations:
+            if location_id not in self.mission_challenge_slot_warnings:
+                logger.warning(
+                    "[Challenge] ALL_LOCATION id=%s slot=absent", location_id
+                )
+                self.mission_challenge_slot_warnings.add(location_id)
+            return
+        if not self.server or not self.server.socket or self.server.socket.closed:
+            return
+        try:
+            logger.info(
+                "[Challenge] ALL_LOCATION_CHECK_SEND id=%s "
+                "source=all_vanilla_save_predicates save_slot=%s",
+                location_id,
+                self.active_save_slot or "<synthetic>",
+            )
+            await self.send_msgs([
+                {"cmd": "LocationChecks", "locations": [location_id]}
+            ])
+        except Exception as error:
+            logger.error(
+                "[Challenge] ALL_LOCATION_CHECK_RETRY id=%s error=%s",
+                location_id,
+                error,
+            )
+            return
+        self.locations_checked.add(location_id)
+        logger.info("[Challenge] ALL_LOCATION_CHECK_ACK id=%s", location_id)
 
     async def check_sticky_mastery_location(self):
         """Sticky compatibility wrapper preserving its exact send contract."""
@@ -2764,6 +3054,7 @@ class DoomEternalContext(CommonContext):
             if not used_duration:
                 await self.check_game_details_death()
             await self.check_weapon_mastery_locations()
+            await self.check_mission_challenge_locations()
             await self.check_campaign_goal()
             await asyncio.sleep(1.0)
 
