@@ -124,8 +124,18 @@ def main() -> int:
     runtime_location_mapping = read_json(ROOT / "data" / "runtime_locations.json")
     runtime_locations = set(runtime_location_mapping.values())
     challenge_registry = load_challenge_registry()
+    mastery_entries = challenge_registry["weapon_masteries"]
+    for entry in mastery_entries:
+        expected_command = {
+            "type": "perk",
+            "perk": entry["gameplay_perk"],
+        }
+        if commands.get(entry["item_id"]) != expected_command:
+            errors.append(
+                f"{entry['name']} AP item must use typed give-then-activate perk delivery"
+            )
     registry_locations = {
-        entry["name"]: entry["id"]
+        entry["name"]: entry["location_id"]
         for entry in all_location_entries(challenge_registry)
     }
     if runtime_location_mapping != registry_locations:
@@ -133,26 +143,26 @@ def main() -> int:
     for name, location_id in registry_locations.items():
         if location_ids.get(name) != location_id:
             errors.append(f"Mission registry/APWorld mapping drift: {name}={location_id}")
-    mission_item_collisions = sorted(
+    runtime_item_collisions = sorted(
         set(registry_locations.values()) & set(item_ids.values())
     )
-    if mission_item_collisions:
+    if runtime_item_collisions:
         errors.append(
-            "Mission Complete IDs must not reuse item IDs: "
-            f"{mission_item_collisions}"
+            "Runtime location IDs must not reuse item IDs: "
+            f"{runtime_item_collisions}"
         )
-    inactive_runtime_ids = set(range(7770095, 7770111))
-    if runtime_locations & inactive_runtime_ids:
-        errors.append("Challenge/Mastery runtime location returned before its dedicated round")
-    inactive_location_names = [
+    mastery_location_names = [
         name for name in location_ids
-        if "Mission Challenge" in name or "Weapon Mastery Challenge" in name
+        if "Weapon Mastery Challenge" in name
     ]
-    if inactive_location_names:
-        errors.append(f"Challenge/Mastery location returned before its dedicated round: {inactive_location_names}")
+    expected_mastery_location_names = [entry["name"] for entry in mastery_entries]
+    if mastery_location_names != expected_mastery_location_names:
+        errors.append(f"Base Mastery registry/APWorld drift: {mastery_location_names}")
+    if any("Mission Challenge" in name for name in location_ids):
+        errors.append("Mission Challenge location returned before its dedicated round")
     registry_text = json.dumps(challenge_registry, sort_keys=True)
-    if "mission_challenges" in registry_text or "weapon_masteries" in registry_text:
-        errors.append("Challenge/Mastery runtime registry returned before its dedicated round")
+    if "mission_challenges" in registry_text:
+        errors.append("Mission Challenge runtime registry returned before its dedicated round")
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (ROOT / "bridge_client.py", ROOT / "ap_map_generator.py", ROOT / "challenge_registry.py")
@@ -302,9 +312,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 115,
-        "locations": 83,
+        "locations": 96,
         "map_checks": 80,
-        "runtime_locations": 3,
+        "runtime_locations": 16,
         "runtime_goals": 1,
         "route_sentinel_batteries": 5,
     }:

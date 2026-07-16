@@ -9,7 +9,7 @@ OUTPUT_DIR="$(realpath -m "$OUTPUT_DIR")"
 TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-v0.3.0-pre-alpha-dev-a}"
+PTB_VERSION="${PTB_VERSION:-v0.3.0-pre-alpha-dev-b}"
 RELEASE_VERSION="v${PTB_VERSION#v}"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
@@ -149,6 +149,9 @@ done
 python3 "$SCRIPT_DIR/rune_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/rune-menu-override.json"
+python3 "$SCRIPT_DIR/mastery_decl_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/base-mastery-overrides.json"
 
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
@@ -330,14 +333,26 @@ if rg -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_
     echo "Old goal-only transition handler entered build" >&2
     exit 1
 fi
+mapfile -t MASTERY_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \( \
+    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
+    -path '*/generated/decls/perks/perk/player/weapons/*' \
+\) | sort)
+[[ "${#MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Base Mastery override set is incomplete" >&2; exit 1; }
+if rg -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${MASTERY_OVERRIDE_FILES[@]}"; then
+    echo "Mastery override retains natural reward, completion stat, or global stat" >&2
+    exit 1
+fi
+if ! rg -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
+    "$OUTPUT_DIR/mod/gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl"; then
+    echo "Sticky AP gameplay upgrade missing" >&2
+    exit 1
+fi
 if find "$OUTPUT_DIR/mod" \( \
     -path '*/generated/decls/unlockable/mission_challenge/*' -o \
-    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
-    -path '*/generated/decls/perks/perk/player/weapons/*' -o \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
 \) -print -quit | grep -q .; then
-    echo "Challenge/Mastery or rejected watcher DECL override entered build" >&2
+    echo "Rejected Challenge/watcher DECL override entered build" >&2
     exit 1
 fi
 
@@ -373,12 +388,19 @@ if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
 fi
 if find "$MOD_AUDIT_DIR" \( \
     -path '*/generated/decls/unlockable/mission_challenge/*' -o \
-    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
-    -path '*/generated/decls/perks/perk/player/weapons/*' -o \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
 \) -print -quit | grep -q .; then
-    echo "Final ZIP contains Challenge/Mastery or rejected watcher DECL override" >&2
+    echo "Final ZIP contains rejected Challenge/watcher DECL override" >&2
+    exit 1
+fi
+mapfile -t AUDIT_MASTERY_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \( \
+    -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
+    -path '*/generated/decls/perks/perk/player/weapons/*' \
+\) | sort)
+[[ "${#AUDIT_MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Final ZIP base Mastery override set drifted" >&2; exit 1; }
+if rg -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${AUDIT_MASTERY_OVERRIDE_FILES[@]}"; then
+    echo "Final ZIP does not isolate Mastery item and location paths" >&2
     exit 1
 fi
 if rg -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \

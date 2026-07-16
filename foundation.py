@@ -73,7 +73,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
     },
 }
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 115, "locations": 83, "map_checks": 80, "runtime_locations": 3, "runtime_goals": 1, "route_sentinel_batteries": 5},
+    "counts": {"items": 115, "locations": 96, "map_checks": 80, "runtime_locations": 16, "runtime_goals": 1, "route_sentinel_batteries": 5},
     "active_maps": {"e1m1_intro": "game/sp/e1m1_intro/e1m1_intro", "hub": "game/sp/hub/hub", "e1m2_war": "game/sp/e1m2_battle/e1m2_battle", "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult"},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
