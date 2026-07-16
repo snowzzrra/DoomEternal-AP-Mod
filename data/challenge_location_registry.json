@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 7,
   "mission_complete": [
     {
       "name": "Hell on Earth - Mission Complete",
@@ -29,6 +29,92 @@
       }
     }
   ],
+  "mission_challenges": [
+    {
+      "name": "Cultist Base - Mission Challenge - Pull the Crystal",
+      "location_id": 7770138,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m3/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_ARGENT_UPGRADED",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m3/challenge_1.decl",
+        "sha256": "8963fd1c4a94903bf5cd649ac390e35f9f141afc60e61dc72ab750945f187b91",
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Cultist Base - Mission Challenge - Armored Rain",
+      "location_id": 7770139,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m3/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_ON_FIRE_MULTI_FLAME",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m3/challenge_2.decl",
+        "sha256": "f502055e1534b70c4de3411973f1149f83301181b3ec762afef6eb7401b8598c",
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Cultist Base - Mission Challenge - Master of Turrets",
+      "location_id": 7770140,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m3/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_ARACHNOTRON",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m3/challenge_3.decl",
+        "sha256": "fae5e067cbc5d3534fa3624cc538c47aa70aac1e7e71cf951c3d0f11c5b3e38e",
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    }
+  ],
+  "all_mission_challenges": {
+    "name": "Cultist Base - All Mission Challenges Completed",
+    "location_id": 7770141,
+    "signal": {
+      "kind": "all_mission_challenge_records",
+      "unlockables": [
+        "mission_challenge/e1m3/challenge_1",
+        "mission_challenge/e1m3/challenge_2",
+        "mission_challenge/e1m3/challenge_3"
+      ]
+    }
+  },
   "weapon_masteries": [
     {
       "name": "Sticky Bombs - Weapon Mastery Challenge",

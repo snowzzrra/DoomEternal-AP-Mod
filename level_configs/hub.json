@@ -47,7 +47,6 @@
                     "class = \"idInteractable_GiveItems\";",
                     "saveType = \"SGS_GAME_DATA\";",
                     "automapPropertiesDecl = \"praetor_token\";",
-                    "model = \"md6def/objects/interact/praetor_suit_token/praetor_suit_token.md6\";",
                     "stat = \"STAT_GAINED_FIRST_PRAETOR_TOKEN\";",
                     "onUseCodexEntry = \"codex/tutorials/praetor_suit_perks\";",
                     "progressionCategory = \"PROGRESSION_CATEGORY_ELITE\";",

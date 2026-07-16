@@ -6,16 +6,21 @@ WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/build/release}"
 OUTPUT_DIR="$(realpath -m "$OUTPUT_DIR")"
-TEMP_DIR="$(mktemp -d /tmp/doom-eap-build.XXXXXX)"
+RELEASE_DIR="$(realpath -m "$SCRIPT_DIR/build/release")"
+if [[ "$OUTPUT_DIR" != "$RELEASE_DIR" ]]; then
+    echo "Playable builds are restricted to $RELEASE_DIR" >&2
+    exit 1
+fi
+TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="${PTB_VERSION:-v0.3.0-pre-alpha-dev-b}"
+PTB_VERSION="v0.3.0-pre-alpha-dev"
 RELEASE_VERSION="v${PTB_VERSION#v}"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
-GENERATED_MAPS_DIR="${AP_GENERATED_MAPS_DIR:-$OUTPUT_DIR/build/generated-maps}"
+GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
-CLIENT_BUILD_DIR="$SCRIPT_DIR/build/client"
+CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
 PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
@@ -94,11 +99,8 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
-    "$GENERATED_MAPS_DIR"
-python3 "$SCRIPT_DIR/tools/generate_foundation_test_plan.py" \
-    --map e1m1_intro \
-    --output "$OUTPUT_DIR/build/focused-sticky-mastery-runtime.txt"
-"$SCRIPT_DIR/build_client.sh"
+    "$GENERATED_MAPS_DIR" "$TEMP_DIR"
+"$SCRIPT_DIR/build_client.sh" "$CLIENT_BUILD_DIR"
 if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
     echo "Fresh client build is missing required executable(s)" >&2
     exit 1
@@ -152,6 +154,9 @@ python3 "$SCRIPT_DIR/rune_decl_builder.py" \
 python3 "$SCRIPT_DIR/mastery_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/base-mastery-overrides.json"
+python3 "$SCRIPT_DIR/mission_challenge_decl_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/cultist-mission-challenge-overrides.json"
 
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
@@ -347,12 +352,33 @@ if ! rg -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
     echo "Sticky AP gameplay upgrade missing" >&2
     exit 1
 fi
+mapfile -t CHALLENGE_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \
+    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | sort)
+[[ "${#CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Cultist Base Mission Challenge override set is incomplete" >&2; exit 1; }
+if find "$OUTPUT_DIR/mod" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_2.decl' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_3.decl' \
+    -print -quit | grep -q .; then
+    echo "Unscoped Mission Challenge override entered build" >&2
+    exit 1
+fi
+if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${CHALLENGE_OVERRIDE_FILES[@]}"; then
+    echo "Cultist Mission Challenge override retains Suit Point or alters Battery" >&2
+    exit 1
+fi
+for challenge_override in "${CHALLENGE_OVERRIDE_FILES[@]}"; do
+    if [[ "$(rg -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
+        [[ "$(rg -c 'num = 0;' "$challenge_override")" != "1" ]]; then
+        echo "Cultist Mission Challenge reward suppression is missing: $challenge_override" >&2
+        exit 1
+    fi
+done
 if find "$OUTPUT_DIR/mod" \( \
-    -path '*/generated/decls/unlockable/mission_challenge/*' -o \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
 \) -print -quit | grep -q .; then
-    echo "Rejected Challenge/watcher DECL override entered build" >&2
+    echo "Rejected watcher DECL override entered build" >&2
     exit 1
 fi
 
@@ -386,12 +412,33 @@ if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     echo "Forbidden propitem DECL override found in final mod ZIP" >&2
     exit 1
 fi
+mapfile -t AUDIT_CHALLENGE_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \
+    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | sort)
+[[ "${#AUDIT_CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Final ZIP Cultist Mission Challenge override set drifted" >&2; exit 1; }
+if find "$MOD_AUDIT_DIR" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_2.decl' \
+    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_3.decl' \
+    -print -quit | grep -q .; then
+    echo "Final ZIP contains an unscoped Mission Challenge override" >&2
+    exit 1
+fi
+if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; then
+    echo "Final ZIP Cultist challenge override changes Suit Point/Battery economy" >&2
+    exit 1
+fi
+for challenge_override in "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; do
+    if [[ "$(rg -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
+        [[ "$(rg -c 'num = 0;' "$challenge_override")" != "1" ]]; then
+        echo "Final ZIP challenge reward suppression drifted: $challenge_override" >&2
+        exit 1
+    fi
+done
 if find "$MOD_AUDIT_DIR" \( \
-    -path '*/generated/decls/unlockable/mission_challenge/*' -o \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
 \) -print -quit | grep -q .; then
-    echo "Final ZIP contains rejected Challenge/watcher DECL override" >&2
+    echo "Final ZIP contains rejected watcher DECL override" >&2
     exit 1
 fi
 mapfile -t AUDIT_MASTERY_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \( \
@@ -443,6 +490,10 @@ if [[ "${PACKAGE_FILES[*]}" != "${ALLOWED_FILES[*]}" ]]; then
 fi
 if printf '%s\n' "${PACKAGE_FILES[@]}" | rg -i -q '(^|/)(playtests?|tests?|build|staging|__pycache__|\.git|todo|session|decisions|pitfalls|architecture)(/|$)|(^|/).*\.log$|(^|/).*\.pid$|(^|/)ap_config\.json$|(^|/)\.local\.env$|(^|/).*-(dev|debug)(\.|/|$)|AP_ICE_DIAG|(^|/).*(condump|seed|cache|output|diagnostic)'; then
     echo "Final ZIP contains a forbidden internal or development artifact" >&2
+    exit 1
+fi
+if find "$OUTPUT_DIR/build" -type f -name '*.txt' -print -quit | grep -q .; then
+    echo "Runtime-test .txt files are forbidden in build/release/build" >&2
     exit 1
 fi
 if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | rg -n -i '(/run/media/system/Eris/|/var/home/guilherme/|[A-Z]:\\\\Users\\\\guilherme\\|ap_ice_diag)' >/dev/null; then

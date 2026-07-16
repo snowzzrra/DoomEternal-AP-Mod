@@ -7,6 +7,7 @@ import ast
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 from ap_map_generator import (
@@ -19,6 +20,9 @@ from ap_map_generator import (
     generate_pickup_notification,
     generate_rpc_command_entities,
     generate_target_relay,
+    find_entity_block_bounds,
+    extract_target_names,
+    generate_map,
 )
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
@@ -34,6 +38,7 @@ from challenge_registry import all_location_entries, load_challenge_registry
 ROOT = Path(__file__).resolve().parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
 MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
+AUTOMAP_FAMILY_REGISTRY_PATH = ROOT / "data" / "automap_family_registry.json"
 
 
 def read_json(path: Path) -> dict:
@@ -98,6 +103,238 @@ def validate_id_namespaces(
     return errors
 
 
+def entity_scalar(block: str, property_name: str) -> str | None:
+    match = re.search(
+        rf'\b{re.escape(property_name)}\s*=\s*"([^"]+)";', block
+    )
+    return match.group(1) if match else None
+
+
+def validate_automap_family_registry(
+    location_ids: dict[str, int], runtime_locations: set[int]
+) -> list[str]:
+    errors: list[str] = []
+    registry = read_json(AUTOMAP_FAMILY_REGISTRY_PATH)
+    families = registry.get("families", {})
+    required_fields = {
+        "match", "vanilla_class", "automap_marker_source", "automap_properties",
+        "dossier_total_owner", "collected_state_writer", "reward_edge", "safe_cut",
+        "vanilla_automap", "vanilla_exploration",
+    }
+    for family_name, family in families.items():
+        missing = sorted(required_fields - set(family))
+        if missing:
+            errors.append(f"Automap family {family_name} is missing fields: {missing}")
+        if "poster" in family.get("automap_properties", []):
+            errors.append(f"Automap family {family_name} reuses Hub-only poster")
+
+    classified: dict[int, str] = {}
+    exact_families = {
+        location_id: family_name
+        for family_name, family in families.items()
+        for location_id in family.get("match", {}).get("location_ids", [])
+    }
+
+    map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
+    for map_key, source in map_sources.items():
+        if not source.get("enabled", True):
+            continue
+        config = read_json(ROOT / source["level_config"])
+        source_text = (ROOT / "vanillamaps" / source["source_file"]).read_text(
+            encoding="utf-8"
+        )
+        for ap_check, location_id in config.get("entities", {}).items():
+            entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+            bounds = find_entity_block_bounds(source_text, entity_name)
+            if bounds is None:
+                errors.append(f"Automap source entity missing: {map_key}/{entity_name}")
+                continue
+            block = source_text[bounds[0]:bounds[1]]
+            inherit = entity_scalar(block, "inherit")
+            family_name = exact_families.get(location_id)
+            if family_name is None:
+                matches = [
+                    name for name, family in families.items()
+                    if any(
+                        inherit and inherit.startswith(prefix)
+                        for prefix in family.get("match", {}).get("inherit_prefixes", [])
+                    )
+                ]
+                if len(matches) != 1:
+                    errors.append(
+                        f"Automap family coverage for {location_id}/{entity_name}: {matches}"
+                    )
+                    continue
+                family_name = matches[0]
+            classified[location_id] = family_name
+            family = families[family_name]
+            if family_name not in {"independent_ice_trigger", "independent_rocket_trigger"}:
+                actual_class = entity_scalar(block, "class")
+                if actual_class != family["vanilla_class"]:
+                    errors.append(
+                        f"Automap family class drift for {location_id}: {actual_class}"
+                    )
+            actual_automap = entity_scalar(block, "automapPropertiesDecl")
+            allowed_automap = family.get("automap_properties", [])
+            if actual_automap not in allowed_automap and not (
+                actual_automap is None and not allowed_automap
+            ):
+                errors.append(
+                    f"Automap field drift for {location_id}: {actual_automap} not in {allowed_automap}"
+                )
+
+        for encounter in config.get("secret_encounters", []):
+            location_id = encounter["location_id"]
+            if exact_families.get(location_id):
+                errors.append(f"Secret encounter {location_id} overlaps exact Automap family")
+            classified[location_id] = "secret_encounters"
+
+    for location_id in runtime_locations:
+        family_name = exact_families.get(location_id)
+        if family_name not in {"runtime_mission", "runtime_mastery", "runtime_challenge"}:
+            errors.append(f"Runtime location {location_id} lacks exact Automap family")
+        else:
+            classified[location_id] = family_name
+
+    all_location_values = set(location_ids.values())
+    if set(classified) != all_location_values:
+        errors.append(
+            "Automap family registry is incomplete: missing="
+            f"{sorted(all_location_values - set(classified))}, extra="
+            f"{sorted(set(classified) - all_location_values)}"
+        )
+
+    pilot = registry.get("pilot", {})
+    pilot_source = map_sources.get(pilot.get("map_key"), {})
+    if pilot_source:
+        source_text = (ROOT / "vanillamaps" / pilot_source["source_file"]).read_text(
+            encoding="utf-8"
+        )
+        config = read_json(ROOT / pilot_source["level_config"])
+        policies = config.get("target_policies", {})
+        for entity_name, expected_decl in pilot.get("marker_entities", {}).items():
+            bounds = find_entity_block_bounds(source_text, entity_name)
+            block = source_text[bounds[0]:bounds[1]] if bounds else ""
+            policy = policies.get(entity_name, {})
+            marker = policy.get("native_automap_carrier", {})
+            if entity_scalar(block, "automapPropertiesDecl") != expected_decl:
+                errors.append(f"Pilot source Automap field drift: {entity_name}")
+            if marker.get("automap_properties_decl") != expected_decl:
+                errors.append(f"Pilot marker does not copy exact family field: {entity_name}")
+            for property_name, marker_key in (
+                ("inherit", "source_inherit"),
+                ("class", "source_class"),
+                ("progressionCategory", "source_progression_category"),
+            ):
+                if entity_scalar(block, property_name) != marker.get(marker_key):
+                    errors.append(f"Pilot source evidence drift: {entity_name}/{property_name}")
+            marker_text = json.dumps(marker, sort_keys=True).lower()
+            if any(term in marker_text for term in ("poster", "currency", "perk", "give", "grant")):
+                errors.append(f"Pilot marker contains forbidden reward/blanket field: {entity_name}")
+            if not policy.get("independent_ap_trigger"):
+                errors.append(f"Pilot carrier lacks independent AP trigger: {entity_name}")
+            if any("ap_remove_native_automap_" in target for target in policy.get("independent_targets", [])):
+                errors.append(f"Pilot carrier incorrectly removes persistent Automap marker: {entity_name}")
+        negative = pilot.get("negative_control")
+        bounds = find_entity_block_bounds(source_text, negative) if negative else None
+        if bounds and entity_scalar(source_text[bounds[0]:bounds[1]], "automapPropertiesDecl"):
+            errors.append("Pilot negative-control family unexpectedly has a vanilla marker")
+    return errors
+
+
+def validate_generated_automap_carriers() -> list[str]:
+    """Prove each enabled native carrier keeps only marker state, not a reward.
+
+    This is deliberately generated-map validation: source metadata alone cannot
+    prove that the independent AP trigger did not drift from its exact vanilla
+    map edge or that the carrier lost its vanilla grant fields.
+    """
+    errors: list[str] = []
+    registry = read_json(AUTOMAP_FAMILY_REGISTRY_PATH)["families"]
+    sources = read_json(MAP_SOURCES_PATH)["maps"]
+    items = read_json(ROOT / "data" / "items.json")
+    reward_terms = (
+        "useableComponentDecl", "triggerDef", "canBePossessed", "equipOnPickup",
+        "forceEquip", "currencyList", "itemList", "inventory", "useStat",
+        "onUseCodexEntry", "progressionCategory", "clipModelInfo",
+        "pickup_statIncreases", "use_statIncreases", "spawn_statIncreases",
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generated_dir = Path(tmpdir)
+        for map_key, source in sources.items():
+            if not source.get("enabled", True):
+                continue
+            config = read_json(ROOT / source["level_config"])
+            vanilla = (ROOT / "vanillamaps" / source["source_file"]).read_text(
+                encoding="utf-8"
+            )
+            output = generated_dir / f"{map_key}.entities"
+            manifest = generated_dir / f"{map_key}.json"
+            try:
+                generate_map(
+                    ROOT / "vanillamaps" / source["source_file"], output,
+                    ROOT / source["level_config"], manifest, items,
+                )
+            except Exception as exc:
+                errors.append(f"Automap carrier generation failed for {map_key}: {exc}")
+                continue
+            generated = output.read_text(encoding="utf-8")
+            if "ap_remove_native_automap_" in generated:
+                errors.append(f"Automap carrier marker removal reappeared in {map_key}")
+            for ap_check, location_id in config.get("entities", {}).items():
+                entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+                source_bounds = find_entity_block_bounds(vanilla, entity_name)
+                if source_bounds is None:
+                    continue
+                source_block = vanilla[source_bounds[0]:source_bounds[1]]
+                inherit = entity_scalar(source_block, "inherit") or ""
+                family = next((
+                    value for value in registry.values()
+                    if value.get("carrier_mode") == "persistent_native_idprop2"
+                    and any(inherit.startswith(prefix) for prefix in value["match"].get("inherit_prefixes", []))
+                ), None)
+                if family:
+                    carrier_bounds = find_entity_block_bounds(generated, entity_name)
+                    trigger_bounds = find_entity_block_bounds(
+                        generated, f"ap_independent_{entity_name}"
+                    )
+                    if carrier_bounds is None or trigger_bounds is None:
+                        errors.append(f"Automap carrier missing for {location_id}/{entity_name}")
+                        continue
+                    carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
+                    trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
+                    for field in ("inherit", "class", "automapPropertiesDecl"):
+                        if entity_scalar(carrier, field) != entity_scalar(source_block, field):
+                            errors.append(f"Automap source metadata drift for {location_id}/{field}")
+                    if 'model = "art/pickups/question_mark_a.lwo";' not in carrier:
+                        errors.append(f"Automap carrier lacks AP visual for {location_id}")
+                    if extract_target_names(carrier):
+                        errors.append(f"Automap carrier retained vanilla targets for {location_id}")
+                    if any(term in carrier for term in reward_terms):
+                        errors.append(f"Automap carrier retains reward edge for {location_id}")
+                    expected = [*extract_target_names(source_block), ap_check]
+                    if extract_target_names(trigger) != expected:
+                        errors.append(f"Automap functional target drift for {location_id}")
+                    if extract_target_names(trigger).count(ap_check) != 1:
+                        errors.append(f"Automap AP check multiplicity drift for {location_id}")
+                elif inherit.startswith("progress/praetor_token"):
+                    generated_bounds = find_entity_block_bounds(generated, entity_name)
+                    if generated_bounds is None:
+                        errors.append(f"Praetor token missing for {location_id}")
+                        continue
+                    token = generated[generated_bounds[0]:generated_bounds[1]]
+                    if "currencyList" in token or "CURRENCY_PRAETOR_UPGRADE" in token:
+                        errors.append(f"Praetor reward retained for {location_id}")
+                    if 'model = "art/pickups/question_mark_a.lwo";' not in token:
+                        errors.append(f"Praetor token lacks AP visual for {location_id}")
+                    if extract_target_names(token) != [*extract_target_names(source_block), ap_check]:
+                        errors.append(f"Praetor functional target drift for {location_id}")
+                    for field in ("inherit", "class", "automapPropertiesDecl", "progressionCategory"):
+                        if entity_scalar(token, field) != entity_scalar(source_block, field):
+                            errors.append(f"Praetor marker/category drift for {location_id}/{field}")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
@@ -123,6 +360,8 @@ def main() -> int:
         errors.append("An AP command grants forbidden CURRENCY_WEAPON_MASTERY")
     runtime_location_mapping = read_json(ROOT / "data" / "runtime_locations.json")
     runtime_locations = set(runtime_location_mapping.values())
+    errors.extend(validate_automap_family_registry(location_ids, runtime_locations))
+    errors.extend(validate_generated_automap_carriers())
     challenge_registry = load_challenge_registry()
     mastery_entries = challenge_registry["weapon_masteries"]
     for entry in mastery_entries:
@@ -158,11 +397,23 @@ def main() -> int:
     expected_mastery_location_names = [entry["name"] for entry in mastery_entries]
     if mastery_location_names != expected_mastery_location_names:
         errors.append(f"Base Mastery registry/APWorld drift: {mastery_location_names}")
-    if any("Mission Challenge" in name for name in location_ids):
-        errors.append("Mission Challenge location returned before its dedicated round")
-    registry_text = json.dumps(challenge_registry, sort_keys=True)
-    if "mission_challenges" in registry_text:
-        errors.append("Mission Challenge runtime registry returned before its dedicated round")
+    mission_challenge_location_names = [
+        name for name in location_ids
+        if "Mission Challenge -" in name
+        or name == challenge_registry["all_mission_challenges"]["name"]
+    ]
+    expected_mission_challenge_names = [
+        *[entry["name"] for entry in challenge_registry["mission_challenges"]],
+        challenge_registry["all_mission_challenges"]["name"],
+    ]
+    if mission_challenge_location_names != expected_mission_challenge_names:
+        errors.append(
+            "Cultist Mission Challenge registry/APWorld drift: "
+            f"{mission_challenge_location_names}"
+        )
+    aggregate_entry = challenge_registry["all_mission_challenges"]
+    if location_ids.get(aggregate_entry["name"]) != aggregate_entry["location_id"]:
+        errors.append("All Mission Challenges aggregate/APWorld mapping drift")
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (ROOT / "bridge_client.py", ROOT / "ap_map_generator.py", ROOT / "challenge_registry.py")
@@ -312,9 +563,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 115,
-        "locations": 96,
+        "locations": 100,
         "map_checks": 80,
-        "runtime_locations": 16,
+        "runtime_locations": 20,
         "runtime_goals": 1,
         "route_sentinel_batteries": 5,
     }:
