@@ -23,7 +23,6 @@ GENERATED_NAME_PREFIXES = (
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
-AUTOMAP_FAMILY_REGISTRY_PATH = Path(__file__).resolve().parent / "data" / "automap_family_registry.json"
 AP_QUESTION_MARK_MODEL = "art/pickups/question_mark_a.lwo"
 
 # you don't need to use this to play the mod
@@ -94,19 +93,6 @@ def assert_no_weapon_mastery_token_currency(content, context):
             f"{context} contains forbidden vanilla Token currency "
             f"{FORBIDDEN_WEAPON_MASTERY_CURRENCY}"
         )
-
-
-def native_automap_carrier_family(block):
-    """Return the explicitly proven persistent idProp2 carrier family, if any."""
-    inherit_match = re.search(r'\binherit\s*=\s*"([^"]+)";', block)
-    inherit = inherit_match.group(1) if inherit_match else ""
-    registry = json.loads(AUTOMAP_FAMILY_REGISTRY_PATH.read_text(encoding="utf-8"))
-    for family_name, family in registry.get("families", {}).items():
-        if family.get("carrier_mode") != "persistent_native_idprop2":
-            continue
-        if any(inherit.startswith(prefix) for prefix in family["match"].get("inherit_prefixes", [])):
-            return family_name
-    return None
 
 
 def native_praetor_token_family(block):
@@ -224,43 +210,9 @@ def neutralize_conditional_pickup_block(block):
         "forceEquip", "canBePossessed",
     ):
         block = re.sub(rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block)
-    return replace_targets_block(block, [])
-
-
-def neutralize_native_automap_carrier_block(block):
-    """Keep a native Automap carrier, but make its world interaction reward-free.
-
-    The carrier deliberately remains after the AP trigger fires.  Its native
-    Automap lifecycle is what changes the question mark into the discovered
-    family marker; removing it is both non-vanilla and loses that state.
-    """
-    for property_name in (
-        "clipModelInfo", "spawn_statIncreases", "pickup_statIncreases",
-        "use_statIncreases", "itemList", "currencyList", "inventory",
-    ):
-        block = remove_property_blocks(block, property_name)
-    for property_name in (
-        "useableComponentDecl", "triggerDef", "equipOnPickup", "lootStyle",
-        "forceEquip", "canBePossessed", "progressionCategory", "useStat",
-        "onUseCodexEntry", "physicsAttributes",
-    ):
-        block = re.sub(
-            rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block
-        )
-    if "renderModelInfo" in block:
-        block = re.sub(
-            r'(renderModelInfo\s*=\s*\{[\s\S]*?model\s*=\s*)(?:"[^"]+"|NULL)',
-            r'\1"art/pickups/question_mark_a.lwo"',
-            block,
-            count=1,
-        )
-    else:
-        block = block.replace(
-            "edit = {",
-            'edit = {\n\t\t\trenderModelInfo = {\n'
-            '\t\t\t\tmodel = "art/pickups/question_mark_a.lwo";\n\t\t\t}',
-            1,
-        )
+    block = re.sub(
+        r'\s*automapPropertiesDecl\s*=\s*(?:"[^"]*"|[^;]+);', "", block
+    )
     return replace_targets_block(block, [])
 
 
@@ -347,6 +299,14 @@ def generate_inert_location_visual(block, policy):
     layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
     position = visual["position"]
     scale = visual["scale"]
+    entity_class = visual.get("class", "idDynamicEntity")
+    inherit = visual.get("inherit", "func/dynamic")
+    inherit_line = f'\t\tinherit = "{inherit}";\n' if inherit else ""
+    automap_decl = visual.get("automap_properties_decl")
+    automap_line = (
+        f'\t\t\tautomapPropertiesDecl = "{automap_decl}";\n'
+        if automap_decl else ""
+    )
     cleanup_name = visual.get("cleanup_entity")
     cleanup = ""
     if cleanup_name:
@@ -373,15 +333,14 @@ def generate_inert_location_visual(block, policy):
 '''
     return f'''entity {{
 {layers}\tentityDef {visual["entity_name"]} {{
-\t\tinherit = "func/dynamic";
-\t\tclass = "idDynamicEntity";
+{inherit_line}\t\tclass = "{entity_class}";
 \t\texpandInheritance = false;
 \t\tpoolCount = 0;
 \t\tpoolGranularity = 2;
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tspawnPosition = {{
+{automap_line}\t\t\tspawnPosition = {{
 \t\t\t\tx = {position[0]};
 \t\t\t\ty = {position[1]};
 \t\t\t\tz = {position[2]};
@@ -543,6 +502,98 @@ def patch_native_reward_entity(block, entity_name, ap_check_id, policy):
     return patched
 
 
+def patch_native_automap_entity(block, entity_name, ap_check_id, policy):
+    """Preserve one hash-locked native lifecycle and remove only visual FX."""
+    contract = policy.get("native_automap_contract")
+    if not contract:
+        raise ValueError(f"{entity_name}: missing native Automap contract")
+    for snippet in contract.get("required_snippets", []):
+        if block.count(snippet) != 1:
+            raise ValueError(
+                f"{entity_name}: native Automap contract drift for {snippet!r}"
+            )
+    original_targets = extract_target_names(block)
+    expected_targets = contract.get("original_targets")
+    if original_targets != expected_targets:
+        raise ValueError(
+            f"{entity_name}: native Automap target drift: "
+            f"expected {expected_targets}, got {original_targets}"
+        )
+    patched = block
+    allowed_removals = {"fxDecl", "updateFX"}
+    for property_name in contract.get("remove_properties", []):
+        if property_name not in allowed_removals:
+            raise ValueError(
+                f"{entity_name}: unsupported native Automap cut {property_name}"
+            )
+        matches = re.findall(
+            rf'(?m)^\s*{re.escape(property_name)}\s*=\s*(?:"[^"]*"|[^;]+);',
+            patched,
+        )
+        if len(matches) != 1:
+            raise ValueError(
+                f"{entity_name}: native Automap field drift for {property_name}"
+            )
+        patched = re.sub(
+            rf'(?m)^\s*{re.escape(property_name)}\s*=\s*(?:"[^"]*"|[^;]+);\s*$',
+            "",
+            patched,
+            count=1,
+        )
+    patched = replace_targets_block(patched, [*original_targets, ap_check_id])
+    if extract_target_names(patched) != [*original_targets, ap_check_id]:
+        raise ValueError(f"{entity_name}: native AP check multiplicity/order drift")
+    for required in (
+        "useableComponentDecl",
+        "automapPropertiesDecl",
+        "saveType",
+        "removeFlag",
+        "thinkComponentDecl",
+    ):
+        if required not in patched:
+            raise ValueError(
+                f"{entity_name}: native lifecycle field was not preserved: {required}"
+            )
+    if "fxDecl" in patched or "updateFX" in patched:
+        raise ValueError(f"{entity_name}: native fire FX was not fully removed")
+    return patched
+
+
+def generate_automap_location_helper(source_block, location_id):
+    """Emit the proven targetless idInfo owner for one physical AP marker."""
+    position = re.search(
+        r'spawnPosition\s*=\s*\{\s*x\s*=\s*([-+0-9.eE]+);\s*'
+        r'y\s*=\s*([-+0-9.eE]+);\s*z\s*=\s*([-+0-9.eE]+);\s*\}',
+        source_block,
+    )
+    if not position:
+        raise ValueError(f"Automap helper source position is missing for {location_id}")
+    marker = re.search(
+        r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
+    )
+    automap_decl = marker.group(1) if marker else "default"
+    return f'''entity {{
+	entityDef ap_automap_location_{location_id} {{
+		inherit = "info/null";
+		class = "idInfo";
+		expandInheritance = false;
+		poolCount = 0;
+		poolGranularity = 2;
+		networkReplicated = false;
+		disableAIPooling = false;
+		edit = {{
+			spawnPosition = {{
+				x = {position.group(1)};
+				y = {position.group(2)};
+				z = {position.group(3)};
+			}}
+			automapPropertiesDecl = "{automap_decl}";
+		}}
+	}}
+}}
+'''
+
+
 def audit_preserved_target_graph(content, entity_name, target_policy):
     """Fail closed when a pickup's retained vanilla branch can grant a reward.
 
@@ -590,15 +641,20 @@ def audit_preserved_target_graph(content, entity_name, target_policy):
         pending.extend(actual_targets)
         visited.add(target_name)
 
-def generate_event_relay(ap_check_id, location_id, spawn_pos_text, include_notification=True):
+def generate_event_relay(
+    ap_check_id, location_id, spawn_pos_text, include_notification=True,
+    completion_targets=None,
+):
     event_name = f"{EVENT_ENTITY_PREFIX}{location_id}"
-    target_lines = []
+    target_names = list(completion_targets or [])
     if include_notification:
         notification_name = f"{NOTIFICATION_ENTITY_PREFIX}{ap_check_id}"
-        target_lines.append(f'\t\t\t\titem[0] = "{notification_name}";')
-        target_lines.append(f'\t\t\t\titem[1] = "{event_name}";')
-    else:
-        target_lines.append(f'\t\t\t\titem[0] = "{event_name}";')
+        target_names.append(notification_name)
+    target_names.append(event_name)
+    target_lines = [
+        f'\t\t\t\titem[{index}] = "{target_name}";'
+        for index, target_name in enumerate(target_names)
+    ]
 
     return f"""entity {{
 	entityDef {ap_check_id} {{
@@ -621,9 +677,12 @@ def generate_event_relay(ap_check_id, location_id, spawn_pos_text, include_notif
 """
 
 
-def generate_target_relay(ap_check_id, location_id, spawn_pos_text):
+def generate_target_relay(
+    ap_check_id, location_id, spawn_pos_text, completion_targets=None,
+):
     return generate_event_relay(
-        ap_check_id, location_id, spawn_pos_text, include_notification=True
+        ap_check_id, location_id, spawn_pos_text, include_notification=True,
+        completion_targets=completion_targets,
     )
 
 
@@ -991,22 +1050,6 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             if "edit = {" in block:
                 target_policy = target_policies.get(entity_name)
-                carrier_family = native_automap_carrier_family(block)
-                if carrier_family and not (target_policy and target_policy.get("independent_ap_trigger")):
-                    # Keep native marker metadata on the original entity, while
-                    # forwarding its pre-existing, non-reward map edge through
-                    # the one-shot AP trigger.  The generated-map contract
-                    # checks this exact target order against the vanilla block.
-                    target_policy = {
-                        "independent_ap_trigger": True,
-                        "independent_targets": [
-                            *extract_target_names(block), ap_check_id,
-                        ],
-                        "native_automap_carrier": {
-                            "family": carrier_family,
-                            "persistent_marker": True,
-                        },
-                    }
                 if not target_policy and native_praetor_token_family(block):
                     # This is deliberately the same narrow cut proven for the
                     # Fortress token: retain the native interaction/category
@@ -1026,12 +1069,35 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     }
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 location_id = config_entities[ap_check_id]
+                new_blocks.append(
+                    generate_automap_location_helper(block, location_id)
+                )
+                if target_policy and target_policy.get("native_automap_contract"):
+                    block = patch_native_automap_entity(
+                        block, entity_name, ap_check_id, target_policy
+                    )
+                    new_blocks.append("entity {" + block)
+                    new_blocks.append(generate_target_relay(
+                        ap_check_id,
+                        location_id,
+                        "",
+                        completion_targets=target_policy.get("completion_targets"),
+                    ))
+                    new_blocks.append(generate_pickup_notification(ap_check_id))
+                    new_blocks.append(generate_check_event(location_id))
+                    modified_count += 1
+                    continue
                 if target_policy and target_policy.get("native_entity_contract"):
                     block = patch_native_reward_entity(
                         block, entity_name, ap_check_id, target_policy
                     )
                     new_blocks.append("entity {" + block)
-                    new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
+                    new_blocks.append(generate_target_relay(
+                        ap_check_id,
+                        location_id,
+                        "",
+                        completion_targets=target_policy.get("completion_targets"),
+                    ))
                     new_blocks.append(generate_pickup_notification(ap_check_id))
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
@@ -1044,22 +1110,21 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     # reward carrier inert.
                     manifest_data[ap_check_id] = location_id
                     if not target_policy.get("remove_original", False):
-                        native_carrier = target_policy.get("native_automap_carrier")
-                        if native_carrier:
-                            new_blocks.append(
-                                "entity {" + neutralize_native_automap_carrier_block(block)
-                            )
-                        else:
-                            new_blocks.append(
-                                "entity {" + neutralize_conditional_pickup_block(block)
-                            )
+                        new_blocks.append(
+                            "entity {" + neutralize_conditional_pickup_block(block)
+                        )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
                     visual = generate_inert_location_visual(block, target_policy)
                     if visual:
                         new_blocks.append(visual)
-                    new_blocks.append(generate_target_relay(ap_check_id, location_id, ""))
+                    new_blocks.append(generate_target_relay(
+                        ap_check_id,
+                        location_id,
+                        "",
+                        completion_targets=target_policy.get("completion_targets"),
+                    ))
                     new_blocks.append(generate_pickup_notification(ap_check_id))
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
@@ -1091,15 +1156,21 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                 }}"""
                 block = block.replace('edit = {', 'edit = {' + hitbox_injection, 1)
 
-                # question mark model for all
+                # Preserve the established AP visual/Automap baseline for
+                # every ordinary physical location.  Automap prototypes may
+                # change visuals only through their explicit branches above.
                 if "renderModelInfo = {" in block:
                     block = re.sub(
                         r'(renderModelInfo\s*=\s*\{[\s\S]*?model\s*=\s*)(?:"[^"]+"|NULL)',
                         r'\1"art/pickups/question_mark_a.lwo"',
                         block,
-                        count=1
+                        count=1,
                     )
-                    block = re.sub(r'scale\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\}', "", block)
+                    block = re.sub(
+                        r'scale\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\}',
+                        "",
+                        block,
+                    )
                 else:
                     render_injection = """
                 renderModelInfo = {
@@ -1111,6 +1182,11 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                 block = re.sub(r'\s*useableComponentDecl\s*=\s*"[^"]*";', '', block)
                 block = re.sub(r'\s*equipOnPickup\s*=\s*\w+;', '', block)
                 block = re.sub(r'\s*forceEquip\s*=\s*\w+;', '', block)
+                block = re.sub(
+                    r'\s*automapPropertiesDecl\s*=\s*(?:"[^"]*"|[^;]+);',
+                    '',
+                    block,
+                )
                 for property_name in (target_policy or {}).get("strip_properties", []):
                     if property_name not in {"canBePossessed"}:
                         raise ValueError(
@@ -1131,7 +1207,10 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
                 location_id = config_entities[ap_check_id]
                 relay_entity_str = generate_target_relay(
-                    ap_check_id, location_id, spawn_pos_text
+                    ap_check_id,
+                    location_id,
+                    spawn_pos_text,
+                    completion_targets=(target_policy or {}).get("completion_targets"),
                 )
                 new_blocks.append(relay_entity_str)
                 new_blocks.append(generate_pickup_notification(ap_check_id))

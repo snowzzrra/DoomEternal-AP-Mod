@@ -17,6 +17,7 @@ VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
 PTB_VERSION="v0.3.0-pre-alpha-dev"
 RELEASE_VERSION="v${PTB_VERSION#v}"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
+AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
 GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
@@ -25,9 +26,11 @@ PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steam
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
-    --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json"
-python3 "$SCRIPT_DIR/validate_data.py"
+if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
+    python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
+        --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json"
+    python3 "$SCRIPT_DIR/validate_data.py"
+fi
 
 if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json" ]]; then
     cp "$OUTPUT_DIR/client/ap_config.json" "$TEMP_DIR/ap_config.json"
@@ -148,6 +151,9 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$supported_game_revision"
 done
 
+python3 "$SCRIPT_DIR/automap_native_decl_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/automap-native-toy-override.json"
 python3 "$SCRIPT_DIR/rune_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/rune-menu-override.json"
@@ -157,6 +163,23 @@ python3 "$SCRIPT_DIR/mastery_decl_builder.py" \
 python3 "$SCRIPT_DIR/mission_challenge_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/cultist-mission-challenge-overrides.json"
+python3 - "$TEMP_DIR/cultist-mission-challenge-overrides.json" <<'PY'
+import json
+import sys
+
+audit = json.load(open(sys.argv[1], encoding="utf-8"))
+assert "battery_unchanged" not in audit
+assert audit["aggregate_reward_suppression"] == {
+    "strategy": "child_currencyToGive_num_zero",
+    "field": "currencyToGive.num",
+    "value": 0,
+    "suppressed_native_rewards": [
+        "CURRENCY_PRAETOR_UPGRADE",
+        "CURRENCY_SENTINEL_BATTERY",
+    ],
+    "runtime_evidence": "v0.3.0c.1",
+}
+PY
 
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
@@ -319,6 +342,7 @@ manifest = {
 )
 PY
 
+if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
     if rg -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
         echo "Rejected stat-write bootstrap entered the normal build: $generated_map" >&2
@@ -364,7 +388,7 @@ if find "$OUTPUT_DIR/mod" -type f -path '*/generated/decls/unlockable/mission_ch
     exit 1
 fi
 if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${CHALLENGE_OVERRIDE_FILES[@]}"; then
-    echo "Cultist Mission Challenge override retains Suit Point or alters Battery" >&2
+    echo "Cultist Mission Challenge child override contains an unscoped currency name" >&2
     exit 1
 fi
 for challenge_override in "${CHALLENGE_OVERRIDE_FILES[@]}"; do
@@ -380,6 +404,7 @@ if find "$OUTPUT_DIR/mod" \( \
 \) -print -quit | grep -q .; then
     echo "Rejected watcher DECL override entered build" >&2
     exit 1
+fi
 fi
 
 PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{print $1}')"
@@ -398,9 +423,35 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
         DoomEternalArchipelagoPreAlpha.zip
 )
 
+if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
+    rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" "$OUTPUT_DIR/mod" \
+        "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/doometernal.apworld" \
+        "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" \
+        "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
+    echo "Automap prototype ZIP created at: $OUTPUT_DIR/$PTB_ZIP_NAME"
+    exit 0
+fi
+
 EXTRACTED_AUDIT_DIR="$TEMP_DIR/extracted-final"
 mkdir -p "$EXTRACTED_AUDIT_DIR"
 unzip -q "$OUTPUT_DIR/$PTB_ZIP_NAME" -d "$EXTRACTED_AUDIT_DIR"
+python3 - "$EXTRACTED_AUDIT_DIR/client/data/items.json" <<'PY'
+import json
+import sys
+
+items = json.load(open(sys.argv[1], encoding="utf-8"))
+assert len(items) == 116
+assert items["7770016"] == {
+    "type": "currency", "currency": "CURRENCY_SENTINEL_BATTERY", "count": 1,
+}
+assert items["7770142"] == {
+    "type": "currency", "currency": "CURRENCY_SENTINEL_BATTERY", "count": 2,
+}
+assert not any(
+    isinstance(value, dict) and value.get("currency") == "CURRENCY_WEAPON_UPGRADE"
+    for value in items.values()
+)
+PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
 unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoPreAlpha.zip" -d "$MOD_AUDIT_DIR"
@@ -424,7 +475,7 @@ if find "$MOD_AUDIT_DIR" -type f -path '*/generated/decls/unlockable/mission_cha
     exit 1
 fi
 if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; then
-    echo "Final ZIP Cultist challenge override changes Suit Point/Battery economy" >&2
+    echo "Final ZIP Cultist challenge child override contains an unscoped currency name" >&2
     exit 1
 fi
 for challenge_override in "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; do
