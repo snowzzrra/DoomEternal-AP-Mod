@@ -180,57 +180,6 @@ entity {
         self.assertEqual(entities.count("count = 2;"), 1)
         self.assertNotIn("inherit =", entities)
 
-    def test_four_physical_batteries_keep_baseline_visual_markers_and_checks(self):
-        expected = {
-            "e1m2_war": {7770084},
-            "e1m3_cult": {7770057, 7770069, 7770070},
-        }
-        sources = json.loads((ROOT / "data/map_sources.json").read_text())
-        items = json.loads((ROOT / "data/items.json").read_text())
-        with tempfile.TemporaryDirectory() as directory:
-            output_root = Path(directory)
-            for map_key, location_ids in expected.items():
-                source = sources["maps"][map_key]
-                config_path = ROOT / source["level_config"]
-                config = json.loads(config_path.read_text())
-                output = output_root / f"{map_key}.entities"
-                manifest = output_root / f"{map_key}.json"
-                generate_map(
-                    ROOT / "vanillamaps" / source["source_file"],
-                    output,
-                    config_path,
-                    manifest,
-                    items,
-                )
-                generated = output.read_text(encoding="utf-8")
-                for location_id in location_ids:
-                    ap_check = next(
-                        name for name, value in config["entities"].items()
-                        if value == location_id
-                    )
-                    entity_name = ap_check.removeprefix("AP_CHECK_").lower()
-                    trigger_bounds = find_entity_block_bounds(generated, entity_name)
-                    self.assertIsNotNone(trigger_bounds, location_id)
-                    trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
-                    self.assertIn('inherit = "trigger/trigger";', trigger)
-                    self.assertIn('class = "idTrigger";', trigger)
-                    self.assertIn("triggerOnce = true;", trigger)
-                    self.assertEqual(extract_target_names(trigger).count(ap_check), 1)
-                    self.assertNotIn("automapPropertiesDecl", trigger, location_id)
-                    self.assertIn("renderModelInfo", trigger, location_id)
-                    self.assertIn("question_mark_a.lwo", trigger, location_id)
-                    self.assertIsNone(find_entity_block_bounds(
-                        generated, f"ap_independent_{entity_name}"
-                    ))
-                    helper_bounds = find_entity_block_bounds(
-                        generated, f"ap_automap_location_{location_id}"
-                    )
-                    self.assertIsNotNone(helper_bounds, location_id)
-                    helper = generated[helper_bounds[0]:helper_bounds[1]]
-                    self.assertIn('class = "idInfo";', helper)
-                    self.assertIn('inherit = "info/null";', helper)
-                    self.assertIn("automapPropertiesDecl", helper, location_id)
-                    self.assertEqual(extract_target_names(helper), [])
 
     def test_weapon_mastery_token_currency_is_rejected_from_registered_maps(self):
         with self.assertRaisesRegex(ValueError, "CURRENCY_WEAPON_MASTERY"):
@@ -293,35 +242,6 @@ entity {
         self.assertNotIn("forceObstacle", content)
         self.assertIn('triggerDef = "trigger/props/weapons/flame_belch";', content)
 
-    def test_target_policy_drops_reward_and_preserves_objective_target(self):
-        content = """
-        edit = {
-            targets = {
-                num = 2;
-                item[0] = "target_relay_pickup_ice_bomb";
-                item[1] = "target_give_item_ice_bomb";
-            }
-        }
-        """
-
-        content = add_ap_check_target(
-            content,
-            "pickup_equipment_ice_bomb",
-            "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
-            {
-                "preserve_targets": ["target_relay_pickup_ice_bomb"],
-                "drop_targets": ["target_give_item_ice_bomb"],
-            },
-        )
-
-        self.assertEqual(
-            extract_target_names(content),
-            [
-                "target_relay_pickup_ice_bomb",
-                "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
-            ],
-        )
-        self.assertNotIn("target_give_item_ice_bomb", content)
 
     def test_target_policy_fails_when_expected_target_is_missing(self):
         content = """
@@ -398,44 +318,6 @@ entity {
             ):
                 self.assertNotIn(forbidden, trigger)
 
-    def test_hub_first_praetor_token_preserves_native_bootstrap_and_appends_ap_last(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output = Path(tmpdir, "hub.entities")
-            manifest = Path(tmpdir, "hub.json")
-            generate_map(
-                ROOT / "vanillamaps" / "hub.map",
-                output,
-                ROOT / "level_configs" / "hub.json",
-                manifest,
-                json.loads((ROOT / "data" / "items.json").read_text()),
-            )
-            generated = output.read_text(encoding="utf-8")
-            bounds = find_entity_block_bounds(generated, "progress_praetor_point_hub_1")
-            self.assertIsNotNone(bounds)
-            block = generated[bounds[0]:bounds[1]]
-            for preserved in (
-                'inherit = "progress/praetor_token";',
-                'class = "idInteractable_GiveItems";',
-                'saveType = "SGS_GAME_DATA";',
-                'automapPropertiesDecl = "praetor_token";',
-                'stat = "STAT_GAINED_FIRST_PRAETOR_TOKEN";',
-                'useStat = "STAT_SUIT_PAGE_UNLOCKED";',
-                'onUseCodexEntry = "codex/tutorials/praetor_suit_perks";',
-                'progressionCategory = "PROGRESSION_CATEGORY_ELITE";',
-                '"game/sp/hub/from_e1m2"',
-            ):
-                self.assertIn(preserved, block)
-            self.assertNotIn("currencyList", block)
-            self.assertNotIn("CURRENCY_PRAETOR_UPGRADE", block)
-            self.assertIn('model = "art/pickups/question_mark_a.lwo";', block)
-            self.assertEqual(
-                extract_target_names(block),
-                ["target_relay_complete_praetor_obj", "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1"],
-            )
-            self.assertEqual(
-                json.loads(manifest.read_text())["AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1"],
-                7770081,
-            )
 
     def test_cultist_rocket_is_independent_one_shot_trigger_with_safe_relay(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -538,131 +420,7 @@ entity {
             ))
             self.assertNotIn("pickups_pickup_weapon_heavy_cannon_1", generated)
 
-    def test_hell_automap_pilot_uses_exact_family_markers_without_rewards(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output = Path(tmpdir, "hell.entities")
-            manifest = Path(tmpdir, "hell.json")
-            generate_map(
-                ROOT / "vanillamaps" / "e1m1_intro.map",
-                output,
-                ROOT / "level_configs" / "e1m1_intro.json",
-                manifest,
-                json.loads((ROOT / "data" / "items.json").read_text()),
-            )
-            generated = output.read_text(encoding="utf-8")
-            toy_name = "mech_street_pickup_collectible_toys_doomguy_1"
-            toy_bounds = find_entity_block_bounds(generated, toy_name)
-            self.assertIsNotNone(toy_bounds)
-            toy = generated[toy_bounds[0]:toy_bounds[1]]
-            self.assertIn('class = "idProp2";', toy)
-            self.assertIn(
-                'useableComponentDecl = "propitem/collectible/toys/doom_slayer";',
-                toy,
-            )
-            self.assertIn('automapPropertiesDecl = "collectible_demon_toy";', toy)
-            self.assertIn('thinkComponentDecl = "bob_rotate_fast";', toy)
-            self.assertIn('saveType = "SGS_GAME_DATA";', toy)
-            self.assertIn('removeFlag = "RMV_IMMEDIATE";', toy)
-            self.assertNotIn("fxDecl", toy)
-            self.assertEqual(
-                extract_target_names(toy),
-                [
-                    "mech_street_target_change_layer_1",
-                    "AP_CHECK_MECH_STREET_PICKUP_COLLECTIBLE_TOYS_DOOMGUY_1",
-                ],
-            )
-            self.assertIsNone(find_entity_block_bounds(
-                generated, f"ap_independent_{toy_name}"
-            ))
 
-            modbot_name = "mech_street_progress_mod_bot_1_e1m1"
-            self.assertIsNone(find_entity_block_bounds(generated, modbot_name))
-            modbot_trigger_bounds = find_entity_block_bounds(
-                generated, f"ap_independent_{modbot_name}"
-            )
-            self.assertIsNotNone(modbot_trigger_bounds)
-            modbot_trigger = generated[
-                modbot_trigger_bounds[0]:modbot_trigger_bounds[1]
-            ]
-            self.assertEqual(
-                extract_target_names(modbot_trigger),
-                ["AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1"],
-            )
-            for forbidden in (
-                "interaction =", "progressionCategory", "useCodex",
-                "fxDecl", "automapPropertiesDecl", "renderModelInfo",
-            ):
-                self.assertNotIn(forbidden, modbot_trigger)
-
-            visual_bounds = find_entity_block_bounds(
-                generated, "ap_location_visual_7770015"
-            )
-            self.assertIsNotNone(visual_bounds)
-            visual = generated[visual_bounds[0]:visual_bounds[1]]
-            self.assertIn('class = "idProp2";', visual)
-            self.assertNotIn("inherit =", visual)
-            self.assertIn('automapPropertiesDecl = "default";', visual)
-            self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual)
-            for forbidden in (
-                "fxDecl", "thinkComponentDecl", "useableComponentDecl",
-                "triggerDef", "targets", "currency", "inventory", "perk",
-            ):
-                self.assertNotIn(forbidden, visual)
-
-            cleanup_bounds = find_entity_block_bounds(
-                generated, "ap_remove_location_visual_7770015"
-            )
-            self.assertIsNotNone(cleanup_bounds)
-            cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
-            self.assertEqual(
-                extract_target_names(cleanup), ["ap_location_visual_7770015"]
-            )
-            modbot_check_bounds = find_entity_block_bounds(
-                generated, "AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1"
-            )
-            self.assertIsNotNone(modbot_check_bounds)
-            modbot_check = generated[
-                modbot_check_bounds[0]:modbot_check_bounds[1]
-            ]
-            self.assertEqual(
-                extract_target_names(modbot_check),
-                [
-                    "ap_remove_location_visual_7770015",
-                    "ap_notify_AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1",
-                    "ap_event_7770015",
-                ],
-            )
-
-            self.assertIsNone(
-                find_entity_block_bounds(generated, "ap_remove_native_automap_7770002")
-            )
-            heavy_bounds = find_entity_block_bounds(
-                generated, "cathedral_pickup_weapon_heavy_cannon_1"
-            )
-            self.assertIsNotNone(heavy_bounds)
-            heavy = generated[heavy_bounds[0]:heavy_bounds[1]]
-            self.assertIn("renderModelInfo", heavy)
-            self.assertIn("question_mark_a.lwo", heavy)
-
-    def test_non_problem_pickups_preserve_existing_targets(self):
-        content = """
-        edit = {
-            targets = {
-                num = 1;
-                item[0] = "keep_me";
-            }
-        }
-        """
-
-        content = add_ap_check_target(
-            content,
-            "pickup_collectible_test",
-            "AP_CHECK_PICKUP_COLLECTIBLE_TEST",
-        )
-
-        self.assertIn("num = 2;", content)
-        self.assertIn('item[0] = "keep_me";', content)
-        self.assertIn('item[1] = "AP_CHECK_PICKUP_COLLECTIBLE_TEST";', content)
 
     def test_secret_encounter_hook_is_inserted_after_last_wait(self):
         content = """

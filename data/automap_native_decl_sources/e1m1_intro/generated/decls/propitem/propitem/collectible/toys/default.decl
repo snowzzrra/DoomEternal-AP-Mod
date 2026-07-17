@@ -1,0 +1,9 @@
+{
+	inherit = "propitem/collectible/default";
+	edit = {
+		use_statIncrease = "STAT_INVALID";
+		inventoryCount = 1;
+		xp = 20;
+		collectible = NULL;
+	}
+}

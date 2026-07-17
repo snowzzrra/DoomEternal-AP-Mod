@@ -240,5 +240,10 @@
     "7770118": {
         "type": "perk",
         "perk": "perk/player/equipment/ice_melee_shatter"
+    },
+    "7770142": {
+        "type": "currency",
+        "currency": "CURRENCY_SENTINEL_BATTERY",
+        "count": 2
     }
 }

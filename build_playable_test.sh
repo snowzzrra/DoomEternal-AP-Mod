@@ -344,40 +344,40 @@ PY
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
-    if rg -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
+    if grep -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
         echo "Rejected stat-write bootstrap entered the normal build: $generated_map" >&2
         exit 1
     fi
 done
-if rg -q 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"; then
+if grep -q 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"; then
     echo "Exultia Heavy Cannon fallback reappeared" >&2
     exit 1
 fi
-if rg -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+if grep -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
     "$OUTPUT_DIR/mod" "$GENERATED_MAPS_DIR" "$OUTPUT_DIR/client/data/items.json"; then
     echo "Rejected Armor Drain or watcher architecture entered build" >&2
     exit 1
 fi
-if rg -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_client.py"; then
+if grep -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_client.py"; then
     echo "Old goal-only transition handler entered build" >&2
     exit 1
 fi
 mapfile -t MASTERY_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \( \
     -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
     -path '*/generated/decls/perks/perk/player/weapons/*' \
-\) | sort)
+\) | LC_ALL=C sort)
 [[ "${#MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Base Mastery override set is incomplete" >&2; exit 1; }
-if rg -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${MASTERY_OVERRIDE_FILES[@]}"; then
+if grep -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${MASTERY_OVERRIDE_FILES[@]}"; then
     echo "Mastery override retains natural reward, completion stat, or global stat" >&2
     exit 1
 fi
-if ! rg -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
+if ! grep -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
     "$OUTPUT_DIR/mod/gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl"; then
     echo "Sticky AP gameplay upgrade missing" >&2
     exit 1
 fi
 mapfile -t CHALLENGE_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \
-    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | sort)
+    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | LC_ALL=C sort)
 [[ "${#CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Cultist Base Mission Challenge override set is incomplete" >&2; exit 1; }
 if find "$OUTPUT_DIR/mod" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
     ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
@@ -387,13 +387,13 @@ if find "$OUTPUT_DIR/mod" -type f -path '*/generated/decls/unlockable/mission_ch
     echo "Unscoped Mission Challenge override entered build" >&2
     exit 1
 fi
-if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${CHALLENGE_OVERRIDE_FILES[@]}"; then
+if grep -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${CHALLENGE_OVERRIDE_FILES[@]}"; then
     echo "Cultist Mission Challenge child override contains an unscoped currency name" >&2
     exit 1
 fi
 for challenge_override in "${CHALLENGE_OVERRIDE_FILES[@]}"; do
-    if [[ "$(rg -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
-        [[ "$(rg -c 'num = 0;' "$challenge_override")" != "1" ]]; then
+    if [[ "$(grep -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
+        [[ "$(grep -c 'num = 0;' "$challenge_override")" != "1" ]]; then
         echo "Cultist Mission Challenge reward suppression is missing: $challenge_override" >&2
         exit 1
     fi
@@ -464,7 +464,7 @@ if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     exit 1
 fi
 mapfile -t AUDIT_CHALLENGE_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \
-    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | sort)
+    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | LC_ALL=C sort)
 [[ "${#AUDIT_CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Final ZIP Cultist Mission Challenge override set drifted" >&2; exit 1; }
 if find "$MOD_AUDIT_DIR" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
     ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
@@ -474,13 +474,13 @@ if find "$MOD_AUDIT_DIR" -type f -path '*/generated/decls/unlockable/mission_cha
     echo "Final ZIP contains an unscoped Mission Challenge override" >&2
     exit 1
 fi
-if rg -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; then
+if grep -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; then
     echo "Final ZIP Cultist challenge child override contains an unscoped currency name" >&2
     exit 1
 fi
 for challenge_override in "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; do
-    if [[ "$(rg -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
-        [[ "$(rg -c 'num = 0;' "$challenge_override")" != "1" ]]; then
+    if [[ "$(grep -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
+        [[ "$(grep -c 'num = 0;' "$challenge_override")" != "1" ]]; then
         echo "Final ZIP challenge reward suppression drifted: $challenge_override" >&2
         exit 1
     fi
@@ -495,18 +495,18 @@ fi
 mapfile -t AUDIT_MASTERY_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \( \
     -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
     -path '*/generated/decls/perks/perk/player/weapons/*' \
-\) | sort)
+\) | LC_ALL=C sort)
 [[ "${#AUDIT_MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Final ZIP base Mastery override set drifted" >&2; exit 1; }
-if rg -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${AUDIT_MASTERY_OVERRIDE_FILES[@]}"; then
+if grep -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${AUDIT_MASTERY_OVERRIDE_FILES[@]}"; then
     echo "Final ZIP does not isolate Mastery item and location paths" >&2
     exit 1
 fi
-if rg -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+if grep -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
     "$MOD_AUDIT_DIR" "$EXTRACTED_AUDIT_DIR/client/data/items.json"; then
     echo "Final ZIP contains Armor Drain or rejected watcher architecture" >&2
     exit 1
 fi
-if rg -q 'Ignoring unexpected goal transition event' \
+if grep -q 'Ignoring unexpected goal transition event' \
     "$EXTRACTED_AUDIT_DIR/client/bridge_client.py"; then
     echo "Final ZIP contains old goal-only transition handler" >&2
     exit 1
@@ -524,7 +524,7 @@ python3 "$SCRIPT_DIR/tools/audit_packaged_transition_bridge.py" \
     "$SCRIPT_DIR/data/challenge_location_registry.json" \
     "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
     "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
-mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | rg -v '/$' | sort)
+mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | grep -v '/$' | LC_ALL=C sort)
 mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
 import json
 import sys
@@ -539,7 +539,7 @@ if [[ "${PACKAGE_FILES[*]}" != "${ALLOWED_FILES[*]}" ]]; then
     printf 'actual:\n%s\nallowed:\n%s\n' "${PACKAGE_FILES[*]}" "${ALLOWED_FILES[*]}" >&2
     exit 1
 fi
-if printf '%s\n' "${PACKAGE_FILES[@]}" | rg -i -q '(^|/)(playtests?|tests?|build|staging|__pycache__|\.git|todo|session|decisions|pitfalls|architecture)(/|$)|(^|/).*\.log$|(^|/).*\.pid$|(^|/)ap_config\.json$|(^|/)\.local\.env$|(^|/).*-(dev|debug)(\.|/|$)|AP_ICE_DIAG|(^|/).*(condump|seed|cache|output|diagnostic)'; then
+if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q '(^|/)(playtests?|tests?|build|staging|__pycache__|\.git|todo|session|decisions|pitfalls|architecture)(/|$)|(^|/).*\.log$|(^|/).*\.pid$|(^|/)ap_config\.json$|(^|/)\.local\.env$|(^|/).*-(dev|debug)(\.|/|$)|AP_ICE_DIAG|(^|/).*(condump|seed|cache|output|diagnostic)'; then
     echo "Final ZIP contains a forbidden internal or development artifact" >&2
     exit 1
 fi
@@ -547,7 +547,7 @@ if find "$OUTPUT_DIR/build" -type f -name '*.txt' -print -quit | grep -q .; then
     echo "Runtime-test .txt files are forbidden in build/release/build" >&2
     exit 1
 fi
-if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | rg -n -i '(/run/media/system/Eris/|/var/home/guilherme/|[A-Z]:\\\\Users\\\\guilherme\\|ap_ice_diag)' >/dev/null; then
+if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | grep -E -n -i '(/run/media/system/Eris/|/var/home/guilherme/|[A-Z]:\\\\Users\\\\guilherme\\|ap_ice_diag)' >/dev/null; then
     echo "Final ZIP text contains a personal path or diagnostic marker" >&2
     exit 1
 fi

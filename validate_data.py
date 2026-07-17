@@ -39,6 +39,16 @@ ROOT = Path(__file__).resolve().parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
 MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
 AUTOMAP_FAMILY_REGISTRY_PATH = ROOT / "data" / "automap_family_registry.json"
+BATTERY_LOCATIONS = {
+    "Exultia - Sentinel Battery": 7770084,
+    "Cultist Base - Sentinel Battery 1": 7770057,
+    "Cultist Base - Sentinel Battery 2": 7770069,
+    "Cultist Base - Sentinel Battery 3": 7770070,
+}
+BATTERY_ITEM_COMMANDS = {
+    7770016: 1,
+    7770142: 2,
+}
 
 
 def read_json(path: Path) -> dict:
@@ -243,7 +253,7 @@ def validate_automap_family_registry(
 
 
 def validate_generated_automap_carriers() -> list[str]:
-    """Prove each enabled native carrier keeps only marker state, not a reward.
+    """Audit native carriers and reject the unresolved persistent-visual cut.
 
     This is deliberately generated-map validation: source metadata alone cannot
     prove that the independent AP trigger did not drift from its exact vanilla
@@ -251,6 +261,11 @@ def validate_generated_automap_carriers() -> list[str]:
     """
     errors: list[str] = []
     registry = read_json(AUTOMAP_FAMILY_REGISTRY_PATH)["families"]
+    exact_families = {
+        location_id: family_name
+        for family_name, family in registry.items()
+        for location_id in family.get("match", {}).get("location_ids", [])
+    }
     sources = read_json(MAP_SOURCES_PATH)["maps"]
     items = read_json(ROOT / "data" / "items.json")
     reward_terms = (
@@ -281,19 +296,52 @@ def validate_generated_automap_carriers() -> list[str]:
             generated = output.read_text(encoding="utf-8")
             if "ap_remove_native_automap_" in generated:
                 errors.append(f"Automap carrier marker removal reappeared in {map_key}")
+            secret_count = len(config.get("secret_encounters", []))
+            if generated.count('automapPropertiesDecl = "automap_encounter_secret";') < secret_count:
+                errors.append(
+                    f"Automap secret marker coverage drift in {map_key}: "
+                    f"expected at least {secret_count} native markers"
+                )
             for ap_check, location_id in config.get("entities", {}).items():
                 entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+                policy = config.get("target_policies", {}).get(entity_name, {})
                 source_bounds = find_entity_block_bounds(vanilla, entity_name)
                 if source_bounds is None:
                     continue
                 source_block = vanilla[source_bounds[0]:source_bounds[1]]
                 inherit = entity_scalar(source_block, "inherit") or ""
-                family = next((
-                    value for value in registry.values()
-                    if value.get("carrier_mode") == "persistent_native_idprop2"
-                    and any(inherit.startswith(prefix) for prefix in value["match"].get("inherit_prefixes", []))
+                family_name = exact_families.get(location_id) or next((
+                    name for name, value in registry.items()
+                    if any(
+                        inherit.startswith(prefix)
+                        for prefix in value["match"].get("inherit_prefixes", [])
+                    )
                 ), None)
-                if family:
+                family = registry.get(family_name, {})
+                if family.get("carrier_mode") == "persistent_native_idprop2":
+                    if policy.get("native_automap_contract"):
+                        carrier_bounds = find_entity_block_bounds(generated, entity_name)
+                        if carrier_bounds is None:
+                            errors.append(
+                                f"Native Automap prototype missing for {location_id}"
+                            )
+                            continue
+                        carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
+                        if "useableComponentDecl" not in carrier:
+                            errors.append(
+                                f"Native Automap lifecycle stripped for {location_id}"
+                            )
+                        if "fxDecl" in carrier or "updateFX" in carrier:
+                            errors.append(f"Native Automap fire FX retained for {location_id}")
+                        expected = [*extract_target_names(source_block), ap_check]
+                        if extract_target_names(carrier) != expected:
+                            errors.append(f"Native Automap AP target drift for {location_id}")
+                        errors.append(
+                            f"Native Automap prototype runtime pending for {location_id}: "
+                            "zero-XP reward cut, removal, marker transition, and reload "
+                            "have no runtime PASS"
+                        )
+                        continue
                     carrier_bounds = find_entity_block_bounds(generated, entity_name)
                     trigger_bounds = find_entity_block_bounds(
                         generated, f"ap_independent_{entity_name}"
@@ -317,6 +365,53 @@ def validate_generated_automap_carriers() -> list[str]:
                         errors.append(f"Automap functional target drift for {location_id}")
                     if extract_target_names(trigger).count(ap_check) != 1:
                         errors.append(f"Automap AP check multiplicity drift for {location_id}")
+                    errors.append(
+                        "Automap lifecycle unresolved for "
+                        f"{location_id}/{entity_name}: reward-free carrier has no "
+                        "proven physical-removal/FX-shutdown/collected-marker writer"
+                    )
+                elif family_name in {"sentinel_crystals", "modbots", "runes"}:
+                    visual = policy.get("independent_visual", {})
+                    completion_targets = policy.get("completion_targets", [])
+                    if visual and completion_targets:
+                        visual_name = visual.get("entity_name")
+                        cleanup_name = visual.get("cleanup_entity")
+                        visual_bounds = find_entity_block_bounds(generated, visual_name)
+                        cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
+                        check_bounds = find_entity_block_bounds(generated, ap_check)
+                        if not all((visual_bounds, cleanup_bounds, check_bounds)):
+                            errors.append(
+                                f"Generic Automap prototype graph missing for {location_id}"
+                            )
+                            continue
+                        cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
+                        check = generated[check_bounds[0]:check_bounds[1]]
+                        if extract_target_names(cleanup) != [visual_name]:
+                            errors.append(
+                                f"Generic Automap cleanup escaped visual for {location_id}"
+                            )
+                        if cleanup_name not in extract_target_names(check):
+                            errors.append(
+                                f"Generic Automap live cleanup is disconnected for {location_id}"
+                            )
+                        errors.append(
+                            f"Generic Automap prototype runtime pending for {location_id}: "
+                            "visual/marker removal and checked-state reload bootstrap "
+                            "have no runtime PASS"
+                        )
+                        continue
+                    errors.append(
+                        f"Automap marker unresolved for {location_id}/{entity_name}: "
+                        f"{family_name} collected state is coupled to an unsafe native interaction"
+                    )
+                elif family_name in {
+                    "ability_progression", "weapons_equipment",
+                    "independent_ice_trigger", "independent_rocket_trigger",
+                }:
+                    errors.append(
+                        f"Automap marker missing for {location_id}/{entity_name}: "
+                        f"{family_name} has no proven generic marker lifecycle"
+                    )
                 elif inherit.startswith("progress/praetor_token"):
                     generated_bounds = find_entity_block_bounds(generated, entity_name)
                     if generated_bounds is None:
@@ -335,6 +430,113 @@ def validate_generated_automap_carriers() -> list[str]:
     return errors
 
 
+def validate_automap_prototypes_only() -> list[str]:
+    """Audit the two enabled Automap prototypes and the carrier rollback."""
+    errors: list[str] = []
+    sources = read_json(MAP_SOURCES_PATH)["maps"]
+    items = read_json(ROOT / "data" / "items.json")
+    allowed_visuals = {
+        "ap_location_visual_7770015",  # Automap prototype: Modbot.
+        "ap_location_visual_7770074",  # Existing Ice contract; not Automap work.
+    }
+
+    for source in sources.values():
+        if not source.get("enabled", True):
+            continue
+        config = read_json(ROOT / source["level_config"])
+        for entity_name, policy in config.get("target_policies", {}).items():
+            if "native_automap_carrier" in policy:
+                errors.append(f"Retired Automap carrier policy remains: {entity_name}")
+            if policy.get("native_automap_contract"):
+                errors.append(f"Unexpected native Automap prototype: {entity_name}")
+            visual = policy.get("independent_visual", {})
+            if visual.get("automap_properties_decl") and entity_name != (
+                "mech_street_progress_mod_bot_1_e1m1"
+            ):
+                errors.append(f"Unexpected generic Automap prototype: {entity_name}")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generated_dir = Path(tmpdir)
+        for map_key, source in sources.items():
+            if not source.get("enabled", True):
+                continue
+            config = read_json(ROOT / source["level_config"])
+            output = generated_dir / f"{map_key}.entities"
+            manifest = generated_dir / f"{map_key}.json"
+            try:
+                generate_map(
+                    ROOT / "vanillamaps" / source["source_file"], output,
+                    ROOT / source["level_config"], manifest, items,
+                )
+            except Exception as exc:
+                errors.append(f"Automap prototype generation failed for {map_key}: {exc}")
+                continue
+            generated = output.read_text(encoding="utf-8")
+            visual_names = set(re.findall(r"entityDef (ap_location_visual_\\d+)", generated))
+            unexpected_visuals = visual_names - allowed_visuals
+            if unexpected_visuals:
+                errors.append(
+                    f"Non-prototype generated inert visual remains in {map_key}: "
+                    f"{sorted(unexpected_visuals)}"
+                )
+
+            for ap_check, location_id in config.get("entities", {}).items():
+                entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+                if entity_name in {
+                    "mech_street_pickup_collectible_toys_doomguy_1",
+                    "mech_street_progress_mod_bot_1_e1m1",
+                } or "praetor_token" in entity_name or config.get(
+                    "target_policies", {}
+                ).get(entity_name, {}).get("independent_visual") or config.get(
+                    "target_policies", {}
+                ).get(entity_name, {}).get("native_entity_contract"):
+                    continue
+                bounds = find_entity_block_bounds(generated, entity_name)
+                if bounds is None:
+                    continue
+                block = generated[bounds[0]:bounds[1]]
+                for forbidden in (
+                    "automapPropertiesDecl", "fxDecl", "thinkComponentDecl",
+                    "question_mark_a.lwo",
+                ):
+                    if forbidden in block:
+                        errors.append(
+                            f"Retired Automap carrier field remains for {location_id}: "
+                            f"{forbidden}"
+                        )
+
+            if map_key != "e1m1_intro":
+                continue
+
+            visual_name = "ap_location_visual_7770015"
+            cleanup_name = "ap_remove_location_visual_7770015"
+            visual_bounds = find_entity_block_bounds(generated, visual_name)
+            cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
+            check_bounds = find_entity_block_bounds(
+                generated, "AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1"
+            )
+            if not all((visual_bounds, cleanup_bounds, check_bounds)):
+                errors.append("Modbot generic Automap prototype graph is incomplete")
+            else:
+                visual = generated[visual_bounds[0]:visual_bounds[1]]
+                cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
+                check = generated[check_bounds[0]:check_bounds[1]]
+                if any(term in visual for term in (
+                    "fxDecl", "thinkComponentDecl", "useableComponentDecl", "currency",
+                    "inventory", "perk", "targets",
+                )):
+                    errors.append("Modbot visual has a forbidden gameplay or FX edge")
+                if extract_target_names(cleanup) != [visual_name]:
+                    errors.append("Modbot cleanup target reaches outside the prototype visual")
+                if extract_target_names(check) != [
+                    cleanup_name,
+                    "ap_notify_AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1",
+                    "ap_event_7770015",
+                ]:
+                    errors.append("Modbot AP check target graph drifted")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
@@ -347,6 +549,21 @@ def main() -> int:
     if reused_location_ids:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
+    if {name: location_ids.get(name) for name in BATTERY_LOCATIONS} != BATTERY_LOCATIONS:
+        errors.append("Four physical Sentinel Battery AP locations must remain active")
+    if item_ids.get("Sentinel Battery") != 7770016:
+        errors.append("Sentinel Battery single item ID drifted")
+    if item_ids.get("Sentinel Battery Bundle") != 7770142:
+        errors.append("Sentinel Battery Bundle item ID drifted")
+    for item_id, count in BATTERY_ITEM_COMMANDS.items():
+        if commands.get(item_id) != {
+            "type": "currency",
+            "currency": "CURRENCY_SENTINEL_BATTERY",
+            "count": count,
+        }:
+            errors.append(f"Sentinel Battery AP command {item_id} must grant exactly {count}")
+    if sum(BATTERY_ITEM_COMMANDS.values()) != 3:
+        errors.append("Sentinel Battery item-type currency contract drifted")
     for deprecated_id in (7770019, 7770057):
         if deprecated_id not in reserved_item_ids:
             errors.append(f"Deprecated item ID {deprecated_id} is not reserved")
@@ -361,7 +578,7 @@ def main() -> int:
     runtime_location_mapping = read_json(ROOT / "data" / "runtime_locations.json")
     runtime_locations = set(runtime_location_mapping.values())
     errors.extend(validate_automap_family_registry(location_ids, runtime_locations))
-    errors.extend(validate_generated_automap_carriers())
+    errors.extend(validate_automap_prototypes_only())
     challenge_registry = load_challenge_registry()
     mastery_entries = challenge_registry["weapon_masteries"]
     for entry in mastery_entries:
@@ -457,6 +674,9 @@ def main() -> int:
             if location_id in manifests.values():
                 errors.append(f"Duplicate manifest location ID: {location_id}")
             manifests[declaration] = location_id
+    for location_id in BATTERY_LOCATIONS.values():
+        if list(manifests.values()).count(location_id) != 1:
+            errors.append(f"Physical Sentinel Battery {location_id} must have one active manifest check")
 
     physical_location_count = 0
     for path in sorted((ROOT / "level_configs").glob("*.json")):
@@ -562,7 +782,7 @@ def main() -> int:
     except ValueError as exc:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
-        "items": 115,
+        "items": 116,
         "locations": 100,
         "map_checks": 80,
         "runtime_locations": 20,
@@ -575,8 +795,8 @@ def main() -> int:
     except ValueError as exc:
         errors.append(f"Item delivery plan compilation failed: {exc}")
         plans = []
-    if len(plans) != 115:
-        errors.append(f"Expected 115 compiled item plans, found {len(plans)}")
+    if len(plans) != 116:
+        errors.append(f"Expected 116 compiled item plans, found {len(plans)}")
 
     generated_bootstrap = generate_bootstrap_entities()
     if generated_bootstrap or any(prefix in generated_bootstrap for prefix in BOOTSTRAP_ENTITY_PREFIXES):
@@ -625,6 +845,27 @@ def main() -> int:
     )
     if not all(fragment in generated_real_commands for fragment in battery_chain):
         errors.append("Sentinel Battery lacks the restored direct currency primitive")
+    battery_bundle_chain = (
+        f'entityDef {RPC_ENTITY_PREFIX}_7770142 {{',
+        'class = "idTarget_GiveItems";',
+        'currencyType = "CURRENCY_SENTINEL_BATTERY";',
+        "count = 2;",
+    )
+    if not all(fragment in generated_real_commands for fragment in battery_bundle_chain):
+        errors.append("Sentinel Battery Bundle must use direct map-side currency count 2")
+    if "CURRENCY_WEAPON_UPGRADE" in generated_real_commands:
+        errors.append("Weapon Point currency command entered the deferred 0.3.0 economy")
+    native_hook_terms = (
+        "WriteProcessMemory", "VirtualProtectEx", "VirtualAllocEx",
+        "CreateRemoteThread", "MH_CreateHook", "DetourAttach",
+    )
+    native_runtime_source = "\n".join(
+        (ROOT / name).read_text(encoding="utf-8", errors="ignore")
+        for name in ("ap_client_exe.cpp", "game_state_probe.cpp", "game_state_probe.h", "mhclient.cpp", "mhclient.h")
+    )
+    for term in native_hook_terms:
+        if term in native_runtime_source:
+            errors.append(f"Forbidden in-process/remote hook primitive entered runtime: {term}")
     if (
         'inherit = "target/give_item";' in generated_real_commands
         or 'inherit = "target/player_stat_modifier";' in generated_real_commands

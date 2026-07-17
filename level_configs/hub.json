@@ -11,8 +11,11 @@
     },
     "target_policies": {
         "pickup_equipment_flame_belch_1": {
-            "preserve_targets": [
-                "target_relay_pickup_flame_belch"
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "independent_targets": [
+                "target_relay_pickup_flame_belch",
+                "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1"
             ],
             "drop_targets": [
                 "target_give_item_flame_belch"
@@ -37,26 +40,14 @@
                 "target_give_item_ice_bomb"
             ]
         },
-        "progress_praetor_point_hub_1": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": ["target_relay_complete_praetor_obj"],
-                "required_snippets": [
-                    "\"game/sp/hub/from_e1m2\"",
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "stat = \"STAT_GAINED_FIRST_PRAETOR_TOKEN\";",
-                    "onUseCodexEntry = \"codex/tutorials/praetor_suit_perks\";",
-                    "progressionCategory = \"PROGRESSION_CATEGORY_ELITE\";",
-                    "useStat = \"STAT_SUIT_PAGE_UNLOCKED\";",
-                    "flags = {\n\t\t\thide = true;\n\t\t}"
-                ]
-            }
-        },
         "progress_argent_cell_1_1072112848": {
-            "gate_relay": "target_relay_argent_cell_useable"
+            "gate_relay": "target_relay_argent_cell_useable",
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "independent_targets": [
+                "target_relay_argent_cell_1_1072112848",
+                "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848"
+            ]
         }
     }
 }

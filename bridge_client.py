@@ -237,6 +237,7 @@ else:
 
 QUEUE_DIR = os.path.join(DOOM_BASE_DIR, "ap_queue")
 RPC_GATE_PATH = os.path.join(DOOM_BASE_DIR, "ap_rpc_enabled")
+GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
 INV_DUMP_DIR = SAVE_GAMES_DIR
 CULTIST_BASE_MAP = "game/sp/e1m3_cult/e1m3_cult"
 DOOM_HUNTER_BASE_MAP = "game/sp/e1m4_boss/e1m4_boss"
@@ -898,14 +899,21 @@ class PrimarySaveSelection(NamedTuple):
         return (self.slot_directory, str(self.path), self.mtime_ns)
 
 
-def active_primary_save(filename="game_duration.dat"):
-    """Return the newest valid primary campaign autosave, re-scanned per call."""
+class GameplaySaveEvidence(NamedTuple):
+    state: str
+    epoch: int
+    slot_directory: str
+    map_name: str
+
+
+def primary_save_candidates(filename="game_duration.dat"):
+    """Return valid primary slots newest-first; backups never qualify."""
     if (
         STEAM_REMOTE_DIR is None
         or STEAM_ID3 <= 0
         or not STEAM_REMOTE_DIR.is_dir()
     ):
-        return None
+        return []
 
     candidates = []
     for path in STEAM_REMOTE_DIR.glob(f"GAME-AUTOSAVE*/{filename}"):
@@ -921,15 +929,54 @@ def active_primary_save(filename="game_duration.dat"):
         candidates.append(
             PrimarySaveSelection(path.parent.name, full_path, stat.st_mtime_ns)
         )
-    if not candidates:
-        return None
-    return max(
+    return sorted(
         candidates,
         key=lambda selected: (
             selected.mtime_ns,
             int(selected.slot_directory.removeprefix("GAME-AUTOSAVE")),
         ),
+        reverse=True,
     )
+
+
+def active_primary_save(filename="game_duration.dat"):
+    """Compatibility view of the newest candidate, not an active-slot proof."""
+    candidates = primary_save_candidates(filename)
+    return candidates[0] if candidates else None
+
+
+def primary_save_for_slot(slot_directory, filename="game_duration.dat"):
+    for selected in primary_save_candidates(filename):
+        if selected.slot_directory == slot_directory:
+            return selected
+    return None
+
+
+def read_gameplay_save_evidence(path=None):
+    """Read the native gameplay/slot handshake published by ap_client.exe."""
+    path = Path(path or GAMEPLAY_SAVE_EVIDENCE_PATH)
+    try:
+        values = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        state = values.get("state", "")
+        epoch = int(values.get("epoch", "-1"))
+        slot_directory = values.get("slot", "")
+        map_name = canonical_map_name(values.get("map_name", ""))
+    except (OSError, UnicodeError, ValueError):
+        return None
+    if state == "menu":
+        return GameplaySaveEvidence(state, epoch, "", "")
+    if (
+        state != "gameplay"
+        or epoch < 0
+        or not re.fullmatch(r"GAME-AUTOSAVE\d+", slot_directory)
+        or not map_name
+    ):
+        return None
+    return GameplaySaveEvidence(state, epoch, slot_directory, map_name)
 
 
 def mastery_save_selection():
@@ -1250,6 +1297,14 @@ if os.path.exists(MANIFESTS_DIR):
             with open(os.path.join(MANIFESTS_DIR, filename), "r", encoding="utf-8") as f:
                 manifest_data = json.load(f)
                 DECL_TO_LOCATION.update(manifest_data)
+
+# Prototype-only cleanup registry. Each target removes one AP visual entity and
+# has no edge to a vanilla pickup, relay, objective, or progression entity.
+AUTOMAP_COMPLETION_BY_MAP = {
+    canonical_map_name("game/sp/e1m1_intro/e1m1_intro"): {
+        7770015: "ap_remove_location_visual_7770015",
+    },
+}
 
 poll_counter = 0
 
@@ -1625,9 +1680,11 @@ def read_telemetry_dump():
         logger.error(f"[Error] Failed to process telemetry condump: {e}")
         return [], None
 
-def read_game_details():
-    path = active_slot_file("game.details")
-    if not path:
+def read_game_details_for_selection(selected):
+    if selected is None:
+        return None
+    path = selected.path.parent / "game.details"
+    if not path.is_file():
         return None
 
     aad = f"{steam_id64(STEAM_ID3)}MANCUBUS{path.name}"
@@ -1646,6 +1703,15 @@ def read_game_details():
     except Exception as error:
         logger.error(f"[Save] Failed to decrypt {path}: {error}")
         return None
+
+
+def read_game_details():
+    """Compatibility view; runtime observers use lifecycle-proven selections."""
+    path = active_slot_file("game.details")
+    if not path:
+        return None
+    selected = PrimarySaveSelection(path.parent.name, path.parent / "game_duration.dat", 0)
+    return read_game_details_for_selection(selected)
 
 class DoomCommandProcessor(ClientCommandProcessor):
     def _cmd_doom_rpc_on(self):
@@ -1901,6 +1967,10 @@ class DoomEternalContext(CommonContext):
         self.death_probe_warning = None
         self.active_save_slot = None
         self.active_save_path = None
+        self.active_gameplay_epoch = None
+        self.runtime_observers_frozen = True
+        self.save_candidate_tokens = {}
+        self.last_save_slot_rejection = None
         self.save_slot_observations = {}
         self.last_mastery_records = {}
         self.weapon_masteries_observed = {}
@@ -1923,6 +1993,9 @@ class DoomEternalContext(CommonContext):
         self.last_rpc_map_name = None
         self.room_seed_name = None
         self.current_map_name = None
+        self.automap_cleanup_epoch = 0
+        self.automap_cleanup_session = uuid.uuid4().hex[:8]
+        self.automap_cleanup_delivered = {}
 
     def queue_dev_commands(self, commands, action):
         """Spool isolated dev commands without touching receipt/bootstrap state."""
@@ -1962,6 +2035,9 @@ class DoomEternalContext(CommonContext):
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
             asyncio.create_task(self.update_death_link(self.death_link_enabled))
             self.onboard_bootstrap("on_connect")
+            self.reconcile_checked_automap_cleanup("server_connected")
+        elif cmd == "RoomUpdate" and "checked_locations" in args:
+            self.reconcile_checked_automap_cleanup("server_checked_update")
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             if (
@@ -2024,6 +2100,90 @@ class DoomEternalContext(CommonContext):
         self.previous_checkpoint_death = self.checkpoint_death_by_save_slot.get(
             selected.slot_directory
         )
+
+    def log_save_slot_rejected(self, selected, reason, evidence_epoch=None):
+        if selected is None:
+            slot = "<none>"
+            path = "<none>"
+            mtime_ns = 0
+        else:
+            slot = selected.slot_directory
+            path = str(selected.path)
+            mtime_ns = selected.mtime_ns
+        rejection = (slot, path, mtime_ns, reason, evidence_epoch)
+        if rejection == self.last_save_slot_rejection:
+            return
+        self.last_save_slot_rejection = rejection
+        logger.info(
+            "SAVE_SLOT_REJECTED slot=%s reason=%s path=%s",
+            slot,
+            reason,
+            path,
+        )
+
+    def update_save_slot_lifecycle(self):
+        """Promote a modified primary slot only after native gameplay proof."""
+        candidates = primary_save_candidates()
+        for selected in candidates:
+            token = (str(selected.path), selected.mtime_ns)
+            if self.save_candidate_tokens.get(selected.slot_directory) != token:
+                self.save_candidate_tokens[selected.slot_directory] = token
+                logger.info(
+                    "SAVE_SLOT_CANDIDATE slot=%s path=%s mtime_ns=%s",
+                    selected.slot_directory,
+                    selected.path,
+                    selected.mtime_ns,
+                )
+
+        evidence = read_gameplay_save_evidence()
+        newest = candidates[0] if candidates else None
+        if evidence is None:
+            self.runtime_observers_frozen = True
+            self.log_save_slot_rejected(newest, "no_gameplay_evidence")
+            return None
+        if evidence.state != "gameplay":
+            self.runtime_observers_frozen = True
+            self.log_save_slot_rejected(newest, "menu", evidence.epoch)
+            return None
+
+        selected = primary_save_for_slot(evidence.slot_directory)
+        if selected is None:
+            self.runtime_observers_frozen = True
+            self.log_save_slot_rejected(newest, "no_gameplay_evidence", evidence.epoch)
+            return None
+
+        details = read_game_details_for_selection(selected)
+        if (
+            not details
+            or canonical_map_name(details.get("mapName")) != evidence.map_name
+        ):
+            self.runtime_observers_frozen = True
+            self.log_save_slot_rejected(selected, "map_mismatch", evidence.epoch)
+            return None
+
+        if (
+            self.active_save_slot != selected.slot_directory
+            or self.active_save_path != str(selected.path)
+        ):
+            if self.active_gameplay_epoch == evidence.epoch:
+                self.runtime_observers_frozen = True
+                self.log_save_slot_rejected(
+                    selected, "no_gameplay_evidence", evidence.epoch
+                )
+                return None
+            self.activate_save_selection(selected)
+        self.active_gameplay_epoch = evidence.epoch
+        self.runtime_observers_frozen = False
+
+        if newest and newest.slot_directory != selected.slot_directory:
+            self.log_save_slot_rejected(
+                newest, "no_gameplay_evidence", evidence.epoch
+            )
+        return selected
+
+    def active_game_details(self):
+        selected = self.update_save_slot_lifecycle()
+        return read_game_details_for_selection(selected) if selected else None
 
     def initialize_item_state(self):
         self.client_state = load_client_state()
@@ -2188,6 +2348,50 @@ class DoomEternalContext(CommonContext):
         state["last_trigger"] = trigger
         state["timestamp"] = time.time()
         self.persist_session_state()
+        return changed
+
+    def advance_automap_cleanup_epoch(self):
+        """Open one idempotent cleanup pass after a level-ready marker."""
+        self.automap_cleanup_epoch += 1
+        return self.automap_cleanup_epoch
+
+    def reconcile_checked_automap_cleanup(self, trigger):
+        """Remove only isolated AP visuals for server-checked map locations."""
+        map_name = canonical_map_name(self.current_map_name or "")
+        targets = AUTOMAP_COMPLETION_BY_MAP.get(map_name, {})
+        if not targets:
+            return False
+        checked = set(getattr(self, "checked_locations", set()))
+        checked.update(getattr(self, "locations_checked", set()))
+        changed = False
+        for location_id, entity_name in sorted(targets.items()):
+            if location_id not in checked:
+                continue
+            delivery_key = (map_name, location_id)
+            if self.automap_cleanup_delivered.get(delivery_key) == self.automap_cleanup_epoch:
+                continue
+            command_id = (
+                f"automap-cleanup-{self.automap_cleanup_session}-"
+                f"{location_id}-e{self.automap_cleanup_epoch}"
+            )
+            command = f"ai_ScriptCmdEnt {entity_name} activate"
+            if not send_command(
+                command,
+                coalesce_key=command_id,
+                already_queued_ok=True,
+            ):
+                continue
+            self.automap_cleanup_delivered[delivery_key] = self.automap_cleanup_epoch
+            changed = True
+            logger.info(
+                "[Automap] Checked-state cleanup queued location=%s map=%s "
+                "epoch=%s trigger=%s target=%s",
+                location_id,
+                map_name,
+                self.automap_cleanup_epoch,
+                trigger,
+                entity_name,
+            )
         return changed
 
     def bootstrap_actions(self):
@@ -2501,10 +2705,12 @@ class DoomEternalContext(CommonContext):
             )
 
     async def check_game_duration_death(self):
-        selected = mastery_save_selection()
+        selected = self.update_save_slot_lifecycle()
         if not selected:
-            return False
-        self.activate_save_selection(selected)
+            # The durable-save path is available but deliberately frozen until
+            # native gameplay evidence promotes a slot. Do not fall back to a
+            # newest-mtime game.details reader while in menus.
+            return True
         path = selected.path
         cache_key = selected.cache_key
         if cache_key == self.last_duration_cache_key:
@@ -2681,7 +2887,7 @@ class DoomEternalContext(CommonContext):
         )
 
     async def check_weapon_mastery_location(self, entry):
-        if not self.item_state_ready:
+        if not self.item_state_ready or self.runtime_observers_frozen:
             return
         unlockable = entry["signal"]["unlockable"]
         if not self.weapon_masteries_observed.get(unlockable):
@@ -2726,7 +2932,7 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_location(entry)
 
     async def check_mission_challenge_location(self, entry):
-        if not self.item_state_ready:
+        if not self.item_state_ready or self.runtime_observers_frozen:
             return
         unlockable = entry["signal"]["unlockable"]
         if not self.mission_challenges_observed.get(unlockable):
@@ -2774,7 +2980,11 @@ class DoomEternalContext(CommonContext):
 
     async def check_all_mission_challenges_location(self):
         """Check the aggregate only after all three durable native records match."""
-        if not self.item_state_ready or not self.all_mission_challenges_observed:
+        if (
+            not self.item_state_ready
+            or self.runtime_observers_frozen
+            or not self.all_mission_challenges_observed
+        ):
             return
         location_id = ALL_MISSION_CHALLENGES_ENTRY["location_id"]
         if location_id in self.checked_locations or location_id in self.locations_checked:
@@ -2813,7 +3023,7 @@ class DoomEternalContext(CommonContext):
         await self.check_weapon_mastery_location(STICKY_MASTERY_ENTRY)
 
     async def check_game_details_death(self):
-        details = read_game_details()
+        details = self.active_game_details()
         if not details:
             return
 
@@ -2981,7 +3191,7 @@ class DoomEternalContext(CommonContext):
         return True
 
     async def check_campaign_goal_save_fallback(self):
-        details = read_game_details()
+        details = self.active_game_details()
         if not details:
             return
         mtime = details.get("_mtime_ns")
@@ -3022,12 +3232,13 @@ class DoomEternalContext(CommonContext):
             await self.check_campaign_goal_save_fallback()
 
     def check_rpc_autopause(self):
-        details = read_game_details()
-        if not details:
+        evidence = read_gameplay_save_evidence()
+        if not evidence or evidence.state != "gameplay":
             self.last_rpc_map_name = None
+            self.current_map_name = None
             return
 
-        map_name = canonical_map_name(details.get("mapName"))
+        map_name = evidence.map_name
         self.current_map_name = map_name
         if self.last_rpc_map_name is None:
             self.last_rpc_map_name = map_name
@@ -3134,6 +3345,7 @@ class DoomEternalContext(CommonContext):
                 migrate_direct_item_command_jobs()
                 self.onboard_bootstrap("on_reconnect")
                 self.reconcile_owned_perks("connect_or_reconnect")
+                self.reconcile_checked_automap_cleanup("connect_or_reconnect")
                 if not self.repair_item_mappings():
                     await asyncio.sleep(0.25)
                     continue
@@ -3153,6 +3365,8 @@ class DoomEternalContext(CommonContext):
                             epoch,
                         )
                         self.reconcile_owned_perks("level_ready")
+                        self.advance_automap_cleanup_epoch()
+                        self.reconcile_checked_automap_cleanup("level_ready")
                     except Exception as e:
                         logger.error(f"[RPC] Auto-RPC failed to consume telemetry ready file: {e}")
 
