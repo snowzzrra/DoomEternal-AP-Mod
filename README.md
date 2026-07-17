@@ -18,13 +18,13 @@ sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
 Current PTB scope:
 
 - Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
-- Content: `80` map checks + `3` runtime Mission Complete locations; the runtime goal is an
-  independent state paired only with Cultist Base completion.
-- Challenges/masteries: vanilla behavior is restored. No Challenge/Mastery AP
-  location or reward stripping is active until a real source event is proven.
-- Automap/Dossier: the failed generic `idInfo` carrier design was removed. A
-  family-specific native prototype remains blocked until a reward-free native
-  collection/used edge is proven.
+- Content: `80` physical map checks + `20` runtime locations; the runtime goal
+  is an independent state paired only with Cultist Base completion.
+- Challenges/masteries: durable native save records drive their AP locations;
+  reward suppression remains scoped to the audited owners.
+- Automap/Dossier: final candidate is blocked. Stripping native reward use also
+  strips the only proven physical-removal, FX-shutdown and collected-marker
+  writer; generic `default` proves only a pre-collection marker.
 - Mission Complete: native publisher exists for Hell, Exultia and Cultist;
   bundled bridge consumes exact pairs and has an integration fixture.
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
@@ -671,7 +671,14 @@ Fix:
 
 - `randomize_chainsaw` defaults to `false`.
 - `randomize_dash` defaults to `false` and remains experimental.
-- `randomize_first_battery` defaults to `false` and remains experimental.
+- `randomize_first_battery` defaults to `false`. When enabled, the mandatory
+  first Sentinel Battery is shuffled into the item pool instead of being
+  locked to its Exultia pickup (`7770084`); the pickup remains an active,
+  normally randomized AP location. In both modes, two randomized `Sentinel
+  Battery Bundle (2)` items keep the total at five Batteries.
+  All four physical Battery pickups remain independent AP locations with zero
+  vanilla Battery grants. Their current persistent Automap carrier regression
+  is a release blocker, not accepted behavior.
 - Super Shotgun is currently kept vanilla/scripted in Cultist Base.
 - Meat Hook is not a separate PTB item because Super Shotgun grants it by
   default.
@@ -683,9 +690,13 @@ Fix:
 - Mission Complete identity exists for Hell, Exultia and Cultist Base; only
   Cultist also has independent goal. Native publisher is proven, bridge runtime
   consumption awaits instrumented retest.
-- Mastery/Challenge runtime locations await a real hook. No watcher/marker
-  architecture is active. Weapon Mastery Token remains absent from pool,
-  starting inventory and commands; generated maps reject `CURRENCY_WEAPON_MASTERY`.
+- Mastery and Mission Challenge locations use durable native save records; the
+  three Cultist challenge children keep `currencyToGive.num = 0`, including the
+  accepted aggregate reward suppression. Weapon Mastery Token remains absent
+  from pool, starting inventory and commands; generated maps reject
+  `CURRENCY_WEAPON_MASTERY`.
+- Weapon Point rewards remain fully vanilla in 0.3.0. Safe conversion is
+  deferred until the project owns an in-process, revision-gated hook host.
 - The first Fortress Praetor token keeps its native Suit bootstrap and AP
   check, but grants zero vanilla Praetor currency.
 

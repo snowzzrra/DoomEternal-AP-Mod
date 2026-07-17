@@ -51,6 +51,7 @@
                 "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"
             ],
             "remove_original": true,
+            "no_auto_visual": true,
             "preserve_layers": false,
             "preserve_targets": [
                 "game_target_relay_1244"

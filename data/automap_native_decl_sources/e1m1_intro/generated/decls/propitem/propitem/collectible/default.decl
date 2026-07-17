@@ -1,0 +1,11 @@
+{
+	edit = {
+		sound_pickup = "play_challenge_complete";
+		componentTypeInfo = "idUseableItemComponent";
+		use_statIncrease = "STAT_COLLECTIBLE_01_FOUND";
+		xp = 1;
+		notification = "hud/collectible_acquired";
+		collectible = "test";
+		suppressCodexHudNotification = true;
+	}
+}

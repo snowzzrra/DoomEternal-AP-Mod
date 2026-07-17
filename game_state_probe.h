@@ -13,6 +13,8 @@ public:
 
     void Poll();
     bool IsSafeForRpc() const;
+    bool IsGameplayLoaded() const;
+    bool IsLoading() const;
 
 private:
     bool Attach(DWORD processId);
@@ -20,7 +22,7 @@ private:
     DWORD FindGameProcess() const;
     bool FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) const;
     bool FindIdGameSystemLocal(uintptr_t& address) const;
-    bool ReadState(std::string& state, bool& safeForRpc) const;
+    bool ReadState(std::string& state, bool& safeForRpc);
     void Report(const std::string& state);
 
     template <typename T>
@@ -45,5 +47,7 @@ private:
     uintptr_t idGameSystemLocal_;
     DWORD nextAttachAttempt_;
     bool safeForRpc_;
+    bool gameplayLoaded_;
+    bool loading_;
     std::string lastReport_;
 };

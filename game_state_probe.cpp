@@ -77,7 +77,9 @@ GameStateProbe::GameStateProbe(LogFunction logFunction)
       moduleSize_(0),
       idGameSystemLocal_(0),
       nextAttachAttempt_(0),
-      safeForRpc_(false) {}
+      safeForRpc_(false),
+      gameplayLoaded_(false),
+      loading_(false) {}
 
 GameStateProbe::~GameStateProbe() {
     Detach();
@@ -261,9 +263,11 @@ void GameStateProbe::Detach() {
     moduleSize_ = 0;
     idGameSystemLocal_ = 0;
     safeForRpc_ = false;
+    gameplayLoaded_ = false;
+    loading_ = false;
 }
 
-bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) const {
+bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) {
     safeForRpc = false;
     unsigned char isLoading = 0;
     unsigned char isLoading2 = 0;
@@ -314,6 +318,11 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) const {
     }
 
     const bool cutsceneActive = cutsceneId > 1;
+    const bool gameplayLoaded = playerAvailable
+        && !isLoading
+        && isLoading2 == 0
+        && isInGame;
+    loading_ = isLoading || isLoading2 != 0;
     const bool safeCandidate = playerAvailable
         && !isLoading
         && isLoading2 == 0
@@ -323,8 +332,11 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) const {
         && !hideReticle
         && !hideHudForCinematic;
     safeForRpc = safeCandidate;
+    gameplayLoaded_ = gameplayLoaded;
 
-    state = std::string("Memory state: safe_candidate=")
+    state = std::string("Memory state: gameplay_loaded=")
+        + (gameplayLoaded ? "YES" : "NO")
+        + " safe_candidate="
         + (safeCandidate ? "YES" : "NO")
         + " isLoading=" + BoolText(isLoading)
         + " isLoading2=" + std::to_string(isLoading2)
@@ -343,6 +355,14 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) const {
 
 bool GameStateProbe::IsSafeForRpc() const {
     return safeForRpc_;
+}
+
+bool GameStateProbe::IsGameplayLoaded() const {
+    return gameplayLoaded_;
+}
+
+bool GameStateProbe::IsLoading() const {
+    return loading_;
 }
 
 void GameStateProbe::Report(const std::string& state) {
@@ -380,7 +400,10 @@ void GameStateProbe::Poll() {
 
     std::string state;
     bool safeForRpc = false;
-    ReadState(state, safeForRpc);
+    if (!ReadState(state, safeForRpc)) {
+        gameplayLoaded_ = false;
+        loading_ = false;
+    }
     safeForRpc_ = safeForRpc;
     Report(state);
 }

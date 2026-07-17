@@ -23,52 +23,5 @@
         "AP_CHECK_MECH_STREET_PICKUP_COLLECTIBLE_TOYS_DOOMGUY_1": 7770018,
         "AP_CHECK_CORNER_STREET_PICKUP_COLLECTIBLE_TOYS_IMP_2": 7770019,
         "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": 7770020
-    },
-    "target_policies": {
-        "barge_pickup_collectible_toys_zombie_1": {
-            "independent_ap_trigger": true,
-            "independent_targets": [
-                "barge_target_relay_1",
-                "AP_CHECK_BARGE_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_1"
-            ],
-            "independent_size": [6.0, 6.0, 6.0],
-            "preserve_targets": [
-                "barge_target_relay_1"
-            ],
-            "safe_target_graph": {
-                "barge_target_relay_1": [
-                    "barge_secret_door_1"
-                ],
-                "barge_secret_door_1": []
-            },
-            "forbidden_target_terms": [
-                "collectible",
-                "inventory",
-                "give",
-                "perk",
-                "currency"
-            ],
-            "native_automap_carrier": {
-                "automap_properties_decl": "collectible_demon_toy",
-                "source_inherit": "pickup/collectible/toys/zombie",
-                "source_class": "idProp2",
-                "source_progression_category": "PROGRESSION_CATEGORY_COLLECTIBLE",
-                "dossier_state": "blocked"
-            }
-        },
-        "pickup_pickup_extra_life_extra_life_1_6_e1m1": {
-            "independent_ap_trigger": true,
-            "independent_targets": [
-                "AP_CHECK_PICKUP_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M1"
-            ],
-            "independent_size": [6.0, 6.0, 6.0],
-            "native_automap_carrier": {
-                "automap_properties_decl": "extra_life",
-                "source_inherit": "pickup/extra_life/extra_life_1",
-                "source_class": "idProp2",
-                "source_progression_category": null,
-                "dossier_state": "not_applicable"
-            }
-        }
     }
 }

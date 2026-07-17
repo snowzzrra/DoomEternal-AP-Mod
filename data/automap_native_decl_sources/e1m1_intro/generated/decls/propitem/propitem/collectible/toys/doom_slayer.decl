@@ -1,0 +1,7 @@
+{
+	inherit = "propitem/collectible/toys/default";
+	edit = {
+		inventoryDecl = "collectible/toys/doom_slayer";
+		collectible = "toys/doomguy";
+	}
+}

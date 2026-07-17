@@ -96,8 +96,16 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         "owner": OWNER,
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
-        "reward_removed": "CURRENCY_PRAETOR_UPGRADE",
-        "battery_unchanged": True,
+        "aggregate_reward_suppression": {
+            "strategy": "child_currencyToGive_num_zero",
+            "field": "currencyToGive.num",
+            "value": 0,
+            "suppressed_native_rewards": [
+                "CURRENCY_PRAETOR_UPGRADE",
+                "CURRENCY_SENTINEL_BATTERY",
+            ],
+            "runtime_evidence": "v0.3.0c.1",
+        },
         "written_paths": written_paths,
     }
 

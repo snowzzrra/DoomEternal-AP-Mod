@@ -15,6 +15,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include "ap_client_path_utils.h"
 #include "game_state_probe.h"
@@ -25,7 +26,8 @@ MeathookInterface* g_MhInterface = nullptr;
 static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
-static const char* kReleaseVersion = "v0.3.0-pre-alpha-dev-c";
+static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
+static const char* kReleaseVersion = "v0.3.0-pre-alpha-dev";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kItemMappingRevision = 7;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
@@ -59,6 +61,7 @@ struct RpcWatchdogContext {
 };
 
 struct SaveSnapshot {
+    std::string slotDirectory;
     std::string path;
     std::string mapName;
     long long mtimeToken = 0;
@@ -761,9 +764,13 @@ public:
     explicit MissionTransitionMonitor(const RuntimePathInfo& runtimePaths)
         : runtimePaths_(runtimePaths) {}
 
-    void Poll() {
+    void Poll(bool gameplayLoaded, bool loading) {
         const DWORD now = GetTickCount();
-        if (now < nextPollTick_) {
+        const bool stateChanged = !gameplayStateInitialized_
+            || gameplayLoaded != gameplayLoaded_
+            || !loadingStateInitialized_
+            || loading != loading_;
+        if (!stateChanged && now < nextPollTick_) {
             return;
         }
         nextPollTick_ = now + kGoalMonitorPollMs;
@@ -772,7 +779,61 @@ public:
             return;
         }
 
-        const std::optional<SaveSnapshot> latest = ReadLatestSnapshot();
+        if (!loadingStateInitialized_ || loading != loading_) {
+            loadingStateInitialized_ = true;
+            loading_ = loading;
+            if (loading_) {
+                // Menu/cloud/delete writes already present at this edge cannot
+                // identify the slot being loaded into gameplay.
+                CaptureMenuSlotTokens();
+                sawLoadingForEpoch_ = true;
+            }
+        }
+
+        if (!gameplayStateInitialized_ || gameplayLoaded != gameplayLoaded_) {
+            const bool firstObservedState = !gameplayStateInitialized_;
+            gameplayStateInitialized_ = true;
+            gameplayLoaded_ = gameplayLoaded;
+            ++gameplayEpoch_;
+            if (!gameplayLoaded_) {
+                CaptureMenuSlotTokens();
+                WriteGameplayEvidence(std::nullopt);
+                return;
+            }
+
+            // A save write observed while the shell/menu is open is only a
+            // candidate. On a real load -> gameplay edge, require game.details
+            // to have changed since loading began before assigning identity.
+            // Starting the helper mid-game is the one bootstrap case.
+            const std::optional<SaveSnapshot> entered =
+                firstObservedState
+                    ? ReadLatestSnapshot()
+                    : sawLoadingForEpoch_
+                        ? ReadChangedSnapshot(menuSlotTokens_)
+                        : std::nullopt;
+            sawLoadingForEpoch_ = false;
+            if (!entered.has_value()) {
+                activeSlotDirectory_.clear();
+                WriteGameplayEvidence(std::nullopt);
+                return;
+            }
+            if (!lastSnapshot_.path.empty()
+                    && lastSnapshot_.slotDirectory == entered->slotDirectory
+                    && lastSnapshot_.mapName != entered->mapName) {
+                WriteTransitionEvent(lastSnapshot_.mapName, entered->mapName, entered->path);
+            }
+            activeSlotDirectory_ = entered->slotDirectory;
+            lastSnapshot_ = *entered;
+            WriteGameplayEvidence(entered);
+            return;
+        }
+
+        if (!gameplayLoaded_) {
+            CaptureMenuSlotTokens();
+            return;
+        }
+
+        const std::optional<SaveSnapshot> latest = ReadSlotSnapshot(activeSlotDirectory_);
         if (!latest.has_value()) {
             return;
         }
@@ -786,6 +847,7 @@ public:
         }
 
         lastSnapshot_ = *latest;
+        WriteGameplayEvidence(latest);
     }
 
 private:
@@ -900,7 +962,7 @@ private:
                 continue;
             }
             const std::string directoryName = entry.path().filename().string();
-            if (directoryName.rfind("GAME-AUTOSAVE", 0) != 0) {
+            if (!std::regex_match(directoryName, std::regex("GAME-AUTOSAVE[0-9]+"))) {
                 continue;
             }
 
@@ -931,6 +993,7 @@ private:
         }
 
         SaveSnapshot snapshot;
+        snapshot.slotDirectory = latestPath.parent_path().filename().string();
         snapshot.path = latestPath.string();
         snapshot.mtimeToken = latestToken;
         snapshot.mapName = ExtractMapName(plaintext);
@@ -938,6 +1001,122 @@ private:
             return std::nullopt;
         }
         return snapshot;
+    }
+
+    std::vector<std::pair<std::string, long long>> ReadSlotTokens() const {
+        std::vector<std::pair<std::string, long long>> tokens;
+        std::error_code error;
+        const std::filesystem::path remoteRoot(steamRemoteDir_);
+        if (!std::filesystem::is_directory(remoteRoot, error)) {
+            return tokens;
+        }
+        for (const auto& entry : std::filesystem::directory_iterator(remoteRoot, error)) {
+            if (error) {
+                break;
+            }
+            if (!entry.is_directory(error)) {
+                continue;
+            }
+            const std::string slot = entry.path().filename().string();
+            if (!std::regex_match(slot, std::regex("GAME-AUTOSAVE[0-9]+"))) {
+                continue;
+            }
+            const std::filesystem::path detailsPath = entry.path() / "game.details";
+            if (!std::filesystem::is_regular_file(detailsPath, error)) {
+                continue;
+            }
+            const auto writeTime = std::filesystem::last_write_time(detailsPath, error);
+            if (!error) {
+                tokens.emplace_back(slot, writeTime.time_since_epoch().count());
+            }
+            error.clear();
+        }
+        return tokens;
+    }
+
+    void CaptureMenuSlotTokens() {
+        menuSlotTokens_ = ReadSlotTokens();
+    }
+
+    std::optional<SaveSnapshot> ReadChangedSnapshot(
+        const std::vector<std::pair<std::string, long long>>& baseline
+    ) {
+        std::optional<SaveSnapshot> newestChanged;
+        for (const auto& [slot, token] : ReadSlotTokens()) {
+            const auto previous = std::find_if(
+                baseline.begin(),
+                baseline.end(),
+                [&slot](const auto& entry) { return entry.first == slot; }
+            );
+            if (previous != baseline.end() && previous->second == token) {
+                continue;
+            }
+            const std::optional<SaveSnapshot> candidate = ReadSlotSnapshot(slot);
+            if (candidate.has_value()
+                    && (!newestChanged.has_value()
+                        || candidate->mtimeToken > newestChanged->mtimeToken)) {
+                newestChanged = candidate;
+            }
+        }
+        return newestChanged;
+    }
+
+    std::optional<SaveSnapshot> ReadSlotSnapshot(const std::string& slotDirectory) {
+        if (!std::regex_match(slotDirectory, std::regex("GAME-AUTOSAVE[0-9]+"))) {
+            return std::nullopt;
+        }
+        std::error_code error;
+        const std::filesystem::path detailsPath =
+            std::filesystem::path(steamRemoteDir_) / slotDirectory / "game.details";
+        if (!std::filesystem::is_regular_file(detailsPath, error)) {
+            return std::nullopt;
+        }
+        const auto writeTime = std::filesystem::last_write_time(detailsPath, error);
+        if (error) {
+            return std::nullopt;
+        }
+        std::string plaintext;
+        if (!DecryptGameDetails(detailsPath, plaintext)) {
+            return std::nullopt;
+        }
+        SaveSnapshot snapshot;
+        snapshot.slotDirectory = slotDirectory;
+        snapshot.path = detailsPath.string();
+        snapshot.mtimeToken = writeTime.time_since_epoch().count();
+        snapshot.mapName = ExtractMapName(plaintext);
+        return snapshot.mapName.empty() ? std::nullopt : std::optional<SaveSnapshot>(snapshot);
+    }
+
+    void WriteGameplayEvidence(const std::optional<SaveSnapshot>& snapshot) {
+        const std::string temporaryPath = std::string(kGameplaySaveEvidencePath) + ".tmp";
+        FILE* output = fopen(temporaryPath.c_str(), "wb");
+        if (!output) {
+            return;
+        }
+        std::string contents =
+            "state=" + std::string(
+                !gameplayLoaded_ ? "menu" : snapshot.has_value() ? "gameplay" : "unproven"
+            ) + "\n"
+            + "epoch=" + std::to_string(gameplayEpoch_) + "\n";
+        if (gameplayLoaded_ && snapshot.has_value()) {
+            contents += "slot=" + snapshot->slotDirectory + "\n"
+                + "map_name=" + snapshot->mapName + "\n"
+                + "source_file=" + snapshot->path + "\n";
+        }
+        fwrite(contents.data(), 1, contents.size(), output);
+        fflush(output);
+        const int handle = _fileno(output);
+        if (handle >= 0) {
+            _commit(handle);
+        }
+        fclose(output);
+        if (!MoveFileExA(
+                temporaryPath.c_str(),
+                kGameplaySaveEvidencePath,
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+            )) {
+            DeleteFileA(temporaryPath.c_str());
+        }
     }
 
     bool DecryptGameDetails(
@@ -1068,7 +1247,15 @@ private:
     std::string steamRemoteDir_;
     unsigned long long steamId3_ = 0;
     SaveSnapshot lastSnapshot_;
+    std::string activeSlotDirectory_;
+    std::vector<std::pair<std::string, long long>> menuSlotTokens_;
     unsigned long long sequence_ = 0;
+    unsigned long long gameplayEpoch_ = 0;
+    bool gameplayStateInitialized_ = false;
+    bool gameplayLoaded_ = false;
+    bool loadingStateInitialized_ = false;
+    bool loading_ = false;
+    bool sawLoadingForEpoch_ = false;
     DWORD nextPollTick_ = 0;
     DWORD nextConfigRetryTick_ = 0;
 };
@@ -1420,7 +1607,10 @@ int main(int argc, char** argv) {
 
     while (true) {
         gameStateProbe.Poll();
-        missionTransitionMonitor.Poll();
+        missionTransitionMonitor.Poll(
+            gameStateProbe.IsGameplayLoaded(),
+            gameStateProbe.IsLoading()
+        );
         ImportSpoolFiles(queue);
 
         const DWORD now = GetTickCount();

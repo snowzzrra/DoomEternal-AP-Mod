@@ -21,7 +21,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_COLLECTIBLE",
       "collected_state_writer": "native idProp2 pickup/useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/collectible/toys/* plus collectible stats",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; Dossier writer is deferred",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": true
@@ -34,7 +34,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_CODEX",
       "collected_state_writer": "native codex useable transaction and STAT_CODEX_PICKUP_FOUND",
       "reward_edge": "useableComponentDecl=propitem/codex/*",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; Dossier writer is deferred",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": true
@@ -47,7 +47,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_CHEAT",
       "collected_state_writer": "native cheat useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "cheatcode useableComponentDecl",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; Dossier writer is deferred",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": true
@@ -60,7 +60,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_COLLECTIBLE_ALBUM",
       "collected_state_writer": "native album useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/collectible/albums/*",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; Dossier writer is deferred",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": true
@@ -109,7 +109,7 @@
       "dossier_total_owner": null,
       "collected_state_writer": "native sp_extra_life useable transaction",
       "reward_edge": "useableComponentDecl=sp_extra_life_1",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction edge, then use an independent AP trigger; no Dossier writer is added",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": false
@@ -122,7 +122,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_BATTERY",
       "collected_state_writer": "native battery useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/batteries/sentinel_battery",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; Dossier writer is deferred",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": true
@@ -147,7 +147,7 @@
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_KEY",
       "collected_state_writer": "native slayer-key useable transaction",
       "reward_edge": "useableComponentDecl=propitem/keycard/slayer_key",
-      "safe_cut": "preserve original idProp2 class/inherit/Automap metadata, replace only world render with approved AP question mark, strip every reward/interaction/progression edge, then use an independent AP trigger; no Dossier writer is added",
+      "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
       "vanilla_automap": true,
       "vanilla_exploration": false
@@ -248,14 +248,5 @@
       "vanilla_automap": false,
       "vanilla_exploration": false
     }
-  },
-  "pilot": {
-    "map_key": "e1m1_intro",
-    "marker_entities": {
-      "barge_pickup_collectible_toys_zombie_1": "collectible_demon_toy",
-      "pickup_pickup_extra_life_extra_life_1_6_e1m1": "extra_life"
-    },
-    "negative_control": "cathedral_pickup_weapon_heavy_cannon_1",
-    "dossier_blocked": ["toys_collectibles"]
   }
 }
