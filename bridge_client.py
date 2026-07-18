@@ -3161,12 +3161,15 @@ class DoomEternalContext(CommonContext):
                 continue
 
             try:
-                if transition["location_id"] == CULTIST_BASE_COMPLETE_LOCATION:
-                    sent = await self.send_campaign_goal("native transition event")
-                else:
-                    sent = await self.send_mission_complete(
-                        transition["location_id"], "native transition event"
-                    )
+                sent = await self.send_mission_complete(
+
+                    transition["location_id"],
+
+                    "native transition event",
+
+                    report_goal=(transition["location_id"] == CULTIST_BASE_COMPLETE_LOCATION)
+
+                )
             except Exception as error:
                 logger.error(
                     "[Mission] LOCATION_CHECK_RETRY id=%s error=%s",

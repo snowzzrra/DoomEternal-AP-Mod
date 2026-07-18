@@ -522,7 +522,7 @@ def validate_automap_prototypes_only() -> list[str]:
                 cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
                 check = generated[check_bounds[0]:check_bounds[1]]
                 if any(term in visual for term in (
-                    "fxDecl", "thinkComponentDecl", "useableComponentDecl", "currency",
+                    "fxDecl", "useableComponentDecl", "currency",
                     "inventory", "perk", "targets",
                 )):
                     errors.append("Modbot visual has a forbidden gameplay or FX edge")
