@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "hell_on_earth": {
+    "location_id": 7770122,
+    "map_key": "e1m1_intro",
+    "ap_check": "AP_CHECK_MISSION_COMPLETE_HELL_ON_EARTH",
+    "source_path": "../Tools/VanillaEntities/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_khan_maykr_priest_meeting/khan_maykr_priest_meeting_info_logic.decl",
+    "source_sha256": "08773eabd81997c8ee65326b0cd14aaf04251f1bcdab19cc0e6beb7895e53b77",
+    "override_path": "e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_khan_maykr_priest_meeting/khan_maykr_priest_meeting_info_logic.decl",
+    "override_sha256": "65cb0d2245ba89ca6f6d20ed36f59db295c5b9dca90417abd59d205146c9c749",
+    "node_id": 3509104422,
+    "original_targets": ["citadel_target_level_transition_3"]
+  },
+  "exultia": {
+    "location_id": 7770123,
+    "map_key": "e1m2_war",
+    "ap_check": "AP_CHECK_MISSION_COMPLETE_EXULTIA",
+    "owner": "extraction_map_exit_level_transition_relay_1723732033",
+    "source_path": "vanillamaps/e1m2_war.map",
+    "source_sha256": "19813480f5b0382c11f2c60dfc0feea2112f2793595231e48e30a3ba38495d6d",
+    "original_targets": ["extraction_target_level_transition_1"],
+    "required_snippets": [
+      "class = \"idTarget_Count\";",
+      "count = 1;",
+      "delay = 1.25;"
+    ]
+  }
+}

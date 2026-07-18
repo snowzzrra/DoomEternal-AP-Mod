@@ -96,8 +96,6 @@ value_mismatch=[(k, expected[k], actual[k]) for k in sorted(set(expected)&set(ac
 assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_expected={only_expected} | only_actual={only_actual} | value_mismatch={value_mismatch}"' \
         "$SCRIPT_DIR/$manifest_path" "$generated_manifest"
 
-    "$TOOLS_DIR/idFileDeCompressor" --compress \
-        "$generated_file" "$packaged_file"
 }
 
 rm -rf "$OUTPUT_DIR"
@@ -149,6 +147,36 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$resource_path" \
         "$relative_entities_path" \
         "$supported_game_revision"
+done
+
+python3 "$SCRIPT_DIR/mission_complete_map_patcher.py" \
+    --contracts "$SCRIPT_DIR/data/mission_complete_map_contracts.json" \
+    --generated-map "e1m1_intro=$GENERATED_MAPS_DIR/e1m1_intro.entities" \
+    --generated-map "e1m2_war=$GENERATED_MAPS_DIR/e1m2_war.entities" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/mission-complete-map-patch.json"
+python3 - "$TEMP_DIR/mission-complete-map-patch.json" <<'PY'
+import json
+import sys
+
+audit = json.load(open(sys.argv[1], encoding="utf-8"))
+assert audit["unrelated_generated_entity_diff_count"] == 0
+assert audit["hell_on_earth"]["after_targets"] == [
+    "AP_CHECK_MISSION_COMPLETE_HELL_ON_EARTH",
+    "citadel_target_level_transition_3",
+]
+assert audit["exultia"]["after_targets"] == [
+    "AP_CHECK_MISSION_COMPLETE_EXULTIA",
+    "extraction_target_level_transition_1",
+]
+PY
+
+for map_row in "${MAP_ROWS[@]}"; do
+    IFS=$'\t' read -r map_key _ _ _ _ resource_path relative_entities_path _ <<< "$map_row"
+    resource_name="$(basename "$resource_path" .resources)"
+    "$TOOLS_DIR/idFileDeCompressor" --compress \
+        "$GENERATED_MAPS_DIR/$map_key.entities" \
+        "$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
 done
 
 python3 "$SCRIPT_DIR/automap_native_decl_builder.py" \

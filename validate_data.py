@@ -23,7 +23,9 @@ from ap_map_generator import (
     find_entity_block_bounds,
     extract_target_names,
     generate_map,
+    validate_target_policies,
 )
+from automap_baseline_guard import assert_separate_automap_helper_guard
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
     compile_all_item_plans,
@@ -431,15 +433,10 @@ def validate_generated_automap_carriers() -> list[str]:
 
 
 def validate_automap_prototypes_only() -> list[str]:
-    """Audit the two enabled Automap prototypes and the carrier rollback."""
+    """Audit generated Automap prototype graphs without rejecting normal visuals."""
     errors: list[str] = []
     sources = read_json(MAP_SOURCES_PATH)["maps"]
     items = read_json(ROOT / "data" / "items.json")
-    allowed_visuals = {
-        "ap_location_visual_7770015",  # Automap prototype: Modbot.
-        "ap_location_visual_7770074",  # Existing Ice contract; not Automap work.
-    }
-
     for source in sources.values():
         if not source.get("enabled", True):
             continue
@@ -472,13 +469,15 @@ def validate_automap_prototypes_only() -> list[str]:
                 errors.append(f"Automap prototype generation failed for {map_key}: {exc}")
                 continue
             generated = output.read_text(encoding="utf-8")
-            visual_names = set(re.findall(r"entityDef (ap_location_visual_\\d+)", generated))
-            unexpected_visuals = visual_names - allowed_visuals
-            if unexpected_visuals:
-                errors.append(
-                    f"Non-prototype generated inert visual remains in {map_key}: "
-                    f"{sorted(unexpected_visuals)}"
-                )
+            visual_names = set(re.findall(r"entityDef (ap_location_visual_\d+)", generated))
+            for visual_name in visual_names:
+                visual_bounds = find_entity_block_bounds(generated, visual_name)
+                if visual_bounds is None:
+                    errors.append(f"Generated Automap visual is unreadable: {visual_name}")
+                    continue
+                visual = generated[visual_bounds[0]:visual_bounds[1]]
+                if extract_target_names(visual):
+                    errors.append(f"Generated Automap visual has functional targets: {visual_name}")
 
             for ap_check, location_id in config.get("entities", {}).items():
                 entity_name = ap_check.removeprefix("AP_CHECK_").lower()
@@ -578,6 +577,10 @@ def main() -> int:
     runtime_location_mapping = read_json(ROOT / "data" / "runtime_locations.json")
     runtime_locations = set(runtime_location_mapping.values())
     errors.extend(validate_automap_family_registry(location_ids, runtime_locations))
+    try:
+        assert_separate_automap_helper_guard()
+    except ValueError as exc:
+        errors.append(f"Generated Automap helper validation failed: {exc}")
     errors.extend(validate_automap_prototypes_only())
     challenge_registry = load_challenge_registry()
     mastery_entries = challenge_registry["weapon_masteries"]
@@ -714,6 +717,17 @@ def main() -> int:
         errors.append("Enabled map sources are not aligned with level_configs/*.json")
 
     for map_key, source in enabled_map_sources.items():
+        config_path = ROOT / source["level_config"]
+        source_path = ROOT / "vanillamaps" / source["source_file"]
+        try:
+            config_data = read_json(config_path)
+            validate_target_policies(
+                config_data.get("entities", {}),
+                config_data.get("target_policies", {}),
+                source_path.read_text(encoding="utf-8"),
+            )
+        except ValueError as exc:
+            errors.append(f"Target-policy validation failed for {map_key}: {exc}")
         for required_key in (
             "source_file",
             "source_sha256",

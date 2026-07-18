@@ -19,7 +19,7 @@ REAPPLY_POLICIES = ("once_per_slot_revision", "once_per_map_load", "manual_only"
 SUPPORTED_MAPS = (
     "game/sp/e1m1_intro/e1m1_intro",
     "game/sp/hub/hub",
-    "game/sp/e1m2_war/e1m2_war",
+    "game/sp/e1m2_battle/e1m2_battle",
     "game/sp/e1m3_cult/e1m3_cult",
 )
 

@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +24,7 @@ from ap_map_generator import (
     remove_balanced_entity_blocks,
     remove_property_blocks,
     validate_source_file,
+    validate_target_policies,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -317,6 +319,137 @@ entity {
                 "canBePossessed",
             ):
                 self.assertNotIn(forbidden, trigger)
+
+    def test_flame_belch_replaces_vanilla_with_only_progression_and_ap_check(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "hub.entities")
+            manifest = Path(tmpdir, "hub.json")
+            generate_map(
+                ROOT / "vanillamaps" / "hub.map", output,
+                ROOT / "level_configs" / "hub.json", manifest,
+                json.loads((ROOT / "data" / "items.json").read_text()),
+            )
+            generated = output.read_text(encoding="utf-8")
+            self.assertIsNone(find_entity_block_bounds(
+                generated, "pickup_equipment_flame_belch_1"
+            ))
+            trigger_bounds = find_entity_block_bounds(
+                generated, "ap_independent_pickup_equipment_flame_belch_1"
+            )
+            self.assertIsNotNone(trigger_bounds)
+            trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
+            self.assertEqual(
+                extract_target_names(trigger),
+                [
+                    "target_relay_pickup_flame_belch",
+                    "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1",
+                ],
+            )
+            self.assertEqual(trigger.count("target_relay_pickup_flame_belch"), 1)
+            self.assertEqual(trigger.count("AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1"), 1)
+            self.assertNotIn("target_give_item_flame_belch", trigger)
+            self.assertNotRegex(
+                generated,
+                r'item\[\d+\]\s*=\s*"target_give_item_flame_belch";',
+            )
+            for forbidden in (
+                "pickup/equipment/flame_belch", "useableComponentDecl",
+                "equipOnPickup", "forceEquip", "itemList", "currencyList",
+            ):
+                self.assertNotIn(forbidden, trigger)
+
+    def test_praetor_suit_page_keeps_one_native_interaction_owner(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "hub.entities")
+            manifest = Path(tmpdir, "hub.json")
+            generate_map(
+                ROOT / "vanillamaps" / "hub.map", output,
+                ROOT / "level_configs" / "hub.json", manifest,
+                json.loads((ROOT / "data" / "items.json").read_text()),
+            )
+            generated = output.read_text(encoding="utf-8")
+            bounds = find_entity_block_bounds(generated, "progress_praetor_point_hub_1")
+            self.assertIsNotNone(bounds)
+            native = generated[bounds[0]:bounds[1]]
+            for required in (
+                'inherit = "progress/praetor_token";',
+                'class = "idInteractable_GiveItems";',
+                'onUseCodexEntry = "codex/tutorials/praetor_suit_perks";',
+                'useStat = "STAT_SUIT_PAGE_UNLOCKED";',
+                "interaction = {",
+                'item[0] = "target_relay_complete_praetor_obj";',
+            ):
+                self.assertIn(required, native)
+            self.assertNotIn("currencyList", native)
+            self.assertNotIn("CURRENCY_PRAETOR_UPGRADE", native)
+            self.assertEqual(
+                extract_target_names(native),
+                [
+                    "target_relay_complete_praetor_obj",
+                    "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1",
+                ],
+            )
+            self.assertIsNone(find_entity_block_bounds(
+                generated, "ap_independent_progress_praetor_point_hub_1"
+            ))
+            self.assertNotIn("ap_location_visual_7770081", generated)
+            self.assertEqual(
+                generated.count('item[0] = "target_relay_complete_praetor_obj";'), 1
+            )
+
+    def test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings(self):
+        cases = (
+            (
+                "e1m2_war", "capitol_progress_dash_1",
+                "capitol_func_mover_16",
+            ),
+            (
+                "e1m3_cult", "game_pickup_extra_life_extra_life_1_10_e1m3",
+                "game_func_mover_43",
+            ),
+        )
+        items = json.loads((ROOT / "data" / "items.json").read_text())
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for map_key, entity_name, parent in cases:
+                output = Path(tmpdir, f"{map_key}.entities")
+                manifest = Path(tmpdir, f"{map_key}.json")
+                generate_map(
+                    ROOT / "vanillamaps" / f"{map_key}.map", output,
+                    ROOT / "level_configs" / f"{map_key}.json", manifest, items,
+                )
+                generated = output.read_text(encoding="utf-8")
+                source = (ROOT / "vanillamaps" / f"{map_key}.map").read_text(
+                    encoding="utf-8"
+                )
+                source_bounds = find_entity_block_bounds(source, entity_name)
+                trigger_bounds = find_entity_block_bounds(
+                    generated, f"ap_independent_{entity_name}"
+                )
+                self.assertIsNotNone(source_bounds)
+                self.assertIsNotNone(trigger_bounds)
+                source_block = source[source_bounds[0]:source_bounds[1]]
+                trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
+                source_position = re.search(
+                    r'spawnPosition\s*=\s*\{.*?\n\s*\}', source_block, re.DOTALL
+                ).group(0)
+                self.assertIn(source_position, trigger)
+                self.assertIn(f'bindParent = "{parent}";', trigger)
+                self.assertIn("bindInfo", remove_property_blocks(trigger, "clipModelInfo"))
+                self.assertLess(trigger.index("clipModelInfo"), trigger.index("bindInfo"))
+
+    def test_target_policy_schema_rejects_unknown_and_unconsumed_configuration(self):
+        source = '''entity { entityDef pickup_test { edit = { targets = {
+            num = 1; item[0] = "known_target"; } } } }'''
+        with self.assertRaisesRegex(ValueError, "unsupported key"):
+            validate_target_policies(
+                {"AP_CHECK_PICKUP_TEST": 7770991},
+                {"pickup_test": {"not_a_policy": True}}, source,
+            )
+        with self.assertRaisesRegex(ValueError, "missing from source targets"):
+            validate_target_policies(
+                {"AP_CHECK_PICKUP_TEST": 7770991},
+                {"pickup_test": {"drop_targets": ["missing_target"]}}, source,
+            )
 
 
     def test_cultist_rocket_is_independent_one_shot_trigger_with_safe_relay(self):

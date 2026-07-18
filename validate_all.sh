@@ -15,6 +15,7 @@ python3 -m py_compile \
     challenge_registry.py \
     foundation.py \
     logic_decl_patcher.py \
+    mission_complete_map_patcher.py \
     mastery_decl_builder.py \
     mission_challenge_decl_builder.py \
     rune_decl_builder.py \
@@ -34,6 +35,7 @@ python3 -m unittest \
     tests.test_validate_data \
       tests.test_foundation \
       tests.test_logic_decl_patcher \
+      tests.test_mission_complete_map_patcher \
       tests.test_scripted_location_contracts \
       tests.test_save_scenarios
 python3 validate_data.py

@@ -18,15 +18,20 @@ def canonical_map_name(name: str | None) -> str | None:
     if not name:
         return name
     normalized = str(name).strip().replace("\\", "/").rstrip("/")
-    return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
+    if normalized in {"game/hub/hub", "game/sp/hub/hub"}:
+        return "game/hub/hub"
+    return normalized
 
 
 def load_challenge_registry(path: Path = REGISTRY_PATH) -> dict:
     registry = json.loads(path.read_text(encoding="utf-8"))
     for entry in registry.get("mission_complete", []):
         signal = entry.get("signal", {})
-        signal["from"] = canonical_map_name(signal.get("from"))
-        signal["to"] = canonical_map_name(signal.get("to"))
+        if signal.get("kind") == "native_transition":
+            signal["from"] = canonical_map_name(signal.get("from"))
+            signal["to"] = canonical_map_name(signal.get("to"))
+        elif signal.get("kind") == "map_terminal":
+            signal["runtime_map"] = canonical_map_name(signal.get("runtime_map"))
     validate_challenge_registry(registry)
     return registry
 
@@ -79,6 +84,15 @@ def validate_challenge_registry(registry: dict) -> None:
 
     for entry in registry["mission_complete"]:
         signal = entry.get("signal", {})
+        if entry["location_id"] in {7770122, 7770123}:
+            if set(signal) != {"kind", "runtime_map"} or signal["kind"] != "map_terminal":
+                raise ValueError(f"{entry['name']}: invalid map terminal signal")
+            if signal["runtime_map"] not in {
+                "game/sp/e1m1_intro/e1m1_intro",
+                "game/sp/e1m2_battle/e1m2_battle",
+            }:
+                raise ValueError(f"{entry['name']}: invalid runtime map identity")
+            continue
         if signal.get("kind") != "native_transition" or not signal.get("from") or not signal.get("to"):
             raise ValueError(f"{entry['name']}: invalid native transition signal")
         if signal["to"] == "game/sp/hub/hub":
