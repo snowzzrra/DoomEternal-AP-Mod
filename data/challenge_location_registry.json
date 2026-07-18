@@ -15,7 +15,7 @@
       "location_id": 7770123,
       "signal": {
         "kind": "native_transition",
-        "from": "game/sp/e1m2_battle/e1m2_battle",
+        "from": "game/sp/e1m2_war/e1m2_war",
         "to": "game/hub/hub"
       }
     },

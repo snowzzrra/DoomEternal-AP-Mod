@@ -199,6 +199,11 @@ def neutralize_conditional_pickup(content, entity_name):
     return content[:start] + block + content[end:]
 
 
+def apply_native_entity_contract(block, contract):
+    if "remove_block" in contract:
+        block = remove_property_blocks(block, contract["remove_block"])
+    return block
+
 def neutralize_conditional_pickup_block(block):
     """Leave a named vanilla pickup inert without preserving its targets."""
     block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "info/null";', block, count=1)
@@ -278,8 +283,8 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 \t\t\t\t\ty = {hitbox_size[1]};
 \t\t\t\t\tz = {hitbox_size[2]};
 \t\t\t\t}}
-{bind_info_line}
 \t\t\t}}
+{bind_info_line}
 \t\t\ttargets = {{
 \t\t\t\tnum = {len(targets)};
 {target_lines}
@@ -1033,10 +1038,11 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                 )
                 if target_policy and target_policy.get("independent_ap_trigger"):
                     if target_policy.get("remove_original", False) or (not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual")):
+                        drop = set(target_policy.get("drop_targets", []))
                         vanilla_targets = extract_target_names(block)
                         existing_independent = target_policy.get("independent_targets", [ap_check_id])
                         target_policy["independent_targets"] = list(dict.fromkeys(
-                            [t for t in vanilla_targets if t] + existing_independent
+                            [t for t in vanilla_targets if t and t not in drop] + existing_independent
                         ))
 
                     manifest_data[ap_check_id] = location_id
@@ -1053,9 +1059,14 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                         if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("independent_targets", []):
                             target_policy.setdefault("independent_targets", target_policy.get("independent_targets", [ap_check_id])).append(universal["independent_visual"]["cleanup_entity"])
                     if not target_policy.get("remove_original", False):
-                        new_blocks.append(
-                            "entity {" + neutralize_conditional_pickup_block(block)
-                        )
+                        if "native_entity_contract" in target_policy:
+                            new_blocks.append(
+                                "entity {" + apply_native_entity_contract(block, target_policy["native_entity_contract"])
+                            )
+                        else:
+                            new_blocks.append(
+                                "entity {" + neutralize_conditional_pickup_block(block)
+                            )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
