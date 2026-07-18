@@ -173,10 +173,11 @@ def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -
 def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> int:
     def blocks(text: str) -> dict[str, str]:
         result = {}
-        for name in re.findall(r"entityDef\s+([^\s{]+)", text):
-            bounds = find_entity_block_bounds(text, name)
-            if bounds:
-                result[name] = text[bounds[0]:bounds[1]]
+        pattern = re.compile(r"\bentity\s*\{\s*entityDef\s+([^\s{]+)")
+        for match in pattern.finditer(text):
+            opening = text.find("{", match.start())
+            end = _matching_brace(text, opening)
+            result[match.group(1)] = text[match.start():end]
         return result
 
     original = blocks(before)

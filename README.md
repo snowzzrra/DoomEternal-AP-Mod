@@ -156,11 +156,18 @@ ap_client.exe detects a real map transition in encrypted `game.details`
 
 ## Vanilla map sources
 
-Official builds now use `vanillamaps/*.map` as the canonical local input for
-the supported maps. `build_playable_test.sh` reads `data/map_sources.json`,
-verifies the expected SHA-256 for each enabled dump, generates fresh
-`build/generated-maps/*.entities`, and only then compresses those outputs into
-the release ZIP.
+`data/map_sources.json` is the single map registry. It drives enabled-map
+enumeration, vanilla source/hash, config, generated filename, manifest,
+runtime identity, resource owner/priority/path, validation, package layout and
+`RELEASE_MANIFEST.json`. `map_registry.py` constructs the generation,
+validation and package plans; test-only entries can exercise every plan but
+are structurally excluded from release assets.
+
+The four accepted maps are additionally frozen by
+`data/frozen_map_baselines.json`. The byte SHA-256/size is the acceptance gate;
+the normalized semantic hash is a diagnostic covering entity names/classes,
+ordered targets, bindParent, layers, transforms, AP IDs, manifests and scripted
+contracts while ignoring only comments and irrelevant whitespace.
 
 When the installed game revision changes:
 
@@ -179,6 +186,46 @@ registry.
 Playtests are manual. Build the playable bundle with `build_playable_test.sh`,
 then install and run it through the normal local workflow. Do not commit local
 paths, configuration, passwords, seeds, runtime output or logs.
+
+### New-map onboarding
+
+For each future map: back up the end-of-previous-mission save; add one registry
+entry; audit the vanilla owner/target graph with `map_preflight.py`; add proven
+APWorld locations/IDs; generate only that map while comparing all frozen
+baselines; run a short transition test from the saved final checkpoint; freeze
+the passed map; then continue. Keep one final save per mission. Doom Hunter Base
+is next and the end-of-Cultist save already exists. Developer test scripts and
+checklists never enter the player package.
+
+The preflight is fail-closed for source/config/manifest/container proof,
+source hash and resource priority, unique entity/AP identities, every original
+target and reward/progression edge, explicit drops, bind/local transform,
+layers/checkpoints/movers/gates, conditional pickup behavior, Mission Complete,
+and replacement-owner proof for any DECL resource. Unknown or unused fields
+fail validation; unclassified targets are never copied automatically.
+
+### APWorld prerequisite registry
+
+Rules live only in `worlds/doometernal/logic.py`; every direct prerequisite is
+also forbidden at its own location. Current exact table:
+
+- Armored Rain → Flame Belch; All Mission Challenges Completed `7770141` → Flame Belch.
+- Sticky Bombs → Sticky Bombs; Full Auto → Full Auto.
+- Precision Bolt/Micro Missiles → Heavy Cannon + matching mod.
+- Heat Blast/Microwave Beam → Plasma Rifle + matching mod.
+- Lock-on Burst/Remote Detonate → Rocket Launcher + matching mod.
+- Destroyer Blade/Arbalest → Ballista + matching mod.
+- Mobile Turret/Energy Shield → Chaingun + matching mod.
+
+No rule is proven for Pull the Crystal or Master of Turrets. Mastery reward
+items do not satisfy natural challenges, and no unrelated location exclusions
+are applied.
+
+Meat Hook Mastery is the explicit external-vanilla exception: the mandatory
+Cultist Base scripted Super Shotgun/Meat Hook sequence guarantees the capability,
+which has no active AP pool representation. It therefore has neither an AP
+access rule nor a direct placement exclusion; validated metadata records the
+exact source and rejects use for any capability active in the AP pool.
 
 `build_playable_test.sh` produces:
 

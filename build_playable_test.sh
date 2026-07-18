@@ -42,13 +42,14 @@ extract_and_build() {
     local source_sha256="$3"
     local config_path="$4"
     local manifest_path="$5"
-    local resource_path="$6"
-    local relative_entities_path="$7"
-    local supported_game_revision="$8"
+    local generated_output="$6"
+    local resource_path="$7"
+    local relative_entities_path="$8"
+    local supported_game_revision="$9"
     local resource_name
     resource_name="$(basename "$resource_path" .resources)"
     local source_map="$VANILLA_MAPS_DIR/$source_file"
-    local generated_file="$GENERATED_MAPS_DIR/$map_key.entities"
+    local generated_file="$GENERATED_MAPS_DIR/$generated_output"
     local generated_manifest="$GENERATED_MANIFESTS_DIR/$map_key.json"
     local packaged_file="$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
     local source_hash_before
@@ -113,37 +114,18 @@ fi
 cp -R "$SCRIPT_DIR/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 
 mapfile -t MAP_ROWS < <(
-    python3 - "$MAP_SOURCES_FILE" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as file:
-    map_sources = json.load(file).get("maps", {})
-
-for map_key, source in map_sources.items():
-    if not source.get("enabled", True):
-        continue
-    print("\t".join([
-        map_key,
-        source["source_file"],
-        source["source_sha256"],
-        source["level_config"],
-        source["manifest"],
-        source["resource_path"],
-        source["relative_entities_path"],
-        source["supported_game_revision"],
-    ]))
-PY
+    python3 "$SCRIPT_DIR/map_registry.py" release-rows --registry "$MAP_SOURCES_FILE"
 )
 
 for map_row in "${MAP_ROWS[@]}"; do
-    IFS=$'\t' read -r map_key source_file source_sha256 config_path manifest_path resource_path relative_entities_path supported_game_revision <<< "$map_row"
+    IFS=$'\t' read -r map_key source_file source_sha256 config_path manifest_path generated_output resource_path relative_entities_path supported_game_revision <<< "$map_row"
     extract_and_build \
         "$map_key" \
         "$source_file" \
         "$source_sha256" \
         "$config_path" \
         "$manifest_path" \
+        "$generated_output" \
         "$resource_path" \
         "$relative_entities_path" \
         "$supported_game_revision"
@@ -172,10 +154,10 @@ assert audit["exultia"]["after_targets"] == [
 PY
 
 for map_row in "${MAP_ROWS[@]}"; do
-    IFS=$'\t' read -r map_key _ _ _ _ resource_path relative_entities_path _ <<< "$map_row"
+    IFS=$'\t' read -r map_key _ _ _ _ generated_output resource_path relative_entities_path _ <<< "$map_row"
     resource_name="$(basename "$resource_path" .resources)"
     "$TOOLS_DIR/idFileDeCompressor" --compress \
-        "$GENERATED_MAPS_DIR/$map_key.entities" \
+        "$GENERATED_MAPS_DIR/$generated_output" \
         "$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
 done
 
@@ -242,6 +224,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$SCRIPT_DIR/bridge_client.py" "$SCRIPT_DIR/bootstrap_actions.py" \
     "$SCRIPT_DIR/challenge_registry.py" \
     "$SCRIPT_DIR/foundation.py" \
+    "$SCRIPT_DIR/map_registry.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
     "$SCRIPT_DIR/start_injector_windows.bat" \
     "$SCRIPT_DIR/ap_config.example.json" \
@@ -251,8 +234,12 @@ mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$SCRIPT_DIR/data/items.json" \
     "$SCRIPT_DIR/data/challenge_location_registry.json" \
     "$SCRIPT_DIR/data/runtime_locations.json" \
+    "$SCRIPT_DIR/data/map_sources.json" \
     "$OUTPUT_DIR/client/data/"
-cp -R "$SCRIPT_DIR/manifests/." "$OUTPUT_DIR/client/manifests/"
+for map_row in "${MAP_ROWS[@]}"; do
+    IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
+    cp "$SCRIPT_DIR/$manifest_path" "$OUTPUT_DIR/client/manifests/"
+done
 cp -R "$SCRIPT_DIR/player_templates" "$OUTPUT_DIR/client/"
 cp -R "$WORKSPACE/Archipelago/worlds/doometernal" \
     "$OUTPUT_DIR/apworld/worlds/doometernal"
@@ -289,7 +276,7 @@ python3 "$SCRIPT_DIR/validate_windows_runtime_deps.py" \
 
 TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
 
-python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" <<'PY'
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" "$SCRIPT_DIR" "$MAP_SOURCES_FILE" <<'PY'
 import hashlib
 import json
 import sys
@@ -299,6 +286,11 @@ output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
 validation_path = Path(sys.argv[3])
 toolchain_compiler = sys.argv[4]
+sys.path.insert(0, sys.argv[5])
+from map_registry import load_map_registry, release_plan
+map_manifest_files = [
+    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[6])))
+]
 
 validation = json.loads(validation_path.read_text(encoding="utf-8"))
 bridge_path = output_dir / "client" / "bridge_client.py"
@@ -318,6 +310,7 @@ manifest = {
         "client/bootstrap_actions.py",
         "client/challenge_registry.py",
         "client/foundation.py",
+        "client/map_registry.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/run_bridge.sh",
@@ -327,10 +320,8 @@ manifest = {
         "client/data/items.json",
         "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
-        "client/manifests/e1m1_intro.json",
-        "client/manifests/e1m2_war.json",
-        "client/manifests/e1m3_cult.json",
-        "client/manifests/hub.json",
+        "client/data/map_sources.json",
+        *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
     ],

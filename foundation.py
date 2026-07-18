@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
 from typing import Any, Iterable
+
+from map_registry import load_map_registry, release_plan
 
 
 VALID_STATUSES = {
@@ -74,7 +78,6 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 }
 DELIVERY_CONTRACTS: dict[str, Any] = {
     "counts": {"items": 116, "locations": 100, "map_checks": 80, "runtime_locations": 20, "runtime_goals": 1, "route_sentinel_batteries": 5},
-    "active_maps": {"e1m1_intro": "game/sp/e1m1_intro/e1m1_intro", "hub": "game/sp/hub/hub", "e1m2_war": "game/sp/e1m2_battle/e1m2_battle", "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult"},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -103,7 +106,22 @@ def load_primitive_registry() -> dict[str, Any]:
 
 
 def load_foundation_contracts() -> dict[str, Any]:
-    return DELIVERY_CONTRACTS
+    contracts = dict(DELIVERY_CONTRACTS)
+    plans = release_plan(load_map_registry())
+    contracts["active_maps"] = {plan.map_key: plan.runtime_map for plan in plans}
+    root = Path(__file__).resolve().parent
+    manifest_counts = [
+        len(json.loads((root / plan.manifest).read_text(encoding="utf-8")))
+        for plan in plans if (root / plan.manifest).exists()
+    ]
+    runtime_path = root / "data" / "runtime_locations.json"
+    if len(manifest_counts) == len(plans) and runtime_path.exists():
+        counts = dict(contracts["counts"])
+        counts["map_checks"] = sum(manifest_counts)
+        counts["runtime_locations"] = len(json.loads(runtime_path.read_text(encoding="utf-8")))
+        counts["locations"] = counts["map_checks"] + counts["runtime_locations"]
+        contracts["counts"] = counts
+    return contracts
 
 
 def validate_primitive_registry(registry: dict[str, Any] | None = None) -> dict[str, Any]:

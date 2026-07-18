@@ -14,6 +14,9 @@ python3 -m py_compile \
     bridge_client.py \
     challenge_registry.py \
     foundation.py \
+    map_registry.py \
+    map_preflight.py \
+    map_semantic_baseline.py \
     logic_decl_patcher.py \
     mission_complete_map_patcher.py \
     mastery_decl_builder.py \
@@ -28,16 +31,19 @@ python3 -m py_compile \
     tools/audit_scripted_location.py \
     tools/audit_packaged_transition_bridge.py
 python3 tools/audit_scripted_location.py --contracts data/scripted_location_contracts.json
-python3 -m unittest \
+for test_module in \
     tests.test_check_events \
     tests.test_challenge_locations \
     tests.test_ap_map_generator \
     tests.test_validate_data \
-      tests.test_foundation \
-      tests.test_logic_decl_patcher \
-      tests.test_mission_complete_map_patcher \
-      tests.test_scripted_location_contracts \
-      tests.test_save_scenarios
+    tests.test_foundation \
+    tests.test_logic_decl_patcher \
+    tests.test_mission_complete_map_patcher \
+    tests.test_scripted_location_contracts \
+    tests.test_save_scenarios
+do
+    python3 -m unittest "$test_module"
+done
 python3 validate_data.py
 g++ -std=c++17 tests/test_ap_client_path_utils.cpp ap_client_path_utils.cpp \
     -o "$VALIDATION_BUILD_DIR/test_ap_client_path_utils"
