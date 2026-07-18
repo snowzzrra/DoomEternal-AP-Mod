@@ -3,6 +3,7 @@ import re
 import sys
 import json
 import argparse
+import copy
 import hashlib
 from pathlib import Path
 from foundation import build_primitive, validate_primitive_registry
@@ -200,9 +201,114 @@ def neutralize_conditional_pickup(content, entity_name):
 
 
 def apply_native_entity_contract(block, contract):
+    required_snippets = contract.get("required_snippets", [])
+    missing_snippets = [snippet for snippet in required_snippets if snippet not in block]
+    if missing_snippets:
+        raise ValueError(
+            "Native entity contract source drift; missing required snippet(s): "
+            + ", ".join(repr(snippet) for snippet in missing_snippets)
+        )
+    expected_targets = contract.get("original_targets")
+    if expected_targets is not None and extract_target_names(block) != expected_targets:
+        raise ValueError(
+            "Native entity contract source target drift: "
+            f"expected {expected_targets}, got {extract_target_names(block)}"
+        )
     if "remove_block" in contract:
+        if not re.search(rf'\b{re.escape(contract["remove_block"])}\s*=\s*\{{', block):
+            raise ValueError(
+                "Native entity contract source drift; missing removable block: "
+                f"{contract['remove_block']}"
+            )
         block = remove_property_blocks(block, contract["remove_block"])
     return block
+
+
+TARGET_POLICY_CONSUMERS = {
+    "independent_ap_trigger": "generate_map independent-trigger branch",
+    "remove_original": "generate_map original-owner branch",
+    "drop_targets": "build_independent_targets",
+    "preserve_targets": "build_independent_targets",
+    "safe_target_graph": "audit_preserved_target_graph",
+    "forbidden_target_terms": "audit_preserved_target_graph",
+    "gate_relay": "append_target_to_named_entity",
+    "independent_entity_name": "generate_independent_pickup_trigger",
+    "independent_position": "generate_independent_pickup_trigger",
+    "independent_size": "generate_independent_pickup_trigger",
+    "independent_targets": "generate_independent_pickup_trigger",
+    "independent_visual": "generate_inert_location_visual",
+    "completion_targets": "generate_target_relay",
+    "no_auto_visual": "generate_map visual branch",
+    "preserve_layers": "generate_independent_pickup_trigger",
+    "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
+    "native_entity_contract": "apply_native_entity_contract",
+}
+
+NATIVE_ENTITY_CONTRACT_KEYS = {
+    "remove_block", "original_targets", "required_snippets",
+}
+
+
+def validate_target_policies(config_entities, target_policies, content):
+    """Fail closed for configured policy keys before map generation mutates them."""
+    if not isinstance(target_policies, dict):
+        raise ValueError("target_policies must be an object")
+    for entity_name, policy in target_policies.items():
+        expected_check = f"AP_CHECK_{entity_name.upper()}"
+        if expected_check not in config_entities:
+            raise ValueError(
+                f"Target policy has no configured AP check: {entity_name}"
+            )
+        if not isinstance(policy, dict):
+            raise ValueError(f"Target policy must be an object: {entity_name}")
+        unknown = sorted(set(policy) - set(TARGET_POLICY_CONSUMERS))
+        if unknown:
+            raise ValueError(
+                f"Target policy has unsupported key(s) for {entity_name}: "
+                + ", ".join(unknown)
+            )
+        bounds = find_entity_block_bounds(content, entity_name)
+        if bounds is None:
+            raise ValueError(f"Target policy source entity not found: {entity_name}")
+        source_block = content[bounds[0]:bounds[1]]
+        source_targets = extract_target_names(source_block)
+        for key in ("drop_targets", "preserve_targets"):
+            if key not in policy:
+                continue
+            targets = policy[key]
+            if not isinstance(targets, list) or not all(isinstance(target, str) for target in targets):
+                raise ValueError(f"{key} must be a list of target names: {entity_name}")
+            missing = sorted(set(targets) - set(source_targets))
+            if missing:
+                raise ValueError(
+                    f"{entity_name} {key} missing from source targets: "
+                    + ", ".join(missing)
+                )
+        if set(policy.get("drop_targets", [])) & set(policy.get("preserve_targets", [])):
+            raise ValueError(f"{entity_name} cannot preserve and drop the same target")
+        contract = policy.get("native_entity_contract")
+        if contract is not None:
+            if not isinstance(contract, dict):
+                raise ValueError(f"native_entity_contract must be an object: {entity_name}")
+            unknown_contract = sorted(set(contract) - NATIVE_ENTITY_CONTRACT_KEYS)
+            if unknown_contract:
+                raise ValueError(
+                    f"Native entity contract has unsupported key(s) for {entity_name}: "
+                    + ", ".join(unknown_contract)
+                )
+            if policy.get("independent_ap_trigger"):
+                raise ValueError(
+                    f"Native entity contract cannot create an independent trigger: {entity_name}"
+                )
+            apply_native_entity_contract(source_block, contract)
+
+
+def bind_parent_from_source(policy, block):
+    """Propagate vanilla moving-platform ownership to every generated physical owner."""
+    bind_match = re.search(r'bindParent\s*=\s*"([^"]+)";', block)
+    if bind_match and not policy.get("bind_parent"):
+        policy["bind_parent"] = bind_match.group(1)
+    return policy
 
 def neutralize_conditional_pickup_block(block):
     """Leave a named vanilla pickup inert without preserving its targets."""
@@ -509,9 +615,6 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
             float(position_match.group(3)) + 1.5,
         ]
 
-    bind_match = re.search(r'bindParent\s*=\s*"([^"]+)";', block)
-    bind_parent = bind_match.group(1) if bind_match else None
-
     independent_targets = [ap_check_id, cleanup_name]
 
     return {
@@ -519,7 +622,6 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
         "independent_targets": independent_targets,
         "independent_size": [5.0, 5.0, 5.0],
         "remove_original": True,
-        "bind_parent": bind_parent,
         "independent_visual": {
             "entity_name": visual_name,
             "class": "idProp2",
@@ -533,6 +635,20 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
         },
         "completion_targets": [cleanup_name],
     }
+
+
+def build_independent_targets(block, ap_check_id, policy):
+    """Keep only explicit safe vanilla targets, then append one AP check."""
+    vanilla_targets = extract_target_names(block)
+    drop_targets = set(policy.get("drop_targets", []))
+    preserve_targets = policy.get("preserve_targets")
+    if preserve_targets is None:
+        retained = [target for target in vanilla_targets if target not in drop_targets]
+    else:
+        preserve_set = set(preserve_targets)
+        retained = [target for target in vanilla_targets if target in preserve_set]
+    configured = policy.get("independent_targets", [ap_check_id])
+    return list(dict.fromkeys([*retained, *configured]))
 
 
 def generate_automap_location_helper(source_block, location_id):
@@ -915,6 +1031,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
+    validate_target_policies(config_entities, target_policies, content)
     for entity_name, policy in target_policies.items():
         gate_relay = policy.get("gate_relay")
         if gate_relay:
@@ -1026,24 +1143,39 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
-                target_policy = target_policies.get(entity_name)
+                target_policy = copy.deepcopy(target_policies.get(entity_name))
                 
                 if not target_policy:
                     target_policy = build_universal_physical_policy(ap_check_id, location_id, block)
+                target_policy = bind_parent_from_source(target_policy, block)
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 
                 new_blocks.append(
                     generate_automap_location_helper(block, location_id)
                 )
-                if target_policy and target_policy.get("independent_ap_trigger"):
+                if target_policy.get("native_entity_contract"):
+                    native_contract = target_policy["native_entity_contract"]
+                    native = apply_native_entity_contract(block, native_contract)
+                    native = add_ap_check_target(
+                        native,
+                        entity_name,
+                        ap_check_id,
+                        {"preserve_targets": native_contract["original_targets"]},
+                    )
+                    new_blocks.append("entity {" + native)
+                    new_blocks.append(generate_event_relay(
+                        ap_check_id, location_id, "", include_notification=False,
+                    ))
+                    new_blocks.append(generate_check_event(location_id))
+                    modified_count += 1
+                    continue
+
+                if target_policy.get("independent_ap_trigger"):
                     if target_policy.get("remove_original", False) or (not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual")):
-                        drop = set(target_policy.get("drop_targets", []))
-                        vanilla_targets = extract_target_names(block)
-                        existing_independent = target_policy.get("independent_targets", [ap_check_id])
-                        target_policy["independent_targets"] = list(dict.fromkeys(
-                            [t for t in vanilla_targets if t and t not in drop] + existing_independent
-                        ))
+                        target_policy["independent_targets"] = build_independent_targets(
+                            block, ap_check_id, target_policy
+                        )
 
                     manifest_data[ap_check_id] = location_id
                     if target_policy.get("independent_visual"):

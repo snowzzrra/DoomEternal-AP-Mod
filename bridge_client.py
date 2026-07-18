@@ -316,25 +316,39 @@ BRIDGE_LOG_PATH = BRIDGE_LOG_DIR / "bridge.log"
 
 
 def configure_bridge_logger():
-    BRIDGE_LOG_DIR.mkdir(parents=True, exist_ok=True)
     bridge_logger = logging.getLogger("doom_eternal_ap.bridge")
     bridge_logger.setLevel(logging.DEBUG)
     bridge_logger.propagate = False
-    if not any(
-        isinstance(handler, logging.FileHandler)
-        and Path(getattr(handler, "baseFilename", "")) == BRIDGE_LOG_PATH
-        for handler in bridge_logger.handlers
-    ):
-        handler = logging.FileHandler(BRIDGE_LOG_PATH, encoding="utf-8")
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(
-            logging.Formatter(
-                "[%(asctime)s] %(levelname)s %(message)s",
-                "%Y-%m-%d %H:%M:%S",
-            )
-        )
-        bridge_logger.addHandler(handler)
     return bridge_logger
+
+
+def start_bridge_logger(path=None):
+    """Start a fresh production log; imports (including tests) never write it."""
+    target = Path(path or BRIDGE_LOG_PATH)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    previous = target.with_name("bridge.previous.log")
+    for handler in list(logger.handlers):
+        if isinstance(handler, logging.FileHandler):
+            logger.removeHandler(handler)
+            handler.close()
+    try:
+        previous.unlink(missing_ok=True)
+        if target.exists():
+            target.replace(previous)
+    except OSError:
+        # Logging must not prevent a client connection when a host filesystem
+        # momentarily refuses a rename.
+        pass
+    handler = logging.FileHandler(target, mode="w", encoding="utf-8")
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter(
+            "[%(asctime)s] %(levelname)s %(message)s",
+            "%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
+    return logger
 
 
 logger = configure_bridge_logger()
@@ -1287,6 +1301,7 @@ MISSION_COMPLETE_TRANSITIONS = {
         canonical_map_name(entry["signal"]["to"]),
     ): entry
     for entry in CHALLENGE_LOCATION_REGISTRY["mission_complete"]
+    if entry["signal"]["kind"] == "native_transition"
 }
 # Load ALL level manifests dynamically
 DECL_TO_LOCATION = {}
@@ -1990,6 +2005,8 @@ class DoomEternalContext(CommonContext):
         self.last_deathlink_kill_attempt = 0.0
         self.last_goal_details_mtime = None
         self.cultist_autosave_path = None
+        self.mission_locations_in_flight = set()
+        self.mission_goal_in_flight = False
         self.last_rpc_map_name = None
         self.room_seed_name = None
         self.current_map_name = None
@@ -2122,7 +2139,7 @@ class DoomEternalContext(CommonContext):
         )
 
     def update_save_slot_lifecycle(self):
-        """Promote a modified primary slot only after native gameplay proof."""
+        """Require proof to promote/switch, then keep observing the proven slot."""
         candidates = primary_save_candidates()
         for selected in candidates:
             token = (str(selected.path), selected.mtime_ns)
@@ -2138,10 +2155,31 @@ class DoomEternalContext(CommonContext):
         evidence = read_gameplay_save_evidence()
         newest = candidates[0] if candidates else None
         if evidence is None:
+            if self.active_save_slot:
+                selected = primary_save_for_slot(self.active_save_slot)
+                if selected is not None:
+                    # A native monitor can briefly republish an unproven state
+                    # during a legitimate checkpoint/map write.  It may never
+                    # promote a candidate, but the already proven active slot
+                    # remains a valid observer source until an explicit menu
+                    # state or a proven new gameplay epoch arrives.
+                    self.active_save_path = str(selected.path)
+                    self.runtime_observers_frozen = False
+                    return selected
             self.runtime_observers_frozen = True
             self.log_save_slot_rejected(newest, "no_gameplay_evidence")
             return None
         if evidence.state != "gameplay":
+            # Native memory can report menu/loading while the active save is
+            # flushing a normal checkpoint.  Promotion still requires a later
+            # proven gameplay epoch, but an already proven primary remains a
+            # valid observer source across that transient sample.
+            if self.active_save_slot:
+                selected = primary_save_for_slot(self.active_save_slot)
+                if selected is not None:
+                    self.active_save_path = str(selected.path)
+                    self.runtime_observers_frozen = False
+                    return selected
             self.runtime_observers_frozen = True
             self.log_save_slot_rejected(newest, "menu", evidence.epoch)
             return None
@@ -2152,19 +2190,19 @@ class DoomEternalContext(CommonContext):
             self.log_save_slot_rejected(newest, "no_gameplay_evidence", evidence.epoch)
             return None
 
-        details = read_game_details_for_selection(selected)
-        if (
-            not details
-            or canonical_map_name(details.get("mapName")) != evidence.map_name
-        ):
-            self.runtime_observers_frozen = True
-            self.log_save_slot_rejected(selected, "map_mismatch", evidence.epoch)
-            return None
-
-        if (
-            self.active_save_slot != selected.slot_directory
-            or self.active_save_path != str(selected.path)
-        ):
+        is_current_active_slot = (
+            self.active_save_slot == selected.slot_directory
+            and self.active_save_path == str(selected.path)
+        )
+        if not is_current_active_slot:
+            details = read_game_details_for_selection(selected)
+            if (
+                not details
+                or canonical_map_name(details.get("mapName")) != evidence.map_name
+            ):
+                self.runtime_observers_frozen = True
+                self.log_save_slot_rejected(selected, "map_mismatch", evidence.epoch)
+                return None
             if self.active_gameplay_epoch == evidence.epoch:
                 self.runtime_observers_frozen = True
                 self.log_save_slot_rejected(
@@ -3079,7 +3117,15 @@ class DoomEternalContext(CommonContext):
             return False
 
         messages = []
-        location_is_new = location_id not in self.locations_checked and location_id not in getattr(self, "checked_locations", set())
+        checked_locations = getattr(self, "checked_locations", set())
+        locations_in_flight = getattr(self, "mission_locations_in_flight", None)
+        if locations_in_flight is None:
+            locations_in_flight = self.mission_locations_in_flight = set()
+        goal_in_flight = getattr(self, "mission_goal_in_flight", False)
+        location_acknowledged = location_id in checked_locations
+        location_is_new = not location_acknowledged
+        if location_acknowledged:
+            locations_in_flight.discard(location_id)
         if location_is_new:
             messages.append(
                 {
@@ -3093,19 +3139,51 @@ class DoomEternalContext(CommonContext):
                 {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
             )
 
-        if messages:
+        if not messages and location_acknowledged:
+            logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
+            return True
+
+        if (location_is_new and location_id in locations_in_flight) or (
+            goal_is_new and goal_in_flight
+        ):
+            logger.info("[Mission] LOCATION_CHECK_RETRY id=%s reason=in_flight", location_id)
+            return False
+
+        if location_is_new:
+            locations_in_flight.add(location_id)
+        if goal_is_new:
+            self.mission_goal_in_flight = True
+        try:
             logger.info(
                 f"[Mission] LOCATION_CHECK_SEND id={location_id} "
                 f"source={source_description}"
             )
+            await self.send_msgs(messages)
+        except Exception:
+            # Nothing is durable until the server write completes.  The native
+            # transition event therefore remains available for a later retry.
             if location_is_new:
-                self.locations_checked.add(location_id)
+                locations_in_flight.discard(location_id)
             if goal_is_new:
+                self.mission_goal_in_flight = False
+            raise
+
+        if location_is_new:
+            # Keep the event and reservation until the server's authoritative
+            # checked_locations update arrives.  locations_checked is only the
+            # local protocol submission ledger, never an acknowledgement.
+            self.locations_checked.add(location_id)
+        if goal_is_new:
+            try:
                 self.session_state["goal_sent"] = True
                 self.persist_session_state()
-            await self.send_msgs(messages)
-        logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
-        return True
+            finally:
+                self.mission_goal_in_flight = False
+        if location_id in checked_locations:
+            locations_in_flight.discard(location_id)
+            logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
+            return True
+        return False
 
     async def send_campaign_goal(self, source_description):
         return await DoomEternalContext.send_mission_complete(
@@ -3161,7 +3239,8 @@ class DoomEternalContext(CommonContext):
                 continue
 
             try:
-                sent = await self.send_mission_complete(
+                sent = await DoomEternalContext.send_mission_complete(
+                    self,
 
                     transition["location_id"],
 
@@ -3443,6 +3522,7 @@ class DoomEternalContext(CommonContext):
         return DoomEternalManager
 
 async def amain(launch_args=None):
+    start_bridge_logger()
     Utils.init_logging("DoomEternalClient")
     parser = get_base_parser()
     parser.add_argument('--name', default=None, help="Player name no Archipelago")

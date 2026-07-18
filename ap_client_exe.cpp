@@ -111,6 +111,16 @@ void LogDebug(const std::string& message) {
     }
 }
 
+void RotateClientLog() {
+    const char* current = "base\\ap_client.log";
+    const char* previous = "base\\ap_client.previous.log";
+    DeleteFileA(previous);
+    MoveFileExA(current, previous, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    if (FILE* file = fopen(current, "wb")) {
+        fclose(file);
+    }
+}
+
 DWORD WINAPI RpcCallWatchdog(LPVOID data) {
     RpcWatchdogContext* context = static_cast<RpcWatchdogContext*>(data);
     Sleep(kRpcStallWarnMs);
@@ -801,24 +811,28 @@ public:
                 return;
             }
 
-            // A save write observed while the shell/menu is open is only a
-            // candidate. On a real load -> gameplay edge, require game.details
-            // to have changed since loading began before assigning identity.
-            // Starting the helper mid-game is the one bootstrap case.
+            // Mission Complete owns its own load-edge baseline.  It must not
+            // wait for the asynchronous Python durable-save observer to prove
+            // a slot: a decrypted primary game.details at safe gameplay is the
+            // transition source.  The first snapshot is baseline-only.
             const std::optional<SaveSnapshot> entered =
-                firstObservedState
+                (firstObservedState || sawLoadingForEpoch_)
                     ? ReadLatestSnapshot()
-                    : sawLoadingForEpoch_
-                        ? ReadChangedSnapshot(menuSlotTokens_)
-                        : std::nullopt;
+                    : std::nullopt;
             sawLoadingForEpoch_ = false;
             if (!entered.has_value()) {
-                activeSlotDirectory_.clear();
+                LogDebug("[Mission] TRANSITION_EVENT_SKIPPED reason=no_load_snapshot");
                 WriteGameplayEvidence(std::nullopt);
                 return;
             }
+            const bool provisional = lastSnapshot_.mapName.empty();
+            LogDebug(
+                "[Mission] MISSION_SNAPSHOT provisional="
+                + std::string(provisional ? "true" : "false")
+                + " slot=" + entered->slotDirectory
+                + " map=" + entered->mapName
+            );
             if (!lastSnapshot_.path.empty()
-                    && lastSnapshot_.slotDirectory == entered->slotDirectory
                     && lastSnapshot_.mapName != entered->mapName) {
                 WriteTransitionEvent(lastSnapshot_.mapName, entered->mapName, entered->path);
             }
@@ -829,7 +843,6 @@ public:
         }
 
         if (!gameplayLoaded_) {
-            CaptureMenuSlotTokens();
             return;
         }
 
@@ -1182,6 +1195,21 @@ private:
     ) {
         const std::string canonicalFrom = CanonicalMapName(fromMap);
         const std::string canonicalTo = CanonicalMapName(toMap);
+        LogDebug(
+            "[Mission] MISSION_TRANSITION_SOURCE slot=" + activeSlotDirectory_
+            + " map=" + canonicalFrom
+        );
+        LogDebug(
+            "[Mission] MISSION_TRANSITION_TARGET slot=" + activeSlotDirectory_
+            + " map=" + canonicalTo
+        );
+        // Hell on Earth and Exultia own their checks in their final map-side
+        // transactions. This publisher remains for the frozen Cultist route.
+        if (!(canonicalFrom == "game/sp/e1m3_cult/e1m3_cult"
+                && canonicalTo == "game/sp/e1m4_boss/e1m4_boss")) {
+            LogDebug("[Mission] TRANSITION_EVENT_SKIPPED reason=map_side_owner");
+            return;
+        }
         ++sequence_;
         SYSTEMTIME now = {};
         GetSystemTime(&now);
@@ -1235,7 +1263,7 @@ private:
         }
 
         LogDebug(
-            "[Mission] Published native transition event: "
+            "[Mission] TRANSITION_EVENT_PUBLISHED "
             + canonicalFrom + " -> " + canonicalTo + "."
         );
     }
@@ -1524,6 +1552,7 @@ int main(int argc, char** argv) {
         printf("Failed to set DOOM working directory: %s\n", argv[1]);
         return 1;
     }
+    RotateClientLog();
 
     char executablePath[MAX_PATH] = {};
     if (GetModuleFileNameA(nullptr, executablePath, MAX_PATH) == 0) {

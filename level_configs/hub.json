@@ -13,6 +13,10 @@
         "pickup_equipment_flame_belch_1": {
             "independent_ap_trigger": true,
             "remove_original": true,
+            "no_auto_visual": true,
+            "preserve_targets": [
+                "target_relay_pickup_flame_belch"
+            ],
             "drop_targets": [
                 "target_give_item_flame_belch"
             ]
@@ -83,9 +87,7 @@
                     "useStat = \"STAT_SUIT_PAGE_UNLOCKED\";",
                     "flags = {\n\t\t\thide = true;\n\t\t}"
                 ]
-            },
-            "independent_ap_trigger": true,
-            "remove_original": false
+            }
         }
     }
 }

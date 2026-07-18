@@ -5,18 +5,16 @@
       "name": "Hell on Earth - Mission Complete",
       "location_id": 7770122,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e1m1_intro/e1m1_intro",
-        "to": "game/hub/hub"
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m1_intro/e1m1_intro"
       }
     },
     {
       "name": "Exultia - Mission Complete",
       "location_id": 7770123,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e1m2_war/e1m2_war",
-        "to": "game/hub/hub"
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
       }
     },
     {
