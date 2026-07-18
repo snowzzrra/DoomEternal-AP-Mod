@@ -3079,7 +3079,7 @@ class DoomEternalContext(CommonContext):
             return False
 
         messages = []
-        location_is_new = location_id not in self.locations_checked
+        location_is_new = location_id not in self.locations_checked and location_id not in getattr(self, "checked_locations", set())
         if location_is_new:
             messages.append(
                 {
@@ -3098,12 +3098,12 @@ class DoomEternalContext(CommonContext):
                 f"[Mission] LOCATION_CHECK_SEND id={location_id} "
                 f"source={source_description}"
             )
+            if location_is_new:
+                self.locations_checked.add(location_id)
+            if goal_is_new:
+                self.session_state["goal_sent"] = True
+                self.persist_session_state()
             await self.send_msgs(messages)
-        if location_is_new:
-            self.locations_checked.add(location_id)
-        if goal_is_new:
-            self.session_state["goal_sent"] = True
-            self.persist_session_state()
         logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
         return True
 

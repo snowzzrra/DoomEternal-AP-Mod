@@ -5,11 +5,10 @@ Game-side repository for the DOOM Eternal Archipelago integration.
 This repo owns the public pre-alpha mod package, the Python bridge, the external
 RPC client, runtime manifests, map-generation scripts, validation scripts, and
 release packaging. The APWorld source does **not** live here; it stays in the
-sibling `Archipelago/worlds/doometernal/` checkout and is compiled into
-`doometernal.apworld` during release builds.
+sibling Archipelago branch and is compiled into `doometernal.apworld` during release builds.
 
 > [!CAUTION]
-> This project is a playable test build, not a finished 1.0 release. Windows is
+> This project is a pre-alpha build, not a finished 1.0 release. Windows is
 > the primary target for public testing, while Linux/Proton remains supported
 > for development and early validation.
 
@@ -86,7 +85,6 @@ Archipelago/worlds/doometernal/
   polling.
 - Mission Complete and the runtime goal use native transition events, with the old
   autosave path kept only as fallback behavior.
-- `g_debugTriggers` is no longer required for normal check detection.
 
 ## Architecture overview
 
@@ -185,7 +183,7 @@ paths, configuration, passwords, seeds, runtime output or logs.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip
+DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -216,9 +214,6 @@ The release intentionally excludes:
 - project memory files;
 - personal config.
 
-The PTB client directory intentionally does **not** bundle Meathook proxy DLL
-aliases such as `version.dll`, `dxgi.dll`, `dinput8.dll`, or `xinput1_4.dll`.
-Those names can shadow Windows system DLL imports for `ap_client.exe`.
 
 ## Installation
 
@@ -230,10 +225,6 @@ Those names can shadow Windows system DLL imports for `ap_client.exe`.
 > [!WARNING]
 > Extract every new release into a brand-new empty directory. Do not copy a new
 > version over an older extracted PTB.
-
-Hotfix note for `v0.1.2-ptb`:
-
-`Fixed a Windows startup failure caused by a bundled proxy DLL shadowing the system VERSION.dll required by ap_client.exe.`
 
 ### Before you begin
 
@@ -263,7 +254,7 @@ Examples:
 
 ```text
 CLIENT DIRECTORY:
-C:\Games\DoomEternalArchipelago-v0.2.1\client
+C:\Games\DoomEternalArchipelago-v0.3.0\client
 
 GAME BASE PATH:
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
@@ -279,7 +270,7 @@ C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
 Locate:
 
 ```text
-DoomEternalArchipelago-v0.1.2-ptb.zip
+DoomEternalArchipelago-v0.3.0-pre-alpha.zip
 ```
 
 Extract it into a brand-new empty directory.
@@ -294,7 +285,7 @@ Do not:
 Expected layout after extraction:
 
 ```text
-DoomEternalArchipelago-v0.1.2/
+DoomEternalArchipelago-v0.3.0/
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoPreAlpha.zip
 ├── README.md
@@ -305,13 +296,6 @@ DoomEternalArchipelago-v0.1.2/
     ├── run_bridge.sh
     └── ap_config.example.json
 ```
-
-The `client/` directory in `v0.1.2-ptb` must not contain:
-
-- `version.dll`
-- `dinput8.dll`
-- `dxgi.dll`
-- `xinput1_4.dll`
 
 ### 2. Install the APWorld
 
@@ -340,14 +324,14 @@ The selected directory must contain:
 Correct example:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.1.2\client
+C:\Games\DoomEternalArchipelago-v0.3.0\client
 ```
 
 Incorrect examples:
 
 ```text
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal
-C:\Games\DoomEternalArchipelago-v0.1.2
+C:\Games\DoomEternalArchipelago-v0.3.0
 ```
 
 Why those are wrong:
@@ -507,14 +491,13 @@ Only one `ap_client.exe` should be running at a time.
 Set DOOM Eternal's Steam launch options to:
 
 ```text
-WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=15 "/absolute/path/to/client/run_bridge.sh" %command%
+WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=5 "/absolute/path/to/client/run_bridge.sh" %command%
 ```
 
 Requirements:
 
 - use an absolute path;
 - do not use only `~/...`;
-- raise `AP_CLIENT_DELAY` to `20` if shader startup is slow;
 - place `XINPUT1_3.dll` beside `DOOMEternalx64vk.exe`.
 
 Typical Linux / Proton paths:
@@ -536,7 +519,7 @@ Saved Games Path: /var/home/YOUR_NAME/.local/share/Steam/steamapps/compatdata/78
 Windows:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.1.2\
+C:\Games\DoomEternalArchipelago-v0.3.0\
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoPreAlpha.zip
 ├── README.md
@@ -566,7 +549,7 @@ Native log path:
 Expected lines:
 
 ```text
-PTB version: v0.1.2-ptb
+PTB version: v0.3.0-pre-alpha
 Meathook RPC server verified.
 RPC memory gate OPEN
 ```
@@ -607,14 +590,14 @@ Launcher and edit:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.2.1/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.0/client"
 ```
 
 Correct fallback in `host.yaml`:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.2.1/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.0/client"
 ```
 
 Forward slashes are valid in Windows YAML paths.
@@ -635,8 +618,8 @@ PTB versions or reused an old extracted directory.
 
 Fix:
 
-1. Delete the extracted PTB directory.
-2. Extract `DoomEternalArchipelago-v0.1.2-ptb.zip` again into a
+1. Delete the extracted pre-alpha directory.
+2. Extract `DoomEternalArchipelago-v0.3.0-pre-alpha.zip` again into a
    brand-new empty directory.
 3. Confirm that `client/` does not contain:
    - `version.dll`
@@ -644,28 +627,6 @@ Fix:
    - `dxgi.dll`
    - `xinput1_4.dll`
 
-### Final checklist
-
-- [ ] PTB extracted into a brand-new directory
-- [ ] `doometernal.apworld` installed
-- [ ] Launcher restarted
-- [ ] `client_directory` ends in `/client`
-- [ ] client directory contains `bridge_client.py`
-- [ ] client directory contains `bridge_identity.json`
-- [ ] client directory contains `ap_client.exe`
-- [ ] Game Base Path ends in `DOOMEternal/base`
-- [ ] Saved Games Path ends in `DOOMEternal/base`
-- [ ] Meathook `v7.2` installed
-- [ ] `XINPUT1_3.dll` is beside `DOOMEternalx64vk.exe`
-- [ ] mod ZIP is inside `Mods/`
-- [ ] mod ZIP was not extracted
-- [ ] injector was executed
-- [ ] only one `ap_client.exe` is open
-- [ ] startup shows `BRIDGE_REVISION=mission-unified-...`
-- [ ] startup shows extracted `BRIDGE_FILE=.../client/bridge_client.py`
-- [ ] startup shows `BRIDGE_SHA256=...` and `BRIDGE_PROTOCOL=3`
-- [ ] log shows `Meathook RPC server verified`
-- [ ] during gameplay, log shows `RPC memory gate OPEN`
 
 ## Current PTB logic
 
@@ -679,22 +640,17 @@ Fix:
   All four physical Battery pickups remain independent AP locations with zero
   vanilla Battery grants. Their current persistent Automap carrier regression
   is a release blocker, not accepted behavior.
-- Super Shotgun is currently kept vanilla/scripted in Cultist Base.
+- Super Shotgun is currently kept vanilla/scripted in Cultist Base, this is
+  due to the fact that the SSG is given by a cutscene, not a pickup. This
+  fix is already being worked on, and is due to be released in a future version.
 - Meat Hook is not a separate PTB item because Super Shotgun grants it by
   default.
-- Empyrean Key reward chest is outside PTB scope; Exultia uses the physical
-  `Slayer Gate Key` pickup instead.
-- Rocket Launcher is an AP trigger location in Cultist Base; only
-  `game_target_relay_1244` is preserved, with no propitem DECL override.
 - Secret Encounters are AP checks in Exultia and Cultist Base.
 - Mission Complete identity exists for Hell, Exultia and Cultist Base; only
-  Cultist also has independent goal. Native publisher is proven, bridge runtime
-  consumption awaits instrumented retest.
+  Cultist also has independent goal.
 - Mastery and Mission Challenge locations use durable native save records; the
   three Cultist challenge children keep `currencyToGive.num = 0`, including the
-  accepted aggregate reward suppression. Weapon Mastery Token remains absent
-  from pool, starting inventory and commands; generated maps reject
-  `CURRENCY_WEAPON_MASTERY`.
+  accepted aggregate reward suppression.
 - Weapon Point rewards remain fully vanilla in 0.3.0. Safe conversion is
   deferred until the project owns an in-process, revision-gated hook host.
 - The first Fortress Praetor token keeps its native Suit bootstrap and AP
@@ -706,23 +662,17 @@ Fix:
   even when Rune effects are active. Planned for v0.2.1.
 - Sentinel Battery counter may visually reset to 0 even while gameplay balance
   remains available. Socket requirements are authoritative.
-- The static audit found `7770055` physically distinct, but that Cultist Base
-  Extra Life check remains a probable runtime reliability risk.
-- Ice progression is runtime PASS both with and without prior ownership. Restore
-  Ship Power alone owns the patched one-edge logic path; `7770074` has exactly
-  `[AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB]`, and door/elevator worked before and
-  after collection. The rendered question mark moved from
-  `0.47 -22.27 -14.38` to `0.47 -22.27 -15.38`; a dedicated final
-  `idTarget_Remove` points only to it. After reload/checkpoint the model can
-  reappear until the trigger is crossed again; the collected AP location emits
-  no second check. This accepted visual-persistence issue is not a v0.2.1
-  blocker. Rocket remains unchanged PASS.
-- Reloading a checkpoint may still recover rare vanilla scripting desyncs.
-- AP-mutated pickups may have reduced automap discoverability.
+- Reloading a checkpoint may still recover rare vanilla scripting desyncs,
+  and most other problems, always try reloading a checkpoint.
+- There's no current way to identify what you sent/received. A second screen
+  dedicated to watching the AP client is recommended.
+- The Rocket launcher pickup may seem buggy, but it works.
+- Deathlink is currently "hardcore". If you have extra lives, it will ignore
+  them, killing you anyway.
 
 ## Roadmap
 
-### 0.1.1 PTB — Runtime stabilization
+### 0.1.1 PTB — Runtime stabilization — DONE
 
 - Freeze the current route through Cultist Base: `80` map checks plus `1`
   runtime goal.
@@ -731,14 +681,14 @@ Fix:
 - Prevent silent item loss on RPC failure, add recovery behavior, and complete
   Windows/Linux smoke testing.
 
-### 0.1.2 PTB — Windows client hotfix
+### 0.1.2 PTB — Windows client hotfix — DONE
 
 - Removed bundled proxy DLL aliases from the external client directory.
 - Fixed the Windows `ap_client.exe` startup failure.
 - Added PE dependency and DLL-shadowing validation to release builds.
 - Preserved the existing `v0.1.x` gameplay scope and item IDs.
 
-### 0.2.x Pre-Alpha — Campaign expansion & Optional systems foundation
+### 0.2.0 - 0.2.1 Pre-Alpha — Campaign expansion & Optional systems foundation — DONE
 
 - Keep the same route and avoid adding new maps during inicial stages.
 - Expand Secret Encounters, mission-completion plumbing, and optional reward
@@ -753,7 +703,7 @@ Fix:
 - Expand location and item coverage without treating balance or compatibility
   as final.
 
-### 0.3.x–0.5.x Alpha — Full base campaign
+### 0.3.x–0.5.x Alpha — Full base campaign — IN PROGRESS
 
 - Make all `13` base-game missions playable end to end.
 - Complete progression logic, persistent upgrades, optional checks, and the
@@ -796,9 +746,12 @@ Fix:
 
 - The Archipelago project and contributors for the multiworld framework,
   protocol, server, and `CommonClient`.
-- tastyfresh for the original large check list used to bootstrap the project.
-- zwip zwap zapony for direct technical guidance and map/runtime research.
-- alby for technical help, runtime investigation, and safe-native-behavior
+- tastyfresh (from the Doom 2016+ Modding Discord server) for the original 
+  large check list used to bootstrap the project.
+- Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct 
+  technical guidance and map/runtime research.
+- alby (from the Doom 2016+ Modding Discord server) for technical help, runtime
+  investigation, and safe-native-behavior
   guidance.
 - chrispy for creating
   [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation this
@@ -808,5 +761,8 @@ Fix:
   and `idFileDeCompressor`.
 - FlavorfulGecko5 and the EntitySlayer contributors for
   [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
-- The DOOM 2016+ Modding community for EternalModInjector, wiki material, and
-  reverse-engineering knowledge that made the map patches possible.
+- The DOOM Modding community for EternalModInjector, wiki material, and
+  general knowledge that made the map patches possible.
+- Meta (from the AP After Dark Discord server) for the Archipelago Logo model.
+- FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago 
+  logo used by the AP client.
