@@ -267,6 +267,29 @@ def validate_target_policies(config_entities, target_policies, content):
                 f"Target policy has unsupported key(s) for {entity_name}: "
                 + ", ".join(unknown)
             )
+        independent_only = {
+            "remove_original", "independent_entity_name", "independent_position",
+            "independent_size", "independent_targets", "independent_visual",
+            "completion_targets", "no_auto_visual", "preserve_layers", "bind_parent",
+        }
+        unused_independent = sorted(
+            set(policy) & independent_only
+            if not policy.get("independent_ap_trigger") else ()
+        )
+        if unused_independent:
+            raise ValueError(
+                f"Target policy has unused independent-trigger field(s) for {entity_name}: "
+                + ", ".join(unused_independent)
+            )
+        graph_only = {"safe_target_graph", "forbidden_target_terms"}
+        unused_graph = sorted(
+            set(policy) & graph_only if "preserve_targets" not in policy else ()
+        )
+        if unused_graph:
+            raise ValueError(
+                f"Target policy has unused target-graph field(s) for {entity_name}: "
+                + ", ".join(unused_graph)
+            )
         bounds = find_entity_block_bounds(content, entity_name)
         if bounds is None:
             raise ValueError(f"Target policy source entity not found: {entity_name}")

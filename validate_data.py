@@ -35,6 +35,9 @@ from foundation import (
     validate_primitive_registry,
 )
 from challenge_registry import all_location_entries, load_challenge_registry
+from map_registry import load_map_registry, validation_plan
+from map_semantic_baseline import assert_frozen_map_baselines
+from map_preflight import validate_registry_preflight
 
 
 ROOT = Path(__file__).resolve().parent
@@ -147,7 +150,7 @@ def validate_automap_family_registry(
         for location_id in family.get("match", {}).get("location_ids", [])
     }
 
-    map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
+    map_sources = load_map_registry(MAP_SOURCES_PATH)["maps"]
     for map_key, source in map_sources.items():
         if not source.get("enabled", True):
             continue
@@ -540,8 +543,30 @@ def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
 
+    try:
+        assert_frozen_map_baselines()
+    except (OSError, ValueError) as exc:
+        errors.append(f"Frozen four-map baseline failed: {exc}")
+
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
+    registry_for_preflight = load_map_registry(MAP_SOURCES_PATH)
+    package_spec = Path(
+        "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
+    )
+    container_catalog = set()
+    if package_spec.exists():
+        container_catalog = {
+            entry.get("name") for entry in read_json(package_spec).get("files", [])
+            if entry.get("name", "").endswith(".resources")
+        }
+    try:
+        validate_registry_preflight(
+            ROOT, registry_for_preflight, location_ids, set(item_ids.values()),
+            container_catalog,
+        )
+    except (OSError, ValueError) as exc:
+        errors.append(f"New-map preflight failed: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
     reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
@@ -644,7 +669,8 @@ def main() -> int:
     ):
         if forbidden in source_text:
             errors.append(f"Rejected watcher/Armor Drain source returned: {forbidden}")
-    map_sources = read_json(MAP_SOURCES_PATH).get("maps", {})
+    map_registry = load_map_registry(MAP_SOURCES_PATH)
+    map_sources = map_registry["maps"]
 
     forbidden_decl_path = "propitem/ap/"
     for path in (
@@ -706,9 +732,9 @@ def main() -> int:
         )
 
     enabled_map_sources = {
-        map_key: source
-        for map_key, source in map_sources.items()
-        if source.get("enabled", True)
+        plan.map_key: map_sources[plan.map_key]
+        for plan in validation_plan(map_registry)
+        if plan.release_asset
     }
     expected_level_configs = {
         Path(source["level_config"]).name for source in enabled_map_sources.values()

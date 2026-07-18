@@ -1,0 +1,68 @@
+{
+  "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult"],
+  "coverage": ["entity names", "classes", "targets/order", "bindParent", "layers", "transforms", "AP IDs", "manifests", "scripted contracts"],
+  "maps": {
+    "e1m1_intro": {
+      "ap_ids": [7770001, 7770002, 7770003, 7770004, 7770005, 7770006, 7770007, 7770008, 7770009, 7770010, 7770011, 7770012, 7770013, 7770014, 7770015, 7770016, 7770017, 7770018, 7770019, 7770020, 7770122],
+      "bind_parents": 40,
+      "byte_sha256": "ef43d9d825d88b25e87efcbb461028cab293088cfc2a1dc66648498d1150dab0",
+      "byte_size": 11776142,
+      "classes": 10162,
+      "entity_count": 10164,
+      "layers": 5406,
+      "manifest_sha256": "13eeb48eb9c1f6246400296e59dea33faa79bf50dfc0866e2e966459517282b0",
+      "scripted_contract_sha256": "45e94b5ab5efed0330fda21b78eee3157b63b2fa39f2c0b858bae3237da65ab4",
+      "semantic_sha256": "bd1df40ce9063455dbaf72dbfbbeb66c635c07c1c1b0a53b32d9eae3d5e9917f",
+      "targets": 18774,
+      "transforms": 22241,
+      "unique_entity_names": 10163
+    },
+    "e1m2_war": {
+      "ap_ids": [7770021, 7770023, 7770024, 7770025, 7770026, 7770027, 7770028, 7770029, 7770030, 7770031, 7770032, 7770034, 7770035, 7770036, 7770037, 7770038, 7770039, 7770040, 7770041, 7770042, 7770043, 7770044, 7770045, 7770083, 7770084, 7770089, 7770090, 7770123],
+      "bind_parents": 226,
+      "byte_sha256": "47f1a441f003f025765dd685e836f6841a4e4e11882b1c832144efcbdab800b1",
+      "byte_size": 11664121,
+      "classes": 11156,
+      "entity_count": 11156,
+      "layers": 2687,
+      "manifest_sha256": "f927a78a6b9d2e6dbeec77998f45496ddc49513d20ccd4792240ae3f044c444f",
+      "scripted_contract_sha256": "04432fc3142f02df878a189dc9b57e2ba26de570c5edd39ceeb3eb0bb2b2490e",
+      "semantic_sha256": "3177e4db7aa18203ebdd0149a0ea5cfc3c20531494f1abc0c631a6d2c13c485d",
+      "targets": 8677,
+      "transforms": 22863,
+      "unique_entity_names": 11156
+    },
+    "e1m3_cult": {
+      "ap_ids": [7770046, 7770047, 7770048, 7770049, 7770050, 7770051, 7770052, 7770053, 7770054, 7770056, 7770057, 7770058, 7770059, 7770060, 7770061, 7770062, 7770063, 7770064, 7770065, 7770066, 7770067, 7770069, 7770070, 7770071, 7770091, 7770092],
+      "bind_parents": 1177,
+      "byte_sha256": "9ffc0bb42c4ea22ca77f5d68e6b79178fa9a0e42a2b808fda033e775ba02e6cf",
+      "byte_size": 19893149,
+      "classes": 18050,
+      "entity_count": 18050,
+      "layers": 4802,
+      "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
+      "scripted_contract_sha256": "61def6090ac712195da96b656288174fd2eb2f21900acb225acf9d9abf692416",
+      "semantic_sha256": "901b0b05aeb5e336b49d76aacb2aee0286842698a5afe07f8f0e6293a8c4dd21",
+      "targets": 10816,
+      "transforms": 37094,
+      "unique_entity_names": 18050
+    },
+    "hub": {
+      "ap_ids": [7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088],
+      "bind_parents": 143,
+      "byte_sha256": "49dfcb11bd12435ab89a2cc0d412a6e23456c2b4a734335de1a8c9347e5fca9d",
+      "byte_size": 4103326,
+      "classes": 3814,
+      "entity_count": 3816,
+      "layers": 153,
+      "manifest_sha256": "1f186649880508571e1591a503b316884f07ee37a30e042283a5119368f12699",
+      "scripted_contract_sha256": "3a2b376e8e13a6577168a0bfc0aaefcea89592e9eea880ff68293b37a9a4b25a",
+      "semantic_sha256": "5de1cb6bb410007e4f962db13fc01d1c5703948b60cff896b194dfb54b271942",
+      "targets": 2774,
+      "transforms": 8030,
+      "unique_entity_names": 3815
+    }
+  },
+  "normalization": "comments and whitespace outside quoted strings ignored",
+  "schema_version": 1
+}

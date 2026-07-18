@@ -1,44 +1,82 @@
 {
+    "schema_version": 1,
+    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult"],
     "maps": {
         "e1m1_intro": {
+            "display_name": "Hell on Earth",
             "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
             "source_file": "e1m1_intro.map",
             "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+            "source_owner": "vanillamaps/e1m1_intro.map",
             "level_config": "level_configs/e1m1_intro.json",
             "manifest": "manifests/e1m1_intro.json",
+            "generated_output": "e1m1_intro.entities",
+            "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
             "resource_path": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+            "resource_owner": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+            "resource_priority": 62,
             "relative_entities_path": "game/sp/e1m1_intro/e1m1_intro.entities",
-            "supported_game_revision": "Steam 6.66 Rev 3.1"
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
         },
         "e1m2_war": {
+            "display_name": "Exultia",
             "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
             "source_file": "e1m2_war.map",
             "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+            "source_owner": "vanillamaps/e1m2_war.map",
             "level_config": "level_configs/e1m2_war.json",
             "manifest": "manifests/e1m2_war.json",
+            "generated_output": "e1m2_war.entities",
+            "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "resource_path": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+            "resource_owner": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+            "resource_priority": 20,
             "relative_entities_path": "game/sp/e1m2_battle/e1m2_battle.entities",
-            "supported_game_revision": "Steam 6.66 Rev 3.1"
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
         },
         "hub": {
+            "display_name": "Fortress/Hub",
             "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
             "source_file": "hub.map",
             "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b",
+            "source_owner": "vanillamaps/hub.map",
             "level_config": "level_configs/hub.json",
             "manifest": "manifests/hub.json",
+            "generated_output": "hub.entities",
+            "runtime_map": "game/hub/hub",
             "resource_path": "game/hub/hub_patch2.resources",
+            "resource_owner": "game/hub/hub_patch2.resources",
+            "resource_priority": 70,
             "relative_entities_path": "game/hub/hub.entities",
-            "supported_game_revision": "Steam 6.66 Rev 3.1"
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
         },
         "e1m3_cult": {
+            "display_name": "Cultist Base",
             "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
             "source_file": "e1m3_cult.map",
             "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+            "source_owner": "vanillamaps/e1m3_cult.map",
             "level_config": "level_configs/e1m3_cult.json",
             "manifest": "manifests/e1m3_cult.json",
+            "generated_output": "e1m3_cult.entities",
+            "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
             "resource_path": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+            "resource_owner": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+            "resource_priority": 42,
             "relative_entities_path": "game/sp/e1m3_cult/e1m3_cult.entities",
-            "supported_game_revision": "Steam 6.66 Rev 3.1"
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
         }
     }
 }
