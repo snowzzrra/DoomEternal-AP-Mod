@@ -1,5 +1,5 @@
 {
-  "map_key": "hub",
+    "map_key": "hub",
     "entities": {
         "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
         "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,
@@ -13,28 +13,37 @@
         "pickup_equipment_flame_belch_1": {
             "independent_ap_trigger": true,
             "remove_original": true,
-            "independent_targets": [
-                "target_relay_pickup_flame_belch",
-                "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1"
-            ],
             "drop_targets": [
                 "target_give_item_flame_belch"
             ]
         },
         "pickup_equipment_ice_bomb": {
             "independent_ap_trigger": true,
-            "independent_targets": [
-                "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB",
-                "ap_remove_location_visual_7770074"
+            "independent_position": [
+                0.47,
+                -22.27,
+                -14.38
             ],
-            "independent_position": [0.47, -22.27, -14.38],
-            "independent_size": [4.0, 3.0, 3.5],
+            "independent_size": [
+                4.0,
+                3.0,
+                3.5
+            ],
             "independent_visual": {
                 "entity_name": "ap_location_visual_7770074",
                 "cleanup_entity": "ap_remove_location_visual_7770074",
                 "model": "art/pickups/question_mark_a.lwo",
-                "position": [0.47, -22.27, -15.38],
-                "scale": [1.75, 1.75, 1.75]
+                "thinkComponentDecl": "bob_rotate_fast",
+                "position": [
+                    0.47,
+                    -22.27,
+                    -15.38
+                ],
+                "scale": [
+                    1.75,
+                    1.75,
+                    1.75
+                ]
             },
             "drop_targets": [
                 "target_give_item_ice_bomb"
@@ -43,11 +52,40 @@
         "progress_argent_cell_1_1072112848": {
             "gate_relay": "target_relay_argent_cell_useable",
             "independent_ap_trigger": true,
-            "remove_original": true,
-            "independent_targets": [
-                "target_relay_argent_cell_1_1072112848",
-                "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848"
-            ]
+            "remove_original": true
+        },
+        "progress_argent_cell_1_750400652": {
+            "gate_relay": "target_relay_argent_cell_useable",
+            "independent_ap_trigger": true,
+            "remove_original": true
+        },
+        "progress_argent_cell_1_2075197287": {
+            "gate_relay": "target_relay_argent_cell_useable",
+            "independent_ap_trigger": true,
+            "remove_original": true
+        },
+        "progress_praetor_point_hub_1": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [
+                    "target_relay_complete_praetor_obj"
+                ],
+                "required_snippets": [
+                    "\"game/sp/hub/from_e1m2\"",
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "model = \"md6def/objects/interact/praetor_suit_token/praetor_suit_token.md6\";",
+                    "stat = \"STAT_GAINED_FIRST_PRAETOR_TOKEN\";",
+                    "onUseCodexEntry = \"codex/tutorials/praetor_suit_perks\";",
+                    "progressionCategory = \"PROGRESSION_CATEGORY_ELITE\";",
+                    "useStat = \"STAT_SUIT_PAGE_UNLOCKED\";",
+                    "flags = {\n\t\t\thide = true;\n\t\t}"
+                ]
+            },
+            "independent_ap_trigger": true,
+            "remove_original": false
         }
     }
 }

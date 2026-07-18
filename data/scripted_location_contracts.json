@@ -7,7 +7,7 @@
       "config": "level_configs/e1m3_cult.json",
       "policy": "game_pickup_weapon_rocket_launcher_1",
       "direct_targets": ["game_target_relay_1244", "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"],
-      "generated_entrypoint_sha256": "6c0bd39bce8b58e9efaff70a8a1edc82f50dd159484641c82e64fbd7550053cd",
+      "generated_entrypoint_sha256": "72a45493707f495f58d165ca21e83d6feaa67ff1ac21f14b7f9679fbd15b75d3",
       "external_references": ["game_target_relay_1244"],
       "classified_external_references": {
         "game_target_relay_1244": "door_state_transition; runtime PASS pre-owned"
@@ -21,7 +21,7 @@
       "config": "level_configs/hub.json",
       "policy": "pickup_equipment_ice_bomb",
       "direct_targets": ["AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB", "ap_remove_location_visual_7770074"],
-      "generated_entrypoint_sha256": "f2cfae592652d9f5e7362956c74d99c347c8f0f0fce1523dcd0c6536af2d6a09",
+      "generated_entrypoint_sha256": "5640e203b33fcf7152ce102d780bd600822b0d8b66460264878dac620928ca16",
       "trigger": {
         "position": [0.47, -22.27, -14.38],
         "size": [4.0, 3.0, 3.5],
@@ -37,7 +37,7 @@
         "clip_type": "CLIPMODEL_NONE",
         "targets": [],
         "persists_after_check": false,
-        "generated_sha256": "ec886118c6d066a74bf9a1d1458088ecf36b40324a029c60c17423d534b16c16",
+        "generated_sha256": "469abed24da4d5be86ce04e6e5882f2742b0684aa2f51ec1baff80425e4ec928",
         "evidence": [
           "vanillamaps/hub.map: func_dynamic_shoot_symbol renders an LWO through func/dynamic + idDynamicEntity with CLIPMODEL_NONE",
           "Tools/kaizo: art/pickups/question_mark_a.lwo renders through renderModelInfo with contributesToLightProbeGen=false",

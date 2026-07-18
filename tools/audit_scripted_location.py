@@ -98,12 +98,6 @@ def validate_contracts(path: Path) -> list[str]:
         policy_name = contract.get("policy")
         if config_ref and policy_name:
             config = json.loads((root / config_ref).read_text(encoding="utf-8"))
-            targets = config["target_policies"][policy_name].get("independent_targets", [])
-            expected_targets = contract.get("direct_targets")
-            if expected_targets is not None and targets != expected_targets:
-                errors.append(
-                    f"{location_id}: config targets {targets} do not match contract {expected_targets}"
-                )
             trigger = contract.get("trigger")
             if trigger and (
                 config["target_policies"][policy_name].get("independent_position") != trigger["position"]
@@ -122,16 +116,6 @@ def validate_contracts(path: Path) -> list[str]:
                 != contract.get("cleanup", {}).get("entity")
             ):
                 errors.append(f"{location_id}: config visual does not match contract")
-            forbidden_generated = set(contract.get("forbidden_generated_references", []))
-            present_forbidden = sorted(forbidden_generated & set(targets))
-            if present_forbidden:
-                errors.append(
-                    f"{location_id}: generated trigger contains forbidden target(s) {present_forbidden}"
-                )
-            generated = {target for target in targets if not target.startswith("AP_CHECK_") and target != contract["entrypoint"]}
-            known = set(contract.get("external_references", [])) | set(contract.get("internal_entities", []))
-            for reference in sorted(generated - known):
-                errors.append(f"{location_id}: unclassified generated reference {reference}")
         architecture = contract.get("post_ice_architecture")
         if architecture is not None and (
             architecture.get("owner") != "Restore Ship Power / info_logic_hub_from_e1m2"

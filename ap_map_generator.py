@@ -241,6 +241,11 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
         "independent_size",
         [AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE],
     )
+    bind_parent = policy.get("bind_parent")
+    bind_info_line = (
+        f"\t\t\tbindInfo = {{\n\t\t\t\tbindParent = \"{bind_parent}\";\n\t\t\t}}\n"
+        if bind_parent else ""
+    )
     if not isinstance(hitbox_size, list) or len(hitbox_size) != 3:
         raise ValueError(f"Independent AP trigger size must have three values: {entity_name}")
     independent_name = policy.get("independent_entity_name", f"ap_independent_{entity_name}")
@@ -273,6 +278,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 \t\t\t\t\ty = {hitbox_size[1]};
 \t\t\t\t\tz = {hitbox_size[2]};
 \t\t\t\t}}
+{bind_info_line}
 \t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = {len(targets)};
@@ -307,6 +313,16 @@ def generate_inert_location_visual(block, policy):
         f'\t\t\tautomapPropertiesDecl = "{automap_decl}";\n'
         if automap_decl else ""
     )
+    think_decl = visual.get("thinkComponentDecl")
+    think_line = (
+        f'\t\t\tthinkComponentDecl = "{think_decl}";\n'
+        if think_decl else ""
+    )
+    bind_parent = policy.get("bind_parent")
+    bind_info_line = (
+        f"\t\t\tbindInfo = {{\n\t\t\t\tbindParent = \"{bind_parent}\";\n\t\t\t}}\n"
+        if bind_parent else ""
+    )
     cleanup_name = visual.get("cleanup_entity")
     cleanup = ""
     if cleanup_name:
@@ -322,6 +338,7 @@ def generate_inert_location_visual(block, policy):
 \t\tedit = {{
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
+{bind_info_line}
 \t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
@@ -340,7 +357,7 @@ def generate_inert_location_visual(block, policy):
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-{automap_line}\t\t\tspawnPosition = {{
+{automap_line}{think_line}{bind_info_line}\t\t\tspawnPosition = {{
 \t\t\t\tx = {position[0]};
 \t\t\t\ty = {position[1]};
 \t\t\t\tz = {position[2]};
@@ -484,32 +501,27 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
         position = [
             float(position_match.group(1)),
             float(position_match.group(2)),
-            float(position_match.group(3)),
+            float(position_match.group(3)) + 1.5,
         ]
 
-    # Collect original vanilla targets so world events (door opens, etc.) still fire.
-    # AP_CHECK_* references from a prior generation pass are already stripped before
-    # this function is called, so whatever remains here is vanilla game logic.
-    vanilla_targets = extract_target_names(block)
+    bind_match = re.search(r'bindParent\s*=\s*"([^"]+)";', block)
+    bind_parent = bind_match.group(1) if bind_match else None
 
-    # Build the ordered target list: vanilla relays → AP check → visual cleanup
-    independent_targets = [t for t in vanilla_targets if t]
-    if ap_check_id not in independent_targets:
-        independent_targets.append(ap_check_id)
-    if cleanup_name not in independent_targets:
-        independent_targets.append(cleanup_name)
+    independent_targets = [ap_check_id, cleanup_name]
 
     return {
         "independent_ap_trigger": True,
         "independent_targets": independent_targets,
-        "independent_size": [6.0, 6.0, 6.0],
+        "independent_size": [5.0, 5.0, 5.0],
         "remove_original": True,
+        "bind_parent": bind_parent,
         "independent_visual": {
             "entity_name": visual_name,
             "class": "idProp2",
             "inherit": None,
             "automap_properties_decl": "default",
             "model": "art/pickups/question_mark_a.lwo",
+            "thinkComponentDecl": "bob_rotate_fast",
             "position": position,
             "scale": [1.0, 1.0, 1.0],
             "cleanup_entity": cleanup_name,
@@ -1020,7 +1032,19 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
                     generate_automap_location_helper(block, location_id)
                 )
                 if target_policy and target_policy.get("independent_ap_trigger"):
+                    if target_policy.get("remove_original", False) or (not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual")):
+                        vanilla_targets = extract_target_names(block)
+                        existing_independent = target_policy.get("independent_targets", [ap_check_id])
+                        target_policy["independent_targets"] = list(dict.fromkeys(
+                            [t for t in vanilla_targets if t] + existing_independent
+                        ))
+
                     manifest_data[ap_check_id] = location_id
+                    if target_policy.get("independent_visual"):
+                        cleanup = target_policy["independent_visual"].get("cleanup_entity")
+                        if cleanup and cleanup not in target_policy.setdefault("independent_targets", [ap_check_id]):
+                            target_policy["independent_targets"].append(cleanup)
+
                     if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
                         universal = build_universal_physical_policy(ap_check_id, location_id, block)
                         target_policy["independent_visual"] = universal["independent_visual"]

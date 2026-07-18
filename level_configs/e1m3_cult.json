@@ -1,5 +1,5 @@
 {
-  "map_key": "e1m3_cult",
+    "map_key": "e1m3_cult",
     "level": "e1m3_cult",
     "region": "Cultist Base",
     "entities": {
@@ -46,10 +46,6 @@
         "game_pickup_weapon_rocket_launcher_1": {
             "independent_ap_trigger": true,
             "independent_entity_name": "ap_independent_rocket_launcher_7770056",
-            "independent_targets": [
-                "game_target_relay_1244",
-                "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1"
-            ],
             "remove_original": true,
             "no_auto_visual": true,
             "preserve_layers": false,
