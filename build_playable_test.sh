@@ -14,9 +14,9 @@ fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-PTB_VERSION="v0.3.0-pre-alpha-dev"
-RELEASE_VERSION="v${PTB_VERSION#v}"
-PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
+RELEASE_VERSION="v0.3.0-pre-alpha"
+PTB_ZIP_NAME="DoomEternalArchipelago-${RELEASE_VERSION}.zip"
+STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
 GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
@@ -99,7 +99,10 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 
 }
 
-rm -rf "$OUTPUT_DIR"
+rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
+    "$OUTPUT_DIR/build" "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" \
+    "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
+    "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME"
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
     "$GENERATED_MAPS_DIR" "$TEMP_DIR"
 "$SCRIPT_DIR/build_client.sh" "$CLIENT_BUILD_DIR"
@@ -224,6 +227,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$SCRIPT_DIR/bridge_client.py" "$SCRIPT_DIR/bootstrap_actions.py" \
     "$SCRIPT_DIR/challenge_registry.py" \
     "$SCRIPT_DIR/foundation.py" \
+    "$SCRIPT_DIR/item_reconciliation.py" \
     "$SCRIPT_DIR/map_registry.py" \
     "$SCRIPT_DIR/run_bridge.sh" "$SCRIPT_DIR/save_decrypt.py" \
     "$SCRIPT_DIR/start_injector_windows.bat" \
@@ -232,6 +236,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$OUTPUT_DIR/client/"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$SCRIPT_DIR/data/items.json" \
+    "$SCRIPT_DIR/data/item_replay_policies.json" \
     "$SCRIPT_DIR/data/challenge_location_registry.json" \
     "$SCRIPT_DIR/data/runtime_locations.json" \
     "$SCRIPT_DIR/data/map_sources.json" \
@@ -310,6 +315,7 @@ manifest = {
         "client/bootstrap_actions.py",
         "client/challenge_registry.py",
         "client/foundation.py",
+        "client/item_reconciliation.py",
         "client/map_registry.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
@@ -318,6 +324,7 @@ manifest = {
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
         "client/data/items.json",
+        "client/data/item_replay_policies.json",
         "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
         "client/data/map_sources.json",
@@ -568,6 +575,11 @@ if find "$OUTPUT_DIR/build" -type f -name '*.txt' -print -quit | grep -q .; then
 fi
 if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | grep -E -n -i '(/run/media/system/Eris/|/var/home/guilherme/|[A-Z]:\\\\Users\\\\guilherme\\|ap_ice_diag)' >/dev/null; then
     echo "Final ZIP text contains a personal path or diagnostic marker" >&2
+    exit 1
+fi
+rm -f "$STALE_DEV_ZIP"
+if find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelago*dev*.zip' -print -quit | grep -q .; then
+    echo "Stale development ZIP remains in build/release" >&2
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"

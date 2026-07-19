@@ -16,10 +16,12 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 #include "ap_client_path_utils.h"
 #include "game_state_probe.h"
 #include "mhclient.h"
+#include "rpc_queue_policy.h"
 
 MeathookInterface* g_MhInterface = nullptr;
 
@@ -27,11 +29,12 @@ static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "v0.3.0-pre-alpha-dev";
+static const char* kReleaseVersion = "v0.3.0-pre-alpha";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kItemMappingRevision = 7;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
+static const DWORD kQueueStateLogMs = 5000;
 static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
@@ -51,6 +54,8 @@ std::string CanonicalMapName(std::string name) {
 struct CommandJob {
     std::string path;
     std::string command;
+    unsigned int retryAttempt = 0;
+    DWORD nextAttemptTick = 0;
 };
 
 struct RpcWatchdogContext {
@@ -1415,7 +1420,11 @@ std::vector<std::string> FindQueuedFiles() {
     return paths;
 }
 
-void ImportSpoolFiles(std::deque<CommandJob>& queue) {
+void ImportSpoolFiles(
+    std::deque<CommandJob>& queue,
+    std::unordered_set<std::string>& knownCommandIds
+) {
+    size_t duplicateCount = 0;
     for (const std::string& queuedPath : FindQueuedFiles()) {
         const std::string processingPath = queuedPath.substr(0, queuedPath.size() - 4) + ".processing";
         if (!MoveFileExA(queuedPath.c_str(), processingPath.c_str(), MOVEFILE_WRITE_THROUGH)) {
@@ -1424,15 +1433,23 @@ void ImportSpoolFiles(std::deque<CommandJob>& queue) {
 
         std::string command;
         if (ReadCommandFile(processingPath, command)) {
-            queue.push_back({processingPath, command});
+            const std::string commandId = CommandIdFromPath(processingPath);
+            if (!RememberRpcCommandId(knownCommandIds, commandId)) {
+                ++duplicateCount;
+                continue;
+            }
+            queue.push_back({processingPath, command, 0, 0});
             LogDebug(
-                "Queued command: command_id=" + CommandIdFromPath(processingPath)
+                "Queued command: command_id=" + commandId
                 + " command=" + command
             );
         } else {
             LogDebug("Discarding unreadable/empty queue file: " + processingPath);
             DeleteFileA(processingPath.c_str());
         }
+    }
+    if (duplicateCount > 0) {
+        LogDebug("RPC_QUEUE_DEDUPE count=" + std::to_string(duplicateCount));
     }
 }
 
@@ -1630,7 +1647,11 @@ int main(int argc, char** argv) {
     }
 
     std::deque<CommandJob> queue;
+    std::unordered_set<std::string> knownCommandIds;
     DWORD lastExecution = 0;
+    DWORD lastQueueStateLog = 0;
+    size_t acknowledgedCommands = 0;
+    bool queueWasActive = false;
     bool lastRpcArmed = false;
     bool lastRpcEnabled = false;
 
@@ -1640,7 +1661,7 @@ int main(int argc, char** argv) {
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading()
         );
-        ImportSpoolFiles(queue);
+        ImportSpoolFiles(queue, knownCommandIds);
 
         const DWORD now = GetTickCount();
         bool rpcArmed = IsRpcExecutionEnabled();
@@ -1669,34 +1690,85 @@ int main(int argc, char** argv) {
         if (!rpcEnabled) {
             DiscardTelemetryJobs(queue);
         }
-        if (!queue.empty()
-                && rpcEnabled
-                && g_MhInterface->m_Initialized
-                && now - lastExecution >= kCommandSpacingMs) {
+        const bool queueActive = !queue.empty();
+        if ((queueActive || queueWasActive)
+                && now - lastQueueStateLog >= kQueueStateLogMs) {
+            LogDebug(
+                "RPC_QUEUE pending=" + std::to_string(queue.size())
+                + " in_flight=0 acked=" + std::to_string(acknowledgedCommands)
+            );
+            lastQueueStateLog = now;
+        }
+        queueWasActive = queueActive;
+
+        bool dispatchNextImmediately = false;
+        if (!queue.empty() && rpcEnabled && g_MhInterface->m_Initialized) {
             CommandJob& job = queue.front();
+            const std::string commandId = CommandIdFromPath(job.path);
+            const bool normalReceipt = IsNormalReceiptCommandId(commandId);
+            const bool dispatchReady = normalReceipt
+                ? ReceiptDispatchReady(now, job.nextAttemptTick)
+                : now - lastExecution >= kCommandSpacingMs;
+            if (!dispatchReady) {
+                Sleep(50);
+                continue;
+            }
             if (GetFileAttributesA(job.path.c_str()) == INVALID_FILE_ATTRIBUTES) {
                 LogDebug("Discarded externally cancelled command: " + job.command);
+                knownCommandIds.erase(commandId);
                 queue.pop_front();
                 continue;
             }
+            const DWORD dispatchTick = GetTickCount();
+            if (normalReceipt) {
+                LogDebug("RPC_DISPATCH id=" + commandId);
+            }
             if (ExecuteCommand(job)) {
                 DeleteFileA(job.path.c_str());
-                LogDebug(
-                    "RPC_DELIVERED_EFFECT_UNKNOWN: command_id="
-                    + CommandIdFromPath(job.path) + " command=" + job.command
-                );
+                if (normalReceipt) {
+                    LogDebug(
+                        "RPC_ACK id=" + commandId
+                        + " elapsed_ms="
+                        + std::to_string(GetTickCount() - dispatchTick)
+                    );
+                    dispatchNextImmediately = true;
+                } else {
+                    LogDebug(
+                        "RPC_DELIVERED_EFFECT_UNKNOWN: command_id="
+                        + commandId + " command=" + job.command
+                    );
+                }
+                ++acknowledgedCommands;
+                knownCommandIds.erase(commandId);
                 queue.pop_front();
             } else {
-                LogDebug(
-                    "Command deferred for retry: command_id="
-                    + CommandIdFromPath(job.path)
-                    + " command=" + job.command
-                    + " result=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
-                    + " wait_error=" + std::to_string(g_MhInterface->m_LastTransportError)
-                );
-                DeleteFileA(kRpcGatePath);
+                if (normalReceipt) {
+                    ++job.retryAttempt;
+                    const DWORD delay = ReceiptRetryDelayMs(job.retryAttempt);
+                    job.nextAttemptTick = GetTickCount() + delay;
+                    LogDebug(
+                        "RPC_RETRY id=" + commandId
+                        + " attempt=" + std::to_string(job.retryAttempt)
+                        + " delay_ms=" + std::to_string(delay)
+                        + " reason="
+                        + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
+                        + "/" + std::to_string(g_MhInterface->m_LastTransportError)
+                    );
+                } else {
+                    LogDebug(
+                        "Command deferred for retry: command_id=" + commandId
+                        + " command=" + job.command
+                        + " result=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
+                        + " wait_error=" + std::to_string(g_MhInterface->m_LastTransportError)
+                    );
+                    DeleteFileA(kRpcGatePath);
+                }
             }
-            lastExecution = now;
+            lastExecution = GetTickCount();
+        }
+
+        if (dispatchNextImmediately) {
+            continue;
         }
 
         Sleep(50);

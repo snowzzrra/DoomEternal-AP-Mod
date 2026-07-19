@@ -1,0 +1,470 @@
+{
+  "version": 1,
+  "items": {
+    "7770000": {
+      "name": "Heavy Cannon",
+      "policy": "replay_idempotent"
+    },
+    "7770001": {
+      "name": "Plasma Rifle",
+      "policy": "replay_idempotent"
+    },
+    "7770002": {
+      "name": "Rocket Launcher",
+      "policy": "replay_idempotent"
+    },
+    "7770003": {
+      "name": "Super Shotgun",
+      "policy": "replay_idempotent"
+    },
+    "7770004": {
+      "name": "Ballista",
+      "policy": "replay_idempotent"
+    },
+    "7770005": {
+      "name": "Chaingun",
+      "policy": "replay_idempotent"
+    },
+    "7770006": {
+      "name": "BFG-9000",
+      "policy": "never_replay"
+    },
+    "7770007": {
+      "name": "The Crucible",
+      "policy": "never_replay"
+    },
+    "7770008": {
+      "name": "The Unmaykr",
+      "policy": "replay_idempotent"
+    },
+    "7770009": {
+      "name": "Sentinel Hammer",
+      "policy": "replay_idempotent"
+    },
+    "7770010": {
+      "name": "Chainsaw",
+      "policy": "replay_idempotent"
+    },
+    "7770011": {
+      "name": "Frag Grenade",
+      "policy": "replay_idempotent"
+    },
+    "7770012": {
+      "name": "Flame Belch",
+      "policy": "replay_idempotent"
+    },
+    "7770013": {
+      "name": "Ice Bomb",
+      "policy": "replay_idempotent"
+    },
+    "7770014": {
+      "name": "Blood Punch",
+      "policy": "replay_idempotent"
+    },
+    "7770015": {
+      "name": "Dash",
+      "policy": "replay_idempotent"
+    },
+    "7770016": {
+      "name": "Sentinel Battery",
+      "policy": "never_replay"
+    },
+    "7770017": {
+      "name": "Progressive Health Upgrade",
+      "policy": "special_progressive"
+    },
+    "7770018": {
+      "name": "Empyrean Key",
+      "policy": "never_replay"
+    },
+    "7770020": {
+      "name": "Rune",
+      "policy": "never_replay"
+    },
+    "7770021": {
+      "name": "Suit Point",
+      "policy": "special_progressive"
+    },
+    "7770022": {
+      "name": "Extra Life",
+      "policy": "never_replay"
+    },
+    "7770023": {
+      "name": "Extra Life Pack",
+      "policy": "never_replay"
+    },
+    "7770024": {
+      "name": "Ammo Refill",
+      "policy": "never_replay"
+    },
+    "7770025": {
+      "name": "Full Heal",
+      "policy": "never_replay"
+    },
+    "7770026": {
+      "name": "Full Armor",
+      "policy": "never_replay"
+    },
+    "7770027": {
+      "name": "Fuel",
+      "policy": "never_replay"
+    },
+    "7770028": {
+      "name": "BFG Ammo",
+      "policy": "never_replay"
+    },
+    "7770029": {
+      "name": "Soulsphere",
+      "policy": "never_replay"
+    },
+    "7770030": {
+      "name": "Berserk",
+      "policy": "never_replay"
+    },
+    "7770031": {
+      "name": "Small Health",
+      "policy": "never_replay"
+    },
+    "7770032": {
+      "name": "Large Health",
+      "policy": "never_replay"
+    },
+    "7770033": {
+      "name": "Small Armor",
+      "policy": "never_replay"
+    },
+    "7770034": {
+      "name": "Large Armor",
+      "policy": "never_replay"
+    },
+    "7770035": {
+      "name": "Shotgun Ammo",
+      "policy": "never_replay"
+    },
+    "7770036": {
+      "name": "Bullet Ammo",
+      "policy": "never_replay"
+    },
+    "7770037": {
+      "name": "Cell Ammo",
+      "policy": "never_replay"
+    },
+    "7770038": {
+      "name": "Rocket Ammo",
+      "policy": "never_replay"
+    },
+    "7770039": {
+      "name": "Chainsaw Fuel",
+      "policy": "never_replay"
+    },
+    "7770040": {
+      "name": "One Extra Life",
+      "policy": "never_replay"
+    },
+    "7770041": {
+      "name": "Armor Shard",
+      "policy": "never_replay"
+    },
+    "7770042": {
+      "name": "Ammo Cache",
+      "policy": "never_replay"
+    },
+    "7770043": {
+      "name": "Imp Trap",
+      "policy": "never_replay"
+    },
+    "7770044": {
+      "name": "Carcass Trap",
+      "policy": "never_replay"
+    },
+    "7770045": {
+      "name": "Revenant Trap",
+      "policy": "never_replay"
+    },
+    "7770046": {
+      "name": "Arachnotron Trap",
+      "policy": "never_replay"
+    },
+    "7770047": {
+      "name": "Hell Knight Trap",
+      "policy": "never_replay"
+    },
+    "7770048": {
+      "name": "Dread Knight Trap",
+      "policy": "never_replay"
+    },
+    "7770049": {
+      "name": "Baron Trap",
+      "policy": "never_replay"
+    },
+    "7770050": {
+      "name": "Tyrant Trap",
+      "policy": "never_replay"
+    },
+    "7770051": {
+      "name": "Marauder Trap",
+      "policy": "never_replay"
+    },
+    "7770052": {
+      "name": "Archvile Trap",
+      "policy": "never_replay"
+    },
+    "7770053": {
+      "name": "Cueball Trap",
+      "policy": "never_replay"
+    },
+    "7770054": {
+      "name": "Ammo Drain Trap",
+      "policy": "never_replay"
+    },
+    "7770055": {
+      "name": "Fuel Drain Trap",
+      "policy": "never_replay"
+    },
+    "7770056": {
+      "name": "BFG Drain Trap",
+      "policy": "never_replay"
+    },
+    "7770058": {
+      "name": "Sticky Bombs",
+      "policy": "replay_idempotent"
+    },
+    "7770059": {
+      "name": "Full Auto",
+      "policy": "replay_idempotent"
+    },
+    "7770060": {
+      "name": "Precision Bolt",
+      "policy": "replay_idempotent"
+    },
+    "7770061": {
+      "name": "Micro Missiles",
+      "policy": "replay_idempotent"
+    },
+    "7770062": {
+      "name": "Heat Blast",
+      "policy": "replay_idempotent"
+    },
+    "7770063": {
+      "name": "Heat Blast Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770064": {
+      "name": "Microwave Beam",
+      "policy": "replay_idempotent"
+    },
+    "7770065": {
+      "name": "Microwave Beam Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770067": {
+      "name": "Precision Bolt Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770068": {
+      "name": "Micro Missiles Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770069": {
+      "name": "Full Auto Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770070": {
+      "name": "Sticky Bombs Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770071": {
+      "name": "Remote Detonate",
+      "policy": "replay_idempotent"
+    },
+    "7770072": {
+      "name": "Remote Detonate Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770073": {
+      "name": "Lock-on Burst",
+      "policy": "replay_idempotent"
+    },
+    "7770074": {
+      "name": "Lock-on Burst Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770075": {
+      "name": "Arbalest",
+      "policy": "replay_idempotent"
+    },
+    "7770076": {
+      "name": "Arbalest Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770077": {
+      "name": "Destroyer Blade",
+      "policy": "replay_idempotent"
+    },
+    "7770078": {
+      "name": "Destroyer Blade Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770079": {
+      "name": "Energy Shield",
+      "policy": "replay_idempotent"
+    },
+    "7770080": {
+      "name": "Energy Shield Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770081": {
+      "name": "Mobile Turret",
+      "policy": "replay_idempotent"
+    },
+    "7770082": {
+      "name": "Mobile Turret Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770083": {
+      "name": "Meat Hook",
+      "policy": "replay_idempotent"
+    },
+    "7770084": {
+      "name": "Meat Hook Mastery",
+      "policy": "replay_idempotent"
+    },
+    "7770085": {
+      "name": "Savagery",
+      "policy": "replay_idempotent"
+    },
+    "7770086": {
+      "name": "Seek and Destroy",
+      "policy": "replay_idempotent"
+    },
+    "7770087": {
+      "name": "Blood Fueled",
+      "policy": "replay_idempotent"
+    },
+    "7770088": {
+      "name": "Progressive Armor Upgrade",
+      "policy": "special_progressive"
+    },
+    "7770089": {
+      "name": "Air Control",
+      "policy": "replay_idempotent"
+    },
+    "7770090": {
+      "name": "Dazed and Confused",
+      "policy": "replay_idempotent"
+    },
+    "7770091": {
+      "name": "Saving Throw",
+      "policy": "replay_idempotent"
+    },
+    "7770092": {
+      "name": "Progressive Ammo Upgrade",
+      "policy": "special_progressive"
+    },
+    "7770093": {
+      "name": "Chrono Strike",
+      "policy": "replay_idempotent"
+    },
+    "7770094": {
+      "name": "Equipment Fiend",
+      "policy": "replay_idempotent"
+    },
+    "7770095": {
+      "name": "Punch and Reave",
+      "policy": "replay_idempotent"
+    },
+    "7770096": {
+      "name": "Victory",
+      "policy": "never_replay"
+    },
+    "7770097": {
+      "name": "Faster Ledge Grab",
+      "policy": "replay_idempotent"
+    },
+    "7770098": {
+      "name": "Faster Weapon Swap",
+      "policy": "replay_idempotent"
+    },
+    "7770099": {
+      "name": "Faster Dash Recharge",
+      "policy": "replay_idempotent"
+    },
+    "7770100": {
+      "name": "Dash Refill on Glory Kill",
+      "policy": "replay_idempotent"
+    },
+    "7770101": {
+      "name": "Reveal Automap Stations",
+      "policy": "replay_idempotent"
+    },
+    "7770102": {
+      "name": "Reveal Automap Progression Items",
+      "policy": "replay_idempotent"
+    },
+    "7770103": {
+      "name": "Larger Automap Reveal",
+      "policy": "replay_idempotent"
+    },
+    "7770104": {
+      "name": "Reveal Dossier Progression Items",
+      "policy": "replay_idempotent"
+    },
+    "7770106": {
+      "name": "Reduced Hazard Damage",
+      "policy": "replay_idempotent"
+    },
+    "7770107": {
+      "name": "Reduced Self Damage",
+      "policy": "replay_idempotent"
+    },
+    "7770108": {
+      "name": "Respawning Barrels",
+      "policy": "replay_idempotent"
+    },
+    "7770109": {
+      "name": "Ammo from Barrels",
+      "policy": "replay_idempotent"
+    },
+    "7770110": {
+      "name": "Powerup Extender",
+      "policy": "replay_idempotent"
+    },
+    "7770111": {
+      "name": "Frag Grenade Cooldown",
+      "policy": "replay_idempotent"
+    },
+    "7770112": {
+      "name": "Frag Grenade Concussive Blast",
+      "policy": "replay_idempotent"
+    },
+    "7770113": {
+      "name": "Frag Grenade Cluster Bombs",
+      "policy": "replay_idempotent"
+    },
+    "7770114": {
+      "name": "Second Frag Grenade",
+      "policy": "replay_idempotent"
+    },
+    "7770115": {
+      "name": "Ice Bomb Cooldown",
+      "policy": "replay_idempotent"
+    },
+    "7770116": {
+      "name": "Extended Ice Bomb Duration",
+      "policy": "replay_idempotent"
+    },
+    "7770117": {
+      "name": "Health from Frozen Demons",
+      "policy": "replay_idempotent"
+    },
+    "7770118": {
+      "name": "Frozen Melee Shatter",
+      "policy": "replay_idempotent"
+    },
+    "7770142": {
+      "name": "Sentinel Battery Bundle",
+      "policy": "never_replay"
+    }
+  }
+}
+

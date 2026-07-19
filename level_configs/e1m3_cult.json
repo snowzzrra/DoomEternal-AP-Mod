@@ -39,9 +39,6 @@
     "remove_entities": [
         "game_target_give_item_1"
     ],
-    "neutralize_entity_references": [
-        "game_pickup_weapon_rocket_launcher_1"
-    ],
     "target_policies": {
         "game_pickup_weapon_rocket_launcher_1": {
             "independent_ap_trigger": true,
@@ -67,7 +64,27 @@
                 "inventory",
                 "give",
                 "equip"
-            ]
+            ],
+            "checkpoint_cleanup": {
+                "source_entity": "game_target_timeline_6",
+                "source_sha256": "affc0be75c36d27cb477554477783b21ad242c4bfd7a153da30f4e50af640935",
+                "event_index": 1,
+                "event_def": "remove",
+                "original_target": "game_pickup_weapon_rocket_launcher_1",
+                "replacement_target": "ap_independent_rocket_launcher_7770056",
+                "original_targets": [
+                    "game_target_timeline_5",
+                    "game_pickup_weapon_rocket_launcher_1",
+                    "game_trigger_trigger_990",
+                    "game_trigger_trigger_994"
+                ],
+                "replacement_targets": [
+                    "game_target_timeline_5",
+                    "ap_independent_rocket_launcher_7770056",
+                    "game_trigger_trigger_990",
+                    "game_trigger_trigger_994"
+                ]
+            }
         }
     },
     "secret_encounters": [

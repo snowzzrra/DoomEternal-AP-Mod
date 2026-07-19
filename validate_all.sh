@@ -14,6 +14,7 @@ python3 -m py_compile \
     bridge_client.py \
     challenge_registry.py \
     foundation.py \
+    item_reconciliation.py \
     map_registry.py \
     map_preflight.py \
     map_semantic_baseline.py \
@@ -37,6 +38,7 @@ for test_module in \
     tests.test_ap_map_generator \
     tests.test_validate_data \
     tests.test_foundation \
+    tests.test_item_reconciliation \
     tests.test_logic_decl_patcher \
     tests.test_mission_complete_map_patcher \
     tests.test_scripted_location_contracts \
