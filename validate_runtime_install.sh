@@ -2,7 +2,7 @@
 set -euo pipefail
 
 GAME_DIR="${DOOM_GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/DOOMEternal}"
-MOD_ZIP="$GAME_DIR/Mods/DoomEternalArchipelagoPreAlpha.zip"
+MOD_ZIP="$GAME_DIR/Mods/DoomEternalArchipelagoAlpha.zip"
 
 if [[ ! -f "$MOD_ZIP" ]]; then
     echo "Missing installed mod: $MOD_ZIP" >&2

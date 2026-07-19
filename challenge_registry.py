@@ -63,9 +63,9 @@ def validate_challenge_registry(registry: dict) -> None:
     if registry.get("schema_version") != 7:
         raise ValueError("runtime registry schema_version must be 7")
     entries = all_location_entries(registry)
-    if len(entries) != 20:
+    if len(entries) != 21:
         raise ValueError(
-            "expected three Mission Complete, thirteen Weapon Mastery, and "
+            "expected four Mission Complete, thirteen Weapon Mastery, and "
             "four Cultist Base Mission Challenge locations"
         )
     names = [entry.get("name") for entry in entries]
@@ -75,7 +75,7 @@ def validate_challenge_registry(registry: dict) -> None:
     if None in ids or len(ids) != len(set(ids)):
         raise ValueError("runtime location IDs must be unique")
     if set(ids) != {
-        7770122, 7770123, 7770124,
+        7770122, 7770123, 7770124, 7770162,
         *BASE_MASTERY_LOCATION_IDS,
         *MISSION_CHALLENGE_LOCATION_IDS,
         ALL_MISSION_CHALLENGES_LOCATION_ID,
@@ -84,12 +84,13 @@ def validate_challenge_registry(registry: dict) -> None:
 
     for entry in registry["mission_complete"]:
         signal = entry.get("signal", {})
-        if entry["location_id"] in {7770122, 7770123}:
+        if entry["location_id"] in {7770122, 7770123, 7770162}:
             if set(signal) != {"kind", "runtime_map"} or signal["kind"] != "map_terminal":
                 raise ValueError(f"{entry['name']}: invalid map terminal signal")
             if signal["runtime_map"] not in {
                 "game/sp/e1m1_intro/e1m1_intro",
                 "game/sp/e1m2_battle/e1m2_battle",
+                "game/sp/e1m4_boss/e1m4_boss",
             }:
                 raise ValueError(f"{entry['name']}: invalid runtime map identity")
             continue

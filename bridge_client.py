@@ -249,6 +249,7 @@ DEATHLINK_KILL_INTERVAL = 2.0
 DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
+FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_3.txt"
 # Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
@@ -1284,6 +1285,9 @@ with open(RUNTIME_LOCATIONS_FILE, "r", encoding="utf-8") as f:
     RUNTIME_LOCATIONS = json.load(f)
 CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Cultist Base - Mission Complete"
+]
+DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
+    "Doom Hunter Base - Mission Complete"
 ]
 CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
 WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
@@ -3285,13 +3289,47 @@ class DoomEternalContext(CommonContext):
     async def send_campaign_goal(self, source_description):
         return await DoomEternalContext.send_mission_complete(
             self,
-            CULTIST_BASE_COMPLETE_LOCATION,
+            DOOM_HUNTER_BASE_COMPLETE_LOCATION,
             source_description,
             report_goal=True,
         )
 
     async def check_campaign_goal_event(self):
-        """Single native-transition consumer for Mission Complete and Cultist goal."""
+        """Consume direct map goal plus native Mission Complete transitions."""
+        fortress_goal_path = Path(INV_DUMP_DIR) / FORTRESS_GOAL_EVENT_FILENAME
+        if fortress_goal_path.exists():
+            try:
+                contents = fortress_goal_path.read_text(
+                    encoding="utf-8", errors="ignore"
+                )
+            except OSError:
+                contents = ""
+            if "AP_GOAL_EVENT_FORTRESS_VISIT_3" not in contents:
+                logger.warning("[Goal] Malformed Fortress Visit 3 goal event; removing it.")
+                try:
+                    fortress_goal_path.unlink()
+                except OSError:
+                    pass
+                return True
+            try:
+                sent = await self.send_campaign_goal(
+                    "Fortress Visit 3 native Super Gore Nest terminal"
+                )
+            except Exception as error:
+                logger.error("[Goal] GOAL_RETRY error=%s", error)
+                return True
+            if sent:
+                try:
+                    fortress_goal_path.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as error:
+                    logger.warning("[Goal] Sent goal event cleanup failed: %s", error)
+                logger.info("[Goal] GOAL_ACK owner=trigger_transition_to_e2m1")
+            else:
+                logger.info("[Goal] GOAL_RETRY reason=mission_or_server_ack")
+            return True
+
         event_paths = goal_event_files()
         if not event_paths:
             return False
@@ -3343,7 +3381,7 @@ class DoomEternalContext(CommonContext):
 
                     "native transition event",
 
-                    report_goal=(transition["location_id"] == CULTIST_BASE_COMPLETE_LOCATION)
+                    report_goal=False
 
                 )
             except Exception as error:
@@ -3407,8 +3445,8 @@ class DoomEternalContext(CommonContext):
         if await self.check_campaign_goal_event():
             return
 
-        if not self.session_state.get("goal_sent", False):
-            await self.check_campaign_goal_save_fallback()
+        # The goal is owned only by the from_e1m4 portal trigger. Save polling
+        # cannot distinguish Mission Select and must never complete a seed.
 
     def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()

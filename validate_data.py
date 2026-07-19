@@ -34,10 +34,11 @@ from foundation import (
     validate_entity_shape,
     validate_primitive_registry,
 )
+from hub_diff_guard import assert_hub_diff_classified
 from challenge_registry import all_location_entries, load_challenge_registry
 from map_registry import load_map_registry, validation_plan
 from map_semantic_baseline import assert_frozen_map_baselines
-from map_preflight import validate_registry_preflight
+from map_preflight import validate_onboarding_audit, validate_registry_preflight
 
 
 ROOT = Path(__file__).resolve().parent
@@ -49,6 +50,8 @@ BATTERY_LOCATIONS = {
     "Cultist Base - Sentinel Battery 1": 7770057,
     "Cultist Base - Sentinel Battery 2": 7770069,
     "Cultist Base - Sentinel Battery 3": 7770070,
+    "Doom Hunter Base - Sentinel Battery 1": 7770148,
+    "Doom Hunter Base - Sentinel Battery 2": 7770151,
 }
 BATTERY_ITEM_COMMANDS = {
     7770016: 1,
@@ -547,6 +550,10 @@ def main() -> int:
         assert_frozen_map_baselines()
     except (OSError, ValueError) as exc:
         errors.append(f"Frozen four-map baseline failed: {exc}")
+    try:
+        assert_hub_diff_classified()
+    except (OSError, ValueError) as exc:
+        errors.append(f"Hub entity diff classification failed: {exc}")
 
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
@@ -567,6 +574,24 @@ def main() -> int:
         )
     except (OSError, ValueError) as exc:
         errors.append(f"New-map preflight failed: {exc}")
+    try:
+        doom_hunter = dict(registry_for_preflight["maps"]["e1m4_boss"])
+        doom_hunter["onboarding_audit"] = "data/onboarding/e1m4_boss.json"
+        validate_onboarding_audit(
+            ROOT, "e1m4_boss", doom_hunter, location_ids, set(item_ids.values()),
+            container_catalog,
+        )
+    except (OSError, ValueError) as exc:
+        errors.append(f"Doom Hunter Base research preflight failed: {exc}")
+    try:
+        hub_visit3 = dict(registry_for_preflight["maps"]["hub"])
+        hub_visit3["onboarding_audit"] = "data/onboarding/hub_visit3.json"
+        validate_onboarding_audit(
+            ROOT, "hub", hub_visit3, location_ids, set(item_ids.values()),
+            container_catalog,
+        )
+    except (OSError, ValueError) as exc:
+        errors.append(f"Fortress Visit 3 preflight failed: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
     reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
@@ -574,7 +599,7 @@ def main() -> int:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
     if {name: location_ids.get(name) for name in BATTERY_LOCATIONS} != BATTERY_LOCATIONS:
-        errors.append("Four physical Sentinel Battery AP locations must remain active")
+        errors.append("Six physical Sentinel Battery AP locations must remain active")
     if item_ids.get("Sentinel Battery") != 7770016:
         errors.append("Sentinel Battery single item ID drifted")
     if item_ids.get("Sentinel Battery Bundle") != 7770142:
@@ -726,9 +751,9 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 76:
+    if physical_location_count != 104:
         errors.append(
-            f"Expected 76 physical locations after the reused Suit check, found {physical_location_count}"
+            f"Expected 104 physical locations through Doom Hunter Base/Fortress Visit 3, found {physical_location_count}"
         )
 
     enabled_map_sources = {
@@ -823,11 +848,11 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 100,
-        "map_checks": 80,
-        "runtime_locations": 20,
+        "locations": 129,
+        "map_checks": 108,
+        "runtime_locations": 21,
         "runtime_goals": 1,
-        "route_sentinel_batteries": 5,
+        "route_sentinel_batteries": 18,
     }:
         errors.append("Foundation frozen counts changed")
     try:

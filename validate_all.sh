@@ -14,6 +14,7 @@ python3 -m py_compile \
     bridge_client.py \
     challenge_registry.py \
     foundation.py \
+    hub_diff_guard.py \
     item_reconciliation.py \
     map_registry.py \
     map_preflight.py \

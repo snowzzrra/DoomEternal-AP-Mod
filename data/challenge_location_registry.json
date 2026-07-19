@@ -25,6 +25,14 @@
         "from": "game/sp/e1m3_cult/e1m3_cult",
         "to": "game/sp/e1m4_boss/e1m4_boss"
       }
+    },
+    {
+      "name": "Doom Hunter Base - Mission Complete",
+      "location_id": 7770162,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
+      }
     }
   ],
   "mission_challenges": [

@@ -18,7 +18,7 @@ AUDIT_KEYS = {
     "movers", "gates", "new_decl_resources", "locations",
 }
 LOCATION_KEYS = {
-    "entity", "ap_id", "ap_name", "entity_match_count", "original_targets",
+    "entity", "class", "inherit", "ap_id", "ap_name", "entity_match_count", "original_targets",
     "reward_grant_currency_ownership_edges", "progression_objective_relays",
     "drop_targets", "bind_parent", "local_transform", "layers", "checkpoints",
     "movers", "gates", "conditional_pickup_behavior",
@@ -88,6 +88,12 @@ def validate_onboarding_audit(
         if source_text.count(f"entityDef {location['entity']}") != 1 or location["entity_match_count"] != 1 or bounds is None:
             raise ValueError(f"{label}: entity must exist uniquely")
         source_block = source_text[bounds[0]:bounds[1]]
+        class_match = re.search(r'class\s*=\s*"([^"]+)";', source_block)
+        inherit_match = re.search(r'inherit\s*=\s*"([^"]+)";', source_block)
+        if not class_match or location["class"] != class_match.group(1):
+            raise ValueError(f"{label}: native class is missing or drifted")
+        if not inherit_match or location["inherit"] != inherit_match.group(1):
+            raise ValueError(f"{label}: native inherit is missing or drifted")
         if canonical_locations.get(location["ap_name"]) != location["ap_id"]:
             raise ValueError(f"{label}: AP name/ID is not synchronized with APWorld")
         if location["ap_id"] in canonical_item_ids:

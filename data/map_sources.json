@@ -1,6 +1,6 @@
 {
     "schema_version": 1,
-    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult"],
+    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss"],
     "maps": {
         "e1m1_intro": {
             "display_name": "Hell on Earth",
@@ -75,6 +75,25 @@
             "resource_owner": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
             "resource_priority": 42,
             "relative_entities_path": "game/sp/e1m3_cult/e1m3_cult.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
+        },
+        "e1m4_boss": {
+            "display_name": "Doom Hunter Base",
+            "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
+            "source_file": "e1m4_boss.map",
+            "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+            "source_owner": "vanillamaps/e1m4_boss.map",
+            "level_config": "level_configs/e1m4_boss.json",
+            "manifest": "manifests/e1m4_boss.json",
+            "generated_output": "e1m4_boss.entities",
+            "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
+            "resource_path": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+            "resource_owner": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+            "resource_priority": 74,
+            "relative_entities_path": "game/sp/e1m4_boss/e1m4_boss.entities",
             "supported_game_revision": "Steam 6.66 Rev 3.1",
             "onboarding_audit": null
         }

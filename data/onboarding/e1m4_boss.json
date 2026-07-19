@@ -1,0 +1,569 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m4_boss",
+  "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+  "resource_owner": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+  "resource_priority": 74,
+  "mission_complete_transition": {
+    "kind": "direct native terminal relay",
+    "owner": "checkpoints_target_relay_65",
+    "target": "checkpoints_target_level_transition_1",
+    "classification": "preserve native target second; prepend AP Mission Complete target"
+  },
+  "layers": [
+    "game/sp/e1m4_boss/dormancy/dorm_wing_b_extraction",
+    "game/sp/extralives/extralives_many"
+  ],
+  "checkpoints": [
+    "cp_01_map_start",
+    "cp_15_boss_outro"
+  ],
+  "movers": [
+    "train_dock_traversal_platform_func_mover_3"
+  ],
+  "gates": [
+    "catwalk_platform_destructible_interact_argent_cell_1_1530710120"
+  ],
+  "new_decl_resources": [],
+  "locations": [
+    {
+      "entity": "clip_pickup_extra_life_extra_life_1_1",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770143,
+      "ap_name": "Doom Hunter Base - Extra Life - Opening",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/extra_life/extra_life_1",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 2.23517418e-08;\n\t\t\ty = 225.039993;\n\t\t\tz = -1.64833868;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "connection_corridor_progress_praetor_token_1_e1m4",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770144,
+      "ap_name": "Doom Hunter Base - Praetor Suit Token 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 64.1499634;\n\t\t\ty = -7.10000181;\n\t\t\tz = 16.8090744;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native one-shot/save/marker owner retained; only currencyList removed; AP target appended after original targets"
+    },
+    {
+      "entity": "pickups_progress_codex_1_e1m4",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770145,
+      "ap_name": "Doom Hunter Base - Deag Ranak Codex",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/codex",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -138.130997;\n\t\t\ty = -84.064003;\n\t\t\tz = 9;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "pickups_progress_codex_2_e1m4",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770146,
+      "ap_name": "Doom Hunter Base - Doom Hunter Base Codex",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/codex",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -3.79999995;\n\t\t\ty = -32.2999992;\n\t\t\tz = -2;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "pickups_progress_codex_3_e1m4",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770147,
+      "ap_name": "Doom Hunter Base - Doom Hunter Codex",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/codex",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -0.0499999002;\n\t\t\ty = 142.899994;\n\t\t\tz = -10.999999;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "pickups_progress_sentinel_battery_1_e1m4",
+      "class": "idProp2",
+      "inherit": "progress/sentinel_battery",
+      "ap_id": 7770148,
+      "ap_name": "Doom Hunter Base - Sentinel Battery 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/sentinel_battery",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -1.49011612e-08;\n\t\t\ty = -86.1999893;\n\t\t\tz = -20.5549965;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "pickups_progress_praetor_token_1_e1m4",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770149,
+      "ap_name": "Doom Hunter Base - Praetor Suit Token 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -14.3998203;\n\t\t\ty = -268.899994;\n\t\t\tz = -5.75091839;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native one-shot/save/marker owner retained; only currencyList removed; AP target appended after original targets"
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_1",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770150,
+      "ap_name": "Doom Hunter Base - Extra Life - Furnace",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/extra_life/extra_life_1",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 190.700012;\n\t\t\ty = 110.100014;\n\t\t\tz = -4.64833832;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "catwalk_platform_progress_sentinel_battery_1_e1m4",
+      "class": "idProp2",
+      "inherit": "progress/sentinel_battery",
+      "ap_id": 7770151,
+      "ap_name": "Doom Hunter Base - Sentinel Battery 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/sentinel_battery",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 186.600052;\n\t\t\ty = 115.800003;\n\t\t\tz = 6.64518404;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "catwalk_platform_progress_argent_cell_1_1530710120",
+      "class": "idInteractable_WorldCache",
+      "inherit": "progress/argent_cell",
+      "ap_id": 7770152,
+      "ap_name": "Doom Hunter Base - Sentinel Crystal",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "catwalk_platform_destructible_interact_argent_cell_1_1530710120",
+          "classification": "cosmetic",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native WorldCache upgrade transaction",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "catwalk_platform_destructible_interact_argent_cell_1_1530710120",
+          "classification": "cosmetic",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 236.000000;\n\t\t\ty = 136.200012;\n\t\t\tz = -4.292600;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "catwalk_platform_destructible_interact_argent_cell_1_1530710120"
+      ],
+      "conditional_pickup_behavior": "opaque native Crystal selection transaction removed; independent AP trigger preserves only the targetless destructible marker owner"
+    },
+    {
+      "entity": "train_dock_traversal_platform_pickup_extra_life_extra_life_1_1_e1m4",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770153,
+      "ap_name": "Doom Hunter Base - Extra Life - Moving Platform",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/extra_life/extra_life_1",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": "train_dock_traversal_platform_func_mover_3",
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\ty = -203;\n\t\t\tz = -0.648338675;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [
+        "train_dock_traversal_platform_func_mover_3"
+      ],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "train_dock_traversal_platform_progress_mod_bot_1_e1m4",
+      "class": "idInteractable_WeaponModBot",
+      "inherit": "progress/mod_bot",
+      "ap_id": 7770154,
+      "ap_name": "Doom Hunter Base - Weapon Modbot",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native WeaponModBot selection transaction",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -12.3000011;\n\t\t\ty = -162.999969;\n\t\t\tz = -13.9998341;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "opaque native Modbot selection transaction removed; independent AP trigger is one-shot and reload-safe"
+    },
+    {
+      "entity": "wing_c_progress_praetor_token_1_e1m4",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770155,
+      "ap_name": "Doom Hunter Base - Praetor Suit Token 3",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -31.7152615;\n\t\t\ty = 335.538696;\n\t\t\tz = 9.43980408;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native one-shot/save/marker owner retained; only currencyList removed; AP target appended after original targets"
+    },
+    {
+      "entity": "wing_c_pickup_collectible_toys_hellknight_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/toys/hellknight",
+      "ap_id": 7770156,
+      "ap_name": "Doom Hunter Base - Hell Knight Toy",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/collectible/toys/hellknight",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -7.4505806e-09;\n\t\t\ty = 181.320007;\n\t\t\tz = -16.4955597;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "wing_b_pickup_collectible_albums_album_03_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/albums/album_03",
+      "ap_id": 7770157,
+      "ap_name": "Doom Hunter Base - Keen - Shadows Don't Scare Commander Keen Vinyl",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/collectible/albums/album_03",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 174.50415;\n\t\t\ty = -100.749954;\n\t\t\tz = 24.5000095;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/e1m4_boss/dormancy/dorm_wing_b_extraction"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "wing_b_progress_praetor_token_1_e1m4",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770158,
+      "ap_name": "Doom Hunter Base - Praetor Suit Token 4",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 123.792709;\n\t\t\ty = -71.379631;\n\t\t\tz = -1.29091871;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native one-shot/save/marker owner retained; only currencyList removed; AP target appended after original targets"
+    },
+    {
+      "entity": "wing_b_progress_cheats_one_shot_kill_on_stagger_1",
+      "class": "idProp2",
+      "inherit": "progress/cheats/one_shot_kill_on_stagger",
+      "ap_id": 7770159,
+      "ap_name": "Doom Hunter Base - Silver Bullet Mode Cheat Code",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/cheats/one_shot_kill_on_stagger",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 133.619995;\n\t\t\ty = -81.7700119;\n\t\t\tz = 34.3360291;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/e1m4_boss/dormancy/dorm_wing_b_extraction"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "wing_a_pickup_collectible_toys_lost_soul_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/toys/lost_soul",
+      "ap_id": 7770160,
+      "ap_name": "Doom Hunter Base - Lost Soul Toy",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:pickup/collectible/toys/lost_soul",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -169.134781;\n\t\t\ty = -97.64991;\n\t\t\tz = 17.0013084;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native owned/conditional prop is replaced by an independent one-shot AP trigger and isolated marker cleanup"
+    },
+    {
+      "entity": "wing_a_progress_rune_1_e1m4",
+      "class": "idInteractable_Rune",
+      "inherit": "progress/rune",
+      "ap_id": 7770161,
+      "ap_name": "Doom Hunter Base - Rune",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native Rune selection/ownership transaction",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -112.600006;\n\t\t\ty = -55.3999825;\n\t\t\tz = 10.2000008;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "opaque native Rune interaction left unreachable; independent one-shot AP trigger uses the existing Rune delivery workaround"
+    }
+  ]
+}
