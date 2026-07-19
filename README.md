@@ -706,7 +706,7 @@ Fix:
 ## Known probable issues
 
 - Rune slots and equipped-state visuals may occasionally appear inconsistent,
-  even when Rune effects are active. Planned for v0.2.1.
+  even when Rune effects are active. Planned for a future fix.
 - Sentinel Battery counter may visually reset to 0 even while gameplay balance
   remains available. Socket requirements are authoritative.
 - Reloading a checkpoint may still recover rare vanilla scripting desyncs,

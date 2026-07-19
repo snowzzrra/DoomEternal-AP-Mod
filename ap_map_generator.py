@@ -242,11 +242,103 @@ TARGET_POLICY_CONSUMERS = {
     "preserve_layers": "generate_independent_pickup_trigger",
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
     "native_entity_contract": "apply_native_entity_contract",
+    "checkpoint_cleanup": "apply_checkpoint_cleanup_contract",
 }
 
 NATIVE_ENTITY_CONTRACT_KEYS = {
     "remove_block", "original_targets", "required_snippets",
 }
+
+CHECKPOINT_CLEANUP_CONTRACT_KEYS = {
+    "source_entity", "source_sha256", "event_index", "event_def",
+    "original_target", "replacement_target", "original_targets",
+    "replacement_targets",
+}
+
+
+def _timeline_event_targets(block):
+    return [
+        target
+        for _, target in re.findall(
+            r'^\t{4}item\[(\d+)\] = \{\n\t{5}entity = "([^"]*)";',
+            block,
+            re.MULTILINE,
+        )
+    ]
+
+
+def apply_checkpoint_cleanup_contract(content, contract):
+    """Retarget one hash-locked native timeline event without moving it."""
+    if not isinstance(contract, dict):
+        raise ValueError("checkpoint_cleanup must be an object")
+    unknown = sorted(set(contract) - CHECKPOINT_CLEANUP_CONTRACT_KEYS)
+    missing = sorted(CHECKPOINT_CLEANUP_CONTRACT_KEYS - set(contract))
+    if unknown or missing:
+        details = []
+        if unknown:
+            details.append("unsupported key(s): " + ", ".join(unknown))
+        if missing:
+            details.append("missing key(s): " + ", ".join(missing))
+        raise ValueError("Checkpoint cleanup contract " + "; ".join(details))
+
+    source_entity = contract["source_entity"]
+    bounds = find_entity_block_bounds(content, source_entity)
+    if bounds is None:
+        raise ValueError(
+            f"Checkpoint cleanup source entity not found: {source_entity}"
+        )
+    start, end = bounds
+    block = content[start:end]
+    digest = hashlib.sha256(block.encode("utf-8")).hexdigest()
+    if digest != contract["source_sha256"]:
+        raise ValueError(
+            f"Checkpoint cleanup source hash drift for {source_entity}: "
+            f"expected {contract['source_sha256']}, got {digest}"
+        )
+    original_targets = _timeline_event_targets(block)
+    if original_targets != contract["original_targets"]:
+        raise ValueError(
+            f"Checkpoint cleanup original target order drift for {source_entity}: "
+            f"expected {contract['original_targets']}, got {original_targets}"
+        )
+
+    event_index = contract["event_index"]
+    header = re.search(
+        rf'^\t{{4}}item\[{event_index}\] = \{{\n'
+        rf'\t{{5}}entity = "{re.escape(contract["original_target"])}";',
+        block,
+        re.MULTILINE,
+    )
+    if header is None:
+        raise ValueError(
+            f"Checkpoint cleanup event {event_index} target drift for {source_entity}"
+        )
+    item_open = block.find("{", header.start())
+    item_end = find_matching_brace(block, item_open)
+    event_block = block[header.start():item_end]
+    event_defs = re.findall(r'eventDef\s*=\s*"([^"]+)";', event_block)
+    if event_defs != [contract["event_def"]]:
+        raise ValueError(
+            f"Checkpoint cleanup event definition drift for {source_entity}: "
+            f"expected {[contract['event_def']]}, got {event_defs}"
+        )
+
+    original_line = f'entity = "{contract["original_target"]}";'
+    replacement_line = f'entity = "{contract["replacement_target"]}";'
+    if block.count(original_line) != 1:
+        raise ValueError(
+            f"Checkpoint cleanup target is not unique in {source_entity}"
+        )
+    updated = block.replace(original_line, replacement_line, 1)
+    replacement_targets = _timeline_event_targets(updated)
+    if replacement_targets != contract["replacement_targets"]:
+        raise ValueError(
+            f"Checkpoint cleanup replacement target order invalid for {source_entity}: "
+            f"expected {contract['replacement_targets']}, got {replacement_targets}"
+        )
+    if len(block) - len(original_line) + len(replacement_line) != len(updated):
+        raise ValueError("Checkpoint cleanup changed more than the approved target")
+    return content[:start] + updated + content[end:]
 
 
 def validate_target_policies(config_entities, target_policies, content):
@@ -324,6 +416,9 @@ def validate_target_policies(config_entities, target_policies, content):
                     f"Native entity contract cannot create an independent trigger: {entity_name}"
                 )
             apply_native_entity_contract(source_block, contract)
+        cleanup = policy.get("checkpoint_cleanup")
+        if cleanup is not None and not isinstance(cleanup, dict):
+            raise ValueError(f"checkpoint_cleanup must be an object: {entity_name}")
 
 
 def bind_parent_from_source(policy, block):
@@ -1088,6 +1183,11 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         if bounds is None:
             raise ValueError(f"Configured removal entity not found: {entity_name}")
         content = content[:bounds[0]] + content[bounds[1]:]
+
+    for entity_name, policy in target_policies.items():
+        cleanup = policy.get("checkpoint_cleanup")
+        if cleanup:
+            content = apply_checkpoint_cleanup_contract(content, cleanup)
 
     for entity_name in neutralize_entity_references:
         reference = re.compile(rf'(\bentity\s*=\s*)"{re.escape(entity_name)}";')

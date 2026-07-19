@@ -1,4 +1,5 @@
 import json
+import hashlib
 import re
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from pathlib import Path
 from ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     add_ap_check_target,
+    apply_checkpoint_cleanup_contract,
     assert_no_weapon_mastery_token_currency,
     command_requires_map_side_rpc,
     compute_file_sha256,
@@ -25,6 +27,7 @@ from ap_map_generator import (
     remove_property_blocks,
     validate_source_file,
     validate_target_policies,
+    _timeline_event_targets,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -531,10 +534,89 @@ entity {
             checkpoint_block = generated[checkpoint_start[0]:checkpoint_start[1]]
             self.assertNotIn('game_target_give_item_1', checkpoint_block)
             self.assertIsNone(find_entity_block_bounds(generated, "game_target_give_item_1"))
-            self.assertNotRegex(
-                generated,
-                r'entity\s*=\s*"ap_independent_rocket_launcher_7770056"',
+            timeline = find_entity_block_bounds(generated, "game_target_timeline_6")
+            self.assertIsNotNone(timeline)
+            timeline_block = generated[timeline[0]:timeline[1]]
+            self.assertEqual(
+                _timeline_event_targets(timeline_block),
+                [
+                    "game_target_timeline_5",
+                    "ap_independent_rocket_launcher_7770056",
+                    "game_trigger_trigger_990",
+                    "game_trigger_trigger_994",
+                ],
             )
+            self.assertEqual(
+                timeline_block.count(
+                    'entity = "ap_independent_rocket_launcher_7770056";'
+                ),
+                1,
+            )
+            self.assertIn('eventDef = "remove";', timeline_block)
+
+            prior_output = output.read_bytes().replace(
+                b'entity = "ap_independent_rocket_launcher_7770056";',
+                b'entity = "";',
+            )
+            self.assertEqual(
+                hashlib.sha256(prior_output).hexdigest(),
+                "9ffc0bb42c4ea22ca77f5d68e6b79178fa9a0e42a2b808fda033e775ba02e6cf",
+            )
+
+    def test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift(self):
+        source = (ROOT / "vanillamaps" / "e1m3_cult.map").read_text(encoding="utf-8")
+        config = json.loads((ROOT / "level_configs" / "e1m3_cult.json").read_text())
+        contract = config["target_policies"][
+            "game_pickup_weapon_rocket_launcher_1"
+        ]["checkpoint_cleanup"]
+        changed = apply_checkpoint_cleanup_contract(source, contract)
+        self.assertEqual(
+            changed.count('entity = "ap_independent_rocket_launcher_7770056";'),
+            1,
+        )
+        restored = changed.replace(
+            'entity = "ap_independent_rocket_launcher_7770056";',
+            'entity = "game_pickup_weapon_rocket_launcher_1";',
+        )
+        self.assertEqual(restored, source)
+
+        bad_hash = dict(contract, source_sha256="0" * 64)
+        with self.assertRaisesRegex(ValueError, "source hash drift"):
+            apply_checkpoint_cleanup_contract(source, bad_hash)
+
+        drifted = source.replace(
+            'entity = "game_trigger_trigger_990";',
+            'entity = "unexpected_checkpoint_target";',
+            1,
+        )
+        bounds = find_entity_block_bounds(drifted, "game_target_timeline_6")
+        drifted_block = drifted[bounds[0]:bounds[1]]
+        target_drift = dict(
+            contract,
+            source_sha256=hashlib.sha256(drifted_block.encode("utf-8")).hexdigest(),
+        )
+        with self.assertRaisesRegex(ValueError, "target order drift"):
+            apply_checkpoint_cleanup_contract(drifted, target_drift)
+
+    def test_non_cultist_generated_maps_remain_byte_identical(self):
+        expected = {
+            "e1m1_intro": "f2b9b36630702bfbf7fb9172aebfede52c1fd29ce91dabde6c05ec58164eca2d",
+            "hub": "49dfcb11bd12435ab89a2cc0d412a6e23456c2b4a734335de1a8c9347e5fca9d",
+            "e1m2_war": "5bc85983a032a3029b0be27fd1123ab0cb51eb0c817204a33f6f0802ca096499",
+        }
+        items = json.loads((ROOT / "data" / "items.json").read_text())
+        for map_key, digest in expected.items():
+            with self.subTest(map_key=map_key), tempfile.TemporaryDirectory() as tmpdir:
+                output = Path(tmpdir, f"{map_key}.entities")
+                manifest = Path(tmpdir, f"{map_key}.json")
+                generate_map(
+                    ROOT / "vanillamaps" / f"{map_key}.map",
+                    output,
+                    ROOT / "level_configs" / f"{map_key}.json",
+                    manifest,
+                    items,
+                )
+                self.assertEqual(compute_file_sha256(output), digest)
 
     def test_exultia_heavy_cannon_fallback_is_removed_without_references(self):
         with tempfile.TemporaryDirectory() as tmpdir:

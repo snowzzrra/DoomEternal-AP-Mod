@@ -15,6 +15,10 @@ from foundation import (
     load_foundation_contracts,
     load_primitive_registry,
 )
+from item_reconciliation import (
+    compile_reconciliation_plan,
+    load_policy_registry,
+)
 from challenge_registry import canonical_map_name, load_challenge_registry
 
 import json
@@ -1266,6 +1270,12 @@ with open(ITEMS_FILE, "r", encoding="utf-8") as f:
     # Keys in JSON are strings, convert them to ints
     _raw_items = json.load(f)
     ITEM_ID_TO_COMMAND = {int(k): v for k, v in _raw_items.items()}
+ITEM_REPLAY_POLICIES_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "item_replay_policies.json"
+)
+ITEM_REPLAY_POLICIES = load_policy_registry(
+    Path(ITEM_REPLAY_POLICIES_FILE), ITEM_ID_TO_COMMAND
+)
 
 RUNTIME_LOCATIONS_FILE = os.path.join(
     os.path.dirname(__file__), "data", "runtime_locations.json"
@@ -1413,6 +1423,8 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
             os.replace(temporary_path, command_path)
         if arm_rpc:
             set_rpc_execution(True)
+        if command_id.startswith("recv-"):
+            logger.info("RPC_ENQUEUE id=%s", command_id)
         return True
     except Exception as e:
         logger.error(f"[Error] Failed to enqueue game command: {e}")
@@ -1438,8 +1450,9 @@ def expected_item_job_activation(item_id, command_index):
 def migrate_direct_item_command_jobs():
     """Rewrite old queued item jobs to map-side RPC activations.
 
-    This keeps a stale .processing job from crash-looping the native RPC path
-    after a bridge update.
+    Only .cmd belongs to the bridge. A .processing file is owned by the native
+    client's in-memory queue and must never be renamed or rewritten here.
+    Native startup recovery handles interrupted .processing jobs exactly once.
     """
     try:
         os.makedirs(QUEUE_DIR, exist_ok=True)
@@ -1447,7 +1460,7 @@ def migrate_direct_item_command_jobs():
         logger.error(f"[Queue] Could not create queue directory for migration: {error}")
         return
 
-    for pattern in ("*.cmd", "*.processing"):
+    for pattern in ("*.cmd",):
         for source_path in sorted(glob.glob(os.path.join(QUEUE_DIR, pattern))):
             path = Path(source_path)
             try:
@@ -1469,12 +1482,6 @@ def migrate_direct_item_command_jobs():
                 rf"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_[0-9]+(?:_[0-9]+)? activate",
                 command,
             ):
-                if path.suffix == ".processing":
-                    target_path = path.with_suffix(".cmd")
-                    try:
-                        os.replace(path, target_path)
-                    except Exception as error:
-                        logger.error(f"[Queue] Failed to requeue {path}: {error}")
                 continue
 
             legacy_effect_prefixes = (
@@ -1494,15 +1501,6 @@ def migrate_direct_item_command_jobs():
                 )
                 continue
             if command == replacement:
-                if path.suffix == ".processing":
-                    command_id = (
-                        f"recv-{receive_index:06d}-item-{item_id}-cmd-{command_index:02d}"
-                    )
-                    target_path = Path(QUEUE_DIR) / f"{command_id}.cmd"
-                    try:
-                        os.replace(path, target_path)
-                    except Exception as error:
-                        logger.error(f"[Queue] Failed to requeue {path}: {error}")
                 continue
 
             command_id = (
@@ -1729,6 +1727,18 @@ def read_game_details():
     return read_game_details_for_selection(selected)
 
 class DoomCommandProcessor(ClientCommandProcessor):
+    def _cmd_ap_reconcile(self):
+        """Manually restore replay-safe AP inventory after Mission Reset."""
+        plan, error = self.ctx.manual_reconcile_inventory()
+        if error:
+            self.output(f"AP reconcile rejected: {error}")
+            return
+        self.output(
+            f"replayed={plan.replayed} special_stages={plan.special_stages} "
+            f"skipped_never_replay={plan.skipped_never_replay} "
+            f"skipped_unproven={plan.skipped_unproven}"
+        )
+
     def _cmd_doom_rpc_on(self):
         """Arm RPC commands; the native memory gate still enforces safe gameplay."""
         set_rpc_execution(True)
@@ -2320,6 +2330,93 @@ class DoomEternalContext(CommonContext):
     def received_item_ids(self, processed_only=False):
         items = self.items_received[: self.items_processed] if processed_only else self.items_received
         return {item.item for item in items}
+
+    def manual_reconcile_inventory(self):
+        """Queue a policy-compiled manual replay without mutating AP state."""
+        if (
+            not self.item_state_ready
+            or not getattr(self, "server", None)
+            or not self.server.socket
+            or self.server.socket.closed
+        ):
+            return None, "connected AP session required"
+        if getattr(self, "team", None) is None or getattr(self, "slot", None) is None:
+            return None, "current AP team/slot identity is incomplete"
+        seed = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None)
+        if not seed or not re.fullmatch(r"[A-Za-z0-9_.-]+", str(seed)):
+            return None, "seed identity is missing or unsafe for deterministic spool IDs"
+
+        evidence = read_gameplay_save_evidence()
+        if evidence is None or evidence.state != "gameplay":
+            return None, "confirmed gameplay epoch required; menus are not eligible"
+        if self.runtime_observers_frozen:
+            return None, "gameplay observers are not level-ready"
+        if self.active_save_slot != evidence.slot_directory:
+            return None, "gameplay evidence does not match the active save slot"
+        if self.active_gameplay_epoch != evidence.epoch:
+            return None, "gameplay evidence does not match the active epoch"
+        if canonical_map_name(self.current_map_name or "") != evidence.map_name:
+            return None, "gameplay evidence does not match the active map"
+        supported = {
+            "game/sp/e1m1_intro/e1m1_intro",
+            "game/sp/e1m2_battle/e1m2_battle",
+            "game/hub/hub",
+            "game/sp/e1m3_cult/e1m3_cult",
+        }
+        if evidence.map_name not in supported:
+            return None, "active map has no ap_rpc_v3 reconciliation entities"
+        if self.items_processed > len(self.items_received):
+            return None, "authoritative received-item history is incomplete"
+
+        identity = f"{seed}-{self.team}-{self.slot}"
+        received = [
+            network_item.item
+            for network_item in self.items_received[: self.items_processed]
+        ]
+        try:
+            plan = compile_reconciliation_plan(
+                received,
+                ITEM_ID_TO_COMMAND,
+                ITEM_REPLAY_POLICIES,
+                identity,
+                evidence.epoch,
+            )
+        except ValueError as error:
+            return None, str(error)
+
+        for selection in plan.selections:
+            if selection.commands:
+                for command in selection.commands:
+                    logger.info(
+                        "[AP Reconcile] item=%s name=%s receipts=%s policy=%s command=%s",
+                        selection.item_id, selection.name, selection.received_count,
+                        selection.policy, command,
+                    )
+            else:
+                logger.info(
+                    "[AP Reconcile] item=%s name=%s receipts=%s policy=%s command=SKIP",
+                    selection.item_id, selection.name, selection.received_count,
+                    selection.policy,
+                )
+        for command in plan.commands:
+            logger.info(
+                "[AP Reconcile] spool=%s item=%s stage=%s policy=%s command=%s",
+                command.spool_id, command.item_id, command.stage,
+                command.policy, command.command,
+            )
+            if not send_command(
+                command.command,
+                coalesce_key=command.spool_id,
+                already_queued_ok=True,
+            ):
+                return None, f"failed to spool {command.spool_id}; rerun is safe"
+        logger.info(
+            "[AP Reconcile] replayed=%s special_stages=%s "
+            "skipped_never_replay=%s skipped_unproven=%s",
+            plan.replayed, plan.special_stages, plan.skipped_never_replay,
+            plan.skipped_unproven,
+        )
+        return plan, None
 
     def reconciliation_epoch(self):
         state = self.session_state.setdefault(
