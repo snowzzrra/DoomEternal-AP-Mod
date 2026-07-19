@@ -213,7 +213,7 @@
       "vanilla_exploration": false
     },
     "runtime_mission": {
-      "match": {"location_ids": [7770122, 7770123, 7770124]},
+      "match": {"location_ids": [7770122, 7770123, 7770124, 7770162]},
       "vanilla_class": "save transition reader",
       "automap_marker_source": null,
       "automap_properties": [],

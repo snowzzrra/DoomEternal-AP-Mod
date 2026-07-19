@@ -1,0 +1,100 @@
+{
+    "map_key": "e1m4_boss",
+    "level": "e1m4_boss",
+    "region": "Doom Hunter Base",
+    "entities": {
+        "AP_CHECK_CLIP_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770143,
+        "AP_CHECK_CONNECTION_CORRIDOR_PROGRESS_PRAETOR_TOKEN_1_E1M4": 7770144,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E1M4": 7770145,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_2_E1M4": 7770146,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E1M4": 7770147,
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_1_E1M4": 7770148,
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E1M4": 7770149,
+        "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770150,
+        "AP_CHECK_CATWALK_PLATFORM_PROGRESS_SENTINEL_BATTERY_1_E1M4": 7770151,
+        "AP_CHECK_CATWALK_PLATFORM_PROGRESS_ARGENT_CELL_1_1530710120": 7770152,
+        "AP_CHECK_TRAIN_DOCK_TRAVERSAL_PLATFORM_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E1M4": 7770153,
+        "AP_CHECK_TRAIN_DOCK_TRAVERSAL_PLATFORM_PROGRESS_MOD_BOT_1_E1M4": 7770154,
+        "AP_CHECK_WING_C_PROGRESS_PRAETOR_TOKEN_1_E1M4": 7770155,
+        "AP_CHECK_WING_C_PICKUP_COLLECTIBLE_TOYS_HELLKNIGHT_1": 7770156,
+        "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1": 7770157,
+        "AP_CHECK_WING_B_PROGRESS_PRAETOR_TOKEN_1_E1M4": 7770158,
+        "AP_CHECK_WING_B_PROGRESS_CHEATS_ONE_SHOT_KILL_ON_STAGGER_1": 7770159,
+        "AP_CHECK_WING_A_PICKUP_COLLECTIBLE_TOYS_LOST_SOUL_1": 7770160,
+        "AP_CHECK_WING_A_PROGRESS_RUNE_1_E1M4": 7770161
+    },
+    "target_policies": {
+        "train_dock_traversal_platform_pickup_extra_life_extra_life_1_1_e1m4": {
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "independent_position": [0, -203, -0.648338675],
+            "drop_targets": []
+        },
+        "connection_corridor_progress_praetor_token_1_e1m4": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "pickups_progress_praetor_token_1_e1m4": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "catwalk_platform_progress_argent_cell_1_1530710120": {
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "preserve_targets": [
+                "catwalk_platform_destructible_interact_argent_cell_1_1530710120"
+            ],
+            "drop_targets": [],
+            "safe_target_graph": {
+                "catwalk_platform_destructible_interact_argent_cell_1_1530710120": []
+            },
+            "forbidden_target_terms": [
+                "currency", "give", "grant", "inventory", "perk"
+            ]
+        },
+        "wing_c_progress_praetor_token_1_e1m4": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "wing_b_progress_praetor_token_1_e1m4": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        }
+    }
+}

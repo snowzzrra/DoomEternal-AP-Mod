@@ -598,10 +598,9 @@ entity {
         with self.assertRaisesRegex(ValueError, "target order drift"):
             apply_checkpoint_cleanup_contract(drifted, target_drift)
 
-    def test_non_cultist_generated_maps_remain_byte_identical(self):
+    def test_unchanged_legacy_generated_maps_remain_byte_identical(self):
         expected = {
             "e1m1_intro": "f2b9b36630702bfbf7fb9172aebfede52c1fd29ce91dabde6c05ec58164eca2d",
-            "hub": "49dfcb11bd12435ab89a2cc0d412a6e23456c2b4a734335de1a8c9347e5fca9d",
             "e1m2_war": "5bc85983a032a3029b0be27fd1123ab0cb51eb0c817204a33f6f0802ca096499",
         }
         items = json.loads((ROOT / "data" / "items.json").read_text())

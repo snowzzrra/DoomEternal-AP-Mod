@@ -23,12 +23,14 @@ def _scalar(block: str, field: str) -> str | None:
 
 
 def _position(block: str) -> tuple[float, float, float] | None:
-    match = re.search(
-        r'spawnPosition\s*=\s*\{\s*x\s*=\s*([-+0-9.eE]+);\s*'
-        r'y\s*=\s*([-+0-9.eE]+);\s*z\s*=\s*([-+0-9.eE]+);\s*\}',
-        block,
-    )
-    return tuple(map(float, match.groups())) if match else None
+    position = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', block)
+    if not position:
+        return None
+    values = []
+    for axis in ("x", "y", "z"):
+        match = re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position.group(1))
+        values.append(float(match.group(1)) if match else 0.0)
+    return tuple(values)
 
 
 def _expected_decl(source_block: str) -> str:

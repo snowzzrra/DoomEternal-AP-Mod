@@ -450,9 +450,6 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
     policy = policy or {}
     layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
     layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
-    position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
-    if not position_match:
-        raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
     configured_position = policy.get("independent_position")
     if configured_position is not None:
         if not isinstance(configured_position, list) or len(configured_position) != 3:
@@ -465,6 +462,9 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
             "\t\t\t}"
         )
     else:
+        position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
+        if not position_match:
+            raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
         position = position_match.group(1)
     hitbox_size = policy.get(
         "independent_size",
@@ -720,18 +720,17 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
     visual_name = f"ap_location_visual_{location_id}"
     cleanup_name = f"ap_remove_location_visual_{location_id}"
 
-    position_match = re.search(
-        r'spawnPosition\s*=\s*\{\s*x\s*=\s*([-+0-9.eE]+);\s*y\s*=\s*([-+0-9.eE]+);\s*z\s*=\s*([-+0-9.eE]+);\s*\}',
-        block,
-    )
-    if not position_match:
+    position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', block)
+    if not position_block:
         position = [0.0, 0.0, 0.0]
     else:
-        position = [
-            float(position_match.group(1)),
-            float(position_match.group(2)),
-            float(position_match.group(3)) + 1.5,
-        ]
+        coordinates = []
+        for axis in ("x", "y", "z"):
+            match = re.search(
+                rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)
+            )
+            coordinates.append(float(match.group(1)) if match else 0.0)
+        position = [coordinates[0], coordinates[1], coordinates[2] + 1.5]
 
     independent_targets = [ap_check_id, cleanup_name]
 
@@ -771,13 +770,14 @@ def build_independent_targets(block, ap_check_id, policy):
 
 def generate_automap_location_helper(source_block, location_id):
     """Emit the proven targetless idInfo owner for one physical AP marker."""
-    position = re.search(
-        r'spawnPosition\s*=\s*\{\s*x\s*=\s*([-+0-9.eE]+);\s*'
-        r'y\s*=\s*([-+0-9.eE]+);\s*z\s*=\s*([-+0-9.eE]+);\s*\}',
-        source_block,
-    )
-    if not position:
+    position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', source_block)
+    if not position_block:
         raise ValueError(f"Automap helper source position is missing for {location_id}")
+    coordinates = {
+        axis: (re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)).group(1)
+               if re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)) else "0")
+        for axis in ("x", "y", "z")
+    }
     marker = re.search(
         r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
     )
@@ -793,9 +793,9 @@ def generate_automap_location_helper(source_block, location_id):
 		disableAIPooling = false;
 		edit = {{
 			spawnPosition = {{
-				x = {position.group(1)};
-				y = {position.group(2)};
-				z = {position.group(3)};
+				x = {coordinates["x"]};
+				y = {coordinates["y"]};
+				z = {coordinates["z"]};
 			}}
 			automapPropertiesDecl = "{automap_decl}";
 		}}

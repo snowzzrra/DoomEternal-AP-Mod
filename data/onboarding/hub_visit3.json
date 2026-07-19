@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "map_key": "hub",
+  "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b",
+  "resource_owner": "game/hub/hub_patch2.resources",
+  "resource_priority": 70,
+  "mission_complete_transition": {
+    "kind": "direct third-visit native portal trigger",
+    "owner": "trigger_transition_to_e2m1",
+    "target": "target_level_transition_to_e2m1",
+    "classification": "from_e1m4 layer only; Mission Select bypasses this owner"
+  },
+  "layers": [
+    "game/sp/hub/from_e1m4"
+  ],
+  "checkpoints": [
+    "from_e1m4"
+  ],
+  "movers": [],
+  "gates": [
+    "interact/hub/1_battery_station",
+    "interact/hub/2_battery_station"
+  ],
+  "new_decl_resources": [],
+  "locations": [
+    {
+      "entity": "sentinel_battery_room_progress_praetor_token_1",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770163,
+      "ap_name": "Fortress of Doom - Praetor Suit Token 2",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used1",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used1",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 15.7067108;\n\t\t\ty = -109.698196;\n\t\t\tz = -7.37999535;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used1"
+      ],
+      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 2"
+    },
+    {
+      "entity": "sentinel_battery_room_progress_praetor_token_2",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770164,
+      "ap_name": "Fortress of Doom - Praetor Suit Token 3",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used2",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used2",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -14.6790056;\n\t\t\ty = -109.682449;\n\t\t\tz = -7.37999535;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used2"
+      ],
+      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 3"
+    },
+    {
+      "entity": "sentinel_battery_room_progress_mod_bot_3",
+      "class": "idInteractable_WeaponModBot",
+      "inherit": "progress/mod_bot",
+      "ap_id": 7770165,
+      "ap_name": "Fortress of Doom - Weapon Modbot 1",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used3",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native WeaponModBot selection transaction",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used3",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -24.9999981;\n\t\t\ty = -97.1999741;\n\t\t\tz = -7.36635542;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used3"
+      ],
+      "conditional_pickup_behavior": "native selection owner removed; targetless item-used relay fires before one-shot AP event; earliest AP access is Visit 2 after cumulative Battery count 5"
+    },
+    {
+      "entity": "sentinel_battery_room_progress_mod_bot_4",
+      "class": "idInteractable_WeaponModBot",
+      "inherit": "progress/mod_bot",
+      "ap_id": 7770166,
+      "ap_name": "Fortress of Doom - Weapon Modbot 2",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native WeaponModBot selection transaction",
+          "classification": "reward",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 25.9999695;\n\t\t\ty = -97.1999741;\n\t\t\tz = -7.36635542;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used"
+      ],
+      "conditional_pickup_behavior": "native selection owner removed; targetless item-used relay fires before one-shot AP event; earliest AP access is Visit 2 after cumulative Battery count 7"
+    },
+    {
+      "entity": "progress_praetor_token_3",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770167,
+      "ap_name": "Fortress of Doom - Praetor Suit Token 4",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used_24",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used_24",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -43.5300941;\n\t\t\ty = 5.64294481;\n\t\t\tz = -21.300045;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used_24"
+      ],
+      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 12"
+    },
+    {
+      "entity": "progress_praetor_token_4",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770168,
+      "ap_name": "Fortress of Doom - Praetor Suit Token 5",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used_25",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList:CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "sentinel_battery_room_target_relay_item_used_25",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 44.659996;\n\t\t\ty = 5.40001488;\n\t\t\tz = -27.1200047;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "sentinel_battery_room_target_relay_item_used_25"
+      ],
+      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 13"
+    },
+    {
+      "entity": "progress_cheats_all_mastered_runes_1",
+      "class": "idProp2",
+      "inherit": "progress/cheats/all_mastered_runes",
+      "ap_id": 7770169,
+      "ap_name": "Fortress of Doom - All Runes Cheat Code",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "target_relay_1",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/cheats/all_mastered_runes",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_1",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 91.2100372;\n\t\t\ty = 61.3200035;\n\t\t\tz = -42.010006;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "target_relay_1"
+      ],
+      "conditional_pickup_behavior": "unlayered persistent Fortress secret; native ownership reward removed; door/marker targets preserved; earliest AP access is Visit 2 after cumulative Battery count 15"
+    },
+    {
+      "entity": "pickup_weapon_gauss_rifle_hub_1",
+      "class": "idProp2",
+      "inherit": "pickup/weapon/gauss_rifle_hub",
+      "ap_id": 7770170,
+      "ap_name": "Fortress of Doom - Ballista",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "target_give_item_ballista",
+          "classification": "grant",
+          "disposition": "drop"
+        },
+        {
+          "target": "target_relay_pickup_ballista",
+          "classification": "objective",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "target_give_item_ballista",
+          "classification": "grant",
+          "disposition": "drop"
+        },
+        {
+          "target": "target_relay_pickup_ballista/target_give_item_ballista",
+          "classification": "grant",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_pickup_ballista",
+          "classification": "objective",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [
+        "target_give_item_ballista"
+      ],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 0.500000358;\n\t\t\ty = -33.4399986;\n\t\t\tz = -3.56003046;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/hub/from_e1m4"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "target_relay_pickup_ballista"
+      ],
+      "conditional_pickup_behavior": "from_e1m4 only; direct and nested Ballista grants removed; objective relay preserved before AP event"
+    },
+    {
+      "entity": "progress_cheats_fully_upgraded_progression_wheel_final",
+      "class": "idProp2",
+      "inherit": "progress/cheats/fully_upgraded_progression_wheel",
+      "ap_id": 7770171,
+      "ap_name": "Fortress of Doom - Fully Upgraded Suit Cheat Code",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "target_relay_close_doors_remove_secret",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native useable/inherit:progress/cheats/fully_upgraded_progression_wheel",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_close_doors_remove_secret",
+          "classification": "removal",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 0.440000236;\n\t\t\ty = -48.5500031;\n\t\t\tz = 13.7900019;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [
+        "target_relay_close_doors_remove_secret"
+      ],
+      "conditional_pickup_behavior": "unlayered persistent Fortress secret; native ownership reward removed; door/marker targets preserved; earliest AP access is Visit 2 after cumulative Battery count 17"
+    }
+  ]
+}

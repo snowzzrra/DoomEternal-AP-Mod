@@ -2,30 +2,29 @@
 
 Game-side repository for the DOOM Eternal Archipelago integration.
 
-This repo owns the public pre-alpha mod package, the Python bridge, the external
+This repo owns the alpha mod package, the Python bridge, the external
 RPC client, runtime manifests, map-generation scripts, validation scripts, and
 release packaging. The APWorld source does **not** live here; it stays in the
 sibling Archipelago branch and is compiled into `doometernal.apworld` during release builds.
 
 > [!CAUTION]
-> This project is a pre-alpha build, not a finished 1.0 release. Windows is
+> This project is an alpha build, not a finished 1.0 release. Windows is
 > the primary target for public testing, while Linux/Proton remains supported
 > for development and early validation.
 
 ## Project status
 
-Current PTB scope:
+Current `v0.3.1-alpha` scope:
 
-- Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base`
-- Content: `80` physical map checks + `20` runtime locations; the runtime goal
-  is an independent state paired only with Cultist Base completion.
+- Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3`
+- Content: `108` generated map checks + `21` runtime checks; the goal is a
+  separate native event on the Fortress visit 3 transition.
 - Challenges/masteries: durable native save records drive their AP locations;
   reward suppression remains scoped to the audited owners.
-- Automap/Dossier: final candidate is blocked. Stripping native reward use also
-  strips the only proven physical-removal, FX-shutdown and collected-marker
-  writer; generic `default` proves only a pre-collection marker.
-- Mission Complete: native publisher exists for Hell, Exultia and Cultist;
-  bundled bridge consumes exact pairs and has an integration fixture.
+- Battery economy: all `18` base-campaign currency is present; the default
+  early Exultia Battery remains locked and the public Bundle ID is unchanged.
+- Mission Complete: Hell, Exultia and Doom Hunter Base use exact map terminal
+  events; Cultist retains its transition publisher.
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final
   Archipelago balancing are future milestones.
 
@@ -144,12 +143,11 @@ Event files are kept until the Archipelago server confirms the location in
 ### Mission completion flow
 
 ```text
-ap_client.exe detects a real map transition in encrypted `game.details`
+native terminal/transition owner
 
-  -> writes a unique ap_transition_*.evt
-  -> bridge_client.py matches the registry's from/to pair
-  -> sends the corresponding Mission Complete location once
-  -> additionally sends CLIENT_GOAL only for Cultist Base
+  -> writes a durable AP event
+  -> bridge_client.py matches its registered location or goal
+  -> sends once and retains the event until server ACK
 ```
 
 ## Release package
@@ -163,7 +161,7 @@ runtime identity, resource owner/priority/path, validation, package layout and
 validation and package plans; test-only entries can exercise every plan but
 are structurally excluded from release assets.
 
-The four accepted maps are additionally frozen by
+The five accepted maps are additionally frozen by
 `data/frozen_map_baselines.json`. The byte SHA-256/size is the acceptance gate;
 the normalized semantic hash is a diagnostic covering entity names/classes,
 ordered targets, bindParent, layers, transforms, AP IDs, manifests and scripted
@@ -194,7 +192,7 @@ entry; audit the vanilla owner/target graph with `map_preflight.py`; add proven
 APWorld locations/IDs; generate only that map while comparing all frozen
 baselines; run a short transition test from the saved final checkpoint; freeze
 the passed map; then continue. Keep one final save per mission. Doom Hunter Base
-is next and the end-of-Cultist save already exists. Developer test scripts and
+uses the existing end-of-Cultist save. Developer test scripts and
 checklists never enter the player package.
 
 The preflight is fail-closed for source/config/manifest/container proof,

@@ -24,5 +24,40 @@
       "count = 1;",
       "delay = 1.25;"
     ]
+  },
+  "doom_hunter_base": {
+    "location_id": 7770162,
+    "map_key": "e1m4_boss",
+    "ap_check": "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
+    "owner": "checkpoints_target_relay_65",
+    "source_path": "vanillamaps/e1m4_boss.map",
+    "source_sha256": "93020236c609df3c7b2243a69d1df1ce08e07764924bd7571d24197b06c1380b",
+    "original_targets": ["checkpoints_target_level_transition_1"],
+    "required_snippets": [
+      "class = \"idTarget_Count\";",
+      "count = 1;",
+      "delay = 2;"
+    ],
+    "terminal": {
+      "owner": "checkpoints_target_level_transition_1",
+      "nextMapName": "maps/game/hub/hub.map",
+      "checkpointName": "from_e1m4",
+      "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E1M4_BOSS"
+    }
+  },
+  "fortress_visit_3_goal": {
+    "map_key": "hub",
+    "owner": "trigger_transition_to_e2m1",
+    "source_path": "vanillamaps/hub.map",
+    "source_sha256": "a70bca4e1523632b4005a6dea30caf4a93add2923ea50efeabd4388163034c4e",
+    "original_targets": [],
+    "required_layer": "game/sp/hub/from_e1m4",
+    "goal_target": "ap_goal_fortress_visit_3",
+    "goal_event_file": "ap_goal_fortress_visit_3.txt",
+    "terminal": {
+      "owner": "target_level_transition_to_e2m1",
+      "nextMapName": "maps/game/sp/e2m1_nest/e2m1_nest.map",
+      "checkpointName": "cp_01_map_start"
+    }
   }
 }

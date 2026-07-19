@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import re
 import tempfile
@@ -118,7 +119,7 @@ def generate_frozen_outputs(registry_path: Path | None = None) -> tuple[dict, te
         results[plan.map_key] = (output, manifest, config)
     patch_mission_complete_maps(
         ROOT / "data" / "mission_complete_map_contracts.json",
-        {key: results[key][0] for key in ("e1m1_intro", "e1m2_war")}, mod_root,
+        {key: value[0] for key, value in results.items()}, mod_root,
     )
     return results, temporary
 
@@ -153,4 +154,12 @@ def assert_frozen_map_baselines() -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(current_baseline(), indent=2, sort_keys=True))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--update", action="store_true")
+    args = parser.parse_args()
+    rendered = json.dumps(current_baseline(), indent=2, sort_keys=True) + "\n"
+    if args.update:
+        BASELINE_PATH.write_text(rendered, encoding="utf-8")
+        print(f"Updated {BASELINE_PATH}")
+    else:
+        print(rendered, end="")

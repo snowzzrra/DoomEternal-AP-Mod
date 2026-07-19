@@ -14,8 +14,8 @@ fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$SCRIPT_DIR/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$SCRIPT_DIR/vanillamaps}"
-RELEASE_VERSION="v0.3.0-pre-alpha"
-PTB_ZIP_NAME="DoomEternalArchipelago-${RELEASE_VERSION}.zip"
+RELEASE_VERSION="v0.3.1-alpha-dev"
+PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
 GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
@@ -100,9 +100,12 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 }
 
 rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
-    "$OUTPUT_DIR/build" "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" \
+    "$OUTPUT_DIR/build" "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
     "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
-    "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME"
+    "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
+    "$STALE_DEV_ZIP" \
+    "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
     "$GENERATED_MAPS_DIR" "$TEMP_DIR"
 "$SCRIPT_DIR/build_client.sh" "$CLIENT_BUILD_DIR"
@@ -119,6 +122,7 @@ cp -R "$SCRIPT_DIR/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 mapfile -t MAP_ROWS < <(
     python3 "$SCRIPT_DIR/map_registry.py" release-rows --registry "$MAP_SOURCES_FILE"
 )
+MISSION_MAP_ARGS=()
 
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r map_key source_file source_sha256 config_path manifest_path generated_output resource_path relative_entities_path supported_game_revision <<< "$map_row"
@@ -132,12 +136,12 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$resource_path" \
         "$relative_entities_path" \
         "$supported_game_revision"
+    MISSION_MAP_ARGS+=(--generated-map "$map_key=$GENERATED_MAPS_DIR/$generated_output")
 done
 
 python3 "$SCRIPT_DIR/mission_complete_map_patcher.py" \
     --contracts "$SCRIPT_DIR/data/mission_complete_map_contracts.json" \
-    --generated-map "e1m1_intro=$GENERATED_MAPS_DIR/e1m1_intro.entities" \
-    --generated-map "e1m2_war=$GENERATED_MAPS_DIR/e1m2_war.entities" \
+    "${MISSION_MAP_ARGS[@]}" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/mission-complete-map-patch.json"
 python3 - "$TEMP_DIR/mission-complete-map-patch.json" <<'PY'
@@ -154,6 +158,16 @@ assert audit["exultia"]["after_targets"] == [
     "AP_CHECK_MISSION_COMPLETE_EXULTIA",
     "extraction_target_level_transition_1",
 ]
+assert audit["doom_hunter_base"]["after_targets"] == [
+    "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
+    "checkpoints_target_level_transition_1",
+]
+assert audit["fortress_visit_3_goal"]["after_targets"] == [
+    "ap_goal_fortress_visit_3",
+]
+assert audit["fortress_visit_3_goal"]["terminal"]["nextMapName"] == (
+    "maps/game/sp/e2m1_nest/e2m1_nest.map"
+)
 PY
 
 for map_row in "${MAP_ROWS[@]}"; do
@@ -307,7 +321,7 @@ manifest = {
     "files": [
         "README.md",
         "RELEASE_MANIFEST.json",
-        "DoomEternalArchipelagoPreAlpha.zip",
+        "DoomEternalArchipelagoAlpha.zip",
         "doometernal.apworld",
         "client/ap_client.exe",
         "client/bridge_client.py",
@@ -439,20 +453,20 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
 
 (
     cd "$OUTPUT_DIR/mod"
-    zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" .
+    zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" .
 )
 
 (
     cd "$OUTPUT_DIR"
     zip -q -r "$PTB_ZIP_NAME" \
         README.md RELEASE_MANIFEST.json client doometernal.apworld \
-        DoomEternalArchipelagoPreAlpha.zip
+        DoomEternalArchipelagoAlpha.zip
 )
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
     rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" "$OUTPUT_DIR/mod" \
         "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/doometernal.apworld" \
-        "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip" \
+        "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
         "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
     echo "Automap prototype ZIP created at: $OUTPUT_DIR/$PTB_ZIP_NAME"
     exit 0
@@ -480,7 +494,7 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoPreAlpha.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip" -d "$MOD_AUDIT_DIR"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
@@ -577,12 +591,11 @@ if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | grep -
     echo "Final ZIP text contains a personal path or diagnostic marker" >&2
     exit 1
 fi
-rm -f "$STALE_DEV_ZIP"
-if find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelago*dev*.zip' -print -quit | grep -q .; then
-    echo "Stale development ZIP remains in build/release" >&2
+if [[ "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelago*dev*.zip' | wc -l)" != "1" ]]; then
+    echo "Development ZIP count in build/release is not exactly one" >&2
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"
-echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
+echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip"
 echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"
