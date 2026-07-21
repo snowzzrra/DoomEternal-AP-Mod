@@ -33,9 +33,9 @@ class NativeChallengeContracts(unittest.TestCase):
                 ("Cultist Base - Mission Challenge - Pull the Crystal", 7770138),
                 ("Cultist Base - Mission Challenge - Armored Rain", 7770139),
                 ("Cultist Base - Mission Challenge - Master of Turrets", 7770140),
-                ("Doom Hunter Base - Mission Challenge - Find the Album", 7770172),
-                ("Doom Hunter Base - Mission Challenge - Map the Area", 7770173),
-                ("Doom Hunter Base - Mission Challenge - Kill Two with One Grenade", 7770174),
+                ("Doom Hunter Base - Mission Challenge - Musical Interlude", 7770172),
+                ("Doom Hunter Base - Mission Challenge - Big Reveal", 7770173),
+                ("Doom Hunter Base - Mission Challenge - Fire in the Hole", 7770174),
             ],
         )
         self.assertEqual(

@@ -14,9 +14,12 @@ import hashlib
 import json
 from pathlib import Path
 
+from map_registry import load_map_registry
+
 SOURCE_OWNER = "gameresources"
 SOURCE_PATH = "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl"
 SOURCE_SHA256 = "c68c18750a4267b43d4ffd6e32b67dbed6af1c86099b947ddca9b98f2187a824"
+OUTPUT_MAP_KEY = "e1m1_intro"
 
 PAGE_STATS_BLOCK = """\t\tstatsToGive = {
 \t\t\tnum = 2;
@@ -84,12 +87,25 @@ def _patch(source: str) -> str:
     return override
 
 
+def output_path_for_map(mod_root: Path, registry_path: Path, map_key: str) -> Path:
+    """Place the DECL in the resource archive that owns the selected map."""
+    registry = load_map_registry(registry_path)
+    try:
+        resource_path = registry["maps"][map_key]["resource_path"]
+    except KeyError as error:
+        raise ValueError(f"DevInvLoadout map is absent from registry: {map_key}") from error
+    return mod_root / Path(resource_path).stem / SOURCE_PATH
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mod-root", type=Path, required=True,
                         help="Root of the unpacked mod directory")
     parser.add_argument("--audit-output", type=Path, required=True,
                         help="Path to write audit JSON")
+    parser.add_argument("--map-registry", type=Path,
+                        default=Path(__file__).resolve().parents[2] / "data" / "map_sources.json")
+    parser.add_argument("--map-key", default=OUTPUT_MAP_KEY)
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
@@ -99,13 +115,16 @@ def main() -> None:
     _assert_source_integrity(source)
     override = _patch(source)
 
-    output_path = args.mod_root / SOURCE_OWNER / SOURCE_PATH
+    output_path = output_path_for_map(args.mod_root, args.map_registry, args.map_key)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(override, encoding="utf-8")
 
     audit = {
         "source_path": SOURCE_PATH,
         "source_sha256": SOURCE_SHA256,
+        "map_key": args.map_key,
+        "resource_container": output_path.relative_to(args.mod_root).parts[0],
+        "logical_decl": "devinvloadout/sp/e1m1",
         "output_path": output_path.as_posix(),
         "output_sha256": hashlib.sha256(override.encode("utf-8")).hexdigest(),
         "stats_to_give": ["STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED"],

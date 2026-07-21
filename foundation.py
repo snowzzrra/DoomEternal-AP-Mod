@@ -75,8 +75,8 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         },
         "item_notification": {
             "family": "ap_item_notify", "status": "experimental",
-            "source": {"map": "game/sp/e1m4_boss/e1m4_boss", "container": "vanilla e1m4_boss.resources", "file": "vanillamaps/e1m4_boss.map", "entity": "gold_ui_prompt", "source_sha256": "vanilla-reference"},
-            "shape": {"class": "idTarget_Notification", "inherit": "target/notification", "required_fields": ["notificationType", "header"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "native HUD notification/AP checks", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
         },
         "item_receipt_relay": {
@@ -289,18 +289,25 @@ def build_primitive(
     elif primitive_id == "item_notification":
         if not isinstance(parameters, dict) or "header_key" not in parameters:
             raise ValueError("item_notification requires header_key parameter")
+        if set(parameters) != {"header_key", "notification_type", "hud_event_id", "icon"}:
+            raise ValueError("item_notification has an invalid parameter set")
         header_key = parameters["header_key"]
-        notif_type = parameters.get("notification_type", "HUD_NOTIFY_GOLD_BOSS_START")
-        icon = parameters.get("icon", "art/ui/icons/callouts/icon_callout_demonskull")
+        notif_type = parameters["notification_type"]
+        hud_event_id = parameters["hud_event_id"]
+        icon = parameters["icon"]
         block = f'''{header}
 \t\tedit = {{
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
 \t\t\t}}
 \t\t\tnotificationType = "{notif_type}";
+\t\t\tnotificationHudEventID = "{hud_event_id}";
+\t\t\tdoNotShowDuplicate = false;
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "{icon}";
 \t\t\theader = "{header_key}";
 \t\t\tsubtext = "";
-\t\t\ticon = "{icon}";
+\t\t\tnotificationSound = "play_secret_encounter_found";
 \t\t}}
 \t}}
 }}

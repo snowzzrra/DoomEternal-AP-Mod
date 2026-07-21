@@ -12,12 +12,15 @@ from pathlib import Path
 
 from tools.decls.devinv_builder import (
     FORBIDDEN_MARKERS,
+    OUTPUT_MAP_KEY,
     PAGE_STATS_BLOCK,
     REQUIRED_MARKERS,
     SOURCE_SHA256,
     _assert_source_integrity,
     _patch,
+    output_path_for_map,
 )
+from tools.validation.validate_devinvloadout_package import validate as validate_packaged_devinv
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -166,6 +169,9 @@ class DevInvLoadoutAuditTests(unittest.TestCase):
             audit = json.loads(audit_path.read_text())
             self.assertEqual(audit["source_path"], "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl")
             self.assertEqual(audit["source_sha256"], SOURCE_SHA256)
+            self.assertEqual(audit["map_key"], OUTPUT_MAP_KEY)
+            self.assertEqual(audit["resource_container"], "e1m1_intro_patch3")
+            self.assertEqual(audit["logical_decl"], "devinvloadout/sp/e1m1")
             self.assertEqual(audit["stats_to_give"], ["STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED"])
             self.assertTrue(audit["clearAllBeforeApply_preserved"])
             self.assertTrue(audit["currencyToGive_preserved"])
@@ -177,6 +183,27 @@ class DevInvLoadoutAuditTests(unittest.TestCase):
                 audit["output_sha256"],
                 hashlib.sha256(override_path.read_bytes()).hexdigest(),
             )
+            self.assertEqual(
+                override_path,
+                output_path_for_map(mod_root, ROOT / "data" / "map_sources.json", OUTPUT_MAP_KEY),
+            )
+            self.assertFalse(
+                (mod_root / "gameresources" / "generated" / "decls" / "devinvloadout" /
+                 "devinvloadout" / "sp" / "e1m1.decl").exists()
+            )
+
+    def test_package_validator_uses_e1m1_game_world_and_registry_container(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mod_root = Path(tmp) / "mod"
+            target = output_path_for_map(mod_root, ROOT / "data" / "map_sources.json", OUTPUT_MAP_KEY)
+            target.parent.mkdir(parents=True)
+            target.write_text(_patch(MINIMAL_VALID_SOURCE), encoding="utf-8")
+            generated_map = Path(tmp) / "e1m1_intro.entities"
+            generated_map.write_text(
+                'entityDef world { edit = { devmapInvLoadout = "devinvloadout/sp/e1m1"; } }',
+                encoding="utf-8",
+            )
+            validate_packaged_devinv(mod_root, ROOT / "data" / "map_sources.json", generated_map)
 
 
 if __name__ == "__main__":
