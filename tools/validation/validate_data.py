@@ -10,7 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ap_map_generator import (
+from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
     command_requires_map_side_rpc,
@@ -25,7 +25,7 @@ from ap_map_generator import (
     generate_map,
     validate_target_policies,
 )
-from automap_baseline_guard import assert_separate_automap_helper_guard
+from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
     compile_all_item_plans,
@@ -33,14 +33,14 @@ from foundation import (
     load_primitive_registry,
     validate_primitive_registry,
 )
-from hub_diff_guard import assert_hub_diff_classified
+from tools.maps.hub_diff_guard import assert_hub_diff_classified
 from challenge_registry import all_location_entries, load_challenge_registry
 from map_registry import load_map_registry, validation_plan
-from map_semantic_baseline import assert_frozen_map_baselines
-from map_preflight import validate_onboarding_audit, validate_registry_preflight
+from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
+from tools.maps.map_preflight import validate_onboarding_audit, validate_registry_preflight
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
 MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
 AUTOMAP_FAMILY_REGISTRY_PATH = ROOT / "data" / "automap_family_registry.json"
@@ -899,7 +899,16 @@ def main() -> int:
     ):
         errors.append("Multi-command items do not use the validated target/count relay")
 
-    generated_real_commands = generate_rpc_command_entities(commands)
+    # Load item names for notification entity validation
+    try:
+        item_names_path = ROOT / "data" / "item_replay_policies.json"
+        with open(item_names_path, "r", encoding="utf-8") as f:
+            policies_data = json.load(f)
+        item_names = {int(k): v.get("name", "") for k, v in policies_data.get("items", {}).items()}
+    except (FileNotFoundError, json.JSONDecodeError):
+        item_names = None
+
+    generated_real_commands = generate_rpc_command_entities(commands, item_names=item_names)
     if "give armor -200" in json.dumps(commands, sort_keys=True) or "give armor -200" in generated_real_commands:
         errors.append("Armor Drain Trap command reappeared")
     if "CURRENCY_WEAPON_MASTERY" in generated_real_commands:

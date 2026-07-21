@@ -93,7 +93,7 @@ def main() -> None:
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
-    vanilla_root = script_dir / "vanilla_decls" / "owners"
+    vanilla_root = script_dir.parents[1] / "vanilla_decls" / "owners"
 
     source = _load_vanilla(vanilla_root)
     _assert_source_integrity(source)

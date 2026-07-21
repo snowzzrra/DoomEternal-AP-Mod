@@ -2755,7 +2755,7 @@ class DoomEternalContext(CommonContext):
             if received.item == item_id
         )
 
-    def item_activation_commands(self, item_id, item_index):
+    def item_activation_commands(self, item_id, item_index, receipt=False):
         definition = ITEM_ID_TO_COMMAND.get(item_id)
         stage = (
             self.progressive_stage(item_id, item_index)
@@ -2765,7 +2765,7 @@ class DoomEternalContext(CommonContext):
         )
         try:
             plan = compile_item_delivery_plan(
-                item_id, ITEM_ID_TO_COMMAND, stage=stage
+                item_id, ITEM_ID_TO_COMMAND, stage=stage, receipt=receipt
             )
         except ValueError as error:
             return None, str(error)
@@ -2775,7 +2775,8 @@ class DoomEternalContext(CommonContext):
         return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
 
     def spool_item_commands(self, item_id, item_index):
-        commands, description = self.item_activation_commands(item_id, item_index)
+        # New receipts use receipt entrypoint (notification + effect)
+        commands, description = self.item_activation_commands(item_id, item_index, receipt=True)
         if commands is None:
             return False, description
 

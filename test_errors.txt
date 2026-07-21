@@ -1,0 +1,925 @@
+EE..EE..E.E.....E.E...........E./usr/bin/python3: can't open file '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/tools/release/build_apworld.py': [Errno 2] No such file or directory
+EEF.EE.EEE............[Bootstrap] Quarantined v1 spool: bootstrap-v1-suit_page.cmd
+..................[Trigger] Failed to send AP check events; preserving files for retry: network down
+.[Trigger] AP event location 7770999 is not part of the connected slot; leaving file in place.
+..F...MIGRATED_DIRECT_ITEM_COMMAND_TO_MAP_ENTITY command_id=recv-000007-item-7770012-cmd-01 old='give weapon/player/equipment_flame_belch' new='ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate'
+......[Mission] LOCATION_CHECK_RETRY id=7770124 error=temporary network failure
+...FFF..E.E.......EEEEEEEEEEEEEE[Mastery] LOCATION_CHECK_RETRY id=7770125 unlockable=weapon_mastery/shotgun/sticky_bomb error=temporary disconnect
+....[Challenge] ALL_LOCATION_CHECK_RETRY id=7770141 key=e1m3 error=temporary disconnect
+..[Challenge] LOCATION_CHECK_RETRY id=7770139 unlockable=mission_challenge/e1m3/challenge_2 error=temporary disconnect
+..........[Mastery] LOCATION_CHECK_RETRY id=7770125 unlockable=weapon_mastery/shotgun/sticky_bomb error=temporary disconnect
+......ss....E.......EE.EEEEEEEEEEE..EEEEEEEEE........E...
+======================================================================
+ERROR: test_all_current_item_mappings_have_generated_map_side_entities (test_ap_map_generator.MapGeneratorTests.test_all_current_item_mappings_have_generated_map_side_entities)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 217, in test_all_current_item_mappings_have_generated_map_side_entities
+    items = json.loads(items_path.read_text(encoding="utf-8"))
+                       ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings (test_ap_map_generator.MapGeneratorTests.test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 414, in test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings
+    items = json.loads((ROOT / "data" / "items.json").read_text())
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_cultist_rocket_is_independent_one_shot_trigger_with_safe_relay (test_ap_map_generator.MapGeneratorTests.test_cultist_rocket_is_independent_one_shot_trigger_with_safe_relay)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 467, in test_cultist_rocket_is_independent_one_shot_trigger_with_safe_relay
+    json.loads((ROOT / "data" / "items.json").read_text()),
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_exultia_heavy_cannon_fallback_is_removed_without_references (test_ap_map_generator.MapGeneratorTests.test_exultia_heavy_cannon_fallback_is_removed_without_references)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 629, in test_exultia_heavy_cannon_fallback_is_removed_without_references
+    json.loads((ROOT / "data" / "items.json").read_text()),
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_flame_belch_replaces_vanilla_with_only_progression_and_ap_check (test_ap_map_generator.MapGeneratorTests.test_flame_belch_replaces_vanilla_with_only_progression_and_ap_check)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 333, in test_flame_belch_replaces_vanilla_with_only_progression_and_ap_check
+    json.loads((ROOT / "data" / "items.json").read_text()),
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_hub_ice_bomb_is_one_shot_check_only_trigger (test_ap_map_generator.MapGeneratorTests.test_hub_ice_bomb_is_one_shot_check_only_trigger)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 281, in test_hub_ice_bomb_is_one_shot_check_only_trigger
+    json.loads((ROOT / "data" / "items.json").read_text()),
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_praetor_suit_page_keeps_one_native_interaction_owner (test_ap_map_generator.MapGeneratorTests.test_praetor_suit_page_keeps_one_native_interaction_owner)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 371, in test_praetor_suit_page_keeps_one_native_interaction_owner
+    json.loads((ROOT / "data" / "items.json").read_text()),
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift (test_ap_map_generator.MapGeneratorTests.test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 567, in test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift
+    source = (ROOT / "vanillamaps" / "e1m3_cult.map").read_text(encoding="utf-8")
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanillamaps/e1m3_cult.map'
+
+======================================================================
+ERROR: test_unchanged_legacy_generated_maps_remain_byte_identical (test_ap_map_generator.MapGeneratorTests.test_unchanged_legacy_generated_maps_remain_byte_identical)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_ap_map_generator.py", line 606, in test_unchanged_legacy_generated_maps_remain_byte_identical
+    items = json.loads((ROOT / "data" / "items.json").read_text())
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_built_apworld_contains_doom_icon (test_apworld_icon.APWorldIconTests.test_built_apworld_contains_doom_icon)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_apworld_icon.py", line 27, in test_built_apworld_contains_doom_icon
+    subprocess.run(
+    ~~~~~~~~~~~~~~^
+        [sys.executable, str(ROOT / "tools" / "release" / "build_apworld.py"), str(APWORLD), str(output)],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        check=True,
+        ^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib64/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/usr/bin/python3', '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/tools/release/build_apworld.py', '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/Archipelago/worlds/doometernal', '/tmp/tmp6khop1ol/doometernal.apworld']' returned non-zero exit status 2.
+
+======================================================================
+ERROR: test_doom_component_uses_packaged_relative_icon (test_apworld_icon.APWorldIconTests.test_doom_component_uses_packaged_relative_icon)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_apworld_icon.py", line 15, in test_doom_component_uses_packaged_relative_icon
+    init_text = (APWORLD / "__init__.py").read_text(encoding="utf-8")
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/Archipelago/worlds/doometernal/__init__.py'
+
+======================================================================
+ERROR: test_all_mastery_overrides_split_natural_and_ap_paths (test_challenge_locations.NativeChallengeContracts.test_all_mastery_overrides_split_natural_and_ap_paths)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 126, in test_all_mastery_overrides_split_natural_and_ap_paths
+    ).read_text(encoding="utf-8")
+      ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanilla_decls/owners/gameresources/generated/decls/unlockable/weapon_mastery/shotgun/sticky_bomb.decl'
+
+======================================================================
+ERROR: test_cultist_challenge_children_suppress_inherited_and_aggregate_rewards (test_challenge_locations.NativeChallengeContracts.test_cultist_challenge_children_suppress_inherited_and_aggregate_rewards)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 171, in test_cultist_challenge_children_suppress_inherited_and_aggregate_rewards
+    ).read_text(encoding="utf-8")
+      ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanilla_decls/owners/gameresources/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl'
+
+======================================================================
+ERROR: test_registry_contains_only_proven_runtime_locations (test_challenge_locations.NativeChallengeContracts.test_registry_contains_only_proven_runtime_locations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 96, in test_registry_contains_only_proven_runtime_locations
+    runtime = json.loads((ROOT / "data" / "runtime_locations.json").read_text())
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/runtime_locations.json'
+
+======================================================================
+ERROR: test_rejected_watcher_and_runtime_location_architecture_cannot_return (test_challenge_locations.NativeChallengeContracts.test_rejected_watcher_and_runtime_location_architecture_cannot_return)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 104, in test_rejected_watcher_and_runtime_location_architecture_cannot_return
+    source = "\n".join(
+        (ROOT / name).read_text(encoding="utf-8")
+        for name in ("bridge_client.py", "ap_map_generator.py", "challenge_registry.py")
+    )
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 105, in <genexpr>
+    (ROOT / name).read_text(encoding="utf-8")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/bridge_client.py'
+
+======================================================================
+ERROR: test_rune_menu_override_preserves_existing_rune_behavior (test_challenge_locations.NativeChallengeContracts.test_rune_menu_override_preserves_existing_rune_behavior)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_challenge_locations.py", line 190, in test_rune_menu_override_preserves_existing_rune_behavior
+    ).read_text(encoding="utf-8")
+      ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanilla_decls/owners/gameresources_patch1/generated/decls/menuelement/hud/dossier/runes.decl'
+
+======================================================================
+ERROR: test_native_log_rotation_and_runtime_identity_are_explicit (test_check_events.CheckEventTests.test_native_log_rotation_and_runtime_identity_are_explicit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 1795, in test_native_log_rotation_and_runtime_identity_are_explicit
+    source = (ROOT / "ap_client_exe.cpp").read_text(encoding="utf-8")
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/ap_client_exe.cpp'
+
+======================================================================
+ERROR: test_native_transition_publisher_is_cultist_only (test_check_events.CheckEventTests.test_native_transition_publisher_is_cultist_only)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 1762, in test_native_transition_publisher_is_cultist_only
+    source = (ROOT / "ap_client_exe.cpp").read_text(encoding="utf-8")
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/ap_client_exe.cpp'
+
+======================================================================
+ERROR: test_command_spool_status_detects_pending (test_check_events.ItemFeedbackTests.test_command_spool_status_detects_pending)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2868, in test_command_spool_status_detects_pending
+    status = bridge_client.command_spool_status("recv-test-item-7770000-cmd-00")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute 'command_spool_status'. Did you mean: 'command_spool_exists'?
+
+======================================================================
+ERROR: test_command_spool_status_returns_consumed_for_missing (test_check_events.ItemFeedbackTests.test_command_spool_status_returns_consumed_for_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2856, in test_command_spool_status_returns_consumed_for_missing
+    status = bridge_client.command_spool_status("recv-test-nonexistent")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute 'command_spool_status'. Did you mean: 'command_spool_exists'?
+
+======================================================================
+ERROR: test_item_currency_count_returns_count_for_battery (test_check_events.ItemFeedbackTests.test_item_currency_count_returns_count_for_battery)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2831, in test_item_currency_count_returns_count_for_battery
+    result = bridge_client._item_currency_count(7770016)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_currency_count'
+
+======================================================================
+ERROR: test_item_currency_count_returns_count_for_bundle (test_check_events.ItemFeedbackTests.test_item_currency_count_returns_count_for_bundle)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2835, in test_item_currency_count_returns_count_for_bundle
+    result = bridge_client._item_currency_count(7770142)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_currency_count'
+
+======================================================================
+ERROR: test_item_currency_count_returns_none_for_non_currency (test_check_events.ItemFeedbackTests.test_item_currency_count_returns_none_for_non_currency)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2827, in test_item_currency_count_returns_none_for_non_currency
+    result = bridge_client._item_currency_count(7770000)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_currency_count'
+
+======================================================================
+ERROR: test_item_name_fallback_for_unknown (test_check_events.ItemFeedbackTests.test_item_name_fallback_for_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2823, in test_item_name_fallback_for_unknown
+    name = bridge_client._item_name(9999999)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_name'
+
+======================================================================
+ERROR: test_item_name_resolves_known_item (test_check_events.ItemFeedbackTests.test_item_name_resolves_known_item)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2815, in test_item_name_resolves_known_item
+    name = bridge_client._item_name(7770000)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_name'
+
+======================================================================
+ERROR: test_item_name_resolves_rune_item (test_check_events.ItemFeedbackTests.test_item_name_resolves_rune_item)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2819, in test_item_name_resolves_rune_item
+    name = bridge_client._item_name(7770085)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_name'
+
+======================================================================
+ERROR: test_item_progressive_stage_returns_empty_for_non_progressive (test_check_events.ItemFeedbackTests.test_item_progressive_stage_returns_empty_for_non_progressive)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2839, in test_item_progressive_stage_returns_empty_for_non_progressive
+    result = bridge_client._item_progressive_stage(7770000, 0)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_progressive_stage'
+
+======================================================================
+ERROR: test_item_progressive_stage_returns_stage_for_progressive (test_check_events.ItemFeedbackTests.test_item_progressive_stage_returns_stage_for_progressive)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2843, in test_item_progressive_stage_returns_stage_for_progressive
+    result = bridge_client._item_progressive_stage(7770017, 0)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_progressive_stage'
+
+======================================================================
+ERROR: test_item_progressive_stage_third_stage (test_check_events.ItemFeedbackTests.test_item_progressive_stage_third_stage)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2848, in test_item_progressive_stage_third_stage
+    result = bridge_client._item_progressive_stage(7770017, 2)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute '_item_progressive_stage'
+
+======================================================================
+ERROR: test_recv_queue_snapshot_counts_correctly (test_check_events.ItemFeedbackTests.test_recv_queue_snapshot_counts_correctly)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2882, in test_recv_queue_snapshot_counts_correctly
+    snapshot = bridge_client.recv_queue_snapshot()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'bridge_client' has no attribute 'recv_queue_snapshot'
+
+======================================================================
+ERROR: test_rune_diagnostic_report_compiles_without_items (test_check_events.RuneDiagnosticTests.test_rune_diagnostic_report_compiles_without_items)
+Empty receipt list should produce a complete report.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2907, in test_rune_diagnostic_report_compiles_without_items
+    lines = ctx.rune_diagnostic_report()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DoomEternalContext' object has no attribute 'rune_diagnostic_report'
+
+======================================================================
+ERROR: test_rune_diagnostic_shows_received_runes (test_check_events.RuneDiagnosticTests.test_rune_diagnostic_shows_received_runes)
+A context with received Rune items should report them.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2932, in test_rune_diagnostic_shows_received_runes
+    lines = ctx.rune_diagnostic_report()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DoomEternalContext' object has no attribute 'rune_diagnostic_report'
+
+======================================================================
+ERROR: test_audit_json_structure (test_devinv_builder.DevInvLoadoutAuditTests.test_audit_json_structure)
+Run builder and verify audit output is well-formed.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_devinv_builder.py", line 164, in test_audit_json_structure
+    devinv_main()
+    ~~~~~~~~~~~^^
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tools/decls/devinv_builder.py", line 98, in main
+    source = _load_vanilla(vanilla_root)
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tools/decls/devinv_builder.py", line 45, in _load_vanilla
+    payload = source.read_bytes()
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 777, in read_bytes
+    with self.open(mode='rb', buffering=0) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tools/decls/vanilla_decls/owners/gameresources/generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl'
+
+======================================================================
+ERROR: test_hash_lock_matches_vanilla_source (test_devinv_builder.DevInvLoadoutSourceIntegrity.test_hash_lock_matches_vanilla_source)
+Prove the hash-locked source is unchanged since commit.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_devinv_builder.py", line 55, in test_hash_lock_matches_vanilla_source
+    actual = hashlib.sha256(source_path.read_bytes()).hexdigest()
+                            ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 777, in read_bytes
+    with self.open(mode='rb', buffering=0) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanilla_decls/owners/gameresources/generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl'
+
+======================================================================
+ERROR: test_incorrect_hash_rejected (test_devinv_builder.DevInvLoadoutSourceIntegrity.test_incorrect_hash_rejected)
+A source with a different hash must raise.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_devinv_builder.py", line 65, in test_incorrect_hash_rejected
+    payload = source_path.read_bytes()
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 777, in read_bytes
+    with self.open(mode='rb', buffering=0) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/vanilla_decls/owners/gameresources/generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl'
+
+======================================================================
+ERROR: test_all_item_plans_are_map_side_and_deterministic (test_foundation.FoundationRegistryTests.test_all_item_plans_are_map_side_and_deterministic)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_all_masteries_are_typed_perks_with_ordered_give_then_activate (test_foundation.FoundationRegistryTests.test_all_masteries_are_typed_perks_with_ordered_give_then_activate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_battery_single_and_bundle_have_exact_direct_currency_counts (test_foundation.FoundationRegistryTests.test_battery_single_and_bundle_have_exact_direct_currency_counts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_currency_path_is_direct_and_rejected_inherit_is_absent (test_foundation.FoundationRegistryTests.test_currency_path_is_direct_and_rejected_inherit_is_absent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_frozen_constructor_snapshots_do_not_drift (test_foundation.FoundationRegistryTests.test_frozen_constructor_snapshots_do_not_drift)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_normal_build_contains_no_stat_write_bootstrap_controls (test_foundation.FoundationRegistryTests.test_normal_build_contains_no_stat_write_bootstrap_controls)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_only_battery_items_remain_runtime_repeatable_currency (test_foundation.FoundationRegistryTests.test_only_battery_items_remain_runtime_repeatable_currency)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_powerup_extender_keeps_canonical_eternal_mapping (test_foundation.FoundationRegistryTests.test_powerup_extender_keeps_canonical_eternal_mapping)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_progressive_stage_and_multi_command_order_are_preserved (test_foundation.FoundationRegistryTests.test_progressive_stage_and_multi_command_order_are_preserved)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_registry_and_contracts_are_complete (test_foundation.FoundationRegistryTests.test_registry_and_contracts_are_complete)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_rejected_and_experimental_primitives_cannot_enter_release (test_foundation.FoundationRegistryTests.test_rejected_and_experimental_primitives_cannot_enter_release)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_foundation.py", line 35, in setUp
+    for key, value in json.loads((ROOT / "data/items.json").read_text()).items()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: setUpClass (test_item_reconciliation.ItemReconciliationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_item_reconciliation.py", line 19, in setUpClass
+    raw = json.loads((ROOT / "data" / "items.json").read_text())
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_hash_mismatch_fails_closed (test_logic_decl_patcher.LogicDeclPatcherTests.test_hash_mismatch_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_logic_decl_patcher.py", line 41, in test_hash_mismatch_fails_closed
+    data = json.loads(CONTRACTS.read_text())
+                      ~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/scripted_location_contracts.json'
+
+======================================================================
+ERROR: test_ice_patch_changes_only_owned_branch_destination (test_logic_decl_patcher.LogicDeclPatcherTests.test_ice_patch_changes_only_owned_branch_destination)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_logic_decl_patcher.py", line 17, in test_ice_patch_changes_only_owned_branch_destination
+    snapshot = patch_contract(CONTRACTS, "7770074", output)
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tools/maps/logic_decl_patcher.py", line 28, in patch_contract
+    contracts = json.loads(contract_path.read_text(encoding="utf-8"))
+                           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/scripted_location_contracts.json'
+
+======================================================================
+ERROR: test_source_and_override_differ_by_one_line_only (test_logic_decl_patcher.LogicDeclPatcherTests.test_source_and_override_differ_by_one_line_only)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_logic_decl_patcher.py", line 25, in test_source_and_override_differ_by_one_line_only
+    contract = json.loads(CONTRACTS.read_text())["locations"]["7770074"]
+                          ~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/scripted_location_contracts.json'
+
+======================================================================
+ERROR: test_exultia_target_order_and_unrelated_blocks_are_unchanged (test_mission_complete_map_patcher.MissionCompleteMapPatcherTests.test_exultia_target_order_and_unrelated_blocks_are_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 62, in test_exultia_target_order_and_unrelated_blocks_are_unchanged
+    maps = self._generated_maps(tmpdir)
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 21, in _generated_maps
+    items = json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8"))
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_hell_decl_patch_is_hash_locked_and_changes_one_target_list (test_mission_complete_map_patcher.MissionCompleteMapPatcherTests.test_hell_decl_patch_is_hash_locked_and_changes_one_target_list)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 42, in test_hell_decl_patch_is_hash_locked_and_changes_one_target_list
+    maps = self._generated_maps(tmpdir)
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 21, in _generated_maps
+    items = json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8"))
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_missing_or_duplicate_native_owner_fails_closed (test_mission_complete_map_patcher.MissionCompleteMapPatcherTests.test_missing_or_duplicate_native_owner_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 90, in test_missing_or_duplicate_native_owner_fails_closed
+    maps = self._generated_maps(tmpdir)
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_mission_complete_map_patcher.py", line 21, in _generated_maps
+    items = json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8"))
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/data/items.json'
+
+======================================================================
+ERROR: test_save_scenarios (unittest.loader._FailedTest.test_save_scenarios)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_save_scenarios
+Traceback (most recent call last):
+  File "/usr/lib64/python3.14/unittest/loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib64/python3.14/unittest/loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_save_scenarios.py", line 7, in <module>
+    from tools import test_save_scenarios as scenarios
+ImportError: cannot import name 'test_save_scenarios' from 'tools' (/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tools/__init__.py)
+
+
+======================================================================
+ERROR: test_scripted_location_contracts (unittest.loader._FailedTest.test_scripted_location_contracts)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_scripted_location_contracts
+Traceback (most recent call last):
+  File "/usr/lib64/python3.14/unittest/loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib64/python3.14/unittest/loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_scripted_location_contracts.py", line 7, in <module>
+    from tools.audit_scripted_location import verify_generated_location
+ModuleNotFoundError: No module named 'tools.audit_scripted_location'
+
+
+======================================================================
+ERROR: test_native_client_serializes_keepalive_and_execute_rpc (test_validate_data.ValidateDataNamespaceTests.test_native_client_serializes_keepalive_and_execute_rpc)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_validate_data.py", line 94, in test_native_client_serializes_keepalive_and_execute_rpc
+    header = (ROOT / "mhclient.h").read_text(encoding="utf-8")
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/mhclient.h'
+
+======================================================================
+FAIL: test_all_physical_locations_have_separate_marker_owners (test_automap_baseline_guard.AutomapBaselineGuardTests.test_all_physical_locations_have_separate_marker_owners)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_automap_baseline_guard.py", line 8, in test_all_physical_locations_have_separate_marker_owners
+    self.assertEqual(assert_separate_automap_helper_guard(), 76)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 104 != 76
+
+======================================================================
+FAIL: test_frag_and_ice_spool_launcher_then_equipment (test_check_events.CheckEventTests.test_frag_and_ice_spool_launcher_then_equipment)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2198, in test_frag_and_ice_spool_launcher_then_equipment
+    self.assertEqual(payloads, [
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+        "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        "ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ])
+    ^^
+AssertionError: Lists differ: ['ai_[15 chars]_rpc_item_7770011 activate', 'ai_ScriptCmdEnt [25 chars]ate'] != ['ai_[15 chars]_rpc_v3_7770011_0 activate', 'ai_ScriptCmdEnt [121 chars]ate']
+
+First differing element 0:
+'ai_ScriptCmdEnt ap_rpc_item_7770011 activate'
+'ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate'
+
+Second list contains 2 additional elements.
+First extra element 2:
+'ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate'
+
+- ['ai_ScriptCmdEnt ap_rpc_item_7770011 activate',
+?                          ^^^^
+
++ ['ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate',
+?                          ^^        ++
+
+-  'ai_ScriptCmdEnt ap_rpc_item_7770013 activate']
+?                          ^^^^       ^          ^
+
++  'ai_ScriptCmdEnt ap_rpc_v3_7770011_1 activate',
+?                          ^^       ^^^          ^
+
++  'ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate',
++  'ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate']
+
+======================================================================
+FAIL: test_multi_command_chrispy_element_uses_child_entity (test_check_events.CheckEventTests.test_multi_command_chrispy_element_uses_child_entity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 1962, in test_multi_command_chrispy_element_uses_child_entity
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        [path.name for path in files],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        ],
+        ^^
+    )
+    ^
+AssertionError: Lists differ: ['recv-000012-item-7770997-cmd-00.cmd'] != ['recv-000012-item-7770997-cmd-00.cmd', 'recv-000012-item-7770997-cmd-01.cmd']
+
+Second list contains 1 additional elements.
+First extra element 1:
+'recv-000012-item-7770997-cmd-01.cmd'
+
+- ['recv-000012-item-7770997-cmd-00.cmd']
++ ['recv-000012-item-7770997-cmd-00.cmd', 'recv-000012-item-7770997-cmd-01.cmd']
+
+======================================================================
+FAIL: test_multi_command_mapping_spools_ordered_child_activations (test_check_events.CheckEventTests.test_multi_command_mapping_spools_ordered_child_activations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 1926, in test_multi_command_mapping_spools_ordered_child_activations
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        [path.name for path in files],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        ],
+        ^^
+    )
+    ^
+AssertionError: Lists differ: ['recv-000007-item-7770012-cmd-00.cmd'] != ['recv-000007-item-7770012-cmd-00.cmd', 'recv-000007-item-7770012-cmd-01.cmd']
+
+Second list contains 1 additional elements.
+First extra element 1:
+'recv-000007-item-7770012-cmd-01.cmd'
+
+- ['recv-000007-item-7770012-cmd-00.cmd']
++ ['recv-000007-item-7770012-cmd-00.cmd', 'recv-000007-item-7770012-cmd-01.cmd']
+
+======================================================================
+FAIL: test_multi_command_partial_crash_spools_remaining_command (test_check_events.CheckEventTests.test_multi_command_partial_crash_spools_remaining_command)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/tests/unit/test_check_events.py", line 2057, in test_multi_command_partial_crash_spools_remaining_command
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        [path.name for path in files],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        ],
+        ^^
+    )
+    ^
+AssertionError: Lists differ: ['recv-000007-item-7770012-cmd-00.cmd'] != ['recv-000007-item-7770012-cmd-00.cmd', 'recv-000007-item-7770012-cmd-01.cmd']
+
+Second list contains 1 additional elements.
+First extra element 1:
+'recv-000007-item-7770012-cmd-01.cmd'
+
+- ['recv-000007-item-7770012-cmd-00.cmd']
++ ['recv-000007-item-7770012-cmd-00.cmd', 'recv-000007-item-7770012-cmd-01.cmd']
+
+----------------------------------------------------------------------
+Ran 189 tests in 9.476s
+
+FAILED (failures=5, errors=56, skipped=2)
+Successfully generated 1 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmph5tfnccr/generated/fixture.json
+Successfully generated 1 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmp4kh54hni/generated/fixture.json
+Successfully generated 1 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpor_qzhl1/generated/fixture.json
+Successfully generated 1 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpor_qzhl1/generated-second/fixture.json
+Successfully generated 20 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpzlgc7mww/e1m1_intro.json
+Successfully generated 27 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpzlgc7mww/e1m2_war.json
+Successfully generated 16 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpzlgc7mww/hub.json
+Successfully generated 26 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpzlgc7mww/e1m3_cult.json
+Successfully generated 19 GLOBAL AP Targets using idTrigger mutation!
+Manifest saved to /tmp/tmpzlgc7mww/e1m4_boss.json

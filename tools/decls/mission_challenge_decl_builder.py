@@ -11,7 +11,7 @@ from pathlib import Path
 from challenge_registry import load_challenge_registry
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;

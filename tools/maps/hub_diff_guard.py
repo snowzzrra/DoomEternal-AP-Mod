@@ -7,11 +7,11 @@ import json
 import tempfile
 from pathlib import Path
 
-from ap_map_generator import find_matching_brace, generate_map
-from mission_complete_map_patcher import _patch_fortress_goal
+from tools.maps.ap_map_generator import find_matching_brace, generate_map
+from tools.maps.mission_complete_map_patcher import _patch_fortress_goal
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088}
 NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172))
 EXPECTED_CHANGED_OR_REMOVED = {

@@ -74,8 +74,23 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_GiveItems", "inherit": "target/give_item", "required_fields": [], "forbidden_fields": []},
             "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": True,
         },
+        "item_notification": {
+            "family": "ap_item_notify", "status": "experimental",
+            "source": {"map": "game/sp/e1m4_boss/e1m4_boss", "container": "vanilla e1m4_boss.resources", "file": "vanillamaps/e1m4_boss.map", "entity": "gold_ui_prompt", "source_sha256": "vanilla-reference"},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "header"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
+        },
+        "item_receipt_relay": {
+            "family": "receipt_relay", "status": "experimental",
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "master_level_target_relay_barge_arena_door_close", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
+            "shape": {"class": "idTarget_Count", "inherit": "target/relay", "required_fields": ["count", "targets"], "forbidden_fields": ["commandText", "currencyList", "gameStat"]},
+            "targets": ["parameterized"], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
+        },
     },
 }
+ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
+RECEIPT_ENTITY_PREFIX = "ap_rpc_item"
+
 DELIVERY_CONTRACTS: dict[str, Any] = {
     "counts": {"items": 116, "locations": 129, "map_checks": 108, "runtime_locations": 21, "runtime_goals": 1, "route_sentinel_batteries": 18},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
@@ -272,6 +287,47 @@ def build_primitive(
 \t}}
 }}
 '''
+    elif primitive_id == "item_notification":
+        if not isinstance(parameters, dict) or "header_key" not in parameters:
+            raise ValueError("item_notification requires header_key parameter")
+        header_key = parameters["header_key"]
+        notif_type = parameters.get("notification_type", "HUD_NOTIFY_GENERIC_CALLOUT")
+        hud_event = parameters.get("hud_event_id", "HUD_EVENT_PLAYER_NOTIFICATION")
+        icon = parameters.get("icon", "art/ui/icons/callouts/icon_callout_demonskull")
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tflags = {{
+\t\t\t\tnoFlood = true;
+\t\t\t}}
+\t\t\tnotificationType = "{notif_type}";
+\t\t\tnotificationHudEventID = "{hud_event}";
+\t\t\tdoNotShowDuplicate = false;
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "{icon}";
+\t\t\theader = "{header_key}";
+\t\t}}
+\t}}
+}}
+'''
+    elif primitive_id == "item_receipt_relay":
+        targets = parameters.get("targets")
+        if not isinstance(targets, list) or not targets:
+            raise ValueError("item_receipt_relay requires a non-empty targets list")
+        target_lines = "\n".join(
+            f'\t\t\t\titem[{index}] = "{target}";'
+            for index, target in enumerate(targets)
+        )
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tcount = 1;
+\t\t\ttargets = {{
+\t\t\t\tnum = {len(targets)};
+{target_lines}
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+'''
     elif primitive_id == "boolean_stat_modifier_direct":
         if set(parameters) != {"stat", "value"} or parameters["value"] != 1:
             raise ValueError("boolean_stat_modifier_direct requires one stat set to 1")
@@ -330,13 +386,25 @@ def classify_item_definition(definition: Any) -> str:
     return "simple_give"
 
 
+def _receipt_entity(silent_entity: str) -> str:
+    """Map ap_rpc_v3_<id> to ap_rpc_item_<id> for receipt entrypoint."""
+    if silent_entity.startswith("ap_rpc_v3_"):
+        return "ap_rpc_item_" + silent_entity[len("ap_rpc_v3_"):]
+    return silent_entity
+
+
 def compile_item_delivery_plan(
     item_id: int,
     definitions: dict[int, Any],
     *,
     stage: int | None = None,
+    receipt: bool = False,
 ) -> DeliveryPlan:
-    """Pure compiler shared by real receipts, repair jobs and directed tests."""
+    """Pure compiler shared by real receipts, repair jobs and directed tests.
+    
+    When receipt=True, uses ap_rpc_item_<id> entrypoints that include notification.
+    When receipt=False (default), uses ap_rpc_v3_<id> silent entrypoints.
+    """
     if item_id not in definitions:
         raise ValueError(f"Unknown item ID: {item_id}")
     definition = definitions[item_id]
@@ -350,18 +418,23 @@ def compile_item_delivery_plan(
     entities: list[str]
     description: str
     resolved_stage = stage
+    prefix = RECEIPT_ENTITY_PREFIX if receipt else "ap_rpc_v3"
     if family == "progressive_perk":
         perks = definition.get("perks", [])
         if stage is None:
             raise ValueError(f"Progressive item {item_id} requires a stage")
         if not 0 <= stage < len(perks):
             raise ValueError(f"Progressive stage {stage} exceeds {len(perks)} stages")
-        entities = [f"ap_rpc_v3_{item_id}_{stage}"]
+        entities = [f"{prefix}_{item_id}_{stage}"]
         description = f"stage {stage}: {perks[stage]}"
     elif family == "multi_command":
         if not definition:
             raise ValueError("mapping list is empty")
-        entities = [f"ap_rpc_v3_{item_id}_{index}" for index in range(len(definition))]
+        # Receipt path uses single relay entity; silent path uses child entities
+        if receipt:
+            entities = [f"{prefix}_{item_id}"]
+        else:
+            entities = [f"ap_rpc_v3_{item_id}_{index}" for index in range(len(definition))]
         description = " -> ".join(definition)
         resolved_stage = None
     elif family == "no_op":
@@ -369,7 +442,7 @@ def compile_item_delivery_plan(
         description = str(definition.get("description", "runtime-only no-op"))
         resolved_stage = None
     else:
-        entities = [f"ap_rpc_v3_{item_id}"]
+        entities = [f"{prefix}_{item_id}"]
         description = str(definition)
         resolved_stage = None
     commands = tuple(
