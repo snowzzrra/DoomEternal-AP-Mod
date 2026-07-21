@@ -7,12 +7,11 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import sys
 import tempfile
 from datetime import datetime, timezone
-
+from pathlib import Path
 
 DEFAULT_ROOT = Path(
     os.environ.get(

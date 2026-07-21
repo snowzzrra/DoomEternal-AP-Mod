@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parent
 DEFAULT_REGISTRY_PATH = ROOT / "data" / "map_sources.json"
 ROOT_KEYS = {"schema_version", "baseline_map_keys", "maps"}

@@ -12,35 +12,34 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from tools.maps.ap_map_generator import (
-    EVENT_ENTITY_PREFIX,
-    RPC_ENTITY_PREFIX,
-    command_requires_map_side_rpc,
-    generate_bootstrap_entities,
-    generate_check_event,
-    generate_event_relay,
-    generate_pickup_notification,
-    generate_rpc_command_entities,
-    generate_target_relay,
-    find_entity_block_bounds,
-    extract_target_names,
-    generate_map,
-    validate_target_policies,
-)
-from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
+from challenge_registry import all_location_entries, load_challenge_registry
 from foundation import (
     compile_all_item_plans,
     load_foundation_contracts,
     load_primitive_registry,
     validate_primitive_registry,
 )
-from tools.maps.hub_diff_guard import assert_hub_diff_classified
-from challenge_registry import all_location_entries, load_challenge_registry
 from map_registry import load_map_registry, validation_plan
-from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
+from tools.maps.ap_map_generator import (
+    EVENT_ENTITY_PREFIX,
+    RPC_ENTITY_PREFIX,
+    command_requires_map_side_rpc,
+    extract_target_names,
+    find_entity_block_bounds,
+    generate_bootstrap_entities,
+    generate_check_event,
+    generate_event_relay,
+    generate_map,
+    generate_pickup_notification,
+    generate_rpc_command_entities,
+    generate_target_relay,
+    validate_target_policies,
+)
+from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
+from tools.maps.hub_diff_guard import assert_hub_diff_classified
 from tools.maps.map_preflight import validate_onboarding_audit, validate_registry_preflight
-
+from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
@@ -906,7 +905,7 @@ def main() -> int:
     # Load item names for notification entity validation
     try:
         item_names_path = ROOT / "data" / "item_replay_policies.json"
-        with open(item_names_path, "r", encoding="utf-8") as f:
+        with open(item_names_path, encoding="utf-8") as f:
             policies_data = json.load(f)
         item_names = {int(k): v.get("name", "") for k, v in policies_data.get("items", {}).items()}
     except (FileNotFoundError, json.JSONDecodeError):

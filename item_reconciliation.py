@@ -1,13 +1,13 @@
 """Pure, fail-closed compiler for manual AP inventory reconciliation."""
 
-from collections import Counter
-from dataclasses import dataclass
 import json
+from collections import Counter
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from foundation import compile_item_delivery_plan
-
 
 REPLAY_IDEMPOTENT = "replay_idempotent"
 SPECIAL_PROGRESSIVE = "special_progressive"

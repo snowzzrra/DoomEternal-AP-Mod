@@ -10,7 +10,6 @@ from pathlib import Path
 
 from challenge_registry import load_challenge_registry
 
-
 ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
 PERK_TO_GIVE = '\t\tperkToGive = "perk/player/weapons/shotgun/pop_rocket_more_bombs";\n'

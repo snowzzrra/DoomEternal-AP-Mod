@@ -8,9 +8,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
 from map_registry import validation_plan
-
+from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
 
 AUDIT_KEYS = {
     "schema_version", "map_key", "source_sha256", "resource_owner",

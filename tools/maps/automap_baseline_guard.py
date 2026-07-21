@@ -9,7 +9,6 @@ from pathlib import Path
 
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds, generate_map
 
-
 ROOT = Path(__file__).resolve().parent.parent.parent
 PROTOTYPE_ENTITIES = {
     "mech_street_pickup_collectible_toys_doomguy_1",
