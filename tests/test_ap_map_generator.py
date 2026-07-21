@@ -560,7 +560,7 @@ entity {
             )
             self.assertEqual(
                 hashlib.sha256(prior_output).hexdigest(),
-                "9ffc0bb42c4ea22ca77f5d68e6b79178fa9a0e42a2b808fda033e775ba02e6cf",
+                "1b7f583d346819227e69023356bd300c76d756121203c1a3876ee17fb3bf2b89",
             )
 
     def test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift(self):

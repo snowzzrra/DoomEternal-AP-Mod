@@ -41,6 +41,7 @@ ap_transition_*.evt
 vanillamaps/
 packaging/
 vanilla_decls/
+gameresources/
 
 # Local investigation
 debug_matches.py
@@ -48,12 +49,10 @@ battery.txt
 *_dump*.txt
 .death-probe-*/
 .death-probe-compat/
-Archive.zip
 .serena/
 tools/
 !tools/
 tools/*
 !tools/audit_scripted_location.py
 
-# Local project memory, caso decida nao publicar
 .local/
