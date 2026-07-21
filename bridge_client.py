@@ -157,16 +157,16 @@ AP_SOURCE_PATH = os.environ.get("ARCHIPELAGO_SOURCE")
 if AP_SOURCE_PATH:
     sys.path.insert(0, os.path.abspath(AP_SOURCE_PATH))
 
-import colorama
-import Utils
-from CommonClient import (
+import colorama  # noqa: E402
+import Utils  # noqa: E402
+from CommonClient import (  # noqa: E402
     ClientCommandProcessor,
     CommonContext,
     get_base_parser,
     gui_enabled,
     server_loop,
 )
-from NetUtils import ClientStatus
+from NetUtils import ClientStatus  # noqa: E402
 
 if "doom_base_dir" in config and "save_games_dir" in config:
     try:
@@ -1235,8 +1235,7 @@ def probe_game_duration(path):
         command,
         cwd=DEATH_PROBE_RUNTIME,
         env=environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
         timeout=10,
         check=False,
@@ -2072,7 +2071,9 @@ class DoomEternalContext(CommonContext):
         elif cmd == "Connected":
             self.initialize_item_state()
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
-            asyncio.create_task(self.update_death_link(self.death_link_enabled))
+            self._death_link_task = asyncio.create_task(
+                self.update_death_link(self.death_link_enabled)
+            )
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
         elif cmd == "RoomUpdate" and "checked_locations" in args:
@@ -2739,7 +2740,7 @@ class DoomEternalContext(CommonContext):
                 continue
             network_item = self.items_received[item_index]
             spooled, description = self.spool_item_commands(
-                network_item.item, item_index
+                network_item.item, item_index, receipt=False
             )
             if not spooled:
                 return False
@@ -2784,10 +2785,9 @@ class DoomEternalContext(CommonContext):
     def item_command_id(self, item_id, item_index, command_index):
         return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
 
-    def spool_item_commands(self, item_id, item_index):
-        # New receipts use receipt entrypoint (notification + effect) only if enabled
+    def spool_item_commands(self, item_id, item_index, *, receipt: bool):
         commands, description = self.item_activation_commands(
-            item_id, item_index, receipt=ENABLE_ITEM_NOTIFICATIONS
+            item_id, item_index, receipt=receipt
         )
         if commands is None:
             return False, description
@@ -3637,7 +3637,7 @@ class DoomEternalContext(CommonContext):
                         continue
 
                     spooled, description = self.spool_item_commands(
-                        item_id, item_index
+                        item_id, item_index, receipt=ENABLE_ITEM_NOTIFICATIONS
                     )
                     if not spooled and description:
                         logger.error(
@@ -3668,7 +3668,7 @@ class DoomEternalContext(CommonContext):
         from kvui import GameManager
 
         class DoomEternalManager(GameManager):
-            logging_pairs = [("Client", "Archipelago")]
+            logging_pairs = (("Client", "Archipelago"),)
             base_title = "DOOM Eternal Archipelago Client"
 
         return DoomEternalManager

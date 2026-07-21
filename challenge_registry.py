@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -176,13 +177,29 @@ def validate_challenge_registry(registry: dict) -> None:
     aggregates = registry.get("all_mission_challenges", [])
     if len(aggregates) != 2:
         raise ValueError("expected exactly two All Mission Challenges aggregates")
+    expected_mission_keys = {"e1m3", "e1m4"}
+    mission_keys = [aggregate.get("mission_key") for aggregate in aggregates]
+    if any(not isinstance(key, str) or not key.strip() for key in mission_keys):
+        raise ValueError("all Mission Challenges aggregates require non-empty mission_key")
+    duplicate_mission_keys = [
+        key for key, count in Counter(mission_keys).items() if count > 1
+    ]
+    if duplicate_mission_keys:
+        raise ValueError(f"duplicate mission_key: {sorted(duplicate_mission_keys)}")
+    if set(mission_keys) != expected_mission_keys:
+        raise ValueError("all Mission Challenges must cover exactly e1m3 and e1m4")
+
+    challenge_missions = {
+        entry["signal"]["unlockable"]: entry["signal"]["unlockable"].split("/")[1]
+        for entry in mission_challenges
+    }
+    aggregate_unlockables: list[str] = []
     for aggregate in aggregates:
-        if "mission_key" not in aggregate or not isinstance(aggregate["mission_key"], str):
-            raise ValueError(f"{aggregate['name']}: missing or invalid mission_key")
+        mission_key = aggregate["mission_key"]
         if aggregate.get("challenges") is not None:
             raise ValueError(f"{aggregate['name']}: deprecated challenges field must be removed")
         unlockables = aggregate.get("signal", {}).get("unlockables", [])
-        if len(unlockables) != 3:
+        if not isinstance(unlockables, list) or len(unlockables) != 3:
             raise ValueError(f"{aggregate['name']}: expected exactly 3 unlockable paths")
         location_id = aggregate["location_id"]
         if location_id not in ALL_MISSION_CHALLENGES_LOCATION_IDS:
@@ -190,8 +207,18 @@ def validate_challenge_registry(registry: dict) -> None:
         if aggregate["signal"]["kind"] != "all_mission_challenge_records":
             raise ValueError(f"{aggregate['name']}: unexpected aggregate signal kind")
         for unlockable in unlockables:
-            if unlockable not in challenge_paths:
+            if unlockable not in challenge_missions:
                 raise ValueError(f"{aggregate['name']}: unknown unlockable path: {unlockable}")
+            if challenge_missions[unlockable] != mission_key:
+                raise ValueError(f"{aggregate['name']}: unlockable belongs to another mission_key")
+        aggregate_unlockables.extend(unlockables)
+
+    unlockable_counts = Counter(aggregate_unlockables)
+    duplicates = [path for path, count in unlockable_counts.items() if count > 1]
+    if duplicates:
+        raise ValueError(f"aggregate unlockables are duplicated: {sorted(duplicates)}")
+    if set(aggregate_unlockables) != set(challenge_missions):
+        raise ValueError("aggregate unlockables must cover every Mission Challenge exactly once")
 
     masteries = registry.get("weapon_masteries", [])
     if len(masteries) != 13:

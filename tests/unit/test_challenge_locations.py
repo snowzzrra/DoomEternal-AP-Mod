@@ -1,3 +1,4 @@
+import copy
 import json
 import tempfile
 import unittest
@@ -10,7 +11,6 @@ from tools.decls.mastery_decl_builder import (
 )
 from tools.decls.mission_challenge_decl_builder import REWARD_FIELD, build_mission_challenge_overrides
 from tools.decls.rune_decl_builder import GATE_LINE, RUNE_OWNER, build_rune_override
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -99,6 +99,16 @@ class NativeChallengeContracts(unittest.TestCase):
     def test_hub_aliases_compare_as_one_canonical_map(self):
         self.assertEqual(canonical_map_name("game/hub/hub"), "game/hub/hub")
         self.assertEqual(canonical_map_name("game/sp/hub/hub"), "game/hub/hub")
+
+    def test_aggregate_mission_keys_are_exclusive_and_complete(self):
+        registry = load_challenge_registry()
+        broken = copy.deepcopy(registry)
+        broken["all_mission_challenges"][1]["mission_key"] = "e1m3"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate mission_key"):
+                load_challenge_registry(path)
 
     def test_rejected_watcher_and_runtime_location_architecture_cannot_return(self):
         source = "\n".join(

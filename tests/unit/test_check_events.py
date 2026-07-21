@@ -6,9 +6,8 @@ import sys
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
 from pathlib import Path
-
+from unittest.mock import patch
 
 ROOT = Path(__file__).parents[2]
 if str(ROOT) not in sys.path:
@@ -108,7 +107,9 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
     def _mission_challenge_records(completion_bits):
         """Build all three exact records; statCount is deliberately irrelevant."""
         records = {}
-        for complete, entry in zip(completion_bits, bridge_client.MISSION_CHALLENGE_ENTRIES):
+        for complete, entry in zip(
+            completion_bits, bridge_client.MISSION_CHALLENGE_ENTRIES, strict=True
+        ):
             signal = entry["signal"]
             records[signal["unlockable"]] = {
                 "numUnlockableRules": signal["numUnlockableRules"],
@@ -1006,7 +1007,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx.persist_session_state = lambda: None
                 # Build records matching real signal values so natural_complete fires
                 records = {}
-                for ul, complete in zip(chall_unlockables, bits):
+                for ul, complete in zip(chall_unlockables, bits, strict=True):
                     entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE.get(ul)
                     signal = entry["signal"]
                     records[ul] = {
@@ -1024,7 +1025,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx.locations_checked = set()
                 sent = []
 
-                async def send_msgs(messages):
+                async def send_msgs(messages, sent=sent):
                     sent.append(messages)
 
                 ctx.send_msgs = send_msgs
@@ -1060,7 +1061,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx.locations_checked = set()
             sent = []
 
-            async def send_msgs(messages):
+            async def send_msgs(messages, sent=sent):
                 sent.append(messages)
 
             ctx.send_msgs = send_msgs
@@ -1306,6 +1307,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_bootstrap_allowlist_rejects_extra_or_wrong_effects(self):
         from copy import deepcopy
+
         from bootstrap_actions import BOOTSTRAP_ACTIONS, validate_bootstrap_catalogue
 
         extra = deepcopy(BOOTSTRAP_ACTIONS)
@@ -1560,6 +1562,44 @@ class CheckEventTests(unittest.TestCase):
         ctx.item_state_ready = True
         ctx.items_received = []
         return ctx
+
+    def test_receipt_entrypoint_selection_respects_explicit_capability(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+                self.assertTrue(ctx.spool_item_commands(7770010, 0, receipt=True)[0])
+                self.assertTrue(ctx.spool_item_commands(7770011, 1, receipt=False)[0])
+                payloads = {
+                    path.name: path.read_text(encoding="utf-8")
+                    for path in Path(tmpdir).glob("*.cmd")
+                }
+                self.assertEqual(
+                    payloads["recv-000000-item-7770010-cmd-00.cmd"],
+                    "ai_ScriptCmdEnt ap_rpc_item_7770010 activate\n",
+                )
+                self.assertEqual(
+                    payloads["recv-000001-item-7770011-cmd-00.cmd"],
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011 activate\n",
+                )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_mapping_repair_forces_silent_entrypoint(self):
+        ctx = self._make_item_context()
+        ctx.items_received = [types.SimpleNamespace(item=7770085)]
+        ctx.items_processed = 1
+        ctx.session_state = {"item_mapping_revision": 0}
+        with (
+            patch.object(ctx, "spool_item_commands", return_value=(True, "repair")) as spool,
+            patch.object(bridge_client, "save_client_state"),
+        ):
+            self.assertFalse(ctx.repair_item_mappings())
+        spool.assert_called_once_with(7770085, 0, receipt=False)
 
     def test_directed_test_commands_are_always_available(self):
         self.assertFalse(hasattr(bridge_client, "DEV_TOOLS_ENABLED"))
@@ -1832,7 +1872,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
                 ctx = self._make_item_context()
 
-                spooled, description = ctx.spool_item_commands(7770010, 3)
+                spooled, description = ctx.spool_item_commands(7770010, 3, receipt=True)
 
                 self.assertTrue(spooled)
                 self.assertEqual(description, "give weapon/player/chainsaw")
@@ -1857,7 +1897,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
                 ctx = self._make_item_context()
 
-                spooled, description = ctx.spool_item_commands(7770045, 11)
+                spooled, description = ctx.spool_item_commands(7770045, 11, receipt=True)
 
                 self.assertTrue(spooled)
                 self.assertEqual(description, "chrispy ai/heavy/revenant")
@@ -1898,7 +1938,7 @@ class CheckEventTests(unittest.TestCase):
                     types.SimpleNamespace(item=item_id) for item_id in item_ids
                 ]
                 for receive_index, item_id in enumerate(item_ids):
-                    spooled, _ = ctx.spool_item_commands(item_id, receive_index)
+                    spooled, _ = ctx.spool_item_commands(item_id, receive_index, receipt=True)
                     self.assertTrue(spooled)
 
                 for path in Path(tmpdir).glob("*.cmd"):
@@ -1921,7 +1961,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
                 ctx = self._make_item_context()
 
-                spooled, description = ctx.spool_item_commands(7770012, 7)
+                spooled, description = ctx.spool_item_commands(7770012, 7, receipt=True)
 
                 self.assertTrue(spooled)
                 self.assertEqual(
@@ -1958,7 +1998,7 @@ class CheckEventTests(unittest.TestCase):
                 ]
                 ctx = self._make_item_context()
 
-                spooled, _ = ctx.spool_item_commands(7770997, 12)
+                spooled, _ = ctx.spool_item_commands(7770997, 12, receipt=True)
 
                 self.assertTrue(spooled)
                 files = sorted(Path(tmpdir).glob("*.cmd"))
@@ -1989,8 +2029,8 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
                 ctx = self._make_item_context()
 
-                self.assertTrue(ctx.spool_item_commands(7770012, 7)[0])
-                self.assertTrue(ctx.spool_item_commands(7770012, 7)[0])
+                self.assertTrue(ctx.spool_item_commands(7770012, 7, receipt=True)[0])
+                self.assertTrue(ctx.spool_item_commands(7770012, 7, receipt=True)[0])
 
                 self.assertEqual(len(list(Path(tmpdir).glob("*.cmd"))), 1)
             finally:
@@ -2007,11 +2047,11 @@ class CheckEventTests(unittest.TestCase):
                 ctx = self._make_item_context()
                 for receive_index in range(100):
                     self.assertTrue(
-                        ctx.spool_item_commands(7770000, receive_index)[0]
+                        ctx.spool_item_commands(7770000, receive_index, receipt=True)[0]
                     )
                 for receive_index in range(100):
                     self.assertTrue(
-                        ctx.spool_item_commands(7770000, receive_index)[0]
+                        ctx.spool_item_commands(7770000, receive_index, receipt=True)[0]
                     )
 
                 jobs = sorted(Path(tmpdir).glob("recv-*.cmd"))
@@ -2049,7 +2089,7 @@ class CheckEventTests(unittest.TestCase):
                     }
                 }
 
-                spooled, _ = ctx.spool_item_commands(7770012, 7)
+                spooled, _ = ctx.spool_item_commands(7770012, 7, receipt=True)
 
                 self.assertTrue(spooled)
                 files = sorted(Path(tmpdir).glob("*.cmd"))
@@ -2071,7 +2111,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.ITEM_ID_TO_COMMAND[7770998] = []
                 ctx = self._make_item_context()
 
-                spooled, description = ctx.spool_item_commands(7770998, 9)
+                spooled, description = ctx.spool_item_commands(7770998, 9, receipt=True)
 
                 self.assertFalse(spooled)
                 self.assertEqual(description, "mapping list is empty")
@@ -2186,7 +2226,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "state.json")
                 ctx = self._make_item_context()
                 for receive_index, item_id in enumerate((7770011, 7770013)):
-                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index)[0])
+                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index, receipt=True)[0])
                 payloads = [
                     path.read_text(encoding="utf-8").strip()
                     for path in sorted(Path(tmpdir).glob("*.cmd"))
@@ -2215,7 +2255,7 @@ class CheckEventTests(unittest.TestCase):
                     7770045: "ai_ScriptCmdEnt ap_rpc_item_7770045 activate\n",
                 }
                 for receive_index, item_id in enumerate(expectations):
-                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index)[0])
+                    self.assertTrue(ctx.spool_item_commands(item_id, receive_index, receipt=True)[0])
 
                 for receive_index, (item_id, expected) in enumerate(expectations.items()):
                     path = Path(
@@ -2800,5 +2840,3 @@ class CheckEventTests(unittest.TestCase):
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
                 bridge_client.INV_DUMP_DIR = original_dump_dir
-
-
