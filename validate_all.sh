@@ -24,6 +24,8 @@ python3 -m py_compile \
     mastery_decl_builder.py \
     mission_challenge_decl_builder.py \
     rune_decl_builder.py \
+    devinv_builder.py \
+    validate_challenge_overrides.py \
     save_decrypt.py \
     save_inspector.py \
     validate_data.py \
@@ -43,7 +45,8 @@ for test_module in \
     tests.test_logic_decl_patcher \
     tests.test_mission_complete_map_patcher \
     tests.test_scripted_location_contracts \
-    tests.test_save_scenarios
+    tests.test_save_scenarios \
+    tests.test_devinv_builder
 do
     python3 -m unittest "$test_module"
 done

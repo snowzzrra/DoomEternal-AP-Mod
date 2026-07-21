@@ -189,27 +189,13 @@ python3 "$SCRIPT_DIR/mastery_decl_builder.py" \
     --audit-output "$TEMP_DIR/base-mastery-overrides.json"
 python3 "$SCRIPT_DIR/mission_challenge_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
-    --audit-output "$TEMP_DIR/cultist-mission-challenge-overrides.json"
+    --audit-output "$TEMP_DIR/mission-challenge-overrides.json"
 python3 "$SCRIPT_DIR/devinv_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/devinv-override.json"
-python3 - "$TEMP_DIR/cultist-mission-challenge-overrides.json" <<'PY'
-import json
-import sys
-
-audit = json.load(open(sys.argv[1], encoding="utf-8"))
-assert "battery_unchanged" not in audit
-assert audit["aggregate_reward_suppression"] == {
-    "strategy": "child_currencyToGive_num_zero",
-    "field": "currencyToGive.num",
-    "value": 0,
-    "suppressed_native_rewards": [
-        "CURRENCY_PRAETOR_UPGRADE",
-        "CURRENCY_SENTINEL_BATTERY",
-    ],
-    "runtime_evidence": "v0.3.0c.1",
-}
-PY
+python3 "$SCRIPT_DIR/validate_challenge_overrides.py" \
+    --registry "$SCRIPT_DIR/data/challenge_location_registry.json" \
+    --mod-root "$OUTPUT_DIR/mod"
 
 python3 "$SCRIPT_DIR/tools/audit_scripted_location.py" \
     --contracts "$SCRIPT_DIR/data/scripted_location_contracts.json" \
@@ -419,28 +405,9 @@ if ! grep -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
     echo "Sticky AP gameplay upgrade missing" >&2
     exit 1
 fi
-mapfile -t CHALLENGE_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \
-    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | LC_ALL=C sort)
-[[ "${#CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Cultist Base Mission Challenge override set is incomplete" >&2; exit 1; }
-if find "$OUTPUT_DIR/mod" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_2.decl' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_3.decl' \
-    -print -quit | grep -q .; then
-    echo "Unscoped Mission Challenge override entered build" >&2
-    exit 1
-fi
-if grep -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${CHALLENGE_OVERRIDE_FILES[@]}"; then
-    echo "Cultist Mission Challenge child override contains an unscoped currency name" >&2
-    exit 1
-fi
-for challenge_override in "${CHALLENGE_OVERRIDE_FILES[@]}"; do
-    if [[ "$(grep -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
-        [[ "$(grep -c 'num = 0;' "$challenge_override")" != "1" ]]; then
-        echo "Cultist Mission Challenge reward suppression is missing: $challenge_override" >&2
-        exit 1
-    fi
-done
+python3 "$SCRIPT_DIR/validate_challenge_overrides.py" \
+    --registry "$SCRIPT_DIR/data/challenge_location_registry.json" \
+    --mod-root "$OUTPUT_DIR/mod"
 if find "$OUTPUT_DIR/mod" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
@@ -506,28 +473,9 @@ if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     echo "Forbidden propitem DECL override found in final mod ZIP" >&2
     exit 1
 fi
-mapfile -t AUDIT_CHALLENGE_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \
-    -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_*.decl' | LC_ALL=C sort)
-[[ "${#AUDIT_CHALLENGE_OVERRIDE_FILES[@]}" == "3" ]] || { echo "Final ZIP Cultist Mission Challenge override set drifted" >&2; exit 1; }
-if find "$MOD_AUDIT_DIR" -type f -path '*/generated/decls/unlockable/mission_challenge/*' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_2.decl' \
-    ! -path '*/generated/decls/unlockable/mission_challenge/e1m3/challenge_3.decl' \
-    -print -quit | grep -q .; then
-    echo "Final ZIP contains an unscoped Mission Challenge override" >&2
-    exit 1
-fi
-if grep -q 'CURRENCY_PRAETOR_UPGRADE|CURRENCY_SENTINEL_BATTERY' "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; then
-    echo "Final ZIP Cultist challenge child override contains an unscoped currency name" >&2
-    exit 1
-fi
-for challenge_override in "${AUDIT_CHALLENGE_OVERRIDE_FILES[@]}"; do
-    if [[ "$(grep -c 'currencyToGive' "$challenge_override")" != "1" ]] || \
-        [[ "$(grep -c 'num = 0;' "$challenge_override")" != "1" ]]; then
-        echo "Final ZIP challenge reward suppression drifted: $challenge_override" >&2
-        exit 1
-    fi
-done
+python3 "$SCRIPT_DIR/validate_challenge_overrides.py" \
+    --registry "$SCRIPT_DIR/data/challenge_location_registry.json" \
+    --mod-root "$MOD_AUDIT_DIR"
 if find "$MOD_AUDIT_DIR" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \

@@ -32,7 +32,10 @@ def _assert_reward_owner(entries: list[dict]) -> None:
     owners = {entry["reward_owner"]["inherited_path"] for entry in entries}
     hashes = {entry["reward_owner"]["sha256"] for entry in entries}
     currencies = {entry["reward_owner"]["currency"] for entry in entries}
-    if len(entries) not in (3, 6) or owners != {"unlockable/mission_challenge/challenge_base.decl"}:
+    registry_paths = set(entry["completion_owner"]["path"] for entry in entries)
+    if len(entries) != len(registry_paths) or len(set(entry["location_id"] for entry in entries)) != len(entries):
+        raise ValueError("Mission Challenge entries have non-unique paths or location IDs")
+    if owners != {"unlockable/mission_challenge/challenge_base.decl"}:
         raise ValueError("refusing an unscoped Mission Challenge reward override")
     if len(hashes) != 1 or currencies != {"CURRENCY_PRAETOR_UPGRADE"}:
         raise ValueError("Mission Challenge reward owner contract drift")
@@ -102,7 +105,6 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
             "value": 0,
             "suppressed_native_rewards": [
                 "CURRENCY_PRAETOR_UPGRADE",
-                "CURRENCY_SENTINEL_BATTERY",
             ],
             "runtime_evidence": "v0.3.0c.1",
         },

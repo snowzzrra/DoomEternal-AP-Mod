@@ -39,7 +39,7 @@ ap_transition_*.evt
 # Game resources and backups
 *.backup
 vanillamaps/
-packaging/
+packaging/*
 vanilla_decls/
 gameresources/
 !packaging/EternalMod.json
@@ -55,5 +55,8 @@ tools/
 !tools/
 tools/*
 !tools/audit_scripted_location.py
+!tools/audit_packaged_transition_bridge.py
+!tools/generate_foundation_test_plan.py
+!tools/test_save_scenarios.py
 
 .local/

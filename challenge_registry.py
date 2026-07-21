@@ -69,8 +69,8 @@ def all_mission_challenge_entries(registry: dict) -> list[dict]:
 
 
 def validate_challenge_registry(registry: dict) -> None:
-    if registry.get("schema_version") != 8:
-        raise ValueError("runtime registry schema_version must be 8")
+    if registry.get("schema_version") != 9:
+        raise ValueError("runtime registry schema_version must be 9")
     entries = all_location_entries(registry)
     expected_count = (
         4   # mission_complete
@@ -128,7 +128,6 @@ def validate_challenge_registry(registry: dict) -> None:
             mission_prefix = "e1m3"
             completion_prefix = "E1M3"
         else:
-            e1m4_index = index - 3
             if entry["location_id"] != next(expected_e1m4_ids):
                 raise ValueError(f"{entry['name']}: E1M4 Mission Challenge ID order drift")
             mission_prefix = "e1m4"
@@ -179,6 +178,10 @@ def validate_challenge_registry(registry: dict) -> None:
     if len(aggregates) != 2:
         raise ValueError("expected exactly two All Mission Challenges aggregates")
     for aggregate in aggregates:
+        if "mission_key" not in aggregate or not isinstance(aggregate["mission_key"], str):
+            raise ValueError(f"{aggregate['name']}: missing or invalid mission_key")
+        if aggregate.get("challenges") is not None:
+            raise ValueError(f"{aggregate['name']}: deprecated challenges field must be removed")
         unlockables = aggregate.get("signal", {}).get("unlockables", [])
         if len(unlockables) != 3:
             raise ValueError(f"{aggregate['name']}: expected exactly 3 unlockable paths")

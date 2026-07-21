@@ -26,10 +26,8 @@ from pathlib import Path
 from typing import NamedTuple
 from bootstrap_actions import (
     BOOTSTRAP_ACTIONS,
-    BOOTSTRAP_ENTITY_PREFIX,
     BOOTSTRAP_REVISION,
     BOOTSTRAP_STAT_PRIMITIVE,
-    LEGACY_BOOTSTRAP_ENTITY_PREFIXES,
     received_any_suit_upgrade,
 )
 
@@ -195,7 +193,7 @@ else:
                 path = input("Enter Path: ").strip()
 
             if not path:
-                raise RuntimeError(f"DOOM Eternal Client Setup cancelled. Please create ap_config.json manually with 'doom_base_dir' and 'save_games_dir'.")
+                raise RuntimeError("DOOM Eternal Client Setup cancelled. Please create ap_config.json manually with 'doom_base_dir' and 'save_games_dir'.")
 
             try:
                 normalized = validation_func(path)
@@ -2109,7 +2107,7 @@ class DoomEternalContext(CommonContext):
         state["mission_challenges"] = self.mission_challenges_observed
         self.all_mission_challenges_observed = {}
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
             self.all_mission_challenges_observed[key] = all(
                 self.mission_challenges_observed.get(ul, False)
                 for ul in aggregate["signal"]["unlockables"]
@@ -3003,7 +3001,7 @@ class DoomEternalContext(CommonContext):
                 slot_directory,
             )
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
             was_complete = self.all_mission_challenges_observed.get(key, False)
             now_complete = all(
                 self.mission_challenges_observed.get(ul, False)
@@ -3128,7 +3126,7 @@ class DoomEternalContext(CommonContext):
         if not self.item_state_ready or self.runtime_observers_frozen:
             return
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
             if not self.all_mission_challenges_observed.get(key, False):
                 continue
             location_id = aggregate["location_id"]

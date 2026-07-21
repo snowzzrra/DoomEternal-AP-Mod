@@ -49,7 +49,8 @@ def _load_vanilla(vanilla_root: Path) -> str:
             f"DevInvLoadout vanilla source hash drift: expected {SOURCE_SHA256}, "
             f"got {actual}"
         )
-    return payload.decode("utf-8")
+    text = payload.decode("utf-8")
+    return text.replace("\r\n", "\n")
 
 
 def _assert_source_integrity(source: str) -> None:
