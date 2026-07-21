@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import json
 import argparse
 import copy
@@ -1252,17 +1251,17 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             manifest_data[ap_check_id] = config_entities[ap_check_id]
 
-            spawn_pos_text = ""
+            _spawn_pos_text = ""
             pos_match = re.search(r'(\s*spawnPosition\s*=\s*\{\s*x\s*=\s*([0-9.-]+);\s*y\s*=\s*([0-9.-]+);\s*z\s*=\s*([0-9.-]+);\s*\})', block)
             if pos_match:
                 x = pos_match.group(2)
                 y = pos_match.group(3)
                 z = str(float(pos_match.group(4)) + 10.0)
-                spawn_pos_text = f"\t\t\tspawnPosition = {{\n\t\t\t\tx = {x};\n\t\t\t\ty = {y};\n\t\t\t\tz = {z};\n\t\t\t}}\n"
+                _spawn_pos_text = f"\t\t\tspawnPosition = {{\n\t\t\t\tx = {x};\n\t\t\t\ty = {y};\n\t\t\t\tz = {z};\n\t\t\t}}\n"
             else:
                 pos_fallback = re.search(r'(\s*spawnPosition\s*=\s*\{[^}]+\})', block)
                 if pos_fallback:
-                    spawn_pos_text = pos_fallback.group(1) + "\n"
+                    _spawn_pos_text2 = pos_fallback.group(1) + "\n"
 
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]

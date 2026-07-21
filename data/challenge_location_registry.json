@@ -1,5 +1,5 @@
 {
-  "schema_version": 8,
+  "schema_version": 9,
   "mission_complete": [
     {
       "name": "Hell on Earth - Mission Complete",
@@ -185,6 +185,7 @@
     {
       "name": "Cultist Base - All Mission Challenges Completed",
       "location_id": 7770141,
+      "mission_key": "e1m3",
       "signal": {
         "kind": "all_mission_challenge_records",
         "unlockables": [
@@ -192,16 +193,12 @@
           "mission_challenge/e1m3/challenge_2",
           "mission_challenge/e1m3/challenge_3"
         ]
-      },
-      "challenges": [
-        "mission_challenge/e1m3/challenge_1",
-        "mission_challenge/e1m3/challenge_2",
-        "mission_challenge/e1m3/challenge_3"
-      ]
+      }
     },
     {
       "name": "Doom Hunter Base - All Mission Challenges Completed",
       "location_id": 7770175,
+      "mission_key": "e1m4",
       "signal": {
         "kind": "all_mission_challenge_records",
         "unlockables": [
@@ -209,12 +206,7 @@
           "mission_challenge/e1m4/challenge_2",
           "mission_challenge/e1m4/challenge_3"
         ]
-      },
-      "challenges": [
-        "mission_challenge/e1m4/challenge_1",
-        "mission_challenge/e1m4/challenge_2",
-        "mission_challenge/e1m4/challenge_3"
-      ]
+      }
     }
   ],
   "weapon_masteries": [

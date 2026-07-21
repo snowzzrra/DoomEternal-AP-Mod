@@ -31,7 +31,6 @@ from foundation import (
     compile_all_item_plans,
     load_foundation_contracts,
     load_primitive_registry,
-    validate_entity_shape,
     validate_primitive_registry,
 )
 from hub_diff_guard import assert_hub_diff_classified
