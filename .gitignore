@@ -15,7 +15,7 @@ __pycache__/
 /build/
 /build/generated-maps/
 dist/
-release/
+/release/
 *.apworld
 DoomEternalArchipelago*.zip
 *.entities

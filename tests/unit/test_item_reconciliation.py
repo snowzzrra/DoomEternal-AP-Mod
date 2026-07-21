@@ -73,6 +73,8 @@ class ItemReconciliationTests(unittest.TestCase):
         self.assertEqual(len({command.spool_id for command in plan.commands}), 7)
         self.assertTrue(all("Suit Point" not in command.description for command in plan.commands))
         self.assertTrue(all("CURRENCY" not in command.command for command in plan.commands))
+        self.assertTrue(all("ap_rpc_v3_" in command.command for command in plan.commands))
+        self.assertTrue(all("ap_rpc_item_" not in command.command for command in plan.commands))
 
     def test_runes_only_use_existing_give_entities(self):
         rune_ids = (7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095)

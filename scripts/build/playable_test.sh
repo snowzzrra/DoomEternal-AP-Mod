@@ -103,9 +103,6 @@ extract_and_build() {
     local GENERATOR_ARGS=()
     if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
         GENERATOR_ARGS+=(--enable-experimental-item-notifications)
-        # Strings are only generated if notifications are enabled
-        GENERATOR_ARGS+=(--strings-output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json")
-        GENERATOR_ARGS+=(--base-strings-file "$REPO_ROOT/tests/fixtures/strings/english.minimal.json")
     fi
 
     python3 "$REPO_ROOT/tools/maps/ap_map_generator.py" \
@@ -153,8 +150,6 @@ if [[ -f "$SCRIPT_DIR/ap_client.exe" ]]; then
     exit 1
 fi
 
-python3 "$REPO_ROOT/tools/release/build_string_table.py"
-
 cp -R "$REPO_ROOT/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 
 mapfile -t MAP_ROWS < <(
@@ -176,6 +171,14 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$supported_game_revision"
     MISSION_MAP_ARGS+=(--generated-map "$map_key=$GENERATED_MAPS_DIR/$generated_output")
 done
+
+if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
+    python3 "$REPO_ROOT/tools/release/build_string_table.py" \
+        --items "$REPO_ROOT/data/items.json" \
+        --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
+        --maps-dir "$GENERATED_MAPS_DIR" \
+        --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json"
+fi
 
 python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
     --contracts "$REPO_ROOT/data/mission_complete_map_contracts.json" \
@@ -296,8 +299,6 @@ python3 "$REPO_ROOT/tools/release/build_apworld.py" \
     "$OUTPUT_DIR/doometernal.apworld"
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 
-# Note: The packaged file still keeps the validate_runtime_install.sh name
-# so the user knows what it does.
 cp "$REPO_ROOT/scripts/validate/runtime_install.sh" "$OUTPUT_DIR/client/validate_runtime_install.sh"
 chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
 
