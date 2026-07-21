@@ -667,23 +667,26 @@ def main() -> int:
     expected_mastery_location_names = [entry["name"] for entry in mastery_entries]
     if mastery_location_names != expected_mastery_location_names:
         errors.append(f"Base Mastery registry/APWorld drift: {mastery_location_names}")
+    aggregate_names = {entry["name"] for entry in challenge_registry.get("all_mission_challenges", [])}
     mission_challenge_location_names = [
         name for name in location_ids
         if "Mission Challenge -" in name
-        or name == challenge_registry["all_mission_challenges"]["name"]
+        or name in aggregate_names
     ]
     expected_mission_challenge_names = [
         *[entry["name"] for entry in challenge_registry["mission_challenges"]],
-        challenge_registry["all_mission_challenges"]["name"],
+        *sorted(aggregate_names),
     ]
     if mission_challenge_location_names != expected_mission_challenge_names:
         errors.append(
-            "Cultist Mission Challenge registry/APWorld drift: "
+            "Mission Challenge registry/APWorld drift: "
             f"{mission_challenge_location_names}"
         )
-    aggregate_entry = challenge_registry["all_mission_challenges"]
-    if location_ids.get(aggregate_entry["name"]) != aggregate_entry["location_id"]:
-        errors.append("All Mission Challenges aggregate/APWorld mapping drift")
+    for aggregate_entry in challenge_registry.get("all_mission_challenges", []):
+        if location_ids.get(aggregate_entry["name"]) != aggregate_entry["location_id"]:
+            errors.append(
+                f"{aggregate_entry['name']} aggregate/APWorld mapping drift"
+            )
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (ROOT / "bridge_client.py", ROOT / "ap_map_generator.py", ROOT / "challenge_registry.py")
@@ -848,9 +851,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 129,
+        "locations": 133,
         "map_checks": 108,
-        "runtime_locations": 21,
+        "runtime_locations": 25,
         "runtime_goals": 1,
         "route_sentinel_batteries": 18,
     }:

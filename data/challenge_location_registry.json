@@ -1,5 +1,5 @@
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "mission_complete": [
     {
       "name": "Hell on Earth - Mission Complete",
@@ -107,20 +107,116 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       }
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Find the Album",
+      "location_id": 7770172,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_1.decl",
+        "sha256": "ee79868c1f8a182466bda0b9fa450a8bb2cdec0fb6fbff34160966a6b4f55ebe",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Map the Area",
+      "location_id": 7770173,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_AUTOMAP",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_2.decl",
+        "sha256": "bfc15814c6e64332231b0069a2514b5cab4b82b090efb0e7308f94f32105383c",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Kill Two with One Grenade",
+      "location_id": 7770174,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_KILL_N_ENEMIES_ONE_GRENADE",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_3.decl",
+        "sha256": "e919b8ca770fa15627bec6efafbd4a6579499cee863d4b18c07a461ce5674b50",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
     }
   ],
-  "all_mission_challenges": {
-    "name": "Cultist Base - All Mission Challenges Completed",
-    "location_id": 7770141,
-    "signal": {
-      "kind": "all_mission_challenge_records",
-      "unlockables": [
+  "all_mission_challenges": [
+    {
+      "name": "Cultist Base - All Mission Challenges Completed",
+      "location_id": 7770141,
+      "signal": {
+        "kind": "all_mission_challenge_records",
+        "unlockables": [
+          "mission_challenge/e1m3/challenge_1",
+          "mission_challenge/e1m3/challenge_2",
+          "mission_challenge/e1m3/challenge_3"
+        ]
+      },
+      "challenges": [
         "mission_challenge/e1m3/challenge_1",
         "mission_challenge/e1m3/challenge_2",
         "mission_challenge/e1m3/challenge_3"
       ]
+    },
+    {
+      "name": "Doom Hunter Base - All Mission Challenges Completed",
+      "location_id": 7770175,
+      "signal": {
+        "kind": "all_mission_challenge_records",
+        "unlockables": [
+          "mission_challenge/e1m4/challenge_1",
+          "mission_challenge/e1m4/challenge_2",
+          "mission_challenge/e1m4/challenge_3"
+        ]
+      },
+      "challenges": [
+        "mission_challenge/e1m4/challenge_1",
+        "mission_challenge/e1m4/challenge_2",
+        "mission_challenge/e1m4/challenge_3"
+      ]
     }
-  },
+  ],
   "weapon_masteries": [
     {
       "name": "Sticky Bombs - Weapon Mastery Challenge",
@@ -140,8 +236,14 @@
       "gameplay_perk": "perk/player/weapons/shotgun/pop_rocket_more_bombs",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/shotgun/sticky_bomb.decl", "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"},
-        "perk": {"path": "perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl", "sha256": "c3759c999ec3762eeb416d5b585f11b5f778c2f6dd3f95071acf5d7ce0af77b3"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/shotgun/sticky_bomb.decl",
+          "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl",
+          "sha256": "c3759c999ec3762eeb416d5b585f11b5f778c2f6dd3f95071acf5d7ce0af77b3"
+        }
       }
     },
     {
@@ -162,8 +264,14 @@
       "gameplay_perk": "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/shotgun/full_auto.decl", "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"},
-        "perk": {"path": "perks/perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback.decl", "sha256": "0d0be45c6d67780bb5614e68f554fe84dffbb3c2f60f94821f7f68ad88296931"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/shotgun/full_auto.decl",
+          "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback.decl",
+          "sha256": "0d0be45c6d67780bb5614e68f554fe84dffbb3c2f60f94821f7f68ad88296931"
+        }
       }
     },
     {
@@ -184,8 +292,14 @@
       "gameplay_perk": "perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/heavy_cannon/piercing_bolt.decl", "sha256": "bd1daf53b3a345fbacd297db1f3bd623b12ea90a6b7661e6e1153f5c66cf7b20"},
-        "perk": {"path": "perks/perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades.decl", "sha256": "0622c4e57cb78fdef5f00d4cea126280ef86506b989cb8b70ec7fef45c36f6eb"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/heavy_cannon/piercing_bolt.decl",
+          "sha256": "bd1daf53b3a345fbacd297db1f3bd623b12ea90a6b7661e6e1153f5c66cf7b20"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades.decl",
+          "sha256": "0622c4e57cb78fdef5f00d4cea126280ef86506b989cb8b70ec7fef45c36f6eb"
+        }
       }
     },
     {
@@ -206,8 +320,14 @@
       "gameplay_perk": "perk/player/weapons/heavy_cannon/burst_detonate_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/heavy_cannon/micro_missiles.decl", "sha256": "baa3e75ea269dd8810fc9d3d070af2fc20c9372f5c7ddbb9142e3f6a9d75f536"},
-        "perk": {"path": "perks/perk/player/weapons/heavy_cannon/burst_detonate_mastery.decl", "sha256": "a3cb75366e34f08a33ee431bbe39b0260199c5205d55e2bb90e24ee2e101d9f5"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/heavy_cannon/micro_missiles.decl",
+          "sha256": "baa3e75ea269dd8810fc9d3d070af2fc20c9372f5c7ddbb9142e3f6a9d75f536"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/heavy_cannon/burst_detonate_mastery.decl",
+          "sha256": "a3cb75366e34f08a33ee431bbe39b0260199c5205d55e2bb90e24ee2e101d9f5"
+        }
       }
     },
     {
@@ -228,8 +348,14 @@
       "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_aoe_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/plasma_rifle/heat_blast.decl", "sha256": "17d3a291e98eb4a1d163d66275fe84598d1e1e4e996f298391ad1dc301f6753b"},
-        "perk": {"path": "perks/perk/player/weapons/plasma_rifle/secondary_aoe_mastery.decl", "sha256": "b2a8b63b2b85fd33c650321ad03f1ed39fef524aa7b77b90cf8bcb67805584ee"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/plasma_rifle/heat_blast.decl",
+          "sha256": "17d3a291e98eb4a1d163d66275fe84598d1e1e4e996f298391ad1dc301f6753b"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/plasma_rifle/secondary_aoe_mastery.decl",
+          "sha256": "b2a8b63b2b85fd33c650321ad03f1ed39fef524aa7b77b90cf8bcb67805584ee"
+        }
       }
     },
     {
@@ -250,8 +376,14 @@
       "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_microwave_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/plasma_rifle/microwave.decl", "sha256": "2ec2475155561d1e685d9dfbce2ae23ef1a788f242677353ea7620c829faa53c"},
-        "perk": {"path": "perks/perk/player/weapons/plasma_rifle/secondary_microwave_mastery.decl", "sha256": "c2364291a062bea70c89f3dc61509dba349d573dc499eb5cf43e0a403c4d5e78"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/plasma_rifle/microwave.decl",
+          "sha256": "2ec2475155561d1e685d9dfbce2ae23ef1a788f242677353ea7620c829faa53c"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/plasma_rifle/secondary_microwave_mastery.decl",
+          "sha256": "c2364291a062bea70c89f3dc61509dba349d573dc499eb5cf43e0a403c4d5e78"
+        }
       }
     },
     {
@@ -272,8 +404,14 @@
       "gameplay_perk": "perk/player/weapons/rocket_launcher/lockon_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/rocket_launcher/lock_on.decl", "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"},
-        "perk": {"path": "perks/perk/player/weapons/rocket_launcher/lockon_mastery.decl", "sha256": "ea90c3cc08b3030f8f4e778ca1dadef65c92c8658a057fa25040aed68b01f351"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/rocket_launcher/lock_on.decl",
+          "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/rocket_launcher/lockon_mastery.decl",
+          "sha256": "ea90c3cc08b3030f8f4e778ca1dadef65c92c8658a057fa25040aed68b01f351"
+        }
       }
     },
     {
@@ -294,8 +432,14 @@
       "gameplay_perk": "perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/rocket_launcher/detonate.decl", "sha256": "5ddc2fc2ba6dd14040f0695708a5652b700dfd7429fe85cc3ab19ff6bee6bc21"},
-        "perk": {"path": "perks/perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal.decl", "sha256": "363d934e78a9bd7d6eb05191a6f1ef9153c09a6e1afea8437e4aaf7cfa3e575c"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/rocket_launcher/detonate.decl",
+          "sha256": "5ddc2fc2ba6dd14040f0695708a5652b700dfd7429fe85cc3ab19ff6bee6bc21"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal.decl",
+          "sha256": "363d934e78a9bd7d6eb05191a6f1ef9153c09a6e1afea8437e4aaf7cfa3e575c"
+        }
       }
     },
     {
@@ -316,8 +460,14 @@
       "gameplay_perk": "perk/player/weapons/gauss_cannon/destroyer_charge_levels",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/ballista/destroyer.decl", "sha256": "2eea3df20de915953f1b35c670c9a5521a7098a56f2b893e061e07f1a586fb14"},
-        "perk": {"path": "perks/perk/player/weapons/gauss_cannon/destroyer_charge_levels.decl", "sha256": "0576ca87c488fce218e966ff012e817206079aabb1f3c0e9cb87644e77c5ca20"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/ballista/destroyer.decl",
+          "sha256": "2eea3df20de915953f1b35c670c9a5521a7098a56f2b893e061e07f1a586fb14"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/gauss_cannon/destroyer_charge_levels.decl",
+          "sha256": "0576ca87c488fce218e966ff012e817206079aabb1f3c0e9cb87644e77c5ca20"
+        }
       }
     },
     {
@@ -338,8 +488,14 @@
       "gameplay_perk": "perk/player/weapons/gauss_cannon/ballista_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/ballista/arbalest.decl", "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"},
-        "perk": {"path": "perks/perk/player/weapons/gauss_cannon/ballista_mastery.decl", "sha256": "3ed88607b68a3b55c99fe831e0f7411523039b5c3cbf87d9f007989435f7a66a"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/ballista/arbalest.decl",
+          "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/gauss_cannon/ballista_mastery.decl",
+          "sha256": "3ed88607b68a3b55c99fe831e0f7411523039b5c3cbf87d9f007989435f7a66a"
+        }
       }
     },
     {
@@ -360,8 +516,14 @@
       "gameplay_perk": "perk/player/weapons/chaingun/turret_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/chaingun/mobile_turret.decl", "sha256": "9f0b2698ec673ee4fe132d35ade41af4dd0e94282c84bd3a5c6e4bce636f02a5"},
-        "perk": {"path": "perks/perk/player/weapons/chaingun/turret_mastery.decl", "sha256": "d90be106461cde08e134cd4e4456a980c93aabf74404650fb227de00d6fa6cb4"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/chaingun/mobile_turret.decl",
+          "sha256": "9f0b2698ec673ee4fe132d35ade41af4dd0e94282c84bd3a5c6e4bce636f02a5"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/chaingun/turret_mastery.decl",
+          "sha256": "d90be106461cde08e134cd4e4456a980c93aabf74404650fb227de00d6fa6cb4"
+        }
       }
     },
     {
@@ -382,8 +544,14 @@
       "gameplay_perk": "perk/player/weapons/chaingun/energy_shell_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/chaingun/energy_shield.decl", "sha256": "aca0e406418408cf326cb348ce8d152fe7bb4db45d725529920514157c869299"},
-        "perk": {"path": "perks/perk/player/weapons/chaingun/energy_shell_mastery.decl", "sha256": "86d7ca4e99f43fc2dfd56f529cae8cac22ef4471b18e17357f87bf953c42646c"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/chaingun/energy_shield.decl",
+          "sha256": "aca0e406418408cf326cb348ce8d152fe7bb4db45d725529920514157c869299"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/chaingun/energy_shell_mastery.decl",
+          "sha256": "86d7ca4e99f43fc2dfd56f529cae8cac22ef4471b18e17357f87bf953c42646c"
+        }
       }
     },
     {
@@ -404,8 +572,14 @@
       "gameplay_perk": "perk/player/weapons/double_barrel/meat_hook_mastery",
       "typed_perk_delivery_valid": true,
       "decls": {
-        "unlockable": {"path": "unlockable/weapon_mastery/double_barrel/meat_hook.decl", "sha256": "5179ed8790b00ff4173ae09e408910f4743cf81551ace8f0265c53c3f510f076"},
-        "perk": {"path": "perks/perk/player/weapons/double_barrel/meat_hook_mastery.decl", "sha256": "d794404f5d707b058e62b9e57e268a3391d6294635bf1042f0a10fe89a3ee1a7"}
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/double_barrel/meat_hook.decl",
+          "sha256": "5179ed8790b00ff4173ae09e408910f4743cf81551ace8f0265c53c3f510f076"
+        },
+        "perk": {
+          "path": "perks/perk/player/weapons/double_barrel/meat_hook_mastery.decl",
+          "sha256": "d794404f5d707b058e62b9e57e268a3391d6294635bf1042f0a10fe89a3ee1a7"
+        }
       }
     }
   ]

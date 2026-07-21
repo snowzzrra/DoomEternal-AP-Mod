@@ -1,0 +1,21 @@
+{
+	inherit = "mission_challenge/challenge_base";
+	edit = {
+		currencyToGive = {
+			num = 0;
+		}
+		displayName = "#str_decl_challenges_e1m3_index2_title_1_GHOST53218";
+		description = "#str_decl_challenges_e1m3_index2_desc_GHOST53220";
+		challengeType = "#str_decl_challenges_type_weak_point_GHOST59425";
+		icon = "art/ui/icons/challenges/weakpoint";
+		challengeImage = "art/ui/dossier/challenge_cards/e1m3_challenge_3";
+		completionStat = "STAT_COMPLETED_E1M3_CHALLENGE_3";
+		rules = {
+			item[0] = {
+				stat = "STAT_WEAKPOINT_DISABLE_ARACHNOTRON";
+				count = 1;
+			}
+		}
+	}
+}
+

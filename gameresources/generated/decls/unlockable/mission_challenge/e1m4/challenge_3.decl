@@ -1,0 +1,21 @@
+{
+	inherit = "mission_challenge/challenge_base";
+	edit = {
+		currencyToGive = {
+			num = 0;
+		}
+		displayName = "#str_decl_challenges_e1m4_index3_title_GHOST62575";
+		description = "#str_decl_challenges_e1m4_index3_desc_GHOST62576";
+		challengeType = "#str_decl_challenges_type_combat_GHOST59424";
+		icon = "art/ui/icons/challenges/combat";
+		challengeImage = "art/ui/dossier/challenge_cards/e1m4_challenge_3";
+		violenceEvent = "violenceevent/mission_challenge/kill_n_demons_with_one_frag";
+		completionStat = "STAT_COMPLETED_E1M4_CHALLENGE_3";
+		rules = {
+			item[0] = {
+				stat = "STAT_KILL_N_ENEMIES_ONE_GRENADE";
+				count = 1;
+			}
+		}
+	}
+}

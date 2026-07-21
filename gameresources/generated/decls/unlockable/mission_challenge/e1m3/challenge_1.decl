@@ -1,0 +1,21 @@
+{
+	inherit = "mission_challenge/challenge_base";
+	edit = {
+		currencyToGive = {
+			num = 0;
+		}
+		displayName = "#str_decl_challenges_e1m3_index0_title_1_GHOST53208";
+		description = "#str_decl_challenges_e1m3_index0_desc_1_GHOST53211";
+		challengeType = "#str_decl_challenges_type_progression_challenge_GHOST59422";
+		icon = "art/ui/icons/challenges/progress";
+		challengeImage = "art/ui/dossier/challenge_cards/e1m3_challenge_1";
+		completionStat = "STAT_COMPLETED_E1M3_CHALLENGE_1";
+		rules = {
+			item[0] = {
+				stat = "STAT_ARGENT_UPGRADED";
+				count = 1;
+			}
+		}
+	}
+}
+

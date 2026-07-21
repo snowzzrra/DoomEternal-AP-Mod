@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build scoped, reward-free overrides for proven Cultist Base challenges."""
+"""Build scoped, reward-free overrides for proven Mission Challenges."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _assert_reward_owner(entries: list[dict]) -> None:
     owners = {entry["reward_owner"]["inherited_path"] for entry in entries}
     hashes = {entry["reward_owner"]["sha256"] for entry in entries}
     currencies = {entry["reward_owner"]["currency"] for entry in entries}
-    if len(entries) != 3 or owners != {"unlockable/mission_challenge/challenge_base.decl"}:
+    if len(entries) not in (3, 6) or owners != {"unlockable/mission_challenge/challenge_base.decl"}:
         raise ValueError("refusing an unscoped Mission Challenge reward override")
     if len(hashes) != 1 or currencies != {"CURRENCY_PRAETOR_UPGRADE"}:
         raise ValueError("Mission Challenge reward owner contract drift")
@@ -90,8 +90,8 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_reward_free_override(entry), encoding="utf-8")
         written_paths.append(target.as_posix())
-    if len(written_paths) != 3 or len(written_paths) != len(set(written_paths)):
-        raise ValueError("Cultist Base Mission Challenge override set is incomplete")
+    if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
+        raise ValueError("Mission Challenge override set is incomplete or has duplicates")
     return {
         "owner": OWNER,
         "challenge_count": len(entries),
