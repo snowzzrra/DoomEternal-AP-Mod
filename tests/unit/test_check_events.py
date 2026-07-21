@@ -104,11 +104,28 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         )
 
     @staticmethod
-    def _mission_challenge_records(completion_bits):
-        """Build all three exact records; statCount is deliberately irrelevant."""
+    def _mission_challenge_entries(mission_key="e1m3"):
+        """Return the three mission-challenge entries for one mission."""
+        prefix = f"mission_challenge/{mission_key}/"
+        entries = tuple(
+            entry
+            for entry in bridge_client.MISSION_CHALLENGE_ENTRIES
+            if entry["signal"]["unlockable"].startswith(prefix)
+        )
+        if len(entries) != 3:
+            raise AssertionError(
+                f"expected three mission challenges for {mission_key}, got {len(entries)}"
+            )
+        return entries
+
+    @classmethod
+    def _mission_challenge_records(cls, completion_bits, mission_key="e1m3"):
+        """Build all three exact records for one mission; statCount is irrelevant."""
         records = {}
         for complete, entry in zip(
-            completion_bits, bridge_client.MISSION_CHALLENGE_ENTRIES, strict=True
+            completion_bits,
+            cls._mission_challenge_entries(mission_key),
+            strict=True,
         ):
             signal = entry["signal"]
             records[signal["unlockable"]] = {
@@ -293,8 +310,15 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 bridge_client.STEAM_ID3 = original_id
 
     @staticmethod
-    def _gameplay_evidence(epoch, slot, map_name="game/sp/e1m1_intro/e1m1_intro"):
-        return bridge_client.GameplaySaveEvidence("gameplay", epoch, slot, map_name)
+    def _gameplay_evidence(
+        epoch,
+        slot,
+        map_name="game/sp/e1m1_intro/e1m1_intro",
+        provisional=False,
+    ):
+        return bridge_client.GameplaySaveEvidence(
+            "gameplay", epoch, slot, map_name, provisional
+        )
 
     @staticmethod
     def _details_for(selected, map_name="game/sp/e1m1_intro/e1m1_intro"):
@@ -366,7 +390,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 os.utime(slot2_save, ns=(300, 300))
                 await ctx.check_game_duration_death()
                 self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE0")
-                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertTrue(ctx.runtime_observers_frozen)
                 self.assertEqual(probe_calls, [slot0_save.resolve()])
 
     async def test_delete_currently_selected_save_at_menu_sends_zero_checks(self):
@@ -465,6 +489,133 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(ctx.update_save_slot_lifecycle())
                 self.assertTrue(ctx.runtime_observers_frozen)
                 self.assertIsNone(ctx.active_save_slot)
+
+    async def test_recreated_newer_slot_freezes_old_observers_until_e1m1_proves_it(self):
+        """A new campaign must not inherit checks from an older 100% slot."""
+        entry = bridge_client.STICKY_MASTERY_ENTRY
+        complete = bridge_client.read_weapon_mastery_records(
+            self._record(25, True, True)
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            remote = Path(directory)
+            slot0 = remote / "GAME-AUTOSAVE0"
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot0.mkdir()
+            slot2.mkdir()
+            old_save = slot0 / "game_duration.dat"
+            new_save = slot2 / "game_duration.dat"
+            old_save.write_bytes(b"old-100-percent")
+            new_save.write_bytes(b"recreated-new-campaign")
+            os.utime(old_save, ns=(100, 100))
+            os.utime(new_save, ns=(200, 200))
+            evidence = [self._gameplay_evidence(1, "GAME-AUTOSAVE0")]
+            sent = []
+
+            class Socket:
+                closed = False
+
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", side_effect=lambda: evidence[0]),
+                patch.object(bridge_client, "read_game_details_for_selection", side_effect=self._details_for),
+                patch.object(bridge_client, "probe_game_duration", side_effect=lambda path: {
+                    "mastery_records": complete if path == old_save.resolve() else {},
+                    "mission_challenge_records": {},
+                    "checkpoint_death": False,
+                }),
+            ):
+                ctx = bridge_client.DoomEternalContext(None, None)
+                ctx.item_state_ready = True
+                ctx.persist_session_state = lambda: None
+                ctx.server = types.SimpleNamespace(socket=Socket())
+                ctx.server_locations = {entry["location_id"]}
+                ctx.checked_locations = set()
+                ctx.locations_checked = set()
+                ctx.send_msgs = lambda messages: _async_append(sent, messages)
+
+                await ctx.check_game_duration_death()
+                evidence[0] = None
+                self.assertTrue(await ctx.check_game_duration_death())
+                await ctx.check_sticky_mastery_location()
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE0")
+                self.assertEqual(sent, [])
+
+                evidence[0] = self._gameplay_evidence(2, "GAME-AUTOSAVE2")
+                await ctx.check_game_duration_death()
+                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
+                await ctx.check_sticky_mastery_location()
+                self.assertEqual(sent, [])
+
+    def test_provisional_hub_evidence_cannot_promote_an_old_slot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            remote = Path(directory)
+            for slot, mtime in (("GAME-AUTOSAVE0", 100), ("GAME-AUTOSAVE1", 200)):
+                path = remote / slot
+                path.mkdir()
+                save = path / "game_duration.dat"
+                save.write_bytes(slot.encode())
+                os.utime(save, ns=(mtime, mtime))
+            evidence = [self._gameplay_evidence(4, "GAME-AUTOSAVE0", "game/hub/hub", True)]
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", side_effect=lambda: evidence[0]),
+                patch.object(bridge_client, "read_game_details_for_selection", side_effect=self._details_for),
+            ):
+                ctx = bridge_client.DoomEternalContext(None, None)
+                self.assertIsNone(ctx.update_save_slot_lifecycle())
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertIsNone(ctx.active_save_slot)
+
+                evidence[0] = self._gameplay_evidence(
+                    5, "GAME-AUTOSAVE1", "game/hub/hub"
+                )
+                self.assertIsNone(ctx.update_save_slot_lifecycle())
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertIsNone(ctx.active_save_slot)
+
+                evidence[0] = self._gameplay_evidence(6, "GAME-AUTOSAVE1")
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE1")
+                self.assertFalse(ctx.runtime_observers_frozen)
+
+    def test_recreated_middle_slot_invalidates_its_previous_observer_authority(self):
+        entry = bridge_client.STICKY_MASTERY_ENTRY
+        with tempfile.TemporaryDirectory() as directory:
+            remote = Path(directory)
+            slot1 = remote / "GAME-AUTOSAVE1"
+            slot1.mkdir()
+            save = slot1 / "game_duration.dat"
+            save.write_bytes(b"old-slot-2")
+            os.utime(save, ns=(100, 100))
+            evidence = [self._gameplay_evidence(1, "GAME-AUTOSAVE1")]
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", side_effect=lambda: evidence[0]),
+                patch.object(bridge_client, "read_game_details_for_selection", side_effect=self._details_for),
+            ):
+                ctx = bridge_client.DoomEternalContext(None, None)
+                ctx.update_save_slot_lifecycle()
+                ctx.weapon_masteries_observed[entry["signal"]["unlockable"]] = True
+                ctx.save_slot_observations["GAME-AUTOSAVE1"]["weapon_masteries"] = (
+                    ctx.weapon_masteries_observed
+                )
+                ctx.checked_locations = {entry["location_id"]}
+
+                save.write_bytes(b"recreated-slot-2")
+                os.utime(save, ns=(200, 200))
+                evidence[0] = self._gameplay_evidence(2, "GAME-AUTOSAVE1")
+                selected = ctx.update_save_slot_lifecycle()
+
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE1")
+                self.assertFalse(
+                    ctx.weapon_masteries_observed[entry["signal"]["unlockable"]]
+                )
+                self.assertEqual(ctx.checked_locations, {entry["location_id"]})
 
     async def test_intentional_100_percent_load_promotes_and_sends_completed_check(self):
         entry = bridge_client.STICKY_MASTERY_ENTRY
@@ -613,10 +764,12 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                     "locations": [entry["location_id"]],
                 }]])
 
-    def test_gameplay_switch_slot_zero_to_two_and_back_requires_new_epoch(self):
+    def test_gameplay_switch_across_all_three_slots_requires_new_epoch(self):
         with tempfile.TemporaryDirectory() as directory:
             remote = Path(directory)
-            for slot in ("GAME-AUTOSAVE0", "GAME-AUTOSAVE2"):
+            for slot in (
+                "GAME-AUTOSAVE0", "GAME-AUTOSAVE1", "GAME-AUTOSAVE2"
+            ):
                 path = remote / slot
                 path.mkdir()
                 (path / "game_duration.dat").write_bytes(slot.encode())
@@ -629,9 +782,11 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ):
                 ctx = bridge_client.DoomEternalContext(None, None)
                 self.assertEqual(ctx.update_save_slot_lifecycle().slot_directory, "GAME-AUTOSAVE0")
-                evidence[0] = self._gameplay_evidence(2, "GAME-AUTOSAVE2")
+                evidence[0] = self._gameplay_evidence(2, "GAME-AUTOSAVE1")
+                self.assertEqual(ctx.update_save_slot_lifecycle().slot_directory, "GAME-AUTOSAVE1")
+                evidence[0] = self._gameplay_evidence(3, "GAME-AUTOSAVE2")
                 self.assertEqual(ctx.update_save_slot_lifecycle().slot_directory, "GAME-AUTOSAVE2")
-                evidence[0] = self._gameplay_evidence(3, "GAME-AUTOSAVE0")
+                evidence[0] = self._gameplay_evidence(4, "GAME-AUTOSAVE0")
                 self.assertEqual(ctx.update_save_slot_lifecycle().slot_directory, "GAME-AUTOSAVE0")
 
     async def test_mastery_predicate_and_deathlink_baseline_follow_slot_switch(self):
@@ -803,7 +958,11 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                     for entry in bridge_client.WEAPON_MASTERY_ENTRIES
                 }
 
-            armored_rain = bridge_client.MISSION_CHALLENGE_ENTRIES[1]
+            armored_rain = next(
+                entry
+                for entry in self._mission_challenge_entries("e1m3")
+                if entry["location_id"] == 7770139
+            )
             evidence = [self._gameplay_evidence(1, "GAME-AUTOSAVE2")]
             sent = []
             probe_calls = []
@@ -817,14 +976,14 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                     return {
                         "mastery_records": {},
                         "mission_challenge_records": self._mission_challenge_records(
-                            (False, True, False)
+                            (False, True, False), mission_key="e1m3"
                         ),
                         "checkpoint_death": False,
                     }
                 return {
                     "mastery_records": complete_masteries(),
                     "mission_challenge_records": self._mission_challenge_records(
-                        (True, True, True)
+                        (True, True, True), mission_key="e1m3"
                     ),
                     "checkpoint_death": False,
                 }
@@ -878,7 +1037,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 await ctx.check_game_duration_death()
                 await ctx.check_mission_challenge_locations()
                 self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
-                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertTrue(ctx.runtime_observers_frozen)
                 self.assertEqual(len(probe_calls), probe_count)
                 self.assertEqual(len(sent), sent_count)
 
@@ -978,7 +1137,8 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx.persist_session_state = lambda: None
             # Only pass records for the first map (e1m3); DHB entries stay default False
             ctx.observe_mission_challenges(
-                self._mission_challenge_records(bits), "all-combinations"
+                self._mission_challenge_records(bits, mission_key="e1m3"),
+                "all-combinations",
             )
             e1m3_done = all(bits)
             self.assertEqual(
@@ -1124,7 +1284,11 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         class Socket:
             closed = False
 
-        location_id = bridge_client.ALL_MISSION_CHALLENGES_ENTRIES[0]["location_id"]
+        location_id = next(
+            entry["location_id"]
+            for entry in bridge_client.ALL_MISSION_CHALLENGES_ENTRIES
+            if entry["mission_key"] == "e1m3"
+        )
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
@@ -1139,7 +1303,8 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         )
         ctx.activate_save_selection(slot0)
         ctx.observe_mission_challenges(
-            self._mission_challenge_records((True, True, True)), slot0.path
+            self._mission_challenge_records((True, True, True), mission_key="e1m3"),
+            slot0.path,
         )
         ctx.server = types.SimpleNamespace(socket=Socket())
         ctx.server_locations = {location_id}
@@ -1160,7 +1325,8 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
         ctx.activate_save_selection(slot2)
         ctx.observe_mission_challenges(
-            self._mission_challenge_records((True, True, False)), slot2.path
+            self._mission_challenge_records((True, True, False), mission_key="e1m3"),
+            slot2.path,
         )
         await ctx.check_all_mission_challenges_location()
         self.assertEqual(len(sent), 2)
