@@ -42,6 +42,7 @@ vanillamaps/
 packaging/
 vanilla_decls/
 gameresources/
+!packaging/EternalMod.json
 
 # Local investigation
 debug_matches.py
