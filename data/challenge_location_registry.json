@@ -109,7 +109,7 @@
       }
     },
     {
-      "name": "Doom Hunter Base - Mission Challenge - Find the Album",
+      "name": "Doom Hunter Base - Mission Challenge - Musical Interlude",
       "location_id": 7770172,
       "signal": {
         "kind": "unlockable_record",
@@ -133,7 +133,7 @@
       }
     },
     {
-      "name": "Doom Hunter Base - Mission Challenge - Map the Area",
+      "name": "Doom Hunter Base - Mission Challenge - Big Reveal",
       "location_id": 7770173,
       "signal": {
         "kind": "unlockable_record",
@@ -157,7 +157,7 @@
       }
     },
     {
-      "name": "Doom Hunter Base - Mission Challenge - Kill Two with One Grenade",
+      "name": "Doom Hunter Base - Mission Challenge - Fire in the Hole",
       "location_id": 7770174,
       "signal": {
         "kind": "unlockable_record",

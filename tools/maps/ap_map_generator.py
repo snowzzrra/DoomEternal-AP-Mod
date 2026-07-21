@@ -962,7 +962,7 @@ def generate_pickup_notification(ap_check_id):
 """
 
 
-def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIFY_GENERIC_CALLOUT", hud_event_id="HUD_EVENT_PLAYER_NOTIFICATION", icon="art/ui/icons/callouts/icon_callout_demonskull", stage=None):
+def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIFY_SECRET_FOUND", hud_event_id="HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND", icon="art/ui/dossier/icons/ico_secrets_off", stage=None):
     """Generate idTarget_Notification for an item received from Archipelago."""
     entity_name = f"{ITEM_NOTIFICATION_PREFIX}{item_id}"
     if stage is not None:
@@ -1155,19 +1155,20 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
             if not name:
                 raise ValueError(f"Item {item_id} has no name in item_names; receipt notification requires it")
             
-            notif_type = "HUD_NOTIFY_GOLD_BOSS_START"
-            icon = "art/ui/icons/callouts/icon_callout_demonskull"
+            notif_type = "HUD_NOTIFY_SECRET_FOUND"
+            hud_event_id = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND"
+            icon = "art/ui/dossier/icons/ico_secrets_off"
             
             if isinstance(command_value, dict) and command_value.get("type") == "progressive_perk":
                 perks = command_value.get("perks", [])
                 for stage in range(len(perks)):
                     header_key = notification_key(item_id_int, command_value, stage=stage)
-                    blocks.append(generate_item_notification(item_id_int, header_key, notif_type, "", icon, stage=stage))
+                    blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon, stage=stage))
                     effect_entities = [f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"]
                     blocks.append(generate_receipt_relay(item_id_int, effect_entities, stage=stage))
             else:
                 header_key = notification_key(item_id_int, command_value)
-                blocks.append(generate_item_notification(item_id_int, header_key, notif_type, "", icon))
+                blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon))
                 effect_entities = [f"{RPC_ENTITY_PREFIX}_{item_id}"]
                 blocks.append(generate_receipt_relay(item_id_int, effect_entities))
 

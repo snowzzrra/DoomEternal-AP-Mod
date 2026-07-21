@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -47,12 +47,42 @@ BUILD_LOG="$OUTPUT_DIR/build/build.log"
 CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
 PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
+report_build_failure() {
+    local status=$?
+    local line_number="$1"
+    local command="$2"
+    printf 'BUILD_FAILED status=%s line=%s command=%q log=%s\n' \
+        "$status" "$line_number" "$command" "$BUILD_LOG" >&2
+    return "$status"
+}
+
+run_build_step() {
+    local step="$1"
+    shift
+    printf 'BUILD_STEP %s\n' "$step"
+    if "$@"; then
+        return 0
+    else
+        local status=$?
+        printf 'BUILD_FAILED status=%s step=%s log=%s\n' \
+            "$status" "$step" "$BUILD_LOG" >&2
+        return "$status"
+    fi
+}
+
 trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'report_build_failure "$LINENO" "$BASH_COMMAND"' ERR
+
+mkdir -p "$(dirname "$BUILD_LOG")"
+: > "$BUILD_LOG"
+exec > >(tee -a "$BUILD_LOG") 2>&1
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
-    python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
+    run_build_step "scripted location contract validation" \
+        python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
         --contracts "$REPO_ROOT/data/scripted_location_contracts.json"
-    python3 "$REPO_ROOT/tools/validation/validate_data.py"
+    run_build_step "release data validation" \
+        python3 "$REPO_ROOT/tools/validation/validate_data.py"
 fi
 
 if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json" ]]; then
@@ -86,7 +116,7 @@ extract_and_build() {
     # Resolves the repository root relative to the script location
     REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-    if ! "$REPO_ROOT/scripts/validate/fast.sh"; then
+    if [[ ! -f "$source_map" ]]; then
         echo "Missing vanilla source for $map_key: $source_map" >&2
         return 1
     fi
@@ -132,14 +162,21 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 }
 
 rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
-    "$OUTPUT_DIR/build" "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
     "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
     "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
     "$STALE_DEV_ZIP" \
     "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
     "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
+find "$OUTPUT_DIR/build" -mindepth 1 -maxdepth 1 ! -name build.log -exec rm -rf -- {} +
 mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
     "$GENERATED_MAPS_DIR" "$TEMP_DIR"
+echo "Build log: $BUILD_LOG"
+if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
+    echo "ITEM_NOTIFICATIONS=enabled"
+else
+    echo "ITEM_NOTIFICATIONS=disabled"
+fi
 "$REPO_ROOT/scripts/build/client.sh" "$CLIENT_BUILD_DIR"
 if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
     echo "Fresh client build is missing required executable(s)" >&2
@@ -234,6 +271,7 @@ python3 "$REPO_ROOT/tools/decls/mission_challenge_decl_builder.py" \
     --audit-output "$TEMP_DIR/mission-challenge-overrides.json"
 python3 "$REPO_ROOT/tools/decls/devinv_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
+    --map-registry "$MAP_SOURCES_FILE" \
     --audit-output "$TEMP_DIR/devinv-override.json"
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
     --registry "$REPO_ROOT/data/challenge_location_registry.json" \
@@ -312,14 +350,13 @@ bridge = Path(sys.argv[1])
 identity = {
     "protocol": 3,
     "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(),
+    "item_notifications": {
+        "enabled": sys.argv[3] == "1",
+        "revision": 1,
+        "experimental": True,
+    },
 }
 identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
-if sys.argv[3] == "1":
-    identity["item_notifications"] = {
-        "enabled": True,
-        "revision": 1,
-        "experimental": True
-    }
 Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
 PY
 
@@ -334,7 +371,7 @@ python3 "$REPO_ROOT/tools/validation/validate_windows_runtime_deps.py" \
 
 TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
 
-python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" "$REPO_ROOT" "$MAP_SOURCES_FILE" <<'PY'
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$ENABLE_ITEM_NOTIFICATIONS" <<'PY'
 import hashlib
 import json
 import sys
@@ -353,6 +390,7 @@ map_manifest_files = [
 validation = json.loads(validation_path.read_text(encoding="utf-8"))
 bridge_path = output_dir / "client" / "bridge_client.py"
 bridge_sha256 = hashlib.sha256(bridge_path.read_bytes()).hexdigest()
+item_notifications_enabled = sys.argv[7] == "1"
 
 manifest = {
     "name": "DOOM Eternal Archipelago",
@@ -403,6 +441,11 @@ manifest = {
         "sha256": bridge_sha256,
         "revision": f"mission-unified-{bridge_sha256[:12]}",
         "transition_handler": "unified",
+    },
+    "item_notifications": {
+        "enabled": item_notifications_enabled,
+        "revision": 1,
+        "experimental": True,
     },
     "validator": {
         "status": validation["status"],
@@ -459,6 +502,16 @@ fi
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
     --registry "$REPO_ROOT/data/challenge_location_registry.json" \
     --mod-root "$OUTPUT_DIR/mod"
+python3 "$REPO_ROOT/tools/validation/validate_devinvloadout_package.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --map-registry "$MAP_SOURCES_FILE" \
+    --generated-map "$GENERATED_MAPS_DIR/e1m1_intro.entities"
+python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
+    --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
+    --maps-dir "$GENERATED_MAPS_DIR" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --client-dir "$OUTPUT_DIR/client" \
+    --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json"
 if find "$OUTPUT_DIR/mod" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
@@ -527,6 +580,16 @@ fi
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
     --registry "$REPO_ROOT/data/challenge_location_registry.json" \
     --mod-root "$MOD_AUDIT_DIR"
+python3 "$REPO_ROOT/tools/validation/validate_devinvloadout_package.py" \
+    --mod-root "$MOD_AUDIT_DIR" \
+    --map-registry "$MAP_SOURCES_FILE" \
+    --generated-map "$GENERATED_MAPS_DIR/e1m1_intro.entities"
+python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
+    --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
+    --maps-dir "$GENERATED_MAPS_DIR" \
+    --mod-root "$MOD_AUDIT_DIR" \
+    --client-dir "$EXTRACTED_AUDIT_DIR/client" \
+    --release-manifest "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json"
 if find "$MOD_AUDIT_DIR" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
