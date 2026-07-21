@@ -129,17 +129,17 @@
         7770092
       ],
       "bind_parents": 1177,
-      "byte_sha256": "29248e102a7db589106f4c18b958d068771ae69ac11fcba4e53df95cfae2a3ab",
-      "byte_size": 19893187,
-      "classes": 18050,
-      "entity_count": 18050,
+      "byte_sha256": "cea7b66d9597041f77f6e675c2dfffe755cb34b4b8125e3eaffcbf0da854ae68",
+      "byte_size": 19905840,
+      "classes": 18035,
+      "entity_count": 18035,
       "layers": 4802,
       "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
-      "scripted_contract_sha256": "e42c8b50579a467e52a044ce57e06a0ac9db80d894bce9133846290c227b758e",
-      "semantic_sha256": "323887b283006bf027932d68de7094a572c610f8acb0225e5c607ed3d94bc307",
-      "targets": 10816,
-      "transforms": 37094,
-      "unique_entity_names": 18050
+      "scripted_contract_sha256": "d885f81c7242873ed2fba4cb9d78448e24e85dcb496db1a07b2f5e73117947b6",
+      "semantic_sha256": "4e9bc7abf3efe3c57aa12e167312eaf8827253c8b943fa92020cfffa9f6423e9",
+      "targets": 10801,
+      "transforms": 37089,
+      "unique_entity_names": 18035
     },
     "e1m4_boss": {
       "ap_ids": [

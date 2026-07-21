@@ -40,6 +40,71 @@
         "game_target_give_item_1"
     ],
     "target_policies": {
+        "game_progress_praetor_token_1_e1m3": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "game_progress_praetor_token_3_e1m3": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "game_progress_praetor_token_4_e1m3": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "game_progress_praetor_token_5_e1m3": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
+        "game_progress_praetor_token_6_e1m3": {
+            "native_entity_contract": {
+                "remove_block": "currencyList",
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"progress/praetor_token\";",
+                    "class = \"idInteractable_GiveItems\";",
+                    "saveType = \"SGS_GAME_DATA\";",
+                    "automapPropertiesDecl = \"praetor_token\";",
+                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
+                ]
+            }
+        },
         "game_pickup_weapon_rocket_launcher_1": {
             "independent_ap_trigger": true,
             "independent_entity_name": "ap_independent_rocket_launcher_7770056",

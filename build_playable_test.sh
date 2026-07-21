@@ -190,6 +190,9 @@ python3 "$SCRIPT_DIR/mastery_decl_builder.py" \
 python3 "$SCRIPT_DIR/mission_challenge_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/cultist-mission-challenge-overrides.json"
+python3 "$SCRIPT_DIR/devinv_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/devinv-override.json"
 python3 - "$TEMP_DIR/cultist-mission-challenge-overrides.json" <<'PY'
 import json
 import sys
