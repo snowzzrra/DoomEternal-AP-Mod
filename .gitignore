@@ -12,8 +12,8 @@ __pycache__/
 *.pdb
 
 # Generated builds/releases
-build/
-build/generated-maps/
+/build/
+/build/generated-maps/
 dist/
 release/
 *.apworld

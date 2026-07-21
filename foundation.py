@@ -77,7 +77,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         "item_notification": {
             "family": "ap_item_notify", "status": "experimental",
             "source": {"map": "game/sp/e1m4_boss/e1m4_boss", "container": "vanilla e1m4_boss.resources", "file": "vanillamaps/e1m4_boss.map", "entity": "gold_ui_prompt", "source_sha256": "vanilla-reference"},
-            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "header"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "shape": {"class": "idTarget_Notification", "inherit": "target/notification", "required_fields": ["notificationType", "header"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
         },
         "item_receipt_relay": {
@@ -291,8 +291,7 @@ def build_primitive(
         if not isinstance(parameters, dict) or "header_key" not in parameters:
             raise ValueError("item_notification requires header_key parameter")
         header_key = parameters["header_key"]
-        notif_type = parameters.get("notification_type", "HUD_NOTIFY_GENERIC_CALLOUT")
-        hud_event = parameters.get("hud_event_id", "HUD_EVENT_PLAYER_NOTIFICATION")
+        notif_type = parameters.get("notification_type", "HUD_NOTIFY_GOLD_BOSS_START")
         icon = parameters.get("icon", "art/ui/icons/callouts/icon_callout_demonskull")
         block = f'''{header}
 \t\tedit = {{
@@ -300,11 +299,9 @@ def build_primitive(
 \t\t\t\tnoFlood = true;
 \t\t\t}}
 \t\t\tnotificationType = "{notif_type}";
-\t\t\tnotificationHudEventID = "{hud_event}";
-\t\t\tdoNotShowDuplicate = false;
-\t\t\trootWidget = "tier3centered";
-\t\t\ticon = "{icon}";
 \t\t\theader = "{header_key}";
+\t\t\tsubtext = "";
+\t\t\ticon = "{icon}";
 \t\t}}
 \t}}
 }}

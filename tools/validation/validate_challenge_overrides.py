@@ -9,14 +9,18 @@ matches exactly — no extra files, no missing files, valid structure.
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import re
 import sys
 from pathlib import Path
 
+# Add root to sys.path to import from challenge_registry
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from challenge_registry import load_challenge_registry
 
 def _load_registry(registry_path: Path) -> list[dict]:
-    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry = load_challenge_registry(registry_path)
     return registry.get("mission_challenges", [])
 
 
@@ -55,7 +59,7 @@ def validate_overrides_from_files(
     expected_ids = _derive_expected_ids(entries)
 
     found_paths: set[str] = set()
-    found_ids: set[int] = set()
+    found_ids: list[int] = []
     forbidden_currencies = re.compile(
         r"\bCURRENCY_(?:PRAETOR_UPGRADE|SENTINEL_BATTERY|WEAPON_UPGRADE|WEAPON_MASTERY)\b"
     )
@@ -102,7 +106,7 @@ def validate_overrides_from_files(
         # Find associated entry for location_id validation
         for entry in entries:
             if entry["completion_owner"]["path"] == assert_path:
-                found_ids.add(entry["location_id"])
+                found_ids.append(entry["location_id"])
                 # Verify structure: completionStat preserved
                 expected_stat = entry["completion_owner"]["completion_stat"]
                 if expected_stat not in content:
@@ -117,9 +121,14 @@ def validate_overrides_from_files(
         errors.append(f"Missing override files: {sorted(missing)}")
 
     # Validate IDs unique
-    if len(expected_ids) != len(found_ids):
+    id_counts = collections.Counter(found_ids)
+    duplicates = [loc_id for loc_id, count in id_counts.items() if count > 1]
+    if duplicates:
+        errors.append(f"Duplicate location IDs found in overrides: {duplicates}")
+
+    if len(expected_ids) != len(set(found_ids)):
         errors.append(
-            f"Location ID count mismatch: expected {len(expected_ids)}, found {len(found_ids)}"
+            f"Location ID count mismatch: expected {len(expected_ids)}, found {len(set(found_ids))}"
         )
 
     return errors

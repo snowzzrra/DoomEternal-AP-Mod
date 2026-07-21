@@ -1,7 +1,7 @@
 {
-    "name": "DoomEternalArchipelagoPreAlpha",
+    "name": "DOOM Eternal Archipelago",
     "author": "snow",
-    "description": "Archipelago pre-alpha for Hell on Earth through Cultist Base",
-    "version": "v0.3.0-pre-alpha",
+    "description": "Multiplayer randomized item progression for DOOM Eternal (through Doom Hunter Base)",
+    "version": "v0.3.1-alpha",
     "loadPriority": 0
 }

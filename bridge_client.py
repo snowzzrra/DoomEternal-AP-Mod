@@ -44,6 +44,16 @@ BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
 BRIDGE_PROTOCOL = 3
 BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
 TRANSITION_HANDLER = "unified"
+
+ENABLE_ITEM_NOTIFICATIONS = False
+try:
+    _identity_path = Path(__file__).resolve().with_name("bridge_identity.json")
+    if _identity_path.is_file():
+        _identity = json.loads(_identity_path.read_text(encoding="utf-8"))
+        if _identity.get("item_notifications", {}).get("enabled"):
+            ENABLE_ITEM_NOTIFICATIONS = True
+except Exception:
+    pass
 def abort_setup(message):
     print(message, file=sys.stderr)
     if os.name == "nt":
@@ -2775,8 +2785,10 @@ class DoomEternalContext(CommonContext):
         return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
 
     def spool_item_commands(self, item_id, item_index):
-        # New receipts use receipt entrypoint (notification + effect)
-        commands, description = self.item_activation_commands(item_id, item_index, receipt=True)
+        # New receipts use receipt entrypoint (notification + effect) only if enabled
+        commands, description = self.item_activation_commands(
+            item_id, item_index, receipt=ENABLE_ITEM_NOTIFICATIONS
+        )
         if commands is None:
             return False, description
 
