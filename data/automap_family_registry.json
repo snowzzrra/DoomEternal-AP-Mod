@@ -237,7 +237,7 @@
       "vanilla_exploration": false
     },
     "runtime_challenge": {
-      "match": {"location_ids": [7770138, 7770139, 7770140, 7770141]},
+      "match": {"location_ids": [7770138, 7770139, 7770140, 7770141, 7770172, 7770173, 7770174, 7770175]},
       "vanilla_class": "native mission-challenge record reader",
       "automap_marker_source": null,
       "automap_properties": [],

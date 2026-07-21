@@ -1302,9 +1302,9 @@ MISSION_CHALLENGE_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
     for entry in MISSION_CHALLENGE_ENTRIES
 }
-ALL_MISSION_CHALLENGES_ENTRY = CHALLENGE_LOCATION_REGISTRY[
-    "all_mission_challenges"
-]
+ALL_MISSION_CHALLENGES_ENTRIES = list(
+    CHALLENGE_LOCATION_REGISTRY.get("all_mission_challenges", [])
+)
 STICKY_MASTERY_ENTRY = WEAPON_MASTERY_BY_UNLOCKABLE[
     "weapon_mastery/shotgun/sticky_bomb"
 ]
@@ -2006,7 +2006,7 @@ class DoomEternalContext(CommonContext):
         self.mastery_slot_warnings = set()
         self.last_mission_challenge_records = {}
         self.mission_challenges_observed = {}
-        self.all_mission_challenges_observed = False
+        self.all_mission_challenges_observed: dict[str, bool] = {}
         self.mission_challenge_slot_warnings = set()
         self.last_sticky_record = None
         self.sticky_mastery_observed = False
@@ -2107,10 +2107,13 @@ class DoomEternalContext(CommonContext):
         }
         state["weapon_masteries"] = self.weapon_masteries_observed
         state["mission_challenges"] = self.mission_challenges_observed
-        self.all_mission_challenges_observed = all(
-            self.mission_challenges_observed.get(entry["signal"]["unlockable"], False)
-            for entry in MISSION_CHALLENGE_ENTRIES
-        )
+        self.all_mission_challenges_observed = {}
+        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
+            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            self.all_mission_challenges_observed[key] = all(
+                self.mission_challenges_observed.get(ul, False)
+                for ul in aggregate["signal"]["unlockables"]
+            )
         self.sticky_mastery_observed = self.weapon_masteries_observed.get(
             STICKY_UNLOCKABLE.decode("ascii"), False
         )
@@ -2290,7 +2293,7 @@ class DoomEternalContext(CommonContext):
         self.session_state.pop("weapon_masteries_observed", None)
         self.weapon_masteries_observed = {}
         self.mission_challenges_observed = {}
-        self.all_mission_challenges_observed = False
+        self.all_mission_challenges_observed = {}
         self.sticky_mastery_observed = False
         self.item_state_ready = True
         self.session_state.setdefault("bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}})
@@ -2999,20 +3002,23 @@ class DoomEternalContext(CommonContext):
                 entry["location_id"],
                 slot_directory,
             )
-        was_all_complete = self.all_mission_challenges_observed
-        self.all_mission_challenges_observed = all(
-            self.mission_challenges_observed.get(entry["signal"]["unlockable"], False)
-            for entry in MISSION_CHALLENGE_ENTRIES
-        )
-        if self.all_mission_challenges_observed and not was_all_complete:
-            if self.item_state_ready:
-                self.persist_session_state()
-            logger.info(
-                "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
-                "predicate=all_unlockable_records save_slot=%s",
-                ALL_MISSION_CHALLENGES_ENTRY["location_id"],
-                slot_directory,
+        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
+            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            was_complete = self.all_mission_challenges_observed.get(key, False)
+            now_complete = all(
+                self.mission_challenges_observed.get(ul, False)
+                for ul in aggregate["signal"]["unlockables"]
             )
+            self.all_mission_challenges_observed[key] = now_complete
+            if now_complete and not was_complete:
+                if self.item_state_ready:
+                    self.persist_session_state()
+                logger.info(
+                    "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
+                    "predicate=all_unlockable_records save_slot=%s",
+                    aggregate["location_id"],
+                    slot_directory,
+                )
 
     def observe_sticky_mastery(self, snapshot, path):
         """Sticky compatibility wrapper used by the proven 24→25 regression."""
@@ -3118,44 +3124,44 @@ class DoomEternalContext(CommonContext):
         await self.check_all_mission_challenges_location()
 
     async def check_all_mission_challenges_location(self):
-        """Check the aggregate only after all three durable native records match."""
-        if (
-            not self.item_state_ready
-            or self.runtime_observers_frozen
-            or not self.all_mission_challenges_observed
-        ):
+        """Check per-mission aggregates against their native challenge records."""
+        if not self.item_state_ready or self.runtime_observers_frozen:
             return
-        location_id = ALL_MISSION_CHALLENGES_ENTRY["location_id"]
-        if location_id in self.checked_locations or location_id in self.locations_checked:
-            return
-        if location_id not in self.server_locations:
-            if location_id not in self.mission_challenge_slot_warnings:
-                logger.warning(
-                    "[Challenge] ALL_LOCATION id=%s slot=absent", location_id
+        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
+            key = aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            if not self.all_mission_challenges_observed.get(key, False):
+                continue
+            location_id = aggregate["location_id"]
+            if location_id in self.checked_locations or location_id in self.locations_checked:
+                continue
+            if location_id not in self.server_locations:
+                if location_id not in self.mission_challenge_slot_warnings:
+                    logger.warning(
+                        "[Challenge] ALL_LOCATION id=%s key=%s slot=absent",
+                        location_id, key,
+                    )
+                    self.mission_challenge_slot_warnings.add(location_id)
+                continue
+            if not self.server or not self.server.socket or self.server.socket.closed:
+                continue
+            try:
+                logger.info(
+                    "[Challenge] ALL_LOCATION_CHECK_SEND id=%s key=%s "
+                    "source=all_vanilla_save_predicates save_slot=%s",
+                    location_id, key,
+                    self.active_save_slot or "<synthetic>",
                 )
-                self.mission_challenge_slot_warnings.add(location_id)
-            return
-        if not self.server or not self.server.socket or self.server.socket.closed:
-            return
-        try:
-            logger.info(
-                "[Challenge] ALL_LOCATION_CHECK_SEND id=%s "
-                "source=all_vanilla_save_predicates save_slot=%s",
-                location_id,
-                self.active_save_slot or "<synthetic>",
-            )
-            await self.send_msgs([
-                {"cmd": "LocationChecks", "locations": [location_id]}
-            ])
-        except Exception as error:
-            logger.error(
-                "[Challenge] ALL_LOCATION_CHECK_RETRY id=%s error=%s",
-                location_id,
-                error,
-            )
-            return
-        self.locations_checked.add(location_id)
-        logger.info("[Challenge] ALL_LOCATION_CHECK_ACK id=%s", location_id)
+                await self.send_msgs([
+                    {"cmd": "LocationChecks", "locations": [location_id]}
+                ])
+            except Exception as error:
+                logger.error(
+                    "[Challenge] ALL_LOCATION_CHECK_RETRY id=%s key=%s error=%s",
+                    location_id, key, error,
+                )
+                continue
+            self.locations_checked.add(location_id)
+            logger.info("[Challenge] ALL_LOCATION_CHECK_ACK id=%s key=%s", location_id, key)
 
     async def check_sticky_mastery_location(self):
         """Sticky compatibility wrapper preserving its exact send contract."""
