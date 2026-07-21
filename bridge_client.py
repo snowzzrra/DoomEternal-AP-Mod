@@ -931,6 +931,7 @@ class GameplaySaveEvidence(NamedTuple):
     epoch: int
     slot_directory: str
     map_name: str
+    provisional: bool = False
 
 
 def primary_save_candidates(filename="game_duration.dat"):
@@ -1003,7 +1004,13 @@ def read_gameplay_save_evidence(path=None):
         or not map_name
     ):
         return None
-    return GameplaySaveEvidence(state, epoch, slot_directory, map_name)
+    return GameplaySaveEvidence(
+        state,
+        epoch,
+        slot_directory,
+        map_name,
+        values.get("provisional", "false").lower() == "true",
+    )
 
 
 def mastery_save_selection():
@@ -2003,6 +2010,7 @@ class DoomEternalContext(CommonContext):
         self.death_probe_warning = None
         self.active_save_slot = None
         self.active_save_path = None
+        self.active_save_token = None
         self.active_gameplay_epoch = None
         self.runtime_observers_frozen = True
         self.save_candidate_tokens = {}
@@ -2139,10 +2147,18 @@ class DoomEternalContext(CommonContext):
             )
         self.active_save_slot = selected.slot_directory
         self.active_save_path = str(selected.path)
+        self.active_save_token = selected.mtime_ns
         self.select_save_observation_slot(selected.slot_directory)
         self.previous_checkpoint_death = self.checkpoint_death_by_save_slot.get(
             selected.slot_directory
         )
+
+    def invalidate_save_observation_slot(self, slot_directory):
+        """Discard local authority when a slot directory has been recreated."""
+        self.save_slot_observations[slot_directory] = {}
+        self.select_save_observation_slot(slot_directory)
+        self.checkpoint_death_by_save_slot.pop(slot_directory, None)
+        self.previous_checkpoint_death = None
 
     def log_save_slot_rejected(self, selected, reason, evidence_epoch=None):
         if selected is None:
@@ -2180,34 +2196,40 @@ class DoomEternalContext(CommonContext):
 
         evidence = read_gameplay_save_evidence()
         newest = candidates[0] if candidates else None
+        active = primary_save_for_slot(self.active_save_slot) if self.active_save_slot else None
+        newer_unproven_candidate = bool(
+            newest
+            and active
+            and newest.slot_directory != active.slot_directory
+            and newest.mtime_ns > active.mtime_ns
+        )
         if evidence is None:
+            if newer_unproven_candidate:
+                self.runtime_observers_frozen = True
+                self.log_save_slot_rejected(newest, "no_gameplay_evidence")
+                return None
             if self.active_save_slot:
-                selected = primary_save_for_slot(self.active_save_slot)
-                if selected is not None:
+                if active is not None:
                     # A native monitor can briefly republish an unproven state
                     # during a legitimate checkpoint/map write.  It may never
                     # promote a candidate, but the already proven active slot
                     # remains a valid observer source until an explicit menu
                     # state or a proven new gameplay epoch arrives.
-                    self.active_save_path = str(selected.path)
+                    self.active_save_path = str(active.path)
                     self.runtime_observers_frozen = False
-                    return selected
+                    return active
             self.runtime_observers_frozen = True
             self.log_save_slot_rejected(newest, "no_gameplay_evidence")
             return None
-        if evidence.state != "gameplay":
-            # Native memory can report menu/loading while the active save is
-            # flushing a normal checkpoint.  Promotion still requires a later
-            # proven gameplay epoch, but an already proven primary remains a
-            # valid observer source across that transient sample.
-            if self.active_save_slot:
-                selected = primary_save_for_slot(self.active_save_slot)
-                if selected is not None:
-                    self.active_save_path = str(selected.path)
-                    self.runtime_observers_frozen = False
-                    return selected
+        hub_evidence = evidence.map_name == "game/hub/hub"
+        if evidence.state != "gameplay" or evidence.provisional or hub_evidence:
+            rejection_reason = (
+                "provisional" if evidence.provisional
+                else "hub" if hub_evidence
+                else "menu"
+            )
             self.runtime_observers_frozen = True
-            self.log_save_slot_rejected(newest, "menu", evidence.epoch)
+            self.log_save_slot_rejected(newest, rejection_reason, evidence.epoch)
             return None
 
         selected = primary_save_for_slot(evidence.slot_directory)
@@ -2236,6 +2258,17 @@ class DoomEternalContext(CommonContext):
                 )
                 return None
             self.activate_save_selection(selected)
+        elif (
+            self.active_gameplay_epoch is not None
+            and self.active_gameplay_epoch != evidence.epoch
+            and self.active_save_token != selected.mtime_ns
+        ):
+            self.invalidate_save_observation_slot(selected.slot_directory)
+            self.active_save_token = selected.mtime_ns
+        elif self.active_gameplay_epoch == evidence.epoch:
+            # A normal checkpoint write retains the proven slot and refreshes
+            # its token without invalidating durable observations.
+            self.active_save_token = selected.mtime_ns
         self.active_gameplay_epoch = evidence.epoch
         self.runtime_observers_frozen = False
 

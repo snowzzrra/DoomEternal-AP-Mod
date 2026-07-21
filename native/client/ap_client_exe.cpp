@@ -843,7 +843,7 @@ public:
             }
             activeSlotDirectory_ = entered->slotDirectory;
             lastSnapshot_ = *entered;
-            WriteGameplayEvidence(entered);
+            WriteGameplayEvidence(entered, provisional);
             return;
         }
 
@@ -1105,7 +1105,10 @@ private:
         return snapshot.mapName.empty() ? std::nullopt : std::optional<SaveSnapshot>(snapshot);
     }
 
-    void WriteGameplayEvidence(const std::optional<SaveSnapshot>& snapshot) {
+    void WriteGameplayEvidence(
+        const std::optional<SaveSnapshot>& snapshot,
+        bool provisional = false
+    ) {
         const std::string temporaryPath = std::string(kGameplaySaveEvidencePath) + ".tmp";
         FILE* output = fopen(temporaryPath.c_str(), "wb");
         if (!output) {
@@ -1119,6 +1122,7 @@ private:
         if (gameplayLoaded_ && snapshot.has_value()) {
             contents += "slot=" + snapshot->slotDirectory + "\n"
                 + "map_name=" + snapshot->mapName + "\n"
+                + "provisional=" + std::string(provisional ? "true" : "false") + "\n"
                 + "source_file=" + snapshot->path + "\n";
         }
         fwrite(contents.data(), 1, contents.size(), output);
