@@ -9,7 +9,7 @@ import re
 import argparse
 from pathlib import Path
 
-from ap_map_generator import (
+from tools.maps.ap_map_generator import (
     extract_target_names,
     find_entity_block_bounds,
     generate_check_event,

@@ -5,7 +5,10 @@ import argparse
 import copy
 import hashlib
 from pathlib import Path
-from foundation import build_primitive, validate_primitive_registry
+from foundation import (
+    build_primitive, validate_primitive_registry, classify_item_definition,
+    ITEM_NOTIFICATION_PREFIX, RECEIPT_ENTITY_PREFIX,
+)
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 
 AP_PICKUP_HITBOX_SIZE = 6
@@ -20,10 +23,29 @@ GENERATED_NAME_PREFIXES = (
     NOTIFICATION_ENTITY_PREFIX,
     EVENT_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
+    ITEM_NOTIFICATION_PREFIX.rstrip("_"),  # ap_notify_item
+    RECEIPT_ENTITY_PREFIX.rstrip("_"),     # ap_rpc_item
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
 AP_QUESTION_MARK_MODEL = "art/pickups/question_mark_a.lwo"
+
+# Item notification type mapping by family
+# Uses existing game notificationType values from idTarget_Notification
+NOTIFICATION_TYPE_BY_FAMILY = {
+    "simple_give": "HUD_NOTIFY_INVENTORY_ACQUIRED",
+    "perk": "HUD_NOTIFY_UPGRADE_PERK",
+    "progressive_perk": "HUD_NOTIFY_UPGRADE_PERK",
+    "resource": "HUD_NOTIFY_GENERIC_CALLOUT",
+    "extra_life": "HUD_NOTIFY_EXTRA_LIFE_ACQUIRED",
+    "trap_spawn": "HUD_NOTIFY_GENERIC_CALLOUT",
+    "currency": "HUD_NOTIFY_INVENTORY_ACQUIRED",
+    "multi_command": "HUD_NOTIFY_GENERIC_CALLOUT",
+    "no_op": "HUD_NOTIFY_GENERIC_CALLOUT",
+}
+# Safe fallback hud_event for each notificationType
+# Known-working event IDs from game: HUD_EVENT_PLAYER_NOTIFICATION (generic)
+NOTIFICATION_DEFAULT_HUD_EVENT = "HUD_EVENT_PLAYER_NOTIFICATION"
 
 # you don't need to use this to play the mod
 # i'm making this file available simply for transparency and for anyone who wants to generate the AP targets in other maps by themselves, since the process is a bit tedious to do manually and this automates it
@@ -940,6 +962,29 @@ def generate_pickup_notification(ap_check_id):
 """
 
 
+def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIFY_GENERIC_CALLOUT", hud_event_id="HUD_EVENT_PLAYER_NOTIFICATION", icon="art/ui/icons/callouts/icon_callout_demonskull"):
+    """Generate idTarget_Notification for an item received from Archipelago."""
+    return build_primitive(
+        "item_notification", f"{ITEM_NOTIFICATION_PREFIX}{item_id}",
+        {"header_key": header_key, "notification_type": notification_type, "hud_event_id": hud_event_id, "icon": icon},
+        release=False,
+    )
+
+
+def generate_receipt_relay(item_id, effect_entity_names):
+    """Generate receipt entrypoint relay that triggers notification + effect(s).
+    
+    Fires notification first, then effect entities.
+    """
+    notif_name = f"{ITEM_NOTIFICATION_PREFIX}{item_id}"
+    targets = [notif_name] + effect_entity_names
+    return build_primitive(
+        "item_receipt_relay", f"{RECEIPT_ENTITY_PREFIX}_{item_id}",
+        {"targets": targets},
+        release=False,
+    )
+
+
 def inject_secret_encounter_completion(
     content,
     manager_name,
@@ -1015,7 +1060,12 @@ def inject_secret_encounter_completion(
 def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
-def generate_rpc_command_entities(items_dict):
+def generate_rpc_command_entities(items_dict, item_names=None):
+    """Generate ap_rpc_v3_* command entities plus receipt notification entities.
+    
+    item_names: dict[int, str] — item_id -> canonical name (from replay_policies)
+    When provided, also generates ap_notify_item_<id> and ap_rpc_item_<id> entities.
+    """
     validate_primitive_registry()
     blocks = []
     required_entities = []
@@ -1085,6 +1135,45 @@ def generate_rpc_command_entities(items_dict):
                 "target_command", entity_name, {"command": command_value}
             ))
 
+    # Only non-no_op items generate notification/receipt entities
+    if item_names:
+        from foundation import ITEM_NOTIFICATION_PREFIX, RECEIPT_ENTITY_PREFIX
+        for item_id, command_value in items_dict.items():
+            is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
+            if is_no_op:
+                continue
+            item_id_int = int(item_id)
+            name = item_names.get(item_id_int)
+            if not name:
+                raise ValueError(f"Item {item_id} has no name in item_names; receipt notification requires it")
+            
+            # Determine notification style based on item family
+            family = classify_item_definition(command_value)
+            notif_type = NOTIFICATION_TYPE_BY_FAMILY.get(family, "HUD_NOTIFY_GENERIC_CALLOUT")
+            hud_event_id = NOTIFICATION_DEFAULT_HUD_EVENT
+            icon = "art/ui/icons/callouts/icon_callout_demonskull"
+            
+            # Generate notification entity
+            header_key = f"#str_ap_item_{item_id}"
+            blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon))
+            
+            # Generate receipt relay (notification + effect)
+            effect_entities = []
+            if isinstance(command_value, dict):
+                if command_value.get("type") == "progressive_perk":
+                    perks = command_value.get("perks", [])
+                    for stage in range(len(perks)):
+                        effect_entities.append(f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}")
+                elif command_value.get("type") in ("perk", "currency"):
+                    effect_entities.append(f"{RPC_ENTITY_PREFIX}_{item_id}")
+            elif isinstance(command_value, list):
+                effect_entities.append(f"{RPC_ENTITY_PREFIX}_{item_id}")
+            else:
+                effect_entities.append(f"{RPC_ENTITY_PREFIX}_{item_id}")
+            
+            if effect_entities:
+                blocks.append(generate_receipt_relay(item_id_int, effect_entities))
+
     generated = "".join(blocks)
     missing_entities = [
         entity_name
@@ -1132,7 +1221,35 @@ def generate_bootstrap_entities():
     """Historical stat-write bootstraps are intentionally absent from v0.2.2."""
     return ""
 
-def generate_map(input_file, output_file, config_file, manifest_file, items_dict):
+def load_item_names(names_path="data/item_replay_policies.json"):
+    """Load item_id -> canonical name from replay policies."""
+    path = Path(__file__).resolve().parent / names_path
+    with open(path, "r", encoding="utf-8") as f:
+        policies = json.load(f)
+    items = policies.get("items", {})
+    return {int(k): v["name"] for k, v in items.items() if "name" in v}
+
+
+def generate_item_string_table(item_names):
+    """Generate BlangJson string table JSON for item notification headers.
+    
+    Format matches BlangJsonGenerator output: {"strings": [{"name", "text"}, ...]}
+    Item names from item_replay_policies.json are the canonical source.
+    Returns JSON string with all item name entries.
+    """
+    strings = []
+    for item_id in sorted(item_names):
+        name = item_names[item_id]
+        # Strip color codes from item names if present
+        name = re.sub(r"\^[0-9a-z]", "", name)
+        strings.append({
+            "name": f"#str_ap_item_{item_id}",
+            "text": name,
+        })
+    return json.dumps({"strings": strings}, indent=4, ensure_ascii=False)
+
+
+def generate_map(input_file, output_file, config_file, manifest_file, items_dict, item_names=None, strings_output=None):
     with open(config_file, "r", encoding="utf-8") as f:
         level_config = json.load(f)
 
@@ -1251,17 +1368,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
 
             manifest_data[ap_check_id] = config_entities[ap_check_id]
 
-            _spawn_pos_text = ""
-            pos_match = re.search(r'(\s*spawnPosition\s*=\s*\{\s*x\s*=\s*([0-9.-]+);\s*y\s*=\s*([0-9.-]+);\s*z\s*=\s*([0-9.-]+);\s*\})', block)
-            if pos_match:
-                x = pos_match.group(2)
-                y = pos_match.group(3)
-                z = str(float(pos_match.group(4)) + 10.0)
-                _spawn_pos_text = f"\t\t\tspawnPosition = {{\n\t\t\t\tx = {x};\n\t\t\t\ty = {y};\n\t\t\t\tz = {z};\n\t\t\t}}\n"
-            else:
-                pos_fallback = re.search(r'(\s*spawnPosition\s*=\s*\{[^}]+\})', block)
-                if pos_fallback:
-                    _spawn_pos_text2 = pos_fallback.group(1) + "\n"
+
 
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
@@ -1399,7 +1506,7 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
         map_content
         + "\n"
         + "".join(secret_blocks)
-        + generate_rpc_command_entities(items_dict)
+        + generate_rpc_command_entities(items_dict, item_names=item_names)
         + generate_bootstrap_entities()
         + generate_system_command_entities()
     )
@@ -1419,6 +1526,12 @@ def generate_map(input_file, output_file, config_file, manifest_file, items_dict
     with open(manifest_file, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=4)
 
+    if strings_output and item_names:
+        os.makedirs(os.path.dirname(strings_output), exist_ok=True)
+        string_table = generate_item_string_table(item_names)
+        with open(strings_output, "w", encoding="utf-8") as f:
+            f.write(string_table)
+
     print(f"Successfully generated {modified_count} GLOBAL AP Targets using idTrigger mutation!")
     print(f"Manifest saved to {manifest_file}")
 
@@ -1429,10 +1542,14 @@ if __name__ == "__main__":
     parser.add_argument("--config", required=True, help="Level configuration JSON")
     parser.add_argument("--manifest", required=True, help="Output manifest JSON")
     parser.add_argument("--items", default="data/items.json", help="Items JSON containing commands")
+    parser.add_argument("--item-names", default="data/item_replay_policies.json", help="Item names JSON")
+    parser.add_argument("--strings-output", default=None, help="Output path for string table JSON")
 
     args = parser.parse_args()
 
     with open(args.items, "r", encoding="utf-8") as f:
         items_dict = json.load(f)
 
-    generate_map(args.input, args.output, args.config, args.manifest, items_dict)
+    item_names = load_item_names(args.item_names) if os.path.exists(args.item_names) else None
+
+    generate_map(args.input, args.output, args.config, args.manifest, items_dict, item_names=item_names, strings_output=args.strings_output)

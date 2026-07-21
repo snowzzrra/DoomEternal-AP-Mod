@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = {
     "container": "e1m1_intro",
     "path": "propitem/propitem/collectible/toys/doom_slayer.decl",

@@ -9,12 +9,12 @@ import re
 import tempfile
 from pathlib import Path
 
-from ap_map_generator import generate_map
+from tools.maps.ap_map_generator import generate_map
 from map_registry import load_map_registry, release_plan
-from mission_complete_map_patcher import patch_mission_complete_maps
+from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 BASELINE_PATH = ROOT / "data" / "frozen_map_baselines.json"
 def _semantic_hash(text: str) -> str:
     """Hash syntax while skipping comments/irrelevant whitespace without copies."""
