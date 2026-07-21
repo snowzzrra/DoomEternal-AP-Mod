@@ -10,6 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
@@ -686,9 +688,10 @@ def main() -> int:
             errors.append(
                 f"{aggregate_entry['name']} aggregate/APWorld mapping drift"
             )
+    # Parse ast of a few key python files
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (ROOT / "bridge_client.py", ROOT / "ap_map_generator.py", ROOT / "challenge_registry.py")
+        for path in (ROOT / "bridge_client.py", ROOT / "tools" / "maps" / "ap_map_generator.py", ROOT / "challenge_registry.py")
     )
     for forbidden in (
         "append_graph_entries", "watchers_for_map", "AP_RUNTIME_CHECK_",
@@ -703,7 +706,8 @@ def main() -> int:
     for path in (
         ROOT / "level_configs" / "hub.json",
         ROOT / "level_configs" / "e1m3_cult.json",
-        ROOT / "ap_map_generator.py",
+        ROOT / "tools" / "maps" / "ap_map_generator.py",
+        ROOT / "scripts" / "build" / "playable_test.sh",
     ):
         if forbidden_decl_path in path.read_text(encoding="utf-8"):
             errors.append(f"Scripted pickup uses forbidden custom DECL path: {path}")
@@ -936,7 +940,7 @@ def main() -> int:
         "CreateRemoteThread", "MH_CreateHook", "DetourAttach",
     )
     native_runtime_source = "\n".join(
-        (ROOT / name).read_text(encoding="utf-8", errors="ignore")
+        (ROOT / "native" / "client" / name).read_text(encoding="utf-8", errors="ignore")
         for name in ("ap_client_exe.cpp", "game_state_probe.cpp", "game_state_probe.h", "mhclient.cpp", "mhclient.h")
     )
     for term in native_hook_terms:

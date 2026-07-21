@@ -62,12 +62,12 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     if recorded.get("protocol") != 3:
         raise AssertionError("RELEASE_MANIFEST does not declare bridge protocol 3")
     identity = json.loads((client_dir / "bridge_identity.json").read_text(encoding="utf-8"))
-    if identity != {
-        "protocol": 3,
-        "sha256": actual,
-        "revision": f"mission-unified-{actual[:12]}",
-    }:
-        raise AssertionError("unpacked bridge identity diverges from bridge or RELEASE_MANIFEST")
+    if identity.get("protocol") != 3:
+        raise AssertionError("unpacked bridge identity protocol diverges")
+    if identity.get("sha256") != actual:
+        raise AssertionError("unpacked bridge identity sha256 diverges")
+    if identity.get("revision") != f"mission-unified-{actual[:12]}":
+        raise AssertionError("unpacked bridge identity revision diverges")
     if "Ignoring unexpected goal transition event" in bridge.read_text(encoding="utf-8"):
         raise AssertionError("unpacked bridge still contains old goal-only handler")
     return actual

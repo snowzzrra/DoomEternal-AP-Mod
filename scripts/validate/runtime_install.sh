@@ -23,19 +23,22 @@ if [[ -f "$GAME_DIR/Mods/ap_mod.zip" ]]; then
     exit 1
 fi
 
-expected_entries=(
-    "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
-    "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
-    "hub_patch2/maps/game/hub/hub.entities"
-    "e1m3_cult_patch3/maps/game/sp/e1m3_cult/e1m3_cult.entities"
-)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-resource_archives=(
-    "base/game/sp/e1m1_intro/e1m1_intro_patch3.resources"
-    "base/game/sp/e1m2_battle/e1m2_battle_patch3.resources"
-    "base/game/hub/hub_patch2.resources"
-    "base/game/sp/e1m3_cult/e1m3_cult_patch3.resources"
-)
+mapfile -t expected_entries < <(python3 -c '
+import json, sys
+for entry in json.load(open(sys.argv[1], encoding="utf-8")):
+    if not entry.get("release_asset"): continue
+    res_name = entry["resource_path"].split("/")[-1].replace(".resources", "")
+    print(f"{res_name}/maps/{entry[\"relative_entities_path\"]}")
+' "$REPO_ROOT/data/map_sources.json")
+
+mapfile -t resource_archives < <(python3 -c '
+import json, sys
+for entry in json.load(open(sys.argv[1], encoding="utf-8")):
+    if not entry.get("release_asset"): continue
+    print(entry["resource_path"])
+' "$REPO_ROOT/data/map_sources.json")
 
 archive_entries="$(unzip -Z1 "$MOD_ZIP")"
 for entry in "${expected_entries[@]}"; do

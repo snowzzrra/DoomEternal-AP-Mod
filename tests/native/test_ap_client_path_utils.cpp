@@ -8,8 +8,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "../ap_client_path_utils.h"
-#include "../rpc_queue_policy.h"
+#include "../../native/client/ap_client_path_utils.h"
+#include "../../rpc_queue_policy.h"
 
 namespace fs = std::filesystem;
 

@@ -1546,6 +1546,13 @@ class BootstrapTests(unittest.TestCase):
 
 
 class CheckEventTests(unittest.TestCase):
+    def setUp(self):
+        self.original_item_notifications = bridge_client.ENABLE_ITEM_NOTIFICATIONS
+        bridge_client.ENABLE_ITEM_NOTIFICATIONS = True
+
+    def tearDown(self):
+        bridge_client.ENABLE_ITEM_NOTIFICATIONS = self.original_item_notifications
+
     def _make_item_context(self):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.session_state = {}

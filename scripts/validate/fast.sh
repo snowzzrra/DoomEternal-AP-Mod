@@ -74,10 +74,9 @@ HERMETIC_TEST_MODULES=(
     tests.unit.test_devinv_builder
 )
 for mod in "${HERMETIC_TEST_MODULES[@]}"; do
-    if python3 -m unittest "$mod" 2>/dev/null; then
+    if python3 -m unittest "$mod"; then
         pass
     else
-        # If test fails due to missing assets (vanillamaps/vanilla_decls), skip with warning
         fail "$mod"
     fi
 done
