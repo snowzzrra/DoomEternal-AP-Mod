@@ -1583,7 +1583,7 @@ class CheckEventTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     payloads["recv-000001-item-7770011-cmd-00.cmd"],
-                    "ai_ScriptCmdEnt ap_rpc_v3_7770011 activate\n",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate\n",
                 )
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
