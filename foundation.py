@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from map_registry import load_map_registry, release_plan
-
 
 VALID_STATUSES = {
     "runtime_verified",

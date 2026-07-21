@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
 import argparse
+import hashlib
 import json
 import re
 import tempfile
 from pathlib import Path
 
-from tools.maps.ap_map_generator import generate_map
 from map_registry import load_map_registry, release_plan
+from tools.maps.ap_map_generator import generate_map
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 BASELINE_PATH = ROOT / "data" / "frozen_map_baselines.json"

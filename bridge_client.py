@@ -1,15 +1,26 @@
 import asyncio
 import atexit
-import os
-import sys
 import glob
-import time
+import hashlib
+import json
+import logging
+import os
 import re
 import shutil
 import subprocess
+import sys
+import time
 import uuid
-import logging
-import hashlib
+from pathlib import Path
+from typing import NamedTuple
+
+from bootstrap_actions import (
+    BOOTSTRAP_ACTIONS,
+    BOOTSTRAP_REVISION,
+    BOOTSTRAP_STAT_PRIMITIVE,
+    received_any_suit_upgrade,
+)
+from challenge_registry import canonical_map_name, load_challenge_registry
 from foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
@@ -18,17 +29,6 @@ from foundation import (
 from item_reconciliation import (
     compile_reconciliation_plan,
     load_policy_registry,
-)
-from challenge_registry import canonical_map_name, load_challenge_registry
-
-import json
-from pathlib import Path
-from typing import NamedTuple
-from bootstrap_actions import (
-    BOOTSTRAP_ACTIONS,
-    BOOTSTRAP_REVISION,
-    BOOTSTRAP_STAT_PRIMITIVE,
-    received_any_suit_upgrade,
 )
 
 try:
@@ -157,14 +157,14 @@ AP_SOURCE_PATH = os.environ.get("ARCHIPELAGO_SOURCE")
 if AP_SOURCE_PATH:
     sys.path.insert(0, os.path.abspath(AP_SOURCE_PATH))
 
-import Utils
 import colorama
+import Utils
 from CommonClient import (
-    CommonContext,
-    server_loop,
-    gui_enabled,
     ClientCommandProcessor,
+    CommonContext,
     get_base_parser,
+    gui_enabled,
+    server_loop,
 )
 from NetUtils import ClientStatus
 
@@ -1275,7 +1275,7 @@ def probe_checkpoint_death(path):
 
 # Load item definitions
 ITEMS_FILE = os.path.join(os.path.dirname(__file__), "data", "items.json")
-with open(ITEMS_FILE, "r", encoding="utf-8") as f:
+with open(ITEMS_FILE, encoding="utf-8") as f:
     # Keys in JSON are strings, convert them to ints
     _raw_items = json.load(f)
     ITEM_ID_TO_COMMAND = {int(k): v for k, v in _raw_items.items()}
@@ -1289,7 +1289,7 @@ ITEM_REPLAY_POLICIES = load_policy_registry(
 RUNTIME_LOCATIONS_FILE = os.path.join(
     os.path.dirname(__file__), "data", "runtime_locations.json"
 )
-with open(RUNTIME_LOCATIONS_FILE, "r", encoding="utf-8") as f:
+with open(RUNTIME_LOCATIONS_FILE, encoding="utf-8") as f:
     RUNTIME_LOCATIONS = json.load(f)
 CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Cultist Base - Mission Complete"
@@ -1331,7 +1331,7 @@ MANIFESTS_DIR = os.path.join(os.path.dirname(__file__), "manifests")
 if os.path.exists(MANIFESTS_DIR):
     for filename in os.listdir(MANIFESTS_DIR):
         if filename.endswith(".json"):
-            with open(os.path.join(MANIFESTS_DIR, filename), "r", encoding="utf-8") as f:
+            with open(os.path.join(MANIFESTS_DIR, filename), encoding="utf-8") as f:
                 manifest_data = json.load(f)
                 DECL_TO_LOCATION.update(manifest_data)
 
@@ -1569,7 +1569,7 @@ def extract_location_id_from_event(path):
         return int(filename_match.group(1))
 
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             contents = f.read()
     except OSError:
         return None
@@ -1583,7 +1583,7 @@ def extract_location_id_from_event(path):
 def parse_goal_transition_event(path, include_raw=False):
     data = {}
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             for raw_line in f:
                 line = raw_line.strip()
                 if not line or "=" not in line:
@@ -1686,7 +1686,7 @@ def read_telemetry_dump():
     map_name = None
 
     try:
-        with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
+        with open(latest_file, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
             for line in lines:
                 lower_line = line.lower()
@@ -2062,7 +2062,7 @@ class DoomEternalContext(CommonContext):
 
     async def server_auth(self, password_requested: bool = False):
         if password_requested and not self.password:
-            await super(DoomEternalContext, self).server_auth(password_requested)
+            await super().server_auth(password_requested)
         await self.get_username()
         await self.send_connect()
 

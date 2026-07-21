@@ -1,15 +1,18 @@
-import os
-import re
-import json
 import argparse
 import copy
 import hashlib
+import json
+import os
+import re
 from pathlib import Path
-from foundation import (
-    build_primitive, validate_primitive_registry, classify_item_definition,
-    ITEM_NOTIFICATION_PREFIX, RECEIPT_ENTITY_PREFIX,
-)
+
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
+from foundation import (
+    ITEM_NOTIFICATION_PREFIX,
+    RECEIPT_ENTITY_PREFIX,
+    build_primitive,
+    validate_primitive_registry,
+)
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -1141,7 +1144,6 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
 
     # Only non-no_op items generate notification/receipt entities
     if item_names and enable_notifications:
-        from foundation import ITEM_NOTIFICATION_PREFIX, RECEIPT_ENTITY_PREFIX
         for item_id, command_value in items_dict.items():
             is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
             if is_no_op:
@@ -1217,7 +1219,7 @@ def generate_bootstrap_entities():
 def load_item_names(names_path="data/item_replay_policies.json"):
     """Load item_id -> canonical name from replay policies."""
     path = Path(__file__).resolve().parents[2] / names_path
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         policies = json.load(f)
     items = policies.get("items", {})
     return {int(k): v["name"] for k, v in items.items() if "name" in v}
@@ -1254,7 +1256,7 @@ def generate_item_string_table(item_names, base_strings_file=None):
     """
     base_data = {"strings": {}}
     if base_strings_file and os.path.exists(base_strings_file):
-        with open(base_strings_file, "r", encoding="utf-8") as f:
+        with open(base_strings_file, encoding="utf-8") as f:
             base_data = json.load(f)
             if "strings" not in base_data:
                 base_data["strings"] = {}
@@ -1282,7 +1284,7 @@ def generate_item_string_table(item_names, base_strings_file=None):
 
 
 def generate_map(input_file, output_file, config_file, manifest_file, items_dict, item_names=None, strings_output=None, enable_notifications=False, base_strings_file=None):
-    with open(config_file, "r", encoding="utf-8") as f:
+    with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
 
     config_entities = level_config.get("entities", {})
@@ -1581,7 +1583,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    with open(args.items, "r", encoding="utf-8") as f:
+    with open(args.items, encoding="utf-8") as f:
         items_dict = json.load(f)
 
     item_names = load_item_names(args.item_names) if os.path.exists(args.item_names) else None

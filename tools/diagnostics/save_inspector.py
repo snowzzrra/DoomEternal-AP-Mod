@@ -9,7 +9,6 @@ import math
 from collections import Counter
 from pathlib import Path
 
-
 DEFAULT_ROOT = Path(
     "/var/home/guilherme/.local/share/Steam/userdata/160032537/782330/remote"
 )

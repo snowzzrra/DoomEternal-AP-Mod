@@ -1,5 +1,6 @@
 import re
 
+
 def notification_label(item_id: int, definition: dict, item_name: str, stage: int = None) -> str:
     """
     Returns the string label for an item notification.

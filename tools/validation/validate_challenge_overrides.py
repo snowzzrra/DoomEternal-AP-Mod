@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import collections
-import json
 import re
 import sys
 from pathlib import Path
@@ -18,6 +17,7 @@ from pathlib import Path
 # Add root to sys.path to import from challenge_registry
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from challenge_registry import load_challenge_registry
+
 
 def _load_registry(registry_path: Path) -> list[dict]:
     registry = load_challenge_registry(registry_path)

@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 WINDOWS_SYSTEM_DLLS = {
     "advapi32.dll",
     "bcrypt.dll",

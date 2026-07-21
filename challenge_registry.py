@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 REGISTRY_PATH = ROOT / "data" / "challenge_location_registry.json"
 NATIVE_MASTERY_MANAGER = "UnlockableManager_0_1_2/idUnlockableManager_2"
