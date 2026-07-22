@@ -37,7 +37,7 @@ class FoundationRegistryTests(unittest.TestCase):
 
     def test_registry_and_contracts_are_complete(self):
         registry = validate_primitive_registry()
-        self.assertEqual(len(registry["primitives"]), 11)
+        self.assertEqual(len(registry["primitives"]), 10)
         self.assertEqual(len(compile_all_item_plans(self.definitions)), 116)
         self.assertEqual(sum(family_counts(self.definitions).values()), 116)
         contracts = load_foundation_contracts()

@@ -15,7 +15,6 @@ from map_registry import load_map_registry, release_plan
 from tools.validation.validate_item_notification_package import (
     HEADER_RE,
     NOTIFICATION_RE,
-    RECEIPT_RE,
     capability,
     entity_block,
     string_table_names,
@@ -47,25 +46,17 @@ def _map_payload_path(mod_root: Path, plan) -> Path:
     return mod_root / resource_name / "maps" / plan.relative_entities_path
 
 
-def _assert_reusable_receipts(content: str, map_key: str) -> None:
-    for suffix in RECEIPT_RE.findall(content):
-        receipt = entity_block(content, f"ap_rpc_item_{suffix}")
+def _assert_notifications(content: str, map_key: str) -> None:
+    if "entityDef ap_rpc_item_" in content:
+        raise AssertionError(f"forbidden receipt root: {map_key}")
+    for suffix in NOTIFICATION_RE.findall(content):
         notification = entity_block(content, f"ap_notify_item_{suffix}")
         entity_block(content, f"ap_rpc_v3_{suffix}")
-        expected_chain = (
-            f'ai_ScriptCmdEnt ap_rpc_v3_{suffix} activate;'
-            f'ai_ScriptCmdEnt ap_notify_item_{suffix} activate'
-        )
-        if 'class = "idTarget_Command";' not in receipt or 'inherit = ' in receipt:
-            raise AssertionError(f"receipt root primitive drift: {map_key}/{suffix}")
-        if f'commandText = "{expected_chain}";' not in receipt:
-            raise AssertionError(f"receipt order drift: {map_key}/{suffix}")
-        for block, label in ((receipt, "receipt"), (notification, "notification")):
-            if any(field in block for field in (
-                'triggerOnce = true;', 'removeAfterActivation = true;',
-                'disableAfterActivation = true;', 'startOff = true;',
-            )):
-                raise AssertionError(f"{label} is one-shot: {map_key}/{suffix}")
+        if any(field in notification for field in (
+            'triggerOnce = true;', 'removeAfterActivation = true;',
+            'disableAfterActivation = true;', 'startOff = true;',
+        )):
+            raise AssertionError(f"notification is one-shot: {map_key}/{suffix}")
 
 
 def audit_mod_payload(
@@ -87,25 +78,24 @@ def audit_mod_payload(
                 raise AssertionError(f"missing generated or packaged map: {plan.map_key}")
             generated = _normalized(generated_path.read_bytes())
             packaged = _normalized(_read_entities(packaged_path, decompressor, temporary))
-            generated_receipts = set(RECEIPT_RE.findall(generated.decode("utf-8")))
-            packaged_receipts = set(RECEIPT_RE.findall(packaged.decode("utf-8")))
             generated_notifications = set(NOTIFICATION_RE.findall(generated.decode("utf-8")))
             packaged_notifications = set(NOTIFICATION_RE.findall(packaged.decode("utf-8")))
             if generated != packaged:
                 raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
             if enabled:
-                if not packaged_receipts or not packaged_notifications:
+                if not packaged_notifications:
                     raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
-                if generated_receipts != packaged_receipts or generated_notifications != packaged_notifications:
+                if generated_notifications != packaged_notifications:
                     raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
-                _assert_reusable_receipts(packaged.decode("utf-8"), plan.map_key)
-            elif packaged_receipts or packaged_notifications:
+                _assert_notifications(packaged.decode("utf-8"), plan.map_key)
+            elif "entityDef ap_rpc_item_" in packaged.decode("utf-8") or packaged_notifications:
                 raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
             records[plan.map_key] = {
                 "generated_source_sha256": hashlib.sha256(generated).hexdigest(),
                 "packaged_payload_sha256": hashlib.sha256(packaged).hexdigest(),
-                "receipt_entity_count": len(packaged_receipts),
+                "effect_entity_count": packaged.decode("utf-8").count("entityDef ap_rpc_v3_"),
                 "notification_entity_count": len(packaged_notifications),
+                "receipt_root_count": 0,
             }
     return records
 

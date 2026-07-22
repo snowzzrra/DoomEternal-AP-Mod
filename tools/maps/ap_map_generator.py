@@ -9,7 +9,6 @@ from pathlib import Path
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
     ITEM_NOTIFICATION_PREFIX,
-    RECEIPT_ENTITY_PREFIX,
     build_primitive,
     validate_primitive_registry,
 )
@@ -28,7 +27,6 @@ GENERATED_NAME_PREFIXES = (
     EVENT_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
     ITEM_NOTIFICATION_PREFIX.rstrip("_"),  # ap_notify_item
-    RECEIPT_ENTITY_PREFIX.rstrip("_"),     # ap_rpc_item
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
@@ -974,26 +972,6 @@ def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIF
     )
 
 
-def generate_receipt_relay(item_id, effect_entity_names, stage=None):
-    """Generate a reusable receipt entrypoint for effect(s) plus notification."""
-    notif_name = f"{ITEM_NOTIFICATION_PREFIX}{item_id}"
-    if stage is not None:
-        notif_name = f"{notif_name}_{stage}"
-    relay_name = f"{RECEIPT_ENTITY_PREFIX}_{item_id}"
-    if stage is not None:
-        relay_name = f"{RECEIPT_ENTITY_PREFIX}_{item_id}_{stage}"
-    
-    activation_chain = [
-        *(f"ai_ScriptCmdEnt {effect} activate" for effect in effect_entity_names),
-        f"ai_ScriptCmdEnt {notif_name} activate",
-    ]
-    return build_primitive(
-        "target_command", relay_name,
-        {"command": ";".join(activation_chain)},
-        release=False,
-    )
-
-
 def inject_secret_encounter_completion(
     content,
     manager_name,
@@ -1070,10 +1048,10 @@ def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
 def generate_rpc_command_entities(items_dict, item_names=None, enable_notifications=False):
-    """Generate ap_rpc_v3_* command entities plus receipt notification entities.
+    """Generate ap_rpc_v3_* effects and independent receipt notifications.
     
     item_names: dict[int, str] — item_id -> canonical name (from replay_policies)
-    When enable_notifications is True, also generates ap_notify_item_<id> and ap_rpc_item_<id> entities.
+    When enable_notifications is True, also generates ap_notify_item_<id> entities.
     """
     validate_primitive_registry()
     blocks = []
@@ -1144,7 +1122,7 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
                 "target_command", entity_name, {"command": command_value}
             ))
 
-    # Only non-no_op items generate notification/receipt entities
+    # Only non-no_op items generate independent notification entities.
     if item_names and enable_notifications:
         for item_id, command_value in items_dict.items():
             is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
@@ -1153,7 +1131,7 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
             item_id_int = int(item_id)
             name = item_names.get(item_id_int)
             if not name:
-                raise ValueError(f"Item {item_id} has no name in item_names; receipt notification requires it")
+                raise ValueError(f"Item {item_id} has no name in item_names; notification requires it")
             
             notif_type = "HUD_NOTIFY_SECRET_FOUND"
             hud_event_id = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND"
@@ -1164,13 +1142,9 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
                 for stage in range(len(perks)):
                     header_key = notification_key(item_id_int, command_value, stage=stage)
                     blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon, stage=stage))
-                    effect_entities = [f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"]
-                    blocks.append(generate_receipt_relay(item_id_int, effect_entities, stage=stage))
             else:
                 header_key = notification_key(item_id_int, command_value)
                 blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon))
-                effect_entities = [f"{RPC_ENTITY_PREFIX}_{item_id}"]
-                blocks.append(generate_receipt_relay(item_id_int, effect_entities))
 
     generated = "".join(blocks)
     missing_entities = [

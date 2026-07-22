@@ -6,7 +6,6 @@ from pathlib import Path
 from foundation import build_primitive
 from tools.maps.ap_map_generator import (
     generate_item_notification,
-    generate_receipt_relay,
     generate_rpc_command_entities,
 )
 from tools.maps.notification_formatting import notification_key, notification_text
@@ -32,35 +31,17 @@ class ItemNotificationFormattingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid parameter"):
             build_primitive("item_notification", "bad", {"header_key": "#str_bad"}, release=False)
 
-    def test_receipt_notification_chain_is_reactivatable_and_ordered(self):
+    def test_notification_entity_is_independent_and_reactivatable(self):
         notification = generate_item_notification(
             7770024, "#str_ap_notify_item_7770024"
         )
-        silent = build_primitive(
-            "target_command", "ap_rpc_v3_7770024", {"command": "give ammo"}
-        )
-        receipt = generate_receipt_relay(7770024, ["ap_rpc_v3_7770024"])
-        for block in (notification, receipt):
-            for one_shot_field in (
-                'noFlood = true;', 'triggerOnce = true;',
-                'removeAfterActivation = true;', 'disableAfterActivation = true;',
-                'startOff = true;',
-            ):
-                self.assertNotIn(one_shot_field, block)
-        self.assertIn('class = "idTarget_Command";', receipt)
-        self.assertNotIn("inherit =", receipt)
-        for field in (
-            "expandInheritance = false;", "poolCount = 0;",
-            "poolGranularity = 2;", "networkReplicated = false;",
-            "disableAIPooling = false;",
+        for one_shot_field in (
+            'noFlood = true;', 'triggerOnce = true;',
+            'removeAfterActivation = true;', 'disableAfterActivation = true;',
+            'startOff = true;',
         ):
-            self.assertIn(field, silent)
-            self.assertIn(field, receipt)
-        self.assertIn(
-            'commandText = "ai_ScriptCmdEnt ap_rpc_v3_7770024 activate;'
-            'ai_ScriptCmdEnt ap_notify_item_7770024 activate";',
-            receipt,
-        )
+            self.assertNotIn(one_shot_field, notification)
+        self.assertNotIn("ap_rpc_item_", notification)
 
     def test_progressive_and_multi_command_receipts_keep_one_notification_per_item(self):
         generated = generate_rpc_command_entities(
@@ -76,18 +57,12 @@ class ItemNotificationFormattingTests(unittest.TestCase):
             },
             enable_notifications=True,
         )
-        self.assertIn(
-            'commandText = "ai_ScriptCmdEnt ap_rpc_v3_7770097 activate;'
-            'ai_ScriptCmdEnt ap_notify_item_7770097 activate";',
-            generated,
-        )
+        self.assertIn('entityDef ap_rpc_v3_7770097 {', generated)
+        self.assertNotIn("ap_rpc_item_", generated)
         self.assertEqual(generated.count("entityDef ap_notify_item_7770097 {"), 1)
         for stage in (0, 1):
-            self.assertIn(
-                f'commandText = "ai_ScriptCmdEnt ap_rpc_v3_7770098_{stage} activate;'
-                f'ai_ScriptCmdEnt ap_notify_item_7770098_{stage} activate";',
-                generated,
-            )
+            self.assertIn(f'entityDef ap_rpc_v3_7770098_{stage} {{', generated)
+            self.assertIn(f'entityDef ap_notify_item_7770098_{stage} {{', generated)
 
     def test_formatter_uses_canonical_keys_counts_stages_and_sanitization(self):
         currency = {"type": "currency", "currency": "CURRENCY_SENTINEL_BATTERY", "count": 2}

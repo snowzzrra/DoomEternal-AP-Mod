@@ -1794,11 +1794,15 @@ class CheckEventTests(unittest.TestCase):
                     for path in Path(tmpdir).glob("*.cmd")
                 }
                 self.assertEqual(
-                    payloads["recv-000000-item-7770010-cmd-00.cmd"],
-                    "ai_ScriptCmdEnt ap_rpc_item_7770010 activate\n",
+                    payloads["recv-000000-item-7770010-effect-00.cmd"],
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770010 activate\n",
                 )
                 self.assertEqual(
-                    payloads["recv-000001-item-7770011-cmd-00.cmd"],
+                    payloads["recv-000000-item-7770010-notify.cmd"],
+                    "ai_ScriptCmdEnt ap_notify_item_7770010 activate\n",
+                )
+                self.assertEqual(
+                    payloads["recv-000001-item-7770011-effect-00.cmd"],
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate\n",
                 )
             finally:
@@ -1819,16 +1823,15 @@ class CheckEventTests(unittest.TestCase):
                     )
 
                 files = sorted(Path(tmpdir).glob("*.cmd"))
-                self.assertEqual(len(files), 3)
-                self.assertEqual(len({path.name for path in files}), 3)
+                self.assertEqual(len(files), 6)
+                self.assertEqual(len({path.name for path in files}), 6)
                 self.assertEqual(
                     [path.read_text(encoding="utf-8") for path in files],
-                    ["ai_ScriptCmdEnt ap_rpc_item_7770024 activate\n"] * 3,
+                    [
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770024 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_7770024 activate\n",
+                    ] * 3,
                 )
-                self.assertTrue(all(
-                    "ap_rpc_v3_7770024" not in path.read_text(encoding="utf-8")
-                    for path in files
-                ))
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2122,12 +2125,14 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(description, "give weapon/player/chainsaw")
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual([path.name for path in files], [
-                    "recv-000003-item-7770010-cmd-00.cmd"
+                    "recv-000003-item-7770010-effect-00.cmd",
+                    "recv-000003-item-7770010-notify.cmd",
                 ])
                 self.assertEqual(
                     files[0].read_text(encoding="utf-8"),
-                    "ai_ScriptCmdEnt ap_rpc_item_7770010 activate\n",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770010 activate\n",
                 )
+                self.assertEqual(files[1].read_text(encoding="utf-8"), "ai_ScriptCmdEnt ap_notify_item_7770010 activate\n")
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2148,11 +2153,11 @@ class CheckEventTests(unittest.TestCase):
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual(
                     [path.name for path in files],
-                    ["recv-000011-item-7770045-cmd-00.cmd"],
+                    ["recv-000011-item-7770045-effect-00.cmd", "recv-000011-item-7770045-notify.cmd"],
                 )
                 self.assertEqual(
                     files[0].read_text(encoding="utf-8"),
-                    "ai_ScriptCmdEnt ap_rpc_item_7770045 activate\n",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770045 activate\n",
                 )
                 self.assertNotIn(
                     "chrispy ai/heavy/revenant",
@@ -2187,7 +2192,7 @@ class CheckEventTests(unittest.TestCase):
 
                 for path in Path(tmpdir).glob("*.cmd"):
                     command = path.read_text(encoding="utf-8")
-                    self.assertTrue("ai_ScriptCmdEnt ap_rpc_" in command)
+                    self.assertTrue("ai_ScriptCmdEnt ap_rpc_" in command or "ai_ScriptCmdEnt ap_notify_item_" in command)
                     self.assertNotIn("chrispy ", command)
                     self.assertNotIn("give ", command)
                     self.assertNotIn("g_giveExtraLives", command)
@@ -2216,13 +2221,15 @@ class CheckEventTests(unittest.TestCase):
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual(
                     [path.name for path in files],
-                    ["recv-000007-item-7770012-cmd-00.cmd"],
+                    ["recv-000007-item-7770012-effect-00.cmd", "recv-000007-item-7770012-effect-01.cmd", "recv-000007-item-7770012-notify.cmd"],
                 )
                 self.assertEqual(
                     [path.read_text(encoding="utf-8") for path in files],
                     [
-            "ai_ScriptCmdEnt ap_rpc_item_7770012 activate\n"
-        ],
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770012_0 activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_7770012 activate\n",
+                    ],
                 )
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
@@ -2248,13 +2255,15 @@ class CheckEventTests(unittest.TestCase):
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual(
                     [path.name for path in files],
-                    ["recv-000012-item-7770997-cmd-00.cmd"],
+                    ["recv-000012-item-7770997-effect-00.cmd", "recv-000012-item-7770997-effect-01.cmd", "recv-000012-item-7770997-notify.cmd"],
                 )
                 self.assertEqual(
                     [path.read_text(encoding="utf-8") for path in files],
                     [
-            "ai_ScriptCmdEnt ap_rpc_item_7770997 activate\n"
-        ],
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770997_0 activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770997_1 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_7770997 activate\n",
+                    ],
                 )
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
@@ -2276,7 +2285,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertTrue(ctx.spool_item_commands(7770012, 7, receipt=True)[0])
                 self.assertTrue(ctx.spool_item_commands(7770012, 7, receipt=True)[0])
 
-                self.assertEqual(len(list(Path(tmpdir).glob("*.cmd"))), 1)
+                self.assertEqual(len(list(Path(tmpdir).glob("*.cmd"))), 3)
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2299,12 +2308,16 @@ class CheckEventTests(unittest.TestCase):
                     )
 
                 jobs = sorted(Path(tmpdir).glob("recv-*.cmd"))
-                self.assertEqual(len(jobs), 100)
+                self.assertEqual(len(jobs), 200)
                 self.assertEqual(
                     [path.name for path in jobs],
                     [
-                        f"recv-{index:06d}-item-7770000-cmd-00.cmd"
+                        name
                         for index in range(100)
+                        for name in (
+                            f"recv-{index:06d}-item-7770000-effect-00.cmd",
+                            f"recv-{index:06d}-item-7770000-notify.cmd",
+                        )
                     ],
                 )
                 self.assertFalse(any(path.name.startswith("reconcile-") for path in jobs))
@@ -2339,7 +2352,11 @@ class CheckEventTests(unittest.TestCase):
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual(
                     [path.name for path in files],
-                    ["recv-000007-item-7770012-cmd-00.cmd"],
+                    [
+                        "recv-000007-item-7770012-cmd-00.cmd",
+                        "recv-000007-item-7770012-effect-01.cmd",
+                        "recv-000007-item-7770012-notify.cmd",
+                    ],
                 )
                 self.assertNotIn("item_command_groups", ctx.session_state)
             finally:
@@ -2476,9 +2493,13 @@ class CheckEventTests(unittest.TestCase):
                     for path in sorted(Path(tmpdir).glob("*.cmd"))
                 ]
                 self.assertEqual(payloads, [
-            "ai_ScriptCmdEnt ap_rpc_item_7770011 activate",
-            "ai_ScriptCmdEnt ap_rpc_item_7770013 activate",
-        ])
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770011_1 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_7770011 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate",
+                    "ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_7770013 activate",
+                ])
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2493,10 +2514,10 @@ class CheckEventTests(unittest.TestCase):
                 ctx = self._make_item_context()
 
                 expectations = {
-                    7770000: "ai_ScriptCmdEnt ap_rpc_item_7770000 activate\n",
-                    7770001: "ai_ScriptCmdEnt ap_rpc_item_7770001 activate\n",
-                    7770004: "ai_ScriptCmdEnt ap_rpc_item_7770004 activate\n",
-                    7770045: "ai_ScriptCmdEnt ap_rpc_item_7770045 activate\n",
+                    7770000: "ai_ScriptCmdEnt ap_rpc_v3_7770000 activate\n",
+                    7770001: "ai_ScriptCmdEnt ap_rpc_v3_7770001 activate\n",
+                    7770004: "ai_ScriptCmdEnt ap_rpc_v3_7770004 activate\n",
+                    7770045: "ai_ScriptCmdEnt ap_rpc_v3_7770045 activate\n",
                 }
                 for receive_index, item_id in enumerate(expectations):
                     self.assertTrue(ctx.spool_item_commands(item_id, receive_index, receipt=True)[0])
@@ -2504,7 +2525,7 @@ class CheckEventTests(unittest.TestCase):
                 for receive_index, (item_id, expected) in enumerate(expectations.items()):
                     path = Path(
                         tmpdir,
-                        f"recv-{receive_index:06d}-item-{item_id}-cmd-00.cmd",
+                        f"recv-{receive_index:06d}-item-{item_id}-effect-00.cmd",
                     )
                     self.assertEqual(path.read_text(encoding="utf-8"), expected)
             finally:
