@@ -477,7 +477,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             slot0 = remote / "GAME-AUTOSAVE0"
             slot0.mkdir()
             (slot0 / "game_duration.dat").write_bytes(b"candidate")
-            evidence = self._gameplay_evidence(3, "GAME-AUTOSAVE0")
+            evidence = self._gameplay_evidence(3, "GAME-AUTOSAVE0", "game/hub/hub")
             wrong_map = "game/sp/e1m2_battle/e1m2_battle"
             with (
                 patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
@@ -570,17 +570,67 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(ctx.runtime_observers_frozen)
                 self.assertIsNone(ctx.active_save_slot)
 
-                evidence[0] = self._gameplay_evidence(
-                    5, "GAME-AUTOSAVE1", "game/hub/hub"
-                )
-                self.assertIsNone(ctx.update_save_slot_lifecycle())
-                self.assertTrue(ctx.runtime_observers_frozen)
-                self.assertIsNone(ctx.active_save_slot)
-
                 evidence[0] = self._gameplay_evidence(6, "GAME-AUTOSAVE1")
                 selected = ctx.update_save_slot_lifecycle()
                 self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE1")
                 self.assertFalse(ctx.runtime_observers_frozen)
+
+    async def test_conclusive_hub_switch_promotes_and_runs_challenge_observers(self):
+        challenge = self._mission_challenge_entries("e1m3")[0]
+        with tempfile.TemporaryDirectory() as directory:
+            remote = Path(directory)
+            slots = {}
+            for slot, mtime in (("GAME-AUTOSAVE0", 200), ("GAME-AUTOSAVE2", 100)):
+                slot_dir = remote / slot
+                slot_dir.mkdir()
+                save = slot_dir / "game_duration.dat"
+                save.write_bytes(slot.encode())
+                os.utime(save, ns=(mtime, mtime))
+                slots[slot] = save.resolve()
+            evidence = self._gameplay_evidence(10, "GAME-AUTOSAVE0", "game/hub/hub")
+            sent = []
+
+            class Socket:
+                closed = False
+
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+                patch.object(
+                    bridge_client, "read_game_details_for_selection",
+                    side_effect=lambda selected: self._details_for(selected, "game/hub/hub"),
+                ),
+                patch.object(bridge_client, "probe_game_duration", side_effect=lambda path: {
+                    "mastery_records": {},
+                    "mission_challenge_records": (
+                        self._mission_challenge_records((True, False, False))
+                        if path == slots["GAME-AUTOSAVE0"] else {}
+                    ),
+                    "checkpoint_death": False,
+                }),
+            ):
+                ctx = bridge_client.DoomEternalContext(None, None)
+                ctx.activate_save_selection(bridge_client.PrimarySaveSelection(
+                    "GAME-AUTOSAVE2", slots["GAME-AUTOSAVE2"], 100
+                ))
+                ctx.active_gameplay_epoch = 9
+                ctx.item_state_ready = True
+                ctx.persist_session_state = lambda: None
+                ctx.server = types.SimpleNamespace(socket=Socket())
+                ctx.server_locations = {challenge["location_id"]}
+                ctx.checked_locations = set()
+                ctx.locations_checked = set()
+                ctx.send_msgs = lambda messages: _async_append(sent, messages)
+
+                await ctx.check_game_duration_death()
+                await ctx.check_mission_challenge_locations()
+
+            self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE0")
+            self.assertFalse(ctx.runtime_observers_frozen)
+            self.assertEqual(sent, [[{
+                "cmd": "LocationChecks", "locations": [challenge["location_id"]]
+            }]])
 
     def test_recreated_middle_slot_invalidates_its_previous_observer_authority(self):
         entry = bridge_client.STICKY_MASTERY_ENTRY
@@ -1751,6 +1801,34 @@ class CheckEventTests(unittest.TestCase):
                     payloads["recv-000001-item-7770011-cmd-00.cmd"],
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate\n",
                 )
+            finally:
+                bridge_client.QUEUE_DIR = original_queue_dir
+                bridge_client.CLIENT_STATE_FILE = original_state_file
+
+    def test_three_same_consumable_receipts_keep_distinct_commands_and_notifications(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_queue_dir = bridge_client.QUEUE_DIR
+            original_state_file = bridge_client.CLIENT_STATE_FILE
+            try:
+                bridge_client.QUEUE_DIR = tmpdir
+                bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
+                ctx = self._make_item_context()
+                for receive_index in range(3):
+                    self.assertTrue(
+                        ctx.spool_item_commands(7770024, receive_index, receipt=True)[0]
+                    )
+
+                files = sorted(Path(tmpdir).glob("*.cmd"))
+                self.assertEqual(len(files), 3)
+                self.assertEqual(len({path.name for path in files}), 3)
+                self.assertEqual(
+                    [path.read_text(encoding="utf-8") for path in files],
+                    ["ai_ScriptCmdEnt ap_rpc_item_7770024 activate\n"] * 3,
+                )
+                self.assertTrue(all(
+                    "ap_rpc_v3_7770024" not in path.read_text(encoding="utf-8")
+                    for path in files
+                ))
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file

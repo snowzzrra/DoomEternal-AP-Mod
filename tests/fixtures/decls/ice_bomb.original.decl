@@ -1,0 +1,22 @@
+{
+	edit = {
+		sound_use = "play_sfx_itemrecieve_1";
+		sound_pickup = "play_sfx_itemrecieve_1";
+		sound_pickupUltraNightmare = "play_sfx_itemrecieve_1";
+		sound_unableToPickup = "play_empty_error";
+		componentTypeInfo = "idUseableItemComponent";
+		controllerShake_highMagnitude = 0.25;
+		inventoryDecl = "equipment/ice_bomb";
+		inventoryCount = 1;
+		additionalInventoryDecl = {
+			num = 1;
+			item[0] = {
+				decl = "throwable/player/ice_bomb";
+				count = 1;
+			}
+		}
+		codexDecl = "codex/tutorials/equipment_ice";
+		notification = "hud/equipment_pickup_acquired_nocodex";
+		suppressCodexHudNotification = true;
+	}
+}

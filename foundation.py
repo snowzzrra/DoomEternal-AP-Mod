@@ -298,7 +298,7 @@ def build_primitive(
         block = f'''{header}
 \t\tedit = {{
 \t\t\tflags = {{
-\t\t\t\tnoFlood = true;
+\t\t\t\tnoFlood = false;
 \t\t\t}}
 \t\t\tnotificationType = "{notif_type}";
 \t\t\tnotificationHudEventID = "{hud_event_id}";

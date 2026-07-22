@@ -2221,11 +2221,9 @@ class DoomEternalContext(CommonContext):
             self.runtime_observers_frozen = True
             self.log_save_slot_rejected(newest, "no_gameplay_evidence")
             return None
-        hub_evidence = evidence.map_name == "game/hub/hub"
-        if evidence.state != "gameplay" or evidence.provisional or hub_evidence:
+        if evidence.state != "gameplay" or evidence.provisional:
             rejection_reason = (
                 "provisional" if evidence.provisional
-                else "hub" if hub_evidence
                 else "menu"
             )
             self.runtime_observers_frozen = True
