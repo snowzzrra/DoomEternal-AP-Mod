@@ -1202,7 +1202,7 @@ def load_item_names(names_path="data/item_replay_policies.json"):
     return {int(k): v["name"] for k, v in items.items() if "name" in v}
 
 
-def generate_map(input_file, output_file, config_file, manifest_file, items_dict, item_names=None, enable_notifications=False):
+def generate_map(input_file, output_file, config_file, manifest_file, items_dict, item_names=None, enable_notifications=True):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
 
@@ -1489,7 +1489,7 @@ if __name__ == "__main__":
     parser.add_argument("--manifest", required=True, help="Output manifest JSON")
     parser.add_argument("--items", default="data/items.json", help="Items JSON containing commands")
     parser.add_argument("--item-names", default="data/item_replay_policies.json", help="Item names JSON")
-    parser.add_argument("--enable-experimental-item-notifications", action="store_true", help="Enable generating item notification UI primitives")
+    parser.add_argument("--disable-item-notifications", action="store_true", help="Omit item notification UI primitives for local diagnostics")
 
     args = parser.parse_args()
 
@@ -1501,5 +1501,5 @@ if __name__ == "__main__":
     generate_map(
         args.input, args.output, args.config, args.manifest, items_dict, 
         item_names=item_names,
-        enable_notifications=args.enable_experimental_item_notifications,
+        enable_notifications=not args.disable_item_notifications,
     )
