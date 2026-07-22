@@ -12,18 +12,8 @@ from tools.validation.audit_item_notification_release import (
 
 
 ENTITY = '''entityDef ap_rpc_v3_7770000 {
-	class = "idTarget_Command";
-}
-entityDef ap_rpc_item_7770000 {
-	class = "idTarget_Command";
-	expandInheritance = false;
-	poolCount = 0;
-	poolGranularity = 2;
-	networkReplicated = false;
-	disableAIPooling = false;
-	edit = {
-		commandText = "ai_ScriptCmdEnt ap_rpc_v3_7770000 activate;ai_ScriptCmdEnt ap_notify_item_7770000 activate";
-	}
+	inherit = "target/relay";
+	class = "idTarget_Relay";
 }
 entityDef ap_notify_item_7770000 {
 	header = "#str_ap_notify_item_7770000";
@@ -59,7 +49,8 @@ class ItemNotificationReleaseAuditTests(unittest.TestCase):
 
             records = audit_release(True, generated, mod, client, manifest, registry, None, True)
             self.assertEqual(len(records), 5)
-            self.assertTrue(all(record["receipt_entity_count"] == 1 for record in records.values()))
+            self.assertTrue(all(record["receipt_root_count"] == 0 for record in records.values()))
+            self.assertTrue(all(record["effect_entity_count"] == 1 for record in records.values()))
 
             inner = root / "DoomEternalArchipelagoAlpha.zip"
             with zipfile.ZipFile(inner, "w") as archive:

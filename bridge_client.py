@@ -2813,8 +2813,12 @@ class DoomEternalContext(CommonContext):
             return None, str(error)
         return [command.command for command in plan.commands], plan.description
 
-    def item_command_id(self, item_id, item_index, command_index):
-        return f"recv-{item_index:06d}-item-{item_id}-cmd-{command_index:02d}"
+    def item_command_id(self, item_id, item_index, command_index, command):
+        if command.startswith("ai_ScriptCmdEnt ap_notify_item_"):
+            suffix = "notify"
+        else:
+            suffix = f"effect-{command_index:02d}"
+        return f"recv-{item_index:06d}-item-{item_id}-{suffix}"
 
     def spool_item_commands(self, item_id, item_index, *, receipt: bool):
         commands, description = self.item_activation_commands(
@@ -2841,7 +2845,9 @@ class DoomEternalContext(CommonContext):
             return False, "stored command group index is invalid"
 
         for command_index in range(next_command, len(commands)):
-            command_id = self.item_command_id(item_id, item_index, command_index)
+            command_id = self.item_command_id(
+                item_id, item_index, command_index, commands[command_index]
+            )
             if not send_command(
                 commands[command_index],
                 coalesce_key=command_id,

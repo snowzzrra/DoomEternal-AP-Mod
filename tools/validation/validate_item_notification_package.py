@@ -9,7 +9,8 @@ import re
 from pathlib import Path
 
 
-RECEIPT_RE = re.compile(r"entityDef ap_rpc_item_(\d+(?:_\d+)?) \{")
+# Any entityDef in this namespace is a forbidden legacy receipt root.
+RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
 NOTIFICATION_RE = re.compile(r"entityDef ap_notify_item_(\d+(?:_\d+)?) \{")
 HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
 STRING_TABLES = (
@@ -88,13 +89,16 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if "bridge_identity.json" not in bridge or "receipt=ENABLE_ITEM_NOTIFICATIONS" not in bridge:
         raise AssertionError("packaged bridge lacks capability-gated receipt routing")
 
+    if receipts:
+        raise AssertionError("package contains forbidden ap_rpc_item receipt root")
+
     if not enabled:
-        if receipts or notifications or headers or any(path.exists() for path in table_paths):
-            raise AssertionError("disabled notifier build contains receipt, notification, or string-table artifacts")
+        if notifications or headers or any(path.exists() for path in table_paths):
+            raise AssertionError("disabled notifier build contains notification or string-table artifacts")
         return
 
-    if not receipts or receipts != notifications:
-        raise AssertionError("enabled notifier receipt and notification entities diverge")
+    if not notifications:
+        raise AssertionError("enabled notifier build lacks notification entities")
     expected_headers = {f"#str_ap_notify_item_{suffix}" for suffix in notifications}
     if headers != expected_headers:
         raise AssertionError("enabled notifier headers diverge from notification entities")
@@ -129,26 +133,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             'disableAfterActivation = true;', 'startOff = true;',
         )):
             raise AssertionError(f"item notification is not reactivatable: {suffix}")
-        receipt = entity_block(content, f"ap_rpc_item_{suffix}")
         entity_block(content, f"ap_rpc_v3_{suffix}")
-        expected_chain = (
-            f'ai_ScriptCmdEnt ap_rpc_v3_{suffix} activate;'
-            f'ai_ScriptCmdEnt ap_notify_item_{suffix} activate'
-        )
-        if 'class = "idTarget_Command";' not in receipt or 'inherit = ' in receipt:
-            raise AssertionError(f"receipt root does not use the reusable command primitive: {suffix}")
-        if f'commandText = "{expected_chain}";' not in receipt:
-            raise AssertionError(f"receipt effect/notification chain is out of order: {suffix}")
-        if any(field in receipt for field in (
-            'triggerOnce = true;', 'removeAfterActivation = true;',
-            'disableAfterActivation = true;', 'startOff = true;',
-        )):
-            raise AssertionError(f"receipt relay is not reactivatable: {suffix}")
-        if any(field not in receipt for field in (
-            'expandInheritance = false;', 'poolCount = 0;', 'poolGranularity = 2;',
-            'networkReplicated = false;', 'disableAIPooling = false;',
-        )):
-            raise AssertionError(f"receipt root lifecycle diverges from ap_rpc_v3: {suffix}")
 
 
 def main() -> None:

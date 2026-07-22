@@ -30,22 +30,9 @@ NOTIFICATION = '''entity {
 }
 '''
 
-RECEIPT = '''entity {
+EFFECT = '''entity {
 \tentityDef ap_rpc_v3_7770000 {
 \t\tclass = "idTarget_Command";
-\t}
-}
-entity {
-\tentityDef ap_rpc_item_7770000 {
-\t\tclass = "idTarget_Command";
-\t\texpandInheritance = false;
-\t\tpoolCount = 0;
-\t\tpoolGranularity = 2;
-\t\tnetworkReplicated = false;
-\t\tdisableAIPooling = false;
-\t\tedit = {
-\t\t\tcommandText = "ai_ScriptCmdEnt ap_rpc_v3_7770000 activate;ai_ScriptCmdEnt ap_notify_item_7770000 activate";
-\t\t}
 \t}
 }
 '''
@@ -66,7 +53,7 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
         manifest = root / "RELEASE_MANIFEST.json"
         manifest.write_text(json.dumps(identity), encoding="utf-8")
         if enabled:
-            (maps / "e1m1_intro.entities").write_text(RECEIPT + NOTIFICATION, encoding="utf-8")
+            (maps / "e1m1_intro.entities").write_text(EFFECT + NOTIFICATION, encoding="utf-8")
             table = mod / "gameresources_patch1" / "EternalMod" / "strings"
             table.mkdir(parents=True)
             fixture = {"strings": [{"name": "#str_ap_notify_item_7770000", "text": "AP: Heavy Cannon"}]}
@@ -86,7 +73,7 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             maps, mod, client, manifest = self._layout(Path(directory), False)
             validate(False, maps, mod, client, manifest)
-            (maps / "e1m1_intro.entities").write_text(RECEIPT, encoding="utf-8")
+            (maps / "e1m1_intro.entities").write_text(EFFECT + NOTIFICATION, encoding="utf-8")
             with self.assertRaisesRegex(AssertionError, "disabled notifier"):
                 validate(False, maps, mod, client, manifest)
 
@@ -99,6 +86,17 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(AssertionError, "must be a list"):
+                validate(True, maps, mod, client, manifest)
+
+    def test_receipt_root_is_rejected_regardless_of_its_class(self):
+        with tempfile.TemporaryDirectory() as directory:
+            maps, mod, client, manifest = self._layout(Path(directory), True)
+            source = maps / "e1m1_intro.entities"
+            source.write_text(
+                source.read_text(encoding="utf-8") + '\\nentityDef ap_rpc_item_7770000 { class = "idTarget_Count"; }',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "forbidden ap_rpc_item"):
                 validate(True, maps, mod, client, manifest)
 
     def test_known_valid_string_fixture_uses_common_and_progressive_stage_zero(self):

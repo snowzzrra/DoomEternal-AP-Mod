@@ -79,16 +79,9 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
         },
-        "item_receipt_relay": {
-            "family": "receipt_relay", "status": "experimental",
-            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "master_level_target_relay_barge_arena_door_close", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
-            "shape": {"class": "idTarget_Count", "inherit": "target/relay", "required_fields": ["count", "targets"], "forbidden_fields": ["commandText", "currencyList", "gameStat"]},
-            "targets": ["parameterized"], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
-        },
     },
 }
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
-RECEIPT_ENTITY_PREFIX = "ap_rpc_item"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
     "counts": {"items": 116, "locations": 129, "map_checks": 108, "runtime_locations": 21, "runtime_goals": 1, "route_sentinel_batteries": 18},
@@ -312,25 +305,6 @@ def build_primitive(
 \t}}
 }}
 '''
-    elif primitive_id == "item_receipt_relay":
-        targets = parameters.get("targets")
-        if not isinstance(targets, list) or not targets:
-            raise ValueError("item_receipt_relay requires a non-empty targets list")
-        target_lines = "\n".join(
-            f'\t\t\t\titem[{index}] = "{target}";'
-            for index, target in enumerate(targets)
-        )
-        block = f'''{header}
-\t\tedit = {{
-\t\t\tcount = 1;
-\t\t\ttargets = {{
-\t\t\t\tnum = {len(targets)};
-{target_lines}
-\t\t\t}}
-\t\t}}
-\t}}
-}}
-'''
     elif primitive_id == "boolean_stat_modifier_direct":
         if set(parameters) != {"stat", "value"} or parameters["value"] != 1:
             raise ValueError("boolean_stat_modifier_direct requires one stat set to 1")
@@ -389,13 +363,6 @@ def classify_item_definition(definition: Any) -> str:
     return "simple_give"
 
 
-def _receipt_entity(silent_entity: str) -> str:
-    """Map ap_rpc_v3_<id> to ap_rpc_item_<id> for receipt entrypoint."""
-    if silent_entity.startswith("ap_rpc_v3_"):
-        return "ap_rpc_item_" + silent_entity[len("ap_rpc_v3_"):]
-    return silent_entity
-
-
 def compile_item_delivery_plan(
     item_id: int,
     definitions: dict[int, Any],
@@ -403,11 +370,7 @@ def compile_item_delivery_plan(
     stage: int | None = None,
     receipt: bool = False,
 ) -> DeliveryPlan:
-    """Pure compiler shared by real receipts, repair jobs and directed tests.
-    
-    When receipt=True, uses ap_rpc_item_<id> entrypoints that include notification.
-    When receipt=False (default), uses ap_rpc_v3_<id> silent entrypoints.
-    """
+    """Compile silent effects and, for new receipts, one final notification."""
     if item_id not in definitions:
         raise ValueError(f"Unknown item ID: {item_id}")
     definition = definitions[item_id]
@@ -421,7 +384,7 @@ def compile_item_delivery_plan(
     entities: list[str]
     description: str
     resolved_stage = stage
-    prefix = RECEIPT_ENTITY_PREFIX if receipt else "ap_rpc_v3"
+    prefix = "ap_rpc_v3"
     if family == "progressive_perk":
         perks = definition.get("perks", [])
         if stage is None:
@@ -433,11 +396,7 @@ def compile_item_delivery_plan(
     elif family == "multi_command":
         if not definition:
             raise ValueError("mapping list is empty")
-        # Receipt path uses single relay entity; silent path uses child entities
-        if receipt:
-            entities = [f"{prefix}_{item_id}"]
-        else:
-            entities = [f"ap_rpc_v3_{item_id}_{index}" for index in range(len(definition))]
+        entities = [f"ap_rpc_v3_{item_id}_{index}" for index in range(len(definition))]
         description = " -> ".join(definition)
         resolved_stage = None
     elif family == "no_op":
@@ -448,17 +407,25 @@ def compile_item_delivery_plan(
         entities = [f"{prefix}_{item_id}"]
         description = str(definition)
         resolved_stage = None
-    commands = tuple(
+    commands = [
         DeliveryCommand(
             entity=entity,
             command=f"ai_ScriptCmdEnt {entity} activate",
             index=index,
         )
         for index, entity in enumerate(entities)
-    )
+    ]
+    if receipt and family != "no_op":
+        suffix = f"{item_id}_{resolved_stage}" if resolved_stage is not None else str(item_id)
+        notification = f"{ITEM_NOTIFICATION_PREFIX}{suffix}"
+        commands.append(DeliveryCommand(
+            entity=notification,
+            command=f"ai_ScriptCmdEnt {notification} activate",
+            index=len(commands),
+        ))
     if any(command.command.startswith(GAMEPLAY_COMMAND_PREFIXES) for command in commands):
         raise ValueError("Delivery plan contains a raw gameplay-changing command")
-    return DeliveryPlan(item_id, family, primitive_id, commands, resolved_stage, description)
+    return DeliveryPlan(item_id, family, primitive_id, tuple(commands), resolved_stage, description)
 
 
 def compile_all_item_plans(definitions: dict[int, Any]) -> list[DeliveryPlan]:
