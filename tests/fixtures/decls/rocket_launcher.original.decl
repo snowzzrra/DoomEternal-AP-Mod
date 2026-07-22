@@ -1,0 +1,20 @@
+{
+	inherit = "propitem/weapon/base";
+	edit = {
+		sound_use = NULL;
+		sound_pickup = NULL;
+		inventoryDecl = "weapon/player/rocket_launcher";
+		inventoryCount = 1;
+		alternateInventoryDecl = {
+			num = 1;
+			item[0] = {
+				decl = "ammo/sharedammopool/rockets";
+				count = 9;
+			}
+		}
+		codexDecl = "codex/slayer/arsenal_rocketlauncher";
+		notification = "hud/weapon_acquired";
+		collectible = "weapons/rocket_launcher";
+		suppressCodexHudNotification = true;
+	}
+}

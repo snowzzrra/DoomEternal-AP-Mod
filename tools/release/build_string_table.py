@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from collections import Counter
 from pathlib import Path
 
 from tools.maps.notification_formatting import notification_key, notification_text
 
 HEADER_KEY_PATTERN = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def referenced_notification_keys(maps_dir: Path) -> set[str]:
@@ -23,6 +23,24 @@ def referenced_notification_keys(maps_dir: Path) -> set[str]:
         for path in map_paths
         for key in HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
     }
+
+
+def string_entries(entries: list[tuple[str, str]]) -> list[dict[str, str]]:
+    """Validate and serialize the strict BLang list schema deterministically."""
+    names = set()
+    result = []
+    for name, text in sorted(entries, key=lambda entry: entry[0]):
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("notification string name cannot be empty")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"notification string text cannot be empty: {name}")
+        if CONTROL_CHARACTERS.search(name) or CONTROL_CHARACTERS.search(text):
+            raise ValueError(f"notification string contains a control character: {name}")
+        if name in names:
+            raise ValueError(f"duplicate notification keys: {[name]}")
+        names.add(name)
+        result.append({"name": name, "text": text})
+    return result
 
 
 def build_string_table(
@@ -55,12 +73,8 @@ def build_string_table(
             key = notification_key(item_id, definition, stage=stage)
             entries.append((key, notification_text(item_id, definition, item_name, stage=stage)))
 
-    key_counts = Counter(key for key, _ in entries)
-    duplicates = sorted(key for key, count in key_counts.items() if count > 1)
-    if duplicates:
-        raise ValueError(f"duplicate notification keys: {duplicates}")
-
-    defined_keys = set(key_counts)
+    serialized_entries = string_entries(entries)
+    defined_keys = {entry["name"] for entry in serialized_entries}
     referenced_keys = referenced_notification_keys(maps_dir)
     if referenced_keys != defined_keys:
         missing = sorted(referenced_keys - defined_keys)
@@ -71,7 +85,7 @@ def build_string_table(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps({"strings": dict(entries)}, indent=4, ensure_ascii=False) + "\n",
+        json.dumps({"strings": serialized_entries}, indent=4, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 

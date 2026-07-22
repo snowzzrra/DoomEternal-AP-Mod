@@ -215,6 +215,11 @@ if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
         --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
         --maps-dir "$GENERATED_MAPS_DIR" \
         --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json"
+    python3 "$REPO_ROOT/tools/release/build_string_table.py" \
+        --items "$REPO_ROOT/data/items.json" \
+        --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
+        --maps-dir "$GENERATED_MAPS_DIR" \
+        --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/portuguese.json"
 fi
 
 python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
@@ -512,6 +517,15 @@ python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --client-dir "$OUTPUT_DIR/client" \
     --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json"
+python3 "$REPO_ROOT/tools/validation/audit_item_notification_release.py" \
+    --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
+    --generated-maps "$GENERATED_MAPS_DIR" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --client-dir "$OUTPUT_DIR/client" \
+    --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json" \
+    --map-registry "$MAP_SOURCES_FILE" \
+    --decompressor "$TOOLS_DIR/idFileDeCompressor" \
+    --update-manifest
 if find "$OUTPUT_DIR/mod" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
@@ -590,6 +604,12 @@ python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
     --mod-root "$MOD_AUDIT_DIR" \
     --client-dir "$EXTRACTED_AUDIT_DIR/client" \
     --release-manifest "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json"
+python3 "$REPO_ROOT/tools/validation/audit_item_notification_release.py" \
+    --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
+    --generated-maps "$GENERATED_MAPS_DIR" \
+    --playable-zip "$OUTPUT_DIR/$PTB_ZIP_NAME" \
+    --map-registry "$MAP_SOURCES_FILE" \
+    --decompressor "$TOOLS_DIR/idFileDeCompressor"
 if find "$MOD_AUDIT_DIR" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \

@@ -975,10 +975,7 @@ def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIF
 
 
 def generate_receipt_relay(item_id, effect_entity_names, stage=None):
-    """Generate receipt entrypoint relay that triggers effect(s) + notification.
-    
-    Fires effect entities first, then notification.
-    """
+    """Generate a reusable receipt entrypoint for effect(s) plus notification."""
     notif_name = f"{ITEM_NOTIFICATION_PREFIX}{item_id}"
     if stage is not None:
         notif_name = f"{notif_name}_{stage}"
@@ -986,10 +983,13 @@ def generate_receipt_relay(item_id, effect_entity_names, stage=None):
     if stage is not None:
         relay_name = f"{RECEIPT_ENTITY_PREFIX}_{item_id}_{stage}"
     
-    targets = [*effect_entity_names, notif_name]
+    activation_chain = [
+        *(f"ai_ScriptCmdEnt {effect} activate" for effect in effect_entity_names),
+        f"ai_ScriptCmdEnt {notif_name} activate",
+    ]
     return build_primitive(
-        "item_receipt_relay", relay_name,
-        {"targets": targets},
+        "target_command", relay_name,
+        {"command": ";".join(activation_chain)},
         release=False,
     )
 

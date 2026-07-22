@@ -12,7 +12,11 @@ from pathlib import Path
 RECEIPT_RE = re.compile(r"entityDef ap_rpc_item_(\d+(?:_\d+)?) \{")
 NOTIFICATION_RE = re.compile(r"entityDef ap_notify_item_(\d+(?:_\d+)?) \{")
 HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
-STRING_TABLE = Path("gameresources_patch1/EternalMod/strings/english.json")
+STRING_TABLES = (
+    Path("gameresources_patch1/EternalMod/strings/english.json"),
+    Path("gameresources_patch1/EternalMod/strings/portuguese.json"),
+)
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def entity_block(content: str, entity_name: str) -> str:
@@ -40,6 +44,32 @@ def capability(path: Path) -> bool:
     return value
 
 
+def string_table_names(path: Path) -> set[str]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if set(data) != {"strings"}:
+        raise AssertionError(f"string table root must contain only strings: {path}")
+    strings = data["strings"]
+    if not isinstance(strings, list):
+        raise AssertionError(f"string table strings must be a list: {path}")
+    names = set()
+    for entry in strings:
+        if not isinstance(entry, dict):
+            raise AssertionError(f"string table entry must be a dict: {path}")
+        if set(entry) != {"name", "text"}:
+            raise AssertionError(f"string table entry keys must be name/text: {path}")
+        name, text = entry["name"], entry["text"]
+        if not isinstance(name, str) or not name.strip():
+            raise AssertionError(f"string table name is empty: {path}")
+        if not isinstance(text, str) or not text.strip():
+            raise AssertionError(f"string table text is empty: {path}")
+        if CONTROL_CHARACTERS.search(name) or CONTROL_CHARACTERS.search(text):
+            raise AssertionError(f"string table contains control characters: {path}")
+        if name in names:
+            raise AssertionError(f"string table name is duplicated: {name}")
+        names.add(name)
+    return names
+
+
 def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, manifest_path: Path) -> None:
     maps = sorted(maps_dir.rglob("*.entities"))
     if not maps:
@@ -48,7 +78,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     receipts = set(RECEIPT_RE.findall(content))
     notifications = set(NOTIFICATION_RE.findall(content))
     headers = set(HEADER_RE.findall(content))
-    table_path = mod_root / STRING_TABLE
+    table_paths = tuple(mod_root / table for table in STRING_TABLES)
 
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("client identity notification capability diverges from build mode")
@@ -59,7 +89,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         raise AssertionError("packaged bridge lacks capability-gated receipt routing")
 
     if not enabled:
-        if receipts or notifications or headers or table_path.exists():
+        if receipts or notifications or headers or any(path.exists() for path in table_paths):
             raise AssertionError("disabled notifier build contains receipt, notification, or string-table artifacts")
         return
 
@@ -68,11 +98,15 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     expected_headers = {f"#str_ap_notify_item_{suffix}" for suffix in notifications}
     if headers != expected_headers:
         raise AssertionError("enabled notifier headers diverge from notification entities")
-    if not table_path.is_file():
-        raise AssertionError("enabled notifier build lacks english.json")
-    strings = json.loads(table_path.read_text(encoding="utf-8")).get("strings")
-    if not isinstance(strings, dict) or set(strings) != headers:
+    if not all(path.is_file() for path in table_paths):
+        raise AssertionError("enabled notifier build lacks English or Portuguese strings")
+    locale_names = [string_table_names(path) for path in table_paths]
+    if locale_names[0] != headers:
         raise AssertionError("english.json keys diverge from generated notification headers")
+    if locale_names[1] != headers:
+        raise AssertionError("portuguese.json keys diverge from generated notification headers")
+    if locale_names[0] != locale_names[1]:
+        raise AssertionError("English and Portuguese string keys diverge")
 
     required_notification_fields = (
         'class = "idTarget_Notification";',
@@ -82,7 +116,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         'rootWidget = "tier3centered";',
         'icon = "art/ui/dossier/icons/ico_secrets_off";',
         'notificationSound = "play_secret_encounter_found";',
-        'noFlood = true;',
+        'noFlood = false;',
     )
     for suffix in notifications:
         notification = entity_block(content, f"ap_notify_item_{suffix}")
@@ -90,11 +124,31 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
         if any(field not in notification for field in required_notification_fields):
             raise AssertionError(f"item notification HUD contract is incomplete: {suffix}")
+        if any(field in notification for field in (
+            'noFlood = true;', 'triggerOnce = true;', 'removeAfterActivation = true;',
+            'disableAfterActivation = true;', 'startOff = true;',
+        )):
+            raise AssertionError(f"item notification is not reactivatable: {suffix}")
         receipt = entity_block(content, f"ap_rpc_item_{suffix}")
-        if f'item[0] = "ap_rpc_v3_{suffix}";' not in receipt:
-            raise AssertionError(f"receipt first target is not the silent effect: {suffix}")
-        if f'item[1] = "ap_notify_item_{suffix}";' not in receipt:
-            raise AssertionError(f"receipt second target is not the notification: {suffix}")
+        entity_block(content, f"ap_rpc_v3_{suffix}")
+        expected_chain = (
+            f'ai_ScriptCmdEnt ap_rpc_v3_{suffix} activate;'
+            f'ai_ScriptCmdEnt ap_notify_item_{suffix} activate'
+        )
+        if 'class = "idTarget_Command";' not in receipt or 'inherit = ' in receipt:
+            raise AssertionError(f"receipt root does not use the reusable command primitive: {suffix}")
+        if f'commandText = "{expected_chain}";' not in receipt:
+            raise AssertionError(f"receipt effect/notification chain is out of order: {suffix}")
+        if any(field in receipt for field in (
+            'triggerOnce = true;', 'removeAfterActivation = true;',
+            'disableAfterActivation = true;', 'startOff = true;',
+        )):
+            raise AssertionError(f"receipt relay is not reactivatable: {suffix}")
+        if any(field not in receipt for field in (
+            'expandInheritance = false;', 'poolCount = 0;', 'poolGranularity = 2;',
+            'networkReplicated = false;', 'disableAIPooling = false;',
+        )):
+            raise AssertionError(f"receipt root lifecycle diverges from ap_rpc_v3: {suffix}")
 
 
 def main() -> None:
