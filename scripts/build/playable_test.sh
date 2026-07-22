@@ -7,12 +7,12 @@ export PYTHONPATH="$REPO_ROOT"
 WORKSPACE="$(cd "$REPO_ROOT/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
 OUTPUT_DIR=""
-ENABLE_ITEM_NOTIFICATIONS="${AP_ENABLE_ITEM_NOTIFICATIONS:-0}"
+ENABLE_ITEM_NOTIFICATIONS=1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --enable-experimental-item-notifications)
-            ENABLE_ITEM_NOTIFICATIONS=1
+        --disable-item-notifications)
+            ENABLE_ITEM_NOTIFICATIONS=0
             shift
             ;;
         *)
@@ -37,7 +37,7 @@ fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$REPO_ROOT/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$REPO_ROOT/vanillamaps}"
-RELEASE_VERSION="v0.3.1-alpha-dev"
+RELEASE_VERSION="v0.3.1-alpha"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
@@ -131,8 +131,8 @@ extract_and_build() {
     echo "[$map_key] source=$source_map size=$source_size sha256=$source_hash_before revision=$supported_game_revision" | tee -a "$BUILD_LOG"
 
     local GENERATOR_ARGS=()
-    if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
-        GENERATOR_ARGS+=(--enable-experimental-item-notifications)
+    if [[ "$ENABLE_ITEM_NOTIFICATIONS" != "1" ]]; then
+        GENERATOR_ARGS+=(--disable-item-notifications)
     fi
 
     python3 "$REPO_ROOT/tools/maps/ap_map_generator.py" \
@@ -358,7 +358,7 @@ identity = {
     "item_notifications": {
         "enabled": sys.argv[3] == "1",
         "revision": 1,
-        "experimental": True,
+        "experimental": False,
     },
 }
 identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
@@ -450,7 +450,7 @@ manifest = {
     "item_notifications": {
         "enabled": item_notifications_enabled,
         "revision": 1,
-        "experimental": True,
+        "experimental": False,
     },
     "validator": {
         "status": validation["status"],
