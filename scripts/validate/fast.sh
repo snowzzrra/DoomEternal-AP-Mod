@@ -36,6 +36,7 @@ python3 -m py_compile \
     bridge_client.py \
     challenge_registry.py \
     foundation.py \
+    item_classification.py \
     tools/maps/hub_diff_guard.py \
     item_reconciliation.py \
     map_registry.py \
@@ -53,7 +54,11 @@ python3 -m py_compile \
     tools/validation/validate_windows_runtime_deps.py \
     tools/diagnostics/save_scenarios.py \
     tools/release/generate_foundation_test_plan.py \
+    tools/release/build_apworld_identity.py \
+    tools/release/build_string_table.py \
     tools/validation/audit_scripted_location.py \
+    tools/validation/audit_item_notification_release.py \
+    tools/validation/validate_item_notification_package.py \
     tools/validation/audit_packaged_transition_bridge.py && pass || fail "py_compile"
 
 # ----- 3. Registry/contract structural validation -----
@@ -68,6 +73,9 @@ HERMETIC_TEST_MODULES=(
     tests.unit.test_validate_data
     tests.unit.test_foundation
     tests.unit.test_item_reconciliation
+    tests.unit.test_item_notifications
+    tests.unit.test_notification_package_validation
+    tests.unit.test_item_notification_release_audit
     tests.unit.test_logic_decl_patcher
     tests.unit.test_scripted_location_contracts
     tests.unit.test_save_scenarios

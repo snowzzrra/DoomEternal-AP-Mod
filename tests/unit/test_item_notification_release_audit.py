@@ -15,7 +15,7 @@ ENTITY = '''entityDef ap_rpc_v3_7770000 {
 	inherit = "target/relay";
 	class = "idTarget_Relay";
 }
-entityDef ap_notify_item_7770000 {
+entityDef ap_notify_item_major_7770000 {
 	header = "#str_ap_notify_item_7770000";
 }
 '''
@@ -31,9 +31,23 @@ class ItemNotificationReleaseAuditTests(unittest.TestCase):
             mod = root / "mod"
             client = root / "client"
             generated.mkdir()
-            client.mkdir()
+            (client / "data").mkdir(parents=True)
             identity = {"item_notifications": {"enabled": True}}
             (client / "bridge_identity.json").write_text(json.dumps(identity), encoding="utf-8")
+            (client / "data" / "item_classifications.json").write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "item_mapping_revision": 5,
+                    "source": "Archipelago/worlds/doometernal/items.py",
+                    "items": {
+                        "7770000": {
+                            "name": "Heavy Cannon",
+                            "classification": 1,
+                        }
+                    },
+                }),
+                encoding="utf-8",
+            )
             manifest = root / "RELEASE_MANIFEST.json"
             manifest.write_text(json.dumps(identity), encoding="utf-8")
             table = mod / "gameresources_patch1" / "EternalMod" / "strings"
@@ -62,6 +76,10 @@ class ItemNotificationReleaseAuditTests(unittest.TestCase):
                 archive.write(inner, "DoomEternalArchipelagoAlpha.zip")
                 archive.write(manifest, "RELEASE_MANIFEST.json")
                 archive.write(client / "bridge_identity.json", "client/bridge_identity.json")
+                archive.write(
+                    client / "data" / "item_classifications.json",
+                    "client/data/item_classifications.json",
+                )
             extracted = root / "extracted"
             packaged_mod, packaged_client, packaged_manifest = _extract_playable_zip(playable, extracted)
             self.assertEqual(

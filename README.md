@@ -97,9 +97,9 @@ For supported pickups, the generator:
 1. locates vanilla pickup entities selected in `level_configs/*.json`;
 2. strips or bypasses vanilla inventory rewards;
 3. converts the interaction into an AP check path;
-4. standardizes the visible AP pickup presentation where possible;
+4. preserves reviewed native presentation or builds an inert AP presentation;
 5. injects an `AP_CHECK_*` relay;
-6. injects native notification feedback;
+6. applies `vanilla_only`, `ap_only`, or justified `vanilla_and_ap` feedback;
 7. injects an `ap_event_<location_id>` command entity that writes a durable
    event file for the bridge.
 
@@ -130,7 +130,7 @@ The external `ap_client.exe` imports queued commands and only consumes them when
 ```text
 AP-mutated pickup
   -> AP_CHECK_* relay
-  -> native pickup notification
+  -> zero or one lateral AP Codex notification
   -> ap_event_<location_id>.txt
   -> bridge_client.py
   -> LocationChecks
@@ -699,8 +699,8 @@ Fix:
   accepted aggregate reward suppression.
 - Weapon Point rewards remain fully vanilla in 0.3.0. Safe conversion is
   deferred until the project owns an in-process, revision-gated hook host.
-- The first Fortress Praetor token keeps its native Suit bootstrap and AP
-  check, but grants zero vanilla Praetor currency.
+- Received progression/useful/trap items use the Current major card; filler
+  uses the lateral Codex card. Location-sent AP feedback always uses Codex.
 
 ## Known probable issues
 
@@ -710,8 +710,6 @@ Fix:
   remains available. Socket requirements are authoritative.
 - Reloading a checkpoint may still recover rare vanilla scripting desyncs,
   and most other problems, always try reloading a checkpoint.
-- There's no current way to identify what you sent/received. A second screen
-  dedicated to watching the AP client is recommended.
 - The Rocket launcher pickup may seem buggy, but it works.
 - Deathlink is currently "hardcore". If you have extra lives, it will ignore
   them, killing you anyway.

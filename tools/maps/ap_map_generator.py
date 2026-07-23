@@ -12,6 +12,11 @@ from foundation import (
     build_primitive,
     validate_primitive_registry,
 )
+from item_classification import (
+    load_item_classifications,
+    notification_entity_name,
+    notification_style_for_item,
+)
 from tools.maps.notification_formatting import notification_key
 from tools.maps.notification_lab import generate_notification_lab
 
@@ -19,6 +24,7 @@ AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
 NOTIFICATION_ENTITY_PREFIX = "ap_notify_"
+LOCATION_NOTIFICATION_PREFIX = "ap_notify_location_"
 EVENT_ENTITY_PREFIX = "ap_event_"
 GENERATED_NAME_PREFIXES = (
     "AP_CHECK_",
@@ -32,24 +38,6 @@ GENERATED_NAME_PREFIXES = (
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
 AP_QUESTION_MARK_MODEL = "art/pickups/question_mark_a.lwo"
-
-# Item notification type mapping by family
-# Uses existing game notificationType values from idTarget_Notification
-NOTIFICATION_TYPE_BY_FAMILY = {
-    "simple_give": "HUD_NOTIFY_INVENTORY_ACQUIRED",
-    "perk": "HUD_NOTIFY_UPGRADE_PERK",
-    "progressive_perk": "HUD_NOTIFY_UPGRADE_PERK",
-    "resource": "HUD_NOTIFY_GENERIC_CALLOUT",
-    "extra_life": "HUD_NOTIFY_EXTRA_LIFE_ACQUIRED",
-    "trap_spawn": "HUD_NOTIFY_GENERIC_CALLOUT",
-    "currency": "HUD_NOTIFY_INVENTORY_ACQUIRED",
-    "multi_command": "HUD_NOTIFY_GENERIC_CALLOUT",
-    "no_op": "HUD_NOTIFY_GENERIC_CALLOUT",
-}
-# Safe fallback hud_event for each notificationType
-# Known-working event IDs from game: HUD_EVENT_PLAYER_NOTIFICATION (generic)
-NOTIFICATION_DEFAULT_HUD_EVENT = "HUD_EVENT_PLAYER_NOTIFICATION"
-
 
 def compute_file_sha256(path):
     digest = hashlib.sha256()
@@ -116,14 +104,6 @@ def assert_no_weapon_mastery_token_currency(content, context):
         )
 
 
-def native_praetor_token_family(block):
-    """Recognize only the reviewed native Praetor currency transaction."""
-    return (
-        'inherit = "progress/praetor_token";' in block
-        and 'class = "idInteractable_GiveItems";' in block
-        and 'automapPropertiesDecl = "praetor_token";' in block
-    )
-
 def remove_balanced_entity_blocks(content, name_prefix):
     pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w*\s*\{', re.IGNORECASE)
     result = []
@@ -166,6 +146,41 @@ def remove_property_blocks(content, property_name):
         pos = i
     result.append(content[pos:])
     return ''.join(result)
+
+
+def retain_single_stat_increase(content, property_name, stat_name):
+    pattern = re.compile(
+        r'\b' + re.escape(property_name) + r'\s*=\s*\{',
+        re.IGNORECASE,
+    )
+    match = pattern.search(content)
+    if match is None:
+        raise ValueError(
+            f"Native entity contract lacks {property_name} stat block"
+        )
+    close_brace = find_matching_brace(content, match.end() - 1)
+    original = content[match.start():close_brace + 1]
+    stat_pattern = re.compile(
+        r'item\[\d+\]\s*=\s*\{\s*'
+        rf'stat\s*=\s*"{re.escape(stat_name)}";\s*'
+        r'increase\s*=\s*(-?\d+);\s*\}',
+        re.DOTALL,
+    )
+    stat_matches = stat_pattern.findall(original)
+    if stat_matches != ["1"]:
+        raise ValueError(
+            f"Native entity contract expected one {stat_name} increase"
+        )
+    replacement = (
+        f'{property_name} = {{\n'
+        '\t\t\tnum = 1;\n'
+        '\t\t\titem[0] = {\n'
+        f'\t\t\t\tstat = "{stat_name}";\n'
+        '\t\t\t\tincrease = 1;\n'
+        '\t\t\t}\n'
+        '\t\t}'
+    )
+    return content[:match.start()] + replacement + content[close_brace + 1:]
 
 
 def find_matching_brace(content, open_brace_index):
@@ -241,6 +256,30 @@ def apply_native_entity_contract(block, contract):
                 f"{contract['remove_block']}"
             )
         block = remove_property_blocks(block, contract["remove_block"])
+    for property_name, value in contract.get("set_properties", {}).items():
+        if isinstance(value, bool):
+            rendered = str(value).lower()
+        elif isinstance(value, str):
+            rendered = f'"{value}"'
+        else:
+            rendered = str(value)
+        scalar = re.compile(
+            rf'(\b{re.escape(property_name)}\s*=\s*)'
+            r'(?:"[^"]*"|true|false|-?\d+(?:\.\d+)?);'
+        )
+        block, replacements = scalar.subn(
+            rf'\g<1>{rendered};', block, count=1
+        )
+        if replacements != 1:
+            raise ValueError(
+                "Native entity contract source drift; missing scalar property: "
+                f"{property_name}"
+            )
+    retain_stat = contract.get("retain_pickup_stat")
+    if retain_stat:
+        block = retain_single_stat_increase(
+            block, "pickup_statIncreases", retain_stat
+        )
     return block
 
 
@@ -267,6 +306,7 @@ TARGET_POLICY_CONSUMERS = {
 
 NATIVE_ENTITY_CONTRACT_KEYS = {
     "remove_block", "original_targets", "required_snippets",
+    "set_properties", "retain_pickup_stat",
 }
 
 CHECKPOINT_CLEANUP_CONTRACT_KEYS = {
@@ -878,8 +918,7 @@ def generate_event_relay(
     event_name = f"{EVENT_ENTITY_PREFIX}{location_id}"
     target_names = list(completion_targets or [])
     if include_notification:
-        notification_name = f"{NOTIFICATION_ENTITY_PREFIX}{ap_check_id}"
-        target_names.append(notification_name)
+        target_names.append(f"{LOCATION_NOTIFICATION_PREFIX}{location_id}")
     target_names.append(event_name)
     target_lines = [
         f'\t\t\t\titem[{index}] = "{target_name}";'
@@ -887,31 +926,33 @@ def generate_event_relay(
     ]
 
     return f"""entity {{
-	entityDef {ap_check_id} {{
-		inherit = "target/relay";
-		class = "idTarget_Count";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			count = 1;
-			targets = {{
-				num = {len(target_lines)};
+\tentityDef {ap_check_id} {{
+\t\tinherit = "target/relay";
+\t\tclass = "idTarget_Count";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tcount = 1;
+\t\t\ttargets = {{
+\t\t\t\tnum = {len(target_lines)};
 {chr(10).join(target_lines)}
-			}}
-{spawn_pos_text}		}}
-	}}
+\t\t\t}}
+{spawn_pos_text}\t\t}}
+\t}}
 }}
 """
 
 
 def generate_target_relay(
     ap_check_id, location_id, spawn_pos_text, completion_targets=None,
+    include_notification=True,
 ):
     return generate_event_relay(
-        ap_check_id, location_id, spawn_pos_text, include_notification=True,
+        ap_check_id, location_id, spawn_pos_text,
+        include_notification=include_notification,
         completion_targets=completion_targets,
     )
 
@@ -934,42 +975,45 @@ def generate_check_event(location_id):
 """
 
 
-def generate_pickup_notification(ap_check_id):
-    notification_name = f"{NOTIFICATION_ENTITY_PREFIX}{ap_check_id}"
-    return f"""entity {{
-	entityDef {notification_name} {{
-		class = "idTarget_Notification";
-		expandInheritance = false;
-		poolCount = 0;
-		poolGranularity = 2;
-		networkReplicated = false;
-		disableAIPooling = false;
-		edit = {{
-			flags = {{
-				noFlood = true;
-			}}
-			notificationType = "HUD_NOTIFY_SECRET_FOUND";
-			notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
-			doNotShowDuplicate = false;
-			rootWidget = "tier3centered";
-			icon = "art/ui/dossier/icons/ico_secrets_off";
-			header = "#str_swf_notification_secret_found";
-			notificationSound = "play_secret_encounter_found";
-		}}
-	}}
-}}
-"""
-
-
-def generate_item_notification(item_id, header_key, notification_type="HUD_NOTIFY_SECRET_FOUND", hud_event_id="HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND", icon="art/ui/dossier/icons/ico_secrets_off", stage=None):
-    """Generate idTarget_Notification for an item received from Archipelago."""
-    entity_name = f"{ITEM_NOTIFICATION_PREFIX}{item_id}"
-    if stage is not None:
-        entity_name = f"{entity_name}_{stage}"
+def generate_pickup_notification(location_id):
     return build_primitive(
-        "item_notification", entity_name,
-        {"header_key": header_key, "notification_type": notification_type, "hud_event_id": hud_event_id, "icon": icon},
-        release=False,
+        "location_notification_codex",
+        f"{LOCATION_NOTIFICATION_PREFIX}{location_id}",
+        {
+            "header_key": "#str_ap_location_sent",
+            "subtext_key": f"#str_ap_location_{location_id}",
+        },
+    )
+
+
+def location_feedback_policy(location_feedback, ap_check_id):
+    if ap_check_id not in location_feedback:
+        raise ValueError(f"Missing explicit location feedback policy for {ap_check_id}")
+    feedback = location_feedback[ap_check_id]
+    if not isinstance(feedback, dict):
+        raise ValueError(
+            f"Invalid location feedback config for {ap_check_id}"
+        )
+    policy = feedback.get("policy")
+    if policy not in {"vanilla_only", "ap_only", "vanilla_and_ap"}:
+        raise ValueError(
+            f"Invalid location feedback policy for {ap_check_id}"
+        )
+    if policy == "vanilla_and_ap" and not feedback.get("justification"):
+        raise ValueError(
+            f"vanilla_and_ap requires justification for {ap_check_id}"
+        )
+    return policy
+
+
+def generate_item_notification(item_id, header_key, classification, stage=None):
+    """Generate the one classification-selected received-item notification."""
+    style = notification_style_for_item(item_id, classification)
+    entity_name = notification_entity_name(item_id, classification, stage=stage)
+    return build_primitive(
+        f"item_notification_{style}",
+        entity_name,
+        {"header_key": header_key},
     )
 
 
@@ -1048,7 +1092,12 @@ def inject_secret_encounter_completion(
 def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
-def generate_rpc_command_entities(items_dict, item_names=None, enable_notifications=False):
+def generate_rpc_command_entities(
+    items_dict,
+    item_names=None,
+    item_classifications=None,
+    enable_notifications=False,
+):
     """Generate ap_rpc_v3_* effects and independent receipt notifications.
     
     item_names: dict[int, str] — item_id -> canonical name (from replay_policies)
@@ -1125,6 +1174,8 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
 
     # Only non-no_op items generate independent notification entities.
     if item_names and enable_notifications:
+        if item_classifications is None:
+            raise ValueError("item notifications require packaged classifications")
         for item_id, command_value in items_dict.items():
             is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
             if is_no_op:
@@ -1133,19 +1184,24 @@ def generate_rpc_command_entities(items_dict, item_names=None, enable_notificati
             name = item_names.get(item_id_int)
             if not name:
                 raise ValueError(f"Item {item_id} has no name in item_names; notification requires it")
-            
-            notif_type = "HUD_NOTIFY_SECRET_FOUND"
-            hud_event_id = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND"
-            icon = "art/ui/dossier/icons/ico_secrets_off"
+            if item_id_int not in item_classifications:
+                raise ValueError(
+                    f"Item {item_id} has no packaged classification"
+                )
+            classification = item_classifications[item_id_int]
             
             if isinstance(command_value, dict) and command_value.get("type") == "progressive_perk":
                 perks = command_value.get("perks", [])
                 for stage in range(len(perks)):
                     header_key = notification_key(item_id_int, command_value, stage=stage)
-                    blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon, stage=stage))
+                    blocks.append(generate_item_notification(
+                        item_id_int, header_key, classification, stage=stage
+                    ))
             else:
                 header_key = notification_key(item_id_int, command_value)
-                blocks.append(generate_item_notification(item_id_int, header_key, notif_type, hud_event_id, icon))
+                blocks.append(generate_item_notification(
+                    item_id_int, header_key, classification
+                ))
 
     generated = "".join(blocks)
     missing_entities = [
@@ -1203,6 +1259,20 @@ def load_item_names(names_path="data/item_replay_policies.json"):
     return {int(k): v["name"] for k, v in items.items() if "name" in v}
 
 
+def load_explicit_location_feedback(map_key, configured):
+    """Merge the reviewed AP-only records with per-map exceptional owners."""
+    path = Path(__file__).resolve().parents[2] / "data/location_feedback_policies.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if document.get("schema_version") != 1:
+        raise ValueError("unsupported location feedback policy schema")
+    explicit = dict(configured)
+    for ap_check in document.get("policies", {}).get(map_key, []):
+        if ap_check in explicit:
+            raise ValueError(f"duplicate explicit location feedback policy for {ap_check}")
+        explicit[ap_check] = {"policy": "ap_only"}
+    return explicit
+
+
 def generate_map(
     input_file,
     output_file,
@@ -1210,11 +1280,18 @@ def generate_map(
     manifest_file,
     items_dict,
     item_names=None,
+    item_classifications=None,
     enable_notifications=True,
     enable_notification_lab=None,
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
+    if item_classifications is None:
+        item_classifications = load_item_classifications(
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "item_classifications.json"
+        )
 
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
@@ -1223,6 +1300,9 @@ def generate_map(
     remove_entities = level_config.get("remove_entities", [])
     neutralize_entity_references = level_config.get("neutralize_entity_references", [])
     secret_encounters = level_config.get("secret_encounters", [])
+    location_feedback = load_explicit_location_feedback(
+        level_config.get("map_key"), level_config.get("location_feedback", {})
+    )
     manifest_data = {}
     map_key = level_config.get("map_key")
 
@@ -1334,8 +1414,11 @@ def generate_map(
 
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
-                target_policy = copy.deepcopy(target_policies.get(entity_name))
-                
+                feedback_policy = location_feedback_policy(
+                    location_feedback, ap_check_id
+                )
+                include_ap_feedback = feedback_policy != "vanilla_only"
+                target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
                 if not target_policy:
                     target_policy = build_universal_physical_policy(ap_check_id, location_id, block)
                 target_policy = bind_parent_from_source(target_policy, block)
@@ -1356,8 +1439,15 @@ def generate_map(
                     )
                     new_blocks.append("entity {" + native)
                     new_blocks.append(generate_event_relay(
-                        ap_check_id, location_id, "", include_notification=False,
+                        ap_check_id,
+                        location_id,
+                        "",
+                        include_notification=include_ap_feedback,
                     ))
+                    if include_ap_feedback:
+                        new_blocks.append(
+                            generate_pickup_notification(location_id)
+                        )
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
                     continue
@@ -1401,8 +1491,12 @@ def generate_map(
                         location_id,
                         "",
                         completion_targets=target_policy.get("completion_targets"),
+                        include_notification=include_ap_feedback,
                     ))
-                    new_blocks.append(generate_pickup_notification(ap_check_id))
+                    if include_ap_feedback:
+                        new_blocks.append(
+                            generate_pickup_notification(location_id)
+                        )
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
                     continue
@@ -1458,9 +1552,20 @@ def generate_map(
             expected_last_event_index,
         )
         manifest_data[ap_check_id] = location_id
-        secret_blocks.append(
-            generate_event_relay(ap_check_id, location_id, "", include_notification=False)
+        feedback_policy = location_feedback_policy(
+            location_feedback, ap_check_id
         )
+        include_ap_feedback = feedback_policy != "vanilla_only"
+        secret_blocks.append(
+            generate_event_relay(
+                ap_check_id,
+                location_id,
+                "",
+                include_notification=include_ap_feedback,
+            )
+        )
+        if include_ap_feedback:
+            secret_blocks.append(generate_pickup_notification(location_id))
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
 
@@ -1468,7 +1573,12 @@ def generate_map(
         map_content
         + "\n"
         + "".join(secret_blocks)
-        + generate_rpc_command_entities(items_dict, item_names=item_names, enable_notifications=enable_notifications)
+        + generate_rpc_command_entities(
+            items_dict,
+            item_names=item_names,
+            item_classifications=item_classifications,
+            enable_notifications=enable_notifications,
+        )
         + generate_bootstrap_entities()
         + generate_system_command_entities()
         + generate_notification_lab(map_key, enabled=enable_notification_lab)

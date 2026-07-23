@@ -34,7 +34,7 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used1",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
       "reward_grant_currency_ownership_edges": [
@@ -48,10 +48,12 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used1",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
-      "drop_targets": [],
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used1"
+      ],
       "bind_parent": null,
       "local_transform": {
         "spawnPosition": "spawnPosition = {\n\t\t\tx = 15.7067108;\n\t\t\ty = -109.698196;\n\t\t\tz = -7.37999535;\n\t\t}"
@@ -62,7 +64,7 @@
       "gates": [
         "sentinel_battery_room_target_relay_item_used1"
       ],
-      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 2"
+      "conditional_pickup_behavior": "generic AP trigger replaces the native owner and drops the vanilla relay; earliest AP access is Visit 2 after cumulative Battery count 2"
     },
     {
       "entity": "sentinel_battery_room_progress_praetor_token_2",
@@ -75,7 +77,7 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used2",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
       "reward_grant_currency_ownership_edges": [
@@ -89,10 +91,12 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used2",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
-      "drop_targets": [],
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used2"
+      ],
       "bind_parent": null,
       "local_transform": {
         "spawnPosition": "spawnPosition = {\n\t\t\tx = -14.6790056;\n\t\t\ty = -109.682449;\n\t\t\tz = -7.37999535;\n\t\t}"
@@ -103,7 +107,7 @@
       "gates": [
         "sentinel_battery_room_target_relay_item_used2"
       ],
-      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 3"
+      "conditional_pickup_behavior": "generic AP trigger replaces the native owner and drops the vanilla relay; earliest AP access is Visit 2 after cumulative Battery count 3"
     },
     {
       "entity": "sentinel_battery_room_progress_mod_bot_3",
@@ -123,14 +127,14 @@
         {
           "target": "native WeaponModBot selection transaction",
           "classification": "reward",
-          "disposition": "drop"
+          "disposition": "preserve"
         }
       ],
       "progression_objective_relays": [
         {
           "target": "sentinel_battery_room_target_relay_item_used3",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
       "drop_targets": [],
@@ -198,7 +202,7 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used_24",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
       "reward_grant_currency_ownership_edges": [
@@ -212,10 +216,12 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used_24",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
-      "drop_targets": [],
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used_24"
+      ],
       "bind_parent": null,
       "local_transform": {
         "spawnPosition": "spawnPosition = {\n\t\t\tx = -43.5300941;\n\t\t\ty = 5.64294481;\n\t\t\tz = -21.300045;\n\t\t}"
@@ -226,7 +232,7 @@
       "gates": [
         "sentinel_battery_room_target_relay_item_used_24"
       ],
-      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 12"
+      "conditional_pickup_behavior": "generic AP trigger replaces the native owner and drops the vanilla relay; earliest AP access is Visit 2 after cumulative Battery count 12"
     },
     {
       "entity": "progress_praetor_token_4",
@@ -239,7 +245,7 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used_25",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
       "reward_grant_currency_ownership_edges": [
@@ -253,10 +259,12 @@
         {
           "target": "sentinel_battery_room_target_relay_item_used_25",
           "classification": "removal",
-          "disposition": "preserve"
+          "disposition": "drop"
         }
       ],
-      "drop_targets": [],
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used_25"
+      ],
       "bind_parent": null,
       "local_transform": {
         "spawnPosition": "spawnPosition = {\n\t\t\tx = 44.659996;\n\t\t\ty = 5.40001488;\n\t\t\tz = -27.1200047;\n\t\t}"
@@ -267,7 +275,7 @@
       "gates": [
         "sentinel_battery_room_target_relay_item_used_25"
       ],
-      "conditional_pickup_behavior": "native save/marker owner retained; currencyList removed; original lifecycle relay order preserved; earliest AP access is Visit 2 after cumulative Battery count 13"
+      "conditional_pickup_behavior": "generic AP trigger replaces the native owner and drops the vanilla relay; earliest AP access is Visit 2 after cumulative Battery count 13"
     },
     {
       "entity": "progress_cheats_all_mastered_runes_1",

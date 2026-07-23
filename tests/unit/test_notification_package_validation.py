@@ -13,18 +13,37 @@ VALID_STRING_FIXTURE = (
 
 
 NOTIFICATION = '''entity {
-\tentityDef ap_notify_item_7770000 {
+\tentityDef ap_notify_item_major_7770000 {
 \t\tclass = "idTarget_Notification";
 \t\tedit = {
 \t\t\tflags = { noFlood = false; }
-\t\t\tnotificationType = "HUD_NOTIFY_SECRET_FOUND";
-\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
+\t\t\tnotificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";
 \t\t\tdoNotShowDuplicate = false;
-\t\t\trootWidget = "tier3centered";
-\t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
+\t\t\trootWidget = "weapon";
+\t\t\ticon = "art/ui/weapon/har";
 \t\t\theader = "#str_ap_notify_item_7770000";
 \t\t\tsubtext = "";
-\t\t\tnotificationSound = "play_secret_encounter_found";
+\t\t\tnotificationSound = "play_ui_notification_large";
+\t\t}
+\t}
+}
+'''
+
+LOCATION_NOTIFICATION = '''entity {
+\tentityDef ap_notify_location_7770001 {
+\t\tclass = "idTarget_Notification";
+\t\tedit = {
+\t\t\tflags = { noFlood = false; }
+\t\t\tnotificationType = "HUD_NOTIFY_CODEX_RECIEVED";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";
+\t\t\tnotificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";
+\t\t\tdoNotShowDuplicate = false;
+\t\t\trootWidget = "compact_notification";
+\t\t\ticon = "art/ui/icons/notifications/demons";
+\t\t\theader = "#str_ap_location_sent";
+\t\t\tsubtext = "#str_ap_location_7770001";
+\t\t\tnotificationSound = "play_hud_lower";
 \t\t}
 \t}
 }
@@ -44,7 +63,7 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
         mod = root / "mod"
         client = root / "client"
         maps.mkdir()
-        client.mkdir()
+        (client / "data").mkdir(parents=True)
         identity = {"item_notifications": {"enabled": enabled}}
         (client / "bridge_identity.json").write_text(json.dumps(identity), encoding="utf-8")
         (client / "bridge_client.py").write_text(
@@ -52,17 +71,53 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
         )
         manifest = root / "RELEASE_MANIFEST.json"
         manifest.write_text(json.dumps(identity), encoding="utf-8")
+        (client / "data" / "items.json").write_text(
+            '{"7770000": "give weapon/player/heavy_cannon"}',
+            encoding="utf-8",
+        )
+        (client / "data" / "item_classifications.json").write_text(
+            json.dumps({
+                "schema_version": 1,
+                "item_mapping_revision": 5,
+                "source": "Archipelago/worlds/doometernal/items.py",
+                "items": {
+                    "7770000": {
+                        "name": "Heavy Cannon",
+                        "classification": 1,
+                    }
+                },
+            }),
+            encoding="utf-8",
+        )
+        table = mod / "gameresources_patch1" / "EternalMod" / "strings"
+        table.mkdir(parents=True)
+        strings = [
+            {"name": "#str_ap_location_sent", "text": "AP Location Sent"},
+            {
+                "name": "#str_ap_location_7770001",
+                "text": "AP: Hell on Earth - Chainsaw",
+            },
+        ]
         if enabled:
-            (maps / "e1m1_intro.entities").write_text(EFFECT + NOTIFICATION, encoding="utf-8")
-            table = mod / "gameresources_patch1" / "EternalMod" / "strings"
-            table.mkdir(parents=True)
-            fixture = {"strings": [{"name": "#str_ap_notify_item_7770000", "text": "AP: Heavy Cannon"}]}
-            (table / "english.json").write_text(json.dumps(fixture), encoding="utf-8")
-            (table / "portuguese.json").write_text(json.dumps(fixture), encoding="utf-8")
+            (maps / "e1m1_intro.entities").write_text(
+                EFFECT + NOTIFICATION + LOCATION_NOTIFICATION,
+                encoding="utf-8",
+            )
+            strings.append({
+                "name": "#str_ap_notify_item_7770000",
+                "text": "AP: Heavy Cannon",
+            })
         else:
             (maps / "e1m1_intro.entities").write_text(
-                'entityDef ap_rpc_v3_7770000 { }', encoding="utf-8"
+                EFFECT + LOCATION_NOTIFICATION, encoding="utf-8"
             )
+        fixture = {"strings": strings}
+        (table / "english.json").write_text(
+            json.dumps(fixture), encoding="utf-8"
+        )
+        (table / "portuguese.json").write_text(
+            json.dumps(fixture), encoding="utf-8"
+        )
         return maps, mod, client, manifest
 
     def test_enabled_package_requires_all_notifier_artifacts(self):

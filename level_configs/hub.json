@@ -18,6 +18,29 @@
         "AP_CHECK_PICKUP_WEAPON_GAUSS_RIFLE_HUB_1": 7770170,
         "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171
     },
+    "location_feedback": {
+        "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_2": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PROGRESS_PRAETOR_TOKEN_3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PROGRESS_PRAETOR_TOKEN_4": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PROGRESS_CHEATS_ALL_MASTERED_RUNES_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": {
+            "policy": "vanilla_only"
+        }
+    },
     "target_removals": {
         "target_relay_pickup_ballista": [
             "target_give_item_ballista"
@@ -86,51 +109,19 @@
             "remove_original": true
         },
         "progress_praetor_point_hub_1": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [
-                    "target_relay_complete_praetor_obj"
-                ],
-                "required_snippets": [
-                    "\"game/sp/hub/from_e1m2\"",
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "model = \"md6def/objects/interact/praetor_suit_token/praetor_suit_token.md6\";",
-                    "stat = \"STAT_GAINED_FIRST_PRAETOR_TOKEN\";",
-                    "onUseCodexEntry = \"codex/tutorials/praetor_suit_perks\";",
-                    "progressionCategory = \"PROGRESSION_CATEGORY_ELITE\";",
-                    "useStat = \"STAT_SUIT_PAGE_UNLOCKED\";",
-                    "flags = {\n\t\t\thide = true;\n\t\t}"
-                ]
-            }
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "drop_targets": ["target_relay_complete_praetor_obj"]
         },
         "sentinel_battery_room_progress_praetor_token_1": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": ["sentinel_battery_room_target_relay_item_used1"],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "drop_targets": ["sentinel_battery_room_target_relay_item_used1"]
         },
         "sentinel_battery_room_progress_praetor_token_2": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": ["sentinel_battery_room_target_relay_item_used2"],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "drop_targets": ["sentinel_battery_room_target_relay_item_used2"]
         },
         "sentinel_battery_room_progress_mod_bot_3": {
             "independent_ap_trigger": true,
@@ -153,30 +144,14 @@
             "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
         },
         "progress_praetor_token_3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": ["sentinel_battery_room_target_relay_item_used_24"],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "drop_targets": ["sentinel_battery_room_target_relay_item_used_24"]
         },
         "progress_praetor_token_4": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": ["sentinel_battery_room_target_relay_item_used_25"],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "drop_targets": ["sentinel_battery_room_target_relay_item_used_25"]
         },
         "pickup_weapon_gauss_rifle_hub_1": {
             "independent_ap_trigger": true,

@@ -23,5 +23,31 @@
         "AP_CHECK_MECH_STREET_PICKUP_COLLECTIBLE_TOYS_DOOMGUY_1": 7770018,
         "AP_CHECK_CORNER_STREET_PICKUP_COLLECTIBLE_TOYS_IMP_2": 7770019,
         "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": 7770020
+    },
+    "location_feedback": {
+        "AP_CHECK_UAC_HQ_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E1M1": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "uac_hq_target_secret_1_e1m1"
+        },
+        "AP_CHECK_CORNER_STREET_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E1M1": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "corner_street_target_secret_1_e1m1"
+        },
+        "AP_CHECK_CORNER_STREET_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E1M1": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "corner_street_target_secret_2_e1m1"
+        },
+        "AP_CHECK_BARGE_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_MECH_STREET_PICKUP_COLLECTIBLE_TOYS_DOOMGUY_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_CORNER_STREET_PICKUP_COLLECTIBLE_TOYS_IMP_2": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": {
+            "policy": "vanilla_only"
+        }
     }
 }

@@ -1,0 +1,472 @@
+{
+    "schema_version": 1,
+    "item_mapping_revision": 5,
+    "source": "Archipelago/worlds/doometernal/items.py",
+    "source_sha256": "8037e503c8c925cc883fd406844da1aa0e68084e48f447146c9a8c601c5ac1e7",
+    "items": {
+        "7770000": {
+            "name": "Heavy Cannon",
+            "classification": 1
+        },
+        "7770001": {
+            "name": "Plasma Rifle",
+            "classification": 1
+        },
+        "7770002": {
+            "name": "Rocket Launcher",
+            "classification": 1
+        },
+        "7770003": {
+            "name": "Super Shotgun",
+            "classification": 1
+        },
+        "7770004": {
+            "name": "Ballista",
+            "classification": 1
+        },
+        "7770005": {
+            "name": "Chaingun",
+            "classification": 1
+        },
+        "7770006": {
+            "name": "BFG-9000",
+            "classification": 1
+        },
+        "7770007": {
+            "name": "The Crucible",
+            "classification": 1
+        },
+        "7770008": {
+            "name": "The Unmaykr",
+            "classification": 1
+        },
+        "7770009": {
+            "name": "Sentinel Hammer",
+            "classification": 1
+        },
+        "7770010": {
+            "name": "Chainsaw",
+            "classification": 1
+        },
+        "7770011": {
+            "name": "Frag Grenade",
+            "classification": 1
+        },
+        "7770012": {
+            "name": "Flame Belch",
+            "classification": 1
+        },
+        "7770013": {
+            "name": "Ice Bomb",
+            "classification": 1
+        },
+        "7770014": {
+            "name": "Blood Punch",
+            "classification": 1
+        },
+        "7770015": {
+            "name": "Dash",
+            "classification": 1
+        },
+        "7770016": {
+            "name": "Sentinel Battery",
+            "classification": 1
+        },
+        "7770017": {
+            "name": "Progressive Health Upgrade",
+            "classification": 1
+        },
+        "7770018": {
+            "name": "Empyrean Key",
+            "classification": 1
+        },
+        "7770020": {
+            "name": "Rune",
+            "classification": 2
+        },
+        "7770021": {
+            "name": "Suit Point",
+            "classification": 2
+        },
+        "7770022": {
+            "name": "Extra Life",
+            "classification": 2
+        },
+        "7770023": {
+            "name": "Extra Life Pack",
+            "classification": 2
+        },
+        "7770024": {
+            "name": "Ammo Refill",
+            "classification": 2
+        },
+        "7770025": {
+            "name": "Full Heal",
+            "classification": 2
+        },
+        "7770026": {
+            "name": "Full Armor",
+            "classification": 2
+        },
+        "7770027": {
+            "name": "Fuel",
+            "classification": 2
+        },
+        "7770028": {
+            "name": "BFG Ammo",
+            "classification": 2
+        },
+        "7770029": {
+            "name": "Soulsphere",
+            "classification": 2
+        },
+        "7770030": {
+            "name": "Berserk",
+            "classification": 2
+        },
+        "7770031": {
+            "name": "Small Health",
+            "classification": 0
+        },
+        "7770032": {
+            "name": "Large Health",
+            "classification": 0
+        },
+        "7770033": {
+            "name": "Small Armor",
+            "classification": 0
+        },
+        "7770034": {
+            "name": "Large Armor",
+            "classification": 0
+        },
+        "7770035": {
+            "name": "Shotgun Ammo",
+            "classification": 0
+        },
+        "7770036": {
+            "name": "Bullet Ammo",
+            "classification": 0
+        },
+        "7770037": {
+            "name": "Cell Ammo",
+            "classification": 0
+        },
+        "7770038": {
+            "name": "Rocket Ammo",
+            "classification": 0
+        },
+        "7770039": {
+            "name": "Chainsaw Fuel",
+            "classification": 0
+        },
+        "7770040": {
+            "name": "One Extra Life",
+            "classification": 0
+        },
+        "7770041": {
+            "name": "Armor Shard",
+            "classification": 0
+        },
+        "7770042": {
+            "name": "Ammo Cache",
+            "classification": 0
+        },
+        "7770043": {
+            "name": "Imp Trap",
+            "classification": 4
+        },
+        "7770044": {
+            "name": "Carcass Trap",
+            "classification": 4
+        },
+        "7770045": {
+            "name": "Revenant Trap",
+            "classification": 4
+        },
+        "7770046": {
+            "name": "Arachnotron Trap",
+            "classification": 4
+        },
+        "7770047": {
+            "name": "Hell Knight Trap",
+            "classification": 4
+        },
+        "7770048": {
+            "name": "Dread Knight Trap",
+            "classification": 4
+        },
+        "7770049": {
+            "name": "Baron Trap",
+            "classification": 4
+        },
+        "7770050": {
+            "name": "Tyrant Trap",
+            "classification": 4
+        },
+        "7770051": {
+            "name": "Marauder Trap",
+            "classification": 4
+        },
+        "7770052": {
+            "name": "Archvile Trap",
+            "classification": 4
+        },
+        "7770053": {
+            "name": "Cueball Trap",
+            "classification": 4
+        },
+        "7770054": {
+            "name": "Ammo Drain Trap",
+            "classification": 4
+        },
+        "7770055": {
+            "name": "Fuel Drain Trap",
+            "classification": 4
+        },
+        "7770056": {
+            "name": "BFG Drain Trap",
+            "classification": 4
+        },
+        "7770058": {
+            "name": "Sticky Bombs",
+            "classification": 1
+        },
+        "7770059": {
+            "name": "Full Auto",
+            "classification": 1
+        },
+        "7770060": {
+            "name": "Precision Bolt",
+            "classification": 1
+        },
+        "7770061": {
+            "name": "Micro Missiles",
+            "classification": 1
+        },
+        "7770062": {
+            "name": "Heat Blast",
+            "classification": 1
+        },
+        "7770063": {
+            "name": "Heat Blast Mastery",
+            "classification": 1
+        },
+        "7770064": {
+            "name": "Microwave Beam",
+            "classification": 1
+        },
+        "7770065": {
+            "name": "Microwave Beam Mastery",
+            "classification": 1
+        },
+        "7770067": {
+            "name": "Precision Bolt Mastery",
+            "classification": 1
+        },
+        "7770068": {
+            "name": "Micro Missiles Mastery",
+            "classification": 1
+        },
+        "7770069": {
+            "name": "Full Auto Mastery",
+            "classification": 1
+        },
+        "7770070": {
+            "name": "Sticky Bombs Mastery",
+            "classification": 1
+        },
+        "7770071": {
+            "name": "Remote Detonate",
+            "classification": 1
+        },
+        "7770072": {
+            "name": "Remote Detonate Mastery",
+            "classification": 1
+        },
+        "7770073": {
+            "name": "Lock-on Burst",
+            "classification": 1
+        },
+        "7770074": {
+            "name": "Lock-on Burst Mastery",
+            "classification": 1
+        },
+        "7770075": {
+            "name": "Arbalest",
+            "classification": 1
+        },
+        "7770076": {
+            "name": "Arbalest Mastery",
+            "classification": 1
+        },
+        "7770077": {
+            "name": "Destroyer Blade",
+            "classification": 1
+        },
+        "7770078": {
+            "name": "Destroyer Blade Mastery",
+            "classification": 1
+        },
+        "7770079": {
+            "name": "Energy Shield",
+            "classification": 1
+        },
+        "7770080": {
+            "name": "Energy Shield Mastery",
+            "classification": 1
+        },
+        "7770081": {
+            "name": "Mobile Turret",
+            "classification": 1
+        },
+        "7770082": {
+            "name": "Mobile Turret Mastery",
+            "classification": 1
+        },
+        "7770083": {
+            "name": "Meat Hook",
+            "classification": 1
+        },
+        "7770084": {
+            "name": "Meat Hook Mastery",
+            "classification": 1
+        },
+        "7770085": {
+            "name": "Savagery",
+            "classification": 2
+        },
+        "7770086": {
+            "name": "Seek and Destroy",
+            "classification": 2
+        },
+        "7770087": {
+            "name": "Blood Fueled",
+            "classification": 2
+        },
+        "7770088": {
+            "name": "Progressive Armor Upgrade",
+            "classification": 1
+        },
+        "7770089": {
+            "name": "Air Control",
+            "classification": 2
+        },
+        "7770090": {
+            "name": "Dazed and Confused",
+            "classification": 2
+        },
+        "7770091": {
+            "name": "Saving Throw",
+            "classification": 2
+        },
+        "7770092": {
+            "name": "Progressive Ammo Upgrade",
+            "classification": 1
+        },
+        "7770093": {
+            "name": "Chrono Strike",
+            "classification": 2
+        },
+        "7770094": {
+            "name": "Equipment Fiend",
+            "classification": 2
+        },
+        "7770095": {
+            "name": "Punch and Reave",
+            "classification": 2
+        },
+        "7770096": {
+            "name": "Victory",
+            "classification": 1
+        },
+        "7770097": {
+            "name": "Faster Ledge Grab",
+            "classification": 2
+        },
+        "7770098": {
+            "name": "Faster Weapon Swap",
+            "classification": 2
+        },
+        "7770099": {
+            "name": "Faster Dash Recharge",
+            "classification": 2
+        },
+        "7770100": {
+            "name": "Dash Refill on Glory Kill",
+            "classification": 2
+        },
+        "7770101": {
+            "name": "Reveal Automap Stations",
+            "classification": 2
+        },
+        "7770102": {
+            "name": "Reveal Automap Progression Items",
+            "classification": 2
+        },
+        "7770103": {
+            "name": "Larger Automap Reveal",
+            "classification": 2
+        },
+        "7770104": {
+            "name": "Reveal Dossier Progression Items",
+            "classification": 2
+        },
+        "7770106": {
+            "name": "Reduced Hazard Damage",
+            "classification": 2
+        },
+        "7770107": {
+            "name": "Reduced Self Damage",
+            "classification": 2
+        },
+        "7770108": {
+            "name": "Respawning Barrels",
+            "classification": 2
+        },
+        "7770109": {
+            "name": "Ammo from Barrels",
+            "classification": 2
+        },
+        "7770110": {
+            "name": "Powerup Extender",
+            "classification": 2
+        },
+        "7770111": {
+            "name": "Frag Grenade Cooldown",
+            "classification": 2
+        },
+        "7770112": {
+            "name": "Frag Grenade Concussive Blast",
+            "classification": 2
+        },
+        "7770113": {
+            "name": "Frag Grenade Cluster Bombs",
+            "classification": 2
+        },
+        "7770114": {
+            "name": "Second Frag Grenade",
+            "classification": 2
+        },
+        "7770115": {
+            "name": "Ice Bomb Cooldown",
+            "classification": 2
+        },
+        "7770116": {
+            "name": "Extended Ice Bomb Duration",
+            "classification": 2
+        },
+        "7770117": {
+            "name": "Health from Frozen Demons",
+            "classification": 2
+        },
+        "7770118": {
+            "name": "Frozen Melee Shatter",
+            "classification": 2
+        },
+        "7770142": {
+            "name": "Sentinel Battery Bundle",
+            "classification": 1
+        }
+    }
+}

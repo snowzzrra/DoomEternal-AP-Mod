@@ -12,8 +12,10 @@ import zipfile
 from pathlib import Path
 
 from map_registry import load_map_registry, release_plan
+from item_classification import load_item_classification_identity
 from tools.validation.validate_item_notification_package import (
     HEADER_RE,
+    LOCATION_NOTIFICATION_RE,
     NOTIFICATION_RE,
     capability,
     entity_block,
@@ -51,7 +53,7 @@ def _assert_notifications(content: str, map_key: str) -> None:
         raise AssertionError(f"forbidden receipt root: {map_key}")
     for suffix in NOTIFICATION_RE.findall(content):
         notification = entity_block(content, f"ap_notify_item_{suffix}")
-        entity_block(content, f"ap_rpc_v3_{suffix}")
+        entity_block(content, f"ap_rpc_v3_{suffix.split('_', 1)[1]}")
         if any(field in notification for field in (
             'triggerOnce = true;', 'removeAfterActivation = true;',
             'disableAfterActivation = true;', 'startOff = true;',
@@ -80,6 +82,9 @@ def audit_mod_payload(
             packaged = _normalized(_read_entities(packaged_path, decompressor, temporary))
             generated_notifications = set(NOTIFICATION_RE.findall(generated.decode("utf-8")))
             packaged_notifications = set(NOTIFICATION_RE.findall(packaged.decode("utf-8")))
+            packaged_locations = set(
+                LOCATION_NOTIFICATION_RE.findall(packaged.decode("utf-8"))
+            )
             if generated != packaged:
                 raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
             if enabled:
@@ -95,6 +100,15 @@ def audit_mod_payload(
                 "packaged_payload_sha256": hashlib.sha256(packaged).hexdigest(),
                 "effect_entity_count": packaged.decode("utf-8").count("entityDef ap_rpc_v3_"),
                 "notification_entity_count": len(packaged_notifications),
+                "major_notification_count": sum(
+                    suffix.startswith("major_")
+                    for suffix in packaged_notifications
+                ),
+                "filler_notification_count": sum(
+                    suffix.startswith("filler_")
+                    for suffix in packaged_notifications
+                ),
+                "location_notification_count": len(packaged_locations),
                 "receipt_root_count": 0,
             }
     return records
@@ -105,12 +119,8 @@ def _audit_locales(enabled: bool, mod_root: Path) -> None:
         mod_root / "gameresources_patch1/EternalMod/strings/english.json",
         mod_root / "gameresources_patch1/EternalMod/strings/portuguese.json",
     ]
-    if not enabled:
-        if any(path.exists() for path in tables):
-            raise AssertionError("disabled notifier payload contains locale strings")
-        return
     if not all(path.is_file() for path in tables):
-        raise AssertionError("enabled notifier payload lacks locale strings")
+        raise AssertionError("notification payload lacks locale strings")
     if string_table_names(tables[0]) != string_table_names(tables[1]):
         raise AssertionError("payload locale string names diverge")
 
@@ -131,14 +141,27 @@ def audit_release(
     if manifest.get("item_notifications", {}).get("enabled") is not enabled:
         raise AssertionError("RELEASE_MANIFEST notification capability diverges from audit mode")
     _audit_locales(enabled, mod_root)
+    classification_path = client_dir / "data" / "item_classifications.json"
+    load_item_classification_identity(classification_path)
+    classification_audit = {
+        "schema_version": 1,
+        "sha256": hashlib.sha256(
+            classification_path.read_bytes()
+        ).hexdigest(),
+    }
     records = audit_mod_payload(
         enabled, generated_maps, mod_root, map_registry, decompressor
     )
     if update_manifest:
         manifest["item_notification_payload"] = {"maps": records}
+        manifest["item_classification_identity"] = classification_audit
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     elif manifest.get("item_notification_payload", {}).get("maps") != records:
         raise AssertionError("RELEASE_MANIFEST packaged notifier map audit diverges")
+    elif manifest.get("item_classification_identity") != classification_audit:
+        raise AssertionError(
+            "RELEASE_MANIFEST item classification audit diverges"
+        )
     return records
 
 

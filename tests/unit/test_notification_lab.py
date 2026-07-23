@@ -124,11 +124,11 @@ class NotificationLabTests(unittest.TestCase):
 
     def test_lab_does_not_change_production_item_notification(self):
         expected = generate_item_notification(
-            7770024, "#str_ap_notify_item_7770024"
+            7770024, "#str_ap_notify_item_7770024", 2
         )
         with patch.dict(os.environ, {"AP_NOTIFICATION_LAB": "1"}):
             actual = generate_item_notification(
-                7770024, "#str_ap_notify_item_7770024"
+                7770024, "#str_ap_notify_item_7770024", 2
             )
         self.assertEqual(actual, expected)
         self.assertNotIn("ap_notify_lab_", actual)
