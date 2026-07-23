@@ -1006,10 +1006,12 @@ def location_feedback_policy(location_feedback, ap_check_id):
     return policy
 
 
-def generate_item_notification(item_id, header_key, classification, stage=None):
+def generate_item_notification(item_id, header_key, classification, stage=None, slot=None):
     """Generate the one classification-selected received-item notification."""
     style = notification_style_for_item(item_id, classification)
-    entity_name = notification_entity_name(item_id, classification, stage=stage)
+    entity_name = notification_entity_name(
+        item_id, classification, stage=stage, slot=slot
+    )
     return build_primitive(
         f"item_notification_{style}",
         entity_name,
@@ -1194,14 +1196,17 @@ def generate_rpc_command_entities(
                 perks = command_value.get("perks", [])
                 for stage in range(len(perks)):
                     header_key = notification_key(item_id_int, command_value, stage=stage)
-                    blocks.append(generate_item_notification(
-                        item_id_int, header_key, classification, stage=stage
-                    ))
+                    for slot in ("a", "b"):
+                        blocks.append(generate_item_notification(
+                            item_id_int, header_key, classification,
+                            stage=stage, slot=slot,
+                        ))
             else:
                 header_key = notification_key(item_id_int, command_value)
-                blocks.append(generate_item_notification(
-                    item_id_int, header_key, classification
-                ))
+                for slot in ("a", "b"):
+                    blocks.append(generate_item_notification(
+                        item_id_int, header_key, classification, slot=slot
+                    ))
 
     generated = "".join(blocks)
     missing_entities = [

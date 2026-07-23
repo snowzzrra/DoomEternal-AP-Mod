@@ -53,7 +53,8 @@ def _assert_notifications(content: str, map_key: str) -> None:
         raise AssertionError(f"forbidden receipt root: {map_key}")
     for suffix in NOTIFICATION_RE.findall(content):
         notification = entity_block(content, f"ap_notify_item_{suffix}")
-        entity_block(content, f"ap_rpc_v3_{suffix.split('_', 1)[1]}")
+        rpc_suffix = suffix.split('_', 1)[1].rsplit('_', 1)[0]
+        entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
         if any(field in notification for field in (
             'triggerOnce = true;', 'removeAfterActivation = true;',
             'disableAfterActivation = true;', 'startOff = true;',
