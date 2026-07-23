@@ -81,13 +81,13 @@ class ItemNotificationFormattingTests(unittest.TestCase):
         )
         for field in (
             'class = "idTarget_Notification";',
-            'notificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";',
-            'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";',
+            'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
+            'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
             'doNotShowDuplicate = false;',
-            'rootWidget = "weapon";',
-            'icon = "art/ui/weapon/har";',
+            'rootWidget = "tier3centered";',
+            'icon = "art/ui/dossier/icons/ico_secrets_off";',
             'header = "#str_ap_notify_item_7770000";',
-            'notificationSound = "play_ui_notification_large";',
+            'notificationSound = "play_secret_encounter_found";',
             'noFlood = false;',
         ):
             self.assertIn(field, block)
@@ -146,15 +146,17 @@ class ItemNotificationFormattingTests(unittest.TestCase):
         )
         self.assertIn('entityDef ap_rpc_v3_7770097 {', generated)
         self.assertNotIn("ap_rpc_item_", generated)
-        self.assertEqual(
-            generated.count("entityDef ap_notify_item_major_7770097 {"), 1
-        )
+        for slot in ("a", "b"):
+            self.assertIn(
+                f"entityDef ap_notify_item_major_7770097_{slot} {{", generated
+            )
         for stage in (0, 1):
             self.assertIn(f'entityDef ap_rpc_v3_7770098_{stage} {{', generated)
-            self.assertIn(
-                f'entityDef ap_notify_item_major_7770098_{stage} {{',
-                generated,
-            )
+            for slot in ("a", "b"):
+                self.assertIn(
+                    f'entityDef ap_notify_item_major_7770098_{stage}_{slot} {{',
+                    generated,
+                )
 
     def test_formatter_uses_canonical_keys_counts_stages_and_sanitization(self):
         currency = {"type": "currency", "currency": "CURRENCY_SENTINEL_BATTERY", "count": 2}

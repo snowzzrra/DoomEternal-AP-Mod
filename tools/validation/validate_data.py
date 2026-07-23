@@ -492,6 +492,43 @@ def validate_automap_prototypes_only() -> list[str]:
                 errors.append(f"Automap prototype generation failed for {map_key}: {exc}")
                 continue
             generated = output.read_text(encoding="utf-8")
+            if map_key == "e1m4_boss":
+                owner_name = "wing_b_pickup_collectible_albums_album_03_1"
+                owner_bounds = find_entity_block_bounds(generated, owner_name)
+                check_bounds = find_entity_block_bounds(
+                    generated, "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1"
+                )
+                owner = (
+                    generated[owner_bounds[0]:owner_bounds[1]]
+                    if owner_bounds is not None else ""
+                )
+                check = (
+                    generated[check_bounds[0]:check_bounds[1]]
+                    if check_bounds is not None else ""
+                )
+                if not owner:
+                    errors.append("Commander Keen album lacks its native collectible owner")
+                required_owner = (
+                    'inherit = "pickup/collectible/albums/album_03";',
+                    'triggerDef = "trigger/props/progression_collectibles";',
+                    'useableComponentDecl = "propitem/collectible/albums/album_03";',
+                    'stat = "STAT_ITEMS_COLLECTED";',
+                    'stat = "STAT_DOOM_COLLECTABLE";',
+                    'stat = "STAT_COLLECTIBLE_ALBUM_FOUND";',
+                    'item[0] = "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1";',
+                )
+                if any(field not in owner for field in required_owner):
+                    errors.append("Commander Keen album native pickup contract drifted")
+                retired_entities = (
+                    "ap_independent_wing_b_pickup_collectible_albums_album_03_1",
+                    "ap_location_visual_7770157",
+                    "ap_remove_location_visual_7770157",
+                    "ap_stat_location_7770157",
+                )
+                if any(f"entityDef {name} {{" in generated for name in retired_entities):
+                    errors.append("Commander Keen album retains an obsolete independent AP pickup")
+                if '"ap_event_7770157"' not in check:
+                    errors.append("Commander Keen album AP check event is missing")
             visual_names = set(re.findall(r"entityDef (ap_location_visual_\d+)", generated))
             for visual_name in visual_names:
                 visual_bounds = find_entity_block_bounds(generated, visual_name)

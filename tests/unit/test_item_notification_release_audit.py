@@ -15,7 +15,10 @@ ENTITY = '''entityDef ap_rpc_v3_7770000 {
 	inherit = "target/relay";
 	class = "idTarget_Relay";
 }
-entityDef ap_notify_item_major_7770000 {
+entityDef ap_notify_item_major_7770000_a {
+	header = "#str_ap_notify_item_7770000";
+}
+entityDef ap_notify_item_major_7770000_b {
 	header = "#str_ap_notify_item_7770000";
 }
 '''

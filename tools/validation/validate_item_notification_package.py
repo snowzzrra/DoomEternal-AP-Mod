@@ -21,7 +21,7 @@ from tools.maps.notification_lab import (
 # Any entityDef in this namespace is a forbidden legacy receipt root.
 RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
 NOTIFICATION_RE = re.compile(
-    r"entityDef ap_notify_item_((?:major|filler)_\d+(?:_\d+)?) \{"
+    r"entityDef ap_notify_item_((?:major|filler)_\d+(?:_\d+)?_[ab]) \{"
 )
 HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
 LOCATION_NOTIFICATION_RE = re.compile(
@@ -136,7 +136,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if enabled and not notifications:
         raise AssertionError("enabled notifier build lacks notification entities")
     expected_headers = {
-        f"#str_ap_notify_item_{suffix.split('_', 1)[1]}"
+        f"#str_ap_notify_item_{suffix.split('_', 1)[1].rsplit('_', 1)[0]}"
         for suffix in notifications
     }
     if headers != expected_headers:
@@ -174,12 +174,12 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
 
     major_fields = (
         'class = "idTarget_Notification";',
-        'notificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";',
-        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";',
+        'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
+        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
         'doNotShowDuplicate = false;',
-        'rootWidget = "weapon";',
-        'icon = "art/ui/weapon/har";',
-        'notificationSound = "play_ui_notification_large";',
+        'rootWidget = "tier3centered";',
+        'icon = "art/ui/dossier/icons/ico_secrets_off";',
+        'notificationSound = "play_secret_encounter_found";',
         'noFlood = false;',
     )
     codex_fields = (
@@ -196,6 +196,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         if 'inherit = ' in notification:
             raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
         style, rpc_suffix = suffix.split("_", 1)
+        rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
         item_id = int(rpc_suffix.split("_", 1)[0])
         expected_style = notification_style_for_item(
             item_id, classifications[item_id]["classification"]
@@ -216,10 +217,10 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             )
             if style == "major"
             else (
-                'notificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";',
-                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";',
-                'rootWidget = "weapon";',
-                'notificationSound = "play_ui_notification_large";',
+                'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
+                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
+                'rootWidget = "tier3centered";',
+                'notificationSound = "play_secret_encounter_found";',
             )
         )
         if any(field in notification for field in forbidden_contract):
@@ -230,6 +231,15 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         )):
             raise AssertionError(f"item notification is not reactivatable: {suffix}")
         entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
+
+    for style in ("major", "filler"):
+        pairs = {
+            suffix.rsplit("_", 1)[0]
+            for suffix in notifications if suffix.startswith(f"{style}_")
+        }
+        for pair in pairs:
+            if {f"{pair}_a", f"{pair}_b"} - notifications:
+                raise AssertionError(f"item notification lacks A/B dedupe pool: {pair}")
 
     for location_id in location_notifications:
         notification = entity_block(

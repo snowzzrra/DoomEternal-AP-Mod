@@ -301,14 +301,18 @@ def build_primitive(
 \t\t\tflags = {{
 \t\t\t\tnoFlood = false;
 \t\t\t}}
-\t\t\tnotificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";
-\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";
+\t\t\tnotificationType = "HUD_NOTIFY_SECRET_FOUND";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
+\t\t\tpriority = 4;
 \t\t\tdoNotShowDuplicate = false;
-\t\t\trootWidget = "weapon";
-\t\t\ticon = "art/ui/weapon/har";
+\t\t\tshowDuringCombat = true;
+\t\t\tnotificationTime = 2400;
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
 \t\t\theader = "{header_key}";
 \t\t\tsubtext = "";
-\t\t\tnotificationSound = "play_ui_notification_large";
+\t\t\tnotificationSound = "play_secret_encounter_found";
+\t\t\tshowCVar = "g_setting_notification_major";
 \t\t}}
 \t}}
 }}
@@ -410,6 +414,7 @@ def compile_item_delivery_plan(
     stage: int | None = None,
     receipt: bool = False,
     classification: int | None = None,
+    notification_slot: str | None = None,
 ) -> DeliveryPlan:
     """Compile silent effects and, for new receipts, one final notification."""
     if item_id not in definitions:
@@ -460,7 +465,7 @@ def compile_item_delivery_plan(
         if classification is None:
             raise ValueError(f"Received item {item_id} requires classification")
         notification = notification_entity_name(
-            item_id, classification, stage=resolved_stage
+            item_id, classification, stage=resolved_stage, slot=notification_slot
         )
         commands.append(DeliveryCommand(
             entity=notification,

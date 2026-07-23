@@ -453,7 +453,7 @@
       "checkpoints": [],
       "movers": [],
       "gates": [],
-      "conditional_pickup_behavior": "native save/stat owner retained with AP target; pickup stats filtered to STAT_COLLECTIBLE_ALBUM_FOUND and useable/inspect owner disabled"
+      "conditional_pickup_behavior": "native collectible owner remains intact; its native pickup contract grants the album and STAT_COLLECTIBLE_ALBUM_FOUND, with the AP check appended as its sole target"
     },
     {
       "entity": "wing_b_progress_praetor_token_1_e1m4",

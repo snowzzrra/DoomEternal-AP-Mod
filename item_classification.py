@@ -55,10 +55,14 @@ def notification_entity_name(
     classification: int,
     *,
     stage: int | None = None,
+    slot: str | None = None,
 ) -> str:
     style = notification_style_for_item(item_id, classification)
-    suffix = f"_{stage}" if stage is not None else ""
-    return f"ap_notify_item_{style}_{item_id}{suffix}"
+    if slot not in {None, "a", "b"}:
+        raise ValueError("notification slot must be a, b, or omitted")
+    stage_suffix = f"_{stage}" if stage is not None else ""
+    slot_suffix = f"_{slot}" if slot is not None else ""
+    return f"ap_notify_item_{style}_{item_id}{stage_suffix}{slot_suffix}"
 
 
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

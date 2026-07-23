@@ -165,14 +165,14 @@
         7770162
       ],
       "bind_parents": 706,
-      "byte_sha256": "fa1ceffda00e3a99a94a299f31442041ca6368b86df59c675ce798e7ba2ab60e",
-      "byte_size": 10465237,
+      "byte_sha256": "61e14022e24b05d853226463c5201af042ccb78f0db1829cb0c0e5da3302a182",
+      "byte_size": 10465420,
       "classes": 8881,
       "entity_count": 8883,
       "layers": 2353,
       "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
-      "scripted_contract_sha256": "8d2e4a53de53c042f84826bf585595a16ec445e97b0585bf39dc6ef257918598",
-      "semantic_sha256": "796141b202d75a9b9bd8c17cfa57f09ce58a97214f780d107f01bb8bdc5c8181",
+      "scripted_contract_sha256": "725d66f826d6489ca630b538c28c5faa4ce4a94fd52a7c5c581e2fd2feb265ba",
+      "semantic_sha256": "7fb4e92b97bedb0c7346d4c71e14967605bc4d97c6d5e0d860ccc4fe90e6ce37",
       "targets": 11989,
       "transforms": 19050,
       "unique_entity_names": 8882

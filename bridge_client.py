@@ -1323,7 +1323,7 @@ if set(ITEM_CLASSIFICATIONS) != set(ITEM_ID_TO_COMMAND):
 
 
 def received_item_classification(item_id, network_classification):
-    """Validate server flags against the packaged APWorld identity."""
+    """Use the packaged identity when a compatible server reports stale flags."""
     if item_id not in ITEM_CLASSIFICATIONS:
         raise ValueError(f"item {item_id} has no packaged classification")
     expected = ITEM_CLASSIFICATIONS[item_id]
@@ -1334,12 +1334,13 @@ def received_item_classification(item_id, network_classification):
         normalized = normalize_network_classification(item_id, classification)
         expected_normalized = normalize_network_classification(item_id, expected)
         if normalized != expected_normalized:
-            raise ValueError(
-                f"item_id={item_id} server_flags={classification} "
-                f"packaged_flags={expected} mapping_revision={ITEM_MAPPING_REVISION}"
+            logger.warning(
+                "[To Game] CLASSIFICATION_MISMATCH item_id=%s server_flags=%s "
+                "packaged_flags=%s mapping_revision=%s; using packaged identity",
+                item_id, classification, expected, ITEM_MAPPING_REVISION,
             )
-    notification_style_for_item(item_id, classification)
-    return classification
+    notification_style_for_item(item_id, expected)
+    return expected
 
 RUNTIME_LOCATIONS_FILE = os.path.join(
     os.path.dirname(__file__), "data", "runtime_locations.json"
@@ -2846,6 +2847,15 @@ class DoomEternalContext(CommonContext):
             if received.item == item_id
         )
 
+    def receipt_notification_slot(self, item_id, item_index):
+        """Alternate the HUD identity per item, not merely per global receipt."""
+        if len(self.items_received) > item_index:
+            ordinal = self.progressive_stage(item_id, item_index)
+        else:
+            # Keeps direct/dev spools deterministic when no NetworkItem history exists.
+            ordinal = item_index
+        return ("a", "b")[ordinal % 2]
+
     def item_activation_commands(
         self,
         item_id,
@@ -2869,6 +2879,10 @@ class DoomEternalContext(CommonContext):
                 stage=stage,
                 receipt=receipt,
                 classification=classification,
+                notification_slot=(
+                    self.receipt_notification_slot(item_id, item_index)
+                    if receipt else None
+                ),
             )
         except ValueError as error:
             return None, str(error)

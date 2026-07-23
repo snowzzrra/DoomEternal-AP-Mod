@@ -13,18 +13,34 @@ VALID_STRING_FIXTURE = (
 
 
 NOTIFICATION = '''entity {
-\tentityDef ap_notify_item_major_7770000 {
+\tentityDef ap_notify_item_major_7770000_a {
 \t\tclass = "idTarget_Notification";
 \t\tedit = {
 \t\t\tflags = { noFlood = false; }
-\t\t\tnotificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";
-\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";
+\t\t\tnotificationType = "HUD_NOTIFY_SECRET_FOUND";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
 \t\t\tdoNotShowDuplicate = false;
-\t\t\trootWidget = "weapon";
-\t\t\ticon = "art/ui/weapon/har";
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
 \t\t\theader = "#str_ap_notify_item_7770000";
 \t\t\tsubtext = "";
-\t\t\tnotificationSound = "play_ui_notification_large";
+\t\t\tnotificationSound = "play_secret_encounter_found";
+\t\t}
+\t}
+}
+entity {
+\tentityDef ap_notify_item_major_7770000_b {
+\t\tclass = "idTarget_Notification";
+\t\tedit = {
+\t\t\tflags = { noFlood = false; }
+\t\t\tnotificationType = "HUD_NOTIFY_SECRET_FOUND";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
+\t\t\tdoNotShowDuplicate = false;
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
+\t\t\theader = "#str_ap_notify_item_7770000";
+\t\t\tsubtext = "";
+\t\t\tnotificationSound = "play_secret_encounter_found";
 \t\t}
 \t}
 }

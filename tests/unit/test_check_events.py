@@ -1786,11 +1786,9 @@ class CheckEventTests(unittest.TestCase):
         self.assertEqual(
             bridge_client.received_item_classification(7770031, None), 0
         )
-        with self.assertRaisesRegex(
-            ValueError,
-            r"item_id=7770031 server_flags=1 packaged_flags=0 mapping_revision=5",
-        ):
-            bridge_client.received_item_classification(7770031, 1)
+        self.assertEqual(
+            bridge_client.received_item_classification(7770031, 1), 0
+        )
 
     def test_receipt_entrypoint_selection_respects_explicit_capability(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1812,7 +1810,7 @@ class CheckEventTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     payloads["recv-000000-item-7770010-notify.cmd"],
-                    "ai_ScriptCmdEnt ap_notify_item_major_7770010 activate\n",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770010_a activate\n",
                 )
                 self.assertEqual(
                     payloads["recv-000001-item-7770011-effect-00.cmd"],
@@ -1830,10 +1828,16 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.QUEUE_DIR = tmpdir
                 bridge_client.CLIENT_STATE_FILE = Path(tmpdir, "client_state.json")
                 ctx = self._make_item_context()
+                ctx.items_received = [
+                    types.SimpleNamespace(item=7770031),
+                    types.SimpleNamespace(item=7770010),
+                    types.SimpleNamespace(item=7770031),
+                    types.SimpleNamespace(item=7770031),
+                ]
                 for receive_index in range(3):
-                    self.assertTrue(
-                        ctx.spool_item_commands(7770031, receive_index, receipt=True)[0]
-                    )
+                    self.assertTrue(ctx.spool_item_commands(
+                        7770031, (0, 2, 3)[receive_index], receipt=True
+                    )[0])
 
                 files = sorted(Path(tmpdir).glob("*.cmd"))
                 self.assertEqual(len(files), 6)
@@ -1842,8 +1846,12 @@ class CheckEventTests(unittest.TestCase):
                     [path.read_text(encoding="utf-8") for path in files],
                     [
                         "ai_ScriptCmdEnt ap_rpc_v3_7770031 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_filler_7770031 activate\n",
-                    ] * 3,
+                        "ai_ScriptCmdEnt ap_notify_item_filler_7770031_a activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770031 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_filler_7770031_b activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770031 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_filler_7770031_a activate\n",
+                    ],
                 )
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
@@ -2145,7 +2153,7 @@ class CheckEventTests(unittest.TestCase):
                     files[0].read_text(encoding="utf-8"),
                     "ai_ScriptCmdEnt ap_rpc_v3_7770010 activate\n",
                 )
-                self.assertEqual(files[1].read_text(encoding="utf-8"), "ai_ScriptCmdEnt ap_notify_item_major_7770010 activate\n")
+                self.assertEqual(files[1].read_text(encoding="utf-8"), "ai_ScriptCmdEnt ap_notify_item_major_7770010_b activate\n")
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2241,7 +2249,7 @@ class CheckEventTests(unittest.TestCase):
                     [
                         "ai_ScriptCmdEnt ap_rpc_v3_7770012_0 activate\n",
                         "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_major_7770012 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_major_7770012_b activate\n",
                     ],
                 )
             finally:
@@ -2277,7 +2285,7 @@ class CheckEventTests(unittest.TestCase):
                     [
                         "ai_ScriptCmdEnt ap_rpc_v3_7770997_0 activate\n",
                         "ai_ScriptCmdEnt ap_rpc_v3_7770997_1 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_major_7770997 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_major_7770997_a activate\n",
                     ],
                 )
             finally:
@@ -2512,10 +2520,10 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(payloads, [
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_1 activate",
-                    "ai_ScriptCmdEnt ap_notify_item_major_7770011 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770011_a activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate",
-                    "ai_ScriptCmdEnt ap_notify_item_major_7770013 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770013_b activate",
                 ])
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir

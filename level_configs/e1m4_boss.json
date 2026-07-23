@@ -81,13 +81,9 @@
         "wing_b_pickup_collectible_albums_album_03_1": {
             "native_entity_contract": {
                 "original_targets": [],
-                "set_properties": {
-                    "useableComponentDecl": "",
-                    "sendNotableItemTelemetryEvent": false
-                },
-                "retain_pickup_stat": "STAT_COLLECTIBLE_ALBUM_FOUND",
                 "required_snippets": [
                     "inherit = \"pickup/collectible/albums/album_03\";",
+                    "triggerDef = \"trigger/props/progression_collectibles\";",
                     "useableComponentDecl = \"propitem/collectible/albums/album_03\";",
                     "stat = \"STAT_COLLECTIBLE_ALBUM_FOUND\";"
                 ]
