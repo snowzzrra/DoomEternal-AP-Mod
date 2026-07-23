@@ -19,6 +19,7 @@ from tools.maps.ap_map_generator import (
     generate_event_relay,
     generate_bootstrap_entities,
     generate_map,
+    generate_pickup_notification,
     generate_rpc_command_entities,
     generate_target_relay,
     inject_secret_encounter_completion,
@@ -77,6 +78,9 @@ entity {
         config_path.write_text(
             json.dumps(
                 {
+                    "location_feedback": {
+                        "AP_CHECK_PICKUP_WEAPON_TEST": {"policy": "ap_only"}
+                    },
                     "entities": {
                         "AP_CHECK_PICKUP_WEAPON_TEST": 7770991,
                     }
@@ -93,7 +97,7 @@ entity {
     def test_check_relay_targets_notification_and_event(self):
         relay = generate_target_relay("AP_CHECK_TEST", 7770999, "")
 
-        self.assertIn('item[0] = "ap_notify_AP_CHECK_TEST";', relay)
+        self.assertIn('item[0] = "ap_notify_location_7770999";', relay)
         self.assertIn(f'item[1] = "{EVENT_ENTITY_PREFIX}7770999";', relay)
 
     def test_check_event_writes_location_specific_file(self):
@@ -115,7 +119,69 @@ entity {
         self.assertIn("count = 1;", relay)
         self.assertIn("num = 1;", relay)
         self.assertIn(f'item[0] = "{EVENT_ENTITY_PREFIX}7770999";', relay)
-        self.assertNotIn("ap_notify_AP_CHECK_SECRET_TEST", relay)
+        self.assertNotIn("ap_notify_location_7770999", relay)
+
+    def test_location_notification_uses_codex_without_secret_found(self):
+        notification = generate_pickup_notification(7770999)
+        for field in (
+            'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
+            'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
+            'rootWidget = "compact_notification";',
+            'notificationSound = "play_hud_lower";',
+            'header = "#str_ap_location_sent";',
+            'subtext = "#str_ap_location_7770999";',
+        ):
+            self.assertIn(field, notification)
+        self.assertNotIn("SECRET_FOUND", notification)
+        self.assertNotIn("secret_found", notification)
+
+    def test_location_feedback_policies_control_exactly_one_ap_popup(self):
+        for policy, expected_count in (
+            ("vanilla_only", 0),
+            ("ap_only", 1),
+        ):
+            with self.subTest(policy=policy), tempfile.TemporaryDirectory() as tmpdir:
+                paths = self._write_generation_fixture(tmpdir)
+                input_path, output_path, config_path, manifest_path, items_path = paths
+                config = json.loads(config_path.read_text())
+                config["location_feedback"] = {
+                    "AP_CHECK_PICKUP_WEAPON_TEST": {"policy": policy}
+                }
+                config_path.write_text(json.dumps(config), encoding="utf-8")
+                generate_map(
+                    input_path,
+                    output_path,
+                    config_path,
+                    manifest_path,
+                    json.loads(items_path.read_text()),
+                    enable_notifications=False,
+                )
+                generated = output_path.read_text(encoding="utf-8")
+                self.assertEqual(
+                    generated.count("entityDef ap_notify_location_7770991 {"),
+                    expected_count,
+                )
+
+    def test_vanilla_and_ap_requires_explicit_justification(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = self._write_generation_fixture(tmpdir)
+            input_path, output_path, config_path, manifest_path, items_path = paths
+            config = json.loads(config_path.read_text())
+            config["location_feedback"] = {
+                "AP_CHECK_PICKUP_WEAPON_TEST": {
+                    "policy": "vanilla_and_ap"
+                }
+            }
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "requires justification"):
+                generate_map(
+                    input_path,
+                    output_path,
+                    config_path,
+                    manifest_path,
+                    json.loads(items_path.read_text()),
+                    enable_notifications=False,
+                )
 
     def test_generated_entities_are_removed_by_exact_or_prefix_name(self):
         content = """
@@ -361,7 +427,7 @@ entity {
             ):
                 self.assertNotIn(forbidden, trigger)
 
-    def test_praetor_suit_page_keeps_one_native_interaction_owner(self):
+    def test_fortress_praetor_uses_the_generic_ap_pickup_pipeline(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output = Path(tmpdir, "hub.entities")
             manifest = Path(tmpdir, "hub.json")
@@ -371,34 +437,103 @@ entity {
                 json.loads((ROOT / "data" / "items.json").read_text()),
             )
             generated = output.read_text(encoding="utf-8")
-            bounds = find_entity_block_bounds(generated, "progress_praetor_point_hub_1")
+            token_name = "progress_praetor_point_hub_1"
+            trigger_name = f"ap_independent_{token_name}"
+            self.assertIsNone(find_entity_block_bounds(generated, token_name))
+            bounds = find_entity_block_bounds(generated, trigger_name)
             self.assertIsNotNone(bounds)
-            native = generated[bounds[0]:bounds[1]]
-            for required in (
-                'inherit = "progress/praetor_token";',
-                'class = "idInteractable_GiveItems";',
-                'onUseCodexEntry = "codex/tutorials/praetor_suit_perks";',
-                'useStat = "STAT_SUIT_PAGE_UNLOCKED";',
-                "interaction = {",
-                'item[0] = "target_relay_complete_praetor_obj";',
-            ):
-                self.assertIn(required, native)
-            self.assertNotIn("currencyList", native)
-            self.assertNotIn("CURRENCY_PRAETOR_UPGRADE", native)
+            trigger = generated[bounds[0]:bounds[1]]
+            self.assertIn('inherit = "trigger/trigger";', trigger)
+            self.assertIn('class = "idTrigger";', trigger)
+            self.assertIn('triggerOnce = true;', trigger)
             self.assertEqual(
-                extract_target_names(native),
+                extract_target_names(trigger),
                 [
-                    "target_relay_complete_praetor_obj",
                     "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1",
+                    "ap_remove_location_visual_7770081",
                 ],
             )
-            self.assertIsNone(find_entity_block_bounds(
-                generated, "ap_independent_progress_praetor_point_hub_1"
-            ))
-            self.assertNotIn("ap_location_visual_7770081", generated)
-            self.assertEqual(
-                generated.count('item[0] = "target_relay_complete_praetor_obj";'), 1
+            visual_bounds = find_entity_block_bounds(
+                generated, "ap_location_visual_7770081"
             )
+            self.assertIsNotNone(visual_bounds)
+            visual = generated[visual_bounds[0]:visual_bounds[1]]
+            self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual)
+            self.assertIn('x = 1.0;', visual)
+            self.assertIn('y = 1.0;', visual)
+            self.assertIn('z = 1.0;', visual)
+            for forbidden in (
+                "progress/praetor_token", "idInteractable_GiveItems",
+                "useableComponentDecl", "currencyList",
+                "CURRENCY_PRAETOR_UPGRADE", "praetor_suit_token.md6",
+            ):
+                self.assertNotIn(forbidden, trigger + visual)
+
+    def test_dhb_praetors_match_a_generic_modbot_pickup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "e1m4_boss.entities"
+            manifest = Path(tmpdir) / "e1m4_boss.json"
+            generate_map(
+                ROOT / "vanillamaps" / "e1m4_boss.map",
+                output,
+                ROOT / "level_configs" / "e1m4_boss.json",
+                manifest,
+                json.loads((ROOT / "data" / "items.json").read_text()),
+                enable_notifications=False,
+            )
+            generated = output.read_text(encoding="utf-8")
+            praetors = {
+                "connection_corridor_progress_praetor_token_1_e1m4": (
+                    "AP_CHECK_CONNECTION_CORRIDOR_PROGRESS_PRAETOR_TOKEN_1_E1M4", 7770144
+                ),
+                "pickups_progress_praetor_token_1_e1m4": (
+                    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E1M4", 7770149
+                ),
+                "wing_c_progress_praetor_token_1_e1m4": (
+                    "AP_CHECK_WING_C_PROGRESS_PRAETOR_TOKEN_1_E1M4", 7770155
+                ),
+                "wing_b_progress_praetor_token_1_e1m4": (
+                    "AP_CHECK_WING_B_PROGRESS_PRAETOR_TOKEN_1_E1M4", 7770158
+                ),
+            }
+            modbot_name = "train_dock_traversal_platform_progress_mod_bot_1_e1m4"
+            modbot_bounds = find_entity_block_bounds(
+                generated, f"ap_independent_{modbot_name}"
+            )
+            self.assertIsNotNone(modbot_bounds)
+            modbot = generated[modbot_bounds[0]:modbot_bounds[1]]
+            for entity_name, (ap_check, location_id) in praetors.items():
+                self.assertIsNone(find_entity_block_bounds(generated, entity_name))
+                bounds = find_entity_block_bounds(
+                    generated, f"ap_independent_{entity_name}"
+                )
+                self.assertIsNotNone(bounds)
+                trigger = generated[bounds[0]:bounds[1]]
+                for field in (
+                    'inherit = "trigger/trigger";', 'class = "idTrigger";',
+                    "triggerOnce = true;", "x = 5.0;", "y = 5.0;", "z = 5.0;",
+                ):
+                    self.assertIn(field, trigger)
+                    self.assertIn(field, modbot)
+                self.assertEqual(extract_target_names(trigger).count(ap_check), 1)
+                self.assertEqual(len(extract_target_names(trigger)), 2)
+                visual_bounds = find_entity_block_bounds(
+                    generated, f"ap_location_visual_{location_id}"
+                )
+                self.assertIsNotNone(visual_bounds)
+                visual = generated[visual_bounds[0]:visual_bounds[1]]
+                self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual)
+                self.assertIn("x = 1.0;", visual)
+                self.assertIn("y = 1.0;", visual)
+                self.assertIn("z = 1.0;", visual)
+                self.assertNotIn("bindParent", trigger)
+                self.assertNotIn("bindParent", visual)
+                for forbidden in (
+                    "progress/praetor_token", "idInteractable_GiveItems",
+                    "useableComponentDecl", "currencyList",
+                    "CURRENCY_PRAETOR_UPGRADE", "praetor_suit_token.md6",
+                ):
+                    self.assertNotIn(forbidden, trigger)
 
     def test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings(self):
         cases = (
@@ -560,7 +695,7 @@ entity {
             )
             self.assertEqual(
                 hashlib.sha256(prior_output).hexdigest(),
-                "1b7f583d346819227e69023356bd300c76d756121203c1a3876ee17fb3bf2b89",
+                "7d03e0e3d688e2caad10198a887cd9a004bd28009054338b482669c977347f78",
             )
 
     def test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift(self):
@@ -600,8 +735,8 @@ entity {
 
     def test_unchanged_legacy_generated_maps_remain_byte_identical(self):
         expected = {
-            "e1m1_intro": "f2b9b36630702bfbf7fb9172aebfede52c1fd29ce91dabde6c05ec58164eca2d",
-            "e1m2_war": "5bc85983a032a3029b0be27fd1123ab0cb51eb0c817204a33f6f0802ca096499",
+            "e1m1_intro": "194326edbd76080e9313dcd49fc4cbc33e400dbfda0188e291699876c69d84f7",
+            "e1m2_war": "10057c8d0ce65d6deb6c65c3b68b35e0953b277143cbd1ac8abdb4dc44d65a3e",
         }
         items = json.loads((ROOT / "data" / "items.json").read_text())
         for map_key, digest in expected.items():

@@ -20,6 +20,7 @@ from foundation import (
     load_primitive_registry,
     validate_primitive_registry,
 )
+from item_classification import load_item_classification_identity
 from map_registry import load_map_registry, validation_plan
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
@@ -421,20 +422,36 @@ def validate_generated_automap_carriers() -> list[str]:
                         f"{family_name} has no proven generic marker lifecycle"
                     )
                 elif inherit.startswith("progress/praetor_token"):
-                    generated_bounds = find_entity_block_bounds(generated, entity_name)
-                    if generated_bounds is None:
-                        errors.append(f"Praetor token missing for {location_id}")
+                    trigger_name = f"ap_independent_{entity_name}"
+                    visual_name = f"ap_location_visual_{location_id}"
+                    cleanup_name = f"ap_remove_location_visual_{location_id}"
+                    trigger_bounds = find_entity_block_bounds(generated, trigger_name)
+                    visual_bounds = find_entity_block_bounds(generated, visual_name)
+                    cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
+                    if not all((trigger_bounds, visual_bounds, cleanup_bounds)):
+                        errors.append(f"Generic AP pickup graph missing for {location_id}")
                         continue
-                    token = generated[generated_bounds[0]:generated_bounds[1]]
-                    if "currencyList" in token or "CURRENCY_PRAETOR_UPGRADE" in token:
-                        errors.append(f"Praetor reward retained for {location_id}")
-                    if 'model = "art/pickups/question_mark_a.lwo";' not in token:
-                        errors.append(f"Praetor token lacks AP visual for {location_id}")
-                    if extract_target_names(token) != [*extract_target_names(source_block), ap_check]:
-                        errors.append(f"Praetor functional target drift for {location_id}")
-                    for field in ("inherit", "class", "automapPropertiesDecl", "progressionCategory"):
-                        if entity_scalar(token, field) != entity_scalar(source_block, field):
-                            errors.append(f"Praetor marker/category drift for {location_id}/{field}")
+                    if find_entity_block_bounds(generated, entity_name) is not None:
+                        errors.append(f"Native Praetor owner retained for {location_id}")
+                    trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
+                    visual = generated[visual_bounds[0]:visual_bounds[1]]
+                    cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
+                    if extract_target_names(trigger) != [ap_check, cleanup_name]:
+                        errors.append(f"Generic AP target drift for {location_id}")
+                    if extract_target_names(cleanup) != [visual_name]:
+                        errors.append(f"Generic AP visual cleanup drift for {location_id}")
+                    if 'model = "art/pickups/question_mark_a.lwo";' not in visual:
+                        errors.append(f"Generic AP visual missing for {location_id}")
+                    for forbidden in (
+                        "progress/praetor_token", "idInteractable_GiveItems",
+                        "useableComponentDecl", "currencyList",
+                        "CURRENCY_PRAETOR_UPGRADE", "praetor_suit_token.md6",
+                    ):
+                        if forbidden in trigger or forbidden in visual:
+                            errors.append(
+                                f"Native Praetor behavior retained for {location_id}: "
+                                f"{forbidden}"
+                            )
     return errors
 
 
@@ -535,7 +552,7 @@ def validate_automap_prototypes_only() -> list[str]:
                     errors.append("Modbot cleanup target reaches outside the prototype visual")
                 if extract_target_names(check) != [
                     cleanup_name,
-                    "ap_notify_AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1",
+                    "ap_notify_location_7770015",
                     "ap_event_7770015",
                 ]:
                     errors.append("Modbot AP check target graph drifted")
@@ -557,6 +574,41 @@ def main() -> int:
 
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
+    try:
+        classification_identity = load_item_classification_identity(
+            ROOT / "data" / "item_classifications.json"
+        )
+        if read_json(
+            ROOT / "data" / "item_classifications.json"
+        ).get("item_mapping_revision") != 5:
+            errors.append("Packaged item classification revision drifted")
+        packaged_item_names = {
+            entry["name"]: item_id
+            for item_id, entry in classification_identity.items()
+        }
+        if packaged_item_names != item_ids:
+            errors.append(
+                "Packaged item classifications diverge from APWorld item IDs/names"
+            )
+    except (OSError, ValueError) as exc:
+        errors.append(f"Packaged item classifications invalid: {exc}")
+    try:
+        location_identity = read_json(ROOT / "data" / "location_names.json")
+        packaged_location_names = {
+            name: int(location_id)
+            for location_id, name in location_identity.get(
+                "locations", {}
+            ).items()
+        }
+        if (
+            location_identity.get("schema_version") != 1
+            or packaged_location_names != location_ids
+        ):
+            errors.append(
+                "Packaged location names diverge from APWorld locations"
+            )
+    except (OSError, ValueError) as exc:
+        errors.append(f"Packaged location names invalid: {exc}")
     registry_for_preflight = load_map_registry(MAP_SOURCES_PATH)
     package_spec = Path(
         "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
@@ -737,13 +789,80 @@ def main() -> int:
         if list(manifests.values()).count(location_id) != 1:
             errors.append(f"Physical Sentinel Battery {location_id} must have one active manifest check")
 
+    feedback_document = read_json(ROOT / "data" / "location_feedback_policies.json")
+    if feedback_document.get("schema_version") != 1:
+        errors.append("Unsupported location feedback policy schema")
+    feedback_ap_only = feedback_document.get("policies", {})
     physical_location_count = 0
+    praetor_policy_count = 0
+    prohibited_praetor_policy = "praetor" + "_token_ap"
     for path in sorted((ROOT / "level_configs").glob("*.json")):
         config_data = read_json(path)
+        if prohibited_praetor_policy in config_data:
+            errors.append(f"Retired Praetor policy remains in {path.name}")
         if config_data.get("map_key") != path.stem:
             errors.append(f"Missing or divergent map_key in {path.name}")
         config = dict(config_data.get("entities", {}))
+        for ap_check in config:
+            if "PRAETOR" not in ap_check:
+                continue
+            praetor_policy_count += 1
+            entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+            policy = config_data.get("target_policies", {}).get(entity_name, {})
+            if "native_entity_contract" in policy:
+                errors.append(
+                    f"Praetor token retains native entity contract: {path.name}/{ap_check}"
+                )
+            if policy and (
+                not policy.get("independent_ap_trigger")
+                or not policy.get("remove_original")
+                or set(policy) - {"independent_ap_trigger", "remove_original", "drop_targets"}
+            ):
+                errors.append(
+                    f"Praetor token lacks generic AP pickup policy: {path.name}/{ap_check}"
+                )
         physical_location_count += len(config)
+        feedback = dict(config_data.get("location_feedback", {}))
+        for ap_check in feedback_ap_only.get(config_data.get("map_key"), []):
+            if ap_check in feedback:
+                errors.append(f"Duplicate explicit feedback policy: {path.name}/{ap_check}")
+            feedback[ap_check] = {"policy": "ap_only"}
+        encounter_checks = {
+            encounter["ap_check"]
+            for encounter in config_data.get("secret_encounters", [])
+        }
+        unknown_feedback = sorted(
+            set(feedback) - set(config) - encounter_checks
+        )
+        if unknown_feedback:
+            errors.append(
+                f"Unknown location feedback keys in {path.name}: "
+                f"{unknown_feedback}"
+            )
+        default_feedback = sorted(
+            (set(config) | encounter_checks) - set(feedback)
+        )
+        if default_feedback:
+            errors.append(
+                f"{path.name} has public-package default feedback policies: "
+                f"{default_feedback}"
+            )
+        for ap_check, record in feedback.items():
+            if not isinstance(record, dict):
+                errors.append(
+                    f"Invalid location feedback record: {path.name}/{ap_check}"
+                )
+                continue
+            policy = record.get("policy")
+            if policy not in {"vanilla_only", "ap_only", "vanilla_and_ap"}:
+                errors.append(
+                    f"Invalid location feedback policy: {path.name}/{ap_check}"
+                )
+            if policy == "vanilla_and_ap" and not record.get("justification"):
+                errors.append(
+                    f"vanilla_and_ap lacks justification: "
+                    f"{path.name}/{ap_check}"
+                )
         reused_config_ids = sorted(reserved_location_ids & set(config.values()))
         if reused_config_ids:
             errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
@@ -759,6 +878,10 @@ def main() -> int:
     if physical_location_count != 104:
         errors.append(
             f"Expected 104 physical locations through Doom Hunter Base/Fortress Visit 3, found {physical_location_count}"
+        )
+    if praetor_policy_count != 14:
+        errors.append(
+            f"Expected 14 shared-policy Praetor Tokens, found {praetor_policy_count}"
         )
 
     enabled_map_sources = {
@@ -782,6 +905,63 @@ def main() -> int:
                 config_data.get("target_policies", {}),
                 source_path.read_text(encoding="utf-8"),
             )
+            source_content = source_path.read_text(encoding="utf-8")
+            target_policies = config_data.get("target_policies", {})
+            secret_feedback = {
+                encounter["ap_check"]: encounter
+                for encounter in config_data.get("secret_encounters", [])
+            }
+            for ap_check, feedback in config_data.get(
+                "location_feedback", {}
+            ).items():
+                if feedback.get("policy") != "vanilla_only":
+                    continue
+                if ap_check in secret_feedback:
+                    manager = secret_feedback[ap_check].get(
+                        "manager_entity",
+                        secret_feedback[ap_check].get("manager"),
+                    )
+                    if (
+                        not manager
+                        or find_entity_block_bounds(source_content, manager)
+                        is None
+                    ):
+                        errors.append(
+                            f"vanilla_only secret owner missing for "
+                            f"{map_key}/{ap_check}"
+                        )
+                    continue
+                entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+                bounds = find_entity_block_bounds(source_content, entity_name)
+                if bounds is None:
+                    errors.append(
+                        f"vanilla_only source missing for {map_key}/{ap_check}"
+                    )
+                    continue
+                source_block = source_content[bounds[0]:bounds[1]]
+                policy = target_policies.get(entity_name, {})
+                vanilla_owner = feedback.get("vanilla_owner")
+                owner_is_secret = False
+                if vanilla_owner:
+                    owner_bounds = find_entity_block_bounds(
+                        source_content, vanilla_owner
+                    )
+                    if owner_bounds is not None:
+                        owner_block = source_content[
+                            owner_bounds[0]:owner_bounds[1]
+                        ]
+                        owner_is_secret = (
+                            'inherit = "target/secret";' in owner_block
+                        )
+                if (
+                    "pickups/secret_item" not in source_block
+                    and not policy.get("native_entity_contract")
+                    and not owner_is_secret
+                ):
+                    errors.append(
+                        f"vanilla_only lacks reviewed vanilla feedback owner: "
+                        f"{map_key}/{ap_check}"
+                    )
         except ValueError as exc:
             errors.append(f"Target-policy validation failed for {map_key}: {exc}")
         for required_key in (
@@ -982,15 +1162,16 @@ def main() -> int:
         "AP_CHECK_SECRET_VALIDATION", 7770998, "", include_notification=False
     )
     event = generate_check_event(7770999)
-    notification = generate_pickup_notification("AP_CHECK_VALIDATION")
+    notification = generate_pickup_notification(7770999)
     if (
-        'item[0] = "ap_notify_AP_CHECK_VALIDATION";' not in relay
+        'item[0] = "ap_notify_location_7770999";' not in relay
         or f'item[1] = "{EVENT_ENTITY_PREFIX}7770999";' not in relay
         or 'class = "idTarget_Notification";' not in notification
-        or 'notificationType = "HUD_NOTIFY_SECRET_FOUND";' not in notification
-        or 'header = "#str_swf_notification_secret_found";' not in notification
+        or 'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";' not in notification
+        or 'header = "#str_ap_location_sent";' not in notification
+        or 'subtext = "#str_ap_location_7770999";' not in notification
     ):
-        errors.append("AP checks are not connected to native pickup notifications")
+        errors.append("AP checks are not connected to Codex location notifications")
     if (
         f"entityDef {EVENT_ENTITY_PREFIX}7770999" not in event
         or "echo AP_CHECK_EVENT_7770999; condump ap_event_7770999.txt"
@@ -1001,7 +1182,7 @@ def main() -> int:
         f'item[0] = "{EVENT_ENTITY_PREFIX}7770998";' not in secret_relay
         or 'class = "idTarget_Count";' not in secret_relay
         or 'class = "idTarget_Relay";' in secret_relay
-        or "ap_notify_AP_CHECK_SECRET_VALIDATION" in secret_relay
+        or "ap_notify_location_7770998" in secret_relay
     ):
         errors.append("Secret encounter checks do not use the validated event-only relay")
 

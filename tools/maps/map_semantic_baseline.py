@@ -94,6 +94,7 @@ def describe_generated_map(path: Path, manifest_path: Path, config_path: Path) -
                 "remove_entities": config.get("remove_entities", []),
                 "neutralize_pickups": config.get("neutralize_pickups", []),
                 "secret_encounters": config.get("secret_encounters", []),
+                "location_feedback": config.get("location_feedback", {}),
             }, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest(),
     }

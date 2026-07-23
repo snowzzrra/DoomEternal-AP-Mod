@@ -8,6 +8,10 @@ import json
 import re
 from pathlib import Path
 
+from item_classification import (
+    load_item_classification_identity,
+    notification_style_for_item,
+)
 from tools.maps.notification_lab import (
     NOTIFICATION_LAB_CONTRACTS,
     NOTIFICATION_LAB_MAP,
@@ -16,8 +20,16 @@ from tools.maps.notification_lab import (
 
 # Any entityDef in this namespace is a forbidden legacy receipt root.
 RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
-NOTIFICATION_RE = re.compile(r"entityDef ap_notify_item_(\d+(?:_\d+)?) \{")
+NOTIFICATION_RE = re.compile(
+    r"entityDef ap_notify_item_((?:major|filler)_\d+(?:_\d+)?) \{"
+)
 HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
+LOCATION_NOTIFICATION_RE = re.compile(
+    r"entityDef ap_notify_location_(\d+) \{"
+)
+LOCATION_STRING_RE = re.compile(
+    r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
+)
 LAB_NOTIFICATION_RE = re.compile(r"entityDef (ap_notify_lab_[a-z_]+) \{")
 LAB_HEADER_RE = re.compile(
     r'header\s*=\s*"(#str_ap_notification_lab_[a-z_]+)";'
@@ -88,9 +100,21 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     receipts = set(RECEIPT_RE.findall(content))
     notifications = set(NOTIFICATION_RE.findall(content))
     headers = set(HEADER_RE.findall(content))
+    location_notifications = set(LOCATION_NOTIFICATION_RE.findall(content))
+    location_strings = set(LOCATION_STRING_RE.findall(content))
     lab_notifications = set(LAB_NOTIFICATION_RE.findall(content))
     lab_headers = set(LAB_HEADER_RE.findall(content))
     table_paths = tuple(mod_root / table for table in STRING_TABLES)
+    commands = json.loads(
+        (client_dir / "data" / "items.json").read_text(encoding="utf-8")
+    )
+    classifications = load_item_classification_identity(
+        client_dir / "data" / "item_classifications.json"
+    )
+    if {int(item_id) for item_id in commands} != set(classifications):
+        raise AssertionError(
+            "packaged item classifications do not cover item mapping"
+        )
 
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("client identity notification capability diverges from build mode")
@@ -104,15 +128,21 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         raise AssertionError("package contains forbidden ap_rpc_item receipt root")
 
     if not enabled:
-        if notifications or headers or any(path.exists() for path in table_paths):
-            raise AssertionError("disabled notifier build contains notification or string-table artifacts")
-        return
+        if notifications or headers:
+            raise AssertionError(
+                "disabled notifier build contains received-item artifacts"
+            )
 
-    if not notifications:
+    if enabled and not notifications:
         raise AssertionError("enabled notifier build lacks notification entities")
-    expected_headers = {f"#str_ap_notify_item_{suffix}" for suffix in notifications}
+    expected_headers = {
+        f"#str_ap_notify_item_{suffix.split('_', 1)[1]}"
+        for suffix in notifications
+    }
     if headers != expected_headers:
         raise AssertionError("enabled notifier headers diverge from notification entities")
+    if not location_notifications or "#str_ap_location_sent" not in location_strings:
+        raise AssertionError("package lacks Codex location feedback")
     expected_lab_notifications = {
         f"{NOTIFICATION_LAB_PREFIX}{contract['name']}"
         for contract in NOTIFICATION_LAB_CONTRACTS
@@ -134,7 +164,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if not all(path.is_file() for path in table_paths):
         raise AssertionError("enabled notifier build lacks English or Portuguese strings")
     locale_names = [string_table_names(path) for path in table_paths]
-    expected_locale_names = headers | lab_headers
+    expected_locale_names = headers | lab_headers | location_strings
     if locale_names[0] != expected_locale_names:
         raise AssertionError("english.json keys diverge from generated notification headers")
     if locale_names[1] != expected_locale_names:
@@ -142,28 +172,77 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if locale_names[0] != locale_names[1]:
         raise AssertionError("English and Portuguese string keys diverge")
 
-    required_notification_fields = (
+    major_fields = (
         'class = "idTarget_Notification";',
-        'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
-        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
+        'notificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";',
+        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";',
         'doNotShowDuplicate = false;',
-        'rootWidget = "tier3centered";',
-        'icon = "art/ui/dossier/icons/ico_secrets_off";',
-        'notificationSound = "play_secret_encounter_found";',
+        'rootWidget = "weapon";',
+        'icon = "art/ui/weapon/har";',
+        'notificationSound = "play_ui_notification_large";',
+        'noFlood = false;',
+    )
+    codex_fields = (
+        'class = "idTarget_Notification";',
+        'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
+        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
+        'notificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";',
+        'rootWidget = "compact_notification";',
+        'notificationSound = "play_hud_lower";',
         'noFlood = false;',
     )
     for suffix in notifications:
         notification = entity_block(content, f"ap_notify_item_{suffix}")
         if 'inherit = ' in notification:
             raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
-        if any(field not in notification for field in required_notification_fields):
+        style, rpc_suffix = suffix.split("_", 1)
+        item_id = int(rpc_suffix.split("_", 1)[0])
+        expected_style = notification_style_for_item(
+            item_id, classifications[item_id]["classification"]
+        )
+        if style != expected_style:
+            raise AssertionError(
+                f"item notification style diverges from classification: {suffix}"
+            )
+        required_fields = major_fields if style == "major" else codex_fields
+        if any(field not in notification for field in required_fields):
             raise AssertionError(f"item notification HUD contract is incomplete: {suffix}")
+        forbidden_contract = (
+            (
+                'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
+                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
+                'rootWidget = "compact_notification";',
+                'notificationSound = "play_hud_lower";',
+            )
+            if style == "major"
+            else (
+                'notificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";',
+                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";',
+                'rootWidget = "weapon";',
+                'notificationSound = "play_ui_notification_large";',
+            )
+        )
+        if any(field in notification for field in forbidden_contract):
+            raise AssertionError(f"item notification mixes HUD contracts: {suffix}")
         if any(field in notification for field in (
             'noFlood = true;', 'triggerOnce = true;', 'removeAfterActivation = true;',
             'disableAfterActivation = true;', 'startOff = true;',
         )):
             raise AssertionError(f"item notification is not reactivatable: {suffix}")
-        entity_block(content, f"ap_rpc_v3_{suffix}")
+        entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
+
+    for location_id in location_notifications:
+        notification = entity_block(
+            content, f"ap_notify_location_{location_id}"
+        )
+        if any(field not in notification for field in codex_fields):
+            raise AssertionError(
+                f"location notification is not Codex: {location_id}"
+            )
+        if "SECRET_FOUND" in notification or "secret_found" in notification:
+            raise AssertionError(
+                f"location notification retains Secret Found: {location_id}"
+            )
 
     for name in lab_notifications:
         notification = entity_block(content, name)

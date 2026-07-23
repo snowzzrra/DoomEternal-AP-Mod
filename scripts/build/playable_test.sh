@@ -214,18 +214,18 @@ for map_row in "${MAP_ROWS[@]}"; do
     MISSION_MAP_ARGS+=(--generated-map "$map_key=$GENERATED_MAPS_DIR/$generated_output")
 done
 
-if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
-    python3 "$REPO_ROOT/tools/release/build_string_table.py" \
-        --items "$REPO_ROOT/data/items.json" \
-        --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
-        --maps-dir "$GENERATED_MAPS_DIR" \
-        --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json"
-    python3 "$REPO_ROOT/tools/release/build_string_table.py" \
-        --items "$REPO_ROOT/data/items.json" \
-        --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
-        --maps-dir "$GENERATED_MAPS_DIR" \
-        --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/portuguese.json"
-fi
+python3 "$REPO_ROOT/tools/release/build_string_table.py" \
+    --items "$REPO_ROOT/data/items.json" \
+    --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
+    --location-names "$REPO_ROOT/data/location_names.json" \
+    --maps-dir "$GENERATED_MAPS_DIR" \
+    --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json"
+python3 "$REPO_ROOT/tools/release/build_string_table.py" \
+    --items "$REPO_ROOT/data/items.json" \
+    --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
+    --location-names "$REPO_ROOT/data/location_names.json" \
+    --maps-dir "$GENERATED_MAPS_DIR" \
+    --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/portuguese.json"
 
 python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
     --contracts "$REPO_ROOT/data/mission_complete_map_contracts.json" \
@@ -320,6 +320,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
     "$REPO_ROOT/challenge_registry.py" \
     "$REPO_ROOT/foundation.py" \
+    "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/scripts/launch/run_bridge.sh" "$REPO_ROOT/save_decrypt.py" \
@@ -329,7 +330,9 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$OUTPUT_DIR/client/"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 cp "$REPO_ROOT/data/items.json" \
+    "$REPO_ROOT/data/item_classifications.json" \
     "$REPO_ROOT/data/item_replay_policies.json" \
+    "$REPO_ROOT/data/location_names.json" \
     "$REPO_ROOT/data/challenge_location_registry.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
     "$REPO_ROOT/data/map_sources.json" \
@@ -416,6 +419,7 @@ manifest = {
         "client/bootstrap_actions.py",
         "client/challenge_registry.py",
         "client/foundation.py",
+        "client/item_classification.py",
         "client/item_reconciliation.py",
         "client/map_registry.py",
         "client/save_death_probe.exe",
@@ -426,7 +430,9 @@ manifest = {
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
         "client/data/items.json",
+        "client/data/item_classifications.json",
         "client/data/item_replay_policies.json",
+        "client/data/location_names.json",
         "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
         "client/data/map_sources.json",

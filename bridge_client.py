@@ -26,6 +26,11 @@ from foundation import (
     load_foundation_contracts,
     load_primitive_registry,
 )
+from item_classification import (
+    load_item_classification_identity,
+    normalize_network_classification,
+    notification_style_for_item,
+)
 from item_reconciliation import (
     compile_reconciliation_plan,
     load_policy_registry,
@@ -1291,6 +1296,50 @@ ITEM_REPLAY_POLICIES_FILE = os.path.join(
 ITEM_REPLAY_POLICIES = load_policy_registry(
     Path(ITEM_REPLAY_POLICIES_FILE), ITEM_ID_TO_COMMAND
 )
+ITEM_CLASSIFICATIONS_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "item_classifications.json"
+)
+_item_classification_document = json.loads(
+    Path(ITEM_CLASSIFICATIONS_FILE).read_text(encoding="utf-8")
+)
+if (
+    _item_classification_document.get("item_mapping_revision")
+    != ITEM_MAPPING_REVISION
+):
+    raise RuntimeError(
+        "Packaged item classification revision diverges from item mapping"
+    )
+ITEM_CLASSIFICATION_IDENTITY = load_item_classification_identity(
+    Path(ITEM_CLASSIFICATIONS_FILE)
+)
+ITEM_CLASSIFICATIONS = {
+    item_id: entry["classification"]
+    for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()
+}
+if set(ITEM_CLASSIFICATIONS) != set(ITEM_ID_TO_COMMAND):
+    raise RuntimeError(
+        "Packaged item classifications diverge from the item command mapping"
+    )
+
+
+def received_item_classification(item_id, network_classification):
+    """Validate server flags against the packaged APWorld identity."""
+    if item_id not in ITEM_CLASSIFICATIONS:
+        raise ValueError(f"item {item_id} has no packaged classification")
+    expected = ITEM_CLASSIFICATIONS[item_id]
+    if network_classification is None:
+        classification = expected
+    else:
+        classification = int(network_classification)
+        normalized = normalize_network_classification(item_id, classification)
+        expected_normalized = normalize_network_classification(item_id, expected)
+        if normalized != expected_normalized:
+            raise ValueError(
+                f"item_id={item_id} server_flags={classification} "
+                f"packaged_flags={expected} mapping_revision={ITEM_MAPPING_REVISION}"
+            )
+    notification_style_for_item(item_id, classification)
+    return classification
 
 RUNTIME_LOCATIONS_FILE = os.path.join(
     os.path.dirname(__file__), "data", "runtime_locations.json"
@@ -2797,7 +2846,15 @@ class DoomEternalContext(CommonContext):
             if received.item == item_id
         )
 
-    def item_activation_commands(self, item_id, item_index, receipt=False):
+    def item_activation_commands(
+        self,
+        item_id,
+        item_index,
+        receipt=False,
+        classification=None,
+    ):
+        if receipt and classification is None:
+            classification = ITEM_CLASSIFICATIONS.get(item_id)
         definition = ITEM_ID_TO_COMMAND.get(item_id)
         stage = (
             self.progressive_stage(item_id, item_index)
@@ -2807,7 +2864,11 @@ class DoomEternalContext(CommonContext):
         )
         try:
             plan = compile_item_delivery_plan(
-                item_id, ITEM_ID_TO_COMMAND, stage=stage, receipt=receipt
+                item_id,
+                ITEM_ID_TO_COMMAND,
+                stage=stage,
+                receipt=receipt,
+                classification=classification,
             )
         except ValueError as error:
             return None, str(error)
@@ -2820,9 +2881,19 @@ class DoomEternalContext(CommonContext):
             suffix = f"effect-{command_index:02d}"
         return f"recv-{item_index:06d}-item-{item_id}-{suffix}"
 
-    def spool_item_commands(self, item_id, item_index, *, receipt: bool):
+    def spool_item_commands(
+        self,
+        item_id,
+        item_index,
+        *,
+        receipt: bool,
+        classification=None,
+    ):
         commands, description = self.item_activation_commands(
-            item_id, item_index, receipt=receipt
+            item_id,
+            item_index,
+            receipt=receipt,
+            classification=classification,
         )
         if commands is None:
             return False, description
@@ -3673,8 +3744,24 @@ class DoomEternalContext(CommonContext):
                         self.persist_session_state()
                         continue
 
+                    try:
+                        classification = received_item_classification(
+                            item_id, getattr(network_item, "flags", None)
+                        )
+                    except (TypeError, ValueError) as error:
+                        logger.error(
+                            f"[To Game] Cannot classify item {item_id}: {error}"
+                        )
+                        self.output(
+                            f"Invalid item classification for DOOM Eternal "
+                            f"item {item_id}. Check the local bridge logs."
+                        )
+                        break
                     spooled, description = self.spool_item_commands(
-                        item_id, item_index, receipt=ENABLE_ITEM_NOTIFICATIONS
+                        item_id,
+                        item_index,
+                        receipt=ENABLE_ITEM_NOTIFICATIONS,
+                        classification=classification,
                     )
                     if not spooled and description:
                         logger.error(

@@ -28,6 +28,65 @@
         "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_2_E1M3": 7770069,
         "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_3_E1M3": 7770070
     },
+    "location_feedback": {
+        "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "game_target_secret_10_e1m3"
+        },
+        "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "game_target_secret_25_e1m3"
+        },
+        "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_12_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "game_target_secret_18_e1m3"
+        },
+        "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "game_target_secret_13_e1m3"
+        },
+        "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "game_target_secret_1_e1m3"
+        },
+        "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M3": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "extralives_target_secret_2_e1m3"
+        },
+        "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_5_E1M3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_1_E1M3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_GAME_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_02_2": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_SOLDIER": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_4_E1M3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_6_E1M3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_GARGOYLE_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_GAME_PROGRESS_CHEATS_SENTINEL_ARMOR_2": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_3_E1M3": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_CAVE_MANCUBUS": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_TORTURE_PIT": {
+            "policy": "vanilla_only"
+        }
+    },
     "neutralize_pickups": [
         "pickups_pickup_weapon_plasma_rifle_1"
     ],
@@ -40,71 +99,6 @@
         "game_target_give_item_1"
     ],
     "target_policies": {
-        "game_progress_praetor_token_1_e1m3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
-        },
-        "game_progress_praetor_token_3_e1m3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
-        },
-        "game_progress_praetor_token_4_e1m3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
-        },
-        "game_progress_praetor_token_5_e1m3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
-        },
-        "game_progress_praetor_token_6_e1m3": {
-            "native_entity_contract": {
-                "remove_block": "currencyList",
-                "original_targets": [],
-                "required_snippets": [
-                    "inherit = \"progress/praetor_token\";",
-                    "class = \"idInteractable_GiveItems\";",
-                    "saveType = \"SGS_GAME_DATA\";",
-                    "automapPropertiesDecl = \"praetor_token\";",
-                    "currencyType = \"CURRENCY_PRAETOR_UPGRADE\";"
-                ]
-            }
-        },
         "game_pickup_weapon_rocket_launcher_1": {
             "independent_ap_trigger": true,
             "independent_entity_name": "ap_independent_rocket_launcher_7770056",

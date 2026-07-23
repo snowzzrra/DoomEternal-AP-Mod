@@ -29,6 +29,35 @@
         "AP_CHECK_CAPITOL_PROGRESS_SENTINEL_BATTERY_1_E1M2": 7770084,
         "AP_CHECK_SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770045
     },
+    "location_feedback": {
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ARACHNOTRON_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CACODEMON_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_ALBUM_E1M2": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E1M2": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "pickups_target_secret_3_e1m2"
+        },
+        "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_4_E1M2": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "extralives_target_secret_2_e1m2"
+        },
+        "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E1M2": {
+            "policy": "vanilla_only",
+            "vanilla_owner": "extralives_target_secret_1_e1m2"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_CAPITOL_ARENA": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_GORE_NEST_ARENA": {
+            "policy": "vanilla_only"
+        }
+    },
     "secret_encounters": [
         {
             "ap_check": "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_CAPITOL_ARENA",

@@ -1779,6 +1779,19 @@ class CheckEventTests(unittest.TestCase):
         ctx.items_received = []
         return ctx
 
+    def test_network_item_classification_matches_packaged_identity(self):
+        self.assertEqual(
+            bridge_client.received_item_classification(7770000, 1), 1
+        )
+        self.assertEqual(
+            bridge_client.received_item_classification(7770031, None), 0
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            r"item_id=7770031 server_flags=1 packaged_flags=0 mapping_revision=5",
+        ):
+            bridge_client.received_item_classification(7770031, 1)
+
     def test_receipt_entrypoint_selection_respects_explicit_capability(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             original_queue_dir = bridge_client.QUEUE_DIR
@@ -1799,7 +1812,7 @@ class CheckEventTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     payloads["recv-000000-item-7770010-notify.cmd"],
-                    "ai_ScriptCmdEnt ap_notify_item_7770010 activate\n",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770010 activate\n",
                 )
                 self.assertEqual(
                     payloads["recv-000001-item-7770011-effect-00.cmd"],
@@ -1809,7 +1822,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
 
-    def test_three_same_consumable_receipts_keep_distinct_commands_and_notifications(self):
+    def test_three_same_filler_receipts_keep_distinct_commands_and_notifications(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             original_queue_dir = bridge_client.QUEUE_DIR
             original_state_file = bridge_client.CLIENT_STATE_FILE
@@ -1819,7 +1832,7 @@ class CheckEventTests(unittest.TestCase):
                 ctx = self._make_item_context()
                 for receive_index in range(3):
                     self.assertTrue(
-                        ctx.spool_item_commands(7770024, receive_index, receipt=True)[0]
+                        ctx.spool_item_commands(7770031, receive_index, receipt=True)[0]
                     )
 
                 files = sorted(Path(tmpdir).glob("*.cmd"))
@@ -1828,8 +1841,8 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(
                     [path.read_text(encoding="utf-8") for path in files],
                     [
-                        "ai_ScriptCmdEnt ap_rpc_v3_7770024 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_7770024 activate\n",
+                        "ai_ScriptCmdEnt ap_rpc_v3_7770031 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_filler_7770031 activate\n",
                     ] * 3,
                 )
             finally:
@@ -2132,7 +2145,7 @@ class CheckEventTests(unittest.TestCase):
                     files[0].read_text(encoding="utf-8"),
                     "ai_ScriptCmdEnt ap_rpc_v3_7770010 activate\n",
                 )
-                self.assertEqual(files[1].read_text(encoding="utf-8"), "ai_ScriptCmdEnt ap_notify_item_7770010 activate\n")
+                self.assertEqual(files[1].read_text(encoding="utf-8"), "ai_ScriptCmdEnt ap_notify_item_major_7770010 activate\n")
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir
                 bridge_client.CLIENT_STATE_FILE = original_state_file
@@ -2228,7 +2241,7 @@ class CheckEventTests(unittest.TestCase):
                     [
                         "ai_ScriptCmdEnt ap_rpc_v3_7770012_0 activate\n",
                         "ai_ScriptCmdEnt ap_rpc_v3_7770012_1 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_7770012 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_major_7770012 activate\n",
                     ],
                 )
             finally:
@@ -2249,7 +2262,9 @@ class CheckEventTests(unittest.TestCase):
                 ]
                 ctx = self._make_item_context()
 
-                spooled, _ = ctx.spool_item_commands(7770997, 12, receipt=True)
+                spooled, _ = ctx.spool_item_commands(
+                    7770997, 12, receipt=True, classification=1
+                )
 
                 self.assertTrue(spooled)
                 files = sorted(Path(tmpdir).glob("*.cmd"))
@@ -2262,7 +2277,7 @@ class CheckEventTests(unittest.TestCase):
                     [
                         "ai_ScriptCmdEnt ap_rpc_v3_7770997_0 activate\n",
                         "ai_ScriptCmdEnt ap_rpc_v3_7770997_1 activate\n",
-                        "ai_ScriptCmdEnt ap_notify_item_7770997 activate\n",
+                        "ai_ScriptCmdEnt ap_notify_item_major_7770997 activate\n",
                     ],
                 )
             finally:
@@ -2372,7 +2387,9 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.ITEM_ID_TO_COMMAND[7770998] = []
                 ctx = self._make_item_context()
 
-                spooled, description = ctx.spool_item_commands(7770998, 9, receipt=True)
+                spooled, description = ctx.spool_item_commands(
+                    7770998, 9, receipt=True, classification=1
+                )
 
                 self.assertFalse(spooled)
                 self.assertEqual(description, "mapping list is empty")
@@ -2495,10 +2512,10 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(payloads, [
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_0 activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770011_1 activate",
-                    "ai_ScriptCmdEnt ap_notify_item_7770011 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770011 activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770013_0 activate",
                     "ai_ScriptCmdEnt ap_rpc_v3_7770013_1 activate",
-                    "ai_ScriptCmdEnt ap_notify_item_7770013 activate",
+                    "ai_ScriptCmdEnt ap_notify_item_major_7770013 activate",
                 ])
             finally:
                 bridge_client.QUEUE_DIR = original_queue_dir

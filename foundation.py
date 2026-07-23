@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from item_classification import notification_entity_name
 from map_registry import load_map_registry, release_plan
 
 VALID_STATUSES = {
@@ -39,7 +40,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         },
         "pickup_notification": {
             "family": "ap_check", "status": "runtime_verified",
-            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "native HUD notification/AP checks", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/weapon_acquired", "entity": "Current major notification", "source_sha256": "runtime-evidence"},
             "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "hub", "e1m3_cult"], "allowed_in_release": True, "frozen": True,
         },
@@ -73,11 +74,23 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_GiveItems", "inherit": "target/give_item", "required_fields": [], "forbidden_fields": []},
             "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": True,
         },
-        "item_notification": {
-            "family": "ap_item_notify", "status": "experimental",
+        "item_notification_major": {
+            "family": "ap_item_notify_major", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "native HUD notification/AP checks", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
             "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
-            "targets": [], "runtime_verified_maps": [], "allowed_in_release": False, "frozen": False,
+            "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
+        },
+        "item_notification_filler": {
+            "family": "ap_item_notify_filler", "status": "runtime_verified",
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Phase A Codex laboratory runtime approval", "source_sha256": "runtime-evidence"},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "notificationEndHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
+        },
+        "location_notification_codex": {
+            "family": "ap_location_notify", "status": "runtime_verified",
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Phase A Codex laboratory runtime approval", "source_sha256": "runtime-evidence"},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "notificationEndHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
         },
     },
 }
@@ -279,28 +292,55 @@ def build_primitive(
 \t}}
 }}
 '''
-    elif primitive_id == "item_notification":
-        if not isinstance(parameters, dict) or "header_key" not in parameters:
-            raise ValueError("item_notification requires header_key parameter")
-        if set(parameters) != {"header_key", "notification_type", "hud_event_id", "icon"}:
-            raise ValueError("item_notification has an invalid parameter set")
+    elif primitive_id == "item_notification_major":
+        if not isinstance(parameters, dict) or set(parameters) != {"header_key"}:
+            raise ValueError("item_notification_major requires only header_key")
         header_key = parameters["header_key"]
-        notif_type = parameters["notification_type"]
-        hud_event_id = parameters["hud_event_id"]
-        icon = parameters["icon"]
         block = f'''{header}
 \t\tedit = {{
 \t\t\tflags = {{
 \t\t\t\tnoFlood = false;
 \t\t\t}}
-\t\t\tnotificationType = "{notif_type}";
-\t\t\tnotificationHudEventID = "{hud_event_id}";
+\t\t\tnotificationType = "HUD_NOTIFY_INVENTORY_ACQUIRED";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION";
 \t\t\tdoNotShowDuplicate = false;
-\t\t\trootWidget = "tier3centered";
-\t\t\ticon = "{icon}";
+\t\t\trootWidget = "weapon";
+\t\t\ticon = "art/ui/weapon/har";
 \t\t\theader = "{header_key}";
 \t\t\tsubtext = "";
-\t\t\tnotificationSound = "play_secret_encounter_found";
+\t\t\tnotificationSound = "play_ui_notification_large";
+\t\t}}
+\t}}
+}}
+'''
+    elif primitive_id in {"item_notification_filler", "location_notification_codex"}:
+        expected = (
+            {"header_key"}
+            if primitive_id == "item_notification_filler"
+            else {"header_key", "subtext_key"}
+        )
+        if not isinstance(parameters, dict) or set(parameters) != expected:
+            raise ValueError(f"{primitive_id} has an invalid parameter set")
+        header_key = parameters["header_key"]
+        subtext_key = parameters.get("subtext_key", "")
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tflags = {{
+\t\t\t\tnoFlood = false;
+\t\t\t}}
+\t\t\thudLocation = "HUD_LOC_LEFT";
+\t\t\tnotificationType = "HUD_NOTIFY_CODEX_RECIEVED";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";
+\t\t\tnotificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";
+\t\t\tdesiredDossierPage = "DOSSIER_PAGE_CODEX";
+\t\t\tpriority = 5;
+\t\t\tdoNotShowDuplicate = false;
+\t\t\trootWidget = "compact_notification";
+\t\t\ticon = "art/ui/icons/notifications/demons";
+\t\t\theader = "{header_key}";
+\t\t\tsubtext = "{subtext_key}";
+\t\t\tnotificationSound = "play_hud_lower";
+\t\t\tshowCVar = "g_setting_notification_minor";
 \t\t}}
 \t}}
 }}
@@ -369,6 +409,7 @@ def compile_item_delivery_plan(
     *,
     stage: int | None = None,
     receipt: bool = False,
+    classification: int | None = None,
 ) -> DeliveryPlan:
     """Compile silent effects and, for new receipts, one final notification."""
     if item_id not in definitions:
@@ -416,8 +457,11 @@ def compile_item_delivery_plan(
         for index, entity in enumerate(entities)
     ]
     if receipt and family != "no_op":
-        suffix = f"{item_id}_{resolved_stage}" if resolved_stage is not None else str(item_id)
-        notification = f"{ITEM_NOTIFICATION_PREFIX}{suffix}"
+        if classification is None:
+            raise ValueError(f"Received item {item_id} requires classification")
+        notification = notification_entity_name(
+            item_id, classification, stage=resolved_stage
+        )
         commands.append(DeliveryCommand(
             entity=notification,
             command=f"ai_ScriptCmdEnt {notification} activate",
