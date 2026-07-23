@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.maps.notification_lab import LAB_STRINGS, generate_notification_lab
 from tools.validation.validate_item_notification_package import validate
-
 
 VALID_STRING_FIXTURE = (
     Path(__file__).resolve().parents[1] / "fixtures" /
@@ -68,6 +68,26 @@ class ItemNotificationPackageValidationTests(unittest.TestCase):
     def test_enabled_package_requires_all_notifier_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             validate(True, *self._layout(Path(directory), True))
+
+    def test_enabled_package_accepts_complete_lab_on_e1m1(self):
+        with tempfile.TemporaryDirectory() as directory:
+            maps, mod, client, manifest = self._layout(Path(directory), True)
+            source = maps / "e1m1_intro.entities"
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + generate_notification_lab("e1m1_intro", enabled=True),
+                encoding="utf-8",
+            )
+            table_dir = mod / "gameresources_patch1" / "EternalMod" / "strings"
+            for locale in ("english", "portuguese"):
+                path = table_dir / f"{locale}.json"
+                data = json.loads(path.read_text(encoding="utf-8"))
+                data["strings"].extend(
+                    {"name": name, "text": text}
+                    for name, text in LAB_STRINGS[locale].items()
+                )
+                path.write_text(json.dumps(data), encoding="utf-8")
+            validate(True, maps, mod, client, manifest)
 
     def test_disabled_package_rejects_notifier_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:

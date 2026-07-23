@@ -114,6 +114,7 @@ def generate_frozen_outputs(registry_path: Path | None = None) -> tuple[dict, te
         generate_map(
             ROOT / "vanillamaps" / plan.source_file, output, config, manifest,
             json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8")),
+            enable_notification_lab=False,
         )
         results[plan.map_key] = (output, manifest, config)
     patch_mission_complete_maps(

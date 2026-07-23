@@ -9,8 +9,15 @@ import re
 from pathlib import Path
 
 from tools.maps.notification_formatting import notification_key, notification_text
+from tools.maps.notification_lab import (
+    notification_lab_enabled,
+    notification_lab_string_entries,
+)
 
 HEADER_KEY_PATTERN = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
+LAB_HEADER_KEY_PATTERN = re.compile(
+    r'header\s*=\s*"(#str_ap_notification_lab_[a-z_]+)";'
+)
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -21,7 +28,10 @@ def referenced_notification_keys(maps_dir: Path) -> set[str]:
     return {
         key
         for path in map_paths
-        for key in HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
+        for key in (
+            HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
+            + LAB_HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
+        )
     }
 
 
@@ -72,6 +82,9 @@ def build_string_table(
         for stage in stages:
             key = notification_key(item_id, definition, stage=stage)
             entries.append((key, notification_text(item_id, definition, item_name, stage=stage)))
+
+    if notification_lab_enabled():
+        entries.extend(notification_lab_string_entries(output_path.stem))
 
     serialized_entries = string_entries(entries)
     defined_keys = {entry["name"] for entry in serialized_entries}
