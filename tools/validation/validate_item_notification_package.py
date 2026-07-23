@@ -8,11 +8,20 @@ import json
 import re
 from pathlib import Path
 
+from tools.maps.notification_lab import (
+    NOTIFICATION_LAB_CONTRACTS,
+    NOTIFICATION_LAB_MAP,
+    NOTIFICATION_LAB_PREFIX,
+)
 
 # Any entityDef in this namespace is a forbidden legacy receipt root.
 RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
 NOTIFICATION_RE = re.compile(r"entityDef ap_notify_item_(\d+(?:_\d+)?) \{")
 HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
+LAB_NOTIFICATION_RE = re.compile(r"entityDef (ap_notify_lab_[a-z_]+) \{")
+LAB_HEADER_RE = re.compile(
+    r'header\s*=\s*"(#str_ap_notification_lab_[a-z_]+)";'
+)
 STRING_TABLES = (
     Path("gameresources_patch1/EternalMod/strings/english.json"),
     Path("gameresources_patch1/EternalMod/strings/portuguese.json"),
@@ -79,6 +88,8 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     receipts = set(RECEIPT_RE.findall(content))
     notifications = set(NOTIFICATION_RE.findall(content))
     headers = set(HEADER_RE.findall(content))
+    lab_notifications = set(LAB_NOTIFICATION_RE.findall(content))
+    lab_headers = set(LAB_HEADER_RE.findall(content))
     table_paths = tuple(mod_root / table for table in STRING_TABLES)
 
     if capability(client_dir / "bridge_identity.json") is not enabled:
@@ -102,12 +113,31 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     expected_headers = {f"#str_ap_notify_item_{suffix}" for suffix in notifications}
     if headers != expected_headers:
         raise AssertionError("enabled notifier headers diverge from notification entities")
+    expected_lab_notifications = {
+        f"{NOTIFICATION_LAB_PREFIX}{contract['name']}"
+        for contract in NOTIFICATION_LAB_CONTRACTS
+    }
+    expected_lab_headers = {
+        f"#str_ap_notification_lab_{contract['name']}"
+        for contract in NOTIFICATION_LAB_CONTRACTS
+    }
+    if lab_notifications and lab_notifications != expected_lab_notifications:
+        raise AssertionError("notification lab entity set is incomplete")
+    if bool(lab_notifications) != bool(lab_headers):
+        raise AssertionError("notification lab entities and headers diverge")
+    if lab_headers and lab_headers != expected_lab_headers:
+        raise AssertionError("notification lab header set is incomplete")
+    for path in maps:
+        path_content = path.read_text(encoding="utf-8")
+        if LAB_NOTIFICATION_RE.search(path_content) and path.stem != NOTIFICATION_LAB_MAP:
+            raise AssertionError(f"notification lab entered the wrong map: {path}")
     if not all(path.is_file() for path in table_paths):
         raise AssertionError("enabled notifier build lacks English or Portuguese strings")
     locale_names = [string_table_names(path) for path in table_paths]
-    if locale_names[0] != headers:
+    expected_locale_names = headers | lab_headers
+    if locale_names[0] != expected_locale_names:
         raise AssertionError("english.json keys diverge from generated notification headers")
-    if locale_names[1] != headers:
+    if locale_names[1] != expected_locale_names:
         raise AssertionError("portuguese.json keys diverge from generated notification headers")
     if locale_names[0] != locale_names[1]:
         raise AssertionError("English and Portuguese string keys diverge")
@@ -134,6 +164,17 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         )):
             raise AssertionError(f"item notification is not reactivatable: {suffix}")
         entity_block(content, f"ap_rpc_v3_{suffix}")
+
+    for name in lab_notifications:
+        notification = entity_block(content, name)
+        if 'class = "idTarget_Notification";' not in notification:
+            raise AssertionError(f"notification lab entity has wrong class: {name}")
+        if any(field in notification for field in (
+            'class = "idTarget_Count";', 'triggerOnce = true;',
+            'removeAfterActivation = true;', 'disableAfterActivation = true;',
+            'noFlood = true;',
+        )):
+            raise AssertionError(f"notification lab entity is not reusable: {name}")
 
 
 def main() -> None:

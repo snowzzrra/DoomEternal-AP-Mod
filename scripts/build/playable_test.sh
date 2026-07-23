@@ -177,6 +177,11 @@ if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
 else
     echo "ITEM_NOTIFICATIONS=disabled"
 fi
+if [[ "${AP_NOTIFICATION_LAB:-0}" == "1" ]]; then
+    echo "NOTIFICATION_LAB=enabled"
+else
+    echo "NOTIFICATION_LAB=disabled"
+fi
 "$REPO_ROOT/scripts/build/client.sh" "$CLIENT_BUILD_DIR"
 if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
     echo "Fresh client build is missing required executable(s)" >&2
