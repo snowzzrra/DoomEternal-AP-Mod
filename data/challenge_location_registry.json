@@ -33,6 +33,15 @@
         "kind": "map_terminal",
         "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
       }
+    },
+    {
+      "name": "Super Gore Nest - Mission Complete",
+      "location_id": 7770210,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e2m1_nest/e2m1_nest",
+        "to": "game/hub/hub"
+      }
     }
   ],
   "mission_challenges": [
@@ -179,6 +188,78 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       }
+    },
+    {
+      "name": "Super Gore Nest - Mission Challenge - Weapon Mod Purchase",
+      "location_id": 7770206,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m1/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_DLE_WEAPON_MOD_PURCHASE",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m1/challenge_1.decl",
+        "sha256": "736f921d3981d9952a6ab86ed84b37784a2543ff25c2968a57be00133945c22c",
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Super Gore Nest - Mission Challenge - Blood Gore Nest",
+      "location_id": 7770207,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m1/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_SGN_CHALLENGE_NEST",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m1/challenge_2.decl",
+        "sha256": "bdb843ed7af7b340ed861be126d62ae5a93c8a15b35c31863bca21437a4c190e",
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "Super Gore Nest - Mission Challenge - Glory Kill Pinky",
+      "location_id": 7770208,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m1/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_PINKY_GLORYKILL_STYLES",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m1/challenge_3.decl",
+        "sha256": "9fb09b0c87245f748b7c87ebf625e16ecc58f5a5942c00d9a95b05c01e4bbb0d",
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
     }
   ],
   "all_mission_challenges": [
@@ -205,6 +286,19 @@
           "mission_challenge/e1m4/challenge_1",
           "mission_challenge/e1m4/challenge_2",
           "mission_challenge/e1m4/challenge_3"
+        ]
+      }
+    },
+    {
+      "name": "Super Gore Nest - All Mission Challenges Completed",
+      "location_id": 7770209,
+      "mission_key": "e2m1",
+      "signal": {
+        "kind": "all_mission_challenge_records",
+        "unlockables": [
+          "mission_challenge/e2m1/challenge_1",
+          "mission_challenge/e2m1/challenge_2",
+          "mission_challenge/e2m1/challenge_3"
         ]
       }
     }

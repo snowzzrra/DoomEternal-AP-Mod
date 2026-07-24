@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "map_key": "e2m1_nest",
+  "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+  "resource_owner": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
+  "resource_priority": 30,
+  "mission_complete_transition": {
+    "kind": "native terminal pending Mission Complete implementation",
+    "owner": "game_target_level_transition_1",
+    "target": "maps/game/hub/hub.map",
+    "classification": "observed native terminal; no AP target added while onboarding is blocked"
+  },
+  "layers": [
+    "game/sp/e2m1_nest/dormancy/dorm_intro",
+    "game/sp/e2m1_nest/dormancy/dorm_slime_tunnels",
+    "game/sp/e2m1_nest/visibility/vis_slayer_gate"
+  ],
+  "checkpoints": [
+    "checkpoints_cp_01_map_start",
+    "checkpoints_cp_14_escape"
+  ],
+  "movers": [],
+  "gates": [
+    "slayer_gate_interact_slayer_gate_door_1",
+    "slayer_gate_interact_slayer_gate_nest_1"
+  ],
+  "new_decl_resources": [],
+  "locations": []
+}

@@ -1,0 +1,164 @@
+{
+    "map_key": "e2m1_nest",
+    "level": "e2m1_nest",
+    "region": "Super Gore Nest",
+    "entities": {
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E2M1": 7770176,
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E2M1": 7770177,
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E2M1": 7770178,
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E2M1": 7770179,
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E2M1": 7770180,
+        "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E2M1": 7770181,
+        "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_2_E2M1": 7770182,
+        "AP_CHECK_PICKUPS_PROGRESS_RUNE_1_E2M1": 7770183,
+        "AP_CHECK_PICKUPS_PROGRESS_RUNE_2_E2M1": 7770184,
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_SOLDIER_SHIELD_1": 7770185,
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_REVENANT_1": 7770186,
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_TIER_3_1": 7770187,
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_04_1": 7770188,
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_05_1": 7770189,
+        "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E2M1": 7770190,
+        "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E2M1": 7770191,
+        "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_8_E2M1": 7770192,
+        "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_9_E2M1": 7770193,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E2M1": 7770194,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E2M1": 7770195,
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_4_E2M1": 7770196,
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_1": 7770197,
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E2M1": 7770198,
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E2M1": 7770199,
+        "AP_CHECK_PICKUPS_PROGRESS_CHEATS_INFINITE_AMMO_1": 7770200,
+        "AP_CHECK_GAME_PICKUP_WEAPON_CHAINGUN_1": 7770201,
+        "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1144181771_E2M1": 7770204,
+        "AP_CHECK_SLAYER_GATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770205
+    },
+    "location_feedback": {
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_SOLDIER_SHIELD_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_REVENANT_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_TIER_3_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_04_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_05_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_CHEATS_INFINITE_AMMO_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_SGN_1": {
+            "policy": "vanilla_only"
+        },
+        "AP_CHECK_SECRET_ENCOUNTER_SGN_2": {
+            "policy": "vanilla_only"
+        }
+    },
+    "target_policies": {
+        "game_pickup_weapon_chaingun_1": {
+            "independent_ap_trigger": true,
+            "independent_entity_name": "ap_independent_chaingun_7770201",
+            "remove_original": true,
+            "no_auto_visual": true,
+            "preserve_layers": false,
+            "drop_targets": [
+                "game_encounter_trigger_commit_39",
+                "game_target_relay_214"
+            ],
+            "independent_targets": [
+                "AP_CHECK_GAME_PICKUP_WEAPON_CHAINGUN_1",
+                "game_encounter_trigger_commit_39",
+                "game_target_relay_214"
+            ]
+        },
+        "pickups_progress_argent_cell_1_1144181771_e2m1": {
+            "independent_ap_trigger": true,
+            "remove_original": true,
+            "preserve_targets": [
+                "pickups_destructible_interact_argent_cell_1_1144181771_e2m1"
+            ],
+            "drop_targets": [],
+            "safe_target_graph": {
+                "pickups_destructible_interact_argent_cell_1_1144181771_e2m1": []
+            },
+            "forbidden_target_terms": [
+                "currency",
+                "give",
+                "grant",
+                "inventory",
+                "perk"
+            ]
+        }
+    },
+    "secret_encounters": [
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_SGN_1",
+            "location_id": 7770202,
+            "manager": "game_encounter_manager_70_e2m1",
+            "after_event_index": 13
+        },
+        {
+            "ap_check": "AP_CHECK_SECRET_ENCOUNTER_SGN_2",
+            "location_id": 7770203,
+            "manager": "game_encounter_manager_77_e2m1",
+            "after_event_index": 5
+        }
+    ],
+    "feedback_policies": {
+        "AP_CHECK_GAME_PICKUP_WEAPON_CHAINGUN_1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_CODEX_4_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_2_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_RUNE_1_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_RUNE_2_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E2M1": {
+            "policy": "ap_only"
+        },
+        "AP_CHECK_SLAYER_GATE_PICKUP_KEYCARD_SLAYER_KEY_1": {
+            "policy": "ap_only"
+        }
+    }
+}

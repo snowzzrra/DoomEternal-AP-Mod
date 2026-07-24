@@ -1,6 +1,6 @@
 {
     "schema_version": 1,
-    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss"],
+    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest"],
     "maps": {
         "e1m1_intro": {
             "display_name": "Hell on Earth",
@@ -94,6 +94,25 @@
             "resource_owner": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
             "resource_priority": 74,
             "relative_entities_path": "game/sp/e1m4_boss/e1m4_boss.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
+        },
+        "e2m1_nest": {
+            "display_name": "Super Gore Nest",
+            "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
+            "source_file": "e2m1_nest.map",
+            "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+            "source_owner": "vanillamaps/e2m1_nest.map",
+            "level_config": "level_configs/e2m1_nest.json",
+            "manifest": "manifests/e2m1_nest.json",
+            "generated_output": "e2m1_nest.entities",
+            "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
+            "resource_path": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
+            "resource_owner": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
+            "resource_priority": 30,
+            "relative_entities_path": "game/sp/e2m1_nest/e2m1_nest.entities",
             "supported_game_revision": "Steam 6.66 Rev 3.1",
             "onboarding_audit": null
         }

@@ -4,7 +4,8 @@
     "hub",
     "e1m2_war",
     "e1m3_cult",
-    "e1m4_boss"
+    "e1m4_boss",
+    "e2m1_nest"
   ],
   "coverage": [
     "entity names",
@@ -176,6 +177,52 @@
       "targets": 11989,
       "transforms": 19050,
       "unique_entity_names": 8882
+    },
+    "e2m1_nest": {
+      "ap_ids": [
+        7770176,
+        7770177,
+        7770178,
+        7770179,
+        7770180,
+        7770181,
+        7770182,
+        7770183,
+        7770184,
+        7770185,
+        7770186,
+        7770187,
+        7770188,
+        7770189,
+        7770190,
+        7770191,
+        7770192,
+        7770193,
+        7770194,
+        7770195,
+        7770196,
+        7770197,
+        7770198,
+        7770199,
+        7770200,
+        7770201,
+        7770202,
+        7770203,
+        7770204,
+        7770205
+      ],
+      "bind_parents": 270,
+      "byte_sha256": "64d284722eeb0782277e36e70547d639e72589b22e01d259fe64cf9723d84788",
+      "byte_size": 14206486,
+      "classes": 13085,
+      "entity_count": 13088,
+      "layers": 2103,
+      "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
+      "scripted_contract_sha256": "c71b5e1f79a7ba2d66d015d8210e1dd65e243864b0a51ba27ffddd99be07dc41",
+      "semantic_sha256": "335afedb867864e30af62579f96bd19826ad2429cdfea0cf93a25089c808fea3",
+      "targets": 8791,
+      "transforms": 27372,
+      "unique_entity_names": 13086
     },
     "hub": {
       "ap_ids": [

@@ -57,13 +57,13 @@ def _assert_proven_observer() -> None:
 
 def _reward_free_override(entry: dict) -> str:
     owner = entry["completion_owner"]
-    source = _source(owner["path"], owner["sha256"])
+    source = _source(owner["path"], owner["sha256"]).replace("\r\n", "\n")
     signal = entry["signal"]
     required = (
         'inherit = "mission_challenge/challenge_base";',
         f'completionStat = "{owner["completion_stat"]}";',
         f'stat = "{signal["rule_0_statname"]}";',
-        "count = 1;",
+        "count = ",
     )
     for snippet in required:
         if source.count(snippet) != 1:
