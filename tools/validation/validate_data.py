@@ -912,13 +912,13 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 104:
+    if physical_location_count != 132:
         errors.append(
-            f"Expected 104 physical locations through Doom Hunter Base/Fortress Visit 3, found {physical_location_count}"
+            f"Expected 132 physical locations through Doom Hunter Base/Fortress Visit 3, found {physical_location_count}"
         )
-    if praetor_policy_count != 14:
+    if praetor_policy_count != 19:
         errors.append(
-            f"Expected 14 shared-policy Praetor Tokens, found {praetor_policy_count}"
+            f"Expected 19 shared-policy Praetor Tokens, found {praetor_policy_count}"
         )
 
     enabled_map_sources = {
@@ -1070,9 +1070,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 133,
-        "map_checks": 108,
-        "runtime_locations": 25,
+        "locations": 168,
+        "map_checks": 138,
+        "runtime_locations": 30,
         "runtime_goals": 1,
         "route_sentinel_batteries": 18,
     }:

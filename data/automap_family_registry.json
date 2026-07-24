@@ -14,10 +14,16 @@
   },
   "families": {
     "toys_collectibles": {
-      "match": {"inherit_prefixes": ["pickup/collectible/toys/"]},
+      "match": {
+        "inherit_prefixes": [
+          "pickup/collectible/toys/"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["collectible_demon_toy"],
+      "automap_properties": [
+        "collectible_demon_toy"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_COLLECTIBLE",
       "collected_state_writer": "native idProp2 pickup/useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/collectible/toys/* plus collectible stats",
@@ -27,10 +33,16 @@
       "vanilla_exploration": true
     },
     "codex": {
-      "match": {"inherit_prefixes": ["progress/codex"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/codex"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["codex"],
+      "automap_properties": [
+        "codex"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_CODEX",
       "collected_state_writer": "native codex useable transaction and STAT_CODEX_PICKUP_FOUND",
       "reward_edge": "useableComponentDecl=propitem/codex/*",
@@ -40,10 +52,16 @@
       "vanilla_exploration": true
     },
     "cheat_codes": {
-      "match": {"inherit_prefixes": ["progress/cheats/"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/cheats/"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["collectible_cheat"],
+      "automap_properties": [
+        "collectible_cheat"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_CHEAT",
       "collected_state_writer": "native cheat useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "cheatcode useableComponentDecl",
@@ -53,10 +71,16 @@
       "vanilla_exploration": true
     },
     "albums": {
-      "match": {"inherit_prefixes": ["pickup/collectible/albums/"]},
+      "match": {
+        "inherit_prefixes": [
+          "pickup/collectible/albums/"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["collectible_album"],
+      "automap_properties": [
+        "collectible_album"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_COLLECTIBLE_ALBUM",
       "collected_state_writer": "native album useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/collectible/albums/*",
@@ -66,10 +90,16 @@
       "vanilla_exploration": true
     },
     "sentinel_crystals": {
-      "match": {"inherit_prefixes": ["progress/argent_cell"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/argent_cell"
+        ]
+      },
       "vanilla_class": "idInteractable_WorldCache",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["argent_cell"],
+      "automap_properties": [
+        "argent_cell"
+      ],
       "dossier_total_owner": "native WorldCache registration plus PROGRESSION_CATEGORY_ARGENT",
       "collected_state_writer": "used_argent interaction state with markForGameUsed",
       "reward_edge": "opaque WorldCache upgrade-selection transaction",
@@ -78,10 +108,16 @@
       "vanilla_exploration": true
     },
     "praetor_tokens": {
-      "match": {"inherit_prefixes": ["progress/praetor_token"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/praetor_token"
+        ]
+      },
       "vanilla_class": "idInteractable_GiveItems",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["praetor_token"],
+      "automap_properties": [
+        "praetor_token"
+      ],
       "dossier_total_owner": "native GiveItems registration plus PROGRESSION_CATEGORY_ELITE",
       "collected_state_writer": "used_praetor interaction state saved as SGS_GAME_DATA",
       "reward_edge": "currencyList CURRENCY_PRAETOR_UPGRADE",
@@ -90,10 +126,16 @@
       "vanilla_exploration": true
     },
     "modbots": {
-      "match": {"inherit_prefixes": ["progress/mod_bot"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/mod_bot"
+        ]
+      },
       "vanilla_class": "idInteractable_WeaponModBot",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["mod_bot"],
+      "automap_properties": [
+        "mod_bot"
+      ],
       "dossier_total_owner": "native WeaponModBot registration plus PROGRESSION_CATEGORY_MODBOT",
       "collected_state_writer": "used_mod selection state saved as SGS_GAME_DATA",
       "reward_edge": "opaque weapon-mod selection transaction",
@@ -102,10 +144,16 @@
       "vanilla_exploration": true
     },
     "extra_lives": {
-      "match": {"inherit_prefixes": ["pickup/extra_life/"]},
+      "match": {
+        "inherit_prefixes": [
+          "pickup/extra_life/"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["extra_life"],
+      "automap_properties": [
+        "extra_life"
+      ],
       "dossier_total_owner": null,
       "collected_state_writer": "native sp_extra_life useable transaction",
       "reward_edge": "useableComponentDecl=sp_extra_life_1",
@@ -115,10 +163,16 @@
       "vanilla_exploration": false
     },
     "sentinel_batteries": {
-      "match": {"inherit_prefixes": ["progress/sentinel_battery"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/sentinel_battery"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["sentinel_battery"],
+      "automap_properties": [
+        "sentinel_battery"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_BATTERY",
       "collected_state_writer": "native battery useable transaction saved as SGS_GAME_DATA",
       "reward_edge": "useableComponentDecl=propitem/batteries/sentinel_battery",
@@ -128,10 +182,16 @@
       "vanilla_exploration": true
     },
     "runes": {
-      "match": {"inherit_prefixes": ["progress/rune"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/rune"
+        ]
+      },
       "vanilla_class": "idInteractable_Rune",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["rune"],
+      "automap_properties": [
+        "rune"
+      ],
       "dossier_total_owner": "native Rune registration plus PROGRESSION_CATEGORY_RUNE",
       "collected_state_writer": "opaque used-rune/Rune Manager transaction",
       "reward_edge": "opaque Rune selection and ownership transaction",
@@ -140,10 +200,16 @@
       "vanilla_exploration": true
     },
     "slayer_keys": {
-      "match": {"inherit_prefixes": ["pickup/keycard/slayer_key"]},
+      "match": {
+        "inherit_prefixes": [
+          "pickup/keycard/slayer_key"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["slayer_key"],
+      "automap_properties": [
+        "slayer_key"
+      ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_KEY",
       "collected_state_writer": "native slayer-key useable transaction",
       "reward_edge": "useableComponentDecl=propitem/keycard/slayer_key",
@@ -153,7 +219,12 @@
       "vanilla_exploration": false
     },
     "ability_progression": {
-      "match": {"inherit_prefixes": ["progress/blood_punch", "progress/dash"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/blood_punch",
+          "progress/dash"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -165,7 +236,12 @@
       "vanilla_exploration": false
     },
     "weapons_equipment": {
-      "match": {"inherit_prefixes": ["pickup/weapon/", "pickup/equipment/"]},
+      "match": {
+        "inherit_prefixes": [
+          "pickup/weapon/",
+          "pickup/equipment/"
+        ]
+      },
       "vanilla_class": "idProp2",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -177,7 +253,11 @@
       "vanilla_exploration": false
     },
     "independent_ice_trigger": {
-      "match": {"location_ids": [7770074]},
+      "match": {
+        "location_ids": [
+          7770074
+        ]
+      },
       "vanilla_class": "idProp2 replaced by independent idTrigger",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -189,7 +269,11 @@
       "vanilla_exploration": false
     },
     "independent_rocket_trigger": {
-      "match": {"location_ids": [7770056]},
+      "match": {
+        "location_ids": [
+          7770056
+        ]
+      },
       "vanilla_class": "idProp2 replaced by independent idTrigger",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -201,10 +285,16 @@
       "vanilla_exploration": false
     },
     "secret_encounters": {
-      "match": {"source_types": ["secret_encounter"]},
+      "match": {
+        "source_types": [
+          "secret_encounter"
+        ]
+      },
       "vanilla_class": "idInfo marker plus encounter manager",
       "automap_marker_source": "original automap_info_null_secret_encounter entity",
-      "automap_properties": ["automap_encounter_secret"],
+      "automap_properties": [
+        "automap_encounter_secret"
+      ],
       "dossier_total_owner": "combat encounter manager, not Exploration",
       "collected_state_writer": "native encounter completion event sequence",
       "reward_edge": "encounter reward remains outside the AP event hook",
@@ -213,7 +303,15 @@
       "vanilla_exploration": false
     },
     "runtime_mission": {
-      "match": {"location_ids": [7770122, 7770123, 7770124, 7770162]},
+      "match": {
+        "location_ids": [
+          7770122,
+          7770123,
+          7770124,
+          7770162,
+          7770210
+        ]
+      },
       "vanilla_class": "save transition reader",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -225,7 +323,23 @@
       "vanilla_exploration": false
     },
     "runtime_mastery": {
-      "match": {"location_ids": [7770125, 7770126, 7770127, 7770128, 7770129, 7770130, 7770131, 7770132, 7770133, 7770134, 7770135, 7770136, 7770137]},
+      "match": {
+        "location_ids": [
+          7770125,
+          7770126,
+          7770127,
+          7770128,
+          7770129,
+          7770130,
+          7770131,
+          7770132,
+          7770133,
+          7770134,
+          7770135,
+          7770136,
+          7770137
+        ]
+      },
       "vanilla_class": "native unlockable record reader",
       "automap_marker_source": null,
       "automap_properties": [],
@@ -237,7 +351,22 @@
       "vanilla_exploration": false
     },
     "runtime_challenge": {
-      "match": {"location_ids": [7770138, 7770139, 7770140, 7770141, 7770172, 7770173, 7770174, 7770175]},
+      "match": {
+        "location_ids": [
+          7770138,
+          7770139,
+          7770140,
+          7770141,
+          7770172,
+          7770173,
+          7770174,
+          7770175,
+          7770206,
+          7770207,
+          7770208,
+          7770209
+        ]
+      },
       "vanilla_class": "native mission-challenge record reader",
       "automap_marker_source": null,
       "automap_properties": [],

@@ -1193,7 +1193,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             e1m3_done = all(bits)
             self.assertEqual(
                 ctx.all_mission_challenges_observed,
-                {"e1m3": e1m3_done, "e1m4": False},
+                {"e1m3": e1m3_done, "e1m4": False, "e2m1": False},
                 bits,
             )
 
@@ -2618,6 +2618,7 @@ class CheckEventTests(unittest.TestCase):
     def test_exact_runtime_transition_pairs_and_unknown_rejection(self):
         expected = {
             ("game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss"): 7770124,
+            ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},

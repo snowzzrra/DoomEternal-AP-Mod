@@ -42,9 +42,9 @@ class FoundationRegistryTests(unittest.TestCase):
         self.assertEqual(sum(family_counts(self.definitions).values()), 116)
         contracts = load_foundation_contracts()
         self.assertEqual(contracts["counts"]["items"], 116)
-        self.assertEqual(contracts["counts"]["locations"], 133)
-        self.assertEqual(contracts["counts"]["map_checks"], 108)
-        self.assertEqual(contracts["counts"]["runtime_locations"], 25)
+        self.assertEqual(contracts["counts"]["locations"], 168)
+        self.assertEqual(contracts["counts"]["map_checks"], 138)
+        self.assertEqual(contracts["counts"]["runtime_locations"], 30)
         self.assertEqual(contracts["counts"]["runtime_goals"], 1)
         for override in contracts["map_overrides"].values():
             self.assertTrue(override["justification"])
@@ -156,7 +156,7 @@ class FoundationRegistryTests(unittest.TestCase):
 class MapExpansionFoundationTests(unittest.TestCase):
     def test_five_release_maps_and_test_only_sixth_fixture(self):
         registry = load_map_registry()
-        self.assertEqual(len(release_plan(registry)), 5)
+        self.assertEqual(len(release_plan(registry)), 6)
         fixture = copy.deepcopy(registry["maps"]["e1m1_intro"])
         fixture.update({
             "display_name": "Registry Sixth Fixture", "test_only": True,
