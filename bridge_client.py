@@ -263,6 +263,9 @@ DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
 FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_5.txt"
+FORTRESS_GOAL_EVENT_MARKER = "AP_GOAL_EVENT_FORTRESS_VISIT_5"
+FORTRESS_GOAL_EVENT_OWNER = "trigger_transition_to_e2m3"
+FORTRESS_GOAL_EVENT_SOURCE = "Fortress Visit 5 native Mars Core terminal"
 # Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
@@ -3589,7 +3592,7 @@ class DoomEternalContext(CommonContext):
     async def send_campaign_goal(self, source_description):
         return await DoomEternalContext.send_mission_complete(
             self,
-            DOOM_HUNTER_BASE_COMPLETE_LOCATION,
+            None,
             source_description,
             report_goal=True,
         )
@@ -3604,8 +3607,8 @@ class DoomEternalContext(CommonContext):
                 )
             except OSError:
                 contents = ""
-            if "AP_GOAL_EVENT_FORTRESS_VISIT_4" not in contents:
-                logger.warning("[Goal] Malformed Fortress Visit 4 goal event; removing it.")
+            if FORTRESS_GOAL_EVENT_MARKER not in contents:
+                logger.warning("[Goal] Malformed Fortress Visit 5 goal event; removing it.")
                 try:
                     fortress_goal_path.unlink()
                 except OSError:
@@ -3613,7 +3616,7 @@ class DoomEternalContext(CommonContext):
                 return True
             try:
                 sent = await self.send_campaign_goal(
-                    "Fortress Visit 4 native ARC Complex terminal"
+                    FORTRESS_GOAL_EVENT_SOURCE
                 )
             except Exception as error:
                 logger.error("[Goal] GOAL_RETRY error=%s", error)
@@ -3625,7 +3628,7 @@ class DoomEternalContext(CommonContext):
                     pass
                 except OSError as error:
                     logger.warning("[Goal] Sent goal event cleanup failed: %s", error)
-                logger.info("[Goal] GOAL_ACK owner=trigger_transition_to_e2m2")
+                logger.info("[Goal] GOAL_ACK owner=%s", FORTRESS_GOAL_EVENT_OWNER)
             else:
                 logger.info("[Goal] GOAL_RETRY reason=mission_or_server_ack")
             return True

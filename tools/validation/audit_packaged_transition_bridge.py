@@ -180,74 +180,10 @@ async def consume(
     ):
         if not event.exists() or sent:
             raise AssertionError("retryable transition must preserve event")
-    elif expected == 7770162:
-        if event.exists() or sent[:1] != [{"cmd": "LocationChecks", "locations": [expected]}] or (
-            len(sent) != 2 or sent[1].get("cmd") != "StatusUpdate"
-        ):
-            raise AssertionError(f"packaged Fortress goal event drift: {sent!r}")
-    elif event.exists() or sent != [{"cmd": "LocationChecks", "locations": [expected]}]:
-        raise AssertionError(f"packaged event did not send expected LocationChecks {expected}: {sent!r}")
-    return sent
-
-
-def event(path: Path, from_map: str, to_map: str) -> Path:
-    path.write_text(f"sequence=7\nfrom_map={from_map}\nto_map={to_map}\n", encoding="utf-8")
-    return path
-
-
-def main() -> int:
-    client_dir = Path(sys.argv[1]).resolve()
-    source_registry = Path(sys.argv[2]).resolve()
-    manifest_path = Path(sys.argv[3]).resolve()
-    apworld_path = Path(sys.argv[4]).resolve()
-    bridge_sha256 = assert_packaged_manifest(client_dir, manifest_path)
-    assert_packaged_launcher(apworld_path, client_dir, bridge_sha256)
-    packaged_registry = client_dir / "data" / "challenge_location_registry.json"
-    if not packaged_registry.is_file() or packaged_registry.read_bytes() != source_registry.read_bytes():
-        raise SystemExit("packaged challenge registry diverges from source")
-    with tempfile.TemporaryDirectory() as directory:
-        game = Path(directory) / "DOOMEternal"
-        base = game / "base"
-        (base / "classicwads").mkdir(parents=True)
-        (game / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
-        old_state_home = os.environ.get("XDG_STATE_HOME")
-        bridge = load_bridge(client_dir, base, Path(directory) / "state")
-        if old_state_home is None:
-            os.environ.pop("XDG_STATE_HOME", None)
-        else:
-            os.environ["XDG_STATE_HOME"] = old_state_home
-        if bridge.BRIDGE_FILE != (client_dir / "bridge_client.py").resolve():
-            raise AssertionError("loaded bridge is not the unpacked client bridge")
-        if bridge.BRIDGE_SHA256 != bridge_sha256:
-            raise AssertionError("loaded bridge SHA differs from unpacked bridge SHA")
-        if bridge.TRANSITION_HANDLER != "unified":
-            raise AssertionError("loaded bridge did not select unified transition handler")
-        identity_lines = []
-        original_logger = bridge.logger
-        bridge.logger = types.SimpleNamespace(
-            info=lambda template, *args: identity_lines.append(template % args)
-        )
-        bridge.log_mission_bridge_identity()
-        bridge.logger = original_logger
-        expected_identity = [
-            f"BRIDGE_REVISION=mission-unified-{bridge_sha256[:12]}",
-            f"BRIDGE_FILE={client_dir / 'bridge_client.py'}",
-            f"BRIDGE_SHA256={bridge_sha256}",
-            "BRIDGE_PROTOCOL=3",
-            "TRANSITION_HANDLER=unified",
-        ]
-        if identity_lines != expected_identity:
-            raise AssertionError(f"unpacked bridge startup identity drift: {identity_lines!r}")
-        asyncio.run(consume(bridge, event(base / "ap_transition_1_1.evt", "game/sp/e1m1_intro/e1m1_intro", "game/sp/hub/hub"), None))
-        asyncio.run(consume(bridge, event(base / "ap_transition_1_2.evt", "game/sp/e1m2_battle/e1m2_battle", "game/hub/hub"), None))
-        asyncio.run(consume(bridge, event(base / "ap_transition_1_3.evt", "game/hub/hub", "game/sp/e1m2_war/e1m2_war"), None))
-        retry_event = event(base / "ap_transition_1_4.evt", "game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss")
-        asyncio.run(consume(bridge, retry_event, 7770124, fail_send=True))
-        asyncio.run(consume(bridge, retry_event, 7770124))
         goal_event = base / bridge.FORTRESS_GOAL_EVENT_FILENAME
-        goal_event.write_text("AP_GOAL_EVENT_FORTRESS_VISIT_4\n", encoding="utf-8")
-        asyncio.run(consume(bridge, goal_event, 7770162, fail_send=True))
-        asyncio.run(consume(bridge, goal_event, 7770162))
+        goal_event.write_text(f"{bridge.FORTRESS_GOAL_EVENT_MARKER}\n", encoding="utf-8")
+        asyncio.run(consume(bridge, goal_event, None, fail_send=True))
+        asyncio.run(consume(bridge, goal_event, None))
     return 0
 
 

@@ -1,7 +1,7 @@
 {
     "schema_version": 1,
     "source": "Archipelago/worlds/doometernal/locations.py",
-    "source_sha256": "71e9017541639555d2bdfc686f1f7a4e0a2782bbc915bb7023f3a9484fe0d73e",
+    "source_sha256": "f129d6719c001523770367b865d1907ea3850971388ddd1febdf438f8dc0f1a1",
     "locations": {
         "7770001": "Hell on Earth - Chainsaw",
         "7770002": "Hell on Earth - Heavy Cannon",
@@ -198,7 +198,6 @@
         "7770235": "ARC Complex - Return of Dr. Hayden - Part 1 Codex",
         "7770236": "ARC Complex - Return of Dr. Hayden - Part 2 Codex",
         "7770237": "ARC Complex - Slayer Key",
-        "7770239": "ARC Complex - Chaingun",
         "7770240": "ARC Complex - Sentinel Crystal",
         "7770242": "ARC Complex - Secret Encounter 1",
         "7770243": "ARC Complex - Secret Encounter 2",
@@ -206,6 +205,13 @@
         "7770245": "ARC Complex - Mission Challenge - External Combustion",
         "7770246": "ARC Complex - Mission Challenge - Solitary Confinement",
         "7770247": "ARC Complex - All Mission Challenges Completed",
-        "7770248": "ARC Complex - Mission Complete"
+        "7770248": "ARC Complex - Mission Complete",
+        "7770249": "ARC Complex - Dr. Elena Richardson Log 1",
+        "7770250": "ARC Complex - Dr. Elena Richardson Log 2",
+        "7770251": "ARC Complex - Dr. Elena Richardson Log 3",
+        "7770252": "ARC Complex - Dr. Elena Richardson Log 4",
+        "7770253": "Fortress of Doom - Praetor Suit",
+        "7770254": "Fortress of Doom - Sentinel Armor",
+        "7770255": "Fortress of Doom - Classic Marine Suit"
     }
 }
