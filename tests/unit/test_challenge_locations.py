@@ -37,9 +37,9 @@ class NativeChallengeContracts(unittest.TestCase):
                 ("Doom Hunter Base - Mission Challenge - Musical Interlude", 7770172),
                 ("Doom Hunter Base - Mission Challenge - Big Reveal", 7770173),
                 ("Doom Hunter Base - Mission Challenge - Fire in the Hole", 7770174),
-                ("Super Gore Nest - Mission Challenge - Weapon Mod Purchase", 7770206),
-                ("Super Gore Nest - Mission Challenge - Blood Gore Nest", 7770207),
-                ("Super Gore Nest - Mission Challenge - Glory Kill Pinky", 7770208),
+                ("Super Gore Nest - Mission Challenge - Weaponslave", 7770206),
+                ("Super Gore Nest - Mission Challenge - A Bloody Secret", 7770207),
+                ("Super Gore Nest - Mission Challenge - War Pinkies", 7770208),
             ],
         )
         self.assertEqual(

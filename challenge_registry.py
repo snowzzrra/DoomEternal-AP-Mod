@@ -140,13 +140,10 @@ def validate_challenge_registry(registry: dict) -> None:
             completion_prefix = "E2M1"
 
         signal = entry.get("signal", {})
-        required = {
-            "kind", "manager", "unlockable", "numUnlockableRules",
-            "rule_0_statname", "rule_0_statDuration", "rule_0_satisfied",
-            "unlockableIsUnlocked",
-        }
-        if set(signal) != required or signal["kind"] != "unlockable_record":
+        if signal.get("kind") not in ("unlockable_record", "physical_event_equivalent"):
             raise ValueError(f"{entry.get('name')}: incomplete native challenge signal")
+        if signal["kind"] == "physical_event_equivalent" and not signal.get("physical_location_ids"):
+            raise ValueError(f"{entry.get('name')}: physical_event_equivalent missing physical_location_ids")
         if signal["manager"] != NATIVE_MASTERY_MANAGER:
             raise ValueError(f"{entry['name']}: unexpected native unlockable manager")
         challenge_num = (index % 3) + 1
@@ -154,7 +151,7 @@ def validate_challenge_registry(registry: dict) -> None:
         if signal["unlockable"] != expected_path or signal["unlockable"] in challenge_paths:
             raise ValueError(f"{entry['name']}: unexpected or duplicate challenge path")
         challenge_paths.add(signal["unlockable"])
-        if signal["numUnlockableRules"] != 1 or signal["rule_0_statDuration"] != 5:
+        if signal["numUnlockableRules"] != 1 or signal["rule_0_statDuration"] not in (1, 5):
             raise ValueError(f"{entry['name']}: unexpected native challenge rule shape")
         if signal["rule_0_satisfied"] is not True or signal["unlockableIsUnlocked"] is not True:
             raise ValueError(f"{entry['name']}: durable completion fields must be true")

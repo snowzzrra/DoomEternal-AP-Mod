@@ -245,7 +245,7 @@ def main() -> int:
         asyncio.run(consume(bridge, retry_event, 7770124, fail_send=True))
         asyncio.run(consume(bridge, retry_event, 7770124))
         goal_event = base / bridge.FORTRESS_GOAL_EVENT_FILENAME
-        goal_event.write_text("AP_GOAL_EVENT_FORTRESS_VISIT_3\n", encoding="utf-8")
+        goal_event.write_text("AP_GOAL_EVENT_FORTRESS_VISIT_4\n", encoding="utf-8")
         asyncio.run(consume(bridge, goal_event, 7770162, fail_send=True))
         asyncio.run(consume(bridge, goal_event, 7770162))
     return 0

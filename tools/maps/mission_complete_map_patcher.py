@@ -174,23 +174,23 @@ def _patch_fortress_goal(contract: dict, root: Path, generated_map: Path) -> dic
     source = (root / contract["source_path"]).read_text(encoding="utf-8")
     source_bounds = find_entity_block_bounds(source, contract["owner"])
     if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
-        raise ValueError("Fortress Visit 3 native goal owner is missing or duplicated")
+        raise ValueError("Fortress Visit 4 native goal owner is missing or duplicated")
     source_block = source[source_bounds[0]:source_bounds[1]]
     source_sha = _sha256(source_block.encode("utf-8"))
     if source_sha != contract["source_sha256"]:
-        raise ValueError("Fortress Visit 3 native goal owner hash mismatch")
+        raise ValueError("Fortress Visit 4 native goal owner hash mismatch")
     if f'"{contract["required_layer"]}"' not in source_block:
-        raise ValueError("Fortress Visit 3 goal owner layer drift")
+        raise ValueError("Fortress Visit 4 goal owner layer drift")
     if extract_target_names(source_block) != contract["original_targets"]:
-        raise ValueError("Fortress Visit 3 goal owner target drift")
+        raise ValueError("Fortress Visit 4 goal owner target drift")
 
     text = generated_map.read_text(encoding="utf-8")
     bounds = find_entity_block_bounds(text, contract["owner"])
     if bounds is None:
-        raise ValueError("Fortress Visit 3 generated goal owner is missing")
+        raise ValueError("Fortress Visit 4 generated goal owner is missing")
     block = text[bounds[0]:bounds[1]]
     if _sha256(block.encode("utf-8")) != source_sha:
-        raise ValueError("Fortress Visit 3 generated goal owner drift")
+        raise ValueError("Fortress Visit 4 generated goal owner drift")
     patched = replace_targets_block(block, [contract["goal_target"]])
     event = f'''entity {{
 \tentityDef {contract["goal_target"]} {{
@@ -201,14 +201,14 @@ def _patch_fortress_goal(contract: dict, root: Path, generated_map: Path) -> dic
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tcommandText = "echo AP_GOAL_EVENT_FORTRESS_VISIT_3; condump ap_goal_fortress_visit_3.txt";
+\t\t\tcommandText = "echo AP_GOAL_EVENT_FORTRESS_VISIT_4; condump ap_goal_fortress_visit_4.txt";
 \t\t}}
 \t}}
 }}
 '''
     result = text[:bounds[0]] + patched + text[bounds[1]:]
     if result.count(f"entityDef {contract['goal_target']}"):
-        raise ValueError("Fortress Visit 3 generated goal target already exists")
+        raise ValueError("Fortress Visit 4 generated goal target already exists")
     generated_map.write_text(result.rstrip() + "\n" + event, encoding="utf-8", newline="")
     return {
         "source_path": contract["source_path"],
@@ -250,7 +250,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     hell_contract = contracts["hell_on_earth"]
     exultia_contract = contracts["exultia"]
     doom_hunter_contract = contracts["doom_hunter_base"]
-    fortress_goal_contract = contracts["fortress_visit_3_goal"]
+    fortress_goal_contract = contracts["fortress_visit_4_goal"]
     if set(generated_maps) < {
         hell_contract["map_key"], exultia_contract["map_key"],
         doom_hunter_contract["map_key"],
@@ -301,7 +301,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         "hell_on_earth": hell,
         "exultia": exultia,
         "doom_hunter_base": doom_hunter,
-        "fortress_visit_3_goal": fortress_goal,
+        "fortress_visit_4_goal": fortress_goal,
         "unrelated_generated_entity_diff_count": unrelated,
     }
 

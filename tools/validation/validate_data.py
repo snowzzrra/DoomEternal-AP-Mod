@@ -749,6 +749,15 @@ def main() -> int:
             "Runtime location IDs must not reuse item IDs: "
             f"{runtime_item_collisions}"
         )
+    all_map_check_ids = set()
+    for map_key, source in load_map_registry(MAP_SOURCES_PATH)["maps"].items():
+        if not source.get("enabled", True):
+            continue
+        cfg = read_json(ROOT / source["level_config"])
+        all_map_check_ids.update(cfg.get("entities", {}).values())
+    if not all_map_check_ids.isdisjoint(runtime_locations):
+        overlap = sorted(all_map_check_ids & runtime_locations)
+        errors.append(f"Physical map check IDs must be disjoint from runtime location IDs: {overlap}")
     mastery_location_names = [
         name for name in location_ids
         if "Weapon Mastery Challenge" in name
