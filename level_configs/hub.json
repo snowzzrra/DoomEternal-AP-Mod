@@ -16,7 +16,10 @@
         "AP_CHECK_PROGRESS_PRAETOR_TOKEN_4": 7770168,
         "AP_CHECK_PROGRESS_CHEATS_ALL_MASTERED_RUNES_1": 7770169,
         "AP_CHECK_PICKUP_WEAPON_GAUSS_RIFLE_HUB_1": 7770170,
-        "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171
+        "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171,
+        "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_1": 7770253,
+        "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_2": 7770254,
+        "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_2_BATTERY_STATION_1": 7770255
     },
     "location_feedback": {
         "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": {
@@ -164,6 +167,15 @@
                 "target_objective_complete_ballista": []
             },
             "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+        },
+        "interact_hub_2_battery_station_1": {
+            "native_entity_contract": {}
+        },
+        "interact_hub_2_battery_station_2": {
+            "native_entity_contract": {}
+        },
+        "sentinel_battery_room_interact_hub_2_battery_station_1": {
+            "native_entity_contract": {}
         }
     }
 }

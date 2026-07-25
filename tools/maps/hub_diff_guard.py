@@ -12,7 +12,7 @@ from tools.maps.mission_complete_map_patcher import _patch_fortress_goal
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088}
-NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172))
+NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172)) | {7770253, 7770254, 7770255}
 EXPECTED_CHANGED_OR_REMOVED = {
     "sentinel_battery_room_progress_praetor_token_1",
     "sentinel_battery_room_progress_praetor_token_2",

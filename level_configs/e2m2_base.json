@@ -30,18 +30,21 @@
         "AP_CHECK_PICKUPS_PROGRESS_CODEX_4_E2M2": 7770235,
         "AP_CHECK_PICKUPS_PROGRESS_CODEX_5_E2M2": 7770236,
         "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770237,
-        "AP_CHECK_PICKUPS_PICKUP_WEAPON_CHAINGUN_1": 7770239,
-        "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1763022446": 7770240
+        "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1763022446": 7770240,
+        "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_1": 7770249,
+        "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_2": 7770250,
+        "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_3": 7770251,
+        "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_4": 7770252
     },
     "location_feedback": {
         "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_FIRE_1": {
-            "policy": "vanilla_only"
+            "policy": "ap_only"
         },
         "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_WHIPLASH_1": {
-            "policy": "vanilla_only"
+            "policy": "ap_only"
         },
         "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CUEBALL_1": {
-            "policy": "vanilla_only"
+            "policy": "ap_only"
         },
         "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_06_2": {
             "policy": "vanilla_only"
@@ -60,20 +63,17 @@
         }
     },
     "target_policies": {
-        "pickups_pickup_weapon_chaingun_1": {
-            "independent_ap_trigger": true,
-            "independent_entity_name": "ap_independent_chaingun_7770239",
-            "independent_size": [
-                1.5,
-                1.5,
-                1.5
-            ],
-            "remove_original": true,
-            "preserve_layers": false,
-            "drop_targets": [],
-            "independent_targets": [
-                "AP_CHECK_PICKUPS_PICKUP_WEAPON_CHAINGUN_1"
-            ]
+        "echoes_interact_use_panel_lore_kiosk_console_1": {
+            "native_entity_contract": {}
+        },
+        "echoes_interact_use_panel_lore_kiosk_console_2": {
+            "native_entity_contract": {}
+        },
+        "echoes_interact_use_panel_lore_kiosk_console_3": {
+            "native_entity_contract": {}
+        },
+        "echoes_interact_use_panel_lore_kiosk_console_4": {
+            "native_entity_contract": {}
         },
         "pickups_progress_argent_cell_1_1763022446": {
             "independent_ap_trigger": true,

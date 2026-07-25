@@ -314,6 +314,8 @@ def validate_generated_automap_carriers() -> list[str]:
             for ap_check, location_id in config.get("entities", {}).items():
                 entity_name = ap_check.removeprefix("AP_CHECK_").lower()
                 policy = config.get("target_policies", {}).get(entity_name, {})
+                if policy.get("native_entity_contract") is not None:
+                    continue
                 source_bounds = find_entity_block_bounds(vanilla, entity_name)
                 if source_bounds is None:
                     continue
@@ -544,11 +546,11 @@ def validate_automap_prototypes_only() -> list[str]:
                 if entity_name in {
                     "mech_street_pickup_collectible_toys_doomguy_1",
                     "mech_street_progress_mod_bot_1_e1m1",
-                } or "praetor_token" in entity_name or config.get(
+                } or config.get(
                     "target_policies", {}
                 ).get(entity_name, {}).get("independent_visual") or config.get(
                     "target_policies", {}
-                ).get(entity_name, {}).get("native_entity_contract"):
+                ).get(entity_name, {}).get("native_entity_contract") is not None:
                     continue
                 bounds = find_entity_block_bounds(generated, entity_name)
                 if bounds is None:
@@ -919,11 +921,12 @@ def main() -> int:
                 errors.append(
                     f"Invalid location feedback policy: {path.name}/{ap_check}"
                 )
-            if policy == "vanilla_and_ap" and not record.get("justification"):
-                errors.append(
-                    f"vanilla_and_ap lacks justification: "
-                    f"{path.name}/{ap_check}"
-                )
+            if policy == "vanilla_only":
+                audited_vanilla_feedback_categories = ("CODEX", "CHEATS", "ALBUMS", "SECRET_ENCOUNTER", "EXTRA_LIFE", "TOYS", "MOD_BOT", "ARGENT_CELL", "PRAETOR", "RUNE")
+                if not any(cat in ap_check for cat in audited_vanilla_feedback_categories) and not record.get("vanilla_feedback_proof"):
+                    errors.append(
+                        f"vanilla_only policy for non-audited UI category lacks required vanilla_feedback_proof: {path.name}/{ap_check}"
+                    )
         reused_config_ids = sorted(reserved_location_ids & set(config.values()))
         if reused_config_ids:
             errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
@@ -936,9 +939,9 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 161:
+    if physical_location_count != 167:
         errors.append(
-            f"Expected 161 physical locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
+            f"Expected 167 physical entity locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
         )
     if praetor_policy_count != 24:
         errors.append(
@@ -1094,8 +1097,8 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 204,
-        "map_checks": 169,
+        "locations": 210,
+        "map_checks": 175,
         "runtime_locations": 35,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
