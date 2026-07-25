@@ -2074,7 +2074,7 @@ class DoomEternalContext(CommonContext):
         self.active_save_path = None
         self.active_save_token = None
         self.active_gameplay_epoch = None
-        self.runtime_observers_frozen = True
+        self.runtime_observers_frozen = False
         self.save_candidate_tokens = {}
         self.last_save_slot_rejection = None
         self.save_slot_observations = {}
@@ -2197,6 +2197,17 @@ class DoomEternalContext(CommonContext):
             STICKY_UNLOCKABLE.decode("ascii"), False
         )
 
+    def has_authoritative_save_proof(self):
+        if self.runtime_observers_frozen:
+            return False
+        proof_auth = getattr(self, "active_save_proof_authoritative", None)
+        if proof_auth is False:
+            return False
+        if self.active_save_slot is not None:
+            proof_slot = getattr(self, "active_save_proof_slot", self.active_save_slot)
+            return bool(proof_slot == self.active_save_slot)
+        return True
+
     def activate_save_selection(self, selected):
         old_slot = self.active_save_slot
         path_changed = str(selected.path) != self.active_save_path
@@ -2210,6 +2221,8 @@ class DoomEternalContext(CommonContext):
         self.active_save_slot = selected.slot_directory
         self.active_save_path = str(selected.path)
         self.active_save_token = selected.mtime_ns
+        self.active_save_proof_authoritative = True
+        self.active_save_proof_slot = selected.slot_directory
         self.select_save_observation_slot(selected.slot_directory)
         self.previous_checkpoint_death = self.checkpoint_death_by_save_slot.get(
             selected.slot_directory
@@ -2222,28 +2235,49 @@ class DoomEternalContext(CommonContext):
         self.checkpoint_death_by_save_slot.pop(slot_directory, None)
         self.previous_checkpoint_death = None
 
-    def log_save_slot_rejected(self, selected, reason, evidence_epoch=None):
-        if selected is None:
-            slot = "<none>"
-            path = "<none>"
-            mtime_ns = 0
-        else:
-            slot = selected.slot_directory
-            path = str(selected.path)
-            mtime_ns = selected.mtime_ns
-        rejection = (slot, path, mtime_ns, reason, evidence_epoch)
-        if rejection == self.last_save_slot_rejection:
+    def log_save_proof_rejected(
+        self, reason, evidence_slot=None, evidence_map=None, candidate_slot=None, candidate_mtime=None, active_slot=None, details_map=None
+    ):
+        rejection = (
+            reason,
+            evidence_slot or "<none>",
+            evidence_map or "<none>",
+            candidate_slot or "<none>",
+            candidate_mtime or 0,
+            active_slot or self.active_save_slot or "<none>",
+            details_map or "<none>",
+        )
+        if rejection == getattr(self, "last_save_proof_rejection", None):
             return
-        self.last_save_slot_rejection = rejection
+        self.last_save_proof_rejection = rejection
+        logger.info(
+            "SAVE_PROOF_REJECTED reason=%s evidence_slot=%s evidence_map=%s "
+            "candidate_slot=%s candidate_mtime=%s active_slot=%s details_map=%s",
+            *rejection,
+        )
         logger.info(
             "SAVE_SLOT_REJECTED slot=%s reason=%s path=%s",
-            slot,
+            candidate_slot or "<none>",
             reason,
-            path,
+            candidate_slot or "<none>",
+        )
+
+    def log_save_proof_accepted(
+        self, slot, map_name, epoch, duration_token, details_token, proof="non_provisional_fresh_map_match"
+    ):
+        logger.info(
+            "SAVE_PROOF_ACCEPTED slot=%s map=%s epoch=%s game_duration_token=%s "
+            "game_details_token=%s proof=%s",
+            slot,
+            map_name,
+            epoch,
+            duration_token,
+            details_token,
+            proof,
         )
 
     def update_save_slot_lifecycle(self):
-        """Require proof to promote/switch, then keep observing the proven slot."""
+        """Require non-provisional fresh proof to promote/switch save slots."""
         candidates = primary_save_candidates()
         for selected in candidates:
             token = (str(selected.path), selected.mtime_ns)
@@ -2259,84 +2293,120 @@ class DoomEternalContext(CommonContext):
         evidence = read_gameplay_save_evidence()
         newest = candidates[0] if candidates else None
         active = primary_save_for_slot(self.active_save_slot) if self.active_save_slot else None
+        candidate_slot = newest.slot_directory if newest else None
+        candidate_mtime = newest.mtime_ns if newest else 0
+
         newer_unproven_candidate = bool(
             newest
             and active
             and newest.slot_directory != active.slot_directory
             and newest.mtime_ns > active.mtime_ns
         )
+
+        def fail_proof(reason, details_map=None):
+            self.runtime_observers_frozen = True
+            self.active_save_proof_authoritative = False
+            self.log_save_proof_rejected(
+                reason,
+                evidence_slot=evidence.slot_directory if evidence else None,
+                evidence_map=evidence.map_name if evidence else None,
+                candidate_slot=candidate_slot,
+                candidate_mtime=candidate_mtime,
+                active_slot=self.active_save_slot,
+                details_map=details_map,
+            )
+            return None
+
         if evidence is None:
             if newer_unproven_candidate:
-                self.runtime_observers_frozen = True
-                self.log_save_slot_rejected(newest, "no_gameplay_evidence")
-                return None
-            if self.active_save_slot:
-                if active is not None:
-                    # A native monitor can briefly republish an unproven state
-                    # during a legitimate checkpoint/map write.  It may never
-                    # promote a candidate, but the already proven active slot
-                    # remains a valid observer source until an explicit menu
-                    # state or a proven new gameplay epoch arrives.
-                    self.active_save_path = str(active.path)
-                    self.runtime_observers_frozen = False
-                    return active
-            self.runtime_observers_frozen = True
-            self.log_save_slot_rejected(newest, "no_gameplay_evidence")
-            return None
-        if evidence.state != "gameplay" or evidence.provisional:
-            rejection_reason = (
-                "provisional" if evidence.provisional
-                else "menu"
-            )
-            self.runtime_observers_frozen = True
-            self.log_save_slot_rejected(newest, rejection_reason, evidence.epoch)
-            return None
+                return fail_proof("no_gameplay_evidence")
+            if self.active_save_slot and active is not None:
+                # A native monitor can briefly republish an unproven state
+                # during a legitimate checkpoint/map write.  It may never
+                # promote a candidate, but the already proven active slot
+                # remains a valid observer source until an explicit menu
+                # state or a proven new gameplay epoch arrives.
+                self.active_save_path = str(active.path)
+                self.runtime_observers_frozen = False
+                return active
+            return fail_proof("no_gameplay_evidence")
+
+        if evidence.state != "gameplay":
+            return fail_proof("menu")
+
+        # SECTION A: PROVISIONAL EVIDENCE NEVER PROMOTES OR SWITCHES A SAVE SLOT
+        if evidence.provisional:
+            return fail_proof("provisional")
+
+        if not evidence.slot_directory or not re.match(r"^GAME-AUTOSAVE[0-9]+$", evidence.slot_directory):
+            return fail_proof("invalid_evidence_slot")
 
         selected = primary_save_for_slot(evidence.slot_directory)
         if selected is None:
-            self.runtime_observers_frozen = True
-            self.log_save_slot_rejected(newest, "no_gameplay_evidence", evidence.epoch)
-            return None
+            return fail_proof("no_gameplay_evidence")
+
+        details = read_game_details_for_selection(selected)
+        if not details:
+            return fail_proof("no_game_details")
+
+        details_map = canonical_map_name(details.get("mapName"))
+        expected_map = evidence.map_name or canonical_map_name(self.current_map_name or "")
+
+        # SECTION B: STRICT CANONICAL MAP COHERENCE (NO HUB WILDCARD FOR SGN / MISSION MAPS)
+        if expected_map == "game/hub/hub":
+            if details_map != "game/hub/hub":
+                return fail_proof("map_mismatch", details_map=details_map)
+        else:
+            if details_map != expected_map:
+                return fail_proof("map_mismatch", details_map=details_map)
 
         is_current_active_slot = (
             self.active_save_slot == selected.slot_directory
             and self.active_save_path == str(selected.path)
         )
-        if not is_current_active_slot:
-            details = read_game_details_for_selection(selected)
-            if (
-                not details
-                or canonical_map_name(details.get("mapName")) != evidence.map_name
-            ):
-                self.runtime_observers_frozen = True
-                self.log_save_slot_rejected(selected, "map_mismatch", evidence.epoch)
-                return None
-            if self.active_gameplay_epoch == evidence.epoch:
-                self.runtime_observers_frozen = True
-                self.log_save_slot_rejected(
-                    selected, "no_gameplay_evidence", evidence.epoch
-                )
-                return None
-            self.activate_save_selection(selected)
-        elif (
-            self.active_gameplay_epoch is not None
-            and self.active_gameplay_epoch != evidence.epoch
-            and self.active_save_token != selected.mtime_ns
-        ):
-            self.invalidate_save_observation_slot(selected.slot_directory)
-            self.active_save_token = selected.mtime_ns
-        elif self.active_gameplay_epoch == evidence.epoch:
-            # A normal checkpoint write retains the proven slot and refreshes
-            # its token without invalidating durable observations.
-            self.active_save_token = selected.mtime_ns
-        self.active_gameplay_epoch = evidence.epoch
-        self.runtime_observers_frozen = False
 
-        if newest and newest.slot_directory != selected.slot_directory:
-            self.log_save_slot_rejected(
-                newest, "no_gameplay_evidence", evidence.epoch
+        details_token = details.get("_mtime_ns", selected.mtime_ns)
+
+        if not is_current_active_slot:
+            if self.active_gameplay_epoch == evidence.epoch and self.active_save_slot is not None:
+                return fail_proof("unproven_epoch", details_map=details_map)
+
+            # SAVE_PROOF_ACCEPTED MUST precede SAVE_SLOT_ACTIVE
+            self.log_save_proof_accepted(
+                selected.slot_directory,
+                expected_map,
+                evidence.epoch,
+                selected.mtime_ns,
+                details_token,
+                proof="non_provisional_fresh_map_match",
             )
-        return selected
+            self.activate_save_selection(selected)
+            self.active_gameplay_epoch = evidence.epoch
+            self.active_save_proof_authoritative = True
+            self.active_save_proof_slot = selected.slot_directory
+            self.active_save_proof_epoch = evidence.epoch
+            self.runtime_observers_frozen = False
+            return selected
+        else:
+            if self.active_gameplay_epoch != evidence.epoch:
+                self.log_save_proof_accepted(
+                    selected.slot_directory,
+                    expected_map,
+                    evidence.epoch,
+                    selected.mtime_ns,
+                    details_token,
+                    proof="non_provisional_fresh_map_match",
+                )
+                if self.active_save_token != selected.mtime_ns:
+                    self.invalidate_save_observation_slot(selected.slot_directory)
+                self.active_gameplay_epoch = evidence.epoch
+                self.active_save_token = selected.mtime_ns
+
+            self.active_save_proof_authoritative = True
+            self.active_save_proof_slot = selected.slot_directory
+            self.active_save_proof_epoch = evidence.epoch
+            self.runtime_observers_frozen = False
+            return selected
 
     def active_game_details(self):
         selected = self.update_save_slot_lifecycle()
@@ -2467,10 +2537,8 @@ class DoomEternalContext(CommonContext):
         if canonical_map_name(self.current_map_name or "") != evidence.map_name:
             return None, "gameplay evidence does not match the active map"
         supported = {
-            "game/sp/e1m1_intro/e1m1_intro",
-            "game/sp/e1m2_battle/e1m2_battle",
-            "game/hub/hub",
-            "game/sp/e1m3_cult/e1m3_cult",
+            canonical_map_name(name)
+            for name in load_foundation_contracts()["active_maps"].values()
         }
         if evidence.map_name not in supported:
             return None, "active map has no ap_rpc_v3 reconciliation entities"
@@ -2548,10 +2616,8 @@ class DoomEternalContext(CommonContext):
         if not self.item_state_ready or not self.current_map_name:
             return False
         supported = {
-            "game/sp/e1m1_intro/e1m1_intro",
-            "game/sp/e1m2_battle/e1m2_battle",
-            "game/hub/hub",
-            "game/sp/e1m3_cult/e1m3_cult",
+            canonical_map_name(name)
+            for name in load_foundation_contracts()["active_maps"].values()
         }
         if canonical_map_name(self.current_map_name) not in supported:
             return False
@@ -3043,6 +3109,8 @@ class DoomEternalContext(CommonContext):
         """Observe only each mastery record's own native completion predicate."""
         slot_directory = self.observation_slot_for_source(path)
         self.select_save_observation_slot(slot_directory)
+        if not self.has_authoritative_save_proof():
+            return
         for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE:
             self.weapon_masteries_observed.setdefault(unlockable, False)
         for unlockable, record in records.items():
@@ -3097,24 +3165,21 @@ class DoomEternalContext(CommonContext):
                 slot_directory,
             )
 
-    def observe_mission_challenges(self, records, path):
-        """Observe durable native records and derive the all-challenges check."""
-        slot_directory = self.observation_slot_for_source(path)
-        self.select_save_observation_slot(slot_directory)
+    def observe_physical_event_challenges(self):
+        """Observe physical_event_equivalent challenge predicates independently of save files."""
         for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE:
             self.mission_challenges_observed.setdefault(unlockable, False)
+
+        locations_checked = getattr(self, "locations_checked", set())
+        checked_locations = getattr(self, "checked_locations", set())
+        all_checks = locations_checked | checked_locations
 
         for entry in MISSION_CHALLENGE_ENTRIES:
             signal = entry["signal"]
             unlockable = signal["unlockable"]
             if signal.get("kind") == "physical_event_equivalent":
                 phys_ids = signal.get("physical_location_ids", [])
-                locations_checked = getattr(self, "locations_checked", set())
-                checked_locations = getattr(self, "checked_locations", set())
-                if any(
-                    loc_id in locations_checked or loc_id in checked_locations
-                    for loc_id in phys_ids
-                ):
+                if any(loc_id in all_checks for loc_id in phys_ids):
                     if not self.mission_challenges_observed.get(unlockable):
                         self.mission_challenges_observed[unlockable] = True
                         if self.item_state_ready:
@@ -3126,6 +3191,33 @@ class DoomEternalContext(CommonContext):
                             entry["location_id"],
                             phys_ids,
                         )
+
+        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
+            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
+            was_complete = self.all_mission_challenges_observed.get(key, False)
+            now_complete = all(
+                self.mission_challenges_observed.get(ul, False)
+                for ul in aggregate["signal"]["unlockables"]
+            )
+            self.all_mission_challenges_observed[key] = now_complete
+            if now_complete and not was_complete:
+                if self.item_state_ready:
+                    self.persist_session_state()
+                logger.info(
+                    "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
+                    "predicate=all_unlockable_records save_slot=%s",
+                    aggregate["location_id"],
+                    self.active_save_slot or "<synthetic>",
+                )
+
+    def observe_mission_challenges(self, records, path):
+        """Observe durable native records and derive the all-challenges check."""
+        slot_directory = self.observation_slot_for_source(path)
+        self.select_save_observation_slot(slot_directory)
+        self.observe_physical_event_challenges()
+
+        if not self.has_authoritative_save_proof():
+            return
 
         for unlockable, record in records.items():
             entry = MISSION_CHALLENGE_BY_UNLOCKABLE.get(unlockable)
@@ -3217,7 +3309,7 @@ class DoomEternalContext(CommonContext):
         )
 
     async def check_weapon_mastery_location(self, entry):
-        if not self.item_state_ready or self.runtime_observers_frozen:
+        if not self.item_state_ready or not self.has_authoritative_save_proof():
             return
         unlockable = entry["signal"]["unlockable"]
         if not self.weapon_masteries_observed.get(unlockable):
@@ -3262,7 +3354,10 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_location(entry)
 
     async def check_mission_challenge_location(self, entry):
-        if not self.item_state_ready or self.runtime_observers_frozen:
+        if not self.item_state_ready:
+            return
+        is_physical = entry["signal"].get("kind") == "physical_event_equivalent"
+        if not is_physical and not self.has_authoritative_save_proof():
             return
         unlockable = entry["signal"]["unlockable"]
         if not self.mission_challenges_observed.get(unlockable):
@@ -3281,12 +3376,14 @@ class DoomEternalContext(CommonContext):
             return
         if not self.server or not self.server.socket or self.server.socket.closed:
             return
+        source_name = "physical_event_equivalent" if is_physical else "vanilla_save_predicate"
         try:
             logger.info(
                 "[Challenge] LOCATION_CHECK_SEND id=%s unlockable=%s "
-                "source=vanilla_save_predicate save_slot=%s",
+                "source=%s save_slot=%s",
                 location_id,
                 unlockable,
+                source_name,
                 self.active_save_slot or "<synthetic>",
             )
             await self.send_msgs([
@@ -3304,17 +3401,23 @@ class DoomEternalContext(CommonContext):
         logger.info("[Challenge] LOCATION_CHECK_ACK id=%s", location_id)
 
     async def check_mission_challenge_locations(self):
+        self.observe_physical_event_challenges()
         for entry in MISSION_CHALLENGE_ENTRIES:
             await self.check_mission_challenge_location(entry)
         await self.check_all_mission_challenges_location()
 
     async def check_all_mission_challenges_location(self):
         """Check per-mission aggregates against their native challenge records."""
-        if not self.item_state_ready or self.runtime_observers_frozen:
+        if not self.item_state_ready or not self.has_authoritative_save_proof():
             return
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
             key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
             if not self.all_mission_challenges_observed.get(key, False):
+                continue
+            if self.runtime_observers_frozen and not all(
+                self.mission_challenges_observed.get(ul, False)
+                for ul in aggregate["signal"]["unlockables"]
+            ):
                 continue
             location_id = aggregate["location_id"]
             if location_id in self.checked_locations or location_id in self.locations_checked:

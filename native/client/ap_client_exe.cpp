@@ -816,12 +816,14 @@ public:
                 return;
             }
 
-            // Mission Complete owns its own load-edge baseline.  It must not
+            // Mission Complete owns its own load-edge baseline. It must not
             // wait for the asynchronous Python durable-save observer to prove
             // a slot: a decrypted primary game.details at safe gameplay is the
-            // transition source.  The first snapshot is baseline-only.
-            const std::optional<SaveSnapshot> entered =
-                (firstObservedState || sawLoadingForEpoch_)
+            // transition source.
+            const std::optional<SaveSnapshot> changed = ReadChangedSnapshot(menuSlotTokens_);
+            const std::optional<SaveSnapshot> entered = changed.has_value()
+                ? changed
+                : (firstObservedState || sawLoadingForEpoch_)
                     ? ReadLatestSnapshot()
                     : std::nullopt;
             sawLoadingForEpoch_ = false;
@@ -830,7 +832,7 @@ public:
                 WriteGameplayEvidence(std::nullopt);
                 return;
             }
-            const bool provisional = lastSnapshot_.mapName.empty();
+            const bool provisional = !changed.has_value();
             LogDebug(
                 "[Mission] MISSION_SNAPSHOT provisional="
                 + std::string(provisional ? "true" : "false")
@@ -851,11 +853,14 @@ public:
             return;
         }
 
-        const std::optional<SaveSnapshot> latest = ReadSlotSnapshot(activeSlotDirectory_);
+        const std::optional<SaveSnapshot> changed = ReadChangedSnapshot(menuSlotTokens_);
+        const std::optional<SaveSnapshot> latest = changed.has_value()
+            ? changed
+            : ReadSlotSnapshot(activeSlotDirectory_);
         if (!latest.has_value()) {
             return;
         }
-        if (latest->path == lastSnapshot_.path && latest->mtimeToken == lastSnapshot_.mtimeToken) {
+        if (latest->path == lastSnapshot_.path && latest->mtimeToken == lastSnapshot_.mtimeToken && !changed.has_value()) {
             return;
         }
 
@@ -864,8 +869,10 @@ public:
             WriteTransitionEvent(lastSnapshot_.mapName, latest->mapName, latest->path);
         }
 
+        activeSlotDirectory_ = latest->slotDirectory;
         lastSnapshot_ = *latest;
-        WriteGameplayEvidence(latest);
+        const bool provisional = !changed.has_value();
+        WriteGameplayEvidence(latest, provisional);
     }
 
 private:

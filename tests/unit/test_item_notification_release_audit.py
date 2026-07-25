@@ -65,7 +65,7 @@ class ItemNotificationReleaseAuditTests(unittest.TestCase):
                 packaged.write_text(ENTITY, encoding="utf-8")
 
             records = audit_release(True, generated, mod, client, manifest, registry, None, True)
-            self.assertEqual(len(records), 5)
+            self.assertEqual(len(records), 6)
             self.assertTrue(all(record["receipt_root_count"] == 0 for record in records.values()))
             self.assertTrue(all(record["effect_entity_count"] == 1 for record in records.values()))
 

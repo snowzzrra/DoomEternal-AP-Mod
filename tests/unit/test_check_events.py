@@ -3131,3 +3131,256 @@ class CheckEventTests(unittest.TestCase):
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
                 bridge_client.INV_DUMP_DIR = original_dump_dir
+
+    def test_chaingun_has_visual_and_trigger_contract(self):
+        from tools.maps.ap_map_generator import generate_map
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_map = Path(tmpdir) / "e2m1_nest.map"
+            out_json = Path(tmpdir) / "e2m1_nest.json"
+            with open("data/items.json") as f:
+                items = json.load(f)
+            generate_map(
+                "vanillamaps/e2m1_nest.map",
+                str(out_map),
+                "level_configs/e2m1_nest.json",
+                str(out_json),
+                items,
+            )
+            content = out_map.read_text(encoding="utf-8")
+            blocks = content.split("entity {")
+            visual_block = None
+            trigger_block = None
+            cleanup_block = None
+            check_block = None
+            for b in blocks:
+                if "entityDef ap_location_visual_7770201 " in b:
+                    visual_block = b
+                elif "entityDef ap_independent_chaingun_7770201 " in b:
+                    trigger_block = b
+                elif "entityDef ap_remove_location_visual_7770201 " in b:
+                    cleanup_block = b
+                elif "entityDef AP_CHECK_GAME_PICKUP_WEAPON_CHAINGUN_1 " in b:
+                    check_block = b
+
+            self.assertIsNotNone(visual_block)
+            self.assertIsNotNone(trigger_block)
+            self.assertIsNotNone(cleanup_block)
+            self.assertIsNotNone(check_block)
+
+            self.assertIn('class = "idProp2";', visual_block)
+            self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual_block)
+            self.assertIn('x = 1.5;', trigger_block)
+            self.assertIn('y = 1.5;', trigger_block)
+            self.assertIn('z = 1.5;', trigger_block)
+            self.assertIn('item[0] = "ap_location_visual_7770201";', cleanup_block)
+            self.assertIn('game_encounter_trigger_commit_39', trigger_block)
+            self.assertIn('game_target_relay_214', trigger_block)
+
+    def test_physical_event_equivalent_immediate_send_and_dedupe(self):
+        ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+        ctx.item_state_ready = True
+        ctx.runtime_observers_frozen = True
+        ctx.locations_checked = set()
+        ctx.checked_locations = set()
+        ctx.server_locations = {7770206, 7770138}
+        ctx.mission_challenges_observed = {}
+        ctx.all_mission_challenges_observed = {}
+        ctx.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+        sent = []
+
+        async def fake_send(messages):
+            sent.extend(messages)
+            for m in messages:
+                ctx.checked_locations.update(m.get("locations", ()))
+
+        ctx.send_msgs = fake_send
+        ctx.locations_checked.add(7770181)
+
+        ctx.observe_physical_event_challenges()
+        self.assertTrue(ctx.mission_challenges_observed.get("mission_challenge/e2m1/challenge_1"))
+
+        entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e2m1/challenge_1"]
+        asyncio.run(ctx.check_mission_challenge_location(entry))
+
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["locations"], [7770206])
+
+        # 2nd modbot does not resend
+        sent.clear()
+        ctx.locations_checked.add(7770182)
+        asyncio.run(ctx.check_mission_challenge_location(entry))
+        self.assertEqual(len(sent), 0)
+
+        # Pull the crystal
+        ctx.locations_checked.add(7770059)
+        ctx.observe_physical_event_challenges()
+        entry_crystal = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e1m3/challenge_1"]
+        asyncio.run(ctx.check_mission_challenge_location(entry_crystal))
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["locations"], [7770138])
+
+    def test_reproduce_sgn_false_positive_rejection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot0 = remote / "GAME-AUTOSAVE0"
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot0.mkdir()
+            slot2.mkdir()
+            (slot0 / "game_duration.dat").write_bytes(b"100_percent_save")
+            (slot0 / "game.details").write_bytes(b"slot0_details")
+            (slot2 / "game_duration.dat").write_bytes(b"real_save")
+            (slot2 / "game.details").write_bytes(b"slot2_details")
+            os.utime(slot0 / "game_duration.dat", ns=(200, 200))
+            os.utime(slot2 / "game_duration.dat", ns=(100, 100))
+
+            evidence = bridge_client.GameplaySaveEvidence("gameplay", 1, "GAME-AUTOSAVE0", "game/hub/hub", True)
+            details_dict = {"mapName": "game/hub/hub", "_path": str(slot0 / "game.details"), "_mtime_ns": 200}
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = None
+            ctx.active_save_path = None
+            ctx.active_save_token = None
+            ctx.active_gameplay_epoch = None
+            ctx.save_candidate_tokens = {}
+            ctx.current_map_name = "game/sp/e2m1_nest/e2m1_nest"
+            ctx.item_state_ready = True
+            ctx.locations_checked = set()
+            ctx.checked_locations = set()
+            ctx.server_locations = {7770206, 7770207, 7770208, 7770209, 7770125}
+            ctx.mission_challenges_observed = {}
+            ctx.weapon_masteries_observed = {}
+            ctx.all_mission_challenges_observed = {}
+            ctx.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+            sent = []
+
+            async def fake_send(messages):
+                sent.extend(messages)
+                for m in messages:
+                    ctx.checked_locations.update(m.get("locations", ()))
+
+            ctx.send_msgs = fake_send
+
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+                patch.object(bridge_client, "read_game_details_for_selection", return_value=details_dict),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertIsNone(selected)
+                self.assertIsNone(ctx.active_save_slot)
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertFalse(ctx.has_authoritative_save_proof())
+
+                # Fake 100% records
+                fake_records = {
+                    "mission_challenge/e2m1/challenge_2": {
+                        "numUnlockableRules": 1,
+                        "rule_0_statname": "STAT_BALLISTA_KILL_CACODEMONS",
+                        "rule_0_statCount": 2,
+                        "rule_0_statDuration": 1,
+                        "rule_0_satisfied": True,
+                        "unlockableIsUnlocked": True,
+                    }
+                }
+                ctx.observe_mission_challenges(fake_records, str(slot0 / "game_duration.dat"))
+                ctx.observe_weapon_masteries({"weapon_mastery/shotgun/sticky_bomb": {
+                    "numUnlockableRules": 1,
+                    "rule_0_statname": "STAT_STICKY_BOMB",
+                    "rule_0_statCount": 20,
+                    "rule_0_statDuration": 0,
+                    "rule_0_satisfied": True,
+                    "unlockableIsUnlocked": True,
+                }}, str(slot0 / "game_duration.dat"))
+
+                asyncio.run(ctx.check_mission_challenge_locations())
+                asyncio.run(ctx.check_weapon_mastery_locations())
+
+                self.assertEqual(len(sent), 0)
+                self.assertFalse(ctx.mission_challenges_observed.get("mission_challenge/e2m1/challenge_2"))
+                self.assertFalse(ctx.weapon_masteries_observed.get("weapon_mastery/shotgun/sticky_bomb"))
+
+    def test_provisional_never_promotes_or_switches_active_slot(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot0 = remote / "GAME-AUTOSAVE0"
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot0.mkdir()
+            slot2.mkdir()
+            (slot0 / "game_duration.dat").write_bytes(b"data0")
+            (slot2 / "game_duration.dat").write_bytes(b"data2")
+            (slot0 / "game.details").write_bytes(b"details0")
+            (slot2 / "game.details").write_bytes(b"details2")
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = "GAME-AUTOSAVE2"
+            ctx.active_save_path = str(slot2 / "game_duration.dat")
+            ctx.active_save_proof_authoritative = True
+            ctx.active_save_proof_slot = "GAME-AUTOSAVE2"
+
+            evidence = bridge_client.GameplaySaveEvidence("gameplay", 2, "GAME-AUTOSAVE0", "game/sp/e2m1_nest/e2m1_nest", True)
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertIsNone(selected)
+                self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertFalse(ctx.has_authoritative_save_proof())
+
+    def test_non_provisional_exact_slot_map_epoch_promotes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot2.mkdir()
+            (slot2 / "game_duration.dat").write_bytes(b"data2")
+            details = slot2 / "game.details"
+            details.write_bytes(b"details2")
+
+            evidence = bridge_client.GameplaySaveEvidence("gameplay", 1, "GAME-AUTOSAVE2", "game/sp/e2m1_nest/e2m1_nest", False)
+            details_dict = {"mapName": "game/sp/e2m1_nest/e2m1_nest", "_path": str(details), "_mtime_ns": 100}
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = None
+            ctx.current_map_name = "game/sp/e2m1_nest/e2m1_nest"
+
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+                patch.object(bridge_client, "read_game_details_for_selection", return_value=details_dict),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertIsNotNone(selected)
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
+                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertTrue(ctx.has_authoritative_save_proof())
+
+    def test_hub_does_not_act_as_wildcard_for_sgn(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot2.mkdir()
+            (slot2 / "game_duration.dat").write_bytes(b"data2")
+            details = slot2 / "game.details"
+            details.write_bytes(b"details2")
+
+            evidence = bridge_client.GameplaySaveEvidence("gameplay", 1, "GAME-AUTOSAVE2", "game/sp/e2m1_nest/e2m1_nest", False)
+            details_dict = {"mapName": "game/hub/hub", "_path": str(details), "_mtime_ns": 100}
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = None
+            ctx.current_map_name = "game/sp/e2m1_nest/e2m1_nest"
+
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+                patch.object(bridge_client, "read_game_details_for_selection", return_value=details_dict),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertIsNone(selected)
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertFalse(ctx.has_authoritative_save_proof())
