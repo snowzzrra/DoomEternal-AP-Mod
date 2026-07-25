@@ -229,7 +229,7 @@ exact source and rejects use for any capability active in the AP pool.
 `build_playable_test.sh` produces:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.1-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.2-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoPreAlpha.zip
@@ -300,7 +300,7 @@ Examples:
 
 ```text
 CLIENT DIRECTORY:
-C:\Games\DoomEternalArchipelago-v0.3.1\client
+C:\Games\DoomEternalArchipelago-v0.3.2\client
 
 GAME BASE PATH:
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
@@ -316,7 +316,7 @@ C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base
 Locate:
 
 ```text
-DoomEternalArchipelago-v0.3.1-alpha.zip
+DoomEternalArchipelago-v0.3.2-alpha.zip
 ```
 
 Extract it into a brand-new empty directory.
@@ -331,7 +331,7 @@ Do not:
 Expected layout after extraction:
 
 ```text
-DoomEternalArchipelago-v0.3.1/
+DoomEternalArchipelago-v0.3.2/
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoPreAlpha.zip
 ├── README.md
@@ -370,14 +370,14 @@ The selected directory must contain:
 Correct example:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.3.1\client
+C:\Games\DoomEternalArchipelago-v0.3.2\client
 ```
 
 Incorrect examples:
 
 ```text
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal
-C:\Games\DoomEternalArchipelago-v0.3.1
+C:\Games\DoomEternalArchipelago-v0.3.2
 ```
 
 Why those are wrong:
@@ -565,7 +565,7 @@ Saved Games Path: /var/home/YOUR_NAME/.local/share/Steam/steamapps/compatdata/78
 Windows:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.3.1\
+C:\Games\DoomEternalArchipelago-v0.3.2\
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoPreAlpha.zip
 ├── README.md
@@ -595,7 +595,7 @@ Native log path:
 Expected lines:
 
 ```text
-PTB version: v0.3.1-alpha
+PTB version: v0.3.2-alpha
 Meathook RPC server verified.
 RPC memory gate OPEN
 ```
@@ -636,14 +636,14 @@ Launcher and edit:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.1/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.2/client"
 ```
 
 Correct fallback in `host.yaml`:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.1/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.2/client"
 ```
 
 Forward slashes are valid in Windows YAML paths.
@@ -665,7 +665,7 @@ PTB versions or reused an old extracted directory.
 Fix:
 
 1. Delete the extracted pre-alpha directory.
-2. Extract `DoomEternalArchipelago-v0.3.1-alpha.zip` again into a
+2. Extract `DoomEternalArchipelago-v0.3.2-alpha.zip` again into a
    brand-new empty directory.
 3. Confirm that `client/` does not contain:
    - `version.dll`
