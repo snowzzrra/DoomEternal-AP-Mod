@@ -68,7 +68,6 @@
                 1.5
             ],
             "remove_original": true,
-            "no_auto_visual": true,
             "preserve_layers": false,
             "drop_targets": [
                 "game_encounter_trigger_commit_39",

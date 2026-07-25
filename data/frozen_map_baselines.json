@@ -212,17 +212,17 @@
         7770205
       ],
       "bind_parents": 270,
-      "byte_sha256": "6daf32cd77a1bf2017df86f252b27628aa055aade35c661fc747258876bcee32",
-      "byte_size": 14206492,
-      "classes": 13085,
-      "entity_count": 13088,
+      "byte_sha256": "891084729c05ea28175f41b614b5575ce35e5530e10a855acd12405d70ba54da",
+      "byte_size": 14207725,
+      "classes": 13087,
+      "entity_count": 13090,
       "layers": 2103,
       "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
-      "scripted_contract_sha256": "188e4832058e49b2d9d3e79178b465643eebe2c72f1c68564102dc82ca551d13",
-      "semantic_sha256": "71f8caa7e3cff173256a6f460dc17eebd1bb4a7be63d13edc4db40c5152c6c4f",
-      "targets": 8791,
-      "transforms": 27372,
-      "unique_entity_names": 13086
+      "scripted_contract_sha256": "6f4d57825851fb044c47f014509a78da4c5978cd7d293e017b650841a4b70c0e",
+      "semantic_sha256": "0471f1faf9ad05fd10ead122b5be29061e98830354677bd15a29c093725d0643",
+      "targets": 8794,
+      "transforms": 27375,
+      "unique_entity_names": 13088
     },
     "hub": {
       "ap_ids": [
