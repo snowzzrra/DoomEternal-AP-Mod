@@ -262,7 +262,7 @@ DEATHLINK_KILL_INTERVAL = 2.0
 DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
-FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_3.txt"
+FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_4.txt"
 # Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
@@ -1125,8 +1125,6 @@ def read_unlockable_record(payload, entry):
 
     cursor = record_offset + len(record_prefix)
     rule_count, cursor = _read_serialized_uint(payload, cursor)
-    if rule_count != signal["numUnlockableRules"]:
-        raise ValueError(f"{signal['unlockable']}: unexpected native rule count")
     satisfied, cursor = _read_structured_bool(payload, cursor, b" rule_0_satisfied")
     if not payload.startswith(b" rule_0_statCount", cursor):
         raise ValueError(f"{signal['unlockable']}: missing rule_0_statCount")
@@ -1138,18 +1136,20 @@ def read_unlockable_record(payload, entry):
     stat_duration, cursor = _read_serialized_uint(
         payload, cursor + len(b"&rule_0_statDuration")
     )
-    if stat_duration != signal["rule_0_statDuration"]:
-        raise ValueError(f"{signal['unlockable']}: unexpected rule_0_statDuration")
-    stat_prefix = b"\x1erule_0_statname\x0a" + bytes([len(stat) * 2])
-    if not payload.startswith(stat_prefix + stat, cursor):
-        raise ValueError(f"{signal['unlockable']}: unexpected rule_0_statname")
-    cursor += len(stat_prefix) + len(stat)
+    stat_prefix = b"\x1erule_0_statname\x0a"
+    if not payload.startswith(stat_prefix, cursor):
+        raise ValueError(f"{signal['unlockable']}: missing rule_0_statname")
+    cursor += len(stat_prefix)
+    stat_len = payload[cursor] // 2
+    cursor += 1
+    stat_bytes = payload[cursor:cursor + stat_len]
+    cursor += stat_len
     unlocked, cursor = _read_structured_bool(
         payload, cursor, b"(unlockableIsUnlocked"
     )
     return {
         "numUnlockableRules": rule_count,
-        "rule_0_statname": stat.decode("ascii"),
+        "rule_0_statname": stat_bytes.decode("ascii", errors="ignore"),
         "rule_0_statCount": stat_count,
         "rule_0_statDuration": stat_duration,
         "rule_0_satisfied": satisfied,
@@ -1166,19 +1166,31 @@ def read_weapon_mastery_records(payload):
     """Return only structured records that exist in the fixed vanilla manager."""
     records = {}
     for entry in WEAPON_MASTERY_ENTRIES:
-        record = read_weapon_mastery_record(payload, entry)
-        if record is not None:
-            records[entry["signal"]["unlockable"]] = record
+        try:
+            record = read_weapon_mastery_record(payload, entry)
+            if record is not None:
+                records[entry["signal"]["unlockable"]] = record
+        except Exception as error:
+            logger.warning(
+                "[Mastery] RECORD_PARSE_ERROR unlockable=%s error=%s",
+                entry["signal"]["unlockable"], error,
+            )
     return records
 
 
 def read_mission_challenge_records(payload):
-    """Return exact Cultist Base challenge records from the native manager."""
+    """Return exact challenge records from the native manager."""
     records = {}
     for entry in MISSION_CHALLENGE_ENTRIES:
-        record = read_unlockable_record(payload, entry)
-        if record is not None:
-            records[entry["signal"]["unlockable"]] = record
+        try:
+            record = read_unlockable_record(payload, entry)
+            if record is not None:
+                records[entry["signal"]["unlockable"]] = record
+        except Exception as error:
+            logger.warning(
+                "[Challenge] RECORD_PARSE_ERROR unlockable=%s error=%s",
+                entry["signal"]["unlockable"], error,
+            )
     return records
 
 
@@ -3091,6 +3103,30 @@ class DoomEternalContext(CommonContext):
         self.select_save_observation_slot(slot_directory)
         for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE:
             self.mission_challenges_observed.setdefault(unlockable, False)
+
+        for entry in MISSION_CHALLENGE_ENTRIES:
+            signal = entry["signal"]
+            unlockable = signal["unlockable"]
+            if signal.get("kind") == "physical_event_equivalent":
+                phys_ids = signal.get("physical_location_ids", [])
+                locations_checked = getattr(self, "locations_checked", set())
+                checked_locations = getattr(self, "checked_locations", set())
+                if any(
+                    loc_id in locations_checked or loc_id in checked_locations
+                    for loc_id in phys_ids
+                ):
+                    if not self.mission_challenges_observed.get(unlockable):
+                        self.mission_challenges_observed[unlockable] = True
+                        if self.item_state_ready:
+                            self.persist_session_state()
+                        logger.info(
+                            "[Challenge] PHYSICAL_EVENT_COMPLETE unlockable=%s location_id=%s "
+                            "predicate=physical_event_equivalent physical_ids=%s",
+                            unlockable,
+                            entry["location_id"],
+                            phys_ids,
+                        )
+
         for unlockable, record in records.items():
             entry = MISSION_CHALLENGE_BY_UNLOCKABLE.get(unlockable)
             if entry is None:
@@ -3115,6 +3151,22 @@ class DoomEternalContext(CommonContext):
                     path,
                 )
                 self.last_mission_challenge_records[record_key] = observed_record
+
+            if observed_record[0] != signal["numUnlockableRules"]:
+                logger.warning(
+                    "[Challenge] REGISTRY_MISMATCH unlockable=%s field=numUnlockableRules expected=%s observed=%s",
+                    unlockable, signal["numUnlockableRules"], observed_record[0],
+                )
+            if observed_record[1] != signal["rule_0_statname"]:
+                logger.warning(
+                    "[Challenge] REGISTRY_MISMATCH unlockable=%s field=rule_0_statname expected=%s observed=%s",
+                    unlockable, signal["rule_0_statname"], observed_record[1],
+                )
+            if observed_record[3] != signal["rule_0_statDuration"]:
+                logger.warning(
+                    "[Challenge] REGISTRY_MISMATCH unlockable=%s field=rule_0_statDuration expected=%s observed=%s",
+                    unlockable, signal["rule_0_statDuration"], observed_record[3],
+                )
 
             natural_complete = (
                 observed_record[0] == signal["numUnlockableRules"]
@@ -3443,8 +3495,8 @@ class DoomEternalContext(CommonContext):
                 )
             except OSError:
                 contents = ""
-            if "AP_GOAL_EVENT_FORTRESS_VISIT_3" not in contents:
-                logger.warning("[Goal] Malformed Fortress Visit 3 goal event; removing it.")
+            if "AP_GOAL_EVENT_FORTRESS_VISIT_4" not in contents:
+                logger.warning("[Goal] Malformed Fortress Visit 4 goal event; removing it.")
                 try:
                     fortress_goal_path.unlink()
                 except OSError:
@@ -3452,7 +3504,7 @@ class DoomEternalContext(CommonContext):
                 return True
             try:
                 sent = await self.send_campaign_goal(
-                    "Fortress Visit 3 native Super Gore Nest terminal"
+                    "Fortress Visit 4 native ARC Complex terminal"
                 )
             except Exception as error:
                 logger.error("[Goal] GOAL_RETRY error=%s", error)
@@ -3464,7 +3516,7 @@ class DoomEternalContext(CommonContext):
                     pass
                 except OSError as error:
                     logger.warning("[Goal] Sent goal event cleanup failed: %s", error)
-                logger.info("[Goal] GOAL_ACK owner=trigger_transition_to_e2m1")
+                logger.info("[Goal] GOAL_ACK owner=trigger_transition_to_e2m2")
             else:
                 logger.info("[Goal] GOAL_RETRY reason=mission_or_server_ack")
             return True

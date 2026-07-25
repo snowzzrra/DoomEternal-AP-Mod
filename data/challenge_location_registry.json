@@ -49,7 +49,8 @@
       "name": "Cultist Base - Mission Challenge - Pull the Crystal",
       "location_id": 7770138,
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
+        "physical_location_ids": [7770059],
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e1m3/challenge_1",
         "numUnlockableRules": 1,
@@ -190,10 +191,11 @@
       }
     },
     {
-      "name": "Super Gore Nest - Mission Challenge - Weapon Mod Purchase",
+      "name": "Super Gore Nest - Mission Challenge - Weaponslave",
       "location_id": 7770206,
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
+        "physical_location_ids": [7770181, 7770182],
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e2m1/challenge_1",
         "numUnlockableRules": 1,
@@ -214,7 +216,7 @@
       }
     },
     {
-      "name": "Super Gore Nest - Mission Challenge - Blood Gore Nest",
+      "name": "Super Gore Nest - Mission Challenge - A Bloody Secret",
       "location_id": 7770207,
       "signal": {
         "kind": "unlockable_record",
@@ -222,7 +224,7 @@
         "unlockable": "mission_challenge/e2m1/challenge_2",
         "numUnlockableRules": 1,
         "rule_0_statname": "STAT_SGN_CHALLENGE_NEST",
-        "rule_0_statDuration": 5,
+        "rule_0_statDuration": 1,
         "rule_0_satisfied": true,
         "unlockableIsUnlocked": true
       },
@@ -238,7 +240,7 @@
       }
     },
     {
-      "name": "Super Gore Nest - Mission Challenge - Glory Kill Pinky",
+      "name": "Super Gore Nest - Mission Challenge - War Pinkies",
       "location_id": 7770208,
       "signal": {
         "kind": "unlockable_record",

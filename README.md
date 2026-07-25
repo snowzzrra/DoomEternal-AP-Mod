@@ -14,12 +14,12 @@ sibling Archipelago branch and is compiled into `doometernal.apworld` during rel
 
 ## Project status
 
-Current `v0.3.1-alpha` scope:
+Current `v0.3.2-alpha` scope:
 
-- Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3`
-- Content: `108` generated map checks + `25` runtime locations = `133`
+- Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore Nest -> Fortress visit 4 (departure to ARC Complex)`
+- Content: `138` generated map checks + `30` runtime locations = `168`
   Archipelago locations; the goal is a
-  separate native event on the Fortress visit 3 transition.
+  separate native event on the Fortress visit 4 transition to ARC Complex.
 - Challenges/masteries: durable native save records drive their AP locations;
   reward suppression remains scoped to the audited owners.
 - Battery economy: all `18` base-campaign currency is present; the default

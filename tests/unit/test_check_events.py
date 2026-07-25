@@ -3085,7 +3085,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.INV_DUMP_DIR = tmpdir
                 event_path = Path(tmpdir, bridge_client.FORTRESS_GOAL_EVENT_FILENAME)
                 event_path.write_text(
-                    "AP_GOAL_EVENT_FORTRESS_VISIT_3\n",
+                    "AP_GOAL_EVENT_FORTRESS_VISIT_4\n",
                     encoding="utf-8",
                 )
                 sent = []

@@ -62,6 +62,11 @@
         "game_pickup_weapon_chaingun_1": {
             "independent_ap_trigger": true,
             "independent_entity_name": "ap_independent_chaingun_7770201",
+            "independent_size": [
+                1.5,
+                1.5,
+                1.5
+            ],
             "remove_original": true,
             "no_auto_visual": true,
             "preserve_layers": false,

@@ -45,19 +45,19 @@
       "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E1M4_BOSS"
     }
   },
-  "fortress_visit_3_goal": {
+  "fortress_visit_4_goal": {
     "map_key": "hub",
-    "owner": "trigger_transition_to_e2m1",
+    "owner": "trigger_transition_to_e2m2",
     "source_path": "vanillamaps/hub.map",
-    "source_sha256": "a70bca4e1523632b4005a6dea30caf4a93add2923ea50efeabd4388163034c4e",
+    "source_sha256": "1d6bd0799acf6869ced80dfbb29c1d689815bffa1b2404fc861eec390aeec73f",
     "original_targets": [],
-    "required_layer": "game/sp/hub/from_e1m4",
-    "goal_target": "ap_goal_fortress_visit_3",
-    "goal_event_file": "ap_goal_fortress_visit_3.txt",
+    "required_layer": "game/sp/hub/from_e2m1",
+    "goal_target": "ap_goal_fortress_visit_4",
+    "goal_event_file": "ap_goal_fortress_visit_4.txt",
     "terminal": {
-      "owner": "target_level_transition_to_e2m1",
-      "nextMapName": "maps/game/sp/e2m1_nest/e2m1_nest.map",
-      "checkpointName": "cp_01_map_start"
+      "owner": "target_level_transition_to_e2m2",
+      "nextMapName": "maps/game/sp/e2m2_base/e2m2_base.map",
+      "checkpointName": "cp_01"
     }
   }
 }
