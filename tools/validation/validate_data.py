@@ -936,9 +936,9 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 163:
+    if physical_location_count != 161:
         errors.append(
-            f"Expected 163 physical locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
+            f"Expected 161 physical locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
         )
     if praetor_policy_count != 24:
         errors.append(
@@ -1094,8 +1094,8 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 206,
-        "map_checks": 171,
+        "locations": 204,
+        "map_checks": 169,
         "runtime_locations": 35,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
