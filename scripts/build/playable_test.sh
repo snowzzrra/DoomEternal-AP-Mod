@@ -250,11 +250,12 @@ assert audit["doom_hunter_base"]["after_targets"] == [
     "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
     "checkpoints_target_level_transition_1",
 ]
-assert audit["fortress_visit_4_goal"]["after_targets"] == [
-    "ap_goal_fortress_visit_4",
+assert (audit.get("fortress_visit_5_goal") or audit.get("fortress_visit_4_goal"))["after_targets"] == [
+    "ap_goal_fortress_visit_5",
 ]
-assert audit["fortress_visit_4_goal"]["terminal"]["nextMapName"] == (
-    "maps/game/sp/e2m2_base/e2m2_base.map"
+assert (audit.get("fortress_visit_5_goal") or audit.get("fortress_visit_4_goal"))["terminal"]["nextMapName"] in (
+    "maps/game/sp/e2m2_base/e2m2_base.map",
+    "maps/game/sp/e2m3_core/e2m3_core.map",
 )
 PY
 

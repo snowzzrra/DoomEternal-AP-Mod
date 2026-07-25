@@ -202,19 +202,39 @@
     "slayer_keys": {
       "match": {
         "inherit_prefixes": [
-          "pickup/keycard/slayer_key"
+          "pickup/keycard/slayer_key",
+          "interact/slayer_gate/chest"
         ]
       },
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
       "automap_properties": [
-        "slayer_key"
+        "slayer_key",
+        "empyreon_shard"
       ],
       "dossier_total_owner": "native idProp2 registration plus PROGRESSION_CATEGORY_KEY",
       "collected_state_writer": "native slayer-key useable transaction",
       "reward_edge": "useableComponentDecl=propitem/keycard/slayer_key",
       "safe_cut": null,
       "carrier_mode": "persistent_native_idprop2",
+      "vanilla_automap": true,
+      "vanilla_exploration": false
+    },
+    "automap_stations": {
+      "match": {
+        "inherit_prefixes": [
+          "interact/automap"
+        ]
+      },
+      "vanilla_class": "idInteractable_Automap",
+      "automap_marker_source": "original entity automapPropertiesDecl",
+      "automap_properties": [
+        "automap_station"
+      ],
+      "dossier_total_owner": null,
+      "collected_state_writer": "native automap interaction state",
+      "reward_edge": null,
+      "safe_cut": null,
       "vanilla_automap": true,
       "vanilla_exploration": false
     },
@@ -309,7 +329,8 @@
           7770123,
           7770124,
           7770162,
-          7770210
+          7770210,
+          7770248
         ]
       },
       "vanilla_class": "save transition reader",
@@ -364,7 +385,11 @@
           7770206,
           7770207,
           7770208,
-          7770209
+          7770209,
+          7770244,
+          7770245,
+          7770246,
+          7770247
         ]
       },
       "vanilla_class": "native mission-challenge record reader",

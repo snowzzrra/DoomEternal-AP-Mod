@@ -25,8 +25,9 @@ EXPECTED_CHANGED_OR_REMOVED = {
     "progress_cheats_fully_upgraded_progression_wheel_final",
     "target_relay_pickup_ballista",
     "target_give_item_ballista",
-    "trigger_transition_to_e2m2",
+    "trigger_transition_to_e2m3",
 }
+
 
 
 def _blocks(text: str) -> dict[str, str]:
@@ -83,8 +84,9 @@ def assert_hub_diff_classified() -> dict:
         contracts = json.loads(
             (ROOT / "data/mission_complete_map_contracts.json").read_text(encoding="utf-8")
         )
+        goal_contract = contracts.get("fortress_visit_5_goal") or contracts.get("fortress_visit_4_goal")
         _patch_fortress_goal(
-            contracts["fortress_visit_4_goal"], ROOT, new_map
+            goal_contract, ROOT, new_map
         )
         before = _blocks(old_map.read_text(encoding="utf-8"))
         after = _blocks(new_map.read_text(encoding="utf-8"))
@@ -113,17 +115,17 @@ def assert_hub_diff_classified() -> dict:
         name for name in added
         if name not in ap_checks
         and name not in named_generated
-        and name != "ap_goal_fortress_visit_4"
+        and name not in ("ap_goal_fortress_visit_4", "ap_goal_fortress_visit_5")
         and not any(str(location_id) in name for location_id in NEW_HUB_LOCATION_IDS)
     }
     if unclassified_added:
         raise ValueError(f"Unclassified added Hub entities: {sorted(unclassified_added)}")
     return {
         "new_fortress_checks": sorted(
-            name for name in changed | removed if name != "trigger_transition_to_e2m2"
+            name for name in changed | removed if name not in ("trigger_transition_to_e2m2", "trigger_transition_to_e2m3")
         ),
-        "goal_hook": ["trigger_transition_to_e2m2", "ap_goal_fortress_visit_4"],
-        "added_ap_entities": sorted(added - {"ap_goal_fortress_visit_4"}),
+        "goal_hook": ["trigger_transition_to_e2m3", "ap_goal_fortress_visit_5"],
+        "added_ap_entities": sorted(added - {"ap_goal_fortress_visit_5", "ap_goal_fortress_visit_4"}),
         "unrelated": [],
     }
 

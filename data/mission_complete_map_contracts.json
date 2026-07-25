@@ -45,18 +45,38 @@
       "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E1M4_BOSS"
     }
   },
-  "fortress_visit_4_goal": {
-    "map_key": "hub",
-    "owner": "trigger_transition_to_e2m2",
-    "source_path": "vanillamaps/hub.map",
-    "source_sha256": "1d6bd0799acf6869ced80dfbb29c1d689815bffa1b2404fc861eec390aeec73f",
-    "original_targets": [],
-    "required_layer": "game/sp/hub/from_e2m1",
-    "goal_target": "ap_goal_fortress_visit_4",
-    "goal_event_file": "ap_goal_fortress_visit_4.txt",
+  "arc_complex": {
+    "location_id": 7770248,
+    "map_key": "e2m2_base",
+    "ap_check": "AP_CHECK_MISSION_COMPLETE_ARC_COMPLEX",
+    "owner": "fort_map_exit_level_transition_relay_393966306",
+    "source_path": "vanillamaps/e2m2_base.map",
+    "source_sha256": "d84b3b9b108b984e7434d70360536e5f1c03feed328851485cc953f9941eee00",
+    "original_targets": ["game_target_level_transition_to_hub", "game_target_level_transition_to_shell"],
+    "required_snippets": [
+      "class = \"idTarget_Count\";",
+      "count = 1;",
+      "delay = 1.25;"
+    ],
     "terminal": {
-      "owner": "target_level_transition_to_e2m2",
-      "nextMapName": "maps/game/sp/e2m2_base/e2m2_base.map",
+      "owner": "game_target_level_transition_to_hub",
+      "nextMapName": "maps/game/hub/hub.map",
+      "checkpointName": "from_e2m2",
+      "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E2M2_BASE"
+    }
+  },
+  "fortress_visit_5_goal": {
+    "map_key": "hub",
+    "owner": "trigger_transition_to_e2m3",
+    "source_path": "vanillamaps/hub.map",
+    "source_sha256": "61ca4767de77e49f244fae8e4efcb44c24a12615899bb8564a965338e4912607",
+    "original_targets": [],
+    "required_layer": "game/sp/hub/from_e2m2",
+    "goal_target": "ap_goal_fortress_visit_5",
+    "goal_event_file": "ap_goal_fortress_visit_5.txt",
+    "terminal": {
+      "owner": "target_level_transition_to_e2m3",
+      "nextMapName": "maps/game/sp/e2m3_core/e2m3_core.map",
       "checkpointName": "cp_01"
     }
   }
