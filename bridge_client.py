@@ -262,7 +262,7 @@ DEATHLINK_KILL_INTERVAL = 2.0
 DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
-FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_4.txt"
+FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_5.txt"
 # Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
@@ -3179,17 +3179,23 @@ class DoomEternalContext(CommonContext):
             unlockable = signal["unlockable"]
             if signal.get("kind") == "physical_event_equivalent":
                 phys_ids = signal.get("physical_location_ids", [])
-                if any(loc_id in all_checks for loc_id in phys_ids):
+                required_count = signal.get("required_count", 1)
+                source_ids = set(phys_ids)
+                matched_ids = source_ids.intersection(all_checks)
+                if len(matched_ids) >= required_count:
                     if not self.mission_challenges_observed.get(unlockable):
                         self.mission_challenges_observed[unlockable] = True
                         if self.item_state_ready:
                             self.persist_session_state()
                         logger.info(
                             "[Challenge] PHYSICAL_EVENT_COMPLETE unlockable=%s location_id=%s "
-                            "predicate=physical_event_equivalent physical_ids=%s",
+                            "predicate=physical_event_equivalent physical_ids=%s "
+                            "required_count=%s matched=%s",
                             unlockable,
                             entry["location_id"],
                             phys_ids,
+                            required_count,
+                            sorted(matched_ids),
                         )
 
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:

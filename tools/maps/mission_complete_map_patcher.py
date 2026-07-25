@@ -201,14 +201,14 @@ def _patch_fortress_goal(contract: dict, root: Path, generated_map: Path) -> dic
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tcommandText = "echo AP_GOAL_EVENT_FORTRESS_VISIT_4; condump ap_goal_fortress_visit_4.txt";
+\t\t\tcommandText = "echo AP_GOAL_EVENT_FORTRESS_VISIT_5; condump ap_goal_fortress_visit_5.txt";
 \t\t}}
 \t}}
 }}
 '''
     result = text[:bounds[0]] + patched + text[bounds[1]:]
     if result.count(f"entityDef {contract['goal_target']}"):
-        raise ValueError("Fortress Visit 4 generated goal target already exists")
+        raise ValueError("Fortress Visit goal generated target already exists")
     generated_map.write_text(result.rstrip() + "\n" + event, encoding="utf-8", newline="")
     return {
         "source_path": contract["source_path"],
@@ -250,11 +250,15 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     hell_contract = contracts["hell_on_earth"]
     exultia_contract = contracts["exultia"]
     doom_hunter_contract = contracts["doom_hunter_base"]
-    fortress_goal_contract = contracts["fortress_visit_4_goal"]
-    if set(generated_maps) < {
+    arc_complex_contract = contracts.get("arc_complex")
+    fortress_goal_contract = contracts.get("fortress_visit_5_goal") or contracts.get("fortress_visit_4_goal")
+    required_keys = {
         hell_contract["map_key"], exultia_contract["map_key"],
         doom_hunter_contract["map_key"],
-    }:
+    }
+    if arc_complex_contract:
+        required_keys.add(arc_complex_contract["map_key"])
+    if set(generated_maps) < required_keys:
         raise ValueError("Mission Complete generated map input is incomplete")
     before_maps = {key: path.read_text(encoding="utf-8") for key, path in generated_maps.items()}
     hell = _patch_hell(hell_contract, root, mod_root)
@@ -263,6 +267,12 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         doom_hunter_contract, root,
         generated_maps[doom_hunter_contract["map_key"]],
     )
+    arc_complex = None
+    if arc_complex_contract and arc_complex_contract["map_key"] in generated_maps:
+        arc_complex = _patch_exultia(
+            arc_complex_contract, root,
+            generated_maps[arc_complex_contract["map_key"]],
+        )
     fortress_goal = _patch_fortress_goal(
         fortress_goal_contract, root,
         generated_maps[fortress_goal_contract["map_key"]],
@@ -277,10 +287,18 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         generated_maps[doom_hunter_contract["map_key"]],
         doom_hunter_contract["ap_check"], doom_hunter_contract["location_id"],
     )
-    for contract, audit in (
+    if arc_complex_contract and arc_complex_contract["map_key"] in generated_maps:
+        _append_standard_event_target(
+            generated_maps[arc_complex_contract["map_key"]],
+            arc_complex_contract["ap_check"], arc_complex_contract["location_id"],
+        )
+    contract_list = [
         (hell_contract, hell), (exultia_contract, exultia),
         (doom_hunter_contract, doom_hunter),
-    ):
+    ]
+    if arc_complex_contract and arc_complex:
+        contract_list.append((arc_complex_contract, arc_complex))
+    for contract, audit in contract_list:
         text = generated_maps[contract["map_key"]].read_text(encoding="utf-8")
         expected_ap_target_references = 2 if "owner" in contract else 1
         if text.count(contract["ap_check"]) != expected_ap_target_references:
@@ -289,21 +307,29 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{contract['map_key']}: standard AP event count drift")
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
+    unrelated_owners = {
+        exultia_contract["owner"],
+        doom_hunter_contract["owner"],
+    }
+    if arc_complex_contract:
+        unrelated_owners.add(arc_complex_contract["owner"])
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),
-            ({exultia_contract["owner"]} if key == exultia_contract["map_key"] else
-             {doom_hunter_contract["owner"]} if key == doom_hunter_contract["map_key"] else set()),
+            unrelated_owners,
         )
         for key, path in generated_maps.items()
     )
-    return {
+    res = {
         "hell_on_earth": hell,
         "exultia": exultia,
         "doom_hunter_base": doom_hunter,
-        "fortress_visit_4_goal": fortress_goal,
+        "fortress_visit_5_goal": fortress_goal,
         "unrelated_generated_entity_diff_count": unrelated,
     }
+    if arc_complex:
+        res["arc_complex"] = arc_complex
+    return res
 
 
 def main() -> int:

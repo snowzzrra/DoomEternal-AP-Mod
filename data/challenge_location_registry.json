@@ -42,6 +42,15 @@
         "from": "game/sp/e2m1_nest/e2m1_nest",
         "to": "game/hub/hub"
       }
+    },
+    {
+      "name": "ARC Complex - Mission Complete",
+      "location_id": 7770248,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e2m2_base/e2m2_base",
+        "to": "game/hub/hub"
+      }
     }
   ],
   "mission_challenges": [
@@ -50,7 +59,9 @@
       "location_id": 7770138,
       "signal": {
         "kind": "physical_event_equivalent",
-        "physical_location_ids": [7770059],
+        "physical_location_ids": [
+          7770059
+        ],
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e1m3/challenge_1",
         "numUnlockableRules": 1,
@@ -195,7 +206,10 @@
       "location_id": 7770206,
       "signal": {
         "kind": "physical_event_equivalent",
-        "physical_location_ids": [7770181, 7770182],
+        "physical_location_ids": [
+          7770181,
+          7770182
+        ],
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e2m1/challenge_1",
         "numUnlockableRules": 1,
@@ -262,6 +276,83 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       }
+    },
+    {
+      "name": "ARC Complex - Mission Challenge - Rune Finder",
+      "location_id": 7770244,
+      "signal": {
+        "kind": "physical_event_equivalent",
+        "physical_location_ids": [
+          7770221,
+          7770222
+        ],
+        "required_count": 2,
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m2/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_DLE_RUNE_ACQUIRED_E2M2",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m2/challenge_1.decl",
+        "sha256": "9d0902c4035bd0dbb28c086a0d3ec1de9e70bac2eb13c9f30af82ffa9e9bb1f0",
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "ARC Complex - Mission Challenge - External Combustion",
+      "location_id": 7770245,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m2/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_KILL_N_ENEMIES_SHIELD_OVERLOAD",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m2/challenge_2.decl",
+        "sha256": "cc7eba46da6f9d8c03eebf89c98eb8602ff8b8ec3ce08018cd4df01d2f2b8db8",
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "name": "ARC Complex - Mission Challenge - Solitary Confinement",
+      "location_id": 7770246,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m2/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_REVENANT",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m2/challenge_3.decl",
+        "sha256": "a347e0f4e9665e5eb0e1400f96df2f9af06f13678948c475114bb2aea4af709d",
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
     }
   ],
   "all_mission_challenges": [
@@ -301,6 +392,19 @@
           "mission_challenge/e2m1/challenge_1",
           "mission_challenge/e2m1/challenge_2",
           "mission_challenge/e2m1/challenge_3"
+        ]
+      }
+    },
+    {
+      "name": "ARC Complex - All Mission Challenges Completed",
+      "location_id": 7770247,
+      "mission_key": "e2m2",
+      "signal": {
+        "kind": "all_mission_challenge_records",
+        "unlockables": [
+          "mission_challenge/e2m2/challenge_1",
+          "mission_challenge/e2m2/challenge_2",
+          "mission_challenge/e2m2/challenge_3"
         ]
       }
     }

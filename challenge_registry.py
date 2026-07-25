@@ -12,8 +12,10 @@ NATIVE_MASTERY_MANAGER = "UnlockableManager_0_1_2/idUnlockableManager_2"
 BASE_MASTERY_LOCATION_IDS = frozenset(range(7770125, 7770138))
 E1M3_CHALLENGE_LOCATION_IDS = frozenset(range(7770138, 7770141))
 E1M4_CHALLENGE_LOCATION_IDS = frozenset(range(7770172, 7770175))
-MISSION_CHALLENGE_LOCATION_IDS = E1M3_CHALLENGE_LOCATION_IDS | E1M4_CHALLENGE_LOCATION_IDS | frozenset(range(7770206, 7770209))
-ALL_MISSION_CHALLENGES_LOCATION_IDS = frozenset({7770141, 7770175, 7770209})
+E2M1_CHALLENGE_LOCATION_IDS = frozenset(range(7770206, 7770209))
+E2M2_CHALLENGE_LOCATION_IDS = frozenset(range(7770244, 7770247))
+MISSION_CHALLENGE_LOCATION_IDS = E1M3_CHALLENGE_LOCATION_IDS | E1M4_CHALLENGE_LOCATION_IDS | E2M1_CHALLENGE_LOCATION_IDS | E2M2_CHALLENGE_LOCATION_IDS
+ALL_MISSION_CHALLENGES_LOCATION_IDS = frozenset({7770141, 7770175, 7770209, 7770247})
 
 
 def canonical_map_name(name: str | None) -> str | None:
@@ -73,10 +75,10 @@ def validate_challenge_registry(registry: dict) -> None:
         raise ValueError("runtime registry schema_version must be 9")
     entries = all_location_entries(registry)
     expected_count = (
-        5   # mission_complete
+        6   # mission_complete
         + 13  # weapon_masteries
-        + 9   # mission_challenges (3 e1m3 + 3 e1m4 + 3 e2m1)
-        + 3   # all_mission_challenges (e1m3 aggregate + e1m4 aggregate + e2m1 aggregate)
+        + 12  # mission_challenges (3 e1m3 + 3 e1m4 + 3 e2m1 + 3 e2m2)
+        + 4   # all_mission_challenges (e1m3, e1m4, e2m1, e2m2 aggregates)
     )
     if len(entries) != expected_count:
         raise ValueError(
@@ -89,7 +91,7 @@ def validate_challenge_registry(registry: dict) -> None:
     if None in ids or len(ids) != len(set(ids)):
         raise ValueError("runtime location IDs must be unique")
     if set(ids) != {
-        7770122, 7770123, 7770124, 7770162, 7770210,
+        7770122, 7770123, 7770124, 7770162, 7770210, 7770248,
         *BASE_MASTERY_LOCATION_IDS,
         *MISSION_CHALLENGE_LOCATION_IDS,
         *ALL_MISSION_CHALLENGES_LOCATION_IDS,
@@ -114,13 +116,14 @@ def validate_challenge_registry(registry: dict) -> None:
             raise ValueError(f"{entry['name']}: noncanonical Hub alias")
 
     mission_challenges = registry.get("mission_challenges", [])
-    if len(mission_challenges) != 9:
-        raise ValueError("expected exactly nine Mission Challenges (3 e1m3 + 3 e1m4 + 3 e2m1)")
+    if len(mission_challenges) != 12:
+        raise ValueError("expected exactly twelve Mission Challenges (3 e1m3 + 3 e1m4 + 3 e2m1 + 3 e2m2)")
     challenge_paths = set()
     completion_stats = set()
     expected_global_ids = iter(range(7770138, 7770141))
     expected_e1m4_ids = iter(range(7770172, 7770175))
     expected_e2m1_ids = iter(range(7770206, 7770209))
+    expected_e2m2_ids = iter(range(7770244, 7770247))
 
     for index, entry in enumerate(mission_challenges):
         if index < 3:
@@ -133,17 +136,33 @@ def validate_challenge_registry(registry: dict) -> None:
                 raise ValueError(f"{entry['name']}: E1M4 Mission Challenge ID order drift")
             mission_prefix = "e1m4"
             completion_prefix = "E1M4"
-        else:
+        elif index < 9:
             if entry["location_id"] != next(expected_e2m1_ids):
                 raise ValueError(f"{entry['name']}: E2M1 Mission Challenge ID order drift")
             mission_prefix = "e2m1"
             completion_prefix = "E2M1"
+        else:
+            if entry["location_id"] != next(expected_e2m2_ids):
+                raise ValueError(f"{entry['name']}: E2M2 Mission Challenge ID order drift")
+            mission_prefix = "e2m2"
+            completion_prefix = "E2M2"
 
         signal = entry.get("signal", {})
         if signal.get("kind") not in ("unlockable_record", "physical_event_equivalent"):
             raise ValueError(f"{entry.get('name')}: incomplete native challenge signal")
-        if signal["kind"] == "physical_event_equivalent" and not signal.get("physical_location_ids"):
-            raise ValueError(f"{entry.get('name')}: physical_event_equivalent missing physical_location_ids")
+        if signal["kind"] == "physical_event_equivalent":
+            phys_ids = signal.get("physical_location_ids")
+            if not phys_ids or not isinstance(phys_ids, list):
+                raise ValueError(f"{entry.get('name')}: physical_event_equivalent missing physical_location_ids")
+            if not all(isinstance(pid, int) for pid in phys_ids):
+                raise ValueError(f"{entry.get('name')}: physical_location_ids must contain only ints")
+            if len(phys_ids) != len(set(phys_ids)):
+                raise ValueError(f"{entry.get('name')}: physical_location_ids must be unique")
+            req_count = signal.get("required_count", 1)
+            if not isinstance(req_count, int) or isinstance(req_count, bool):
+                raise ValueError(f"{entry.get('name')}: required_count must be an int, not bool")
+            if req_count < 1 or req_count > len(phys_ids):
+                raise ValueError(f"{entry.get('name')}: required_count must be 1..{len(phys_ids)}")
         if signal["manager"] != NATIVE_MASTERY_MANAGER:
             raise ValueError(f"{entry['name']}: unexpected native unlockable manager")
         challenge_num = (index % 3) + 1
@@ -151,7 +170,7 @@ def validate_challenge_registry(registry: dict) -> None:
         if signal["unlockable"] != expected_path or signal["unlockable"] in challenge_paths:
             raise ValueError(f"{entry['name']}: unexpected or duplicate challenge path")
         challenge_paths.add(signal["unlockable"])
-        if signal["numUnlockableRules"] != 1 or signal["rule_0_statDuration"] not in (1, 5):
+        if signal["numUnlockableRules"] != 1 or signal["rule_0_statDuration"] not in (1, 2, 5):
             raise ValueError(f"{entry['name']}: unexpected native challenge rule shape")
         if signal["rule_0_satisfied"] is not True or signal["unlockableIsUnlocked"] is not True:
             raise ValueError(f"{entry['name']}: durable completion fields must be true")
@@ -178,9 +197,9 @@ def validate_challenge_registry(registry: dict) -> None:
             raise ValueError(f"{entry['name']}: invalid inherited Suit Point owner")
 
     aggregates = registry.get("all_mission_challenges", [])
-    if len(aggregates) != 3:
-        raise ValueError("expected exactly three All Mission Challenges aggregates")
-    expected_mission_keys = {"e1m3", "e1m4", "e2m1"}
+    if len(aggregates) != 4:
+        raise ValueError("expected exactly four All Mission Challenges aggregates")
+    expected_mission_keys = {"e1m3", "e1m4", "e2m1", "e2m2"}
     mission_keys = [aggregate.get("mission_key") for aggregate in aggregates]
     if any(not isinstance(key, str) or not key.strip() for key in mission_keys):
         raise ValueError("all Mission Challenges aggregates require non-empty mission_key")

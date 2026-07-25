@@ -22,10 +22,11 @@ class NativeChallengeContracts(unittest.TestCase):
         self.assertEqual(
             {entry["location_id"] for entry in entries},
             {
-                7770122, 7770123, 7770124, 7770162, 7770210,
+                7770122, 7770123, 7770124, 7770162, 7770210, 7770248,
                 *range(7770125, 7770142),
                 7770172, 7770173, 7770174, 7770175,
                 7770206, 7770207, 7770208, 7770209,
+                7770244, 7770245, 7770246, 7770247,
             },
         )
         self.assertEqual(
@@ -40,10 +41,13 @@ class NativeChallengeContracts(unittest.TestCase):
                 ("Super Gore Nest - Mission Challenge - Weaponslave", 7770206),
                 ("Super Gore Nest - Mission Challenge - A Bloody Secret", 7770207),
                 ("Super Gore Nest - Mission Challenge - War Pinkies", 7770208),
+                ("ARC Complex - Mission Challenge - Rune Finder", 7770244),
+                ("ARC Complex - Mission Challenge - External Combustion", 7770245),
+                ("ARC Complex - Mission Challenge - Solitary Confinement", 7770246),
             ],
         )
         self.assertEqual(
-            len(registry["all_mission_challenges"]), 3,
+            len(registry["all_mission_challenges"]), 4,
         )
         self.assertEqual(
             registry["all_mission_challenges"][0],
@@ -89,6 +93,22 @@ class NativeChallengeContracts(unittest.TestCase):
                         "mission_challenge/e2m1/challenge_1",
                         "mission_challenge/e2m1/challenge_2",
                         "mission_challenge/e2m1/challenge_3",
+                    ],
+                },
+            },
+        )
+        self.assertEqual(
+            registry["all_mission_challenges"][3],
+            {
+                "name": "ARC Complex - All Mission Challenges Completed",
+                "location_id": 7770247,
+                "mission_key": "e2m2",
+                "signal": {
+                    "kind": "all_mission_challenge_records",
+                    "unlockables": [
+                        "mission_challenge/e2m2/challenge_1",
+                        "mission_challenge/e2m2/challenge_2",
+                        "mission_challenge/e2m2/challenge_3",
                     ],
                 },
             },
@@ -182,7 +202,7 @@ class NativeChallengeContracts(unittest.TestCase):
             audit = build_mission_challenge_overrides(root)
             self.assertEqual(
                 audit["location_ids"],
-                [7770138, 7770139, 7770140, 7770172, 7770173, 7770174, 7770206, 7770207, 7770208],
+                [7770138, 7770139, 7770140, 7770172, 7770173, 7770174, 7770206, 7770207, 7770208, 7770244, 7770245, 7770246],
             )
             self.assertEqual(audit["aggregate_reward_suppression"], {
                 "strategy": "child_currencyToGive_num_zero",
@@ -193,7 +213,7 @@ class NativeChallengeContracts(unittest.TestCase):
                 ],
                 "runtime_evidence": "v0.3.0c.1",
             })
-            self.assertEqual(len(audit["written_paths"]), 9)
+            self.assertEqual(len(audit["written_paths"]), 12)
             for entry in registry["mission_challenges"]:
                 source = (
                     ROOT / "vanilla_decls" / "owners" / "gameresources" /

@@ -1193,7 +1193,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             e1m3_done = all(bits)
             self.assertEqual(
                 ctx.all_mission_challenges_observed,
-                {"e1m3": e1m3_done, "e1m4": False, "e2m1": False},
+                {"e1m3": e1m3_done, "e1m4": False, "e2m1": False, "e2m2": False},
                 bits,
             )
 
@@ -2618,7 +2618,8 @@ class CheckEventTests(unittest.TestCase):
     def test_exact_runtime_transition_pairs_and_unknown_rejection(self):
         expected = {
             ("game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss"): 7770124,
-            ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210
+            ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210,
+            ("game/sp/e2m2_base/e2m2_base", "game/hub/hub"): 7770248,
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
@@ -3218,6 +3219,46 @@ class CheckEventTests(unittest.TestCase):
         asyncio.run(ctx.check_mission_challenge_location(entry_crystal))
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["locations"], [7770138])
+
+        # Rune Finder (required_count = 2)
+        sent.clear()
+        ctx.server_locations.update({7770244, 7770245, 7770246, 7770247})
+        entry_rune = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e2m2/challenge_1"]
+        # 1 Rune checked -> does not fire
+        ctx.locations_checked.add(7770221)
+        ctx.observe_physical_event_challenges()
+        self.assertFalse(ctx.mission_challenges_observed.get("mission_challenge/e2m2/challenge_1"))
+        asyncio.run(ctx.check_mission_challenge_location(entry_rune))
+        self.assertEqual(len(sent), 0)
+
+        # 2nd Rune checked -> fires Rune Finder
+        ctx.locations_checked.add(7770222)
+        ctx.observe_physical_event_challenges()
+        self.assertTrue(ctx.mission_challenges_observed.get("mission_challenge/e2m2/challenge_1"))
+        asyncio.run(ctx.check_mission_challenge_location(entry_rune))
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["locations"], [7770244])
+
+        # Aggregate for e2m2: requires challenge_1 (Rune Finder), challenge_2, and challenge_3
+        # Currently challenge_2 and challenge_3 are not complete -> aggregate not complete
+        self.assertFalse(ctx.all_mission_challenges_observed.get("e2m2"))
+
+        # Mark challenge_2 and challenge_3 complete and mock save proof for aggregate
+        sent.clear()
+        ctx.has_authoritative_save_proof = lambda: True
+        ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_2"] = True
+        ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_3"] = True
+        ctx.observe_physical_event_challenges()
+        self.assertTrue(ctx.all_mission_challenges_observed.get("e2m2"))
+        asyncio.run(ctx.check_all_mission_challenges_location())
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["locations"], [7770247])
+
+        # Reconnect/reload -> dedupe, no duplicate resend
+        sent.clear()
+        ctx.observe_physical_event_challenges()
+        asyncio.run(ctx.check_all_mission_challenges_location())
+        self.assertEqual(len(sent), 0)
 
     def test_reproduce_sgn_false_positive_rejection(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1395,8 +1395,7 @@ def generate_map(
         'inherit = "progress/blood_punch"',
         'inherit = "progress/dash"',
         'inherit = "progress/praetor_token"',
-        'inherit = "pickup/keycard/slayer_key"',
-        'inherit = "interact/slayer_gate/chest"'
+        'inherit = "pickup/keycard/slayer_key"'
     ]
 
     for block in blocks[1:]:

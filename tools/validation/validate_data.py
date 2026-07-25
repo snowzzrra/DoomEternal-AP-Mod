@@ -772,8 +772,22 @@ def main() -> int:
         or name in aggregate_names
     ]
     expected_mission_challenge_names = [
-        *[entry["name"] for entry in challenge_registry["mission_challenges"]],
-        *sorted(aggregate_names),
+        "Cultist Base - Mission Challenge - Pull the Crystal",
+        "Cultist Base - Mission Challenge - Armored Rain",
+        "Cultist Base - Mission Challenge - Master of Turrets",
+        "Doom Hunter Base - Mission Challenge - Musical Interlude",
+        "Doom Hunter Base - Mission Challenge - Big Reveal",
+        "Doom Hunter Base - Mission Challenge - Fire in the Hole",
+        "Super Gore Nest - Mission Challenge - Weaponslave",
+        "Super Gore Nest - Mission Challenge - A Bloody Secret",
+        "Super Gore Nest - Mission Challenge - War Pinkies",
+        "Cultist Base - All Mission Challenges Completed",
+        "Doom Hunter Base - All Mission Challenges Completed",
+        "Super Gore Nest - All Mission Challenges Completed",
+        "ARC Complex - Mission Challenge - Rune Finder",
+        "ARC Complex - Mission Challenge - External Combustion",
+        "ARC Complex - Mission Challenge - Solitary Confinement",
+        "ARC Complex - All Mission Challenges Completed",
     ]
     if mission_challenge_location_names != expected_mission_challenge_names:
         errors.append(
@@ -783,7 +797,8 @@ def main() -> int:
     for aggregate_entry in challenge_registry.get("all_mission_challenges", []):
         if location_ids.get(aggregate_entry["name"]) != aggregate_entry["location_id"]:
             errors.append(
-                f"{aggregate_entry['name']} aggregate/APWorld mapping drift"
+                "Aggregate Mission Challenge ID mismatch: "
+                f"{aggregate_entry['name']}"
             )
     # Parse ast of a few key python files
     source_text = "\n".join(
@@ -921,13 +936,13 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 132:
+    if physical_location_count != 163:
         errors.append(
-            f"Expected 132 physical locations through Doom Hunter Base/Fortress Visit 3, found {physical_location_count}"
+            f"Expected 163 physical locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
         )
-    if praetor_policy_count != 19:
+    if praetor_policy_count != 24:
         errors.append(
-            f"Expected 19 shared-policy Praetor Tokens, found {praetor_policy_count}"
+            f"Expected 24 shared-policy Praetor Tokens, found {praetor_policy_count}"
         )
 
     enabled_map_sources = {
@@ -1079,11 +1094,11 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 168,
-        "map_checks": 138,
-        "runtime_locations": 30,
+        "locations": 206,
+        "map_checks": 171,
+        "runtime_locations": 35,
         "runtime_goals": 1,
-        "route_sentinel_batteries": 18,
+        "route_sentinel_batteries": 21,
     }:
         errors.append("Foundation frozen counts changed")
     try:
