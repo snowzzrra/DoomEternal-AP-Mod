@@ -1652,6 +1652,10 @@ int main(int argc, char** argv) {
         );
         while (!g_MhInterface || !g_MhInterface->m_Initialized) {
             gameStateProbe.Poll();
+            missionTransitionMonitor.Poll(
+                gameStateProbe.IsGameplayLoaded(),
+                gameStateProbe.IsLoading()
+            );
             Sleep(100);
         }
         LogDebug("Meathook RPC server verified.");

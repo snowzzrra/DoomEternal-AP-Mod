@@ -56,9 +56,9 @@
       "name": "Mars Core - Mission Complete",
       "location_id": 7770289,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e2m3_core/e2m3_core",
-        "to": "game/sp/e2m4_boss/e2m4_boss"
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e2m3_core/e2m3_core",
+        "owner": "hell_chunk_2_trigger_trigger_end_portal"
       }
     }
   ],

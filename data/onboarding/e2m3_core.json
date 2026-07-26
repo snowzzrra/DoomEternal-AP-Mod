@@ -5,9 +5,9 @@
   "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
   "resource_priority": 10,
   "mission_complete_transition": {
-    "kind": "native_transition",
-    "owner": "hell_chunk_2_target_level_transition_1",
-    "target": "game/sp/e2m4_boss/e2m4_boss",
+    "kind": "direct_owner",
+    "owner": "hell_chunk_2_trigger_trigger_end_portal",
+    "target": "ap_event_7770289",
     "classification": "progression"
   },
   "layers": [
@@ -919,38 +919,6 @@
       "reward_removed": true
     },
     {
-      "entity": "phobos_pickup_weapon_bfg_2",
-      "class": "idProp2",
-      "inherit": "pickup/weapon/bfg",
-      "ap_id": 7770282,
-      "ap_name": "Mars Core - BFG-9000",
-      "entity_match_count": 1,
-      "original_targets": [],
-      "reward_grant_currency_ownership_edges": [
-        {
-          "target": "inherit=pickup/weapon/bfg",
-          "classification": "grant",
-          "disposition": "drop"
-        }
-      ],
-      "progression_objective_relays": [],
-      "drop_targets": [],
-      "bind_parent": null,
-      "local_transform": {
-        "spawn_x": "x = 1659.50037;",
-        "spawn_y": "y = 235.999954;",
-        "spawn_z": "z = 67.5;"
-      },
-      "layers": [],
-      "checkpoints": [],
-      "movers": [],
-      "gates": [],
-      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
-      "family": "weapons_equipment",
-      "feedback_policy": "ap_only",
-      "reward_removed": true
-    },
-    {
       "entity": "uac_chunk_1_interact_gore_nest_1",
       "class": "idInteractable_GoreNest",
       "inherit": "interact/gore_nest",
@@ -1069,10 +1037,14 @@
   },
   "campaign_goal_owner": "hell_chunk_2_trigger_trigger_end_portal",
   "bfg_ownership_graph": {
+    "status": "vanilla_grant_deferred_from_randomization",
+    "deferred_location_id": 7770282,
+    "vanilla_cutscene_id": 4701,
+    "super_shotgun_cutscene_id": 5008,
     "physical_owner": "phobos_pickup_weapon_bfg_2",
     "grant_edge": "inherit=pickup/weapon/bfg",
-    "checkpoint_fallback_removed": "phobos_pickup_weapon_bfg_1",
-    "mission_select_fallback_removed": "_pickup_weapon_bfg_1",
+    "checkpoint_fallback_preserved": "phobos_pickup_weapon_bfg_1",
+    "mission_select_fallback_preserved": "_pickup_weapon_bfg_1",
     "functional_timeline_preserved": "phobos_target_timeline_sg_deck_fire",
     "objective_give_preserved": "objective_target_objective_give_1",
     "objective_complete_preserved": "objective_target_objective_complete_1",

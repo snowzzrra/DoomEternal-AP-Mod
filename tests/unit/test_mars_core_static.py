@@ -51,7 +51,7 @@ class MarsCoreStaticContracts(unittest.TestCase):
             for entry in self.config["secret_encounters"]
         })
         self.assertEqual(manifest, expected)
-        self.assertEqual(len(expected), 29)
+        self.assertEqual(len(expected), 28)
         for ap_check, location_id in expected.items():
             if ap_check in self.config["entities"]:
                 owner = ap_check.removeprefix("AP_CHECK_").lower()
@@ -67,17 +67,21 @@ class MarsCoreStaticContracts(unittest.TestCase):
                 1,
             )
 
-    def test_bfg_grant_is_removed_without_drifting_functional_sequence(self):
-        for removed_owner in (
+    def test_bfg_vanilla_sequence_is_byte_preserved(self):
+        for vanilla_owner in (
             "phobos_pickup_weapon_bfg_2",
             "phobos_pickup_weapon_bfg_1",
             "_pickup_weapon_bfg_1",
         ):
-            self.assertNotIn(f"entityDef {removed_owner} ", self.generated)
-        self.assertEqual(
-            self.generated.count("entityDef AP_CHECK_PHOBOS_PICKUP_WEAPON_BFG_2"),
-            1,
-        )
+            source_bounds = find_entity_block_bounds(self.source, vanilla_owner)
+            generated_bounds = find_entity_block_bounds(self.generated, vanilla_owner)
+            self.assertIsNotNone(source_bounds)
+            self.assertIsNotNone(generated_bounds)
+            self.assertEqual(
+                self.source[source_bounds[0]:source_bounds[1]],
+                self.generated[generated_bounds[0]:generated_bounds[1]],
+            )
+        self.assertNotIn("AP_CHECK_PHOBOS_PICKUP_WEAPON_BFG_2", self.generated)
         for preserved_owner in (
             "phobos_target_timeline_sg_deck_fire",
             "objective_target_objective_give_1",
@@ -111,8 +115,21 @@ class MarsCoreStaticContracts(unittest.TestCase):
     def test_campaign_goal_is_only_on_audited_mars_terminal_owner(self):
         bounds = find_entity_block_bounds(self.generated, self.goal["owner"])
         targets = extract_target_names(self.generated[bounds[0]:bounds[1]])
-        self.assertEqual(targets[-1], "ap_campaign_goal_event")
+        source_bounds = find_entity_block_bounds(self.source, self.goal["owner"])
+        vanilla_targets = extract_target_names(
+            self.source[source_bounds[0]:source_bounds[1]]
+        )
+        self.assertEqual(len(vanilla_targets), 7)
+        self.assertEqual(targets[:7], vanilla_targets)
+        self.assertEqual(
+            targets[-2:],
+            [self.goal["location_event_target"], "ap_campaign_goal_event"],
+        )
+        self.assertEqual(targets.count(self.goal["location_event_target"]), 1)
         self.assertEqual(targets.count("ap_campaign_goal_event"), 1)
+        self.assertEqual(
+            self.generated.count(f"AP_CHECK_EVENT_{self.goal['location_id']}"), 1
+        )
         self.assertEqual(self.generated.count(self.goal["marker"]), 1)
         hub = (ROOT / "vanillamaps" / "hub.map").read_text(encoding="utf-8")
         self.assertNotIn(self.goal["marker"], hub)
@@ -170,6 +187,15 @@ class MarsCoreStaticContracts(unittest.TestCase):
         )
         self.assertEqual(onboarding["resource_owner"], expected_owner)
         self.assertEqual(onboarding["resource_priority"], 10)
+        self.assertEqual(
+            onboarding["mission_complete_transition"],
+            {
+                "kind": "direct_owner",
+                "owner": "hell_chunk_2_trigger_trigger_end_portal",
+                "target": "ap_event_7770289",
+                "classification": "progression",
+            },
+        )
         automap_registry = json.loads(
             (ROOT / "data" / "automap_family_registry.json").read_text(
                 encoding="utf-8"
@@ -190,7 +216,11 @@ class MarsCoreStaticContracts(unittest.TestCase):
             *(entry["ap_check"] for entry in self.config["secret_encounters"]),
         }
         self.assertEqual(set(policies), expected)
-        for location_id in range(7770256, 7770285):
+        for location_id in [
+            *range(7770256, 7770282),
+            7770283,
+            7770284,
+        ]:
             self.assertEqual(
                 self.generated.count(f"entityDef ap_notify_location_{location_id}"),
                 1,

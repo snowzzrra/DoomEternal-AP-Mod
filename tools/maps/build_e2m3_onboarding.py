@@ -31,7 +31,6 @@ FAMILIES = {
     7770279: "codex",
     7770280: "slayer_keys",
     7770281: "sentinel_crystals",
-    7770282: "weapons_equipment",
     7770283: "secret_encounters",
     7770284: "secret_encounters",
 }
@@ -69,10 +68,7 @@ def _transform(block: str) -> dict[str, str]:
 
 def _reward_edge(location_id: int, block: str, inherit: str) -> dict:
     useable = _scalar(block, "useableComponentDecl")
-    if location_id == 7770282:
-        target = "inherit=pickup/weapon/bfg"
-        classification = "grant"
-    elif location_id == 7770281:
+    if location_id == 7770281:
         target = "native WorldCache Sentinel Crystal upgrade transaction"
         classification = "ownership"
     elif location_id in SECRET_OWNERS:
@@ -104,7 +100,12 @@ def build() -> dict:
     }
     owners.update(SECRET_OWNERS)
     locations = []
-    for location_id in range(7770256, 7770285):
+    active_location_ids = [
+        *range(7770256, 7770282),
+        7770283,
+        7770284,
+    ]
+    for location_id in active_location_ids:
         entity = owners[location_id]
         bounds = find_entity_block_bounds(source, entity)
         if bounds is None or source.count(f"entityDef {entity}") != 1:
@@ -172,9 +173,9 @@ def build() -> dict:
         "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
         "resource_priority": 10,
         "mission_complete_transition": {
-            "kind": "native_transition",
-            "owner": "hell_chunk_2_target_level_transition_1",
-            "target": GOAL_CONTRACT["destination_map"],
+            "kind": "direct_owner",
+            "owner": GOAL_CONTRACT["owner"],
+            "target": GOAL_CONTRACT["location_event_target"],
             "classification": "progression",
         },
         "layers": sorted({
@@ -245,10 +246,14 @@ def build() -> dict:
         },
         "campaign_goal_owner": GOAL_CONTRACT["owner"],
         "bfg_ownership_graph": {
+            "status": "vanilla_grant_deferred_from_randomization",
+            "deferred_location_id": 7770282,
+            "vanilla_cutscene_id": 4701,
+            "super_shotgun_cutscene_id": 5008,
             "physical_owner": "phobos_pickup_weapon_bfg_2",
             "grant_edge": "inherit=pickup/weapon/bfg",
-            "checkpoint_fallback_removed": "phobos_pickup_weapon_bfg_1",
-            "mission_select_fallback_removed": "_pickup_weapon_bfg_1",
+            "checkpoint_fallback_preserved": "phobos_pickup_weapon_bfg_1",
+            "mission_select_fallback_preserved": "_pickup_weapon_bfg_1",
             "functional_timeline_preserved": "phobos_target_timeline_sg_deck_fire",
             "objective_give_preserved": "objective_target_objective_give_1",
             "objective_complete_preserved": "objective_target_objective_complete_1",

@@ -105,9 +105,11 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
                     "mars_core_slipgate_1",
                     "hell_chunk_2_target_poi_hell_gate1",
                     "hell_chunk_2_target_fast_travel_inhibit_1",
+                    "ap_event_7770289",
                     "ap_campaign_goal_event",
                 ],
             )
+            self.assertEqual(mars.count("AP_CHECK_EVENT_7770289"), 1)
             self.assertEqual(mars.count("entityDef ap_campaign_goal_event"), 1)
             self.assertEqual(mars.count(audit["campaign_goal"]["marker"]), 1)
 
