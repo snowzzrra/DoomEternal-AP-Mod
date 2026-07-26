@@ -192,7 +192,10 @@ def _patch_campaign_goal(contract: dict, root: Path, generated_map: Path) -> dic
     block = text[bounds[0]:bounds[1]]
     if _sha256(block.encode("utf-8")) != source_sha:
         raise ValueError("generated campaign goal owner drift")
-    patched = replace_targets_block(block, [*original_targets, CAMPAIGN_GOAL_TARGET])
+    location_target = contract["location_event_target"]
+    patched = replace_targets_block(
+        block, [*original_targets, location_target, CAMPAIGN_GOAL_TARGET]
+    )
     event = f'''entity {{
 \tentityDef {CAMPAIGN_GOAL_TARGET} {{
 \t\tclass = "idTarget_Command";
@@ -210,7 +213,12 @@ def _patch_campaign_goal(contract: dict, root: Path, generated_map: Path) -> dic
     result = text[:bounds[0]] + patched + text[bounds[1]:]
     if result.count(f"entityDef {CAMPAIGN_GOAL_TARGET}"):
         raise ValueError("campaign goal generated target already exists")
-    generated_map.write_text(result.rstrip() + "\n" + event, encoding="utf-8", newline="")
+    location_event = generate_check_event(contract["location_id"])
+    generated_map.write_text(
+        result.rstrip() + "\n" + location_event + event,
+        encoding="utf-8",
+        newline="",
+    )
     return {
         "source_path": contract["source"],
         "source_sha256": source_sha,
@@ -218,7 +226,11 @@ def _patch_campaign_goal(contract: dict, root: Path, generated_map: Path) -> dic
         "runtime_map": contract["runtime_map"],
         "destination_map": contract["destination_map"],
         "before_targets": original_targets,
-        "after_targets": [*original_targets, CAMPAIGN_GOAL_TARGET],
+        "after_targets": [
+            *original_targets, location_target, CAMPAIGN_GOAL_TARGET
+        ],
+        "location_id": contract["location_id"],
+        "location_event_target": location_target,
         "event_file": contract["event_filename"],
         "marker": contract["marker"],
         "changed_lists": 1,

@@ -12,6 +12,8 @@ REQUIRED_FIELDS = {
     "release",
     "event_filename",
     "marker",
+    "location_id",
+    "location_event_target",
     "owner",
     "source",
     "runtime_map",
@@ -28,9 +30,11 @@ def load_campaign_goal_contract(path: Path = CONTRACT_PATH) -> dict:
         )
     if contract["schema_version"] != 1:
         raise ValueError("unsupported campaign goal contract schema")
-    for key in REQUIRED_FIELDS - {"schema_version"}:
+    for key in REQUIRED_FIELDS - {"schema_version", "location_id"}:
         if not isinstance(contract[key], str) or not contract[key].strip():
             raise ValueError(f"campaign goal contract has invalid {key}")
+    if contract["location_id"] != 7770289:
+        raise ValueError("campaign goal contract has invalid location_id")
     if not contract["event_filename"].endswith(".txt"):
         raise ValueError("campaign goal event_filename must be a .txt file")
     if not contract["marker"].startswith("AP_GOAL_EVENT_"):

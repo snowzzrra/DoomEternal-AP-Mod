@@ -109,15 +109,25 @@ def validate_challenge_registry(registry: dict) -> None:
 
     for entry in registry["mission_complete"]:
         signal = entry.get("signal", {})
-        if entry["location_id"] in {7770122, 7770123, 7770162}:
-            if set(signal) != {"kind", "runtime_map"} or signal["kind"] != "map_terminal":
+        if entry["location_id"] in {7770122, 7770123, 7770162, 7770289}:
+            expected_fields = (
+                {"kind", "runtime_map", "owner"}
+                if entry["location_id"] == 7770289
+                else {"kind", "runtime_map"}
+            )
+            if set(signal) != expected_fields or signal["kind"] != "map_terminal":
                 raise ValueError(f"{entry['name']}: invalid map terminal signal")
             if signal["runtime_map"] not in {
                 "game/sp/e1m1_intro/e1m1_intro",
                 "game/sp/e1m2_battle/e1m2_battle",
                 "game/sp/e1m4_boss/e1m4_boss",
+                "game/sp/e2m3_core/e2m3_core",
             }:
                 raise ValueError(f"{entry['name']}: invalid runtime map identity")
+            if entry["location_id"] == 7770289 and signal["owner"] != (
+                "hell_chunk_2_trigger_trigger_end_portal"
+            ):
+                raise ValueError(f"{entry['name']}: invalid direct publisher owner")
             continue
         if signal.get("kind") != "native_transition" or not signal.get("from") or not signal.get("to"):
             raise ValueError(f"{entry['name']}: invalid native transition signal")

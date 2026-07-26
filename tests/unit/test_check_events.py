@@ -2108,6 +2108,25 @@ class CheckEventTests(unittest.TestCase):
         self.assertIn("MISSION_TRANSITION_SOURCE", source)
         self.assertIn("TRANSITION_EVENT_PUBLISHED", source)
 
+    def test_native_monitor_retries_late_config_before_transport_is_ready(self):
+        source = (
+            ROOT / "native" / "client" / "ap_client_exe.cpp"
+        ).read_text(encoding="utf-8")
+        startup_wait = source.split(
+            "while (!g_MhInterface || !g_MhInterface->m_Initialized)", 1
+        )[1].split('LogDebug("Meathook RPC server verified.")', 1)[0]
+        self.assertIn("missionTransitionMonitor.Poll(", startup_wait)
+        monitor = source.split("class MissionTransitionMonitor", 1)[1].split(
+            "bool ReadCommandFile", 1
+        )[0]
+        self.assertIn("nextConfigRetryTick_ = now + 5000;", monitor)
+        self.assertEqual(
+            source.count(
+                "[Mission] Monitoring encrypted game.details transitions via "
+            ),
+            1,
+        )
+
     def test_bridge_log_rotation_uses_only_temp_test_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             current = Path(directory) / "bridge.log"
@@ -2641,7 +2660,6 @@ class CheckEventTests(unittest.TestCase):
             ("game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss"): 7770124,
             ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210,
             ("game/sp/e2m2_base/e2m2_base", "game/hub/hub"): 7770248,
-            ("game/sp/e2m3_core/e2m3_core", "game/sp/e2m4_boss/e2m4_boss"): 7770289,
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
@@ -2662,6 +2680,11 @@ class CheckEventTests(unittest.TestCase):
                 7770122: {"kind": "map_terminal", "runtime_map": "game/sp/e1m1_intro/e1m1_intro"},
                 7770123: {"kind": "map_terminal", "runtime_map": "game/sp/e1m2_battle/e1m2_battle"},
                 7770162: {"kind": "map_terminal", "runtime_map": "game/sp/e1m4_boss/e1m4_boss"},
+                7770289: {
+                    "kind": "map_terminal",
+                    "runtime_map": "game/sp/e2m3_core/e2m3_core",
+                    "owner": "hell_chunk_2_trigger_trigger_end_portal",
+                },
             },
         )
         self.assertNotIn("e1m2_war", json.dumps(terminals))
@@ -3436,7 +3459,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertFalse(ctx.mission_challenges_observed.get("mission_challenge/e2m1/challenge_2"))
                 self.assertFalse(ctx.weapon_masteries_observed.get("weapon_mastery/shotgun/sticky_bomb"))
 
-    def test_provisional_never_promotes_or_switches_active_slot(self):
+    def test_provisional_other_slot_does_not_replace_authoritative_active_slot(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             remote = Path(tmpdir)
             slot0 = remote / "GAME-AUTOSAVE0"
@@ -3461,10 +3484,47 @@ class CheckEventTests(unittest.TestCase):
                 patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
             ):
                 selected = ctx.update_save_slot_lifecycle()
-                self.assertIsNone(selected)
+                self.assertIsNotNone(selected)
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
+                self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
+                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertTrue(ctx.has_authoritative_save_proof())
+
+    def test_newer_unproven_other_slot_freezes_without_revoking_authority(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot0 = remote / "GAME-AUTOSAVE0"
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot0.mkdir()
+            slot2.mkdir()
+            for slot, payload in ((slot0, b"data0"), (slot2, b"data2")):
+                (slot / "game_duration.dat").write_bytes(payload)
+                (slot / "game.details").write_bytes(payload)
+            os.utime(slot2 / "game_duration.dat", ns=(100, 100))
+            os.utime(slot0 / "game_duration.dat", ns=(200, 200))
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = "GAME-AUTOSAVE2"
+            ctx.active_save_path = str(slot2 / "game_duration.dat")
+            ctx.active_save_token = 100
+            ctx.active_save_proof_authoritative = True
+            ctx.active_save_proof_slot = "GAME-AUTOSAVE2"
+            evidence = bridge_client.GameplaySaveEvidence(
+                "menu", 2, "GAME-AUTOSAVE0", None, True
+            )
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(
+                    bridge_client,
+                    "read_gameplay_save_evidence",
+                    return_value=evidence,
+                ),
+            ):
+                self.assertIsNone(ctx.update_save_slot_lifecycle())
                 self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
                 self.assertTrue(ctx.runtime_observers_frozen)
-                self.assertFalse(ctx.has_authoritative_save_proof())
+                self.assertTrue(ctx.active_save_proof_authoritative)
 
     def test_non_provisional_exact_slot_map_epoch_promotes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3493,6 +3553,48 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
                 self.assertFalse(ctx.runtime_observers_frozen)
                 self.assertTrue(ctx.has_authoritative_save_proof())
+
+    def test_menu_mtime_update_keeps_authoritative_same_slot_readable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot2 = remote / "GAME-AUTOSAVE2"
+            slot2.mkdir()
+            duration = slot2 / "game_duration.dat"
+            duration.write_bytes(b"updated challenge records")
+            (slot2 / "game.details").write_bytes(b"details2")
+            os.utime(duration, ns=(200, 200))
+
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.active_save_slot = "GAME-AUTOSAVE2"
+            ctx.active_save_path = str(duration)
+            ctx.active_save_token = 100
+            ctx.active_save_proof_authoritative = True
+            ctx.active_save_proof_slot = "GAME-AUTOSAVE2"
+            ctx.runtime_observers_frozen = True
+            challenge = "mission_challenge/e2m3/challenge_1"
+            ctx.save_slot_observations = {
+                "GAME-AUTOSAVE2": {
+                    "mission_challenges": {challenge: True}
+                }
+            }
+            evidence = bridge_client.GameplaySaveEvidence(
+                "menu", 1, "GAME-AUTOSAVE2", None, False
+            )
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 160032537),
+                patch.object(
+                    bridge_client,
+                    "read_gameplay_save_evidence",
+                    return_value=evidence,
+                ),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
+                self.assertEqual(ctx.active_save_token, 200)
+                self.assertFalse(ctx.runtime_observers_frozen)
+                self.assertTrue(ctx.has_authoritative_save_proof())
+                self.assertFalse(ctx.mission_challenges_observed[challenge])
 
     def test_hub_does_not_act_as_wildcard_for_sgn(self):
         with tempfile.TemporaryDirectory() as tmpdir:

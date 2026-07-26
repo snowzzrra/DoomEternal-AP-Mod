@@ -2277,7 +2277,7 @@ class DoomEternalContext(CommonContext):
         )
 
     def update_save_slot_lifecycle(self):
-        """Require non-provisional fresh proof to promote/switch save slots."""
+        """Keep an authoritative slot through transient samples; prove switches."""
         candidates = primary_save_candidates()
         for selected in candidates:
             token = (str(selected.path), selected.mtime_ns)
@@ -2305,7 +2305,6 @@ class DoomEternalContext(CommonContext):
 
         def fail_proof(reason, details_map=None):
             self.runtime_observers_frozen = True
-            self.active_save_proof_authoritative = False
             self.log_save_proof_rejected(
                 reason,
                 evidence_slot=evidence.slot_directory if evidence else None,
@@ -2317,25 +2316,41 @@ class DoomEternalContext(CommonContext):
             )
             return None
 
+        def continue_authoritative_active():
+            if (
+                not getattr(self, "active_save_proof_authoritative", False)
+                or getattr(self, "active_save_proof_slot", None)
+                != self.active_save_slot
+                or active is None
+                or newer_unproven_candidate
+            ):
+                return None
+            self.active_save_path = str(active.path)
+            if self.active_save_token != active.mtime_ns:
+                self.invalidate_save_observation_slot(active.slot_directory)
+                self.active_save_token = active.mtime_ns
+            self.runtime_observers_frozen = False
+            return active
+
         if evidence is None:
             if newer_unproven_candidate:
                 return fail_proof("no_gameplay_evidence")
-            if self.active_save_slot and active is not None:
-                # A native monitor can briefly republish an unproven state
-                # during a legitimate checkpoint/map write.  It may never
-                # promote a candidate, but the already proven active slot
-                # remains a valid observer source until an explicit menu
-                # state or a proven new gameplay epoch arrives.
-                self.active_save_path = str(active.path)
-                self.runtime_observers_frozen = False
-                return active
+            continued = continue_authoritative_active()
+            if continued is not None:
+                return continued
             return fail_proof("no_gameplay_evidence")
 
         if evidence.state != "gameplay":
+            continued = continue_authoritative_active()
+            if continued is not None:
+                return continued
             return fail_proof("menu")
 
         # SECTION A: PROVISIONAL EVIDENCE NEVER PROMOTES OR SWITCHES A SAVE SLOT
         if evidence.provisional:
+            continued = continue_authoritative_active()
+            if continued is not None:
+                return continued
             return fail_proof("provisional")
 
         if not evidence.slot_directory or not re.match(r"^GAME-AUTOSAVE[0-9]+$", evidence.slot_directory):
