@@ -1,7 +1,7 @@
 {
     "schema_version": 1,
     "source": "Archipelago/worlds/doometernal/locations.py",
-    "source_sha256": "f129d6719c001523770367b865d1907ea3850971388ddd1febdf438f8dc0f1a1",
+    "source_sha256": "0e4b98b1eed3e3920502d71ab45b23223ea55702000e5f972a58dc8cf3de1cc7",
     "locations": {
         "7770001": "Hell on Earth - Chainsaw",
         "7770002": "Hell on Earth - Heavy Cannon",

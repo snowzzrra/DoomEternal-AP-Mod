@@ -1395,7 +1395,9 @@ def generate_map(
         'inherit = "progress/blood_punch"',
         'inherit = "progress/dash"',
         'inherit = "progress/praetor_token"',
-        'inherit = "pickup/keycard/slayer_key"'
+        'inherit = "pickup/keycard/slayer_key"',
+        'inherit = "interact/use_panel/lore_kiosk_console"',
+        'inherit = "interact/hub/2_battery_station"',
     ]
 
     for block in blocks[1:]:
@@ -1432,14 +1434,18 @@ def generate_map(
                 new_blocks.append(
                     generate_automap_location_helper(block, location_id)
                 )
-                if target_policy.get("native_entity_contract"):
+                if "native_entity_contract" in target_policy:
                     native_contract = target_policy["native_entity_contract"]
                     native = apply_native_entity_contract(block, native_contract)
                     native = add_ap_check_target(
                         native,
                         entity_name,
                         ap_check_id,
-                        {"preserve_targets": native_contract["original_targets"]},
+                        {
+                            "preserve_targets": native_contract.get(
+                                "original_targets", extract_target_names(block)
+                            )
+                        },
                     )
                     new_blocks.append("entity {" + native)
                     new_blocks.append(generate_event_relay(

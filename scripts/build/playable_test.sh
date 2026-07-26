@@ -688,8 +688,9 @@ if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | grep -
     echo "Final ZIP text contains a personal path or diagnostic marker" >&2
     exit 1
 fi
-if [[ "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelago*dev*.zip' | wc -l)" != "1" ]]; then
-    echo "Development ZIP count in build/release is not exactly one" >&2
+if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
+   [[ "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelagoPlayableTest-*.zip' | wc -l)" != "1" ]]; then
+    echo "Playable development ZIP is missing or not unique in build/release" >&2
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"

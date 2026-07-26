@@ -238,6 +238,38 @@
       "vanilla_automap": true,
       "vanilla_exploration": false
     },
+    "lore_kiosks": {
+      "match": {
+        "inherit_prefixes": [
+          "interact/use_panel/lore_kiosk_console"
+        ]
+      },
+      "vanilla_class": "idInteractable",
+      "automap_marker_source": "no source marker; generated targetless idInfo uses the default marker declaration",
+      "automap_properties": [],
+      "dossier_total_owner": "native lore-kiosk interaction and its relay chain",
+      "collected_state_writer": "native kiosk interaction state saved at checkpoint",
+      "reward_edge": "native kiosk relay/UI sequence",
+      "safe_cut": "append AP target while retaining the complete native interaction contract",
+      "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
+    "hub_battery_station_rewards": {
+      "match": {
+        "inherit_prefixes": [
+          "interact/hub/2_battery_station"
+        ]
+      },
+      "vanilla_class": "idInteractable_Obstacle",
+      "automap_marker_source": "no source marker; generated targetless idInfo uses the default marker declaration",
+      "automap_properties": [],
+      "dossier_total_owner": "native Fortress battery-station interaction and unlock sequence",
+      "collected_state_writer": "native obstacle interaction state",
+      "reward_edge": "native battery-station relay chain",
+      "safe_cut": "append AP target while retaining the complete native interaction contract",
+      "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
     "ability_progression": {
       "match": {
         "inherit_prefixes": [

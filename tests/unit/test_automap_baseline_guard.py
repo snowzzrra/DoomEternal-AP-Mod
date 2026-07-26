@@ -5,7 +5,7 @@ from tools.maps.automap_baseline_guard import assert_separate_automap_helper_gua
 
 class AutomapBaselineGuardTests(unittest.TestCase):
     def test_all_physical_locations_have_separate_marker_owners(self):
-        self.assertEqual(assert_separate_automap_helper_guard(), 161)
+        self.assertEqual(assert_separate_automap_helper_guard(), 167)
 
 
 if __name__ == "__main__":
