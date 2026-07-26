@@ -60,9 +60,17 @@ def assert_separate_automap_helper_guard() -> int:
             )
             generated = output.read_text()
             helper_names = re.findall(r'entityDef\s+(ap_automap_location_\d+)\s*\{', generated)
+            secret_automap_owners = {
+                entry["location_id"]: entry["automap_owner"]
+                for entry in config.get("secret_encounters", [])
+                if entry.get("automap_owner")
+            }
             expected_names = {
                 f"ap_automap_location_{location_id}"
                 for location_id in config["entities"].values()
+            } | {
+                f"ap_automap_location_{location_id}"
+                for location_id in secret_automap_owners
             }
             if len(helper_names) != len(set(helper_names)) or set(helper_names) != expected_names:
                 raise ValueError(
@@ -111,5 +119,36 @@ def assert_separate_automap_helper_guard() -> int:
                             raise ValueError(
                                 f"Physical visual disappeared: {map_key}/{location_id}"
                             )
+                checked += 1
+            for location_id, automap_owner in secret_automap_owners.items():
+                source_bounds = find_entity_block_bounds(source_text, automap_owner)
+                helper_bounds = find_entity_block_bounds(
+                    generated, f"ap_automap_location_{location_id}"
+                )
+                if source_bounds is None or helper_bounds is None:
+                    raise ValueError(
+                        f"Secret Automap helper source/owner missing: {map_key}/{location_id}"
+                    )
+                source_block = source_text[source_bounds[0]:source_bounds[1]]
+                helper = generated[helper_bounds[0]:helper_bounds[1]]
+                if _scalar(helper, "class") != "idInfo" or _scalar(helper, "inherit") != "info/null":
+                    raise ValueError(f"Secret Automap helper type drift: {map_key}/{location_id}")
+                if extract_target_names(helper):
+                    raise ValueError(f"Secret Automap helper has targets: {map_key}/{location_id}")
+                for forbidden in (
+                    "renderModelInfo", "useableComponentDecl", "itemList",
+                    "currencyList", "inventory", "bindInfo",
+                ):
+                    if forbidden in helper:
+                        raise ValueError(
+                            f"Secret Automap helper retains {forbidden}: "
+                            f"{map_key}/{location_id}"
+                        )
+                if _scalar(helper, "automapPropertiesDecl") != _expected_decl(source_block):
+                    raise ValueError(f"Secret Automap helper decl drift: {map_key}/{location_id}")
+                _assert_close(
+                    _position(helper), _position(source_block),
+                    f"{map_key}/{location_id}",
+                )
                 checked += 1
     return checked

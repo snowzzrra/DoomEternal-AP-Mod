@@ -7,8 +7,11 @@ import json
 import tempfile
 from pathlib import Path
 
-from tools.maps.ap_map_generator import find_matching_brace, generate_map
-from tools.maps.mission_complete_map_patcher import _patch_fortress_goal
+from tools.maps.ap_map_generator import (
+    find_entity_block_bounds,
+    find_matching_brace,
+    generate_map,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088}
@@ -25,7 +28,6 @@ EXPECTED_CHANGED_OR_REMOVED = {
     "progress_cheats_fully_upgraded_progression_wheel_final",
     "target_relay_pickup_ballista",
     "target_give_item_ballista",
-    "trigger_transition_to_e2m3",
     "interact_hub_2_battery_station_1",
     "interact_hub_2_battery_station_2",
     "sentinel_battery_room_interact_hub_2_battery_station_1",
@@ -84,13 +86,20 @@ def assert_hub_diff_classified() -> dict:
             ROOT / "vanillamaps/hub.map", new_map, config_path,
             temporary / "new-manifest.json", items,
         )
-        contracts = json.loads(
-            (ROOT / "data/mission_complete_map_contracts.json").read_text(encoding="utf-8")
-        )
-        goal_contract = contracts.get("fortress_visit_5_goal") or contracts.get("fortress_visit_4_goal")
-        _patch_fortress_goal(
-            goal_contract, ROOT, new_map
-        )
+        generated_text = new_map.read_text(encoding="utf-8")
+        source_text = (ROOT / "vanillamaps/hub.map").read_text(encoding="utf-8")
+        goal_owner = "trigger_transition_to_e2m3"
+        generated_bounds = find_entity_block_bounds(generated_text, goal_owner)
+        source_bounds = find_entity_block_bounds(source_text, goal_owner)
+        if generated_bounds is None or source_bounds is None:
+            raise ValueError("Hub Mars Core transition owner is missing")
+        if (
+            generated_text[generated_bounds[0]:generated_bounds[1]]
+            != source_text[source_bounds[0]:source_bounds[1]]
+        ):
+            raise ValueError("Hub Mars Core transition drifted while removing old goal")
+        if "ap_campaign_goal_event" in generated_text or "AP_GOAL_EVENT_" in generated_text:
+            raise ValueError("Hub still contains a campaign goal hook")
         before = _blocks(old_map.read_text(encoding="utf-8"))
         after = _blocks(new_map.read_text(encoding="utf-8"))
 
@@ -118,7 +127,6 @@ def assert_hub_diff_classified() -> dict:
         name for name in added
         if name not in ap_checks
         and name not in named_generated
-        and name not in ("ap_goal_fortress_visit_4", "ap_goal_fortress_visit_5")
         and not any(str(location_id) in name for location_id in NEW_HUB_LOCATION_IDS)
     }
     if unclassified_added:
@@ -127,8 +135,9 @@ def assert_hub_diff_classified() -> dict:
         "new_fortress_checks": sorted(
             name for name in changed | removed if name not in ("trigger_transition_to_e2m2", "trigger_transition_to_e2m3")
         ),
-        "goal_hook": ["trigger_transition_to_e2m3", "ap_goal_fortress_visit_5"],
-        "added_ap_entities": sorted(added - {"ap_goal_fortress_visit_5", "ap_goal_fortress_visit_4"}),
+        "removed_goal_hook": ["trigger_transition_to_e2m3"],
+        "goal_hook": [],
+        "added_ap_entities": sorted(added),
         "unrelated": [],
     }
 

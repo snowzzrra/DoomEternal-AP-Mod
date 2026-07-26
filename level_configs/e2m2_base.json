@@ -64,16 +64,52 @@
     },
     "target_policies": {
         "echoes_interact_use_panel_lore_kiosk_console_1": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": ["echoes_target_relay_kiosk_1"],
+                "required_snippets": [
+                    "inherit = \"interact/use_panel/lore_kiosk_console\";",
+                    "class = \"idInteractable\";",
+                    "whenToSave = \"SGT_CHECKPOINT\";",
+                    "activateTargetsOnEndInteraction = true;",
+                    "item[0] = \"echoes_target_relay_kiosk_1\";"
+                ]
+            }
         },
         "echoes_interact_use_panel_lore_kiosk_console_2": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": ["echoes_target_relay_kiosk_2"],
+                "required_snippets": [
+                    "inherit = \"interact/use_panel/lore_kiosk_console\";",
+                    "class = \"idInteractable\";",
+                    "whenToSave = \"SGT_CHECKPOINT\";",
+                    "activateTargetsOnEndInteraction = true;",
+                    "item[0] = \"echoes_target_relay_kiosk_2\";"
+                ]
+            }
         },
         "echoes_interact_use_panel_lore_kiosk_console_3": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": ["echoes_target_relay_kiosk_3"],
+                "required_snippets": [
+                    "inherit = \"interact/use_panel/lore_kiosk_console\";",
+                    "class = \"idInteractable\";",
+                    "whenToSave = \"SGT_CHECKPOINT\";",
+                    "activateTargetsOnEndInteraction = true;",
+                    "item[0] = \"echoes_target_relay_kiosk_3\";"
+                ]
+            }
         },
         "echoes_interact_use_panel_lore_kiosk_console_4": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": ["echoes_target_relay_kiosk_4"],
+                "required_snippets": [
+                    "inherit = \"interact/use_panel/lore_kiosk_console\";",
+                    "class = \"idInteractable\";",
+                    "whenToSave = \"SGT_CHECKPOINT\";",
+                    "activateTargetsOnEndInteraction = true;",
+                    "item[0] = \"echoes_target_relay_kiosk_4\";"
+                ]
+            }
         },
         "pickups_progress_argent_cell_1_1763022446": {
             "independent_ap_trigger": true,

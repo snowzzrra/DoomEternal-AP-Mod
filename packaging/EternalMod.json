@@ -1,7 +1,7 @@
 {
     "name": "DOOM Eternal Archipelago",
     "author": "snow",
-    "description": "Multiplayer randomized item progression for DOOM Eternal (through ARC Complex)",
-    "version": "v0.3.3-alpha",
+    "description": "Multiplayer randomized item progression for DOOM Eternal (through Mars Core)",
+    "version": "v0.3.4-alpha",
     "loadPriority": 0
 }

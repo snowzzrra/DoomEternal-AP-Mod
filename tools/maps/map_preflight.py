@@ -16,11 +16,20 @@ AUDIT_KEYS = {
     "resource_priority", "mission_complete_transition", "layers", "checkpoints",
     "movers", "gates", "new_decl_resources", "locations",
 }
+AUDIT_KEYS_V2 = AUDIT_KEYS | {
+    "runtime_map", "supported_game_revision",
+    "resource_priority_metadata_only", "source_evidence",
+    "entry_transition", "exit_transition", "campaign_goal_owner",
+    "bfg_ownership_graph", "inventory_exclusions",
+}
 LOCATION_KEYS = {
     "entity", "class", "inherit", "ap_id", "ap_name", "entity_match_count", "original_targets",
     "reward_grant_currency_ownership_edges", "progression_objective_relays",
     "drop_targets", "bind_parent", "local_transform", "layers", "checkpoints",
     "movers", "gates", "conditional_pickup_behavior",
+}
+LOCATION_KEYS_V2 = LOCATION_KEYS | {
+    "family", "feedback_policy", "reward_removed",
 }
 EDGE_KEYS = {"target", "classification", "disposition"}
 TRANSITION_KEYS = {"kind", "owner", "target", "classification"}
@@ -60,8 +69,10 @@ def validate_onboarding_audit(
     if not audit_path.exists():
         raise ValueError(f"{map_key}: onboarding audit does not exist")
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    _exact_keys(audit, AUDIT_KEYS, f"{map_key} audit")
-    if audit["schema_version"] != 1 or audit["map_key"] != map_key:
+    schema_version = audit.get("schema_version")
+    expected_audit_keys = AUDIT_KEYS_V2 if schema_version == 2 else AUDIT_KEYS
+    _exact_keys(audit, expected_audit_keys, f"{map_key} audit")
+    if schema_version not in {1, 2} or audit["map_key"] != map_key:
         raise ValueError(f"{map_key}: onboarding audit identity mismatch")
     for field in ("source_sha256", "resource_owner", "resource_priority"):
         if audit[field] != source[field]:
@@ -82,7 +93,11 @@ def validate_onboarding_audit(
     config = json.loads((root / source["level_config"]).read_text(encoding="utf-8"))
     for index, location in enumerate(audit["locations"]):
         label = f"{map_key} location[{index}]"
-        _exact_keys(location, LOCATION_KEYS, label)
+        _exact_keys(
+            location,
+            LOCATION_KEYS_V2 if schema_version == 2 else LOCATION_KEYS,
+            label,
+        )
         bounds = find_entity_block_bounds(source_text, location["entity"])
         if source_text.count(f"entityDef {location['entity']}") != 1 or location["entity_match_count"] != 1 or bounds is None:
             raise ValueError(f"{label}: entity must exist uniquely")
@@ -146,7 +161,7 @@ def validate_registry_preflight(
 ) -> None:
     for plan in validation_plan(registry):
         source = registry["maps"][plan.map_key]
-        if source["onboarding_status"] == "onboarding":
+        if source["onboarding_audit"]:
             validate_onboarding_audit(
                 root, plan.map_key, source, canonical_locations,
                 canonical_item_ids, container_catalog,

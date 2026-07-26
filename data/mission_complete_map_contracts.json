@@ -64,20 +64,5 @@
       "checkpointName": "from_e2m2",
       "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E2M2_BASE"
     }
-  },
-  "fortress_visit_5_goal": {
-    "map_key": "hub",
-    "owner": "trigger_transition_to_e2m3",
-    "source_path": "vanillamaps/hub.map",
-    "source_sha256": "61ca4767de77e49f244fae8e4efcb44c24a12615899bb8564a965338e4912607",
-    "original_targets": [],
-    "required_layer": "game/sp/hub/from_e2m2",
-    "goal_target": "ap_goal_fortress_visit_5",
-    "goal_event_file": "ap_goal_fortress_visit_5.txt",
-    "terminal": {
-      "owner": "target_level_transition_to_e2m3",
-      "nextMapName": "maps/game/sp/e2m3_core/e2m3_core.map",
-      "checkpointName": "cp_01"
-    }
   }
 }

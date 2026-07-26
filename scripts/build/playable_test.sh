@@ -37,7 +37,7 @@ fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$REPO_ROOT/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$REPO_ROOT/vanillamaps}"
-RELEASE_VERSION="v0.3.3-alpha"
+RELEASE_VERSION="v0.3.4-alpha"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
@@ -232,11 +232,12 @@ python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
     "${MISSION_MAP_ARGS[@]}" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/mission-complete-map-patch.json"
-python3 - "$TEMP_DIR/mission-complete-map-patch.json" <<'PY'
+python3 - "$TEMP_DIR/mission-complete-map-patch.json" "$REPO_ROOT/data/campaign_goal_contract.json" <<'PY'
 import json
 import sys
 
 audit = json.load(open(sys.argv[1], encoding="utf-8"))
+goal_contract = json.load(open(sys.argv[2], encoding="utf-8"))
 assert audit["unrelated_generated_entity_diff_count"] == 0
 assert audit["hell_on_earth"]["after_targets"] == [
     "AP_CHECK_MISSION_COMPLETE_HELL_ON_EARTH",
@@ -250,13 +251,12 @@ assert audit["doom_hunter_base"]["after_targets"] == [
     "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
     "checkpoints_target_level_transition_1",
 ]
-assert (audit.get("fortress_visit_5_goal") or audit.get("fortress_visit_4_goal"))["after_targets"] == [
-    "ap_goal_fortress_visit_5",
-]
-assert (audit.get("fortress_visit_5_goal") or audit.get("fortress_visit_4_goal"))["terminal"]["nextMapName"] in (
-    "maps/game/sp/e2m2_base/e2m2_base.map",
-    "maps/game/sp/e2m3_core/e2m3_core.map",
-)
+assert audit["campaign_goal"]["owner"] == goal_contract["owner"]
+assert audit["campaign_goal"]["runtime_map"] == goal_contract["runtime_map"]
+assert audit["campaign_goal"]["destination_map"] == goal_contract["destination_map"]
+assert audit["campaign_goal"]["event_file"] == goal_contract["event_filename"]
+assert audit["campaign_goal"]["marker"] == goal_contract["marker"]
+assert audit["campaign_goal"]["after_targets"][-1] == "ap_campaign_goal_event"
 PY
 
 for map_row in "${MAP_ROWS[@]}"; do
@@ -319,6 +319,7 @@ cp "$REPO_ROOT/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$REPO_ROOT/README.md" "$OUTPUT_DIR/README.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
+    "$REPO_ROOT/campaign_goal_contract.py" \
     "$REPO_ROOT/challenge_registry.py" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
@@ -337,6 +338,7 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/challenge_location_registry.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
     "$REPO_ROOT/data/map_sources.json" \
+    "$REPO_ROOT/data/campaign_goal_contract.json" \
     "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
@@ -418,6 +420,7 @@ manifest = {
         "client/bridge_client.py",
         "client/bridge_identity.json",
         "client/bootstrap_actions.py",
+        "client/campaign_goal_contract.py",
         "client/challenge_registry.py",
         "client/foundation.py",
         "client/item_classification.py",
@@ -437,6 +440,7 @@ manifest = {
         "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
         "client/data/map_sources.json",
+        "client/data/campaign_goal_contract.json",
         *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",

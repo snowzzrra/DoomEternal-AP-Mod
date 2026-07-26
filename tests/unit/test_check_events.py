@@ -120,7 +120,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
     def _mission_challenge_records(cls, completion_bits, mission_key="e1m3"):
-        """Build all three exact records for one mission; statCount is irrelevant."""
+        """Build all three exact records for one mission."""
         records = {}
         for complete, entry in zip(
             completion_bits,
@@ -131,7 +131,9 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             records[signal["unlockable"]] = {
                 "numUnlockableRules": signal["numUnlockableRules"],
                 "rule_0_statname": signal["rule_0_statname"],
-                "rule_0_statCount": 0 if complete else 999,
+                "rule_0_statCount": (
+                    signal.get("rule_0_statCount", 0) if complete else 999
+                ),
                 "rule_0_statDuration": signal["rule_0_statDuration"],
                 "rule_0_satisfied": complete,
                 "unlockableIsUnlocked": complete,
@@ -1156,7 +1158,12 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             )
 
             persistent_complete = bridge_client.read_mission_challenge_records(
-                self._record(0, True, True, entry)
+                self._record(
+                    entry["signal"].get("rule_0_statCount", 0),
+                    True,
+                    True,
+                    entry,
+                )
             )
             ctx.observe_mission_challenges(
                 persistent_complete, "mission-select-persistent-challenge"
@@ -1193,7 +1200,13 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             e1m3_done = all(bits)
             self.assertEqual(
                 ctx.all_mission_challenges_observed,
-                {"e1m3": e1m3_done, "e1m4": False, "e2m1": False, "e2m2": False},
+                {
+                    "e1m3": e1m3_done,
+                    "e1m4": False,
+                    "e2m1": False,
+                    "e2m2": False,
+                    "e2m3": False,
+                },
                 bits,
             )
 
@@ -1223,7 +1236,10 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                     records[ul] = {
                         "numUnlockableRules": signal["numUnlockableRules"],
                         "rule_0_statname": signal["rule_0_statname"],
-                        "rule_0_statCount": 0 if complete else 999,
+                        "rule_0_statCount": (
+                            signal.get("rule_0_statCount", 0)
+                            if complete else 999
+                        ),
                         "rule_0_statDuration": signal["rule_0_statDuration"],
                         "rule_0_satisfied": complete,
                         "unlockableIsUnlocked": complete,
@@ -1259,7 +1275,12 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             records = bridge_client.read_mission_challenge_records(
-                self._record(1, True, True, entry)
+                self._record(
+                    entry["signal"].get("rule_0_statCount", 1),
+                    True,
+                    True,
+                    entry,
+                )
             )
             ctx.observe_mission_challenges(records, "complete-challenge")
             ctx.server = types.SimpleNamespace(socket=Socket())
@@ -2620,6 +2641,7 @@ class CheckEventTests(unittest.TestCase):
             ("game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss"): 7770124,
             ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210,
             ("game/sp/e2m2_base/e2m2_base", "game/hub/hub"): 7770248,
+            ("game/sp/e2m3_core/e2m3_core", "game/sp/e2m4_boss/e2m4_boss"): 7770289,
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
@@ -3084,9 +3106,12 @@ class CheckEventTests(unittest.TestCase):
             try:
                 bridge_client.DOOM_BASE_DIR = tmpdir
                 bridge_client.INV_DUMP_DIR = tmpdir
-                event_path = Path(tmpdir, bridge_client.FORTRESS_GOAL_EVENT_FILENAME)
+                event_path = Path(
+                    tmpdir,
+                    bridge_client.CAMPAIGN_GOAL_CONTRACT["event_filename"],
+                )
                 event_path.write_text(
-                    f"{bridge_client.FORTRESS_GOAL_EVENT_MARKER}\n",
+                    f"{bridge_client.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
                     encoding="utf-8",
                 )
                 sent = []
@@ -3141,6 +3166,65 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(len(sent), 1)
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
+                bridge_client.INV_DUMP_DIR = original_dump_dir
+
+    def test_goal_event_network_failure_preserves_file_for_retry(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_dump_dir = bridge_client.INV_DUMP_DIR
+            try:
+                bridge_client.INV_DUMP_DIR = tmpdir
+                event_path = Path(
+                    tmpdir,
+                    bridge_client.CAMPAIGN_GOAL_CONTRACT["event_filename"],
+                )
+                event_path.write_text(
+                    f"{bridge_client.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
+                    encoding="utf-8",
+                )
+
+                class FakeContext:
+                    def __init__(self):
+                        self.session_state = {"goal_sent": False}
+                        self.locations_checked = set()
+                        self.checked_locations = set()
+                        self.server_locations = set()
+                        self.server = types.SimpleNamespace(
+                            socket=types.SimpleNamespace(closed=False)
+                        )
+                        self.mission_goal_in_flight = False
+                        self.attempts = 0
+                        self.persisted = 0
+
+                    async def send_msgs(self, messages):
+                        self.attempts += 1
+                        if self.attempts == 1:
+                            raise RuntimeError("temporary goal network failure")
+
+                    def persist_session_state(self):
+                        self.persisted += 1
+
+                    async def send_campaign_goal(self, source_description):
+                        return await bridge_client.DoomEternalContext.send_campaign_goal(
+                            self, source_description
+                        )
+
+                ctx = FakeContext()
+                asyncio.run(
+                    bridge_client.DoomEternalContext.check_campaign_goal_event(ctx)
+                )
+                self.assertTrue(event_path.exists())
+                self.assertFalse(ctx.session_state["goal_sent"])
+                self.assertFalse(ctx.mission_goal_in_flight)
+                self.assertEqual(ctx.persisted, 0)
+
+                asyncio.run(
+                    bridge_client.DoomEternalContext.check_campaign_goal_event(ctx)
+                )
+                self.assertFalse(event_path.exists())
+                self.assertTrue(ctx.session_state["goal_sent"])
+                self.assertEqual(ctx.attempts, 2)
+                self.assertEqual(ctx.persisted, 1)
+            finally:
                 bridge_client.INV_DUMP_DIR = original_dump_dir
 
     def test_chaingun_has_visual_and_trigger_contract(self):

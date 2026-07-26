@@ -20,6 +20,7 @@ from bootstrap_actions import (
     BOOTSTRAP_STAT_PRIMITIVE,
     received_any_suit_upgrade,
 )
+from campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
 from challenge_registry import canonical_map_name, load_challenge_registry
 from foundation import (
     compile_item_delivery_plan,
@@ -262,10 +263,6 @@ DEATHLINK_KILL_INTERVAL = 2.0
 DEATHLINK_KILL_COALESCE_KEY = "deathlink-kill"
 CHECK_EVENT_PREFIX = "ap_event_"
 GOAL_EVENT_PREFIX = "ap_transition_"
-FORTRESS_GOAL_EVENT_FILENAME = "ap_goal_fortress_visit_5.txt"
-FORTRESS_GOAL_EVENT_MARKER = "AP_GOAL_EVENT_FORTRESS_VISIT_5"
-FORTRESS_GOAL_EVENT_OWNER = "trigger_transition_to_e2m3"
-FORTRESS_GOAL_EVENT_SOURCE = "Fortress Visit 5 native Mars Core terminal"
 # Kept for state/tests created by the v0.2.1 single-transition monitor.
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
@@ -3268,10 +3265,21 @@ class DoomEternalContext(CommonContext):
                     "[Challenge] REGISTRY_MISMATCH unlockable=%s field=rule_0_statDuration expected=%s observed=%s",
                     unlockable, signal["rule_0_statDuration"], observed_record[3],
                 )
+            expected_count = signal.get("rule_0_statCount")
+            if expected_count is not None and observed_record[2] < expected_count:
+                logger.warning(
+                    "[Challenge] REGISTRY_MISMATCH unlockable=%s "
+                    "field=rule_0_statCount expected_at_least=%s observed=%s",
+                    unlockable, expected_count, observed_record[2],
+                )
 
             natural_complete = (
                 observed_record[0] == signal["numUnlockableRules"]
                 and observed_record[1] == signal["rule_0_statname"]
+                and (
+                    expected_count is None
+                    or observed_record[2] >= expected_count
+                )
                 and observed_record[3] == signal["rule_0_statDuration"]
                 and observed_record[4] is signal["rule_0_satisfied"]
                 and observed_record[5] is signal["unlockableIsUnlocked"]
@@ -3652,36 +3660,44 @@ class DoomEternalContext(CommonContext):
 
     async def check_campaign_goal_event(self):
         """Consume direct map goal plus native Mission Complete transitions."""
-        fortress_goal_path = Path(INV_DUMP_DIR) / FORTRESS_GOAL_EVENT_FILENAME
-        if fortress_goal_path.exists():
+        goal_event_path = (
+            Path(INV_DUMP_DIR) / CAMPAIGN_GOAL_CONTRACT["event_filename"]
+        )
+        if goal_event_path.exists():
             try:
-                contents = fortress_goal_path.read_text(
+                contents = goal_event_path.read_text(
                     encoding="utf-8", errors="ignore"
                 )
             except OSError:
                 contents = ""
-            if FORTRESS_GOAL_EVENT_MARKER not in contents:
-                logger.warning("[Goal] Malformed Fortress Visit 5 goal event; removing it.")
+            if CAMPAIGN_GOAL_CONTRACT["marker"] not in contents:
+                logger.warning("[Goal] Malformed campaign goal event; removing it.")
                 try:
-                    fortress_goal_path.unlink()
+                    goal_event_path.unlink()
                 except OSError:
                     pass
                 return True
             try:
                 sent = await self.send_campaign_goal(
-                    FORTRESS_GOAL_EVENT_SOURCE
+                    (
+                        f"{CAMPAIGN_GOAL_CONTRACT['runtime_map']} -> "
+                        f"{CAMPAIGN_GOAL_CONTRACT['destination_map']}"
+                    )
                 )
             except Exception as error:
                 logger.error("[Goal] GOAL_RETRY error=%s", error)
                 return True
             if sent:
                 try:
-                    fortress_goal_path.unlink()
+                    goal_event_path.unlink()
                 except FileNotFoundError:
                     pass
                 except OSError as error:
                     logger.warning("[Goal] Sent goal event cleanup failed: %s", error)
-                logger.info("[Goal] GOAL_ACK owner=%s", FORTRESS_GOAL_EVENT_OWNER)
+                logger.info(
+                    "[Goal] GOAL_ACK owner=%s",
+                    CAMPAIGN_GOAL_CONTRACT["owner"],
+                )
             else:
                 logger.info("[Goal] GOAL_RETRY reason=mission_or_server_ack")
             return True

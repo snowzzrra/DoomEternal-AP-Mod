@@ -27,6 +27,7 @@ class NativeChallengeContracts(unittest.TestCase):
                 7770172, 7770173, 7770174, 7770175,
                 7770206, 7770207, 7770208, 7770209,
                 7770244, 7770245, 7770246, 7770247,
+                7770285, 7770286, 7770287, 7770288, 7770289,
             },
         )
         self.assertEqual(
@@ -44,10 +45,13 @@ class NativeChallengeContracts(unittest.TestCase):
                 ("ARC Complex - Mission Challenge - Rune Finder", 7770244),
                 ("ARC Complex - Mission Challenge - External Combustion", 7770245),
                 ("ARC Complex - Mission Challenge - Solitary Confinement", 7770246),
+                ("Mars Core - Mission Challenge - Big Ba-Da Boom", 7770285),
+                ("Mars Core - Mission Challenge - Disarmament", 7770286),
+                ("Mars Core - Mission Challenge - Lock and Key", 7770287),
             ],
         )
         self.assertEqual(
-            len(registry["all_mission_challenges"]), 4,
+            len(registry["all_mission_challenges"]), 5,
         )
         self.assertEqual(
             registry["all_mission_challenges"][0],
@@ -109,6 +113,22 @@ class NativeChallengeContracts(unittest.TestCase):
                         "mission_challenge/e2m2/challenge_1",
                         "mission_challenge/e2m2/challenge_2",
                         "mission_challenge/e2m2/challenge_3",
+                    ],
+                },
+            },
+        )
+        self.assertEqual(
+            registry["all_mission_challenges"][4],
+            {
+                "name": "Mars Core - All Mission Challenges Completed",
+                "location_id": 7770288,
+                "mission_key": "e2m3",
+                "signal": {
+                    "kind": "all_mission_challenge_records",
+                    "unlockables": [
+                        "mission_challenge/e2m3/challenge_1",
+                        "mission_challenge/e2m3/challenge_2",
+                        "mission_challenge/e2m3/challenge_3",
                     ],
                 },
             },
@@ -195,14 +215,20 @@ class NativeChallengeContracts(unittest.TestCase):
 
         self.assertEqual(STICKY_DECLS["unlockable"]["path"], "unlockable/weapon_mastery/shotgun/sticky_bomb.decl")
 
-    def test_cultist_challenge_children_suppress_inherited_and_aggregate_rewards(self):
+    def test_challenge_children_suppress_inherited_and_aggregate_rewards(self):
         registry = load_challenge_registry()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             audit = build_mission_challenge_overrides(root)
             self.assertEqual(
                 audit["location_ids"],
-                [7770138, 7770139, 7770140, 7770172, 7770173, 7770174, 7770206, 7770207, 7770208, 7770244, 7770245, 7770246],
+                [
+                    7770138, 7770139, 7770140,
+                    7770172, 7770173, 7770174,
+                    7770206, 7770207, 7770208,
+                    7770244, 7770245, 7770246,
+                    7770285, 7770286, 7770287,
+                ],
             )
             self.assertEqual(audit["aggregate_reward_suppression"], {
                 "strategy": "child_currencyToGive_num_zero",
@@ -213,7 +239,7 @@ class NativeChallengeContracts(unittest.TestCase):
                 ],
                 "runtime_evidence": "v0.3.0c.1",
             })
-            self.assertEqual(len(audit["written_paths"]), 12)
+            self.assertEqual(len(audit["written_paths"]), 15)
             for entry in registry["mission_challenges"]:
                 source = (
                     ROOT / "vanilla_decls" / "owners" / "gameresources" /

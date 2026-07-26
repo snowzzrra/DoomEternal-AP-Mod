@@ -767,34 +767,23 @@ def main() -> int:
     expected_mastery_location_names = [entry["name"] for entry in mastery_entries]
     if mastery_location_names != expected_mastery_location_names:
         errors.append(f"Base Mastery registry/APWorld drift: {mastery_location_names}")
-    aggregate_names = {entry["name"] for entry in challenge_registry.get("all_mission_challenges", [])}
-    mission_challenge_location_names = [
-        name for name in location_ids
-        if "Mission Challenge -" in name
-        or name in aggregate_names
-    ]
-    expected_mission_challenge_names = [
-        "Cultist Base - Mission Challenge - Pull the Crystal",
-        "Cultist Base - Mission Challenge - Armored Rain",
-        "Cultist Base - Mission Challenge - Master of Turrets",
-        "Doom Hunter Base - Mission Challenge - Musical Interlude",
-        "Doom Hunter Base - Mission Challenge - Big Reveal",
-        "Doom Hunter Base - Mission Challenge - Fire in the Hole",
-        "Super Gore Nest - Mission Challenge - Weaponslave",
-        "Super Gore Nest - Mission Challenge - A Bloody Secret",
-        "Super Gore Nest - Mission Challenge - War Pinkies",
-        "Cultist Base - All Mission Challenges Completed",
-        "Doom Hunter Base - All Mission Challenges Completed",
-        "Super Gore Nest - All Mission Challenges Completed",
-        "ARC Complex - Mission Challenge - Rune Finder",
-        "ARC Complex - Mission Challenge - External Combustion",
-        "ARC Complex - Mission Challenge - Solitary Confinement",
-        "ARC Complex - All Mission Challenges Completed",
-    ]
-    if mission_challenge_location_names != expected_mission_challenge_names:
+    expected_mission_challenges = {
+        entry["name"]: entry["location_id"]
+        for entry in (
+            *challenge_registry.get("mission_challenges", []),
+            *challenge_registry.get("all_mission_challenges", []),
+        )
+    }
+    actual_mission_challenges = {
+        name: location_id
+        for name, location_id in location_ids.items()
+        if name in expected_mission_challenges
+    }
+    if actual_mission_challenges != expected_mission_challenges:
         errors.append(
             "Mission Challenge registry/APWorld drift: "
-            f"{mission_challenge_location_names}"
+            f"actual={actual_mission_challenges}, "
+            f"expected={expected_mission_challenges}"
         )
     for aggregate_entry in challenge_registry.get("all_mission_challenges", []):
         if location_ids.get(aggregate_entry["name"]) != aggregate_entry["location_id"]:
@@ -939,13 +928,18 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 167:
+    if physical_location_count != 194:
         errors.append(
-            f"Expected 167 physical entity locations through ARC Complex/Fortress Visit 5, found {physical_location_count}"
+            f"Expected 194 physical entity locations through Mars Core, found {physical_location_count}"
         )
-    if praetor_policy_count != 24:
+    expected_praetor_policy_count = sum(
+        "Praetor Suit Token" in name for name in location_ids
+    )
+    if praetor_policy_count != expected_praetor_policy_count:
         errors.append(
-            f"Expected 24 shared-policy Praetor Tokens, found {praetor_policy_count}"
+            "Shared-policy Praetor Token coverage drift: "
+            f"expected={expected_praetor_policy_count}, "
+            f"found={praetor_policy_count}"
         )
 
     enabled_map_sources = {
@@ -1019,7 +1013,7 @@ def main() -> int:
                         )
                 if (
                     "pickups/secret_item" not in source_block
-                    and not policy.get("native_entity_contract")
+                    and "native_entity_contract" not in policy
                     and not owner_is_secret
                 ):
                     errors.append(
@@ -1097,9 +1091,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 210,
-        "map_checks": 175,
-        "runtime_locations": 35,
+        "locations": 244,
+        "map_checks": 204,
+        "runtime_locations": 40,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
     }:
