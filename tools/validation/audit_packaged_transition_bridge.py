@@ -289,8 +289,11 @@ def main() -> int:
         asyncio.run(consume(bridge, retry_event, 7770124, fail_send=True))
         asyncio.run(consume(bridge, retry_event, 7770124))
 
-        goal_event = base / bridge.FORTRESS_GOAL_EVENT_FILENAME
-        goal_event.write_text(f"{bridge.FORTRESS_GOAL_EVENT_MARKER}\n", encoding="utf-8")
+        goal_event = base / bridge.CAMPAIGN_GOAL_CONTRACT["event_filename"]
+        goal_event.write_text(
+            f"{bridge.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
+            encoding="utf-8",
+        )
         asyncio.run(consume(
             bridge, goal_event, None, fail_send=True, expect_goal=True
         ))

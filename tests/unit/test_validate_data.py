@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -15,6 +16,55 @@ from bootstrap_actions import SUIT_PAGE_UNLOCKING_ITEM_IDS
 
 
 class ValidateDataNamespaceTests(unittest.TestCase):
+    def test_runtime_automap_families_cover_registry_exactly(self):
+        runtime_ids = set(
+            json.loads(
+                (ROOT / "data" / "runtime_locations.json").read_text()
+            ).values()
+        )
+        families = json.loads(
+            (ROOT / "data" / "automap_family_registry.json").read_text()
+        )["families"]
+        classified = {
+            location_id
+            for family_name in (
+                "runtime_mission", "runtime_mastery", "runtime_challenge"
+            )
+            for location_id in families[family_name]["match"]["location_ids"]
+        }
+        self.assertEqual(classified, runtime_ids)
+
+    def test_mission_challenge_registry_matches_apworld_by_name_and_id(self):
+        registry = json.loads(
+            (ROOT / "data" / "challenge_location_registry.json").read_text()
+        )
+        locations = extract_namedtuple_table(
+            APWORLD / "locations.py", "location_data_table"
+        )
+        expected = {
+            entry["name"]: entry["location_id"]
+            for entry in (
+                *registry["mission_challenges"],
+                *registry["all_mission_challenges"],
+            )
+        }
+        self.assertEqual(
+            {name: locations[name] for name in expected},
+            expected,
+        )
+
+    def test_praetor_shared_policy_count_is_derived_from_apworld(self):
+        locations = extract_namedtuple_table(
+            APWORLD / "locations.py", "location_data_table"
+        )
+        expected = sum("Praetor Suit Token" in name for name in locations)
+        configured = sum(
+            "PRAETOR" in ap_check
+            for path in (ROOT / "level_configs").glob("*.json")
+            for ap_check in json.loads(path.read_text()).get("entities", {})
+        )
+        self.assertEqual(configured, expected)
+
     def test_bootstrap_suit_predicate_matches_canonical_apworld_metadata(self):
         items = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
         expected_names = {

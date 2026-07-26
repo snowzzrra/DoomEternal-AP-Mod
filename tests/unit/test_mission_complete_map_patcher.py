@@ -25,6 +25,8 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
             ("hub", "hub.map", "hub.json"),
             ("e1m3_cult", "e1m3_cult.map", "e1m3_cult.json"),
             ("e1m4_boss", "e1m4_boss.map", "e1m4_boss.json"),
+            ("e2m2_base", "e2m2_base.map", "e2m2_base.json"),
+            ("e2m3_core", "e2m3_core.map", "e2m3_core.json"),
         ):
             output = Path(directory, f"{key}.entities")
             generate_map(
@@ -84,6 +86,30 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
                 event = generated[event_bounds[0]:event_bounds[1]]
                 self.assertIn('class = "idTarget_Command";', event)
                 self.assertIn(f"AP_CHECK_EVENT_{location_id}", event)
+
+    def test_campaign_goal_preserves_mars_exit_targets_and_is_unique(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            maps = self._generated_maps(tmpdir)
+            audit = patch_mission_complete_maps(CONTRACTS, maps, Path(tmpdir, "mod"))
+            mars = maps["e2m3_core"].read_text(encoding="utf-8")
+            owner = audit["campaign_goal"]["owner"]
+            bounds = find_entity_block_bounds(mars, owner)
+            self.assertIsNotNone(bounds)
+            self.assertEqual(
+                extract_target_names(mars[bounds[0]:bounds[1]]),
+                [
+                    "lava_area_portal_screenfx_1",
+                    "hell_chunk_2_target_relay_174",
+                    "hell_chunk_2_target_relay_175",
+                    "e3_target_objective_complete_4",
+                    "mars_core_slipgate_1",
+                    "hell_chunk_2_target_poi_hell_gate1",
+                    "hell_chunk_2_target_fast_travel_inhibit_1",
+                    "ap_campaign_goal_event",
+                ],
+            )
+            self.assertEqual(mars.count("entityDef ap_campaign_goal_event"), 1)
+            self.assertEqual(mars.count(audit["campaign_goal"]["marker"]), 1)
 
     def test_missing_or_duplicate_native_owner_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmpdir:

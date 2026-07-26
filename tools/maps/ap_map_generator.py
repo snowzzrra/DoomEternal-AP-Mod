@@ -461,9 +461,9 @@ def validate_target_policies(config_entities, target_policies, content):
                 )
         if set(policy.get("drop_targets", [])) & set(policy.get("preserve_targets", [])):
             raise ValueError(f"{entity_name} cannot preserve and drop the same target")
-        contract = policy.get("native_entity_contract")
-        if contract is not None:
-            if not isinstance(contract, dict):
+        if "native_entity_contract" in policy:
+            contract = policy["native_entity_contract"]
+            if not isinstance(contract, dict) or not contract:
                 raise ValueError(f"native_entity_contract must be an object: {entity_name}")
             unknown_contract = sorted(set(contract) - NATIVE_ENTITY_CONTRACT_KEYS)
             if unknown_contract:
@@ -474,6 +474,51 @@ def validate_target_policies(config_entities, target_policies, content):
             if policy.get("independent_ap_trigger"):
                 raise ValueError(
                     f"Native entity contract cannot create an independent trigger: {entity_name}"
+                )
+            if (
+                "original_targets" not in contract
+                or not isinstance(contract["original_targets"], list)
+                or not all(
+                    isinstance(target, str)
+                    for target in contract["original_targets"]
+                )
+            ):
+                raise ValueError(
+                    f"native_entity_contract requires exact original_targets: {entity_name}"
+                )
+            snippets = contract.get("required_snippets")
+            if (
+                not isinstance(snippets, list)
+                or len(snippets) < 3
+                or not all(isinstance(snippet, str) and snippet for snippet in snippets)
+            ):
+                raise ValueError(
+                    f"native_entity_contract requires stable required_snippets: {entity_name}"
+                )
+            evidence = "\n".join(snippets)
+            if not any(token in evidence for token in ("inherit =", "class =")):
+                raise ValueError(
+                    f"native_entity_contract lacks a stable owner class: {entity_name}"
+                )
+            if not any(
+                token in evidence
+                for token in ("whenToSave =", "saveType =", "stat =")
+            ):
+                raise ValueError(
+                    f"native_entity_contract lacks a save writer: {entity_name}"
+                )
+            if not any(
+                token in evidence
+                for token in (
+                    "useableComponentDecl =",
+                    "currency",
+                    "target_relay",
+                    "2_battery_required",
+                    "triggerDef =",
+                )
+            ):
+                raise ValueError(
+                    f"native_entity_contract lacks a reward/progression edge: {entity_name}"
                 )
             apply_native_entity_contract(source_block, contract)
         cleanup = policy.get("checkpoint_cleanup")
@@ -1555,6 +1600,25 @@ def generate_map(
                 f"Secret encounter {ap_check_id} is missing a manager entity name"
             )
         expected_last_event_index = secret_hook["after_event_index"]
+        automap_owner = secret_hook.get("automap_owner")
+        if automap_owner:
+            if map_content.count(f"entityDef {automap_owner}") != 1:
+                raise ValueError(
+                    f"Secret encounter automap owner is missing or duplicated: {automap_owner}"
+                )
+            automap_bounds = find_entity_block_bounds(map_content, automap_owner)
+            if automap_bounds is None:
+                raise ValueError(
+                    f"Secret encounter automap owner not found: {automap_owner}"
+                )
+            automap_block = map_content[automap_bounds[0]:automap_bounds[1]]
+            secret_blocks.append(
+                generate_automap_location_helper(automap_block, location_id)
+            )
+            map_content = (
+                map_content[:automap_bounds[0]]
+                + map_content[automap_bounds[1]:]
+            )
         map_content = inject_secret_encounter_completion(
             map_content,
             manager_name,

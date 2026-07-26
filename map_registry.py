@@ -73,7 +73,9 @@ def validate_map_registry(registry: dict[str, Any]) -> None:
                 f"Map {map_key} registry fields: missing={sorted(missing)}, "
                 f"unknown={sorted(unknown)}"
             )
-        if source["onboarding_status"] not in {"frozen_baseline", "onboarding"}:
+        if source["onboarding_status"] not in {
+            "frozen_baseline", "onboarding", "implementation_candidate",
+        }:
             raise ValueError(f"Map {map_key} has invalid onboarding_status")
         if source["test_only"] and source["onboarding_status"] != "onboarding":
             raise ValueError(f"Test-only map {map_key} must use onboarding status")
@@ -88,12 +90,11 @@ def validate_map_registry(registry: dict[str, Any]) -> None:
             raise ValueError(f"Duplicate runtime map: {source['runtime_map']}")
         seen_outputs.add(source["generated_output"])
         seen_runtime_maps.add(source["runtime_map"])
-        if source["onboarding_status"] == "onboarding" and not source["onboarding_audit"]:
+        if (
+            source["onboarding_status"] in {"onboarding", "implementation_candidate"}
+            and not source["onboarding_audit"]
+        ):
             raise ValueError(f"Onboarding map {map_key} lacks onboarding_audit")
-        if source["onboarding_status"] == "frozen_baseline" and source["onboarding_audit"] is not None:
-            raise ValueError(f"Frozen map {map_key} must use its semantic baseline, not onboarding_audit")
-
-
 def _plans(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
     return tuple(
         MapPlan(

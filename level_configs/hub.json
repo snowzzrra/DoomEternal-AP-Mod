@@ -169,13 +169,42 @@
             "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
         },
         "interact_hub_2_battery_station_1": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"interact/hub/2_battery_station\";",
+                    "class = \"idInteractable_Obstacle\";",
+                    "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+                    "stat = \"STAT_SLAYER_HUB_MILESTONE_3\";",
+                    "whenToSave = \"SGT_NORMAL\";",
+                    "saveType = \"SGS_GAME_DATA\";"
+                ]
+            }
         },
         "interact_hub_2_battery_station_2": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"interact/hub/2_battery_station\";",
+                    "class = \"idInteractable_Obstacle\";",
+                    "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+                    "stat = \"STAT_SLAYER_HUB_MILESTONE_2\";",
+                    "whenToSave = \"SGT_NORMAL\";",
+                    "saveType = \"SGS_GAME_DATA\";"
+                ]
+            }
         },
         "sentinel_battery_room_interact_hub_2_battery_station_1": {
-            "native_entity_contract": {}
+            "native_entity_contract": {
+                "original_targets": [],
+                "required_snippets": [
+                    "inherit = \"interact/hub/2_battery_station\";",
+                    "class = \"idInteractable_Obstacle\";",
+                    "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+                    "whenToSave = \"SGT_NORMAL\";",
+                    "saveType = \"SGS_GAME_DATA\";"
+                ]
+            }
         }
     }
 }

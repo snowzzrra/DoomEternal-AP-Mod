@@ -1,6 +1,6 @@
 {
     "schema_version": 1,
-    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest", "e2m2_base"],
+    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest", "e2m2_base", "e2m3_core"],
     "maps": {
         "e1m1_intro": {
             "display_name": "Hell on Earth",
@@ -134,6 +134,25 @@
             "relative_entities_path": "game/sp/e2m2_base/e2m2_base.entities",
             "supported_game_revision": "Steam 6.66 Rev 3.1",
             "onboarding_audit": null
+        },
+        "e2m3_core": {
+            "display_name": "Mars Core",
+            "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
+            "source_file": "e2m3_core.map",
+            "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+            "source_owner": "vanillamaps/e2m3_core.map",
+            "level_config": "level_configs/e2m3_core.json",
+            "manifest": "manifests/e2m3_core.json",
+            "generated_output": "e2m3_core.entities",
+            "runtime_map": "game/sp/e2m3_core/e2m3_core",
+            "resource_path": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+            "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+            "resource_priority": 10,
+            "relative_entities_path": "game/sp/e2m3_core/e2m3_core.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": "data/onboarding/e2m3_core.json"
         }
     }
 }

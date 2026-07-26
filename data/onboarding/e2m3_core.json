@@ -1,0 +1,1100 @@
+{
+  "schema_version": 2,
+  "map_key": "e2m3_core",
+  "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+  "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+  "resource_priority": 10,
+  "mission_complete_transition": {
+    "kind": "native_transition",
+    "owner": "hell_chunk_2_target_level_transition_1",
+    "target": "game/sp/e2m4_boss/e2m4_boss",
+    "classification": "progression"
+  },
+  "layers": [
+    "game/sp/e2m3_core/bfg_checkpoint_pickup",
+    "game/sp/e2m3_core/e2m3_core_gameplay_hell_chunk_2/hell_gameplay",
+    "game/sp/e2m3_core/master_level_classic_mode",
+    "game/sp/e2m3_core/slayergate_01"
+  ],
+  "checkpoints": [
+    "cp_01",
+    "cp_08_post_bfg_fire"
+  ],
+  "movers": [
+    "slayer_gate_func_mover_key_grate",
+    "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3"
+  ],
+  "gates": [
+    "slayer_arena_target_changelayer_slayergate_1",
+    "hell_chunk_2_trigger_trigger_end_portal"
+  ],
+  "new_decl_resources": [
+    {
+      "path": "unlockable/mission_challenge/e2m3/challenge_1.decl",
+      "replaces_owner": "gameresources",
+      "source_sha256": "bc2fdc5f7077aea0fe3a8b9c3ba19fb3b49992e4a30639c83015a479b162069e",
+      "container": "gameresources.resources"
+    },
+    {
+      "path": "unlockable/mission_challenge/e2m3/challenge_2.decl",
+      "replaces_owner": "gameresources",
+      "source_sha256": "fdb2a60ce10d86d06f027f71ea6cddc9f7464bb112a13a58ecff79912b6a9215",
+      "container": "gameresources.resources"
+    },
+    {
+      "path": "unlockable/mission_challenge/e2m3/challenge_3.decl",
+      "replaces_owner": "gameresources",
+      "source_sha256": "c83dc3b5168f296e7cf344e093398be523d0b552fde3f4ab51a70e5343640860",
+      "container": "gameresources.resources"
+    }
+  ],
+  "locations": [
+    {
+      "entity": "hell_chunk_2_progress_praetor_token_1_e3m2",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770256,
+      "ap_name": "Mars Core - Praetor Suit Token 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList=CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -1914.09998;",
+        "spawn_y": "y = 2188.10034;",
+        "spawn_z": "z = 54.4000015;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "praetor_tokens",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "uac_chunk_1_progress_praetor_token_1_e2m3",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770257,
+      "ap_name": "Mars Core - Praetor Suit Token 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList=CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1820.94995;",
+        "spawn_y": "y = -1723.5;",
+        "spawn_z": "z = 55.8000107;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "praetor_tokens",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "phobos_progress_praetor_token_1_e2m3",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770258,
+      "ap_name": "Mars Core - Praetor Suit Token 3",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList=CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 2179;",
+        "spawn_y": "y = 1171;",
+        "spawn_z": "z = -60.284687;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "praetor_tokens",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "meteors_progress_praetor_token_1_e2m3",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770259,
+      "ap_name": "Mars Core - Praetor Suit Token 4",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList=CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2324.33325;",
+        "spawn_y": "y = -680.886414;",
+        "spawn_z": "z = -41.8499985;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "praetor_tokens",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "meteors_progress_praetor_token_1_e3m2",
+      "class": "idInteractable_GiveItems",
+      "inherit": "progress/praetor_token",
+      "ap_id": 7770260,
+      "ap_name": "Mars Core - Praetor Suit Token 5",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "currencyList=CURRENCY_PRAETOR_UPGRADE",
+          "classification": "currency",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2500.96069;",
+        "spawn_y": "y = -224.83905;",
+        "spawn_z": "z = 94.8413239;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "praetor_tokens",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "hell_chunk_2_progress_sentinel_battery_1_e2m3",
+      "class": "idProp2",
+      "inherit": "progress/sentinel_battery",
+      "ap_id": 7770261,
+      "ap_name": "Mars Core - Sentinel Battery 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/batteries/sentinel_battery",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -1904.15015;",
+        "spawn_y": "y = 2139.39673;",
+        "spawn_z": "z = 61.1177979;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "sentinel_batteries",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "phobos_progress_sentinel_battery_1_e2m3",
+      "class": "idProp2",
+      "inherit": "progress/sentinel_battery",
+      "ap_id": 7770262,
+      "ap_name": "Mars Core - Sentinel Battery 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/batteries/sentinel_battery",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 2292.51245;",
+        "spawn_y": "y = 1077.34631;",
+        "spawn_z": "z = -56.2850227;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "sentinel_batteries",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "meteors_progress_sentinel_battery_1_e2m3",
+      "class": "idProp2",
+      "inherit": "progress/sentinel_battery",
+      "ap_id": 7770263,
+      "ap_name": "Mars Core - Sentinel Battery 3",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/batteries/sentinel_battery",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2263.50024;",
+        "spawn_y": "y = -756.499756;",
+        "spawn_z": "z = -51.5550079;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "sentinel_batteries",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_progress_rune_1_e2m3",
+      "class": "idInteractable_Rune",
+      "inherit": "progress/rune",
+      "ap_id": 7770264,
+      "ap_name": "Mars Core - Rune 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native Rune selection transaction",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 2231.29932;",
+        "spawn_y": "y = 1016.20007;",
+        "spawn_z": "z = -62.322876;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "runes",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "uac_chunk_1_progress_rune_1_e2m3",
+      "class": "idInteractable_Rune",
+      "inherit": "progress/rune",
+      "ap_id": 7770265,
+      "ap_name": "Mars Core - Rune 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native Rune selection transaction",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1770.09998;",
+        "spawn_y": "y = -1833.59985;",
+        "spawn_z": "z = 79.900032;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "runes",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_1_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770266,
+      "ap_name": "Mars Core - Extra Life 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2417.8938;",
+        "spawn_y": "y = -216.245529;",
+        "spawn_z": "z = 92.2173843;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_2_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770267,
+      "ap_name": "Mars Core - Extra Life 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2284.59912;",
+        "spawn_y": "y = -610.500244;",
+        "spawn_z": "z = -24.4983406;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_4_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770268,
+      "ap_name": "Mars Core - Extra Life 3",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2250.59985;",
+        "spawn_y": "y = -741.000244;",
+        "spawn_z": "z = -79.8483353;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_5_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770269,
+      "ap_name": "Mars Core - Extra Life 4",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 2234.05078;",
+        "spawn_y": "y = 1063.54578;",
+        "spawn_z": "z = -50.0499916;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "hell_chunk_2_pickup_extra_life_extra_life_1_1_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770270,
+      "ap_name": "Mars Core - Extra Life 5",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -1890.25171;",
+        "spawn_y": "y = 2251.59863;",
+        "spawn_z": "z = 61.1517601;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "uac_chunk_1_pickup_extra_life_extra_life_1_1_e2m3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770271,
+      "ap_name": "Mars Core - Extra Life 6",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=sp_extra_life_1",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1757.49963;",
+        "spawn_y": "y = -1766.3999;",
+        "spawn_z": "z = 79.0516357;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "extra_lives",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_collectible_toys_prowler_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/toys/prowler",
+      "ap_id": 7770272,
+      "ap_name": "Mars Core - Prowler Toy",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/collectible/toys/prowler",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1753.2998;",
+        "spawn_y": "y = -1774.09961;",
+        "spawn_z": "z = 79.0026245;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "toys_collectibles",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "pickups_pickup_collectible_toys_carcass_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/toys/carcass",
+      "ap_id": 7770273,
+      "ap_name": "Mars Core - Carcass Toy",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/collectible/toys/carcass",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2411.80322;",
+        "spawn_y": "y = -193.382202;",
+        "spawn_z": "z = 98.044075;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "toys_collectibles",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "slayer_gate_pickup_collectible_toys_pinky_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/toys/pinky",
+      "ap_id": 7770274,
+      "ap_name": "Mars Core - Pinky Toy",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/collectible/toys/pinky",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2125.69995;",
+        "spawn_y": "y = -774.099976;",
+        "spawn_z": "z = -37.883564;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "toys_collectibles",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "meteors_pickup_collectible_albums_album_08_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/albums/album_08",
+      "ap_id": 7770275,
+      "ap_name": "Mars Core - DOOM 64 - Main Theme Vinyl Record",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/collectible/albums/album_08",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2498.50049;",
+        "spawn_y": "y = -215.399979;",
+        "spawn_z": "z = 104;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "albums",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "slayer_gate_pickup_collectible_albums_album_09_1",
+      "class": "idProp2",
+      "inherit": "pickup/collectible/albums/album_09",
+      "ap_id": 7770276,
+      "ap_name": "Mars Core - Quake Champions - Goroth Vinyl Record",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/collectible/albums/album_09",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2121.90015;",
+        "spawn_y": "y = -816.199951;",
+        "spawn_z": "z = -28.309782;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "albums",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "meteors_progress_cheats_powerup_infinite_onslaught_1",
+      "class": "idProp2",
+      "inherit": "progress/cheats/powerup_infinite_onslaught",
+      "ap_id": 7770277,
+      "ap_name": "Mars Core - Infinite Onslaught Cheat Code",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=cheatcode_infinite_onslaught_powerup",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2504.04175;",
+        "spawn_y": "y = -251.300003;",
+        "spawn_z": "z = 84.2941666;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "cheat_codes",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "phobos_progress_codex_1",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770278,
+      "ap_name": "Mars Core - BFG-10000 Codex",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/codex/earth/bfg_10k",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 2189.75;",
+        "spawn_y": "y = 1218.25098;",
+        "spawn_z": "z = -54.7499847;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "hell_chunk_2_progress_codex_1",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770279,
+      "ap_name": "Mars Core - Lost City of Hebeth Codex",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/codex/sentinel/lost_city_hebeth",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -1888.09949;",
+        "spawn_y": "y = 2152.34985;",
+        "spawn_z": "z = 57.0777779;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "slayer_arena_pickup_keycard_slayer_key_1",
+      "class": "idProp2",
+      "inherit": "pickup/keycard/slayer_key",
+      "ap_id": 7770280,
+      "ap_name": "Mars Core - Slayer Key",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "slayer_arena_target_changelayer_slayergate_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        },
+        {
+          "target": "slayer_gate_func_mover_key_grate",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "useableComponentDecl=propitem/keycard/slayer_key",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "slayer_arena_target_changelayer_slayergate_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        },
+        {
+          "target": "slayer_gate_func_mover_key_grate",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2139.30029;",
+        "spawn_y": "y = -846.000183;",
+        "spawn_z": "z = -29.3300209;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [
+        "slayer_gate_func_mover_key_grate"
+      ],
+      "gates": [
+        "slayer_arena_target_changelayer_slayergate_1",
+        "slayer_gate_func_mover_key_grate"
+      ],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "slayer_keys",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "slayer_gate_progress_argent_cell_1_1335273921_e2m3",
+      "class": "idInteractable_WorldCache",
+      "inherit": "progress/argent_cell",
+      "ap_id": 7770281,
+      "ap_name": "Mars Core - Sentinel Crystal",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3",
+          "classification": "cosmetic",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "native WorldCache Sentinel Crystal upgrade transaction",
+          "classification": "ownership",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2174.300781;",
+        "spawn_y": "y = -835.499817;",
+        "spawn_z": "z = -34.999996;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [
+        "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3"
+      ],
+      "gates": [
+        "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3"
+      ],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "sentinel_crystals",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "phobos_pickup_weapon_bfg_2",
+      "class": "idProp2",
+      "inherit": "pickup/weapon/bfg",
+      "ap_id": 7770282,
+      "ap_name": "Mars Core - BFG-9000",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "inherit=pickup/weapon/bfg",
+          "classification": "grant",
+          "disposition": "drop"
+        }
+      ],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1659.50037;",
+        "spawn_y": "y = 235.999954;",
+        "spawn_z": "z = 67.5;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "independent one-shot AP owner; vanilla reward owner removed; audited functional targets and cleanup retained",
+      "family": "weapons_equipment",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "uac_chunk_1_interact_gore_nest_1",
+      "class": "idInteractable_GoreNest",
+      "inherit": "interact/gore_nest",
+      "ap_id": 7770283,
+      "ap_name": "Mars Core - Secret Encounter 1",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "uac_chunk_1_encounter_secret_challenge_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "completion_manager=uac_chunk_1_encounter_manager_4",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "uac_chunk_1_encounter_secret_challenge_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = 1804.24048;",
+        "spawn_y": "y = -1723.70007;",
+        "spawn_z": "z = 55.7999992;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native Secret Encounter interaction and used state retained; manager completion gets one AP target",
+      "family": "secret_encounters",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    },
+    {
+      "entity": "meteors_interact_gore_nest_1",
+      "class": "idInteractable_GoreNest",
+      "inherit": "interact/gore_nest",
+      "ap_id": 7770284,
+      "ap_name": "Mars Core - Secret Encounter 2",
+      "entity_match_count": 1,
+      "original_targets": [
+        {
+          "target": "meteors_encounter_secret_challenge_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "reward_grant_currency_ownership_edges": [
+        {
+          "target": "completion_manager=meteors_encounter_manager_secret_enc_01",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "progression_objective_relays": [
+        {
+          "target": "meteors_encounter_secret_challenge_1",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawn_x": "x = -2372.5;",
+        "spawn_y": "y = -183.90004;",
+        "spawn_z": "z = 74.7499847;"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": "native Secret Encounter interaction and used state retained; manager completion gets one AP target",
+      "family": "secret_encounters",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    }
+  ],
+  "runtime_map": "game/sp/e2m3_core/e2m3_core",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "resource_priority_metadata_only": true,
+  "source_evidence": {
+    "file": "vanillamaps/e2m3_core.map",
+    "size_bytes": 15991600,
+    "entity_count": 13220,
+    "preexisting_ap_prefixes": []
+  },
+  "entry_transition": {
+    "owner": "target_level_transition_to_e2m3",
+    "source_map": "game/hub/hub",
+    "destination_map": "game/sp/e2m3_core/e2m3_core",
+    "checkpoint": "cp_01",
+    "layer": "game/sp/hub/from_e2m2"
+  },
+  "exit_transition": {
+    "owner": "hell_chunk_2_target_level_transition_1",
+    "relay": "hell_chunk_2_target_relay_175",
+    "terminal_owner": "hell_chunk_2_trigger_trigger_end_portal",
+    "ordered_relay_targets": [
+      "hell_chunk_2_target_level_transition_1",
+      "sound_sound_soundentity_eol_stinger"
+    ],
+    "destination_map": "game/sp/e2m4_boss/e2m4_boss",
+    "checkpoint": "cp_01",
+    "kind": "direct relay with six-second terminal delay"
+  },
+  "campaign_goal_owner": "hell_chunk_2_trigger_trigger_end_portal",
+  "bfg_ownership_graph": {
+    "physical_owner": "phobos_pickup_weapon_bfg_2",
+    "grant_edge": "inherit=pickup/weapon/bfg",
+    "checkpoint_fallback_removed": "phobos_pickup_weapon_bfg_1",
+    "mission_select_fallback_removed": "_pickup_weapon_bfg_1",
+    "functional_timeline_preserved": "phobos_target_timeline_sg_deck_fire",
+    "objective_give_preserved": "objective_target_objective_give_1",
+    "objective_complete_preserved": "objective_target_objective_complete_1",
+    "cinematic_owners_preserved": [
+      "cinematic_info_logic_bfg10k_firing",
+      "cinematic_target_relay_bfg10k"
+    ],
+    "tutorial_gate": null,
+    "inventory_gate": null,
+    "ammo_pickups": [
+      "hell_chunk_2_pickup_ammo_bfg_2",
+      "phobos_pickup_ammo_bfg_1",
+      "meteors_pickup_ammo_bfg_1",
+      "meteors_pickup_ammo_bfg_2"
+    ]
+  },
+  "inventory_exclusions": [
+    "common ammo/health/armor/fuel and BFG ammo",
+    "phobos_interact_automap_1_e2m3 (map reveal only)",
+    "Slayer Gate door/nest/chest (native functional reward; no new item type)",
+    "slayer_gate_interact_use_panel_kiosk_console_1 (mission console)",
+    "master-level keycards, switches and weapon reserves",
+    "phobos_pickup_weapon_plasma_rifle_1 and phobos_pickup_weapon_chaingun_1_e2m3"
+  ]
+}
