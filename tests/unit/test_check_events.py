@@ -3077,7 +3077,7 @@ class CheckEventTests(unittest.TestCase):
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
 
-    def test_goal_ui_failure_does_not_retry_or_undo_commit(self):
+    def test_goal_only_send_commits_and_does_not_retry(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             original_base_dir = bridge_client.DOOM_BASE_DIR
             original_dump_dir = bridge_client.INV_DUMP_DIR
@@ -3086,7 +3086,7 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.INV_DUMP_DIR = tmpdir
                 event_path = Path(tmpdir, bridge_client.FORTRESS_GOAL_EVENT_FILENAME)
                 event_path.write_text(
-                    "AP_GOAL_EVENT_FORTRESS_VISIT_4\n",
+                    f"{bridge_client.FORTRESS_GOAL_EVENT_MARKER}\n",
                     encoding="utf-8",
                 )
                 sent = []
@@ -3096,7 +3096,7 @@ class CheckEventTests(unittest.TestCase):
                         self.session_state = {"goal_sent": False}
                         self.locations_checked = set()
                         self.checked_locations = set()
-                        self.server_locations = {7770162}
+                        self.server_locations = set()
                         self.server = types.SimpleNamespace(
                             socket=types.SimpleNamespace(closed=False)
                         )
@@ -3123,12 +3123,22 @@ class CheckEventTests(unittest.TestCase):
                 )
                 self.assertTrue(ctx.session_state["goal_sent"])
                 self.assertFalse(event_path.exists())
-                self.assertEqual(len(sent), 2)
+
+                self.assertEqual(
+                    sent,
+                    [
+                        {
+                            "cmd": "StatusUpdate",
+                            "status": bridge_client.ClientStatus.CLIENT_GOAL,
+                        }
+                    ],
+                )
 
                 asyncio.run(
                     bridge_client.DoomEternalContext.check_campaign_goal_event(ctx)
                 )
-                self.assertEqual(len(sent), 2)
+
+                self.assertEqual(len(sent), 1)
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
                 bridge_client.INV_DUMP_DIR = original_dump_dir
@@ -3187,6 +3197,7 @@ class CheckEventTests(unittest.TestCase):
         ctx.mission_challenges_observed = {}
         ctx.all_mission_challenges_observed = {}
         ctx.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+        ctx.persist_session_state = lambda: None
         sent = []
 
         async def fake_send(messages):

@@ -3516,20 +3516,36 @@ class DoomEternalContext(CommonContext):
     ):
         if not self.server or not self.server.socket or self.server.socket.closed:
             return False
-        if location_id not in self.server_locations:
-            logger.warning("[Mission] MISSION_LOCATION id=%s slot=absent", location_id)
+
+        has_location = location_id is not None
+
+        if has_location and location_id not in self.server_locations:
+            logger.warning(
+                "[Mission] MISSION_LOCATION id=%s slot=absent",
+                location_id,
+            )
             return False
 
         messages = []
         checked_locations = getattr(self, "checked_locations", set())
-        locations_in_flight = getattr(self, "mission_locations_in_flight", None)
+        locations_in_flight = getattr(
+            self,
+            "mission_locations_in_flight",
+            None,
+        )
         if locations_in_flight is None:
             locations_in_flight = self.mission_locations_in_flight = set()
+
         goal_in_flight = getattr(self, "mission_goal_in_flight", False)
-        location_acknowledged = location_id in checked_locations
-        location_is_new = not location_acknowledged
+
+        location_acknowledged = (
+            has_location and location_id in checked_locations
+        )
+        location_is_new = has_location and not location_acknowledged
+
         if location_acknowledged:
             locations_in_flight.discard(location_id)
+
         if location_is_new:
             messages.append(
                 {
@@ -3537,35 +3553,61 @@ class DoomEternalContext(CommonContext):
                     "locations": [location_id],
                 }
             )
-        goal_is_new = report_goal and not self.session_state.get("goal_sent", False)
+
+        goal_is_new = (
+            report_goal
+            and not self.session_state.get("goal_sent", False)
+        )
         if goal_is_new:
             messages.append(
-                {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
+                {
+                    "cmd": "StatusUpdate",
+                    "status": ClientStatus.CLIENT_GOAL,
+                }
             )
 
-        if not messages and location_acknowledged:
-            logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
-            return True
+        if not messages:
+            location_done = not has_location or location_acknowledged
+            goal_done = (
+                not report_goal
+                or self.session_state.get("goal_sent", False)
+            )
+            return location_done and goal_done
 
-        if (location_is_new and location_id in locations_in_flight) or (
-            goal_is_new and goal_in_flight
+        if (
+            location_is_new
+            and location_id in locations_in_flight
+        ) or (
+            goal_is_new
+            and goal_in_flight
         ):
-            logger.info("[Mission] LOCATION_CHECK_RETRY id=%s reason=in_flight", location_id)
+            logger.info(
+                "[Mission] LOCATION_CHECK_RETRY id=%s reason=in_flight",
+                location_id,
+            )
             return False
 
         if location_is_new:
             locations_in_flight.add(location_id)
+
         if goal_is_new:
             self.mission_goal_in_flight = True
+
         try:
-            logger.info(
-                f"[Mission] LOCATION_CHECK_SEND id={location_id} "
-                f"source={source_description}"
-            )
+            if location_is_new:
+                logger.info(
+                    "[Mission] LOCATION_CHECK_SEND id=%s source=%s",
+                    location_id,
+                    source_description,
+                )
+            if goal_is_new:
+                logger.info(
+                    "[Goal] GOAL_SEND source=%s",
+                    source_description,
+                )
+
             await self.send_msgs(messages)
         except Exception:
-            # Nothing is durable until the server write completes.  The native
-            # transition event therefore remains available for a later retry.
             if location_is_new:
                 locations_in_flight.discard(location_id)
             if goal_is_new:
@@ -3573,21 +3615,32 @@ class DoomEternalContext(CommonContext):
             raise
 
         if location_is_new:
-            # Keep the event and reservation until the server's authoritative
-            # checked_locations update arrives.  locations_checked is only the
-            # local protocol submission ledger, never an acknowledgement.
             self.locations_checked.add(location_id)
+
         if goal_is_new:
             try:
                 self.session_state["goal_sent"] = True
                 self.persist_session_state()
             finally:
                 self.mission_goal_in_flight = False
-        if location_id in checked_locations:
+
+        location_done = (
+            not has_location
+            or location_id in checked_locations
+        )
+        goal_done = (
+            not report_goal
+            or self.session_state.get("goal_sent", False)
+        )
+
+        if has_location and location_id in checked_locations:
             locations_in_flight.discard(location_id)
-            logger.info("[Mission] LOCATION_CHECK_ACK id=%s", location_id)
-            return True
-        return False
+            logger.info(
+                "[Mission] LOCATION_CHECK_ACK id=%s",
+                location_id,
+            )
+
+        return location_done and goal_done
 
     async def send_campaign_goal(self, source_description):
         return await DoomEternalContext.send_mission_complete(

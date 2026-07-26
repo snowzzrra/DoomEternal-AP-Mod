@@ -37,7 +37,8 @@
             "policy": "vanilla_only"
         },
         "AP_CHECK_PICKUPS_ALBUM_E1M2": {
-            "policy": "vanilla_only"
+            "policy": "vanilla_only",
+            "vanilla_feedback_proof": "The retained native idProp2 album transaction writes STAT_COLLECTIBLE_ALBUM_FOUND and provides the album UI feedback."
         },
         "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E1M2": {
             "policy": "vanilla_only",

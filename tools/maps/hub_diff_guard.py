@@ -26,6 +26,9 @@ EXPECTED_CHANGED_OR_REMOVED = {
     "target_relay_pickup_ballista",
     "target_give_item_ballista",
     "trigger_transition_to_e2m3",
+    "interact_hub_2_battery_station_1",
+    "interact_hub_2_battery_station_2",
+    "sentinel_battery_room_interact_hub_2_battery_station_1",
 }
 
 
