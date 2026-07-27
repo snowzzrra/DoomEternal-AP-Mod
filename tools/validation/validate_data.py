@@ -928,9 +928,9 @@ def main() -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 193:
+    if physical_location_count != 205:
         errors.append(
-            f"Expected 193 physical entity locations through Mars Core, found {physical_location_count}"
+            f"Expected 205 physical entity locations through Sentinel Prime, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -1091,9 +1091,9 @@ def main() -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 243,
-        "map_checks": 203,
-        "runtime_locations": 40,
+        "locations": 256,
+        "map_checks": 215,
+        "runtime_locations": 41,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
     }:

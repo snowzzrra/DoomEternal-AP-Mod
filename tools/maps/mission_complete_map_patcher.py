@@ -174,27 +174,71 @@ def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -
 CAMPAIGN_GOAL_TARGET = "ap_campaign_goal_event"
 
 
-def _patch_campaign_goal(contract: dict, root: Path, generated_map: Path) -> dict:
-    source = (root / contract["source"]).read_text(encoding="utf-8")
-    source_bounds = find_entity_block_bounds(source, contract["owner"])
-    if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
-        raise ValueError("campaign goal owner is missing or duplicated")
+def _generate_sentinel_location_event(location_id: int) -> str:
+    """Render Sentinel Prime's terminal publisher without an empty conDump arg.
+
+    This terminal is the final map-side owner.  Keep its location publisher
+    separate from the campaign-goal publisher below, and quote the filename so
+    the console receives one concrete argument even when the command is
+    dispatched from the terminal transition graph.
+    """
+    event_name = f"ap_event_{location_id}"
+    return f'''entity {{
+\tentityDef {event_name} {{
+\t\tclass = "idTarget_Command";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tcommandText = "echo AP_CHECK_EVENT_{location_id}; condump \\"{event_name}.txt\\"";
+\t\t}}
+\t}}
+}}
+'''
+
+
+def _patch_sentinel_prime_end(
+    mission: dict, goal: dict, root: Path, generated_map: Path,
+) -> dict:
+    source = (root / mission["source_path"]).read_text(encoding="utf-8")
+    source_bounds = find_entity_block_bounds(source, mission["owner"])
+    if source_bounds is None or source.count(f"entityDef {mission['owner']}") != 1:
+        raise ValueError("Sentinel Prime terminal owner is missing or duplicated")
     source_block = source[source_bounds[0]:source_bounds[1]]
     source_sha = _sha256(source_block.encode("utf-8"))
-    original_targets = extract_target_names(source_block)
-    if not original_targets:
-        raise ValueError("campaign goal owner has no functional targets")
+    if source_sha != mission["source_sha256"]:
+        raise ValueError("Sentinel Prime terminal owner hash mismatch")
+    for snippet in mission["required_snippets"]:
+        if snippet not in source_block:
+            raise ValueError(f"Sentinel Prime terminal owner drift: missing {snippet}")
+    if extract_target_names(source_block):
+        raise ValueError("Sentinel Prime terminal unexpectedly has targets")
 
     text = generated_map.read_text(encoding="utf-8")
-    bounds = find_entity_block_bounds(text, contract["owner"])
-    if bounds is None:
-        raise ValueError("generated campaign goal owner is missing")
-    block = text[bounds[0]:bounds[1]]
-    if _sha256(block.encode("utf-8")) != source_sha:
-        raise ValueError("generated campaign goal owner drift")
-    location_target = contract["location_event_target"]
-    patched = replace_targets_block(
-        block, [*original_targets, location_target, CAMPAIGN_GOAL_TARGET]
+    bounds = find_entity_block_bounds(text, mission["owner"])
+    if bounds is None or _sha256(text[bounds[0]:bounds[1]].encode("utf-8")) != source_sha:
+        raise ValueError("generated Sentinel Prime terminal owner drift")
+    native = source_block.replace(
+        f"entityDef {mission['owner']}",
+        f"entityDef {mission['native_owner']}",
+        1,
+    )
+    relay = generate_event_relay(
+        mission["owner"], mission["location_id"], "",
+        include_notification=False,
+    )
+    relay_bounds = find_entity_block_bounds(relay, mission["owner"])
+    if relay_bounds is None:
+        raise ValueError("could not build Sentinel Prime terminal relay")
+    relay_block = replace_targets_block(
+        relay[relay_bounds[0]:relay_bounds[1]],
+        [
+            f"ap_event_{mission['location_id']}",
+            goal["event_target"],
+            mission["native_owner"],
+        ],
     )
     event = f'''entity {{
 \tentityDef {CAMPAIGN_GOAL_TARGET} {{
@@ -205,34 +249,37 @@ def _patch_campaign_goal(contract: dict, root: Path, generated_map: Path) -> dic
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tcommandText = "echo {contract["marker"]}; condump {contract["event_filename"]}";
+\t\t\tcommandText = "echo {goal["marker"]}; condump {goal["event_filename"]}";
 \t\t}}
 \t}}
 }}
 '''
-    result = text[:bounds[0]] + patched + text[bounds[1]:]
+    result = text[:bounds[0]] + relay_block + native + text[bounds[1]:]
     if result.count(f"entityDef {CAMPAIGN_GOAL_TARGET}"):
         raise ValueError("campaign goal generated target already exists")
-    location_event = generate_check_event(contract["location_id"])
+    location_event = _generate_sentinel_location_event(mission["location_id"])
     generated_map.write_text(
         result.rstrip() + "\n" + location_event + event,
         encoding="utf-8",
         newline="",
     )
     return {
-        "source_path": contract["source"],
+        "source_path": mission["source_path"],
         "source_sha256": source_sha,
-        "owner": contract["owner"],
-        "runtime_map": contract["runtime_map"],
-        "destination_map": contract["destination_map"],
-        "before_targets": original_targets,
+        "owner": mission["owner"],
+        "native_owner": mission["native_owner"],
+        "runtime_map": goal["runtime_map"],
+        "destination_map": goal["destination_map"],
+        "before_targets": [],
         "after_targets": [
-            *original_targets, location_target, CAMPAIGN_GOAL_TARGET
+            f"ap_event_{mission['location_id']}",
+            CAMPAIGN_GOAL_TARGET,
+            mission["native_owner"],
         ],
-        "location_id": contract["location_id"],
-        "location_event_target": location_target,
-        "event_file": contract["event_filename"],
-        "marker": contract["marker"],
+        "location_id": mission["location_id"],
+        "location_event_target": f"ap_event_{mission['location_id']}",
+        "event_file": goal["event_filename"],
+        "marker": goal["marker"],
         "changed_lists": 1,
     }
 
@@ -265,8 +312,9 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     exultia_contract = contracts["exultia"]
     doom_hunter_contract = contracts["doom_hunter_base"]
     arc_complex_contract = contracts.get("arc_complex")
+    sentinel_contract = contracts["sentinel_prime"]
     campaign_goal_contract = load_campaign_goal_contract(root / "data" / "campaign_goal_contract.json")
-    goal_map_key = Path(campaign_goal_contract["source"]).stem
+    goal_map_key = sentinel_contract["map_key"]
     required_keys = {
         hell_contract["map_key"], exultia_contract["map_key"],
         doom_hunter_contract["map_key"],
@@ -289,8 +337,8 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             arc_complex_contract, root,
             generated_maps[arc_complex_contract["map_key"]],
         )
-    campaign_goal = _patch_campaign_goal(
-        campaign_goal_contract, root,
+    campaign_goal = _patch_sentinel_prime_end(
+        sentinel_contract, campaign_goal_contract, root,
         generated_maps[goal_map_key],
     )
     _append_standard_event_target(

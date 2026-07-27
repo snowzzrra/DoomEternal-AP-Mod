@@ -1,6 +1,6 @@
 {
     "schema_version": 1,
-    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest", "e2m2_base", "e2m3_core"],
+    "baseline_map_keys": ["e1m1_intro", "hub", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest", "e2m2_base", "e2m3_core", "e2m4_boss"],
     "maps": {
         "e1m1_intro": {
             "display_name": "Hell on Earth",
@@ -153,6 +153,25 @@
             "relative_entities_path": "game/sp/e2m3_core/e2m3_core.entities",
             "supported_game_revision": "Steam 6.66 Rev 3.1",
             "onboarding_audit": "data/onboarding/e2m3_core.json"
+        },
+        "e2m4_boss": {
+            "display_name": "Sentinel Prime",
+            "enabled": true,
+            "test_only": false,
+            "onboarding_status": "frozen_baseline",
+            "source_file": "e2m4_boss.map",
+            "source_sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390",
+            "source_owner": "vanillamaps/e2m4_boss.map",
+            "level_config": "level_configs/e2m4_boss.json",
+            "manifest": "manifests/e2m4_boss.json",
+            "generated_output": "e2m4_boss.entities",
+            "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+            "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+            "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+            "resource_priority": 76,
+            "relative_entities_path": "game/sp/e2m4_boss/e2m4_boss.entities",
+            "supported_game_revision": "Steam 6.66 Rev 3.1",
+            "onboarding_audit": null
         }
     }
 }

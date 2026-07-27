@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evidence": {
-    "maps": "vanillamaps/{e1m1_intro,e1m2_war,hub,e1m3_cult,e1m4_boss,e2m1_nest,e2m2_base,e2m3_core}.map",
+    "maps": "vanillamaps/{e1m1_intro,e1m2_war,hub,e1m3_cult,e1m4_boss,e2m1_nest,e2m2_base,e2m3_core,e2m4_boss}.map",
     "base_decls": "../Tools/gameresources_decl_analysis_20260710_201519/files/generated/decls",
     "patch_decls": "../Tools/gameresources_patch2_decl_analysis_20260710_210928.zip",
     "package_order": "DOOMEternal/base/packagemapspec.json",
@@ -10,7 +10,8 @@
       "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
       "game/hub/hub_patch2.resources",
       "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
-      "game/sp/e2m3_core/e2m3_core_patch2.resources"
+      "game/sp/e2m3_core/e2m3_core_patch2.resources",
+      "game/sp/e2m4_boss/e2m4_boss_patch2.resources"
     ]
   },
   "families": {
@@ -364,7 +365,8 @@
           7770162,
           7770210,
           7770248,
-          7770289
+          7770289,
+          7770290
         ]
       },
       "vanilla_class": "save transition reader",

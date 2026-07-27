@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
   "release": "v0.3.4-alpha",
-  "event_filename": "ap_goal_mars_core_exit.txt",
-  "marker": "AP_GOAL_EVENT_MARS_CORE_EXIT",
-  "location_id": 7770289,
-  "location_event_target": "ap_event_7770289",
-  "owner": "hell_chunk_2_trigger_trigger_end_portal",
-  "source": "vanillamaps/e2m3_core.map",
-  "runtime_map": "game/sp/e2m3_core/e2m3_core",
-  "destination_map": "game/sp/e2m4_boss/e2m4_boss"
+  "event_filename": "ap_goal_sentinel_prime_complete.txt",
+  "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE",
+  "event_target": "ap_campaign_goal_event",
+  "owner": "e2m4_endoflevel_transition",
+  "source": "vanillamaps/e2m4_boss.map",
+  "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+  "destination_map": "game/hub/hub"
 }

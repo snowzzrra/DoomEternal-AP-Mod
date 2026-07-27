@@ -2660,6 +2660,7 @@ class CheckEventTests(unittest.TestCase):
             ("game/sp/e1m3_cult/e1m3_cult", "game/sp/e1m4_boss/e1m4_boss"): 7770124,
             ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210,
             ("game/sp/e2m2_base/e2m2_base", "game/hub/hub"): 7770248,
+            ("game/sp/e2m3_core/e2m3_core", "game/sp/e2m4_boss/e2m4_boss"): 7770289,
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
@@ -2680,10 +2681,10 @@ class CheckEventTests(unittest.TestCase):
                 7770122: {"kind": "map_terminal", "runtime_map": "game/sp/e1m1_intro/e1m1_intro"},
                 7770123: {"kind": "map_terminal", "runtime_map": "game/sp/e1m2_battle/e1m2_battle"},
                 7770162: {"kind": "map_terminal", "runtime_map": "game/sp/e1m4_boss/e1m4_boss"},
-                7770289: {
+                7770290: {
                     "kind": "map_terminal",
-                    "runtime_map": "game/sp/e2m3_core/e2m3_core",
-                    "owner": "hell_chunk_2_trigger_trigger_end_portal",
+                    "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+                    "owner": "e2m4_endoflevel_transition",
                 },
             },
         )

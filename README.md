@@ -17,9 +17,10 @@ sibling Archipelago branch and is compiled into `doometernal.apworld` during rel
 Current `v0.3.4-alpha` scope:
 
 - Route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore Nest -> Fortress visit 4 -> ARC Complex -> Fortress visit 5 -> Mars Core -> native exit to Sentinel Prime`.
-- Content: `203` generated map checks + `40` runtime locations = `243`
-  public Archipelago locations; the goal remains a separate native event on
-  the audited Mars Core exit.
+- Content: `215` generated map checks + `41` runtime locations = `256`
+  addressed Archipelago locations; Victory remains a separate final location
+  and the goal remains a separate native event on
+  the audited Sentinel Prime terminal.
 - Challenges/masteries: durable native save records drive their AP locations;
   reward suppression remains scoped to the audited owners.
 - BFG-9000: vanilla cutscene `4701` grants the weapon; deferred location ID
@@ -27,7 +28,7 @@ Current `v0.3.4-alpha` scope:
   `5008`. Item/command `7770006` remain defined but have no active pool copy.
 - Battery economy: all `18` base-campaign currency is present; the default
   early Exultia Battery remains locked and the public Bundle ID is unchanged.
-- Mission Complete: seven campaign missions publish independent locations from
+- Mission Complete: eight campaign missions publish independent locations from
   audited terminal or native-transition owners; Mars Core publishes directly
   beside the independently retried campaign goal.
 - Full campaign, DLC, Master Levels, Horde Mode, enemy randomizer, and final

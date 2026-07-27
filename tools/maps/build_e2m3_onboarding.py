@@ -9,12 +9,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from campaign_goal_contract import load_campaign_goal_contract
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
 
 ROOT = Path(__file__).resolve().parents[2]
-GOAL_CONTRACT = load_campaign_goal_contract()
-SOURCE = ROOT / GOAL_CONTRACT["source"]
+SOURCE_PATH = "vanillamaps/e2m3_core.map"
+RUNTIME_MAP = "game/sp/e2m3_core/e2m3_core"
+DESTINATION_MAP = "game/sp/e2m4_boss/e2m4_boss"
+TERMINAL_OWNER = "hell_chunk_2_trigger_trigger_end_portal"
+SOURCE = ROOT / SOURCE_PATH
 CONFIG = ROOT / "level_configs" / "e2m3_core.json"
 LOCATION_NAMES = ROOT / "data" / "location_names.json"
 OUTPUT = ROOT / "data" / "onboarding" / "e2m3_core.json"
@@ -174,8 +176,8 @@ def build() -> dict:
         "resource_priority": 10,
         "mission_complete_transition": {
             "kind": "direct_owner",
-            "owner": GOAL_CONTRACT["owner"],
-            "target": GOAL_CONTRACT["location_event_target"],
+            "owner": "native load-edge transition monitor",
+            "target": "e2m3_core -> e2m4_boss",
             "classification": "progression",
         },
         "layers": sorted({
@@ -193,7 +195,7 @@ def build() -> dict:
         ],
         "gates": [
             "slayer_arena_target_changelayer_slayergate_1",
-            GOAL_CONTRACT["owner"],
+            TERMINAL_OWNER,
         ],
         "new_decl_resources": [
             {
@@ -216,11 +218,11 @@ def build() -> dict:
             },
         ],
         "locations": locations,
-        "runtime_map": GOAL_CONTRACT["runtime_map"],
+        "runtime_map": RUNTIME_MAP,
         "supported_game_revision": "Steam 6.66 Rev 3.1",
         "resource_priority_metadata_only": True,
         "source_evidence": {
-            "file": GOAL_CONTRACT["source"],
+            "file": SOURCE_PATH,
             "size_bytes": 15991600,
             "entity_count": 13220,
             "preexisting_ap_prefixes": [],
@@ -228,23 +230,23 @@ def build() -> dict:
         "entry_transition": {
             "owner": "target_level_transition_to_e2m3",
             "source_map": "game/hub/hub",
-            "destination_map": GOAL_CONTRACT["runtime_map"],
+            "destination_map": RUNTIME_MAP,
             "checkpoint": "cp_01",
             "layer": "game/sp/hub/from_e2m2",
         },
         "exit_transition": {
             "owner": "hell_chunk_2_target_level_transition_1",
             "relay": "hell_chunk_2_target_relay_175",
-            "terminal_owner": GOAL_CONTRACT["owner"],
+            "terminal_owner": TERMINAL_OWNER,
             "ordered_relay_targets": [
                 "hell_chunk_2_target_level_transition_1",
                 "sound_sound_soundentity_eol_stinger",
             ],
-            "destination_map": GOAL_CONTRACT["destination_map"],
+            "destination_map": DESTINATION_MAP,
             "checkpoint": "cp_01",
             "kind": "direct relay with six-second terminal delay",
         },
-        "campaign_goal_owner": GOAL_CONTRACT["owner"],
+        "campaign_goal_owner": "none; moved to Sentinel Prime terminal",
         "bfg_ownership_graph": {
             "status": "vanilla_grant_deferred_from_randomization",
             "deferred_location_id": 7770282,
