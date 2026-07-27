@@ -27,6 +27,7 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
             ("e1m4_boss", "e1m4_boss.map", "e1m4_boss.json"),
             ("e2m2_base", "e2m2_base.map", "e2m2_base.json"),
             ("e2m3_core", "e2m3_core.map", "e2m3_core.json"),
+            ("e2m4_boss", "e2m4_boss.map", "e2m4_boss.json"),
         ):
             output = Path(directory, f"{key}.entities")
             generate_map(
@@ -87,31 +88,45 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
                 self.assertIn('class = "idTarget_Command";', event)
                 self.assertIn(f"AP_CHECK_EVENT_{location_id}", event)
 
-    def test_campaign_goal_preserves_mars_exit_targets_and_is_unique(self):
+    def test_sentinel_terminal_publishes_location_and_goal_independently(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             maps = self._generated_maps(tmpdir)
             audit = patch_mission_complete_maps(CONTRACTS, maps, Path(tmpdir, "mod"))
             mars = maps["e2m3_core"].read_text(encoding="utf-8")
+            sentinel = maps["e2m4_boss"].read_text(encoding="utf-8")
             owner = audit["campaign_goal"]["owner"]
-            bounds = find_entity_block_bounds(mars, owner)
+            bounds = find_entity_block_bounds(sentinel, owner)
             self.assertIsNotNone(bounds)
             self.assertEqual(
-                extract_target_names(mars[bounds[0]:bounds[1]]),
+                extract_target_names(sentinel[bounds[0]:bounds[1]]),
                 [
-                    "lava_area_portal_screenfx_1",
-                    "hell_chunk_2_target_relay_174",
-                    "hell_chunk_2_target_relay_175",
-                    "e3_target_objective_complete_4",
-                    "mars_core_slipgate_1",
-                    "hell_chunk_2_target_poi_hell_gate1",
-                    "hell_chunk_2_target_fast_travel_inhibit_1",
-                    "ap_event_7770289",
+                    "ap_event_7770290",
                     "ap_campaign_goal_event",
+                    "e2m4_endoflevel_transition_native",
                 ],
             )
-            self.assertEqual(mars.count("AP_CHECK_EVENT_7770289"), 1)
-            self.assertEqual(mars.count("entityDef ap_campaign_goal_event"), 1)
-            self.assertEqual(mars.count(audit["campaign_goal"]["marker"]), 1)
+            self.assertNotIn("ap_campaign_goal_event", mars)
+            self.assertNotIn("AP_CHECK_EVENT_7770289", mars)
+            self.assertEqual(sentinel.count("AP_CHECK_EVENT_7770290"), 1)
+            self.assertEqual(sentinel.count("entityDef ap_campaign_goal_event"), 1)
+            self.assertEqual(sentinel.count(audit["campaign_goal"]["marker"]), 1)
+
+            mission_bounds = find_entity_block_bounds(sentinel, "ap_event_7770290")
+            goal_bounds = find_entity_block_bounds(sentinel, "ap_campaign_goal_event")
+            self.assertIsNotNone(mission_bounds)
+            self.assertIsNotNone(goal_bounds)
+            mission_publisher = sentinel[mission_bounds[0]:mission_bounds[1]]
+            goal_publisher = sentinel[goal_bounds[0]:goal_bounds[1]]
+            self.assertIn("AP_CHECK_EVENT_7770290", mission_publisher)
+            self.assertIn('condump \\"ap_event_7770290.txt\\"', mission_publisher)
+            self.assertIn(audit["campaign_goal"]["marker"], goal_publisher)
+            self.assertIn(
+                'condump ap_goal_sentinel_prime_complete.txt', goal_publisher
+            )
+            self.assertNotIn(audit["campaign_goal"]["marker"], mission_publisher)
+            self.assertNotIn("AP_CHECK_EVENT_7770290", goal_publisher)
+            for publisher in (mission_publisher, goal_publisher):
+                self.assertNotIn("condump ;", publisher.lower())
 
     def test_missing_or_duplicate_native_owner_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmpdir:

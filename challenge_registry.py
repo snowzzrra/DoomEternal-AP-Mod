@@ -84,7 +84,7 @@ def validate_challenge_registry(registry: dict) -> None:
         raise ValueError("runtime registry schema_version must be 10")
     entries = all_location_entries(registry)
     expected_count = (
-        7   # mission_complete
+        8   # mission_complete
         + 13  # weapon_masteries
         + 15  # mission_challenges (five missions, three each)
         + 5   # all_mission_challenges (one aggregate per mission)
@@ -101,6 +101,7 @@ def validate_challenge_registry(registry: dict) -> None:
         raise ValueError("runtime location IDs must be unique")
     if set(ids) != {
         7770122, 7770123, 7770124, 7770162, 7770210, 7770248, 7770289,
+        7770290,
         *BASE_MASTERY_LOCATION_IDS,
         *MISSION_CHALLENGE_LOCATION_IDS,
         *ALL_MISSION_CHALLENGES_LOCATION_IDS,
@@ -109,10 +110,10 @@ def validate_challenge_registry(registry: dict) -> None:
 
     for entry in registry["mission_complete"]:
         signal = entry.get("signal", {})
-        if entry["location_id"] in {7770122, 7770123, 7770162, 7770289}:
+        if entry["location_id"] in {7770122, 7770123, 7770162, 7770290}:
             expected_fields = (
                 {"kind", "runtime_map", "owner"}
-                if entry["location_id"] == 7770289
+                if entry["location_id"] == 7770290
                 else {"kind", "runtime_map"}
             )
             if set(signal) != expected_fields or signal["kind"] != "map_terminal":
@@ -121,11 +122,11 @@ def validate_challenge_registry(registry: dict) -> None:
                 "game/sp/e1m1_intro/e1m1_intro",
                 "game/sp/e1m2_battle/e1m2_battle",
                 "game/sp/e1m4_boss/e1m4_boss",
-                "game/sp/e2m3_core/e2m3_core",
+                "game/sp/e2m4_boss/e2m4_boss",
             }:
                 raise ValueError(f"{entry['name']}: invalid runtime map identity")
-            if entry["location_id"] == 7770289 and signal["owner"] != (
-                "hell_chunk_2_trigger_trigger_end_portal"
+            if entry["location_id"] == 7770290 and signal["owner"] != (
+                "e2m4_endoflevel_transition"
             ):
                 raise ValueError(f"{entry['name']}: invalid direct publisher owner")
             continue

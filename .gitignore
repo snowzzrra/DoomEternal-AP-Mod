@@ -41,7 +41,11 @@ ap_transition_*.evt
 vanillamaps/
 vanilla_decls/
 gameresources/
-packaging/mod_assets
+!packaging/mod_assets/
+!packaging/mod_assets/e2m4_boss_patch2/
+!packaging/mod_assets/e2m4_boss_patch2/art/
+!packaging/mod_assets/e2m4_boss_patch2/art/pickups/
+!packaging/mod_assets/e2m4_boss_patch2/art/pickups/question_mark_a.lwo
 
 # Local investigation
 debug_matches.py

@@ -3,14 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from campaign_goal_contract import load_campaign_goal_contract
 from tools.maps.ap_map_generator import (
     extract_target_names,
     find_entity_block_bounds,
     generate_map,
     validate_target_policies,
 )
-from tools.maps.mission_complete_map_patcher import _patch_campaign_goal
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,8 +32,6 @@ class MarsCoreStaticContracts(unittest.TestCase):
             cls.generated_manifest,
             cls.items,
         )
-        cls.goal = load_campaign_goal_contract()
-        _patch_campaign_goal(cls.goal, ROOT, cls.output)
         cls.source = cls.source_path.read_text(encoding="utf-8")
         cls.generated = cls.output.read_text(encoding="utf-8")
 
@@ -112,27 +108,16 @@ class MarsCoreStaticContracts(unittest.TestCase):
             self.assertNotIn("renderModelInfo", helper)
             self.assertNotIn("useableComponentDecl", helper)
 
-    def test_campaign_goal_is_only_on_audited_mars_terminal_owner(self):
-        bounds = find_entity_block_bounds(self.generated, self.goal["owner"])
-        targets = extract_target_names(self.generated[bounds[0]:bounds[1]])
-        source_bounds = find_entity_block_bounds(self.source, self.goal["owner"])
-        vanilla_targets = extract_target_names(
-            self.source[source_bounds[0]:source_bounds[1]]
-        )
-        self.assertEqual(len(vanilla_targets), 7)
-        self.assertEqual(targets[:7], vanilla_targets)
+    def test_mars_terminal_has_no_direct_publishers(self):
+        owner = "hell_chunk_2_trigger_trigger_end_portal"
+        source_bounds = find_entity_block_bounds(self.source, owner)
+        generated_bounds = find_entity_block_bounds(self.generated, owner)
         self.assertEqual(
-            targets[-2:],
-            [self.goal["location_event_target"], "ap_campaign_goal_event"],
+            self.source[source_bounds[0]:source_bounds[1]],
+            self.generated[generated_bounds[0]:generated_bounds[1]],
         )
-        self.assertEqual(targets.count(self.goal["location_event_target"]), 1)
-        self.assertEqual(targets.count("ap_campaign_goal_event"), 1)
-        self.assertEqual(
-            self.generated.count(f"AP_CHECK_EVENT_{self.goal['location_id']}"), 1
-        )
-        self.assertEqual(self.generated.count(self.goal["marker"]), 1)
-        hub = (ROOT / "vanillamaps" / "hub.map").read_text(encoding="utf-8")
-        self.assertNotIn(self.goal["marker"], hub)
+        self.assertNotIn("AP_CHECK_EVENT_7770289", self.generated)
+        self.assertNotIn("ap_campaign_goal_event", self.generated)
 
     def test_campaign_goal_runtime_dependency_is_packaged_and_manifested(self):
         build_script = (
@@ -190,9 +175,9 @@ class MarsCoreStaticContracts(unittest.TestCase):
         self.assertEqual(
             onboarding["mission_complete_transition"],
             {
-                "kind": "direct_owner",
-                "owner": "hell_chunk_2_trigger_trigger_end_portal",
-                "target": "ap_event_7770289",
+                "kind": "native_transition",
+                "owner": "native load-edge transition monitor",
+                "target": "e2m3_core -> e2m4_boss",
                 "classification": "progression",
             },
         )

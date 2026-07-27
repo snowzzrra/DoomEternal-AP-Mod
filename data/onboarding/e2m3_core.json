@@ -5,9 +5,9 @@
   "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
   "resource_priority": 10,
   "mission_complete_transition": {
-    "kind": "direct_owner",
-    "owner": "hell_chunk_2_trigger_trigger_end_portal",
-    "target": "ap_event_7770289",
+    "kind": "native_transition",
+    "owner": "native load-edge transition monitor",
+    "target": "e2m3_core -> e2m4_boss",
     "classification": "progression"
   },
   "layers": [
@@ -1035,7 +1035,7 @@
     "checkpoint": "cp_01",
     "kind": "direct relay with six-second terminal delay"
   },
-  "campaign_goal_owner": "hell_chunk_2_trigger_trigger_end_portal",
+  "campaign_goal_owner": "none; moved to Sentinel Prime terminal",
   "bfg_ownership_graph": {
     "status": "vanilla_grant_deferred_from_randomization",
     "deferred_location_id": 7770282,

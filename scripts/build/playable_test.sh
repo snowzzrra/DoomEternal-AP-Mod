@@ -256,7 +256,11 @@ assert audit["campaign_goal"]["runtime_map"] == goal_contract["runtime_map"]
 assert audit["campaign_goal"]["destination_map"] == goal_contract["destination_map"]
 assert audit["campaign_goal"]["event_file"] == goal_contract["event_filename"]
 assert audit["campaign_goal"]["marker"] == goal_contract["marker"]
-assert audit["campaign_goal"]["after_targets"][-1] == "ap_campaign_goal_event"
+assert audit["campaign_goal"]["after_targets"] == [
+    "ap_event_7770290",
+    "ap_campaign_goal_event",
+    "e2m4_endoflevel_transition_native",
+]
 PY
 
 for map_row in "${MAP_ROWS[@]}"; do

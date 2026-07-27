@@ -7,7 +7,8 @@
     "e1m4_boss",
     "e2m1_nest",
     "e2m2_base",
-    "e2m3_core"
+    "e2m3_core",
+    "e2m4_boss"
   ],
   "coverage": [
     "entity names",
@@ -306,21 +307,49 @@
         7770280,
         7770281,
         7770283,
-        7770284,
-        7770289
+        7770284
       ],
       "bind_parents": 347,
-      "byte_sha256": "407445951db40f9a922a3cf5225b903e906c06ff37c87f6f093092e24a877f3f",
-      "byte_size": 16076791,
-      "classes": 13489,
-      "entity_count": 13527,
+      "byte_sha256": "e1a1f8f8bfc3f1c156703cac690495cc3f2a29adae22e264300c3b397e444b2b",
+      "byte_size": 16865585,
+      "classes": 13487,
+      "entity_count": 13525,
       "layers": 6997,
       "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
       "scripted_contract_sha256": "fe140df67dfcbae5f7e1ea9855c9bea7e2ec534dc03e67f5b76928613ebf75ed",
-      "semantic_sha256": "a6e6aca05788d9d09d3a9f34325ebb1d591a89b177580d30ace674aee0c37f2b",
-      "targets": 11444,
+      "semantic_sha256": "677d03eb448422da8179a2807f148ae54d5bf72e5c67448bbb732366bc4a2c29",
+      "targets": 11442,
       "transforms": 30260,
-      "unique_entity_names": 13490
+      "unique_entity_names": 13488
+    },
+    "e2m4_boss": {
+      "ap_ids": [
+        7770290,
+        7770291,
+        7770292,
+        7770293,
+        7770294,
+        7770295,
+        7770296,
+        7770297,
+        7770298,
+        7770299,
+        7770300,
+        7770301,
+        7770302
+      ],
+      "bind_parents": 11,
+      "byte_sha256": "1e365d133b535b98bbdde0d7328a42b4b5640743024f4c23fae17b9d16e625f6",
+      "byte_size": 2529063,
+      "classes": 2602,
+      "entity_count": 2604,
+      "layers": 124,
+      "manifest_sha256": "331eb16dd9de476d90246045ef49dfdb6d7b9d2fb94cbbd4ecbcad66ace9e1e0",
+      "scripted_contract_sha256": "a8c692e3f8257ff54381a561524980af2926ecef741c53fdb1a080a4efa2cf3c",
+      "semantic_sha256": "416d957682e2456b6986b74c1a06f2fa0c1cfe6439f720f36f344cf934ec66af",
+      "targets": 1480,
+      "transforms": 5365,
+      "unique_entity_names": 2603
     },
     "hub": {
       "ap_ids": [

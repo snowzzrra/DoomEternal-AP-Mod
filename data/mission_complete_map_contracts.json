@@ -64,5 +64,27 @@
       "checkpointName": "from_e2m2",
       "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E2M2_BASE"
     }
+  },
+  "sentinel_prime": {
+    "location_id": 7770290,
+    "map_key": "e2m4_boss",
+    "ap_check": "AP_CHECK_MISSION_COMPLETE_SENTINEL_PRIME",
+    "owner": "e2m4_endoflevel_transition",
+    "native_owner": "e2m4_endoflevel_transition_native",
+    "source_path": "vanillamaps/e2m4_boss.map",
+    "source_sha256": "792db1454c005b251efa58c0cdd904b7a87a1596fbbf8066e4bac90a0d565327",
+    "original_targets": [],
+    "required_snippets": [
+      "inherit = \"target/level_transition\";",
+      "nextMapName = \"maps/game/hub/hub.map\";",
+      "checkpointName = \"from_e2m4\";",
+      "levelCompletionStat = \"STAT_DLE_COMPLETED_LEVEL_E2M4_BOSS\";"
+    ],
+    "terminal": {
+      "owner": "e2m4_endoflevel_transition",
+      "nextMapName": "maps/game/hub/hub.map",
+      "checkpointName": "from_e2m4",
+      "levelCompletionStat": "STAT_DLE_COMPLETED_LEVEL_E2M4_BOSS"
+    }
   }
 }
