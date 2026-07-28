@@ -17,7 +17,14 @@ from content_catalog import (
     RuntimeLocationSpec,
 )
 from tools.maps.mission_complete_map_patcher import compile_publishers
-from tools.validation.audit_resource_packages import audit_resource_packages
+from tools.maps.ap_map_generator import (
+    apply_injected_entity_model_override,
+    resolve_donor_model_override,
+)
+from tools.validation.audit_resource_packages import (
+    audit_resource_packages,
+    audit_source_asset_dependencies,
+)
 
 
 @pytest.mark.parametrize("strategy", sorted(PHYSICAL_STRATEGIES))
@@ -157,3 +164,127 @@ def test_resident_model_requires_no_dependency_bundle(tmp_path: Path) -> None:
         source_map_root=maps,
     )
     assert records[0]["sha256"] == "resident"
+
+
+def _donor_block(kind: str) -> str:
+    inherit, model = {
+        "question_mark": (
+            "pickup/collectible/question_mark",
+            "art/pickups/question_mark_a.lwo",
+        ),
+        "codex": ("progress/codex", "art/pickups/codex.lwo"),
+    }[kind]
+    return f'''entity {{
+    layers {{ "gameplay" }}
+    entityDef donor {{
+        inherit = "{inherit}";
+        class = "idProp2";
+        edit = {{
+            triggerDef = "trigger/props/pickup_large";
+            spawnPosition = {{ x = 1; y = 2; z = 3; }}
+            renderModelInfo = {{ model = "{model}"; }}
+            clipModelInfo = {{ type = "CLIPMODEL_BOX"; }}
+            interaction = {{ initalState = "idle"; }}
+        }}
+    }}
+}}'''
+
+
+def _override_asset(kind: str = "codex") -> dict:
+    return {
+        "strategy": "donor_model_override",
+        "scope": "injected_entity_only",
+        "donor": {"kind": kind, "selection": "per_location_source"},
+    }
+
+
+def _injected_visual(model: str) -> str:
+    return f'''entity {{
+    layers {{ "gameplay" }}
+    entityDef ap_location_visual_1 {{
+        class = "idProp2";
+        edit = {{
+            triggerDef = "trigger/props/pickup_large";
+            spawnPosition = {{ x = 1; y = 2; z = 3; }}
+            renderModelInfo = {{ model = "{model}"; }}
+            clipModelInfo = {{ type = "CLIPMODEL_BOX"; }}
+            interaction = {{ initalState = "idle"; }}
+        }}
+    }}
+}}'''
+
+
+@pytest.mark.parametrize("kind", ["question_mark", "codex"])
+def test_donor_model_override_supports_generic_donors(kind: str) -> None:
+    donor = _donor_block(kind)
+    donor_model = resolve_donor_model_override(
+        donor, donor, _override_asset(kind)
+    )
+    visual = _injected_visual(donor_model)
+    overridden = apply_injected_entity_model_override(
+        visual, "art/pickups/question_mark_a.lwo"
+    )
+    assert 'model = "art/pickups/question_mark_a.lwo";' in overridden
+
+
+def test_model_override_preserves_injected_structure_and_source_donor() -> None:
+    donor = _donor_block("codex")
+    original_donor = donor
+    visual = _injected_visual("art/pickups/codex.lwo")
+    overridden = apply_injected_entity_model_override(
+        visual, "art/pickups/question_mark_a.lwo"
+    )
+    assert donor == original_donor
+    assert overridden.replace(
+        "art/pickups/question_mark_a.lwo", "art/pickups/codex.lwo"
+    ) == visual
+    for field in (
+        "layers", "triggerDef", "spawnPosition", "clipModelInfo", "interaction",
+    ):
+        assert field in overridden
+
+
+def test_model_override_rejects_non_injected_entity() -> None:
+    with pytest.raises(ValueError, match="limited to injected"):
+        apply_injected_entity_model_override(
+            _injected_visual("art/pickups/codex.lwo").replace(
+                "ap_location_visual_1", "game_progress_codex_1"
+            ),
+            "art/pickups/question_mark_a.lwo",
+        )
+
+
+def test_missing_override_bundle_fails_source_preflight(tmp_path: Path) -> None:
+    model = tmp_path / "synthetic" / "art"
+    model.mkdir(parents=True)
+    (model / "ap.lwo").write_bytes(b"model")
+    override = AssetSpec(
+        "override", "synthetic", "donor_model_override", "art/ap.lwo",
+        "synthetic", "synthetic_patch.resources", (), "required",
+        {"kind": "codex", "selection": "per_location_source"},
+        "missing", "injected_entity_only",
+        ("trigger", "collision", "transform", "layers", "interaction"),
+    )
+    with pytest.raises(AssertionError, match="BUNDLE_MISSING"):
+        audit_source_asset_dependencies(tmp_path, (override,))
+
+
+def test_missing_model_payload_fails_with_short_dependency_error(
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "synthetic" / "art"
+    model.mkdir(parents=True)
+    (model / "ap.lwo").write_bytes(b"model")
+    bundle = AssetSpec(
+        "payload", "synthetic", "streamdb", "art/missing_payload.lwo",
+        "streamdb", "synthetic_patch.resources", (), "embedded",
+    )
+    override = AssetSpec(
+        "override", "synthetic", "donor_model_override", "art/ap.lwo",
+        "synthetic", "synthetic_patch.resources", (), "required",
+        {"kind": "codex", "selection": "per_location_source"},
+        "payload", "injected_entity_only",
+        ("trigger", "collision", "transform", "layers", "interaction"),
+    )
+    with pytest.raises(AssertionError, match=r"DEPENDENCY_MISSING.*payload"):
+        audit_source_asset_dependencies(tmp_path, (override, bundle))

@@ -10,6 +10,37 @@ from pathlib import Path
 from typing import Iterable
 
 from content_catalog import AssetSpec, load_content_catalog
+from tools.maps.ap_map_generator import resolve_donor_model_override
+
+
+def audit_source_asset_dependencies(
+    asset_root: Path,
+    assets: Iterable[AssetSpec],
+) -> None:
+    """Fail fast when a declared copied model or linked payload is absent."""
+    selected = tuple(assets)
+    by_key = {(asset.map_key, asset.key): asset for asset in selected}
+    for asset in selected:
+        if asset.strategy != "resident_model":
+            for member in (asset.model, *asset.dependencies):
+                source = asset_root / asset.resource_base / member
+                if not source.is_file():
+                    raise AssertionError(
+                        f"[ASSET] DEPENDENCY_MISSING bundle={asset.key} "
+                        f"dependency={member}"
+                    )
+        if asset.strategy == "donor_model_override":
+            bundle = by_key.get((asset.map_key, asset.asset_bundle or ""))
+            if bundle is None:
+                raise AssertionError(
+                    f"[ASSET] BUNDLE_MISSING override={asset.key}"
+                )
+            payload = asset_root / bundle.resource_base / bundle.model
+            if not payload.is_file():
+                raise AssertionError(
+                    f"[ASSET] DEPENDENCY_MISSING bundle={bundle.key} "
+                    f"dependency={bundle.model}"
+                )
 
 
 def audit_resource_packages(
@@ -25,15 +56,19 @@ def audit_resource_packages(
     """Audit bundles/resident assets against the resource base and final ZIP."""
     records: list[dict[str, str]] = []
     catalog = load_content_catalog()
+    selected_assets = tuple(
+        asset
+        for asset in (assets if assets is not None else catalog.assets)
+        if map_key is None or asset.map_key == map_key
+    )
+    audit_source_asset_dependencies(asset_root, selected_assets)
     zip_names: set[str] | None = None
     zip_archive: zipfile.ZipFile | None = None
     if zip_path is not None:
         zip_archive = zipfile.ZipFile(zip_path)
         zip_names = set(zip_archive.namelist())
     try:
-        for asset in assets if assets is not None else catalog.assets:
-            if map_key is not None and asset.map_key != map_key:
-                continue
+        for asset in selected_assets:
             if asset.strategy == "resident_model":
                 if source_map_root is None:
                     source_map_root = Path(__file__).resolve().parents[2] / "vanillamaps"
@@ -88,6 +123,73 @@ def audit_resource_packages(
                     "sha256": "resident",
                 })
                 continue
+
+            if asset.strategy == "donor_model_override":
+                maps_root = source_map_root or (
+                    Path(__file__).resolve().parents[2] / "vanillamaps"
+                )
+                source_map = maps_root / f"{asset.map_key}.map"
+                if not source_map.is_file():
+                    raise AssertionError(
+                        f"{asset.map_key}: donor source map is missing"
+                    )
+                source_text = source_map.read_text(encoding="utf-8")
+                try:
+                    donor_model = resolve_donor_model_override(
+                        source_text,
+                        source_text,
+                        {
+                            "strategy": asset.strategy,
+                            "scope": asset.scope,
+                            "donor": dict(asset.donor),
+                        },
+                    )
+                except ValueError as error:
+                    raise AssertionError(
+                        f"{asset.map_key}: donor unresolved: {error}"
+                    ) from error
+                map_spec = catalog.maps.get(asset.map_key)
+                staged_entities = None
+                entities_member = None
+                if map_spec is not None:
+                    entities_member = (
+                        f"{Path(asset.resource_owner).stem}/maps/"
+                        f"{map_spec.relative_entities_path}"
+                    )
+                    staged_entities = (
+                        generated_maps_root / map_spec.data["generated_output"]
+                        if generated_maps_root is not None
+                        else mod_root / entities_member
+                    )
+                if staged_entities is not None and staged_entities.is_file():
+                    generated = staged_entities.read_text(encoding="utf-8")
+                    visual_blocks = [
+                        block
+                        for block in generated.split("entity {")
+                        if "entityDef ap_location_visual_" in block
+                    ]
+                    if not visual_blocks or any(
+                        f'model = "{asset.model}";' not in block
+                        or f'model = "{donor_model}";' in block
+                        for block in visual_blocks
+                    ):
+                        raise AssertionError(
+                            f"{asset.map_key}: injected AP visual override is incomplete"
+                        )
+                    if "modelDecl" in generated:
+                        raise AssertionError(
+                            f"{asset.map_key}: global model override is forbidden"
+                        )
+                if zip_names is not None and entities_member is not None:
+                    matches = [
+                        name for name in zip_names
+                        if name == entities_member
+                        or name.endswith(f"/{entities_member}")
+                    ]
+                    if len(matches) != 1:
+                        raise AssertionError(
+                            f"{asset.map_key}: final ZIP lacks generated donor override"
+                        )
 
             members = (asset.model, *asset.dependencies)
             for member in members:

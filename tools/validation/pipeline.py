@@ -24,6 +24,9 @@ from tools.maps.map_semantic_baseline import (
     assert_map_baseline,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from tools.validation.audit_resource_packages import (
+    audit_source_asset_dependencies,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +53,7 @@ CORE_MAP_INPUTS = (
     "tools/maps/notification_formatting.py",
     "tools/maps/notification_lab.py",
     "tools/maps/mission_complete_map_patcher.py",
+    "tools/validation/audit_resource_packages.py",
     "content_catalog.py",
     "publisher_contracts.py",
 )
@@ -66,6 +70,7 @@ PREFLIGHT_PYTHON = (
     "tools/maps/map_semantic_baseline.py",
     "tools/validation/pipeline.py",
     "tools/validation/validate_data.py",
+    "tools/validation/audit_resource_packages.py",
 )
 
 
@@ -156,6 +161,10 @@ class Pipeline:
                             "  scripts/pipeline.sh fast"
                         ) from error
             catalog = load_content_catalog()
+            audit_source_asset_dependencies(
+                ROOT / "packaging" / "mod_assets",
+                catalog.assets,
+            )
             physical_ids = {item.location_id for item in catalog.physical_locations}
             runtime_ids = {item.location_id for item in catalog.runtime_locations}
             overlap = physical_ids & runtime_ids
@@ -284,6 +293,10 @@ class Pipeline:
                 "resource_owner": asset.resource_owner,
                 "dependencies": asset.dependencies,
                 "dependency_policy": asset.dependency_policy,
+                "donor": dict(asset.donor),
+                "asset_bundle": asset.asset_bundle,
+                "scope": asset.scope,
+                "preserve": asset.preserve,
             }
             for asset in catalog.assets if asset.map_key == map_key
         ])

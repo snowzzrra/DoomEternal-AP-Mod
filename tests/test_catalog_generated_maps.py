@@ -27,6 +27,19 @@ def test_generated_map_uses_declared_visual_asset_strategy(
         return
     generated = temporary_generated_maps[map_spec.key].read_text(encoding="utf-8")
     for asset in assets:
-        assert f'model = "{asset.model}";' in generated
+        if asset.strategy in {"resident_model", "donor_model_override"}:
+            assert f'model = "{asset.model}";' in generated
         if asset.strategy == "resident_model":
             assert not asset.dependencies
+        if asset.strategy == "donor_model_override":
+            visual_blocks = [
+                block for block in generated.split("entity {")
+                if "entityDef ap_location_visual_" in block
+            ]
+            assert visual_blocks
+            assert all(
+                f'model = "{asset.model}";' in block
+                and 'model = "art/pickups/codex.lwo";' not in block
+                for block in visual_blocks
+            )
+            assert "modelDecl" not in generated

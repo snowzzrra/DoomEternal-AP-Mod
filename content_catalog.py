@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -34,7 +34,8 @@ RUNTIME_STRATEGIES = frozenset({
 })
 PUBLISHER_STRATEGIES = TRIGGER_STRATEGIES | EFFECT_STRATEGIES
 ASSET_STRATEGIES = frozenset({
-    "packaged_bundle", "resident_model", "map_resource", "streamdb",
+    "donor_model_override", "packaged_bundle", "resident_model",
+    "map_resource", "streamdb",
 })
 
 
@@ -109,6 +110,12 @@ class AssetSpec:
     resource_owner: str
     dependencies: tuple[str, ...]
     dependency_policy: str
+    donor: Mapping[str, Any] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    asset_bundle: str | None = None
+    scope: str = ""
+    preserve: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -254,6 +261,10 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 spec.resource_owner,
                 tuple(raw_asset.get("dependencies", [])),
                 raw_asset.get("dependency_policy", "required"),
+                _freeze(raw_asset.get("donor", {})),
+                raw_asset.get("asset_bundle"),
+                raw_asset.get("scope", ""),
+                tuple(raw_asset.get("preserve", [])),
             ))
         for raw_asset in package_by_key.get(key, {}).get("assets", {}).get("assets", []):
             assets.append(AssetSpec(
@@ -262,6 +273,10 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 raw_asset.get("resource_owner", spec.resource_owner),
                 tuple(raw_asset.get("dependencies", [])),
                 raw_asset.get("dependency_policy", "required"),
+                _freeze(raw_asset.get("donor", {})),
+                raw_asset.get("asset_bundle"),
+                raw_asset.get("scope", ""),
+                tuple(raw_asset.get("preserve", [])),
             ))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
@@ -330,6 +345,9 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             count = item.signal.get("required_count", 1)
             if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= len(sources):
                 raise ValueError(f"{item.name}: invalid required_count")
+    asset_keys = {(asset.map_key, asset.key): asset for asset in catalog.assets}
+    if len(asset_keys) != len(catalog.assets):
+        raise ValueError("asset keys must be unique within each map")
     for asset in catalog.assets:
         if (
             asset.strategy not in ASSET_STRATEGIES
@@ -345,6 +363,32 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             raise ValueError(f"{asset.key}: packaged_bundle requires declared dependencies")
         if asset.strategy == "resident_model" and asset.dependencies:
             raise ValueError(f"{asset.key}: resident_model must not declare copied dependencies")
+        if asset.strategy == "donor_model_override":
+            if (
+                asset.scope != "injected_entity_only"
+                or not asset.donor.get("kind")
+                or asset.donor.get("selection") not in {
+                    "per_location_source", "named_entity",
+                }
+            ):
+                raise ValueError(f"{asset.key}: invalid donor_model_override contract")
+            if (
+                asset.donor.get("selection") == "named_entity"
+                and not asset.donor.get("entity")
+            ):
+                raise ValueError(f"{asset.key}: named donor requires entity")
+            required_preserve = {
+                "trigger", "collision", "transform", "layers", "interaction",
+            }
+            if not required_preserve <= set(asset.preserve):
+                raise ValueError(
+                    f"{asset.key}: donor_model_override preserve contract is incomplete"
+                )
+            if (
+                not asset.asset_bundle
+                or (asset.map_key, asset.asset_bundle) not in asset_keys
+            ):
+                raise ValueError(f"{asset.key}: unknown asset_bundle")
     active_goals = [
         publisher
         for publisher in catalog.publishers

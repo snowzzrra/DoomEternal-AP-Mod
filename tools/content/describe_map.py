@@ -29,7 +29,15 @@ def describe(map_key: str) -> dict:
         for item in catalog.publishers if item.map_key == map_key
     ]
     assets = [
-        {"key": item.key, "strategy": item.strategy, "model": item.model}
+        {
+            "key": item.key,
+            "strategy": item.strategy,
+            "model": item.model,
+            "donor": dict(item.donor),
+            "asset_bundle": item.asset_bundle,
+            "scope": item.scope,
+            "preserve": item.preserve,
+        }
         for item in catalog.assets if item.map_key == map_key
     ]
     route = json.loads(
