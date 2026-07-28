@@ -814,7 +814,9 @@ def append_target_to_named_entity(content, entity_name, target_name):
     raise ValueError(f"unterminated gated AP target relay: {entity_name}")
 
 
-def build_universal_physical_policy(ap_check_id, location_id, block):
+def build_universal_physical_policy(
+    ap_check_id, location_id, block, visual_model=AP_QUESTION_MARK_MODEL
+):
     """Generate an independent trigger and visual for any generic physical location.
 
     Preserves the original vanilla relay targets so that doors, gates, and other
@@ -849,7 +851,7 @@ def build_universal_physical_policy(ap_check_id, location_id, block):
             "class": "idProp2",
             "inherit": None,
             "automap_properties_decl": "default",
-            "model": "art/pickups/question_mark_a.lwo",
+            "model": visual_model,
             "thinkComponentDecl": "bob_rotate_fast",
             "position": position,
             "scale": [1.0, 1.0, 1.0],
@@ -1345,6 +1347,17 @@ def generate_map(
 
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
+    asset_specs = {
+        asset["key"]: asset for asset in level_config.get("assets", [])
+    }
+    default_visual_asset = level_config.get("default_visual_asset")
+    if default_visual_asset and default_visual_asset not in asset_specs:
+        raise ValueError(f"Unknown default_visual_asset: {default_visual_asset}")
+    default_visual_model = (
+        asset_specs[default_visual_asset]["model"]
+        if default_visual_asset
+        else AP_QUESTION_MARK_MODEL
+    )
     neutralize_pickups = level_config.get("neutralize_pickups", [])
     target_removals = level_config.get("target_removals", {})
     remove_entities = level_config.get("remove_entities", [])
@@ -1471,7 +1484,15 @@ def generate_map(
                 include_ap_feedback = feedback_policy != "vanilla_only"
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
                 if not target_policy:
-                    target_policy = build_universal_physical_policy(ap_check_id, location_id, block)
+                    target_policy = build_universal_physical_policy(
+                        ap_check_id, location_id, block, default_visual_model
+                    )
+                visual = target_policy.get("independent_visual")
+                if visual and visual.get("asset"):
+                    asset_key = visual["asset"]
+                    if asset_key not in asset_specs:
+                        raise ValueError(f"Unknown independent_visual asset: {asset_key}")
+                    visual["model"] = asset_specs[asset_key]["model"]
                 target_policy = bind_parent_from_source(target_policy, block)
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
@@ -1520,7 +1541,9 @@ def generate_map(
                             target_policy["independent_targets"].append(cleanup)
 
                     if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
-                        universal = build_universal_physical_policy(ap_check_id, location_id, block)
+                        universal = build_universal_physical_policy(
+                            ap_check_id, location_id, block, default_visual_model
+                        )
                         target_policy["independent_visual"] = universal["independent_visual"]
                         if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("completion_targets", []):
                             target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])

@@ -459,12 +459,10 @@
       "location_id": 7770141,
       "mission_key": "e1m3",
       "signal": {
-        "kind": "all_mission_challenge_records",
-        "unlockables": [
-          "mission_challenge/e1m3/challenge_1",
-          "mission_challenge/e1m3/challenge_2",
-          "mission_challenge/e1m3/challenge_3"
-        ]
+        "kind": "aggregate",
+        "children": [7770138, 7770139, 7770140],
+        "required_count": 3,
+        "authority": "server_checked_locations"
       }
     },
     {
@@ -472,12 +470,10 @@
       "location_id": 7770175,
       "mission_key": "e1m4",
       "signal": {
-        "kind": "all_mission_challenge_records",
-        "unlockables": [
-          "mission_challenge/e1m4/challenge_1",
-          "mission_challenge/e1m4/challenge_2",
-          "mission_challenge/e1m4/challenge_3"
-        ]
+        "kind": "aggregate",
+        "children": [7770172, 7770173, 7770174],
+        "required_count": 3,
+        "authority": "server_checked_locations"
       }
     },
     {
@@ -485,12 +481,10 @@
       "location_id": 7770209,
       "mission_key": "e2m1",
       "signal": {
-        "kind": "all_mission_challenge_records",
-        "unlockables": [
-          "mission_challenge/e2m1/challenge_1",
-          "mission_challenge/e2m1/challenge_2",
-          "mission_challenge/e2m1/challenge_3"
-        ]
+        "kind": "aggregate",
+        "children": [7770206, 7770207, 7770208],
+        "required_count": 3,
+        "authority": "server_checked_locations"
       }
     },
     {
@@ -498,12 +492,10 @@
       "location_id": 7770247,
       "mission_key": "e2m2",
       "signal": {
-        "kind": "all_mission_challenge_records",
-        "unlockables": [
-          "mission_challenge/e2m2/challenge_1",
-          "mission_challenge/e2m2/challenge_2",
-          "mission_challenge/e2m2/challenge_3"
-        ]
+        "kind": "aggregate",
+        "children": [7770244, 7770245, 7770246],
+        "required_count": 3,
+        "authority": "server_checked_locations"
       }
     },
     {
@@ -511,12 +503,10 @@
       "location_id": 7770288,
       "mission_key": "e2m3",
       "signal": {
-        "kind": "all_mission_challenge_records",
-        "unlockables": [
-          "mission_challenge/e2m3/challenge_1",
-          "mission_challenge/e2m3/challenge_2",
-          "mission_challenge/e2m3/challenge_3"
-        ]
+        "kind": "aggregate",
+        "children": [7770285, 7770286, 7770287],
+        "required_count": 3,
+        "authority": "server_checked_locations"
       }
     }
   ],

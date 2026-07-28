@@ -256,10 +256,18 @@ assert audit["campaign_goal"]["runtime_map"] == goal_contract["runtime_map"]
 assert audit["campaign_goal"]["destination_map"] == goal_contract["destination_map"]
 assert audit["campaign_goal"]["event_file"] == goal_contract["event_filename"]
 assert audit["campaign_goal"]["marker"] == goal_contract["marker"]
+publishers = audit["campaign_goal"]["publishers"]
+assert set(publishers) == {
+    "sentinel_prime_mission_complete",
+    "sentinel_prime_campaign_goal",
+}
 assert audit["campaign_goal"]["after_targets"] == [
-    "ap_event_7770290",
-    "ap_campaign_goal_event",
-    "e2m4_endoflevel_transition_native",
+    publishers["sentinel_prime_campaign_goal"]["relay"],
+    publishers["sentinel_prime_mission_complete"]["relay"],
+    "ap_publisher_preserved_e2m4_endoflevel_transition_native_relay",
+]
+assert audit["campaign_goal"]["preserved_native_targets"] == [
+    "e2m4_endoflevel_transition_native"
 ]
 PY
 
@@ -325,10 +333,14 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
     "$REPO_ROOT/campaign_goal_contract.py" \
     "$REPO_ROOT/challenge_registry.py" \
+    "$REPO_ROOT/content_catalog.py" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
     "$REPO_ROOT/map_registry.py" \
+    "$REPO_ROOT/observer_lifecycle.py" \
+    "$REPO_ROOT/publisher_contracts.py" \
+    "$REPO_ROOT/publisher_runtime.py" \
     "$REPO_ROOT/scripts/launch/run_bridge.sh" "$REPO_ROOT/save_decrypt.py" \
     "$REPO_ROOT/scripts/launch/start_injector_windows.bat" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
@@ -343,6 +355,8 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
     "$REPO_ROOT/data/map_sources.json" \
     "$REPO_ROOT/data/campaign_goal_contract.json" \
+    "$REPO_ROOT/data/observer_contracts.json" \
+    "$REPO_ROOT/data/publisher_contracts.json" \
     "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
@@ -426,10 +440,14 @@ manifest = {
         "client/bootstrap_actions.py",
         "client/campaign_goal_contract.py",
         "client/challenge_registry.py",
+        "client/content_catalog.py",
         "client/foundation.py",
         "client/item_classification.py",
         "client/item_reconciliation.py",
         "client/map_registry.py",
+        "client/observer_lifecycle.py",
+        "client/publisher_contracts.py",
+        "client/publisher_runtime.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/run_bridge.sh",
@@ -445,6 +463,8 @@ manifest = {
         "client/data/runtime_locations.json",
         "client/data/map_sources.json",
         "client/data/campaign_goal_contract.json",
+        "client/data/observer_contracts.json",
+        "client/data/publisher_contracts.json",
         *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
@@ -559,6 +579,11 @@ PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{p
 FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print $1}')"
 [[ "$PACKAGED_CLIENT_SHA256" == "$FRESH_CLIENT_SHA256" ]] || { echo "Packaged ap_client.exe is not the fresh build" >&2; exit 1; }
 
+python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
+    --asset-root "$REPO_ROOT/packaging/mod_assets" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --source-map-root "$REPO_ROOT/vanillamaps"
+
 (
     cd "$OUTPUT_DIR/mod"
     zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" .
@@ -603,6 +628,11 @@ PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
 unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip" -d "$MOD_AUDIT_DIR"
+python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
+    --asset-root "$REPO_ROOT/packaging/mod_assets" \
+    --mod-root "$MOD_AUDIT_DIR" \
+    --source-map-root "$REPO_ROOT/vanillamaps" \
+    --zip "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \

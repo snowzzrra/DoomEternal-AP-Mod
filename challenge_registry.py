@@ -1,4 +1,4 @@
-"""Canonical registry for native mission and Weapon Mastery locations."""
+"""Compatibility facade for the JSON-authored runtime challenge registry."""
 
 from __future__ import annotations
 
@@ -6,296 +6,162 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from content_catalog import RUNTIME_STRATEGIES
+
+
 ROOT = Path(__file__).resolve().parent
 REGISTRY_PATH = ROOT / "data" / "challenge_location_registry.json"
-NATIVE_MASTERY_MANAGER = "UnlockableManager_0_1_2/idUnlockableManager_2"
-BASE_MASTERY_LOCATION_IDS = frozenset(range(7770125, 7770138))
-E1M3_CHALLENGE_LOCATION_IDS = frozenset(range(7770138, 7770141))
-E1M4_CHALLENGE_LOCATION_IDS = frozenset(range(7770172, 7770175))
-E2M1_CHALLENGE_LOCATION_IDS = frozenset(range(7770206, 7770209))
-E2M2_CHALLENGE_LOCATION_IDS = frozenset(range(7770244, 7770247))
-E2M3_CHALLENGE_LOCATION_IDS = frozenset(range(7770285, 7770288))
-MISSION_CHALLENGE_LOCATION_IDS = (
-    E1M3_CHALLENGE_LOCATION_IDS
-    | E1M4_CHALLENGE_LOCATION_IDS
-    | E2M1_CHALLENGE_LOCATION_IDS
-    | E2M2_CHALLENGE_LOCATION_IDS
-    | E2M3_CHALLENGE_LOCATION_IDS
-)
-ALL_MISSION_CHALLENGES_LOCATION_IDS = frozenset({
-    7770141, 7770175, 7770209, 7770247, 7770288,
-})
 
 
 def canonical_map_name(name: str | None) -> str | None:
     if not name:
         return name
     normalized = str(name).strip().replace("\\", "/").rstrip("/")
-    if normalized in {"game/hub/hub", "game/sp/hub/hub"}:
-        return "game/hub/hub"
-    return normalized
+    return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
 
 
 def load_challenge_registry(path: Path = REGISTRY_PATH) -> dict:
     registry = json.loads(path.read_text(encoding="utf-8"))
     for entry in registry.get("mission_complete", []):
         signal = entry.get("signal", {})
-        if signal.get("kind") == "native_transition":
-            signal["from"] = canonical_map_name(signal.get("from"))
-            signal["to"] = canonical_map_name(signal.get("to"))
-        elif signal.get("kind") == "map_terminal":
-            signal["runtime_map"] = canonical_map_name(signal.get("runtime_map"))
+        for field in ("from", "to", "runtime_map"):
+            if field in signal:
+                signal[field] = canonical_map_name(signal[field])
     validate_challenge_registry(registry)
     return registry
 
 
 def all_location_entries(registry: dict) -> list[dict]:
-    entries = [
-        *registry["mission_complete"],
+    return [
+        *registry.get("mission_complete", []),
         *registry.get("weapon_masteries", []),
         *registry.get("mission_challenges", []),
+        *registry.get("all_mission_challenges", []),
     ]
-    for aggregate in registry.get("all_mission_challenges", []):
-        entries.append(aggregate)
-    return entries
 
 
 def mastery_entry_by_unlockable(registry: dict) -> dict[str, dict]:
-    return {
-        entry["signal"]["unlockable"]: entry
-        for entry in registry["weapon_masteries"]
-    }
+    return {entry["signal"]["unlockable"]: entry for entry in registry.get("weapon_masteries", [])}
 
 
 def mission_challenge_entry_by_unlockable(registry: dict) -> dict[str, dict]:
-    return {
-        entry["signal"]["unlockable"]: entry
-        for entry in registry["mission_challenges"]
-    }
+    return {entry["signal"]["unlockable"]: entry for entry in registry.get("mission_challenges", [])}
 
 
 def all_mission_challenge_entries(registry: dict) -> list[dict]:
-    """Return all aggregate entries keyed by the unlockable paths they cover."""
     return list(registry.get("all_mission_challenges", []))
 
 
+def aggregate_ready(signal: dict, checked_locations: set[int]) -> bool:
+    if signal.get("authority") != "server_checked_locations":
+        raise ValueError("aggregate authority must be server_checked_locations")
+    children = set(signal.get("children", []))
+    required_count = signal.get("required_count")
+    if not children or not isinstance(required_count, int):
+        raise ValueError("aggregate requires children and required_count")
+    return len(children & set(checked_locations)) >= required_count
+
+
+def _mission_key(entry: dict) -> str | None:
+    if entry.get("mission_key"):
+        return entry["mission_key"]
+    unlockable = entry.get("signal", {}).get("unlockable", "")
+    pieces = unlockable.split("/")
+    return pieces[1] if len(pieces) > 2 and pieces[0] == "mission_challenge" else None
+
+
 def validate_challenge_registry(registry: dict) -> None:
-    if registry.get("schema_version") != 10:
-        raise ValueError("runtime registry schema_version must be 10")
+    """Validate generic registry invariants; mission count is deliberately data-driven."""
     entries = all_location_entries(registry)
-    expected_count = (
-        8   # mission_complete
-        + 13  # weapon_masteries
-        + 15  # mission_challenges (five missions, three each)
-        + 5   # all_mission_challenges (one aggregate per mission)
-    )
-    if len(entries) != expected_count:
-        raise ValueError(
-            f"expected {expected_count} location entries, got {len(entries)}"
-        )
+    if not entries:
+        raise ValueError("runtime registry has no locations")
     names = [entry.get("name") for entry in entries]
     ids = [entry.get("location_id") for entry in entries]
-    if None in names or len(names) != len(set(names)):
+    if any(not isinstance(name, str) or not name.strip() for name in names) or len(names) != len(set(names)):
         raise ValueError("runtime location names must be unique")
-    if None in ids or len(ids) != len(set(ids)):
-        raise ValueError("runtime location IDs must be unique")
-    if set(ids) != {
-        7770122, 7770123, 7770124, 7770162, 7770210, 7770248, 7770289,
-        7770290,
-        *BASE_MASTERY_LOCATION_IDS,
-        *MISSION_CHALLENGE_LOCATION_IDS,
-        *ALL_MISSION_CHALLENGES_LOCATION_IDS,
-    }:
-        raise ValueError("runtime IDs must use the reserved mission/Mastery range")
-
-    for entry in registry["mission_complete"]:
-        signal = entry.get("signal", {})
-        if entry["location_id"] in {7770122, 7770123, 7770162, 7770290}:
-            expected_fields = (
-                {"kind", "runtime_map", "owner"}
-                if entry["location_id"] == 7770290
-                else {"kind", "runtime_map"}
-            )
-            if set(signal) != expected_fields or signal["kind"] != "map_terminal":
-                raise ValueError(f"{entry['name']}: invalid map terminal signal")
-            if signal["runtime_map"] not in {
-                "game/sp/e1m1_intro/e1m1_intro",
-                "game/sp/e1m2_battle/e1m2_battle",
-                "game/sp/e1m4_boss/e1m4_boss",
-                "game/sp/e2m4_boss/e2m4_boss",
-            }:
-                raise ValueError(f"{entry['name']}: invalid runtime map identity")
-            if entry["location_id"] == 7770290 and signal["owner"] != (
-                "e2m4_endoflevel_transition"
-            ):
-                raise ValueError(f"{entry['name']}: invalid direct publisher owner")
-            continue
-        if signal.get("kind") != "native_transition" or not signal.get("from") or not signal.get("to"):
-            raise ValueError(f"{entry['name']}: invalid native transition signal")
-        if signal["to"] == "game/sp/hub/hub":
-            raise ValueError(f"{entry['name']}: noncanonical Hub alias")
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in ids) or len(ids) != len(set(ids)):
+        raise ValueError("runtime location IDs must be unique integers")
 
     mission_challenges = registry.get("mission_challenges", [])
-    if len(mission_challenges) != 15:
-        raise ValueError("expected exactly fifteen Mission Challenges")
-    challenge_paths = set()
-    completion_stats = set()
-    mission_groups = (
-        ("e1m3", "E1M3", tuple(range(7770138, 7770141))),
-        ("e1m4", "E1M4", tuple(range(7770172, 7770175))),
-        ("e2m1", "E2M1", tuple(range(7770206, 7770209))),
-        ("e2m2", "E2M2", tuple(range(7770244, 7770247))),
-        ("e2m3", "E2M3", tuple(range(7770285, 7770288))),
-    )
-
-    for index, entry in enumerate(mission_challenges):
-        group_index, challenge_index = divmod(index, 3)
-        mission_prefix, completion_prefix, expected_ids = mission_groups[group_index]
-        if entry["location_id"] != expected_ids[challenge_index]:
-            raise ValueError(
-                f"{entry['name']}: {completion_prefix} Mission Challenge ID order drift"
-            )
-
+    challenge_by_unlockable: dict[str, dict] = {}
+    challenge_missions: dict[str, str] = {}
+    completion_stats: set[str] = set()
+    for entry in mission_challenges:
         signal = entry.get("signal", {})
-        if signal.get("kind") not in ("unlockable_record", "physical_event_equivalent"):
-            raise ValueError(f"{entry.get('name')}: incomplete native challenge signal")
-        if signal["kind"] == "physical_event_equivalent":
-            phys_ids = signal.get("physical_location_ids")
-            if not phys_ids or not isinstance(phys_ids, list):
-                raise ValueError(f"{entry.get('name')}: physical_event_equivalent missing physical_location_ids")
-            if not all(isinstance(pid, int) for pid in phys_ids):
-                raise ValueError(f"{entry.get('name')}: physical_location_ids must contain only ints")
-            if len(phys_ids) != len(set(phys_ids)):
-                raise ValueError(f"{entry.get('name')}: physical_location_ids must be unique")
-            req_count = signal.get("required_count", 1)
-            if not isinstance(req_count, int) or isinstance(req_count, bool):
-                raise ValueError(f"{entry.get('name')}: required_count must be an int, not bool")
-            if req_count < 1 or req_count > len(phys_ids):
-                raise ValueError(f"{entry.get('name')}: required_count must be 1..{len(phys_ids)}")
-        if signal["manager"] != NATIVE_MASTERY_MANAGER:
-            raise ValueError(f"{entry['name']}: unexpected native unlockable manager")
-        challenge_num = challenge_index + 1
-        expected_path = f"mission_challenge/{mission_prefix}/challenge_{challenge_num}"
-        if signal["unlockable"] != expected_path or signal["unlockable"] in challenge_paths:
-            raise ValueError(f"{entry['name']}: unexpected or duplicate challenge path")
-        challenge_paths.add(signal["unlockable"])
-        if signal["numUnlockableRules"] != 1 or signal["rule_0_statDuration"] not in (1, 2, 5):
-            raise ValueError(f"{entry['name']}: unexpected native challenge rule shape")
-        if mission_prefix == "e2m3" and (
-            not isinstance(signal.get("rule_0_statCount"), int)
-            or isinstance(signal.get("rule_0_statCount"), bool)
-            or signal["rule_0_statCount"] <= 0
-        ):
-            raise ValueError(f"{entry['name']}: Mars Core challenge count is not exact")
-        if signal["rule_0_satisfied"] is not True or signal["unlockableIsUnlocked"] is not True:
-            raise ValueError(f"{entry['name']}: durable completion fields must be true")
+        kind = signal.get("kind")
+        if kind not in {"unlockable_record", "physical_event_equivalent"}:
+            raise ValueError(f"{entry['name']}: unknown challenge strategy")
+        unlockable = signal.get("unlockable")
+        mission_key = _mission_key(entry)
+        if not isinstance(unlockable, str) or not unlockable or not mission_key or unlockable in challenge_by_unlockable:
+            raise ValueError(f"{entry['name']}: invalid or duplicate challenge unlockable")
+        challenge_by_unlockable[unlockable] = entry
+        challenge_missions[unlockable] = mission_key
+        sources = signal.get("physical_location_ids", [])
+        if kind == "physical_event_equivalent":
+            if not isinstance(sources, list) or not sources or any(not isinstance(item, int) or isinstance(item, bool) for item in sources) or len(sources) != len(set(sources)):
+                raise ValueError(f"{entry['name']}: invalid physical_location_ids")
+            required = signal.get("required_count", 1)
+            if not isinstance(required, int) or isinstance(required, bool) or not 1 <= required <= len(sources):
+                raise ValueError(f"{entry['name']}: invalid required_count")
+        completion = entry.get("completion_owner", {})
+        stat = completion.get("completion_stat")
+        if not isinstance(stat, str) or not stat or stat in completion_stats:
+            raise ValueError(f"{entry['name']}: invalid or duplicate completion stat")
+        completion_stats.add(stat)
 
-        completion_owner = entry.get("completion_owner", {})
-        if completion_owner.get("path") != f"unlockable/{expected_path}.decl":
-            raise ValueError(f"{entry['name']}: invalid completion owner path")
-        completion_stat = completion_owner.get("completion_stat")
-        expected_stat = f"STAT_COMPLETED_{completion_prefix}_CHALLENGE_{challenge_num}"
-        if completion_stat != expected_stat:
-            raise ValueError(f"{entry['name']}: invalid completion stat owner: {completion_stat}")
-        if completion_stat in completion_stats:
-            raise ValueError(f"{entry['name']}: duplicate completion stat")
-        completion_stats.add(completion_stat)
-        if len(str(completion_owner.get("sha256", ""))) != 64:
-            raise ValueError(f"{entry['name']}: completion owner is not hash locked")
-
-        reward_owner = entry.get("reward_owner", {})
-        if reward_owner != {
-            "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-            "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-            "currency": "CURRENCY_PRAETOR_UPGRADE",
-        }:
-            raise ValueError(f"{entry['name']}: invalid inherited Suit Point owner")
-
-    aggregates = registry.get("all_mission_challenges", [])
-    if len(aggregates) != 5:
-        raise ValueError("expected exactly five All Mission Challenges aggregates")
-    expected_mission_keys = {"e1m3", "e1m4", "e2m1", "e2m2", "e2m3"}
-    mission_keys = [aggregate.get("mission_key") for aggregate in aggregates]
-    if any(not isinstance(key, str) or not key.strip() for key in mission_keys):
-        raise ValueError("all Mission Challenges aggregates require non-empty mission_key")
-    duplicate_mission_keys = [
-        key for key, count in Counter(mission_keys).items() if count > 1
-    ]
-    if duplicate_mission_keys:
-        raise ValueError(f"duplicate mission_key: {sorted(duplicate_mission_keys)}")
-    if set(mission_keys) != expected_mission_keys:
-        raise ValueError("all Mission Challenges mission coverage drift")
-
-    challenge_missions = {
-        entry["signal"]["unlockable"]: entry["signal"]["unlockable"].split("/")[1]
-        for entry in mission_challenges
-    }
-    aggregate_unlockables: list[str] = []
-    for aggregate in aggregates:
-        mission_key = aggregate["mission_key"]
-        if aggregate.get("challenges") is not None:
-            raise ValueError(f"{aggregate['name']}: deprecated challenges field must be removed")
-        unlockables = aggregate.get("signal", {}).get("unlockables", [])
-        if not isinstance(unlockables, list) or len(unlockables) != 3:
-            raise ValueError(f"{aggregate['name']}: expected exactly 3 unlockable paths")
-        location_id = aggregate["location_id"]
-        if location_id not in ALL_MISSION_CHALLENGES_LOCATION_IDS:
-            raise ValueError(f"{aggregate['name']}: unexpected aggregate location ID")
-        if aggregate["signal"]["kind"] != "all_mission_challenge_records":
-            raise ValueError(f"{aggregate['name']}: unexpected aggregate signal kind")
-        for unlockable in unlockables:
-            if unlockable not in challenge_missions:
-                raise ValueError(f"{aggregate['name']}: unknown unlockable path: {unlockable}")
-            if challenge_missions[unlockable] != mission_key:
-                raise ValueError(f"{aggregate['name']}: unlockable belongs to another mission_key")
-        aggregate_unlockables.extend(unlockables)
-
-    unlockable_counts = Counter(aggregate_unlockables)
-    duplicates = [path for path, count in unlockable_counts.items() if count > 1]
-    if duplicates:
-        raise ValueError(f"aggregate unlockables are duplicated: {sorted(duplicates)}")
-    if set(aggregate_unlockables) != set(challenge_missions):
-        raise ValueError("aggregate unlockables must cover every Mission Challenge exactly once")
-
-    masteries = registry.get("weapon_masteries", [])
-    if len(masteries) != 13:
-        raise ValueError("expected exactly thirteen proven base Weapon Masteries")
-    unlockables = set()
-    item_ids = set()
-    perks = set()
-    for entry in masteries:
+    aggregate_children: list[int] = []
+    aggregate_missions: list[str] = []
+    aggregate_entries = registry.get("all_mission_challenges", [])
+    declared_missions = [_mission_key(entry) for entry in aggregate_entries]
+    if any(not mission_key for mission_key in declared_missions) or len(declared_missions) != len(set(declared_missions)):
+        raise ValueError("duplicate mission_key")
+    for entry in aggregate_entries:
         signal = entry.get("signal", {})
-        required = {
-            "kind", "manager", "unlockable", "numUnlockableRules",
-            "rule_0_statname", "rule_0_statCount", "rule_0_statDuration",
-            "rule_0_satisfied", "unlockableIsUnlocked",
+        mission_key = _mission_key(entry)
+        children = signal.get("children")
+        if signal.get("kind") not in {"aggregate", "all_mission_challenge_records"} or not mission_key:
+            raise ValueError(f"{entry['name']}: invalid aggregate strategy")
+        if not isinstance(children, list) or not children or len(children) != len(set(children)):
+            raise ValueError(f"{entry['name']}: aggregate requires unique children")
+        challenge_ids_for_mission = {
+            child["location_id"]
+            for child in registry.get("mission_challenges", [])
+            if _mission_key(child) == mission_key
         }
-        if set(signal) != required or signal["kind"] != "unlockable_record":
-            raise ValueError(f"{entry.get('name')}: incomplete native mastery signal")
-        if signal["manager"] != NATIVE_MASTERY_MANAGER:
-            raise ValueError(f"{entry['name']}: unexpected native unlockable manager")
-        if signal["numUnlockableRules"] != 1 or signal["rule_0_statCount"] <= 0:
-            raise ValueError(f"{entry['name']}: unsupported native mastery rule shape")
-        if signal["rule_0_statDuration"] != 4:
-            raise ValueError(f"{entry['name']}: expected DUR_CUSTOM save enum 4")
-        if signal["rule_0_satisfied"] is not True or signal["unlockableIsUnlocked"] is not True:
-            raise ValueError(f"{entry['name']}: completion fields must be true")
-        if not signal["unlockable"].startswith("weapon_mastery/"):
-            raise ValueError(f"{entry['name']}: not a base-game mastery path")
-        if signal["unlockable"] in unlockables:
-            raise ValueError(f"duplicate native mastery path: {signal['unlockable']}")
-        unlockables.add(signal["unlockable"])
-        if not isinstance(entry.get("item_id"), int) or entry["item_id"] in item_ids:
-            raise ValueError(f"{entry['name']}: invalid or duplicate AP Mastery item ID")
-        item_ids.add(entry["item_id"])
-        perk = entry.get("gameplay_perk")
-        if not entry.get("typed_perk_delivery_valid") or not isinstance(perk, str) or perk in perks:
-            raise ValueError(f"{entry['name']}: unsupported typed perk delivery")
-        perks.add(perk)
-        decls = entry.get("decls", {})
-        for kind, prefix in (("unlockable", "unlockable/weapon_mastery/"), ("perk", "perks/perk/player/weapons/")):
-            locked = decls.get(kind, {})
-            if not isinstance(locked.get("path"), str) or not locked["path"].startswith(prefix):
-                raise ValueError(f"{entry['name']}: invalid {kind} override path")
-            if len(str(locked.get("sha256", ""))) != 64:
-                raise ValueError(f"{entry['name']}: {kind} source is not hash locked")
+        if set(children) != challenge_ids_for_mission:
+            raise ValueError(f"{entry['name']}: aggregate children must match the mission AP locations")
+        if signal.get("required_count") != len(children):
+            raise ValueError(f"{entry['name']}: aggregate required_count drift")
+        if signal.get("authority") != "server_checked_locations":
+            raise ValueError(f"{entry['name']}: aggregate authority must be server_checked_locations")
+        for child in children:
+            if child not in {item["location_id"] for item in registry.get("mission_challenges", [])}:
+                raise ValueError(f"{entry['name']}: aggregate child is missing or from another mission")
+        aggregate_missions.append(mission_key)
+        aggregate_children.extend(children)
+    if len(aggregate_children) != len(set(aggregate_children)):
+        raise ValueError("aggregate children are duplicated")
+    if set(aggregate_children) != {
+        entry["location_id"] for entry in registry.get("mission_challenges", [])
+    }:
+        raise ValueError("aggregates must cover every mission challenge exactly once")
+
+    for entry in registry.get("mission_complete", []):
+        signal = entry.get("signal", {})
+        if signal.get("kind") not in {"native_transition", "map_terminal"}:
+            raise ValueError(f"{entry['name']}: unknown Mission Complete strategy")
+        if signal["kind"] == "native_transition" and (not signal.get("from") or not signal.get("to")):
+            raise ValueError(f"{entry['name']}: native transition lacks endpoints")
+        if signal["kind"] == "map_terminal" and not signal.get("runtime_map"):
+            raise ValueError(f"{entry['name']}: terminal lacks runtime map")
+
+    for entry in registry.get("weapon_masteries", []):
+        signal = entry.get("signal", {})
+        if signal.get("kind") != "unlockable_record" or not isinstance(entry.get("item_id"), int):
+            raise ValueError(f"{entry['name']}: invalid mastery record")
+        if not signal.get("unlockable") or not signal.get("manager"):
+            raise ValueError(f"{entry['name']}: incomplete mastery signal")
+    strategies = {entry.get("signal", {}).get("kind") for entry in entries}
+    if not strategies <= RUNTIME_STRATEGIES:
+        raise ValueError(f"unknown runtime strategies: {sorted(strategies - RUNTIME_STRATEGIES)}")

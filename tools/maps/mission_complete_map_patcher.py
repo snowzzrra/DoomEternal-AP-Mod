@@ -10,6 +10,11 @@ import re
 from pathlib import Path
 
 from campaign_goal_contract import load_campaign_goal_contract
+from publisher_contracts import (
+    PublisherContract,
+    load_publisher_contracts,
+    map_publishers_for_owner,
+)
 from tools.maps.ap_map_generator import (
     extract_target_names,
     find_entity_block_bounds,
@@ -171,20 +176,36 @@ def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -
     path.write_text(text.rstrip() + "\n" + addition, encoding="utf-8", newline="")
 
 
-CAMPAIGN_GOAL_TARGET = "ap_campaign_goal_event"
-
-
-def _generate_sentinel_location_event(location_id: int) -> str:
-    """Render Sentinel Prime's terminal publisher without an empty conDump arg.
-
-    This terminal is the final map-side owner.  Keep its location publisher
-    separate from the campaign-goal publisher below, and quote the filename so
-    the console receives one concrete argument even when the command is
-    dispatched from the terminal transition graph.
-    """
-    event_name = f"ap_event_{location_id}"
+def _render_relay(name: str, targets: list[str], delay: float) -> str:
+    items = "\n".join(
+        f'\t\t\t\titem[{index}] = "{target}";'
+        for index, target in enumerate(targets)
+    )
     return f'''entity {{
-\tentityDef {event_name} {{
+\tentityDef {name} {{
+\t\tinherit = "target/relay";
+\t\tclass = "idTarget_Count";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tcount = 1;
+\t\t\ttargets = {{
+\t\t\t\tnum = {len(targets)};
+{items}
+\t\t\t}}
+\t\t\tdelay = {delay:.2f};
+\t\t}}
+\t}}
+}}
+'''
+
+
+def _render_command(name: str, command: str) -> str:
+    return f'''entity {{
+\tentityDef {name} {{
 \t\tclass = "idTarget_Command";
 \t\texpandInheritance = false;
 \t\tpoolCount = 0;
@@ -192,15 +213,75 @@ def _generate_sentinel_location_event(location_id: int) -> str:
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tcommandText = "echo AP_CHECK_EVENT_{location_id}; condump \\"{event_name}.txt\\"";
+\t\t\tcommandText = "{command}";
 \t\t}}
 \t}}
 }}
 '''
 
 
+def compile_publishers(publishers: tuple[PublisherContract, ...]) -> dict:
+    """Compile deterministic, isolated marker/dump pipelines for one owner."""
+    if not publishers:
+        raise ValueError("terminal owner requires at least one publisher")
+    ordered = tuple(sorted(publishers, key=lambda publisher: publisher.key))
+    owner_targets: list[str] = []
+    entities: list[str] = []
+    audit: dict[str, dict] = {}
+    native_targets: list[str] = []
+    seen_entity_names: set[str] = set()
+    for index, publisher in enumerate(ordered):
+        triggers = publisher.triggers_for("map_event_file")
+        if len(triggers) != 1:
+            raise ValueError(f"{publisher.key}: compiler requires one map_event_file trigger")
+        trigger = triggers[0]
+        prefix = f"ap_publisher_{publisher.key}"
+        relay = f"{prefix}_relay"
+        marker = f"{prefix}_marker"
+        dump_delay = f"{prefix}_dump_delay"
+        dump = f"{prefix}_dump"
+        names = {relay, marker, dump_delay, dump}
+        if seen_entity_names & names:
+            raise ValueError(f"{publisher.key}: generated publisher entity collision")
+        seen_entity_names.update(names)
+        owner_targets.append(relay)
+        offset = index * 0.35
+        entities.extend([
+            _render_relay(relay, [marker, dump_delay], offset),
+            _render_command(marker, f"echo {trigger['marker']}"),
+            _render_relay(dump_delay, [dump], 0.10),
+            _render_command(dump, f"condump {trigger['filename']}"),
+        ])
+        audit[publisher.key] = {
+            "relay": relay,
+            "marker_entity": marker,
+            "dump_relay": dump_delay,
+            "dump_entity": dump,
+            "filename": trigger["filename"],
+            "marker": trigger["marker"],
+            "offset": offset,
+        }
+        for effect in publisher.effects:
+            if effect["strategy"] == "preserved_native_target":
+                native_targets.append(effect["target"])
+    for native_target in dict.fromkeys(native_targets):
+        native_relay = f"ap_publisher_preserved_{native_target}_relay"
+        owner_targets.append(native_relay)
+        entities.append(_render_relay(native_relay, [native_target], len(ordered) * 0.35 + 0.25))
+    return {
+        "owner_targets": owner_targets,
+        "entities": "".join(entities),
+        "publishers": audit,
+        "preserved_native_targets": list(dict.fromkeys(native_targets)),
+    }
+
+
 def _patch_sentinel_prime_end(
-    mission: dict, goal: dict, root: Path, generated_map: Path,
+    mission: dict,
+    goal: dict,
+    publishers: tuple[PublisherContract, ...],
+    root: Path,
+    generated_map: Path,
 ) -> dict:
     source = (root / mission["source_path"]).read_text(encoding="utf-8")
     source_bounds = find_entity_block_bounds(source, mission["owner"])
@@ -232,34 +313,18 @@ def _patch_sentinel_prime_end(
     relay_bounds = find_entity_block_bounds(relay, mission["owner"])
     if relay_bounds is None:
         raise ValueError("could not build Sentinel Prime terminal relay")
+    compiled = compile_publishers(
+        map_publishers_for_owner(publishers, mission["map_key"], mission["owner"])
+    )
+    if compiled["preserved_native_targets"] != [mission["native_owner"]]:
+        raise ValueError("Sentinel Prime preserved native target contract drift")
     relay_block = replace_targets_block(
         relay[relay_bounds[0]:relay_bounds[1]],
-        [
-            f"ap_event_{mission['location_id']}",
-            goal["event_target"],
-            mission["native_owner"],
-        ],
+        compiled["owner_targets"],
     )
-    event = f'''entity {{
-\tentityDef {CAMPAIGN_GOAL_TARGET} {{
-\t\tclass = "idTarget_Command";
-\t\texpandInheritance = false;
-\t\tpoolCount = 0;
-\t\tpoolGranularity = 2;
-\t\tnetworkReplicated = false;
-\t\tdisableAIPooling = false;
-\t\tedit = {{
-\t\t\tcommandText = "echo {goal["marker"]}; condump {goal["event_filename"]}";
-\t\t}}
-\t}}
-}}
-'''
     result = text[:bounds[0]] + relay_block + native + text[bounds[1]:]
-    if result.count(f"entityDef {CAMPAIGN_GOAL_TARGET}"):
-        raise ValueError("campaign goal generated target already exists")
-    location_event = _generate_sentinel_location_event(mission["location_id"])
     generated_map.write_text(
-        result.rstrip() + "\n" + location_event + event,
+        result.rstrip() + "\n" + compiled["entities"],
         encoding="utf-8",
         newline="",
     )
@@ -271,15 +336,13 @@ def _patch_sentinel_prime_end(
         "runtime_map": goal["runtime_map"],
         "destination_map": goal["destination_map"],
         "before_targets": [],
-        "after_targets": [
-            f"ap_event_{mission['location_id']}",
-            CAMPAIGN_GOAL_TARGET,
-            mission["native_owner"],
-        ],
+        "after_targets": compiled["owner_targets"],
         "location_id": mission["location_id"],
-        "location_event_target": f"ap_event_{mission['location_id']}",
+        "location_event_target": compiled["publishers"]["sentinel_prime_mission_complete"]["relay"],
         "event_file": goal["event_filename"],
         "marker": goal["marker"],
+        "publishers": compiled["publishers"],
+        "preserved_native_targets": compiled["preserved_native_targets"],
         "changed_lists": 1,
     }
 
@@ -308,61 +371,43 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     if contracts.get("schema_version") != 1:
         raise ValueError("unsupported Mission Complete map contract schema")
     root = contract_path.parent.parent
-    hell_contract = contracts["hell_on_earth"]
-    exultia_contract = contracts["exultia"]
-    doom_hunter_contract = contracts["doom_hunter_base"]
-    arc_complex_contract = contracts.get("arc_complex")
-    sentinel_contract = contracts["sentinel_prime"]
     campaign_goal_contract = load_campaign_goal_contract(root / "data" / "campaign_goal_contract.json")
-    goal_map_key = sentinel_contract["map_key"]
-    required_keys = {
-        hell_contract["map_key"], exultia_contract["map_key"],
-        doom_hunter_contract["map_key"],
+    publisher_contracts = load_publisher_contracts(root / "data" / "publisher_contracts.json")
+    contract_items = {
+        name: value for name, value in contracts.items()
+        if isinstance(value, dict) and "map_key" in value
     }
-    if arc_complex_contract:
-        required_keys.add(arc_complex_contract["map_key"])
-    required_keys.add(goal_map_key)
+    required_keys = {contract["map_key"] for contract in contract_items.values()}
     if set(generated_maps) < required_keys:
         raise ValueError("Mission Complete generated map input is incomplete")
     before_maps = {key: path.read_text(encoding="utf-8") for key, path in generated_maps.items()}
-    hell = _patch_hell(hell_contract, root, mod_root)
-    exultia = _patch_exultia(exultia_contract, root, generated_maps[exultia_contract["map_key"]])
-    doom_hunter = _patch_exultia(
-        doom_hunter_contract, root,
-        generated_maps[doom_hunter_contract["map_key"]],
-    )
-    arc_complex = None
-    if arc_complex_contract and arc_complex_contract["map_key"] in generated_maps:
-        arc_complex = _patch_exultia(
-            arc_complex_contract, root,
-            generated_maps[arc_complex_contract["map_key"]],
-        )
-    campaign_goal = _patch_sentinel_prime_end(
-        sentinel_contract, campaign_goal_contract, root,
-        generated_maps[goal_map_key],
-    )
-    _append_standard_event_target(
-        generated_maps[hell_contract["map_key"]], hell_contract["ap_check"], hell_contract["location_id"]
-    )
-    _append_standard_event_target(
-        generated_maps[exultia_contract["map_key"]], exultia_contract["ap_check"], exultia_contract["location_id"]
-    )
-    _append_standard_event_target(
-        generated_maps[doom_hunter_contract["map_key"]],
-        doom_hunter_contract["ap_check"], doom_hunter_contract["location_id"],
-    )
-    if arc_complex_contract and arc_complex_contract["map_key"] in generated_maps:
+    audits: dict[str, dict] = {}
+    terminal_audit: dict | None = None
+    for name, contract in contract_items.items():
+        strategy = contract.get("patch_strategy")
+        if strategy == "logic_node_targets":
+            audit = _patch_hell(contract, root, mod_root)
+        elif strategy == "entity_targets":
+            audit = _patch_exultia(contract, root, generated_maps[contract["map_key"]])
+        elif strategy == "terminal_publishers":
+            audit = _patch_sentinel_prime_end(
+                contract,
+                campaign_goal_contract,
+                publisher_contracts,
+                root,
+                generated_maps[contract["map_key"]],
+            )
+            terminal_audit = audit
+        else:
+            raise ValueError(f"{name}: unknown Mission Complete patch strategy {strategy!r}")
+        audits[name] = audit
+    for name, contract in contract_items.items():
+        if contract["patch_strategy"] == "terminal_publishers":
+            continue
         _append_standard_event_target(
-            generated_maps[arc_complex_contract["map_key"]],
-            arc_complex_contract["ap_check"], arc_complex_contract["location_id"],
+            generated_maps[contract["map_key"]], contract["ap_check"], contract["location_id"]
         )
-    contract_list = [
-        (hell_contract, hell), (exultia_contract, exultia),
-        (doom_hunter_contract, doom_hunter),
-    ]
-    if arc_complex_contract and arc_complex:
-        contract_list.append((arc_complex_contract, arc_complex))
-    for contract, audit in contract_list:
+        audit = audits[name]
         text = generated_maps[contract["map_key"]].read_text(encoding="utf-8")
         expected_ap_target_references = 2 if "owner" in contract else 1
         if text.count(contract["ap_check"]) != expected_ap_target_references:
@@ -371,12 +416,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{contract['map_key']}: standard AP event count drift")
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
-    unrelated_owners = {
-        exultia_contract["owner"],
-        doom_hunter_contract["owner"],
-    }
-    if arc_complex_contract:
-        unrelated_owners.add(arc_complex_contract["owner"])
+    unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
     unrelated_owners.add(campaign_goal_contract["owner"])
     unrelated = sum(
         _unrelated_entity_diff_count(
@@ -385,15 +425,10 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         )
         for key, path in generated_maps.items()
     )
-    res = {
-        "hell_on_earth": hell,
-        "exultia": exultia,
-        "doom_hunter_base": doom_hunter,
-        "campaign_goal": campaign_goal,
-        "unrelated_generated_entity_diff_count": unrelated,
-    }
-    if arc_complex:
-        res["arc_complex"] = arc_complex
+    res = dict(audits)
+    if terminal_audit is not None:
+        res["campaign_goal"] = terminal_audit
+    res["unrelated_generated_entity_diff_count"] = unrelated
     return res
 
 

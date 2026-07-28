@@ -1,5 +1,11 @@
 {
     "map_key": "hub",
+    "region": "Fortress of Doom - Second Visit",
+    "region_overrides": {
+        "7770073": "Fortress of Doom - First Visit",
+        "7770086": "Fortress of Doom - First Visit",
+        "7770170": "Fortress of Doom - Third Visit"
+    },
     "entities": {
         "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
         "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,

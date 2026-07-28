@@ -1219,13 +1219,9 @@ private:
             "[Mission] MISSION_TRANSITION_TARGET slot=" + activeSlotDirectory_
             + " map=" + canonicalTo
         );
-        // Hell on Earth and Exultia own their checks in their final map-side
-        // transactions. This publisher remains for the frozen Cultist route.
-        if (!(canonicalFrom == "game/sp/e1m3_cult/e1m3_cult"
-                && canonicalTo == "game/sp/e1m4_boss/e1m4_boss")) {
-            LogDebug("[Mission] TRANSITION_EVENT_SKIPPED reason=map_side_owner");
-            return;
-        }
+        // Emit every observed load edge. The Python publisher registry decides
+        // whether the edge is authoritative for zero, one, or many publishers;
+        // a map-side trigger must never disable a native fallback here.
         ++sequence_;
         SYSTEMTIME now = {};
         GetSystemTime(&now);

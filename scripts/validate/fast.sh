@@ -26,7 +26,7 @@ echo "=== validate_fast: hermetic validation ==="
 # ----- 1. Shell syntax -----
 echo "--- Shell syntax ---"
 bash -n scripts/build/client.sh scripts/build/playable_test.sh scripts/validate/all.sh scripts/validate/fast.sh \
-    scripts/validate/runtime_install.sh && pass || fail "shell syntax"
+    scripts/validate/apworld_python.sh scripts/validate/runtime_install.sh && pass || fail "shell syntax"
 
 # ----- 2. Python compilation -----
 echo "--- Python py_compile ---"
@@ -35,10 +35,14 @@ python3 -m py_compile \
     bootstrap_actions.py \
     bridge_client.py \
     challenge_registry.py \
+    content_catalog.py \
     foundation.py \
     item_classification.py \
     tools/maps/hub_diff_guard.py \
     item_reconciliation.py \
+    observer_lifecycle.py \
+    publisher_contracts.py \
+    publisher_runtime.py \
     map_registry.py \
     tools/maps/map_preflight.py \
     tools/maps/map_semantic_baseline.py \
@@ -109,8 +113,8 @@ echo "  SKIP: test_challenge_locations (needs vanilla_decls/)"
 echo "  SKIP: test_ap_map_generator (needs vanillamaps/)"
 echo "  SKIP: test_mission_complete_map_patcher (needs vanillamaps/)"
 echo "  SKIP: scripts/build/client.sh (needs MinGW toolchain)"
-echo "  SKIP: APWorld tests (needs distrobox/Archipelago setup)"
-echo "  SKIP: seed generation (needs distrobox/Archipelago setup)"
+echo "  SKIP: APWorld tests (needs APWORLD_PYTHON with pytest)"
+echo "  SKIP: seed generation (needs APWORLD_PYTHON with Archipelago)"
 
 # ----- Summary -----
 echo "=== validate_fast complete: ${PASS} passed, ${FAIL} failed ==="
