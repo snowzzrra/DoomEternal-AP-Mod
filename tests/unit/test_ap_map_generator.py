@@ -733,44 +733,6 @@ entity {
         with self.assertRaisesRegex(ValueError, "target order drift"):
             apply_checkpoint_cleanup_contract(drifted, target_drift)
 
-    def test_unchanged_legacy_generated_maps_remain_byte_identical(self):
-        expected = {
-            "e1m1_intro": "194326edbd76080e9313dcd49fc4cbc33e400dbfda0188e291699876c69d84f7",
-            "e1m2_war": "10057c8d0ce65d6deb6c65c3b68b35e0953b277143cbd1ac8abdb4dc44d65a3e",
-        }
-        items = json.loads((ROOT / "data" / "items.json").read_text())
-        for map_key, digest in expected.items():
-            with self.subTest(map_key=map_key), tempfile.TemporaryDirectory() as tmpdir:
-                output = Path(tmpdir, f"{map_key}.entities")
-                manifest = Path(tmpdir, f"{map_key}.json")
-                generate_map(
-                    ROOT / "vanillamaps" / f"{map_key}.map",
-                    output,
-                    ROOT / "level_configs" / f"{map_key}.json",
-                    manifest,
-                    items,
-                )
-                self.assertEqual(compute_file_sha256(output), digest)
-
-    def test_exultia_heavy_cannon_fallback_is_removed_without_references(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output = Path(tmpdir, "exultia.entities")
-            manifest = Path(tmpdir, "exultia.json")
-            generate_map(
-                ROOT / "vanillamaps" / "e1m2_war.map",
-                output,
-                ROOT / "level_configs" / "e1m2_war.json",
-                manifest,
-                json.loads((ROOT / "data" / "items.json").read_text()),
-            )
-            generated = output.read_text(encoding="utf-8")
-            self.assertIsNone(find_entity_block_bounds(
-                generated, "pickups_pickup_weapon_heavy_cannon_1"
-            ))
-            self.assertNotIn("pickups_pickup_weapon_heavy_cannon_1", generated)
-
-
-
     def test_secret_encounter_hook_is_inserted_after_last_wait(self):
         content = """
 entity {

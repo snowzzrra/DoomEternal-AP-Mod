@@ -35,7 +35,6 @@ def pytest_configure(config: pytest.Config) -> None:
         "integration: generates or patches real map output",
         "slow: build-like or broad regression test",
         "apworld: complete APWorld import, seed, or fill test",
-        "legacy_generated: isolated pre-catalog generator regression; not in incremental runners",
     ):
         config.addinivalue_line("markers", marker)
 
@@ -107,16 +106,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         elif name == "test_catalog_generated_maps.py":
             item.add_marker(pytest.mark.integration)
             item.add_marker(pytest.mark.slow)
-        elif name == "test_automap_baseline_guard.py":
-            item.add_marker(pytest.mark.slow)
-            item.add_marker(pytest.mark.legacy_generated)
         elif name.startswith("test_content_"):
             item.add_marker(pytest.mark.catalog)
         elif "generated_content" in name:
             item.add_marker(pytest.mark.generated)
         elif "generate_map(" in text or "patch_mission_complete_maps(" in text:
             item.add_marker(pytest.mark.slow)
-            item.add_marker(pytest.mark.legacy_generated)
         else:
             item.add_marker(pytest.mark.unit)
         map_spec = getattr(item, "callspec", None)

@@ -90,6 +90,10 @@ def _asset_package_payload(catalog: ContentCatalog, map_key: str) -> dict:
                 "resource_owner": asset.resource_owner,
                 "dependencies": asset.dependencies,
                 "dependency_policy": asset.dependency_policy,
+                "donor": dict(asset.donor),
+                "asset_bundle": asset.asset_bundle,
+                "scope": asset.scope,
+                "preserve": asset.preserve,
             }
             for asset in catalog.assets if asset.map_key == map_key
         ],

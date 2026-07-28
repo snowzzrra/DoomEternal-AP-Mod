@@ -718,6 +718,78 @@ def generate_inert_location_visual(block, policy):
 ''' + cleanup
 
 
+def donor_kind_from_block(block):
+    """Classify a structural donor without depending on a map key."""
+    inherit_match = re.search(r'\binherit\s*=\s*"([^"]+)";', block)
+    inherit = inherit_match.group(1) if inherit_match else ""
+    model_match = re.search(
+        r'renderModelInfo\s*=\s*\{.*?\bmodel\s*=\s*"([^"]+)";',
+        block,
+        flags=re.DOTALL,
+    )
+    model = model_match.group(1) if model_match else ""
+    if inherit.startswith("progress/codex"):
+        return "codex"
+    if model.endswith("/question_mark_a.lwo"):
+        return "question_mark"
+    if inherit.startswith("pickup/extra_life"):
+        return "extra_life"
+    return inherit.split("/", 1)[0] if inherit else "other"
+
+
+def resolve_donor_model_override(content, location_block, asset):
+    """Resolve a donor and its original model for an injected-only override."""
+    if asset.get("strategy") != "donor_model_override":
+        raise ValueError("asset is not a donor_model_override")
+    if asset.get("scope") != "injected_entity_only":
+        raise ValueError("donor model override scope must be injected_entity_only")
+    donor = asset.get("donor", {})
+    selection = donor.get("selection")
+    if selection == "per_location_source":
+        donor_block = location_block
+    elif selection == "named_entity":
+        entity_name = donor.get("entity")
+        bounds = find_entity_block_bounds(content, entity_name) if entity_name else None
+        if bounds is None:
+            raise ValueError(f"donor entity not found: {entity_name}")
+        donor_block = content[bounds[0]:bounds[1]]
+    else:
+        raise ValueError(f"unsupported donor selection: {selection}")
+    resolved_kind = donor_kind_from_block(donor_block)
+    if resolved_kind != donor.get("kind"):
+        raise ValueError(
+            f"donor kind mismatch: expected {donor.get('kind')}, got {resolved_kind}"
+        )
+    model_match = re.search(
+        r'renderModelInfo\s*=\s*\{.*?\bmodel\s*=\s*"([^"]+)";',
+        donor_block,
+        flags=re.DOTALL,
+    )
+    if model_match is None:
+        raise ValueError("donor model is missing")
+    return model_match.group(1)
+
+
+def apply_injected_entity_model_override(entity_text, replacement_model):
+    """Replace only an injected AP visual's render model."""
+    name_match = re.search(r'\bentityDef\s+([^\s{]+)', entity_text)
+    entity_name = name_match.group(1) if name_match else ""
+    if not entity_name.startswith("ap_location_visual_"):
+        raise ValueError("model override is limited to injected AP visual entities")
+    pattern = re.compile(
+        r'(renderModelInfo\s*=\s*\{.*?\bmodel\s*=\s*")[^"]+(";\s*)',
+        flags=re.DOTALL,
+    )
+    updated, count = pattern.subn(
+        lambda match: f"{match.group(1)}{replacement_model}{match.group(2)}",
+        entity_text,
+        count=1,
+    )
+    if count != 1:
+        raise ValueError(f"injected AP visual model is missing: {entity_name}")
+    return updated
+
+
 def replace_targets_block(block, target_names):
     targets_lines = [
         "targets = {",
@@ -1488,11 +1560,21 @@ def generate_map(
                         ap_check_id, location_id, block, default_visual_model
                     )
                 visual = target_policy.get("independent_visual")
-                if visual and visual.get("asset"):
-                    asset_key = visual["asset"]
-                    if asset_key not in asset_specs:
-                        raise ValueError(f"Unknown independent_visual asset: {asset_key}")
-                    visual["model"] = asset_specs[asset_key]["model"]
+                if visual:
+                    asset_key = visual.get("asset") or default_visual_asset
+                    if asset_key:
+                        if asset_key not in asset_specs:
+                            raise ValueError(
+                                f"Unknown independent_visual asset: {asset_key}"
+                            )
+                        visual_asset = asset_specs[asset_key]
+                        if visual_asset["strategy"] == "donor_model_override":
+                            visual["model"] = resolve_donor_model_override(
+                                content, block, visual_asset
+                            )
+                            visual["_model_override"] = visual_asset["model"]
+                        else:
+                            visual["model"] = visual_asset["model"]
                 target_policy = bind_parent_from_source(target_policy, block)
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
@@ -1549,6 +1631,20 @@ def generate_map(
                             target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])
                         if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("independent_targets", []):
                             target_policy.setdefault("independent_targets", target_policy.get("independent_targets", [ap_check_id])).append(universal["independent_visual"]["cleanup_entity"])
+                    visual_policy = target_policy.get("independent_visual")
+                    if visual_policy and "_model_override" not in visual_policy:
+                        asset_key = (
+                            visual_policy.get("asset") or default_visual_asset
+                        )
+                        visual_asset = asset_specs.get(asset_key) if asset_key else None
+                        if (
+                            visual_asset
+                            and visual_asset["strategy"] == "donor_model_override"
+                        ):
+                            visual_policy["model"] = resolve_donor_model_override(
+                                content, block, visual_asset
+                            )
+                            visual_policy["_model_override"] = visual_asset["model"]
                     if not target_policy.get("remove_original", False):
                         if "native_entity_contract" in target_policy:
                             new_blocks.append(
@@ -1563,6 +1659,13 @@ def generate_map(
                     )
                     visual = generate_inert_location_visual(block, target_policy)
                     if visual:
+                        replacement_model = target_policy[
+                            "independent_visual"
+                        ].get("_model_override")
+                        if replacement_model:
+                            visual = apply_injected_entity_model_override(
+                                visual, replacement_model
+                            )
                         new_blocks.append(visual)
                     new_blocks.append(generate_target_relay(
                         ap_check_id,

@@ -4,12 +4,34 @@
     "region": "Sentinel Prime",
     "assets": [
         {
+            "key": "archipelago_location_model_payload",
+            "strategy": "streamdb",
+            "model": "art/pickups/question_mark_a_id#3385987379760210816.lwo",
+            "resource_base": "streamdb",
+            "dependencies": [],
+            "dependency_policy": "embedded_materials_textures"
+        },
+        {
             "key": "sentinel_prime_ap_visual",
-            "strategy": "resident_model",
-            "model": "art/pickups/codex.lwo",
+            "strategy": "donor_model_override",
+            "model": "art/pickups/question_mark_a.lwo",
             "resource_base": "e2m4_boss",
             "dependencies": [],
-            "dependency_policy": "resident"
+            "dependency_policy": "shared_streamdb_payload",
+            "asset_bundle": "archipelago_location_model_payload",
+            "donor": {
+                "kind": "codex",
+                "selection": "named_entity",
+                "entity": "game_progress_codex_1_e2m4"
+            },
+            "scope": "injected_entity_only",
+            "preserve": [
+                "trigger",
+                "collision",
+                "transform",
+                "layers",
+                "interaction"
+            ]
         }
     ],
     "default_visual_asset": "sentinel_prime_ap_visual",
