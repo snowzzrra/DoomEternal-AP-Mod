@@ -40,11 +40,20 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path):
     if spec is None or spec.loader is None:
         raise RuntimeError("packaged bridge is not importable")
     module = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(client_dir))
+    source_root = Path(__file__).resolve().parents[2]
+    original_sys_path = sys.path[:]
+    sys.path[:] = [
+        str(client_dir),
+        *(
+            entry
+            for entry in original_sys_path
+            if Path(entry or os.getcwd()).resolve() != source_root
+        ),
+    ]
     try:
         spec.loader.exec_module(module)
     finally:
-        sys.path.pop(0)
+        sys.path[:] = original_sys_path
     return module
 
 

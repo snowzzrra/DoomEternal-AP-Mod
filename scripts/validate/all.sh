@@ -8,7 +8,7 @@ VALIDATION_BUILD_DIR="$REPO_ROOT/build/release/build/validation"
 cd "$REPO_ROOT"
 mkdir -p "$VALIDATION_BUILD_DIR"
 bash -n scripts/build/client.sh scripts/build/playable_test.sh scripts/validate/all.sh \
-    scripts/validate/runtime_install.sh
+    scripts/validate/apworld_python.sh scripts/validate/runtime_install.sh
 
 export PYTHONPATH="$REPO_ROOT"
 
@@ -17,9 +17,13 @@ python3 -m py_compile \
     bootstrap_actions.py \
     bridge_client.py \
     challenge_registry.py \
+    content_catalog.py \
     foundation.py \
     tools/maps/hub_diff_guard.py \
     item_reconciliation.py \
+    observer_lifecycle.py \
+    publisher_contracts.py \
+    publisher_runtime.py \
     map_registry.py \
     tools/maps/map_preflight.py \
     tools/maps/map_semantic_baseline.py \
@@ -72,15 +76,15 @@ python3 tools/validation/validate_windows_runtime_deps.py \
     --forbid-local dxgi.dll \
     --forbid-local xinput1_4.dll
 
-distrobox enter doom-cpp -- bash -lc "
-    cd '$REPO_ROOT/../Archipelago'
-    python3.11 -m unittest discover \
-        -s worlds/doometernal/test -p 'test_*.py'
-"
+source "$SCRIPT_DIR/apworld_python.sh"
 
-distrobox enter doom-cpp -- bash -lc "
-    cd '$REPO_ROOT/../Archipelago'
-    python3.11 Generate.py \
-        --player_files_path '$REPO_ROOT/player_templates' \
-        --outputpath /tmp/doom-eap-validation
-"
+ARCHIP_ROOT="$REPO_ROOT/../Archipelago"
+PYTHONPATH="$ARCHIP_ROOT:$REPO_ROOT" "$APWORLD_PYTHON" -m pytest \
+    -c "$ARCHIP_ROOT/pytest.ini" \
+    "$ARCHIP_ROOT/worlds/doometernal/test" \
+    -q --maxfail=1
+
+PYTHONPATH="$ARCHIP_ROOT:$REPO_ROOT" SKIP_REQUIREMENTS_UPDATE=1 \
+    "$APWORLD_PYTHON" "$ARCHIP_ROOT/Generate.py" \
+    --player_files_path "$REPO_ROOT/player_templates" \
+    --outputpath /tmp/doom-eap-validation

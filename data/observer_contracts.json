@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "registry_revision": 1,
+  "policies": {
+    "save_based": {
+      "requires_live_runtime": true,
+      "requires_authoritative_save": true,
+      "baseline_policy": "first_binding_snapshot",
+      "binding_scope": "ap_session_team_slot_doom_save_registry",
+      "completion_policy": "false_to_true_edge"
+    },
+    "server_aggregate": {
+      "requires_live_runtime": true,
+      "requires_authoritative_save": true,
+      "baseline_policy": "none",
+      "binding_scope": "ap_session_team_slot",
+      "completion_policy": "server_checked_children"
+    }
+  },
+  "observers": {
+    "weapon_masteries": {
+      "policy": "save_based",
+      "strategies": ["unlockable_record"]
+    },
+    "mission_challenges": {
+      "policy": "save_based",
+      "strategies": ["unlockable_record", "stat_threshold"]
+    },
+    "mission_challenge_aggregates": {
+      "policy": "server_aggregate",
+      "strategies": ["aggregate"]
+    },
+    "future_save_records": {
+      "policy": "save_based",
+      "strategies": ["stat_threshold", "unlockable_record"]
+    }
+  }
+}

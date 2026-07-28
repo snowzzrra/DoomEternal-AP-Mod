@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "release": "v0.3.4-alpha",
+  "publisher_key": "sentinel_prime_campaign_goal",
   "event_filename": "ap_goal_sentinel_prime_complete.txt",
   "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE",
   "event_target": "ap_campaign_goal_event",

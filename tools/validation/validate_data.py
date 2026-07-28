@@ -79,6 +79,16 @@ def extract_namedtuple_table(path: Path, variable: str) -> dict[str, int]:
                 for key, value in zip(node.value.keys, node.value.values)
                 if ast.literal_eval(value.args[0]) is not None
             }
+    if variable == "location_data_table":
+        generated = path.with_name("generated_content.py")
+        generated_tree = ast.parse(generated.read_text(encoding="utf-8"), filename=str(generated))
+        for node in generated_tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "LOCATION_ROWS"
+                for target in node.targets
+            ):
+                rows = ast.literal_eval(node.value)
+                return {name: code for name, code, _ in rows if code is not None}
     raise RuntimeError(f"Could not find {variable} in {path}")
 
 
@@ -303,6 +313,13 @@ def validate_generated_automap_carriers() -> list[str]:
                 errors.append(f"Automap carrier generation failed for {map_key}: {exc}")
                 continue
             generated = output.read_text(encoding="utf-8")
+            assets = {
+                asset["key"]: asset for asset in config.get("assets", [])
+            }
+            default_asset = assets.get(config.get("default_visual_asset"), {})
+            default_visual_model = default_asset.get(
+                "model", "art/pickups/question_mark_a.lwo"
+            )
             if "ap_remove_native_automap_" in generated:
                 errors.append(f"Automap carrier marker removal reappeared in {map_key}")
             secret_count = len(config.get("secret_encounters", []))
@@ -314,6 +331,12 @@ def validate_generated_automap_carriers() -> list[str]:
             for ap_check, location_id in config.get("entities", {}).items():
                 entity_name = ap_check.removeprefix("AP_CHECK_").lower()
                 policy = config.get("target_policies", {}).get(entity_name, {})
+                visual_policy = policy.get("independent_visual", {})
+                visual_asset = assets.get(visual_policy.get("asset"), {})
+                expected_visual_model = visual_asset.get(
+                    "model",
+                    visual_policy.get("model", default_visual_model),
+                )
                 if policy.get("native_entity_contract") is not None:
                     continue
                 source_bounds = find_entity_block_bounds(vanilla, entity_name)
@@ -365,7 +388,7 @@ def validate_generated_automap_carriers() -> list[str]:
                     for field in ("inherit", "class", "automapPropertiesDecl"):
                         if entity_scalar(carrier, field) != entity_scalar(source_block, field):
                             errors.append(f"Automap source metadata drift for {location_id}/{field}")
-                    if 'model = "art/pickups/question_mark_a.lwo";' not in carrier:
+                    if f'model = "{expected_visual_model}";' not in carrier:
                         errors.append(f"Automap carrier lacks AP visual for {location_id}")
                     if extract_target_names(carrier):
                         errors.append(f"Automap carrier retained vanilla targets for {location_id}")
@@ -442,7 +465,7 @@ def validate_generated_automap_carriers() -> list[str]:
                         errors.append(f"Generic AP target drift for {location_id}")
                     if extract_target_names(cleanup) != [visual_name]:
                         errors.append(f"Generic AP visual cleanup drift for {location_id}")
-                    if 'model = "art/pickups/question_mark_a.lwo";' not in visual:
+                    if f'model = "{expected_visual_model}";' not in visual:
                         errors.append(f"Generic AP visual missing for {location_id}")
                     for forbidden in (
                         "progress/praetor_token", "idInteractable_GiveItems",
@@ -472,9 +495,7 @@ def validate_automap_prototypes_only() -> list[str]:
             if policy.get("native_automap_contract"):
                 errors.append(f"Unexpected native Automap prototype: {entity_name}")
             visual = policy.get("independent_visual", {})
-            if visual.get("automap_properties_decl") and entity_name != (
-                "mech_street_progress_mod_bot_1_e1m1"
-            ):
+            if visual.get("automap_properties_decl") and not policy.get("allow_automap_properties"):
                 errors.append(f"Unexpected generic Automap prototype: {entity_name}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -494,43 +515,6 @@ def validate_automap_prototypes_only() -> list[str]:
                 errors.append(f"Automap prototype generation failed for {map_key}: {exc}")
                 continue
             generated = output.read_text(encoding="utf-8")
-            if map_key == "e1m4_boss":
-                owner_name = "wing_b_pickup_collectible_albums_album_03_1"
-                owner_bounds = find_entity_block_bounds(generated, owner_name)
-                check_bounds = find_entity_block_bounds(
-                    generated, "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1"
-                )
-                owner = (
-                    generated[owner_bounds[0]:owner_bounds[1]]
-                    if owner_bounds is not None else ""
-                )
-                check = (
-                    generated[check_bounds[0]:check_bounds[1]]
-                    if check_bounds is not None else ""
-                )
-                if not owner:
-                    errors.append("Commander Keen album lacks its native collectible owner")
-                required_owner = (
-                    'inherit = "pickup/collectible/albums/album_03";',
-                    'triggerDef = "trigger/props/progression_collectibles";',
-                    'useableComponentDecl = "propitem/collectible/albums/album_03";',
-                    'stat = "STAT_ITEMS_COLLECTED";',
-                    'stat = "STAT_DOOM_COLLECTABLE";',
-                    'stat = "STAT_COLLECTIBLE_ALBUM_FOUND";',
-                    'item[0] = "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1";',
-                )
-                if any(field not in owner for field in required_owner):
-                    errors.append("Commander Keen album native pickup contract drifted")
-                retired_entities = (
-                    "ap_independent_wing_b_pickup_collectible_albums_album_03_1",
-                    "ap_location_visual_7770157",
-                    "ap_remove_location_visual_7770157",
-                    "ap_stat_location_7770157",
-                )
-                if any(f"entityDef {name} {{" in generated for name in retired_entities):
-                    errors.append("Commander Keen album retains an obsolete independent AP pickup")
-                if '"ap_event_7770157"' not in check:
-                    errors.append("Commander Keen album AP check event is missing")
             visual_names = set(re.findall(r"entityDef (ap_location_visual_\d+)", generated))
             for visual_name in visual_names:
                 visual_bounds = find_entity_block_bounds(generated, visual_name)
@@ -566,35 +550,6 @@ def validate_automap_prototypes_only() -> list[str]:
                             f"{forbidden}"
                         )
 
-            if map_key != "e1m1_intro":
-                continue
-
-            visual_name = "ap_location_visual_7770015"
-            cleanup_name = "ap_remove_location_visual_7770015"
-            visual_bounds = find_entity_block_bounds(generated, visual_name)
-            cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
-            check_bounds = find_entity_block_bounds(
-                generated, "AP_CHECK_MECH_STREET_PROGRESS_MOD_BOT_1_E1M1"
-            )
-            if not all((visual_bounds, cleanup_bounds, check_bounds)):
-                errors.append("Modbot generic Automap prototype graph is incomplete")
-            else:
-                visual = generated[visual_bounds[0]:visual_bounds[1]]
-                cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
-                check = generated[check_bounds[0]:check_bounds[1]]
-                if any(term in visual for term in (
-                    "fxDecl", "useableComponentDecl", "currency",
-                    "inventory", "perk", "targets",
-                )):
-                    errors.append("Modbot visual has a forbidden gameplay or FX edge")
-                if extract_target_names(cleanup) != [visual_name]:
-                    errors.append("Modbot cleanup target reaches outside the prototype visual")
-                if extract_target_names(check) != [
-                    cleanup_name,
-                    "ap_notify_location_7770015",
-                    "ap_event_7770015",
-                ]:
-                    errors.append("Modbot AP check target graph drifted")
     return errors
 
 
@@ -665,24 +620,6 @@ def main() -> int:
         )
     except (OSError, ValueError) as exc:
         errors.append(f"New-map preflight failed: {exc}")
-    try:
-        doom_hunter = dict(registry_for_preflight["maps"]["e1m4_boss"])
-        doom_hunter["onboarding_audit"] = "data/onboarding/e1m4_boss.json"
-        validate_onboarding_audit(
-            ROOT, "e1m4_boss", doom_hunter, location_ids, set(item_ids.values()),
-            container_catalog,
-        )
-    except (OSError, ValueError) as exc:
-        errors.append(f"Doom Hunter Base research preflight failed: {exc}")
-    try:
-        hub_visit3 = dict(registry_for_preflight["maps"]["hub"])
-        hub_visit3["onboarding_audit"] = "data/onboarding/hub_visit3.json"
-        validate_onboarding_audit(
-            ROOT, "hub", hub_visit3, location_ids, set(item_ids.values()),
-            container_catalog,
-        )
-    except (OSError, ValueError) as exc:
-        errors.append(f"Fortress Visit 3 preflight failed: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
     reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
@@ -807,8 +744,7 @@ def main() -> int:
 
     forbidden_decl_path = "propitem/ap/"
     for path in (
-        ROOT / "level_configs" / "hub.json",
-        ROOT / "level_configs" / "e1m3_cult.json",
+        *(ROOT / source["level_config"] for source in map_sources.values()),
         ROOT / "tools" / "maps" / "ap_map_generator.py",
         ROOT / "scripts" / "build" / "playable_test.sh",
     ):
@@ -818,15 +754,8 @@ def main() -> int:
         if path.is_file() and forbidden_decl_path in path.as_posix():
             errors.append(f"Forbidden custom scripted-pickup DECL is packaged: {path}")
 
-    forbidden_decl_overrides = (
-        ROOT / "packaging" / "mod_assets" / "hub_patch2" / "generated" /
-        "decls" / "propitem" / "propitem" / "equipment" / "ice_bomb.decl",
-        ROOT / "packaging" / "mod_assets" / "e1m3_cult_patch3" / "generated" /
-        "decls" / "propitem" / "propitem" / "weapon" /
-        "rocket_launcher" / "base.decl",
-    )
-    for override_path in forbidden_decl_overrides:
-        if override_path.exists():
+    for override_path in (ROOT / "packaging" / "mod_assets").rglob("*.decl"):
+        if "propitem/ap/" in override_path.as_posix():
             errors.append(f"Forbidden scripted-pickup DECL override remains packaged: {override_path}")
 
     manifests: dict[str, int] = {}

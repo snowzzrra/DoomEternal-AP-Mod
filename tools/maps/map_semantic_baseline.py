@@ -154,6 +154,22 @@ def assert_frozen_map_baselines() -> dict:
     return actual
 
 
+def accept_frozen_map_baseline(map_key: str) -> None:
+    """Accept exactly one map after confirming every other baseline is frozen."""
+    expected = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    actual = current_baseline()
+    if map_key not in actual["maps"]:
+        raise ValueError(f"unknown baseline map: {map_key}")
+    expected_other = dict(expected["maps"])
+    actual_other = dict(actual["maps"])
+    expected_other.pop(map_key, None)
+    actual_other.pop(map_key, None)
+    if expected_other != actual_other:
+        raise ValueError("refusing baseline acceptance: a frozen map also changed")
+    expected["maps"][map_key] = actual["maps"][map_key]
+    BASELINE_PATH.write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--update", action="store_true")

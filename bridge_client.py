@@ -21,7 +21,11 @@ from bootstrap_actions import (
     received_any_suit_upgrade,
 )
 from campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
-from challenge_registry import canonical_map_name, load_challenge_registry
+from challenge_registry import (
+    aggregate_ready,
+    canonical_map_name,
+    load_challenge_registry,
+)
 from foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
@@ -35,6 +39,21 @@ from item_classification import (
 from item_reconciliation import (
     compile_reconciliation_plan,
     load_policy_registry,
+)
+from observer_lifecycle import (
+    RuntimeObservationLease,
+    SaveObserverBaselineStore,
+    observer_registry_revision,
+    unlockable_record_complete,
+)
+from publisher_contracts import (
+    load_publisher_contracts,
+    publishers_for_transition,
+)
+from publisher_runtime import (
+    publisher_acknowledged,
+    quarantine_malformed_event,
+    read_map_event,
 )
 
 try:
@@ -1366,6 +1385,9 @@ DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Doom Hunter Base - Mission Complete"
 ]
 CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
+OBSERVER_REGISTRY_REVISION = observer_registry_revision(
+    Path(__file__).with_name("data") / "challenge_location_registry.json"
+)
 WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
 WEAPON_MASTERY_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
@@ -1385,14 +1407,25 @@ STICKY_MASTERY_ENTRY = WEAPON_MASTERY_BY_UNLOCKABLE[
     "weapon_mastery/shotgun/sticky_bomb"
 ]
 STICKY_MASTERY_LOCATION = STICKY_MASTERY_ENTRY["location_id"]
+PUBLISHERS = load_publisher_contracts()
 MISSION_COMPLETE_TRANSITIONS = {
-    (
-        canonical_map_name(entry["signal"]["from"]),
-        canonical_map_name(entry["signal"]["to"]),
-    ): entry
-    for entry in CHALLENGE_LOCATION_REGISTRY["mission_complete"]
-    if entry["signal"]["kind"] == "native_transition"
+    (trigger["from_map"], trigger["to_map"]): {
+        "location_id": next(
+            effect["location_id"]
+            for effect in publisher.effects
+            if effect["strategy"] == "location_check"
+        ),
+        "publisher_key": publisher.key,
+    }
+    for publisher in PUBLISHERS
+    for trigger in publisher.triggers_for("native_transition")
+    if any(effect["strategy"] == "location_check" for effect in publisher.effects)
 }
+PUBLISHER_MAP_EVENT_FILENAMES = frozenset(
+    trigger["filename"]
+    for publisher in PUBLISHERS
+    for trigger in publisher.triggers_for("map_event_file")
+)
 # Load ALL level manifests dynamically
 DECL_TO_LOCATION = {}
 MANIFESTS_DIR = os.path.join(os.path.dirname(__file__), "manifests")
@@ -2074,10 +2107,15 @@ class DoomEternalContext(CommonContext):
         self.active_save_path = None
         self.active_save_token = None
         self.active_gameplay_epoch = None
-        self.runtime_observers_frozen = False
+        # Save/challenge observers start closed and are opened only by a
+        # same-process, gameplay-loaded RuntimeObservationLease.
+        self.runtime_observers_frozen = True
+        self.runtime_observation_lease = RuntimeObservationLease()
+        self.last_observer_lease_block = None
         self.save_candidate_tokens = {}
         self.last_save_slot_rejection = None
         self.save_slot_observations = {}
+        self.selected_observation_slot = None
         self.last_mastery_records = {}
         self.weapon_masteries_observed = {}
         self.mastery_slot_warnings = set()
@@ -2098,6 +2136,7 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = None
         self.mission_locations_in_flight = set()
         self.mission_goal_in_flight = False
+        self.publisher_effects_in_flight = set()
         self.last_rpc_map_name = None
         self.room_seed_name = None
         self.current_map_name = None
@@ -2169,33 +2208,21 @@ class DoomEternalContext(CommonContext):
         return self.active_save_slot or "<synthetic>"
 
     def select_save_observation_slot(self, slot_directory):
+        """Select a slot without trusting legacy observed=true persistence."""
+        if getattr(self, "selected_observation_slot", None) == slot_directory:
+            return
+        self.selected_observation_slot = slot_directory
         state = self.save_slot_observations.setdefault(slot_directory, {})
-        masteries = state.get("weapon_masteries", {})
-        challenges = state.get("mission_challenges", {})
-        if not isinstance(masteries, dict):
-            masteries = {}
-        if not isinstance(challenges, dict):
-            challenges = {}
+        state.pop("weapon_masteries", None)
+        state.pop("mission_challenges", None)
         self.weapon_masteries_observed = {
-            unlockable: bool(masteries.get(unlockable, False))
-            for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE
+            unlockable: False for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE
         }
         self.mission_challenges_observed = {
-            unlockable: bool(challenges.get(unlockable, False))
-            for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE
+            unlockable: False for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE
         }
-        state["weapon_masteries"] = self.weapon_masteries_observed
-        state["mission_challenges"] = self.mission_challenges_observed
         self.all_mission_challenges_observed = {}
-        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
-            self.all_mission_challenges_observed[key] = all(
-                self.mission_challenges_observed.get(ul, False)
-                for ul in aggregate["signal"]["unlockables"]
-            )
-        self.sticky_mastery_observed = self.weapon_masteries_observed.get(
-            STICKY_UNLOCKABLE.decode("ascii"), False
-        )
+        self.sticky_mastery_observed = False
 
     def has_authoritative_save_proof(self):
         if self.runtime_observers_frozen:
@@ -2231,6 +2258,7 @@ class DoomEternalContext(CommonContext):
     def invalidate_save_observation_slot(self, slot_directory):
         """Discard local authority when a slot directory has been recreated."""
         self.save_slot_observations[slot_directory] = {}
+        self.selected_observation_slot = None
         self.select_save_observation_slot(slot_directory)
         self.checkpoint_death_by_save_slot.pop(slot_directory, None)
         self.previous_checkpoint_death = None
@@ -2332,6 +2360,13 @@ class DoomEternalContext(CommonContext):
             self.runtime_observers_frozen = False
             return active
 
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None and not lease.process_probe():
+            if self.last_observer_lease_block != "game_not_running":
+                logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=game_not_running")
+                self.last_observer_lease_block = "game_not_running"
+            return fail_proof("game_not_running")
+
         if evidence is None:
             if newer_unproven_candidate:
                 return fail_proof("no_gameplay_evidence")
@@ -2366,6 +2401,25 @@ class DoomEternalContext(CommonContext):
 
         details_map = canonical_map_name(details.get("mapName"))
         expected_map = evidence.map_name or canonical_map_name(self.current_map_name or "")
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None:
+            try:
+                evidence_mtime_ns = Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
+            except OSError:
+                evidence_mtime_ns = 0
+            live, reason = lease.validate(
+                evidence_mtime_ns=evidence_mtime_ns,
+                evidence_state=evidence.state,
+                evidence_map=evidence.map_name,
+                current_map=canonical_map_name(self.current_map_name or ""),
+                details_map=details_map,
+            )
+            if not live:
+                if reason != self.last_observer_lease_block:
+                    logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=%s", reason)
+                    self.last_observer_lease_block = reason
+                return fail_proof(reason, details_map=details_map)
+            self.last_observer_lease_block = None
 
         # SECTION B: STRICT CANONICAL MAP COHERENCE (NO HUB WILDCARD FOR SGN / MISSION MAPS)
         if expected_map == "game/hub/hub":
@@ -2476,6 +2530,7 @@ class DoomEternalContext(CommonContext):
             and isinstance(state, dict)
         }
         self.session_state["save_slot_observations"] = self.save_slot_observations
+        self.selected_observation_slot = None
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
         self.weapon_masteries_observed = {}
@@ -3120,12 +3175,68 @@ class DoomEternalContext(CommonContext):
             await self.report_local_death()
         return True
 
+    def observe_save_edges(self, observer_key, records, entries, slot_directory):
+        if not self.item_state_ready:
+            return set()
+        identity = (
+            getattr(self, "room_seed_name", None)
+            or getattr(self, "seed_name", None)
+            or self.state_key
+            or "unknown"
+        )
+        binding_key = SaveObserverBaselineStore.binding_key(
+            session_identity=str(identity),
+            team=int(getattr(self, "team", 0) or 0),
+            slot=int(getattr(self, "slot", 0) or 0),
+            doom_save_slot=slot_directory,
+            registry_revision=OBSERVER_REGISTRY_REVISION,
+        )
+        acknowledged = {
+            key
+            for key, entry in entries.items()
+            if entry["location_id"] in getattr(self, "checked_locations", set())
+        }
+        pending, created, new_edges = SaveObserverBaselineStore(
+            self.session_state
+        ).observe(
+            binding_key=binding_key,
+            observer_key=observer_key,
+            records=records,
+            acknowledged_records=acknowledged,
+        )
+        sessions = self.client_state.get("sessions", {})
+        if sessions.get(self.state_key) is self.session_state:
+            self.persist_session_state()
+        if created:
+            logger.info(
+                "[OBSERVER] BASELINE_CREATED session=%s save_slot=%s records=%s",
+                self.state_key,
+                slot_directory,
+                sum(records.values()),
+            )
+        for key in sorted(new_edges):
+            logger.info("[OBSERVER] EDGE_COMPLETE key=%s", key)
+        return pending
+
     def observe_weapon_masteries(self, records, path):
         """Observe only each mastery record's own native completion predicate."""
         slot_directory = self.observation_slot_for_source(path)
         self.select_save_observation_slot(slot_directory)
         if not self.has_authoritative_save_proof():
             return
+        completion_states = {
+            unlockable: (
+                unlockable in records
+                and unlockable_record_complete(records[unlockable], entry["signal"])
+            )
+            for unlockable, entry in WEAPON_MASTERY_BY_UNLOCKABLE.items()
+        }
+        pending_edges = self.observe_save_edges(
+            "weapon_masteries",
+            completion_states,
+            WEAPON_MASTERY_BY_UNLOCKABLE,
+            slot_directory,
+        )
         for unlockable in WEAPON_MASTERY_BY_UNLOCKABLE:
             self.weapon_masteries_observed.setdefault(unlockable, False)
         for unlockable, record in records.items():
@@ -3153,32 +3264,12 @@ class DoomEternalContext(CommonContext):
                 )
                 self.last_mastery_records[record_key] = observed_record
 
-            natural_complete = (
-                observed_record[0] == signal["numUnlockableRules"]
-                and observed_record[1] == signal["rule_0_statname"]
-                and observed_record[2] >= signal["rule_0_statCount"]
-                and observed_record[3] == signal["rule_0_statDuration"]
-                and observed_record[4] is signal["rule_0_satisfied"]
-                and observed_record[5] is signal["unlockableIsUnlocked"]
-            )
-            if not natural_complete or self.weapon_masteries_observed.get(unlockable):
+            if unlockable not in pending_edges:
                 continue
             self.weapon_masteries_observed[unlockable] = True
             if unlockable == STICKY_UNLOCKABLE.decode("ascii"):
                 self.sticky_mastery_observed = True
                 self.last_sticky_record = observed_record[1:]
-                logger.info(
-                    "[Mastery] STICKY_NATURAL_COMPLETE predicate=unlockable_record"
-                )
-            if self.item_state_ready:
-                self.persist_session_state()
-            logger.info(
-                "[Mastery] NATURAL_COMPLETE unlockable=%s location_id=%s "
-                "predicate=unlockable_record save_slot=%s",
-                unlockable,
-                entry["location_id"],
-                slot_directory,
-            )
 
     def observe_physical_event_challenges(self):
         """Observe physical_event_equivalent challenge predicates independently of save files."""
@@ -3213,24 +3304,6 @@ class DoomEternalContext(CommonContext):
                             sorted(matched_ids),
                         )
 
-        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
-            was_complete = self.all_mission_challenges_observed.get(key, False)
-            now_complete = all(
-                self.mission_challenges_observed.get(ul, False)
-                for ul in aggregate["signal"]["unlockables"]
-            )
-            self.all_mission_challenges_observed[key] = now_complete
-            if now_complete and not was_complete:
-                if self.item_state_ready:
-                    self.persist_session_state()
-                logger.info(
-                    "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
-                    "predicate=all_unlockable_records save_slot=%s",
-                    aggregate["location_id"],
-                    self.active_save_slot or "<synthetic>",
-                )
-
     def observe_mission_challenges(self, records, path):
         """Observe durable native records and derive the all-challenges check."""
         slot_directory = self.observation_slot_for_source(path)
@@ -3240,11 +3313,31 @@ class DoomEternalContext(CommonContext):
         if not self.has_authoritative_save_proof():
             return
 
+        save_entries = {
+            unlockable: entry
+            for unlockable, entry in MISSION_CHALLENGE_BY_UNLOCKABLE.items()
+            if entry["signal"]["kind"] in {"unlockable_record", "stat_threshold"}
+        }
+        completion_states = {
+            unlockable: (
+                unlockable in records
+                and unlockable_record_complete(records[unlockable], entry["signal"])
+            )
+            for unlockable, entry in save_entries.items()
+        }
+        pending_edges = self.observe_save_edges(
+            "mission_challenges",
+            completion_states,
+            save_entries,
+            slot_directory,
+        )
         for unlockable, record in records.items():
             entry = MISSION_CHALLENGE_BY_UNLOCKABLE.get(unlockable)
             if entry is None:
                 continue
             signal = entry["signal"]
+            if signal["kind"] not in {"unlockable_record", "stat_threshold"}:
+                continue
             observed_record = (
                 int(record["numUnlockableRules"]),
                 record["rule_0_statname"],
@@ -3288,46 +3381,9 @@ class DoomEternalContext(CommonContext):
                     unlockable, expected_count, observed_record[2],
                 )
 
-            natural_complete = (
-                observed_record[0] == signal["numUnlockableRules"]
-                and observed_record[1] == signal["rule_0_statname"]
-                and (
-                    expected_count is None
-                    or observed_record[2] >= expected_count
-                )
-                and observed_record[3] == signal["rule_0_statDuration"]
-                and observed_record[4] is signal["rule_0_satisfied"]
-                and observed_record[5] is signal["unlockableIsUnlocked"]
-            )
-            if not natural_complete or self.mission_challenges_observed.get(unlockable):
+            if unlockable not in pending_edges:
                 continue
             self.mission_challenges_observed[unlockable] = True
-            if self.item_state_ready:
-                self.persist_session_state()
-            logger.info(
-                "[Challenge] NATURAL_COMPLETE unlockable=%s location_id=%s "
-                "predicate=unlockable_record save_slot=%s",
-                unlockable,
-                entry["location_id"],
-                slot_directory,
-            )
-        for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
-            was_complete = self.all_mission_challenges_observed.get(key, False)
-            now_complete = all(
-                self.mission_challenges_observed.get(ul, False)
-                for ul in aggregate["signal"]["unlockables"]
-            )
-            self.all_mission_challenges_observed[key] = now_complete
-            if now_complete and not was_complete:
-                if self.item_state_ready:
-                    self.persist_session_state()
-                logger.info(
-                    "[Challenge] ALL_NATURAL_COMPLETE location_id=%s "
-                    "predicate=all_unlockable_records save_slot=%s",
-                    aggregate["location_id"],
-                    slot_directory,
-                )
 
     def observe_sticky_mastery(self, snapshot, path):
         """Sticky compatibility wrapper used by the proven 24→25 regression."""
@@ -3386,7 +3442,7 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_location(entry)
 
     async def check_mission_challenge_location(self, entry):
-        if not self.item_state_ready:
+        if not self.item_state_ready or self.runtime_observers_frozen:
             return
         is_physical = entry["signal"].get("kind") == "physical_event_equivalent"
         if not is_physical and not self.has_authoritative_save_proof():
@@ -3439,49 +3495,45 @@ class DoomEternalContext(CommonContext):
         await self.check_all_mission_challenges_location()
 
     async def check_all_mission_challenges_location(self):
-        """Check per-mission aggregates against their native challenge records."""
+        """Publish aggregates only from server-authoritative checked children."""
         if not self.item_state_ready or not self.has_authoritative_save_proof():
             return
+        checked = set(self.checked_locations)
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
-            key = aggregate.get("mission_key") or aggregate["signal"]["unlockables"][0].rsplit("/", 1)[0]
-            if not self.all_mission_challenges_observed.get(key, False):
-                continue
-            if self.runtime_observers_frozen and not all(
-                self.mission_challenges_observed.get(ul, False)
-                for ul in aggregate["signal"]["unlockables"]
-            ):
+            signal = aggregate["signal"]
+            children = set(signal["children"])
+            if not aggregate_ready(signal, checked):
                 continue
             location_id = aggregate["location_id"]
-            if location_id in self.checked_locations or location_id in self.locations_checked:
+            if location_id in checked or location_id in self.locations_checked:
                 continue
             if location_id not in self.server_locations:
                 if location_id not in self.mission_challenge_slot_warnings:
                     logger.warning(
-                        "[Challenge] ALL_LOCATION id=%s key=%s slot=absent",
-                        location_id, key,
+                        "[Challenge] ALL_LOCATION id=%s slot=absent", location_id
                     )
                     self.mission_challenge_slot_warnings.add(location_id)
                 continue
             if not self.server or not self.server.socket or self.server.socket.closed:
                 continue
+            logger.info(
+                "[Challenge] ALL_LOCATION_CHECK_SEND id=%s authority=server_checked_locations "
+                "children=%s",
+                location_id,
+                sorted(children),
+            )
             try:
-                logger.info(
-                    "[Challenge] ALL_LOCATION_CHECK_SEND id=%s key=%s "
-                    "source=all_vanilla_save_predicates save_slot=%s",
-                    location_id, key,
-                    self.active_save_slot or "<synthetic>",
-                )
                 await self.send_msgs([
                     {"cmd": "LocationChecks", "locations": [location_id]}
                 ])
             except Exception as error:
                 logger.error(
-                    "[Challenge] ALL_LOCATION_CHECK_RETRY id=%s key=%s error=%s",
-                    location_id, key, error,
+                    "[Challenge] ALL_LOCATION_CHECK_RETRY id=%s error=%s",
+                    location_id,
+                    error,
                 )
                 continue
             self.locations_checked.add(location_id)
-            logger.info("[Challenge] ALL_LOCATION_CHECK_ACK id=%s key=%s", location_id, key)
 
     async def check_sticky_mastery_location(self):
         """Sticky compatibility wrapper preserving its exact send contract."""
@@ -3534,136 +3586,188 @@ class DoomEternalContext(CommonContext):
 
         await self.send_death(f"{self.auth or 'The Doom Slayer'} was slain.")
 
+    def record_publisher_ack(self, publisher_key, effect_index, effect):
+        state = self.session_state.setdefault("publisher_acknowledgements", {})
+        publisher_state = state.setdefault(publisher_key, {})
+        publisher_state[str(effect_index)] = {
+            "strategy": effect["strategy"],
+            "location_id": effect.get("location_id"),
+        }
+        if hasattr(self, "persist_session_state"):
+            self.persist_session_state()
+
+    async def send_publisher_effect(
+        self, publisher, effect_index, effect, source_description
+    ):
+        strategy = effect["strategy"]
+        effect_key = (publisher.key, effect_index)
+        if not hasattr(self, "publisher_effects_in_flight"):
+            self.publisher_effects_in_flight = set()
+        checked_locations = getattr(self, "checked_locations", set())
+        if strategy == "preserved_native_target":
+            return True
+        if strategy == "location_check":
+            location_id = effect["location_id"]
+            if location_id in checked_locations:
+                self.publisher_effects_in_flight.discard(effect_key)
+                DoomEternalContext.record_publisher_ack(
+                    self, publisher.key, effect_index, effect
+                )
+                logger.info(
+                    "[PUBLISHER] EFFECT_ACK key=%s effect=location_check location_id=%s",
+                    publisher.key,
+                    location_id,
+                )
+                return True
+            if location_id in self.locations_checked or effect_key in self.publisher_effects_in_flight:
+                logger.info(
+                    "[PUBLISHER] FALLBACK_SUPPRESSED key=%s reason=already_dispatched",
+                    publisher.key,
+                )
+                return False
+            if location_id not in self.server_locations:
+                logger.warning(
+                    "[PUBLISHER] EFFECT_BLOCKED key=%s effect=location_check "
+                    "location_id=%s reason=slot_absent",
+                    publisher.key,
+                    location_id,
+                )
+                return False
+            message = {"cmd": "LocationChecks", "locations": [location_id]}
+        elif strategy == "campaign_goal":
+            if self.session_state.get("goal_sent", False):
+                self.publisher_effects_in_flight.discard(effect_key)
+                DoomEternalContext.record_publisher_ack(
+                    self, publisher.key, effect_index, effect
+                )
+                logger.info(
+                    "[PUBLISHER] EFFECT_ACK key=%s effect=campaign_goal",
+                    publisher.key,
+                )
+                return True
+            if effect_key in self.publisher_effects_in_flight:
+                logger.info(
+                    "[PUBLISHER] FALLBACK_SUPPRESSED key=%s reason=in_flight",
+                    publisher.key,
+                )
+                return False
+            message = {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
+        else:
+            raise ValueError(f"unsupported publisher effect strategy: {strategy}")
+
+        if not self.server or not self.server.socket or self.server.socket.closed:
+            return False
+        self.publisher_effects_in_flight.add(effect_key)
+        logger.info(
+            "[PUBLISHER] EFFECT_SEND key=%s effect=%s location_id=%s source=%s",
+            publisher.key,
+            strategy,
+            effect.get("location_id", ""),
+            source_description,
+        )
+        try:
+            await self.send_msgs([message])
+        except Exception:
+            self.publisher_effects_in_flight.discard(effect_key)
+            raise
+        if strategy == "location_check":
+            self.locations_checked.add(effect["location_id"])
+            if effect["location_id"] in getattr(self, "checked_locations", set()):
+                self.publisher_effects_in_flight.discard(effect_key)
+                DoomEternalContext.record_publisher_ack(
+                    self, publisher.key, effect_index, effect
+                )
+                logger.info(
+                    "[PUBLISHER] EFFECT_ACK key=%s effect=location_check location_id=%s",
+                    publisher.key,
+                    effect["location_id"],
+                )
+                return True
+            return False
+        self.session_state["goal_sent"] = True
+        self.publisher_effects_in_flight.discard(effect_key)
+        DoomEternalContext.record_publisher_ack(
+            self, publisher.key, effect_index, effect
+        )
+        logger.info(
+            "[PUBLISHER] EFFECT_ACK key=%s effect=campaign_goal",
+            publisher.key,
+        )
+        return True
+
+    async def execute_publisher(self, publisher, trigger_strategy, source_description):
+        if publisher_acknowledged(
+            publisher,
+            getattr(self, "checked_locations", set()),
+            self.session_state.get("goal_sent", False),
+        ):
+            logger.info(
+                "[PUBLISHER] FALLBACK_SUPPRESSED key=%s reason=already_acknowledged",
+                publisher.key,
+            )
+            return True
+        logger.info(
+            "[PUBLISHER] TRIGGER_OBSERVED key=%s strategy=%s",
+            publisher.key,
+            trigger_strategy,
+        )
+        results = []
+        for index, effect in enumerate(publisher.effects):
+            try:
+                results.append(
+                    await DoomEternalContext.send_publisher_effect(
+                        self,
+                        publisher, index, effect, source_description
+                    )
+                )
+            except Exception as error:
+                logger.error(
+                    "[PUBLISHER] EFFECT_RETRY key=%s effect=%s error=%s",
+                    publisher.key,
+                    effect["strategy"],
+                    error,
+                )
+                results.append(False)
+        return all(results)
+
     async def send_mission_complete(
         self, location_id, source_description, report_goal=False
     ):
-        if not self.server or not self.server.socket or self.server.socket.closed:
-            return False
-
-        has_location = location_id is not None
-
-        if has_location and location_id not in self.server_locations:
-            logger.warning(
-                "[Mission] MISSION_LOCATION id=%s slot=absent",
-                location_id,
-            )
-            return False
-
-        messages = []
-        checked_locations = getattr(self, "checked_locations", set())
-        locations_in_flight = getattr(
-            self,
-            "mission_locations_in_flight",
+        """Compatibility wrapper routed through the declarative effect sender."""
+        matching = next(
+            (
+                publisher
+                for publisher in PUBLISHERS
+                if any(
+                    effect["strategy"] == "location_check"
+                    and effect["location_id"] == location_id
+                    for effect in publisher.effects
+                )
+            ),
             None,
         )
-        if locations_in_flight is None:
-            locations_in_flight = self.mission_locations_in_flight = set()
-
-        goal_in_flight = getattr(self, "mission_goal_in_flight", False)
-
-        location_acknowledged = (
-            has_location and location_id in checked_locations
-        )
-        location_is_new = has_location and not location_acknowledged
-
-        if location_acknowledged:
-            locations_in_flight.discard(location_id)
-
-        if location_is_new:
-            messages.append(
-                {
-                    "cmd": "LocationChecks",
-                    "locations": [location_id],
-                }
+        if matching is None and report_goal:
+            matching = next(
+                publisher
+                for publisher in PUBLISHERS
+                if any(effect["strategy"] == "campaign_goal" for effect in publisher.effects)
             )
-
-        goal_is_new = (
-            report_goal
-            and not self.session_state.get("goal_sent", False)
-        )
-        if goal_is_new:
-            messages.append(
-                {
-                    "cmd": "StatusUpdate",
-                    "status": ClientStatus.CLIENT_GOAL,
-                }
-            )
-
-        if not messages:
-            location_done = not has_location or location_acknowledged
-            goal_done = (
-                not report_goal
-                or self.session_state.get("goal_sent", False)
-            )
-            return location_done and goal_done
-
-        if (
-            location_is_new
-            and location_id in locations_in_flight
-        ) or (
-            goal_is_new
-            and goal_in_flight
-        ):
-            logger.info(
-                "[Mission] LOCATION_CHECK_RETRY id=%s reason=in_flight",
-                location_id,
-            )
+        if matching is None:
             return False
-
-        if location_is_new:
-            locations_in_flight.add(location_id)
-
-        if goal_is_new:
-            self.mission_goal_in_flight = True
-
-        try:
-            if location_is_new:
-                logger.info(
-                    "[Mission] LOCATION_CHECK_SEND id=%s source=%s",
-                    location_id,
-                    source_description,
+        results = []
+        for index, effect in enumerate(matching.effects):
+            if effect["strategy"] == "preserved_native_target":
+                continue
+            if effect["strategy"] == "campaign_goal" and not report_goal:
+                continue
+            if effect["strategy"] == "location_check" and location_id is None:
+                continue
+            results.append(
+                await DoomEternalContext.send_publisher_effect(
+                    self, matching, index, effect, source_description
                 )
-            if goal_is_new:
-                logger.info(
-                    "[Goal] GOAL_SEND source=%s",
-                    source_description,
-                )
-
-            await self.send_msgs(messages)
-        except Exception:
-            if location_is_new:
-                locations_in_flight.discard(location_id)
-            if goal_is_new:
-                self.mission_goal_in_flight = False
-            raise
-
-        if location_is_new:
-            self.locations_checked.add(location_id)
-
-        if goal_is_new:
-            try:
-                self.session_state["goal_sent"] = True
-                self.persist_session_state()
-            finally:
-                self.mission_goal_in_flight = False
-
-        location_done = (
-            not has_location
-            or location_id in checked_locations
-        )
-        goal_done = (
-            not report_goal
-            or self.session_state.get("goal_sent", False)
-        )
-
-        if has_location and location_id in checked_locations:
-            locations_in_flight.discard(location_id)
-            logger.info(
-                "[Mission] LOCATION_CHECK_ACK id=%s",
-                location_id,
             )
-
-        return location_done and goal_done
+        return bool(results) and all(results)
 
     async def send_campaign_goal(self, source_description):
         return await DoomEternalContext.send_mission_complete(
@@ -3674,125 +3778,109 @@ class DoomEternalContext(CommonContext):
         )
 
     async def check_campaign_goal_event(self):
-        """Consume direct map goal plus native Mission Complete transitions."""
-        goal_event_path = (
-            Path(INV_DUMP_DIR) / CAMPAIGN_GOAL_CONTRACT["event_filename"]
-        )
-        if goal_event_path.exists():
-            try:
-                contents = goal_event_path.read_text(
-                    encoding="utf-8", errors="ignore"
-                )
-            except OSError:
-                contents = ""
-            if CAMPAIGN_GOAL_CONTRACT["marker"] not in contents:
-                logger.warning("[Goal] Malformed campaign goal event; removing it.")
-                try:
-                    goal_event_path.unlink()
-                except OSError:
-                    pass
-                return True
-            try:
-                sent = await self.send_campaign_goal(
-                    (
-                        f"{CAMPAIGN_GOAL_CONTRACT['runtime_map']} -> "
-                        f"{CAMPAIGN_GOAL_CONTRACT['destination_map']}"
+        """Consume independent map files and native transition triggers."""
+        observed = False
+        quarantine_root = Path(INV_DUMP_DIR) / "quarantine"
+        for publisher in PUBLISHERS:
+            for trigger in publisher.triggers_for("map_event_file"):
+                path = Path(INV_DUMP_DIR) / trigger["filename"]
+                if not path.exists():
+                    continue
+                observed = True
+                valid, contents, digest = read_map_event(path, trigger["marker"])
+                if not valid:
+                    quarantine_malformed_event(
+                        path,
+                        key=publisher.key,
+                        contents=contents,
+                        sha256=digest,
+                        quarantine_root=quarantine_root,
                     )
+                    logger.warning(
+                        "[PUBLISHER] EVENT_MALFORMED key=%s filename=%s sha256=%s",
+                        publisher.key,
+                        trigger["filename"],
+                        digest,
+                    )
+                    continue
+                complete = await DoomEternalContext.execute_publisher(
+                    self,
+                    publisher,
+                    "map_event_file",
+                    f"map event {trigger['filename']}",
                 )
-            except Exception as error:
-                logger.error("[Goal] GOAL_RETRY error=%s", error)
-                return True
-            if sent:
-                try:
-                    goal_event_path.unlink()
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    logger.warning("[Goal] Sent goal event cleanup failed: %s", error)
-                logger.info(
-                    "[Goal] GOAL_ACK owner=%s",
-                    CAMPAIGN_GOAL_CONTRACT["owner"],
-                )
-            else:
-                logger.info("[Goal] GOAL_RETRY reason=mission_or_server_ack")
-            return True
+                if complete:
+                    try:
+                        path.unlink()
+                    except FileNotFoundError:
+                        pass
+                    except OSError as error:
+                        logger.warning(
+                            "[PUBLISHER] EVENT_CLEANUP_RETRY key=%s filename=%s error=%s",
+                            publisher.key,
+                            trigger["filename"],
+                            error,
+                        )
 
-        event_paths = goal_event_files()
-        if not event_paths:
-            return False
-
-        for path in event_paths:
+        for path in goal_event_files():
+            observed = True
             event = parse_goal_transition_event(path, include_raw=True)
             if event is None:
-                logger.warning(
-                    "[Goal] Malformed goal transition event "
-                    f"{os.path.basename(path)}; removing it."
+                try:
+                    raw = Path(path).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    raw = ""
+                digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+                quarantine_malformed_event(
+                    Path(path),
+                    key="native_transition",
+                    contents=raw,
+                    sha256=digest,
+                    quarantine_root=quarantine_root,
                 )
+                logger.warning(
+                    "[PUBLISHER] EVENT_MALFORMED key=native_transition filename=%s sha256=%s",
+                    os.path.basename(path),
+                    digest,
+                )
+                continue
+            matching = publishers_for_transition(
+                PUBLISHERS, event["from_map"], event["to_map"]
+            )
+            if not matching:
+                logger.info(
+                    "[PUBLISHER] TRANSITION_IGNORED from=%s to=%s reason=no_contract",
+                    event["from_map"],
+                    event["to_map"],
+                )
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+                continue
+            completed = []
+            for publisher in matching:
+                completed.append(
+                    await DoomEternalContext.execute_publisher(
+                        self,
+                        publisher,
+                        "native_transition",
+                        f"native transition {event['from_map']} -> {event['to_map']}",
+                    )
+                )
+            if all(completed):
                 try:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
                 except OSError as error:
                     logger.warning(
-                        "[Goal] Could not remove malformed goal transition "
-                        f"event {os.path.basename(path)} yet: {error}"
+                        "[PUBLISHER] EVENT_CLEANUP_RETRY key=native_transition "
+                        "filename=%s error=%s",
+                        os.path.basename(path),
+                        error,
                     )
-                continue
-
-            transition = MISSION_COMPLETE_TRANSITIONS.get(
-                (event.get("from_map"), event.get("to_map"))
-            )
-            logger.info(
-                "[Mission] TRANSITION_EVENT raw=%s->%s canonical=%s->%s",
-                event.get("raw_from_map"), event.get("raw_to_map"),
-                event.get("from_map"), event.get("to_map"),
-            )
-            if transition is None:
-                logger.info("[Mission] TRANSITION_IGNORED reason=no_registry_match")
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    logger.warning(
-                        "[Goal] Could not remove unexpected goal transition "
-                        f"event {os.path.basename(path)} yet: {error}"
-                    )
-                continue
-
-            try:
-                sent = await DoomEternalContext.send_mission_complete(
-                    self,
-
-                    transition["location_id"],
-
-                    "native transition event",
-
-                    report_goal=False
-
-                )
-            except Exception as error:
-                logger.error(
-                    "[Mission] LOCATION_CHECK_RETRY id=%s error=%s",
-                    transition["location_id"], error,
-                )
-                return True
-            if not sent:
-                logger.info("[Mission] LOCATION_CHECK_RETRY id=%s", transition["location_id"])
-                return True
-
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
-            except OSError as error:
-                logger.warning(
-                    "[Goal] Goal sent but transition event file "
-                    f"{os.path.basename(path)} could not be removed yet: {error}"
-                )
-            logger.info("[Mission] MISSION_LOCATION id=%s name=%s", transition["location_id"], transition["name"])
-
-        return True
+        return observed
 
     async def check_campaign_goal_save_fallback(self):
         details = self.active_game_details()
@@ -3877,6 +3965,8 @@ class DoomEternalContext(CommonContext):
         event_paths_by_location = {}
         unknown_event_paths = []
         for path in check_event_files():
+            if os.path.basename(path) in PUBLISHER_MAP_EVENT_FILENAMES:
+                continue
             location_id = extract_location_id_from_event(path)
             if location_id is None:
                 unknown_event_paths.append(path)
@@ -3959,6 +4049,9 @@ class DoomEternalContext(CommonContext):
                 ready_path = os.path.join(INV_DUMP_DIR, "ap_telemetry_ready.txt")
                 if os.path.exists(ready_path):
                     try:
+                        self.runtime_observation_lease.observe_gameplay_loaded(
+                            os.stat(ready_path).st_mtime_ns
+                        )
                         os.remove(ready_path)
                         if not rpc_execution_enabled():
                             set_rpc_execution(True)

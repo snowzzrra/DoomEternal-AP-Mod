@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "hell_on_earth_mission_complete",
+      "map_key": "e1m1_intro",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "3509104422",
+          "filename": "ap_event_7770122.txt",
+          "marker": "AP_CHECK_EVENT_7770122"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770122
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "exultia_mission_complete",
+      "map_key": "e1m2_war",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "extraction_map_exit_level_transition_relay_1723732033",
+          "filename": "ap_event_7770123.txt",
+          "marker": "AP_CHECK_EVENT_7770123"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770123
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "cultist_base_mission_complete",
+      "map_key": "e1m3_cult",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e1m3_cult/e1m3_cult",
+          "to_map": "game/sp/e1m4_boss/e1m4_boss"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770124
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "doom_hunter_base_mission_complete",
+      "map_key": "e1m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "checkpoints_target_relay_65",
+          "filename": "ap_event_7770162.txt",
+          "marker": "AP_CHECK_EVENT_7770162"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770162
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "super_gore_nest_mission_complete",
+      "map_key": "e2m1_nest",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m1_nest/e2m1_nest",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770210
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "arc_complex_mission_complete",
+      "map_key": "e2m2_base",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "fort_map_exit_level_transition_relay_393966306",
+          "filename": "ap_event_7770248.txt",
+          "marker": "AP_CHECK_EVENT_7770248"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m2_base/e2m2_base",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770248
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "mars_core_mission_complete",
+      "map_key": "e2m3_core",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m3_core/e2m3_core",
+          "to_map": "game/sp/e2m4_boss/e2m4_boss"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770289
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "sentinel_prime_mission_complete",
+      "map_key": "e2m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "e2m4_endoflevel_transition",
+          "filename": "ap_mission_sentinel_prime_complete.txt",
+          "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770290
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "e2m4_endoflevel_transition_native"
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "sentinel_prime_campaign_goal",
+      "map_key": "e2m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "e2m4_endoflevel_transition",
+          "filename": "ap_goal_sentinel_prime_complete.txt",
+          "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "campaign_goal"
+        }
+      ],
+      "dedupe_scope": "ap_session_goal",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

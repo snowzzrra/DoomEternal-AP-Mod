@@ -10,6 +10,7 @@ CONTRACT_PATH = ROOT / "data" / "campaign_goal_contract.json"
 REQUIRED_FIELDS = {
     "schema_version",
     "release",
+    "publisher_key",
     "event_filename",
     "marker",
     "event_target",
@@ -38,6 +39,8 @@ def load_campaign_goal_contract(path: Path = CONTRACT_PATH) -> dict:
         raise ValueError("campaign goal marker must use AP_GOAL_EVENT_")
     if contract["event_target"] != "ap_campaign_goal_event":
         raise ValueError("campaign goal event_target drift")
+    if contract["publisher_key"] != "sentinel_prime_campaign_goal":
+        raise ValueError("campaign goal compatibility projection drift")
     if contract["runtime_map"] == contract["destination_map"]:
         raise ValueError("campaign goal transition cannot target its source map")
     return contract

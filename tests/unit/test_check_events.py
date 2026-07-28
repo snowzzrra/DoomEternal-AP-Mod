@@ -77,6 +77,58 @@ def _load_bridge_client():
 bridge_client = _load_bridge_client()
 
 
+class _SyntheticLiveLease:
+    """Legacy bridge tests isolate save logic; lease behavior has its own suite."""
+
+    last_block_reason = None
+
+    @staticmethod
+    def process_probe():
+        return True
+
+    @staticmethod
+    def observe_gameplay_loaded(*args, **kwargs):
+        return None
+
+    @staticmethod
+    def validate(**kwargs):
+        return True, "live"
+
+
+bridge_client.RuntimeObservationLease = _SyntheticLiveLease
+
+
+class _SyntheticBaselineStore:
+    """Legacy predicate tests bypass first-bind baseline; lifecycle owns that contract."""
+
+    binding_key = staticmethod(bridge_client.SaveObserverBaselineStore.binding_key)
+
+    def __init__(self, state):
+        self.state = state
+
+    def observe(
+        self, *, binding_key, observer_key, records, acknowledged_records
+    ):
+        pending = {
+            key
+            for key, complete in records.items()
+            if complete and key not in acknowledged_records
+        }
+        return pending, False, pending
+
+
+bridge_client.SaveObserverBaselineStore = _SyntheticBaselineStore
+
+
+async def _synthetic_to_thread(function, *args, **kwargs):
+    return function(*args, **kwargs)
+
+
+# Save-parser threading is integration behavior; these legacy unit records are
+# deterministic bytes and must not leave executor threads in IsolatedAsyncio.
+bridge_client.asyncio.to_thread = _synthetic_to_thread
+
+
 async def _async_append(target, value):
     target.append(value)
 
@@ -161,6 +213,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(signal["unlockable"], incomplete)
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
+            ctx.runtime_observers_frozen = False
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             ctx.observe_weapon_masteries(incomplete, "incomplete-native-fixture")
@@ -578,7 +631,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(ctx.runtime_observers_frozen)
 
     async def test_conclusive_hub_switch_promotes_and_runs_challenge_observers(self):
-        challenge = self._mission_challenge_entries("e1m3")[0]
+        challenge = self._mission_challenge_entries("e1m3")[1]
         with tempfile.TemporaryDirectory() as directory:
             remote = Path(directory)
             slots = {}
@@ -606,7 +659,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(bridge_client, "probe_game_duration", side_effect=lambda path: {
                     "mastery_records": {},
                     "mission_challenge_records": (
-                        self._mission_challenge_records((True, False, False))
+                        self._mission_challenge_records((False, True, False))
                         if path == slots["GAME-AUTOSAVE0"] else {}
                     ),
                     "checkpoint_death": False,
@@ -762,7 +815,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 }]])
 
     async def test_natural_challenge_durable_save_sends_once(self):
-        entry = bridge_client.MISSION_CHALLENGE_ENTRIES[0]
+        entry = bridge_client.MISSION_CHALLENGE_ENTRIES[1]
         incomplete = bridge_client.read_mission_challenge_records(
             self._record(0, False, False, entry)
         )
@@ -883,6 +936,9 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(bridge_client, "probe_game_duration", side_effect=probe),
             ):
                 ctx = bridge_client.DoomEternalContext(None, None)
+                ctx.item_state_ready = True
+                ctx.session_state = {}
+                ctx.persist_session_state = lambda: None
                 reports = []
 
                 async def report():
@@ -1105,7 +1161,9 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 }
                 self.assertTrue(set(range(7770126, 7770138)) <= sent_ids)
                 self.assertNotIn(7770125, sent_ids)
-                self.assertTrue({7770138, 7770140, 7770141} <= sent_ids)
+                self.assertIn(7770140, sent_ids)
+                self.assertNotIn(7770138, sent_ids)
+                self.assertNotIn(7770141, sent_ids)
 
                 sent_count = len(sent)
                 Path(slots["GAME-AUTOSAVE0"]).write_bytes(b"slot0-reload")
@@ -1147,11 +1205,18 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ])
 
     def test_each_mission_challenge_requires_its_own_durable_record(self):
-        for entry in bridge_client.MISSION_CHALLENGE_ENTRIES:
+        for entry in (
+            item for item in bridge_client.MISSION_CHALLENGE_ENTRIES
+            if item["signal"]["kind"] in {"unlockable_record", "stat_threshold"}
+        ):
             incomplete = bridge_client.read_mission_challenge_records(
                 self._record(0, False, False, entry)
             )
             ctx = bridge_client.DoomEternalContext(None, None)
+            ctx.item_state_ready = True
+            ctx.runtime_observers_frozen = False
+            ctx.session_state = {}
+            ctx.persist_session_state = lambda: None
             ctx.observe_mission_challenges(incomplete, "incomplete-challenge")
             self.assertFalse(
                 ctx.mission_challenges_observed[entry["signal"]["unlockable"]]
@@ -1180,7 +1245,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 {entry["signal"]["unlockable"]},
             )
 
-    def test_all_challenge_record_combinations_only_complete_at_111(self):
+    def test_save_records_never_complete_server_aggregate_locally(self):
         for bits in (
             (False, False, False), (False, False, True),
             (False, True, False), (False, True, True),
@@ -1192,31 +1257,19 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx.runtime_observers_frozen = False
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
-            # Only pass records for the first map (e1m3); DHB entries stay default False
             ctx.observe_mission_challenges(
                 self._mission_challenge_records(bits, mission_key="e1m3"),
                 "all-combinations",
             )
-            e1m3_done = all(bits)
-            self.assertEqual(
-                ctx.all_mission_challenges_observed,
-                {
-                    "e1m3": e1m3_done,
-                    "e1m4": False,
-                    "e2m1": False,
-                    "e2m2": False,
-                    "e2m3": False,
-                },
-                bits,
-            )
+            self.assertEqual(ctx.all_mission_challenges_observed, {}, bits)
 
-    async def test_all_challenges_location_sends_only_for_111(self):
+    async def test_all_challenges_location_sends_only_for_checked_children(self):
         class Socket:
             closed = False
 
         for aggregate in bridge_client.ALL_MISSION_CHALLENGES_ENTRIES:
             location_id = aggregate["location_id"]
-            chall_unlockables = aggregate["signal"]["unlockables"]
+            children = aggregate["signal"]["children"]
             for bits in (
                 (False, False, False), (False, False, True),
                 (False, True, False), (False, True, True),
@@ -1228,26 +1281,12 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx.runtime_observers_frozen = False
                 ctx.session_state = {}
                 ctx.persist_session_state = lambda: None
-                # Build records matching real signal values so natural_complete fires
-                records = {}
-                for ul, complete in zip(chall_unlockables, bits, strict=True):
-                    entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE.get(ul)
-                    signal = entry["signal"]
-                    records[ul] = {
-                        "numUnlockableRules": signal["numUnlockableRules"],
-                        "rule_0_statname": signal["rule_0_statname"],
-                        "rule_0_statCount": (
-                            signal.get("rule_0_statCount", 0)
-                            if complete else 999
-                        ),
-                        "rule_0_statDuration": signal["rule_0_statDuration"],
-                        "rule_0_satisfied": complete,
-                        "unlockableIsUnlocked": complete,
-                    }
-                ctx.observe_mission_challenges(records, "all-location-combinations")
                 ctx.server = types.SimpleNamespace(socket=Socket())
                 ctx.server_locations = {location_id}
-                ctx.checked_locations = set()
+                ctx.checked_locations = {
+                    child for child, complete in zip(children, bits, strict=True)
+                    if complete
+                }
                 ctx.locations_checked = set()
                 sent = []
 
@@ -1256,11 +1295,10 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
                 ctx.send_msgs = send_msgs
                 await ctx.check_all_mission_challenges_location()
-                all_done = all(bits)
                 self.assertEqual(
                     sent,
                     [[{"cmd": "LocationChecks", "locations": [location_id]}]]
-                    if all_done else [],
+                    if all(bits) else [],
                     (aggregate["name"], bits),
                 )
 
@@ -1268,7 +1306,10 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         class Socket:
             closed = False
 
-        for entry in bridge_client.MISSION_CHALLENGE_ENTRIES:
+        for entry in (
+            item for item in bridge_client.MISSION_CHALLENGE_ENTRIES
+            if item["signal"]["kind"] in {"unlockable_record", "stat_threshold"}
+        ):
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
             ctx.runtime_observers_frozen = False
@@ -1351,35 +1392,24 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         await ctx.check_mission_challenge_locations()
         self.assertEqual(len(sent), 2)
 
-    async def test_all_challenges_retry_server_dedupe_and_slot_switch(self):
+    async def test_all_challenges_retry_and_server_dedupe(self):
         class Socket:
             closed = False
 
-        location_id = next(
-            entry["location_id"]
-            for entry in bridge_client.ALL_MISSION_CHALLENGES_ENTRIES
+        aggregate = next(
+            entry for entry in bridge_client.ALL_MISSION_CHALLENGES_ENTRIES
             if entry["mission_key"] == "e1m3"
         )
+        location_id = aggregate["location_id"]
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
         ctx.session_state = {}
         ctx.state_key = "aggregate-seed:1:2"
         ctx.persist_session_state = lambda: None
-        slot0 = bridge_client.PrimarySaveSelection(
-            "GAME-AUTOSAVE0", Path("/tmp/GAME-AUTOSAVE0/game_duration.dat"), 1
-        )
-        slot2 = bridge_client.PrimarySaveSelection(
-            "GAME-AUTOSAVE2", Path("/tmp/GAME-AUTOSAVE2/game_duration.dat"), 2
-        )
-        ctx.activate_save_selection(slot0)
-        ctx.observe_mission_challenges(
-            self._mission_challenge_records((True, True, True), mission_key="e1m3"),
-            slot0.path,
-        )
         ctx.server = types.SimpleNamespace(socket=Socket())
         ctx.server_locations = {location_id}
-        ctx.checked_locations = set()
+        ctx.checked_locations = set(aggregate["signal"]["children"])
         ctx.locations_checked = set()
         sent = []
 
@@ -1394,17 +1424,8 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(sent), 2)
         self.assertEqual(ctx.locations_checked, {location_id})
 
-        ctx.activate_save_selection(slot2)
-        ctx.observe_mission_challenges(
-            self._mission_challenge_records((True, True, False), mission_key="e1m3"),
-            slot2.path,
-        )
-        await ctx.check_all_mission_challenges_location()
-        self.assertEqual(len(sent), 2)
-
-        ctx.activate_save_selection(slot0)
-        ctx.locations_checked.clear()  # Simulate a fresh bridge process/reload.
-        ctx.checked_locations = {location_id}
+        ctx.locations_checked.clear()
+        ctx.checked_locations.add(location_id)
         await ctx.check_all_mission_challenges_location()
         self.assertEqual(len(sent), 2)
 
@@ -2094,14 +2115,14 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.canonical_map_name(contract["map"]),
             )
 
-    def test_native_transition_publisher_is_cultist_only(self):
+    def test_native_transition_publisher_emits_generic_edges(self):
         source = (ROOT / "native" / "client" / "ap_client_exe.cpp").read_text(encoding="utf-8")
         monitor = source.split("class MissionTransitionMonitor", 1)[1].split(
             "bool ReadCommandFile", 1
         )[0]
-        self.assertIn('canonicalFrom == "game/sp/e1m3_cult/e1m3_cult"', monitor)
-        self.assertIn('canonicalTo == "game/sp/e1m4_boss/e1m4_boss"', monitor)
-        self.assertIn("reason=map_side_owner", monitor)
+        self.assertNotIn('canonicalFrom == "game/sp/e1m3_cult/e1m3_cult"', monitor)
+        self.assertNotIn('canonicalTo == "game/sp/e1m4_boss/e1m4_boss"', monitor)
+        self.assertNotIn("reason=map_side_owner", monitor)
         self.assertNotIn('canonicalFrom == "game/sp/e1m1_intro/e1m1_intro"', monitor)
         self.assertNotIn('canonicalFrom == "game/sp/e1m2_battle/e1m2_battle"', monitor)
         self.assertNotIn("e1m2_war/e1m2_war", source)
@@ -2661,6 +2682,7 @@ class CheckEventTests(unittest.TestCase):
             ("game/sp/e2m1_nest/e2m1_nest", "game/hub/hub"): 7770210,
             ("game/sp/e2m2_base/e2m2_base", "game/hub/hub"): 7770248,
             ("game/sp/e2m3_core/e2m3_core", "game/sp/e2m4_boss/e2m4_boss"): 7770289,
+            ("game/sp/e2m4_boss/e2m4_boss", "game/hub/hub"): 7770290,
         }
         self.assertEqual(
             {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
@@ -2874,7 +2896,7 @@ class CheckEventTests(unittest.TestCase):
                 )
                 self.assertEqual(ctx.session_state["goal_sent"], False)
                 self.assertEqual(ctx.locations_checked, {7770124})
-                self.assertEqual(persisted, [])
+                self.assertEqual(persisted, [True])
                 self.assertFalse(event_path.exists())
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
@@ -3025,7 +3047,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertEqual(ctx.send_attempts, 2)
                 self.assertEqual(ctx.locations_checked, {7770124})
                 self.assertFalse(ctx.session_state["goal_sent"])
-                self.assertEqual(ctx.persisted, 0)
+                self.assertEqual(ctx.persisted, 1)
             finally:
                 bridge_client.DOOM_BASE_DIR = original_base_dir
 
@@ -3298,7 +3320,7 @@ class CheckEventTests(unittest.TestCase):
     def test_physical_event_equivalent_immediate_send_and_dedupe(self):
         ctx = bridge_client.DoomEternalContext("localhost:38281", "")
         ctx.item_state_ready = True
-        ctx.runtime_observers_frozen = True
+        ctx.runtime_observers_frozen = False
         ctx.locations_checked = set()
         ctx.checked_locations = set()
         ctx.server_locations = {7770206, 7770138}
@@ -3362,13 +3384,14 @@ class CheckEventTests(unittest.TestCase):
         # Currently challenge_2 and challenge_3 are not complete -> aggregate not complete
         self.assertFalse(ctx.all_mission_challenges_observed.get("e2m2"))
 
-        # Mark challenge_2 and challenge_3 complete and mock save proof for aggregate
+        # Server ACKs challenge_2 and challenge_3; local observed flags are not authority.
         sent.clear()
         ctx.has_authoritative_save_proof = lambda: True
         ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_2"] = True
         ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_3"] = True
+        ctx.checked_locations.update({7770245, 7770246})
         ctx.observe_physical_event_challenges()
-        self.assertTrue(ctx.all_mission_challenges_observed.get("e2m2"))
+        self.assertFalse(ctx.all_mission_challenges_observed.get("e2m2"))
         asyncio.run(ctx.check_all_mission_challenges_location())
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["locations"], [7770247])

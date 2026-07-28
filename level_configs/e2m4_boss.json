@@ -2,6 +2,17 @@
     "map_key": "e2m4_boss",
     "level": "e2m4_boss",
     "region": "Sentinel Prime",
+    "assets": [
+        {
+            "key": "sentinel_prime_ap_visual",
+            "strategy": "resident_model",
+            "model": "art/pickups/codex.lwo",
+            "resource_base": "e2m4_boss",
+            "dependencies": [],
+            "dependency_policy": "resident"
+        }
+    ],
+    "default_visual_asset": "sentinel_prime_ap_visual",
     "entities": {
         "AP_CHECK_GAME_PROGRESS_CODEX_1_E2M4": 7770291,
         "AP_CHECK_GAME_PROGRESS_CODEX_2_E2M4": 7770292,
@@ -30,10 +41,11 @@
         "game_pickup_extra_life_extra_life_1_1": {
             "independent_ap_trigger": true,
             "independent_visual": {
+                "asset": "sentinel_prime_ap_visual",
                 "entity_name": "ap_location_visual_7770301",
                 "class": "idProp2",
                 "inherit": null,
-                "model": "art/pickups/question_mark_a.lwo",
+                "model": "art/pickups/codex.lwo",
                 "thinkComponentDecl": "bob_rotate_fast",
                 "position": [-43.3499985, -20.1500034, 271.500031],
                 "scale": [1.0, 1.0, 1.0],
@@ -43,10 +55,11 @@
         "game_pickup_extra_life_extra_life_1_3_e2m4": {
             "independent_ap_trigger": true,
             "independent_visual": {
+                "asset": "sentinel_prime_ap_visual",
                 "entity_name": "ap_location_visual_7770302",
                 "class": "idProp2",
                 "inherit": null,
-                "model": "art/pickups/question_mark_a.lwo",
+                "model": "art/pickups/codex.lwo",
                 "thinkComponentDecl": "bob_rotate_fast",
                 "position": [6.20003986, -6.19996214, 282.80014],
                 "scale": [1.0, 1.0, 1.0],

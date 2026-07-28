@@ -49,7 +49,6 @@ gameresources/
 
 # Local investigation
 debug_matches.py
-battery.txt
 *_dump*.txt
 .death-probe-*/
 .death-probe-compat/

@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "hell_on_earth": {
+    "patch_strategy": "logic_node_targets",
     "location_id": 7770122,
     "map_key": "e1m1_intro",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_HELL_ON_EARTH",
@@ -12,6 +13,7 @@
     "original_targets": ["citadel_target_level_transition_3"]
   },
   "exultia": {
+    "patch_strategy": "entity_targets",
     "location_id": 7770123,
     "map_key": "e1m2_war",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_EXULTIA",
@@ -26,6 +28,7 @@
     ]
   },
   "doom_hunter_base": {
+    "patch_strategy": "entity_targets",
     "location_id": 7770162,
     "map_key": "e1m4_boss",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
@@ -46,6 +49,7 @@
     }
   },
   "arc_complex": {
+    "patch_strategy": "entity_targets",
     "location_id": 7770248,
     "map_key": "e2m2_base",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_ARC_COMPLEX",
@@ -66,6 +70,7 @@
     }
   },
   "sentinel_prime": {
+    "patch_strategy": "terminal_publishers",
     "location_id": 7770290,
     "map_key": "e2m4_boss",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_SENTINEL_PRIME",
