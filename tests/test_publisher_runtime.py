@@ -5,8 +5,10 @@ from pathlib import Path
 from publisher_contracts import (
     PublisherContract,
     publishers_for_transition,
+    validate_publisher_contracts,
 )
 from publisher_runtime import (
+    PublisherEngine,
     publisher_acknowledged,
     quarantine_malformed_event,
     read_map_event,
@@ -45,6 +47,60 @@ def test_native_transition_publishes_mission_complete_once() -> None:
     assert matching == (publisher,)
     assert not publisher_acknowledged(publisher, set(), False)
     assert publisher_acknowledged(publisher, {77}, False)
+
+
+def test_one_trigger_dispatches_two_publishers() -> None:
+    mission = _publisher(
+        "mission", {"strategy": "location_check", "location_id": 77}, "MISSION", "mission.txt"
+    )
+    goal = _publisher("goal", {"strategy": "campaign_goal"}, "GOAL", "goal.txt")
+    assert PublisherEngine((goal, mission)).observe(
+        "native_transition", {"from_map": "fixture/from", "to_map": "fixture/to"}
+    ) == (goal, mission)
+
+
+def test_two_publishers_may_share_one_map_side_trigger() -> None:
+    document = {
+        "schema_version": 1,
+        "publishers": [
+            {
+                "key": key,
+                "map_key": "synthetic",
+                "triggers": [{
+                    "strategy": "map_event_file",
+                    "owner": "owner",
+                    "filename": "shared.txt",
+                    "marker": "SHARED",
+                }],
+                "effects": [effect],
+                "dedupe_scope": f"scope_{key}",
+                "fallback_policy": "first_success_wins",
+            }
+            for key, effect in (
+                ("mission", {"strategy": "location_check", "location_id": 77}),
+                ("goal", {"strategy": "campaign_goal"}),
+            )
+        ],
+    }
+    validate_publisher_contracts(document)
+
+
+def test_publisher_with_two_effects_acknowledges_independently() -> None:
+    publisher = PublisherContract(
+        "multi",
+        "synthetic",
+        ({"strategy": "terminal_owner", "owner": "terminal"},),
+        (
+            {"strategy": "location_check", "location_id": 77},
+            {"strategy": "campaign_goal"},
+        ),
+        "multi_scope",
+        "first_success_wins",
+    )
+    engine = PublisherEngine((publisher,))
+    assert engine.observe("terminal_owner", {"owner": "terminal"}) == (publisher,)
+    assert not publisher_acknowledged(publisher, {77}, False)
+    assert publisher_acknowledged(publisher, {77}, True)
 
 
 def test_map_and_transition_order_first_success_wins() -> None:

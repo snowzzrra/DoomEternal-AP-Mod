@@ -1,0 +1,68 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Split monolithic baseline without content change"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "4d2293a482400005ab7d0b0af1ff61d7a1bce60b1a2c7ae91f0498629cf20e59",
+  "byte_sha256": "4025fdb0ded94076b0f5a5a7a7c13e3bbc5046d8dfa8fc1e449f3ebbb10ed027",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 126,
+    "byte_size": 28809474,
+    "classes": 19131,
+    "entity_count": 19135,
+    "layers": 3691,
+    "targets": 96263,
+    "transforms": 40957,
+    "unique_entity_names": 19132
+  },
+  "manifest_sha256": "b23240f1ecc1d2cadcd0d8f25fb803acb9666afa470383c26bc9e87ae39e85f1",
+  "map_key": "e2m2_base",
+  "physical_ap_ids": [
+    7770211,
+    7770212,
+    7770213,
+    7770214,
+    7770215,
+    7770216,
+    7770217,
+    7770218,
+    7770219,
+    7770220,
+    7770221,
+    7770222,
+    7770223,
+    7770224,
+    7770225,
+    7770226,
+    7770227,
+    7770228,
+    7770229,
+    7770230,
+    7770231,
+    7770232,
+    7770233,
+    7770234,
+    7770235,
+    7770236,
+    7770237,
+    7770240,
+    7770242,
+    7770243,
+    7770249,
+    7770250,
+    7770251,
+    7770252
+  ],
+  "publisher_contract_sha256": "e4ad5ba9a17917e66aaf094c317043a584ab26ee663cc4301702dda89ed80cd9",
+  "runtime_location_ids": [],
+  "schema_version": 2,
+  "scripted_contract_sha256": "040c342e4226f996b98b3d3b6b6569e6b5772b96924fa25c7358fa0d1f41e1ae",
+  "semantic_sha256": "990d17e10f6167a40ab406f16b0ae0d74603ae48050c52a9cdf65b4397dde5c3"
+}

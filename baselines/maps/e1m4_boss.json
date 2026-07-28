@@ -1,0 +1,55 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Split monolithic baseline without content change"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "a529ec4c08d2866c70540d7193382dcf7d9a0f6333dcc71fcfcbf6ccda9e8bb0",
+  "byte_sha256": "e393d52057154b0e1c8223106e1b6e4c70f5c704a6e0cda85c9d1dc4c3a60625",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 706,
+    "byte_size": 10659274,
+    "classes": 9139,
+    "entity_count": 9141,
+    "layers": 2353,
+    "targets": 11989,
+    "transforms": 19050,
+    "unique_entity_names": 9140
+  },
+  "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
+  "map_key": "e1m4_boss",
+  "physical_ap_ids": [
+    7770143,
+    7770144,
+    7770145,
+    7770146,
+    7770147,
+    7770148,
+    7770149,
+    7770150,
+    7770151,
+    7770152,
+    7770153,
+    7770154,
+    7770155,
+    7770156,
+    7770157,
+    7770158,
+    7770159,
+    7770160,
+    7770161
+  ],
+  "publisher_contract_sha256": "2d2e3d4df1b83ffabd693bcec6a3826709f68a87d2d6f7312f4ed9f1d64a4406",
+  "runtime_location_ids": [
+    7770162
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "725d66f826d6489ca630b538c28c5faa4ce4a94fd52a7c5c581e2fd2feb265ba",
+  "semantic_sha256": "0649606a9188e851a7201e71b85af3ce14aeabfe7069f122c653f1c9d8ccfb6e"
+}

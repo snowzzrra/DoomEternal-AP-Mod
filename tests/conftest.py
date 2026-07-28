@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -60,6 +61,13 @@ def _changed_paths() -> set[str]:
 def selected_map_keys(config: pytest.Config, catalog: ContentCatalog) -> set[str]:
     requested = config.getoption("doom_map")
     all_keys = {spec.key for spec in catalog.enabled_maps()}
+    pipeline_selected = os.environ.get("AP_PIPELINE_SELECTED_MAPS")
+    if pipeline_selected:
+        selected = set(json.loads(pipeline_selected))
+        unknown = selected - all_keys
+        if unknown:
+            raise pytest.UsageError(f"unknown pipeline map keys: {sorted(unknown)}")
+        return selected
     if requested:
         if requested not in all_keys:
             raise pytest.UsageError(f"unknown --map {requested!r}; use a key from content_catalog")
@@ -140,6 +148,16 @@ def temporary_generated_maps(
     tmp_path_factory: pytest.TempPathFactory, request: pytest.FixtureRequest, content_catalog: ContentCatalog,
 ) -> dict[str, Path]:
     """Generate each selected real map once in pytest's session-only temp tree."""
+    pipeline_maps = os.environ.get("AP_PIPELINE_MAPS_JSON")
+    if pipeline_maps:
+        supplied = {
+            key: Path(path)
+            for key, path in json.loads(pipeline_maps).items()
+        }
+        missing = [str(path) for path in supplied.values() if not path.is_file()]
+        if missing:
+            raise ValueError(f"pipeline supplied missing generated maps: {missing}")
+        return supplied
     cache_root = tmp_path_factory.mktemp("doom-generated-maps")
     selected = selected_map_keys(request.config, content_catalog)
     items = json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8"))

@@ -377,9 +377,16 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         name: value for name, value in contracts.items()
         if isinstance(value, dict) and "map_key" in value
     }
-    required_keys = {contract["map_key"] for contract in contract_items.values()}
-    if set(generated_maps) < required_keys:
-        raise ValueError("Mission Complete generated map input is incomplete")
+    unknown_keys = set(generated_maps) - {
+        plan.key for plan in __import__("content_catalog").discover_maps(root)
+    }
+    if unknown_keys:
+        raise ValueError(f"unknown generated map input: {sorted(unknown_keys)}")
+    contract_items = {
+        name: contract
+        for name, contract in contract_items.items()
+        if contract["map_key"] in generated_maps
+    }
     before_maps = {key: path.read_text(encoding="utf-8") for key, path in generated_maps.items()}
     audits: dict[str, dict] = {}
     terminal_audit: dict | None = None

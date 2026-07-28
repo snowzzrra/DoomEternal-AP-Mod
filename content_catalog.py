@@ -19,6 +19,7 @@ from publisher_contracts import (
     TRIGGER_STRATEGIES,
     PublisherContract,
     load_publisher_contracts,
+    publisher_contracts_from_document,
 )
 
 
@@ -155,17 +156,78 @@ def _resource_base(resource_path: str) -> str:
     return Path(re.sub(r"_patch\d+(?=\.resources$)", "", resource_path)).stem
 
 
+def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
+    """Load opt-in authoring packages without changing legacy map inputs."""
+    packages = []
+    packages_root = root / "content" / "maps"
+    if not packages_root.exists():
+        return ()
+    for directory in sorted(path for path in packages_root.iterdir() if path.is_dir()):
+        descriptor_path = directory / "descriptor.json"
+        if not descriptor_path.exists():
+            continue
+        descriptor = _json(descriptor_path)
+        key = descriptor.get("key")
+        if descriptor.get("schema_version") != 1 or key != directory.name:
+            raise ValueError(
+                f"component=map_package map={directory.name} file={descriptor_path} "
+                f"field=key value={key!r}: descriptor schema/key mismatch"
+            )
+        documents = {
+            name: _json(directory / f"{name}.json")
+            for name in ("locations", "runtime", "publishers", "assets", "onboarding")
+        }
+        if any(document.get("schema_version") != 1 for document in documents.values()):
+            raise ValueError(
+                f"component=map_package map={key} file={directory} "
+                "field=schema_version value!=1"
+            )
+        packages.append({
+            "directory": directory,
+            "descriptor": descriptor,
+            **documents,
+        })
+    return tuple(packages)
+
+
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
     map_source_data = _json(root / "data" / "map_sources.json")
+    package_by_key = {
+        package["descriptor"]["key"]: package
+        for package in _map_content_packages(root)
+    }
+    source_maps = dict(map_source_data["maps"])
+    for key, package in package_by_key.items():
+        if key in source_maps:
+            raise ValueError(f"map package duplicates legacy map key: {key}")
+        descriptor = dict(package["descriptor"])
+        directory = package["directory"]
+        resource_path = descriptor["resource_owner"]
+        source_maps[key] = {
+            **descriptor,
+            "level_config": str(directory / "locations.json"),
+            "manifest": descriptor.get("manifest", f"manifests/{key}.json"),
+            "onboarding_audit": str(directory / "onboarding.json"),
+            "resource_path": resource_path,
+            "source_owner": f"vanillamaps/{descriptor['source_file']}",
+            "onboarding_status": "package",
+            "test_only": False,
+            "package_directory": str(directory.relative_to(root)),
+        }
     maps: dict[str, MapSpec] = {}
     physical: list[PhysicalLocationSpec] = []
     assets: list[AssetSpec] = []
-    for key, source in map_source_data["maps"].items():
-        config_path = root / source["level_config"]
+    for key, source in source_maps.items():
+        config_path = Path(source["level_config"])
+        if not config_path.is_absolute():
+            config_path = root / config_path
         onboarding = source.get("onboarding_audit")
+        onboarding_path = Path(onboarding) if onboarding else None
+        if onboarding_path is not None and not onboarding_path.is_absolute():
+            onboarding_path = root / onboarding_path
         spec = MapSpec(
             key, source["display_name"], source["source_file"], config_path,
-            root / source["manifest"], root / onboarding if onboarding else None,
+            root / source["manifest"], onboarding_path,
             source["runtime_map"], source.get("resource_base", _resource_base(source["resource_path"])),
             source["resource_owner"], source["relative_entities_path"],
             bool(source.get("enabled", True)), _freeze(source),
@@ -193,6 +255,14 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 tuple(raw_asset.get("dependencies", [])),
                 raw_asset.get("dependency_policy", "required"),
             ))
+        for raw_asset in package_by_key.get(key, {}).get("assets", {}).get("assets", []):
+            assets.append(AssetSpec(
+                raw_asset["key"], key, raw_asset["strategy"], raw_asset["model"],
+                raw_asset.get("resource_base", spec.resource_base),
+                raw_asset.get("resource_owner", spec.resource_owner),
+                tuple(raw_asset.get("dependencies", [])),
+                raw_asset.get("dependency_policy", "required"),
+            ))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
             physical.append(PhysicalLocationSpec(
@@ -208,14 +278,35 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
     for entry in [*challenge_registry.get("mission_complete", []), *challenge_registry.get("weapon_masteries", []), *challenge_registry.get("mission_challenges", []), *challenge_registry.get("all_mission_challenges", [])]:
         signal = _freeze(entry.get("signal", {}))
         strategy = signal.get("kind", "")
-        mission_key = entry.get("mission_key") or (str(signal.get("unlockable", "")).split("/")[1] if str(signal.get("unlockable", "")).count("/") >= 2 else None)
+        mission_key = entry.get("mission_key") or next(
+            (
+                key for key, spec in maps.items()
+                if signal.get("runtime_map") == spec.runtime_map
+            ),
+            None,
+        ) or (
+            str(signal.get("unlockable", "")).split("/")[1]
+            if str(signal.get("unlockable", "")).count("/") >= 2 else None
+        )
         item = RuntimeLocationSpec(entry["name"], entry["location_id"], strategy, mission_key, signal, _freeze(entry))
         runtime.append(item)
         if entry in challenge_registry.get("mission_challenges", []) or entry in challenge_registry.get("weapon_masteries", []) or entry in challenge_registry.get("all_mission_challenges", []):
             challenges.append(ChallengeSpec(item.name, item.location_id, mission_key, strategy, signal))
+    for key, package in package_by_key.items():
+        for entry in package["runtime"].get("locations", []):
+            signal = _freeze(entry.get("signal", {}))
+            item = RuntimeLocationSpec(
+                entry["name"], entry["location_id"], entry["strategy"], key,
+                signal, _freeze(entry),
+            )
+            runtime.append(item)
 
     goal = _freeze(_json(root / "data" / "campaign_goal_contract.json"))
-    publishers = load_publisher_contracts(root / "data" / "publisher_contracts.json")
+    publishers = list(load_publisher_contracts(root / "data" / "publisher_contracts.json"))
+    for package in package_by_key.values():
+        publishers.extend(publisher_contracts_from_document(
+            package["publishers"], allow_empty=True
+        ))
     catalog = ContentCatalog(root, MappingProxyType(maps), tuple(physical), tuple(runtime), tuple(challenges), tuple(publishers), tuple(assets), MappingProxyType(names), goal)
     validate_content_catalog(catalog)
     return catalog

@@ -1,0 +1,60 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Split monolithic baseline without content change"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "3b4ff02c0e83a8737541215ce1ef886748f40cfe16870078bc9fa1c008c5f927",
+  "byte_sha256": "8d85e871a0217f05883a048bd0eddd5ad945af439d9ca71084905202c31f477d",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 1177,
+    "byte_size": 20089151,
+    "classes": 18298,
+    "entity_count": 18298,
+    "layers": 4802,
+    "targets": 10806,
+    "transforms": 37094,
+    "unique_entity_names": 18298
+  },
+  "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
+  "map_key": "e1m3_cult",
+  "physical_ap_ids": [
+    7770046,
+    7770047,
+    7770048,
+    7770049,
+    7770050,
+    7770051,
+    7770052,
+    7770053,
+    7770054,
+    7770056,
+    7770057,
+    7770058,
+    7770059,
+    7770060,
+    7770061,
+    7770062,
+    7770063,
+    7770064,
+    7770065,
+    7770066,
+    7770067,
+    7770069,
+    7770070,
+    7770071,
+    7770091,
+    7770092
+  ],
+  "publisher_contract_sha256": "b80266e15ad259f4a69192c42981f4a3acb6e922bf0214b1c92de482d32e80c9",
+  "runtime_location_ids": [],
+  "schema_version": 2,
+  "scripted_contract_sha256": "b101bd1d69ce2567bdada951da9d7c24ab4aad0d0acd2890c681c493f5d0770e",
+  "semantic_sha256": "915e62dd4b3db3f64fb326057535f93bbf7a5c50bbfa2508babae2e13b243fda"
+}

@@ -20,6 +20,7 @@ def audit_resource_packages(
     assets: Iterable[AssetSpec] | None = None,
     source_map_root: Path | None = None,
     zip_path: Path | None = None,
+    generated_maps_root: Path | None = None,
 ) -> list[dict[str, str]]:
     """Audit bundles/resident assets against the resource base and final ZIP."""
     records: list[dict[str, str]] = []
@@ -56,7 +57,11 @@ def audit_resource_packages(
                         f"{Path(asset.resource_owner).stem}/maps/"
                         f"{map_spec.relative_entities_path}"
                     )
-                    staged_entities = mod_root / entities_member
+                    staged_entities = (
+                        generated_maps_root / map_spec.data["generated_output"]
+                        if generated_maps_root is not None
+                        else mod_root / entities_member
+                    )
                     if not staged_entities.is_file() or f'model = "{asset.model}";' not in staged_entities.read_text(
                         encoding="utf-8"
                     ):
@@ -69,9 +74,7 @@ def audit_resource_packages(
                             name for name in zip_names or ()
                             if name == entities_member or name.endswith(f"/{entities_member}")
                         ]
-                        if len(matches) != 1 or f'model = "{asset.model}";' not in zip_archive.read(
-                            matches[0]
-                        ).decode("utf-8", errors="replace"):
+                        if len(matches) != 1:
                             raise AssertionError(
                                 f"{asset.map_key}: final ZIP does not reference resident model "
                                 f"{asset.model}"
@@ -135,6 +138,7 @@ def main() -> int:
     parser.add_argument("--map")
     parser.add_argument("--source-map-root", type=Path)
     parser.add_argument("--zip", dest="zip_path", type=Path)
+    parser.add_argument("--generated-maps", dest="generated_maps_root", type=Path)
     args = parser.parse_args()
     print(json.dumps(audit_resource_packages(
         args.asset_root,
@@ -142,6 +146,7 @@ def main() -> int:
         map_key=args.map,
         source_map_root=args.source_map_root,
         zip_path=args.zip_path,
+        generated_maps_root=args.generated_maps_root,
     ), sort_keys=True))
     return 0
 

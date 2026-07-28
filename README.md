@@ -167,11 +167,20 @@ runtime identity, resource owner/priority/path, validation, package layout and
 validation and package plans; test-only entries can exercise every plan but
 are structurally excluded from release assets.
 
-The five accepted maps are additionally frozen by
-`data/frozen_map_baselines.json`. The byte SHA-256/size is the acceptance gate;
-the normalized semantic hash is a diagnostic covering entity names/classes,
-ordered targets, bindParent, layers, transforms, AP IDs, manifests and scripted
-contracts while ignoring only comments and irrelevant whitespace.
+Each accepted map has an independent baseline at
+`baselines/maps/<map_key>.json`. It separates physical AP IDs from runtime
+locations and records generated metrics plus byte, semantic, manifest,
+scripted, publisher and asset/package contract hashes. Accept one map only:
+
+```bash
+python -m tools.content.accept_baseline \
+    --map <map_key> \
+    --reason "<intentional content change>"
+```
+
+Use `scripts/pipeline.sh fast|map|changed|integration|release`. The final gate
+is `scripts/pipeline.sh release --build`; its content-addressed receipt is the
+only way the build reuses validated map outputs.
 
 When the installed game revision changes:
 
@@ -181,7 +190,8 @@ When the installed game revision changes:
    `ap_event_`, or `ap_rpc_auto_enable`.
 4. Update `data/map_sources.json` with the new `source_sha256` and
    `supported_game_revision`.
-5. Re-run `./validate_all.sh` and `./build_playable_test.sh`.
+5. Re-run `scripts/pipeline.sh map <map_key>`, accept the focused baseline if
+   intentional, then run `scripts/pipeline.sh release --build`.
 
 If the installed resource is already contaminated by a previous AP patch, use
 the clean `*.backup` variant or another known-vanilla dump before updating the
@@ -193,8 +203,9 @@ paths, configuration, passwords, seeds, runtime output or logs.
 
 ### New-map onboarding
 
-For each future map: back up the end-of-previous-mission save; add one registry
-entry; audit the vanilla owner/target graph with `map_preflight.py`; add proven
+For each future map, start with `python -m tools.content.new_map`; back up the
+end-of-previous-mission save; fill its MapContentPackage; audit the vanilla
+owner/target graph with `map_preflight.py`; add proven
 APWorld locations/IDs; generate only that map while comparing all frozen
 baselines; run a short transition test from the saved final checkpoint; freeze
 the passed map; then continue. Keep one final save per mission. Doom Hunter Base

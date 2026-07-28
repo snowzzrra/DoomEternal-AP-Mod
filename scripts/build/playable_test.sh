@@ -3,6 +3,9 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [[ -z "${AP_PIPELINE_RECEIPT:-}" ]]; then
+    exec "$REPO_ROOT/scripts/pipeline.sh" release --build "$@"
+fi
 export PYTHONPATH="$REPO_ROOT"
 WORKSPACE="$(cd "$REPO_ROOT/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
@@ -77,7 +80,7 @@ mkdir -p "$(dirname "$BUILD_LOG")"
 : > "$BUILD_LOG"
 exec > >(tee -a "$BUILD_LOG") 2>&1
 
-if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
+if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" && -z "${AP_PIPELINE_RECEIPT:-}" ]]; then
     run_build_step "scripted location contract validation" \
         python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
         --contracts "$REPO_ROOT/data/scripted_location_contracts.json"
@@ -135,13 +138,18 @@ extract_and_build() {
         GENERATOR_ARGS+=(--disable-item-notifications)
     fi
 
-    python3 "$REPO_ROOT/tools/maps/ap_map_generator.py" \
-        --input "$source_map" \
-        --output "$generated_file" \
-        --config "$REPO_ROOT/$config_path" \
-        --manifest "$generated_manifest" \
-        --items "$REPO_ROOT/data/items.json" \
-        "${GENERATOR_ARGS[@]}"
+    if [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
+        cp "$AP_PIPELINE_ARTIFACT_ROOT/maps/$generated_output" "$generated_file"
+        cp "$AP_PIPELINE_ARTIFACT_ROOT/manifests/$map_key.json" "$generated_manifest"
+    else
+        python3 "$REPO_ROOT/tools/maps/ap_map_generator.py" \
+            --input "$source_map" \
+            --output "$generated_file" \
+            --config "$REPO_ROOT/$config_path" \
+            --manifest "$generated_manifest" \
+            --items "$REPO_ROOT/data/items.json" \
+            "${GENERATOR_ARGS[@]}"
+    fi
 
     source_hash_after="$(sha256sum "$source_map" | awk '{print $1}')"
     if [[ "$source_hash_after" != "$source_hash_before" ]]; then
@@ -227,6 +235,9 @@ python3 "$REPO_ROOT/tools/release/build_string_table.py" \
     --maps-dir "$GENERATED_MAPS_DIR" \
     --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/portuguese.json"
 
+if [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
+    cp -R "$AP_PIPELINE_ARTIFACT_ROOT/mod/." "$OUTPUT_DIR/mod/"
+else
 python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
     --contracts "$REPO_ROOT/data/mission_complete_map_contracts.json" \
     "${MISSION_MAP_ARGS[@]}" \
@@ -270,6 +281,7 @@ assert audit["campaign_goal"]["preserved_native_targets"] == [
     "e2m4_endoflevel_transition_native"
 ]
 PY
+fi
 
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r map_key _ _ _ _ generated_output resource_path relative_entities_path _ <<< "$map_row"
@@ -357,6 +369,7 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/campaign_goal_contract.json" \
     "$REPO_ROOT/data/observer_contracts.json" \
     "$REPO_ROOT/data/publisher_contracts.json" \
+    "$REPO_ROOT/data/content_identity.json" \
     "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
@@ -465,6 +478,7 @@ manifest = {
         "client/data/campaign_goal_contract.json",
         "client/data/observer_contracts.json",
         "client/data/publisher_contracts.json",
+        "client/data/content_identity.json",
         *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
@@ -487,6 +501,11 @@ manifest = {
         "revision": f"mission-unified-{bridge_sha256[:12]}",
         "transition_handler": "unified",
     },
+    "content_identity": json.loads(
+        (Path(sys.argv[5]) / "data" / "content_identity.json").read_text(
+            encoding="utf-8"
+        )
+    ),
     "item_notifications": {
         "enabled": item_notifications_enabled,
         "revision": 1,
@@ -582,6 +601,7 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$OUTPUT_DIR/mod" \
+    --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps"
 
 (
@@ -631,6 +651,7 @@ unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip" -d "$MOD_AUDIT_D
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
+    --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
     --zip "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \

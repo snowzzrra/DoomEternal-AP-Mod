@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 import re
@@ -553,14 +554,25 @@ def validate_automap_prototypes_only() -> list[str]:
     return errors
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--map", dest="map_key")
+    args = parser.parse_args(argv)
+    if args.map_key:
+        from tools.validation.pipeline import Pipeline
+
+        pipeline = Pipeline()
+        pipeline.validate_map(args.map_key)
+        pipeline.report()
+        print(f"map data validation passed: {args.map_key}")
+        return 0
     errors: list[str] = []
     warnings: list[str] = []
 
     try:
         assert_frozen_map_baselines()
     except (OSError, ValueError) as exc:
-        errors.append(f"Frozen four-map baseline failed: {exc}")
+        errors.append(f"Map baseline failed: {exc}")
     try:
         assert_hub_diff_classified()
     except (OSError, ValueError) as exc:

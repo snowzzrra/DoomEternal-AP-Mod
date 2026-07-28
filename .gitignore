@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+.cache/ap_pipeline/
 
 # Native build
 *.o
