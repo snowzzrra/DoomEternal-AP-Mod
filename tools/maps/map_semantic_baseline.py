@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
-from content_catalog import ContentCatalog, load_content_catalog
+from content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from map_registry import load_map_registry, release_plan
 from tools.maps.ap_map_generator import generate_map
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
@@ -91,8 +91,9 @@ def _asset_package_payload(catalog: ContentCatalog, map_key: str) -> dict:
                 "dependencies": asset.dependencies,
                 "dependency_policy": asset.dependency_policy,
                 "donor": dict(asset.donor),
-                "asset_bundle": asset.asset_bundle,
-                "scope": asset.scope,
+                "replacement_slot_policy": asset.replacement_slot_policy,
+                "replacement_slot": thaw_content(asset.replacement_slot),
+                "usage_policy": asset.usage_policy,
                 "preserve": asset.preserve,
             }
             for asset in catalog.assets if asset.map_key == map_key

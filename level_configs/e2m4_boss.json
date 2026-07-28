@@ -4,27 +4,45 @@
     "region": "Sentinel Prime",
     "assets": [
         {
-            "key": "archipelago_location_model_payload",
-            "strategy": "streamdb",
-            "model": "art/pickups/question_mark_a_id#3385987379760210816.lwo",
-            "resource_base": "streamdb",
-            "dependencies": [],
-            "dependency_policy": "embedded_materials_textures"
-        },
-        {
             "key": "sentinel_prime_ap_visual",
             "strategy": "donor_model_override",
-            "model": "art/pickups/question_mark_a.lwo",
+            "model": "art/pickups/codex.lwo",
             "resource_base": "e2m4_boss",
             "dependencies": [],
-            "dependency_policy": "shared_streamdb_payload",
-            "asset_bundle": "archipelago_location_model_payload",
+            "dependency_policy": "model_importer_bundle",
             "donor": {
                 "kind": "codex",
                 "selection": "named_entity",
                 "entity": "game_progress_codex_1_e2m4"
             },
-            "scope": "injected_entity_only",
+            "replacement_slot_policy": "safe_resident_static_lwo",
+            "replacement_slot": {
+                "model_path": "art/pickups/codex.lwo",
+                "resource_archive": "e2m4_boss",
+                "material2": "art/pickups/codex",
+                "import_bundle": "codex_id#13626551837332538432",
+                "asset_id": "13626551837332538432",
+                "streamdb_payload": "art/pickups/codex_id#13626551837332538432.lwo",
+                "resource_payload_sha256": "b35312754e76fe37fd059fc8481d8cb269c7e30e2f858c12fd8bd61b608bb14f",
+                "streamdb_payload_sha256": "e41e0a3310996ee1c7c062ad4385176a151500ca688f71d1f3d3527fad796e81",
+                "vanilla_reference_allowlist": [
+                    "game_progress_codex_1_e2m4",
+                    "game_progress_codex_2_e2m4",
+                    "game_progress_codex_3_e2m4",
+                    "game_progress_codex_4_e2m4",
+                    "game_progress_codex_5_e2m4",
+                    "game_progress_codex_6_e2m4",
+                    "game_progress_codex_7_e2m4",
+                    "game_progress_codex_8_e2m4",
+                    "game_progress_codex_9_e2m4"
+                ],
+                "provenance": {
+                    "producer": "Doom Eternal Model Importer v1.2",
+                    "source_obj": "Archipelago.obj",
+                    "source_obj_sha256": "9a6255bfb72694ffcf3447f16fa12ad374c3b0d71a1dedd6f4aefe9630990e0c"
+                }
+            },
+            "usage_policy": "removed_vanilla_entity_allowlist",
             "preserve": [
                 "trigger",
                 "collision",

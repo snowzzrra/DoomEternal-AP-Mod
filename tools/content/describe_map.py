@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from content_catalog import load_content_catalog
+from content_catalog import load_content_catalog, thaw_content
 from tools.maps.map_semantic_baseline import baseline_path
 
 
@@ -34,8 +34,9 @@ def describe(map_key: str) -> dict:
             "strategy": item.strategy,
             "model": item.model,
             "donor": dict(item.donor),
-            "asset_bundle": item.asset_bundle,
-            "scope": item.scope,
+            "replacement_slot_policy": item.replacement_slot_policy,
+            "replacement_slot": thaw_content(item.replacement_slot),
+            "usage_policy": item.usage_policy,
             "preserve": item.preserve,
         }
         for item in catalog.assets if item.map_key == map_key
