@@ -36,7 +36,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         physical = list(catalog.physical_locations)
     rows = [(item.name, item.location_id, item.region) for item in physical]
     rows.extend((item.name, item.location_id, _runtime_region(catalog, item.name)) for item in catalog.runtime_locations)
-    route = __import__("json").loads((catalog.root / "data" / "campaign_route.json").read_text(encoding="utf-8"))
+    route = catalog.route
     rows.extend((item["name"], None, item["region"]) for item in route.get("virtual_locations", []))
     if len({name for name, _, _ in rows}) != len(rows):
         raise ValueError("generated APWorld locations are not unique")
@@ -50,6 +50,15 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     ]
     identity = json.loads(
         (catalog.root / "data" / "content_identity.json").read_text(encoding="utf-8")
+    )
+    goal_publisher = next(
+        publisher for publisher in catalog.publishers
+        if any(effect["strategy"] == "campaign_goal" for effect in publisher.effects)
+    )
+    goal_location = next(
+        item.name for item in catalog.runtime_locations
+        if item.mission_key == goal_publisher.map_key
+        and item.category == "mission_complete"
     )
     lines.extend([
         f"CONTENT_SCHEMA_VERSION = {identity['content_schema_version']!r}",
@@ -70,6 +79,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         "}",
         f"CAMPAIGN_REGIONS = {tuple(route['regions'])!r}",
         f"CAMPAIGN_CONNECTIONS = {tuple(tuple(row) for row in route['connections'])!r}",
+        f"CAMPAIGN_GOAL_LOCATION = {goal_location!r}",
         "RUNTIME_LOCATION_NAMES = frozenset({",
     ])
     lines.extend(f"    {item.name!r}," for item in catalog.runtime_locations)

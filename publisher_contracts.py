@@ -162,10 +162,45 @@ def publisher_contracts_from_document(
     return tuple(result)
 
 
-def load_publisher_contracts(path: Path = CONTRACT_PATH) -> tuple[PublisherContract, ...]:
+def load_publisher_contracts(path: Path | None = None) -> tuple[PublisherContract, ...]:
+    if path is None and (ROOT / "content" / "maps").is_dir():
+        from content_catalog import load_content_catalog
+        return load_content_catalog().publishers
+    path = path or CONTRACT_PATH
     return publisher_contracts_from_document(
         json.loads(path.read_text(encoding="utf-8"))
     )
+
+
+def publisher_contracts_document(publishers) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "publishers": [
+            {
+                "key": publisher.key,
+                "map_key": publisher.map_key,
+                "triggers": [
+                    {key: _thaw(item) for key, item in trigger.items()}
+                    for trigger in publisher.triggers
+                ],
+                "effects": [
+                    {key: _thaw(item) for key, item in effect.items()}
+                    for effect in publisher.effects
+                ],
+                "dedupe_scope": publisher.dedupe_scope,
+                "fallback_policy": publisher.fallback_policy,
+            }
+            for publisher in publishers
+        ],
+    }
+
+
+def _thaw(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
 
 
 def publishers_for_transition(

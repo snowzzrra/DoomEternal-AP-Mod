@@ -1385,9 +1385,7 @@ DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Doom Hunter Base - Mission Complete"
 ]
 CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
-OBSERVER_REGISTRY_REVISION = observer_registry_revision(
-    Path(__file__).with_name("data") / "challenge_location_registry.json"
-)
+OBSERVER_REGISTRY_REVISION = observer_registry_revision(CHALLENGE_LOCATION_REGISTRY)
 WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
 WEAPON_MASTERY_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry

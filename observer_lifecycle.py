@@ -142,8 +142,12 @@ class RuntimeObservationLease:
         return True, "live"
 
 
-def observer_registry_revision(registry_path: Path) -> str:
-    document = json.loads(registry_path.read_text(encoding="utf-8"))
+def observer_registry_revision(registry_path: Path | Mapping) -> str:
+    document = (
+        registry_path
+        if isinstance(registry_path, Mapping)
+        else json.loads(registry_path.read_text(encoding="utf-8"))
+    )
     evidence = {
         "schema_version": document.get("schema_version"),
         "weapon_masteries": document.get("weapon_masteries", []),

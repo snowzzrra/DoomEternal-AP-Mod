@@ -13,6 +13,7 @@ from tools.validation.validate_data import (
     validate_id_namespaces,
 )
 from bootstrap_actions import SUIT_PAGE_UNLOCKING_ITEM_IDS
+from content_catalog import load_content_catalog
 
 
 class ValidateDataNamespaceTests(unittest.TestCase):
@@ -59,9 +60,8 @@ class ValidateDataNamespaceTests(unittest.TestCase):
         )
         expected = sum("Praetor Suit Token" in name for name in locations)
         configured = sum(
-            "PRAETOR" in ap_check
-            for path in (ROOT / "level_configs").glob("*.json")
-            for ap_check in json.loads(path.read_text()).get("entities", {})
+            "PRAETOR" in location.ap_check
+            for location in load_content_catalog().physical_locations
         )
         self.assertEqual(configured, expected)
 

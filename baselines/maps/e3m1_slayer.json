@@ -1,0 +1,72 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.5-alpha.1",
+      "reason": "Initial Taras Nabad MapContentPackage baseline: 28 physical checks, Automap excluded, Crucible deferred vanilla, native question-mark AP visual."
+    },
+    {
+      "content_revision": "v0.3.5-alpha.1",
+      "reason": "Final generic strategy traversal preserves player-start auto-enable while generating Taras package checks."
+    },
+    {
+      "content_revision": "v0.3.5-alpha.1",
+      "reason": "Remove inactive Crucible item RPC from package maps while retaining the vanilla acquisition edge."
+    }
+  ],
+  "asset_package_contract_sha256": "066e8f506d1346768f54f791677b9694e5e7ee8f2c534f1e4944ba217a851fdc",
+  "byte_sha256": "1c9ece9f2f86bbcbb341d25b4e1fb1dfa1b5fb092858dc5d28456db80fb04baf",
+  "content_revision": "v0.3.5-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 298,
+    "byte_size": 11975609,
+    "classes": 12150,
+    "entity_count": 12152,
+    "layers": 1662,
+    "targets": 7619,
+    "transforms": 23367,
+    "unique_entity_names": 12151
+  },
+  "manifest_sha256": "fbd39658cef8856e8f010ca380f2011b3eababc0a673e295c5fa439c2f32fbf9",
+  "map_key": "e3m1_slayer",
+  "physical_ap_ids": [
+    7770303,
+    7770306,
+    7770307,
+    7770308,
+    7770309,
+    7770310,
+    7770311,
+    7770312,
+    7770313,
+    7770314,
+    7770315,
+    7770316,
+    7770317,
+    7770318,
+    7770319,
+    7770320,
+    7770321,
+    7770322,
+    7770323,
+    7770324,
+    7770325,
+    7770326,
+    7770327,
+    7770328,
+    7770329,
+    7770330,
+    7770331,
+    7770332
+  ],
+  "publisher_contract_sha256": "318b56d762ccf7d015bc43f7da08c09c13344c049e55d0d6bd5483e75b8d1c0f",
+  "runtime_location_ids": [
+    7770333,
+    7770334,
+    7770335,
+    7770336,
+    7770337
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "d49c77f62f6707294223b8c68daf1e557ea13f221201f8dc2115f7b6ac152b91",
+  "semantic_sha256": "1540b4c17b35376cb9364886e6b99b862811db15dddecc6cdcaa0215f8cd94a8"
+}

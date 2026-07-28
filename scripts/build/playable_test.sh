@@ -40,7 +40,7 @@ fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$REPO_ROOT/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$REPO_ROOT/vanillamaps}"
-RELEASE_VERSION="v0.3.4-alpha"
+RELEASE_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["release_version"])' "$REPO_ROOT/data/content_identity.json")"
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
@@ -49,6 +49,27 @@ GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
 CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
 PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
+
+mkdir -p "$TEMP_DIR"
+python3 - "$REPO_ROOT" "$TEMP_DIR" <<'PY'
+import json
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from challenge_registry import challenge_registry_document
+from content_catalog import load_content_catalog
+from publisher_contracts import publisher_contracts_document
+catalog = load_content_catalog(Path(sys.argv[1]))
+target = Path(sys.argv[2])
+(target / "challenge_location_registry.json").write_text(
+    json.dumps(challenge_registry_document(catalog), indent=2) + "\n",
+    encoding="utf-8",
+)
+(target / "publisher_contracts.json").write_text(
+    json.dumps(publisher_contracts_document(catalog.publishers), indent=2) + "\n",
+    encoding="utf-8",
+)
+PY
 
 report_build_failure() {
     local status=$?
@@ -291,7 +312,6 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
 done
 
-TEMP_DIR=$(mktemp -d)
 python3 "$REPO_ROOT/tools/maps/automap_native_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/automap-native-toy-override.json"
@@ -309,7 +329,7 @@ python3 "$REPO_ROOT/tools/decls/devinv_builder.py" \
     --map-registry "$MAP_SOURCES_FILE" \
     --audit-output "$TEMP_DIR/devinv-override.json"
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
-    --registry "$REPO_ROOT/data/challenge_location_registry.json" \
+    --registry "$TEMP_DIR/challenge_location_registry.json" \
     --mod-root "$OUTPUT_DIR/mod"
 
 python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
@@ -363,12 +383,12 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/item_classifications.json" \
     "$REPO_ROOT/data/item_replay_policies.json" \
     "$REPO_ROOT/data/location_names.json" \
-    "$REPO_ROOT/data/challenge_location_registry.json" \
+    "$TEMP_DIR/challenge_location_registry.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
     "$REPO_ROOT/data/map_sources.json" \
     "$REPO_ROOT/data/campaign_goal_contract.json" \
     "$REPO_ROOT/data/observer_contracts.json" \
-    "$REPO_ROOT/data/publisher_contracts.json" \
+    "$TEMP_DIR/publisher_contracts.json" \
     "$REPO_ROOT/data/content_identity.json" \
     "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
@@ -564,7 +584,7 @@ if ! grep -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
     exit 1
 fi
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
-    --registry "$REPO_ROOT/data/challenge_location_registry.json" \
+    --registry "$TEMP_DIR/challenge_location_registry.json" \
     --mod-root "$OUTPUT_DIR/mod"
 python3 "$REPO_ROOT/tools/validation/validate_devinvloadout_package.py" \
     --mod-root "$OUTPUT_DIR/mod" \
@@ -628,12 +648,15 @@ fi
 EXTRACTED_AUDIT_DIR="$TEMP_DIR/extracted-final"
 mkdir -p "$EXTRACTED_AUDIT_DIR"
 unzip -q "$OUTPUT_DIR/$PTB_ZIP_NAME" -d "$EXTRACTED_AUDIT_DIR"
-python3 - "$EXTRACTED_AUDIT_DIR/client/data/items.json" <<'PY'
+python3 - \
+    "$EXTRACTED_AUDIT_DIR/client/data/items.json" \
+    "$REPO_ROOT/data/items.json" <<'PY'
 import json
 import sys
 
 items = json.load(open(sys.argv[1], encoding="utf-8"))
-assert len(items) == 116
+canonical_items = json.load(open(sys.argv[2], encoding="utf-8"))
+assert items == canonical_items
 assert items["7770016"] == {
     "type": "currency", "currency": "CURRENCY_SENTINEL_BATTERY", "count": 1,
 }
@@ -663,7 +686,7 @@ if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     exit 1
 fi
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
-    --registry "$REPO_ROOT/data/challenge_location_registry.json" \
+    --registry "$TEMP_DIR/challenge_location_registry.json" \
     --mod-root "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/validate_devinvloadout_package.py" \
     --mod-root "$MOD_AUDIT_DIR" \
@@ -717,7 +740,7 @@ python3 "$REPO_ROOT/tools/validation/validate_windows_runtime_deps.py" \
 [[ "$(sha256sum "$EXTRACTED_AUDIT_DIR/client/ap_client.exe" | awk '{print $1}')" == "$FRESH_CLIENT_SHA256" ]] || { echo "ZIP ap_client.exe hash mismatch" >&2; exit 1; }
 python3 "$REPO_ROOT/tools/validation/audit_packaged_transition_bridge.py" \
     "$EXTRACTED_AUDIT_DIR/client" \
-    "$REPO_ROOT/data/challenge_location_registry.json" \
+    "$TEMP_DIR/challenge_location_registry.json" \
     "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
     "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
 mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | grep -v '/$' | LC_ALL=C sort)
@@ -748,7 +771,7 @@ if unzip -p "$OUTPUT_DIR/$PTB_ZIP_NAME" README.md RELEASE_MANIFEST.json | grep -
     exit 1
 fi
 if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
-   [[ "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name 'DoomEternalArchipelagoPlayableTest-*.zip' | wc -l)" != "1" ]]; then
+   [[ "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name "$PTB_ZIP_NAME" | wc -l)" != "1" ]]; then
     echo "Playable development ZIP is missing or not unique in build/release" >&2
     exit 1
 fi

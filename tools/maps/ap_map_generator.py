@@ -1390,13 +1390,22 @@ def load_item_names(names_path="data/item_replay_policies.json"):
     return {int(k): v["name"] for k, v in items.items() if "name" in v}
 
 
-def load_explicit_location_feedback(map_key, configured):
+def load_explicit_location_feedback(
+    map_key, configured, declared_checks=(),
+):
     """Merge the reviewed AP-only records with per-map exceptional owners."""
     path = Path(__file__).resolve().parents[2] / "data/location_feedback_policies.json"
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("schema_version") != 1:
         raise ValueError("unsupported location feedback policy schema")
-    explicit = dict(configured)
+    explicit = {
+        key: value for key, value in configured.items()
+        if key != "default_policy"
+    }
+    default_policy = configured.get("default_policy")
+    if default_policy:
+        for ap_check in declared_checks:
+            explicit.setdefault(ap_check, {"policy": default_policy})
     for ap_check in document.get("policies", {}).get(map_key, []):
         if ap_check in explicit:
             raise ValueError(f"duplicate explicit location feedback policy for {ap_check}")
@@ -1417,12 +1426,58 @@ def generate_map(
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
+    config_path = Path(config_file)
+    package_assets = config_path.with_name("assets.json")
+    if config_path.name == "locations.json" and package_assets.is_file():
+        asset_document = json.loads(package_assets.read_text(encoding="utf-8"))
+        level_config = {
+            **level_config,
+            "assets": asset_document.get("assets", []),
+            "default_visual_asset": asset_document.get("default_visual_asset"),
+        }
+    legacy_compatibility = {}
+    if config_path.name != "locations.json":
+        compatibility_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "generator_legacy_item_compatibility.json"
+        )
+        legacy_compatibility = json.loads(
+            compatibility_path.read_text(encoding="utf-8")
+        )
+        merged_items = {}
+        compatibility_items = legacy_compatibility.get("items", {})
+        insert_after = legacy_compatibility.get("insert_after")
+        for item_id, command in items_dict.items():
+            merged_items[item_id] = command
+            if item_id == insert_after:
+                merged_items.update(compatibility_items)
+        if not set(compatibility_items) <= set(merged_items):
+            raise ValueError("legacy compatibility item insertion point is missing")
+        items_dict = merged_items
+        if item_names is not None:
+            item_names = {
+                **{
+                    int(key): value
+                    for key, value in legacy_compatibility.get("names", {}).items()
+                },
+                **item_names,
+            }
     if item_classifications is None:
         item_classifications = load_item_classifications(
             Path(__file__).resolve().parents[2]
             / "data"
             / "item_classifications.json"
         )
+    item_classifications = {
+        **{
+            int(key): value
+            for key, value in legacy_compatibility.get(
+                "classifications", {}
+            ).items()
+        },
+        **item_classifications,
+    }
 
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
@@ -1442,8 +1497,14 @@ def generate_map(
     remove_entities = level_config.get("remove_entities", [])
     neutralize_entity_references = level_config.get("neutralize_entity_references", [])
     secret_encounters = level_config.get("secret_encounters", [])
+    declared_checks = (
+        *config_entities,
+        *(entry["ap_check"] for entry in secret_encounters),
+    )
     location_feedback = load_explicit_location_feedback(
-        level_config.get("map_key"), level_config.get("location_feedback", {})
+        level_config.get("map_key"),
+        level_config.get("location_feedback", {}),
+        declared_checks,
     )
     manifest_data = {}
     map_key = level_config.get("map_key")
@@ -1518,27 +1579,16 @@ def generate_map(
     new_blocks = [blocks[0]]
 
     modified_count = 0
-    trigger_conditions = [
-        'inherit = "progress/codex"',
-        'inherit = "pickup/collectible/',
-        'inherit = "pickup/weapon/',
-        'inherit = "pickup/extra_life/',
-        'inherit = "progress/mod_bot"',
-        'inherit = "progress/cheats/',
-        'inherit = "pickup/equipment/',
-        'inherit = "progress/rune"',
-        'inherit = "progress/argent_cell"',
-        'inherit = "progress/sentinel_battery"',
-        'inherit = "progress/blood_punch"',
-        'inherit = "progress/dash"',
-        'inherit = "progress/praetor_token"',
-        'inherit = "pickup/keycard/slayer_key"',
-        'inherit = "interact/use_panel/lore_kiosk_console"',
-        'inherit = "interact/hub/2_battery_station"',
-    ]
-
     for block in blocks[1:]:
-        if any(cond in block for cond in trigger_conditions):
+        # The normalized content contract is the authority.  Inheritance is
+        # deliberately not a gate: any explicitly declared entity can use an
+        # existing strategy, including interactable panels.
+        declared_match = re.search(r'entityDef\s+([^\s{]+)', block)
+        declared_ap_check = (
+            f"AP_CHECK_{declared_match.group(1).strip().upper()}"
+            if declared_match else ""
+        )
+        if declared_ap_check in config_entities:
             name_match = re.search(r'entityDef\s+([^\s{]+)', block)
             if not name_match:
                 new_blocks.append("entity {" + block)
@@ -1546,10 +1596,6 @@ def generate_map(
 
             entity_name = name_match.group(1).strip()
             ap_check_id = f"AP_CHECK_{entity_name.upper()}"
-
-            if ap_check_id not in config_entities:
-                new_blocks.append("entity {" + block)
-                continue
 
             manifest_data[ap_check_id] = config_entities[ap_check_id]
 
