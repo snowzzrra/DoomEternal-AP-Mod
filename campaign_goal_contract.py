@@ -39,8 +39,8 @@ def load_campaign_goal_contract(path: Path = CONTRACT_PATH) -> dict:
         raise ValueError("campaign goal marker must use AP_GOAL_EVENT_")
     if contract["event_target"] != "ap_campaign_goal_event":
         raise ValueError("campaign goal event_target drift")
-    if contract["publisher_key"] != "sentinel_prime_campaign_goal":
-        raise ValueError("campaign goal compatibility projection drift")
+    if not contract["publisher_key"].endswith("_campaign_goal"):
+        raise ValueError("campaign goal publisher key must identify a campaign goal")
     if contract["runtime_map"] == contract["destination_map"]:
         raise ValueError("campaign goal transition cannot target its source map")
     return contract

@@ -40,8 +40,52 @@ class MapPlan:
         return f"client/{self.manifest}"
 
 
-def load_map_registry(path: Path = DEFAULT_REGISTRY_PATH) -> dict[str, Any]:
-    registry = json.loads(path.read_text(encoding="utf-8"))
+def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
+    from content_catalog import load_content_catalog
+
+    catalog = load_content_catalog(root)
+    legacy = json.loads((root / "data" / "map_sources.json").read_text(encoding="utf-8"))
+    maps = dict(legacy["maps"])
+    for key, spec in catalog.maps.items():
+        if key in maps:
+            continue
+        raw = dict(spec.data)
+        maps[key] = {
+            field: raw.get(field)
+            for field in MAP_KEYS
+        }
+        maps[key].update({
+            "display_name": spec.display_name,
+            "enabled": spec.enabled,
+            "test_only": bool(raw.get("test_only", False)),
+            "onboarding_status": raw.get("onboarding_status", "implementation_candidate"),
+            "source_file": spec.source_file,
+            "source_sha256": spec.source_sha256,
+            "source_owner": raw.get("source_owner", spec.source_file),
+            "level_config": str(spec.level_config_path.relative_to(root)),
+            "manifest": str(spec.manifest_path.relative_to(root)),
+            "generated_output": raw["generated_output"],
+            "runtime_map": spec.runtime_map,
+            "resource_path": spec.resource_path,
+            "resource_owner": spec.resource_owner,
+            "resource_priority": spec.resource_priority,
+            "relative_entities_path": spec.relative_entities_path,
+            "supported_game_revision": spec.supported_game_revision,
+            "onboarding_audit": str(spec.onboarding_path.relative_to(root)),
+        })
+    return {
+        "schema_version": 1,
+        "baseline_map_keys": list(legacy["baseline_map_keys"]),
+        "maps": maps,
+    }
+
+
+def load_map_registry(path: Path | None = None, *, root: Path = ROOT) -> dict[str, Any]:
+    normalized_path = root / "data" / "map_sources.json"
+    if path is None or path.resolve() == normalized_path.resolve():
+        registry = _catalog_registry(root)
+    else:
+        registry = json.loads(path.read_text(encoding="utf-8"))
     validate_map_registry(registry)
     return registry
 
@@ -135,7 +179,7 @@ def release_plan(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
 def _main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("release-rows", "release-manifest-files"))
-    parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
+    parser.add_argument("--registry", type=Path)
     args = parser.parse_args()
     plans = release_plan(load_map_registry(args.registry))
     if args.command == "release-rows":

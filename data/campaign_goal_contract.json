@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "release": "v0.3.4-alpha",
-  "publisher_key": "sentinel_prime_campaign_goal",
-  "event_filename": "ap_goal_sentinel_prime_complete.txt",
-  "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE",
+  "release": "v0.3.5-alpha",
+  "publisher_key": "taras_nabad_campaign_goal",
+  "event_filename": "ap_goal_taras_nabad_complete.txt",
+  "marker": "AP_GOAL_EVENT_TARAS_NABAD_COMPLETE",
   "event_target": "ap_campaign_goal_event",
-  "owner": "e2m4_endoflevel_transition",
-  "source": "vanillamaps/e2m4_boss.map",
-  "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+  "owner": "game_map_exit_level_transition_relay_852698944",
+  "source": "vanillamaps/e3m1_slayer.map",
+  "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
   "destination_map": "game/hub/hub"
 }

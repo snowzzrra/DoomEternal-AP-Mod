@@ -161,6 +161,62 @@ class Pipeline:
                             "  scripts/pipeline.sh fast"
                         ) from error
             catalog = load_content_catalog()
+            item_document = json.loads(
+                (ROOT / "data" / "items.json").read_text(encoding="utf-8")
+            )
+            for spec in catalog.enabled_maps():
+                if not spec.onboarding_path or not spec.data.get("package_directory"):
+                    continue
+                onboarding = json.loads(
+                    spec.onboarding_path.read_text(encoding="utf-8")
+                )
+                guards = onboarding.get("vanilla_guards", {})
+                forbidden = tuple(
+                    str(term).casefold()
+                    for term in guards.get("forbidden_ap_terms", [])
+                )
+                public_surface = [
+                    item.ap_check
+                    for item in catalog.physical_locations
+                    if item.map_key == spec.key
+                ] + [
+                    item.name
+                    for item in catalog.runtime_locations
+                    if item.mission_key == spec.key
+                ] + [
+                    json.dumps(item_document, sort_keys=True)
+                ]
+                for term in forbidden:
+                    if any(term in value.casefold() for value in public_surface):
+                        raise ValueError(
+                            f"component=onboarding map={spec.key} "
+                            f"field=forbidden_ap_terms value={term!r}"
+                        )
+                source = (
+                    ROOT / "vanillamaps" / spec.source_file
+                ).read_text(encoding="utf-8")
+                edge = guards.get("required_source_edge")
+                if edge:
+                    marker = f"entityDef {edge['from']}"
+                    start = source.find(marker)
+                    end = source.find("\nentity {", start + len(marker))
+                    block = source[start:end if end >= 0 else None]
+                    if start < 0 or f'"{edge["to"]}"' not in block:
+                        raise ValueError(
+                            f"component=onboarding map={spec.key} "
+                            "field=required_source_edge value=missing"
+                        )
+                excluded = set(guards.get("excluded_entities", []))
+                declared_entities = {
+                    item.ap_check.removeprefix("AP_CHECK_").casefold()
+                    for item in catalog.physical_locations
+                    if item.map_key == spec.key
+                }
+                if {name.casefold() for name in excluded} & declared_entities:
+                    raise ValueError(
+                        f"component=onboarding map={spec.key} "
+                        "field=excluded_entities value=declared"
+                    )
             audit_source_asset_dependencies(
                 ROOT / "packaging" / "mod_assets",
                 catalog.assets,
@@ -646,8 +702,9 @@ class Pipeline:
                         f"component=build map={key} file={packaged} "
                         "field=sha256 value=does not match validation receipt"
                     )
+            identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
             zip_path = ROOT / "build" / "release" / (
-                "DoomEternalArchipelagoPlayableTest-v0.3.4-alpha.zip"
+                f"DoomEternalArchipelagoPlayableTest-{identity['release_version']}.zip"
             )
             if not zipfile.is_zipfile(zip_path):
                 raise ValueError(f"external ZIP audit failed: {zip_path}")
@@ -658,7 +715,6 @@ class Pipeline:
                 handle.flush()
                 if not zipfile.is_zipfile(handle.name):
                     raise ValueError("internal ZIP audit failed")
-            identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
             print(f"ARTIFACT {zip_path}")
             print(f"SHA256 {_sha256(zip_path)}")
             print(f"CONTENT_REVISION {identity['content_revision']}")

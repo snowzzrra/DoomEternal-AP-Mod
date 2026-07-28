@@ -74,6 +74,11 @@ class MapSpec:
     relative_entities_path: str
     enabled: bool
     data: Mapping[str, Any]
+    source_sha256: str = ""
+    source_size: int = 0
+    resource_path: str = ""
+    resource_priority: int = 0
+    supported_game_revision: str = ""
 
 
 @dataclass(frozen=True)
@@ -95,6 +100,7 @@ class RuntimeLocationSpec:
     mission_key: str | None
     signal: Mapping[str, Any]
     data: Mapping[str, Any]
+    category: str = ""
 
 
 @dataclass(frozen=True)
@@ -141,6 +147,12 @@ class ContentCatalog:
     assets: tuple[AssetSpec, ...]
     location_names: Mapping[int, str]
     campaign_goal: Mapping[str, Any]
+    route: Mapping[str, Any] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    reserved_location_ids: Mapping[int, Mapping[str, Any]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def map(self, key: str) -> MapSpec:
         return self.maps[key]
@@ -209,11 +221,57 @@ def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
     return tuple(packages)
 
 
+def _normalized_route(
+    root: Path,
+    packages: tuple[dict[str, Any], ...],
+) -> Mapping[str, Any]:
+    legacy = _json(root / "data" / "campaign_route.json")
+    regions = list(legacy.get("regions", []))
+    connections = [list(row) for row in legacy.get("connections", [])]
+    virtual_locations = [dict(row) for row in legacy.get("virtual_locations", [])]
+    for package in packages:
+        raw = package["descriptor"].get("route", {})
+        if isinstance(raw, list):
+            raw = {"connections": raw}
+        if not isinstance(raw, Mapping):
+            raise ValueError(
+                f"{package['descriptor']['key']}: route must be an object or connection list"
+            )
+        for region in raw.get("regions", []):
+            if region not in regions:
+                regions.append(region)
+        for row in raw.get("connections", []):
+            normalized = list(row)
+            if len(normalized) != 3:
+                raise ValueError(
+                    f"{package['descriptor']['key']}: route connection must have three fields"
+                )
+            if normalized not in connections:
+                connections.append(normalized)
+        for row in raw.get("virtual_locations", []):
+            normalized = dict(row)
+            if normalized not in virtual_locations:
+                virtual_locations.append(normalized)
+    known = set(regions)
+    for source, destination, _rule in connections:
+        if source not in known or destination not in known:
+            raise ValueError(
+                f"route references undeclared region: {source!r} -> {destination!r}"
+            )
+    return _freeze({
+        "schema_version": legacy.get("schema_version", 1),
+        "regions": regions,
+        "connections": connections,
+        "virtual_locations": virtual_locations,
+    })
+
+
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
     map_source_data = _json(root / "data" / "map_sources.json")
+    packages = _map_content_packages(root)
     package_by_key = {
         package["descriptor"]["key"]: package
-        for package in _map_content_packages(root)
+        for package in packages
     }
     source_maps = dict(map_source_data["maps"])
     for key, package in package_by_key.items():
@@ -228,8 +286,10 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             "manifest": descriptor.get("manifest", f"manifests/{key}.json"),
             "onboarding_audit": str(directory / "onboarding.json"),
             "resource_path": resource_path,
-            "source_owner": f"vanillamaps/{descriptor['source_file']}",
-            "onboarding_status": "package",
+            "source_owner": descriptor.get("source_owner", descriptor["source_file"]),
+            "onboarding_status": descriptor.get(
+                "onboarding_status", "implementation_candidate"
+            ),
             "test_only": False,
             "package_directory": str(directory.relative_to(root)),
         }
@@ -250,6 +310,11 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             source["runtime_map"], source.get("resource_base", _resource_base(source["resource_path"])),
             source["resource_owner"], source["relative_entities_path"],
             bool(source.get("enabled", True)), _freeze(source),
+            str(source.get("source_sha256", "")),
+            int(source.get("source_size", 0)),
+            str(source.get("resource_path", source["resource_owner"])),
+            int(source.get("resource_priority", 0)),
+            str(source.get("supported_game_revision", "")),
         )
         maps[key] = spec
         config = _json(config_path)
@@ -310,36 +375,80 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 default_region, "secret_encounter", _freeze(encounter),
             ))
 
-    names = {int(location_id): name for location_id, name in _json(root / "data" / "location_names.json")["locations"].items()}
+    names = {
+        int(location_id): name
+        for location_id, name in
+        _json(root / "data" / "location_names.json")["locations"].items()
+    }
+    for key, package in package_by_key.items():
+        package_names = package["locations"].get("names", {})
+        package_ids = {
+            int(location_id)
+            for location_id in package["locations"].get("entities", {}).values()
+        } | {
+            int(entry["location_id"])
+            for entry in package["locations"].get("secret_encounters", [])
+        }
+        normalized_names = {
+            int(location_id): name
+            for location_id, name in package_names.items()
+        }
+        if set(normalized_names) != package_ids:
+            raise ValueError(
+                f"{key}: package physical names must match physical location IDs"
+            )
+        for location_id, name in normalized_names.items():
+            if location_id in names and names[location_id] != name:
+                raise ValueError(
+                    f"{key}: package/legacy location name divergence for {location_id}"
+                )
+            names[location_id] = name
     physical = [PhysicalLocationSpec(names.get(p.location_id, ""), p.location_id, p.map_key, p.ap_check, p.region, p.strategy, p.policy) for p in physical]
     challenge_registry = _json(root / "data" / "challenge_location_registry.json")
     runtime: list[RuntimeLocationSpec] = []
     challenges: list[ChallengeSpec] = []
-    for entry in [*challenge_registry.get("mission_complete", []), *challenge_registry.get("weapon_masteries", []), *challenge_registry.get("mission_challenges", []), *challenge_registry.get("all_mission_challenges", [])]:
-        signal = _freeze(entry.get("signal", {}))
-        strategy = signal.get("kind", "")
-        mission_key = entry.get("mission_key") or next(
-            (
-                key for key, spec in maps.items()
-                if signal.get("runtime_map") == spec.runtime_map
-            ),
-            None,
-        ) or (
-            str(signal.get("unlockable", "")).split("/")[1]
-            if str(signal.get("unlockable", "")).count("/") >= 2 else None
-        )
-        item = RuntimeLocationSpec(entry["name"], entry["location_id"], strategy, mission_key, signal, _freeze(entry))
-        runtime.append(item)
-        if entry in challenge_registry.get("mission_challenges", []) or entry in challenge_registry.get("weapon_masteries", []) or entry in challenge_registry.get("all_mission_challenges", []):
-            challenges.append(ChallengeSpec(item.name, item.location_id, mission_key, strategy, signal))
+    for category in (
+        "mission_complete", "weapon_masteries",
+        "mission_challenges", "all_mission_challenges",
+    ):
+        for entry in challenge_registry.get(category, []):
+            signal = _freeze(entry.get("signal", {}))
+            strategy = signal.get("kind", "")
+            mission_key = entry.get("mission_key") or next(
+                (
+                    key for key, spec in maps.items()
+                    if signal.get("runtime_map") == spec.runtime_map
+                ),
+                None,
+            ) or (
+                str(signal.get("unlockable", "")).split("/")[1]
+                if str(signal.get("unlockable", "")).count("/") >= 2 else None
+            )
+            item = RuntimeLocationSpec(
+                entry["name"], entry["location_id"], strategy, mission_key,
+                signal, _freeze(entry), category,
+            )
+            runtime.append(item)
+            if category != "mission_complete":
+                challenges.append(ChallengeSpec(
+                    item.name, item.location_id, mission_key, strategy, signal
+                ))
     for key, package in package_by_key.items():
         for entry in package["runtime"].get("locations", []):
             signal = _freeze(entry.get("signal", {}))
+            category = entry.get("category", "")
             item = RuntimeLocationSpec(
                 entry["name"], entry["location_id"], entry["strategy"], key,
-                signal, _freeze(entry),
+                signal, _freeze(entry), category,
             )
             runtime.append(item)
+            if category in {
+                "weapon_masteries", "mission_challenges",
+                "all_mission_challenges",
+            }:
+                challenges.append(ChallengeSpec(
+                    item.name, item.location_id, key, item.strategy, signal
+                ))
 
     goal = _freeze(_json(root / "data" / "campaign_goal_contract.json"))
     publishers = list(load_publisher_contracts(root / "data" / "publisher_contracts.json"))
@@ -347,7 +456,19 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
         publishers.extend(publisher_contracts_from_document(
             package["publishers"], allow_empty=True
         ))
-    catalog = ContentCatalog(root, MappingProxyType(maps), tuple(physical), tuple(runtime), tuple(challenges), tuple(publishers), tuple(assets), MappingProxyType(names), goal)
+    reserved: dict[int, Mapping[str, Any]] = {}
+    for key, package in package_by_key.items():
+        for entry in package["onboarding"].get("reserved_ids", []):
+            location_id = int(entry["id"])
+            if location_id in reserved:
+                raise ValueError(f"duplicate reserved location ID: {location_id}")
+            reserved[location_id] = _freeze({**entry, "map_key": key})
+    catalog = ContentCatalog(
+        root, MappingProxyType(maps), tuple(physical), tuple(runtime),
+        tuple(challenges), tuple(publishers), tuple(assets),
+        MappingProxyType(names), goal, _normalized_route(root, packages),
+        MappingProxyType(reserved),
+    )
     validate_content_catalog(catalog)
     return catalog
 
@@ -359,6 +480,11 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
         raise ValueError("content catalog location IDs must be unique integers")
     if any(not name for name in names) or len(names) != len(set(names)):
         raise ValueError("content catalog location names must be unique")
+    collisions = set(ids) & set(catalog.reserved_location_ids)
+    if collisions:
+        raise ValueError(
+            f"reserved location IDs are public: {sorted(collisions)}"
+        )
     known_ids = set(ids)
     for item in catalog.runtime_locations:
         if item.strategy not in RUNTIME_STRATEGIES:

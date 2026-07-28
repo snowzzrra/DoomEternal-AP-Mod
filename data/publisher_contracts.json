@@ -190,7 +190,8 @@
       ],
       "effects": [
         {
-          "strategy": "campaign_goal"
+          "strategy": "preserved_native_target",
+          "target": "e2m4_endoflevel_transition_native"
         }
       ],
       "dedupe_scope": "ap_session_goal",

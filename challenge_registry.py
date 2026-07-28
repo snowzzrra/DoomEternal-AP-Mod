@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from collections import Counter
 from pathlib import Path
+from types import MappingProxyType
+from typing import Any
 
 from content_catalog import RUNTIME_STRATEGIES
 
@@ -20,8 +22,38 @@ def canonical_map_name(name: str | None) -> str | None:
     return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
 
 
-def load_challenge_registry(path: Path = REGISTRY_PATH) -> dict:
-    registry = json.loads(path.read_text(encoding="utf-8"))
+def _thaw(value: Any) -> Any:
+    if isinstance(value, (dict, MappingProxyType)):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
+def challenge_registry_document(catalog=None) -> dict:
+    if catalog is None:
+        from content_catalog import load_content_catalog
+        catalog = load_content_catalog()
+    registry = {
+        "schema_version": 10,
+        "mission_complete": [],
+        "weapon_masteries": [],
+        "mission_challenges": [],
+        "all_mission_challenges": [],
+    }
+    for item in catalog.runtime_locations:
+        if not item.category:
+            raise ValueError(f"{item.name}: runtime location lacks category")
+        registry[item.category].append(_thaw(item.data))
+    return registry
+
+
+def load_challenge_registry(path: Path | None = None) -> dict:
+    if path is None and (ROOT / "content" / "maps").is_dir():
+        registry = challenge_registry_document()
+    else:
+        registry_path = path or REGISTRY_PATH
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
     for entry in registry.get("mission_complete", []):
         signal = entry.get("signal", {})
         for field in ("from", "to", "runtime_map"):

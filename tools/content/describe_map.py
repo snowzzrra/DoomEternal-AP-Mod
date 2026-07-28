@@ -41,9 +41,7 @@ def describe(map_key: str) -> dict:
         }
         for item in catalog.assets if item.map_key == map_key
     ]
-    route = json.loads(
-        (catalog.root / "data" / "campaign_route.json").read_text(encoding="utf-8")
-    )
+    route = catalog.route
     return {
         "map_key": map_key,
         "source": spec.source_file,

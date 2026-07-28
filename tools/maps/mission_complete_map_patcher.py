@@ -9,7 +9,7 @@ import json
 import re
 from pathlib import Path
 
-from campaign_goal_contract import load_campaign_goal_contract
+from content_catalog import load_content_catalog
 from publisher_contracts import (
     PublisherContract,
     load_publisher_contracts,
@@ -278,7 +278,6 @@ def compile_publishers(publishers: tuple[PublisherContract, ...]) -> dict:
 
 def _patch_sentinel_prime_end(
     mission: dict,
-    goal: dict,
     publishers: tuple[PublisherContract, ...],
     root: Path,
     generated_map: Path,
@@ -328,19 +327,62 @@ def _patch_sentinel_prime_end(
         encoding="utf-8",
         newline="",
     )
+    mission_publisher = next(
+        publisher for publisher in publishers
+        if publisher.key == "sentinel_prime_mission_complete"
+    )
+    transition = mission_publisher.triggers_for("native_transition")[0]
+    event = mission_publisher.triggers_for("map_event_file")[0]
     return {
         "source_path": mission["source_path"],
         "source_sha256": source_sha,
         "owner": mission["owner"],
         "native_owner": mission["native_owner"],
-        "runtime_map": goal["runtime_map"],
-        "destination_map": goal["destination_map"],
+        "runtime_map": transition["from_map"],
+        "destination_map": transition["to_map"],
         "before_targets": [],
         "after_targets": compiled["owner_targets"],
         "location_id": mission["location_id"],
         "location_event_target": compiled["publishers"]["sentinel_prime_mission_complete"]["relay"],
-        "event_file": goal["event_filename"],
-        "marker": goal["marker"],
+        "event_file": event["filename"],
+        "marker": event["marker"],
+        "publishers": compiled["publishers"],
+        "preserved_native_targets": compiled["preserved_native_targets"],
+        "changed_lists": 1,
+    }
+
+
+def _patch_declared_terminal(
+    map_key: str,
+    owner: str,
+    publishers: tuple[PublisherContract, ...],
+    generated_map: Path,
+) -> dict:
+    text = generated_map.read_text(encoding="utf-8")
+    if text.count(f"entityDef {owner}") != 1:
+        raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
+    bounds = find_entity_block_bounds(text, owner)
+    if bounds is None:
+        raise ValueError(f"{map_key}: terminal owner block not found: {owner}")
+    block = text[bounds[0]:bounds[1]]
+    before = extract_target_names(block)
+    compiled = compile_publishers(publishers)
+    if compiled["preserved_native_targets"] != before:
+        raise ValueError(
+            f"{map_key}: preserved terminal targets differ from vanilla: "
+            f"{compiled['preserved_native_targets']} != {before}"
+        )
+    patched = replace_targets_block(block, compiled["owner_targets"])
+    generated_map.write_text(
+        (text[:bounds[0]] + patched + text[bounds[1]:]).rstrip()
+        + "\n" + compiled["entities"],
+        encoding="utf-8",
+        newline="",
+    )
+    return {
+        "owner": owner,
+        "before_targets": before,
+        "after_targets": compiled["owner_targets"],
         "publishers": compiled["publishers"],
         "preserved_native_targets": compiled["preserved_native_targets"],
         "changed_lists": 1,
@@ -371,8 +413,8 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     if contracts.get("schema_version") != 1:
         raise ValueError("unsupported Mission Complete map contract schema")
     root = contract_path.parent.parent
-    campaign_goal_contract = load_campaign_goal_contract(root / "data" / "campaign_goal_contract.json")
-    publisher_contracts = load_publisher_contracts(root / "data" / "publisher_contracts.json")
+    catalog = load_content_catalog(root)
+    publisher_contracts = catalog.publishers
     contract_items = {
         name: value for name, value in contracts.items()
         if isinstance(value, dict) and "map_key" in value
@@ -399,7 +441,6 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         elif strategy == "terminal_publishers":
             audit = _patch_sentinel_prime_end(
                 contract,
-                campaign_goal_contract,
                 publisher_contracts,
                 root,
                 generated_maps[contract["map_key"]],
@@ -408,6 +449,29 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         else:
             raise ValueError(f"{name}: unknown Mission Complete patch strategy {strategy!r}")
         audits[name] = audit
+    legacy_patched_maps = {
+        contract["map_key"] for contract in contract_items.values()
+    }
+    owner_groups: dict[tuple[str, str], list[PublisherContract]] = {}
+    for publisher in publisher_contracts:
+        if publisher.map_key not in generated_maps or publisher.map_key in legacy_patched_maps:
+            continue
+        owners = {
+            trigger["owner"] for trigger in publisher.triggers
+            if trigger["strategy"] in {"terminal_owner", "map_event_file"}
+        }
+        for owner in owners:
+            owner_groups.setdefault((publisher.map_key, owner), []).append(publisher)
+    for (map_key, owner), grouped in owner_groups.items():
+        audit = _patch_declared_terminal(
+            map_key, owner, tuple(grouped), generated_maps[map_key]
+        )
+        audits[f"{map_key}:{owner}"] = audit
+        if any(
+            effect["strategy"] == "campaign_goal"
+            for publisher in grouped for effect in publisher.effects
+        ):
+            terminal_audit = audit
     for name, contract in contract_items.items():
         if contract["patch_strategy"] == "terminal_publishers":
             continue
@@ -424,7 +488,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
-    unrelated_owners.add(campaign_goal_contract["owner"])
+    unrelated_owners.update(owner for _map_key, owner in owner_groups)
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),

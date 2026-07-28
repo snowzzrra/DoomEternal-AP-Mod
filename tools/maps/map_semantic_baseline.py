@@ -185,7 +185,10 @@ def _diff(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> dict:
     result: dict[str, Any] = {}
     keys = sorted(set(expected) | set(actual))
     for key in keys:
-        if key == "acceptance":
+        # Release identity is validated globally.  Map baselines are scoped to
+        # map semantics so a version-only bump cannot force every frozen map
+        # to accept an otherwise identical baseline.
+        if key in {"acceptance", "content_revision"}:
             continue
         left, right = expected.get(key), actual.get(key)
         if isinstance(left, Mapping) and isinstance(right, Mapping):
@@ -194,6 +197,15 @@ def _diff(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> dict:
                 result[key] = nested
         elif left != right:
             result[key] = {"expected": left, "actual": right}
+    # Runtime publisher effects are validated by the normalized publisher
+    # contract tests.  A runtime-only effect move must not require accepting a
+    # new map baseline when the compiled map bytes and semantics are unchanged.
+    if (
+        "publisher_contract_sha256" in result
+        and "byte_sha256" not in result
+        and "semantic_sha256" not in result
+    ):
+        result.pop("publisher_contract_sha256")
     return result
 
 

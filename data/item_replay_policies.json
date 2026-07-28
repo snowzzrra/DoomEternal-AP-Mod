@@ -29,10 +29,6 @@
       "name": "BFG-9000",
       "policy": "never_replay"
     },
-    "7770007": {
-      "name": "The Crucible",
-      "policy": "never_replay"
-    },
     "7770008": {
       "name": "The Unmaykr",
       "policy": "replay_idempotent"
@@ -467,4 +463,3 @@
     }
   }
 }
-

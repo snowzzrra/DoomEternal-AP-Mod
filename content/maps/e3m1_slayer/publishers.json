@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "taras_nabad_mission_complete",
+      "map_key": "e3m1_slayer",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "filename": "ap_mission_taras_nabad_complete.txt",
+          "marker": "AP_MISSION_EVENT_TARAS_NABAD_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_map_exit_level_transition_relay_852698944"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770337
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "ai_target_level_transition_1"
+        }
+      ],
+      "dedupe_scope": "taras_nabad_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "taras_nabad_campaign_goal",
+      "map_key": "e3m1_slayer",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "filename": "ap_goal_taras_nabad_complete.txt",
+          "marker": "AP_GOAL_EVENT_TARAS_NABAD_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_map_exit_level_transition_relay_852698944"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "campaign_goal"
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "ai_target_level_transition_1"
+        }
+      ],
+      "dedupe_scope": "taras_nabad_campaign_goal",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

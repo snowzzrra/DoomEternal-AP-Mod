@@ -66,6 +66,23 @@ def build_string_table(
 ) -> None:
     items = json.loads(items_path.read_text(encoding="utf-8"))
     policies = json.loads(policies_path.read_text(encoding="utf-8"))
+    compatibility_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "generator_legacy_item_compatibility.json"
+    )
+    if compatibility_path.is_file():
+        compatibility = json.loads(
+            compatibility_path.read_text(encoding="utf-8")
+        )
+        items = {**compatibility.get("items", {}), **items}
+        policy_items = dict(policies.get("items", {}))
+        for item_id, name in compatibility.get("names", {}).items():
+            policy_items.setdefault(item_id, {
+                "name": name,
+                "policy": "never_replay",
+            })
+        policies = {**policies, "items": policy_items}
     item_names = {
         int(item_id): entry["name"]
         for item_id, entry in policies.get("items", {}).items()
@@ -102,15 +119,27 @@ def build_string_table(
         key for key in referenced_keys if key.startswith("#str_ap_location_")
     }
     if location_keys:
-        if location_names_path is None:
-            location_names_path = (
-                Path(__file__).resolve().parents[2]
-                / "data"
-                / "location_names.json"
-            )
-        location_identity = json.loads(
-            location_names_path.read_text(encoding="utf-8")
+        default_location_names = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "location_names.json"
         )
+        if location_names_path is None:
+            location_names_path = default_location_names
+        if location_names_path.resolve() == default_location_names.resolve():
+            from content_catalog import load_content_catalog
+            location_identity = {
+                "schema_version": 1,
+                "locations": {
+                    str(location_id): name
+                    for location_id, name
+                    in load_content_catalog().location_names.items()
+                },
+            }
+        else:
+            location_identity = json.loads(
+                location_names_path.read_text(encoding="utf-8")
+            )
         if location_identity.get("schema_version") != 1:
             raise ValueError("unsupported location-name schema")
         location_names = location_identity.get("locations", {})

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m1_slayer",
+  "level": "e3m1_slayer",
+  "region": "Taras Nabad",
+  "entities": {
+    "AP_CHECK_GAME_PROGRESS_ARGENT_CELL_1_498834914": 7770303,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E3M1": 7770306,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E3M1": 7770307,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E3M1": 7770308,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E3M1": 7770309,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E3M1": 7770310,
+    "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_1_E3M1": 7770311,
+    "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E3M1": 7770312,
+    "AP_CHECK_PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E3M1": 7770313,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M1": 7770314,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M1": 7770315,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E3M1": 7770316,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_GOO_1": 7770317,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_MARAUDER_1": 7770318,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_PAIN_ELEMENTAL_1": 7770319,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E3M1": 7770320,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_2_E3M1": 7770321,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E3M1": 7770322,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_4_E3M1": 7770323,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_5_E3M1": 7770324,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_6_E3M1": 7770325,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_7_E3M1": 7770326,
+    "AP_CHECK_PICKUPS_PROGRESS_CHEATS_POWERUP_INFINITE_OVERDRIVE_1": 7770327,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_10_1": 7770328,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_11_1": 7770329,
+    "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770330
+  },
+  "names": {
+    "7770303": "Taras Nabad - Sentinel Crystal",
+    "7770306": "Taras Nabad - Praetor Suit Token 1",
+    "7770307": "Taras Nabad - Praetor Suit Token 2",
+    "7770308": "Taras Nabad - Praetor Suit Token 3",
+    "7770309": "Taras Nabad - Praetor Suit Token 4",
+    "7770310": "Taras Nabad - Praetor Suit Token 5",
+    "7770311": "Taras Nabad - Sentinel Battery 1",
+    "7770312": "Taras Nabad - Sentinel Battery 2",
+    "7770313": "Taras Nabad - Sentinel Battery 3",
+    "7770314": "Taras Nabad - Extra Life 1",
+    "7770315": "Taras Nabad - Extra Life 2",
+    "7770316": "Taras Nabad - Extra Life 3",
+    "7770317": "Taras Nabad - Toy - Cyber Mancubus",
+    "7770318": "Taras Nabad - Toy - Marauder",
+    "7770319": "Taras Nabad - Toy - Pain Elemental",
+    "7770320": "Taras Nabad - Codex 1",
+    "7770321": "Taras Nabad - Codex 2",
+    "7770322": "Taras Nabad - Codex 3",
+    "7770323": "Taras Nabad - Codex 4",
+    "7770324": "Taras Nabad - Codex 5",
+    "7770325": "Taras Nabad - Codex 6",
+    "7770326": "Taras Nabad - Codex 7",
+    "7770327": "Taras Nabad - Cheat Code - Powerup Mode: Overdrive",
+    "7770328": "Taras Nabad - Album 1",
+    "7770329": "Taras Nabad - Album 2",
+    "7770330": "Taras Nabad - Slayer Key",
+    "7770331": "Taras Nabad - Secret Encounter 1",
+    "7770332": "Taras Nabad - Secret Encounter 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "game_progress_argent_cell_1_498834914": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": ["game_destructible_interact_argent_cell_1_498834914"],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "game_destructible_interact_argent_cell_1_498834914": []
+      },
+      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+    },
+    "pickups_pickup_keycard_slayer_key_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": ["target_changelayer_slayergate_1"],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "target_changelayer_slayergate_1": []
+      },
+      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+    }
+  },
+  "remove_entities": [],
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M1_1",
+      "location_id": 7770331,
+      "manager": "ai_encounter_manager_atrium_secret_e3m1",
+      "after_event_index": 6,
+      "automap_owner": "automap_info_null_secret_encounter_1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M1_2",
+      "location_id": 7770332,
+      "manager": "ai_encounter_manager_throne_secret_e3m1",
+      "after_event_index": 4,
+      "automap_owner": "automap_info_null_secret_encounter_2"
+    }
+  ]
+}

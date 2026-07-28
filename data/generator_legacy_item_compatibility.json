@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "insert_after": "7770006",
+  "items": {
+    "7770007": [
+      "give weapon/player/crucible",
+      "give ammo/sharedammopool/crucible 3"
+    ]
+  },
+  "names": {
+    "7770007": "The Crucible"
+  },
+  "classifications": {
+    "7770007": 1
+  }
+}

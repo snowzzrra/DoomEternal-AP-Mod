@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m1_slayer",
+  "status": "static_candidate_pending_runtime_confirmation",
+  "source": {
+    "path": "vanillamaps/e3m1_slayer.map",
+    "size": 11693231,
+    "sha256": "28dd0ba428859ef8c86d568016d058f7d537770fd50c07ef1cdeead31335248a",
+    "ap_markers_absent": true,
+    "structurally_parsed": true
+  },
+  "owner": {
+    "resource": "game/sp/e3m1_slayer/e3m1_slayer_patch3.resources",
+    "status": "static_candidate_pending_runtime_confirmation"
+  },
+  "reserved_ids": [
+    {
+      "id": 7770304,
+      "status": "excluded_vanilla_content",
+      "content": "Automap Station",
+      "public": false,
+      "generated": false,
+      "reusable": false,
+      "reason": "Automap Station is explicitly excluded from AP locations"
+    },
+    {
+      "id": 7770305,
+      "status": "deferred_vanilla_progression",
+      "content": "Crucible acquisition",
+      "public": false,
+      "generated": false,
+      "reusable": false,
+      "requires": "complete cutscene stripping and runtime validation"
+    }
+  ],
+  "vanilla_guards": {
+    "forbidden_ap_terms": ["crucible"],
+    "required_source_edge": {
+      "from": "game_target_relay_getcrucible",
+      "to": "game_target_give_item_1"
+    },
+    "excluded_entities": ["interact_automap_1_e3m1"]
+  },
+  "challenge_notes": {
+    "man_made_wiki_sources": [7770320, 7770321, 7770322, 7770323, 7770324, 7770325],
+    "excluded_codex": 7770326,
+    "reason": "The vanilla DECL requires six tracked Codex pickups; Codex 7 is outside that six-source equivalence."
+  },
+  "checks": [
+    "source hash locked",
+    "owner is a static patch3 candidate",
+    "native question-mark asset ID locked",
+    "Crucible grant edge preserved",
+    "Automap remains vanilla",
+    "package-scoped cache input verified"
+  ]
+}
