@@ -738,11 +738,18 @@ def donor_kind_from_block(block):
 
 
 def resolve_donor_model_override(content, location_block, asset):
-    """Resolve a donor and its original model for an injected-only override."""
+    """Resolve the structural donor independently from its replacement slot."""
     if asset.get("strategy") != "donor_model_override":
         raise ValueError("asset is not a donor_model_override")
-    if asset.get("scope") != "injected_entity_only":
-        raise ValueError("donor model override scope must be injected_entity_only")
+    replacement_policy = asset.get("replacement_slot_policy")
+    replacement_slot = asset.get("replacement_slot", {})
+    if replacement_policy == "safe_resident_static_lwo":
+        if replacement_slot.get("model_path") != asset.get("model"):
+            raise ValueError(
+                "replacement slot model_path must match the visual model"
+            )
+    elif replacement_policy != "native_question_mark":
+        raise ValueError("unsupported replacement slot policy")
     donor = asset.get("donor", {})
     selection = donor.get("selection")
     if selection == "per_location_source":

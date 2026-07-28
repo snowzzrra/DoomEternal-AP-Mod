@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -193,8 +195,12 @@ def _donor_block(kind: str) -> str:
 def _override_asset(kind: str = "codex") -> dict:
     return {
         "strategy": "donor_model_override",
-        "scope": "injected_entity_only",
+        "model": "art/pickups/question_mark_a.lwo",
         "donor": {"kind": kind, "selection": "per_location_source"},
+        "replacement_slot_policy": "safe_resident_static_lwo",
+        "replacement_slot": {
+            "model_path": "art/pickups/question_mark_a.lwo",
+        },
     }
 
 
@@ -220,6 +226,7 @@ def test_donor_model_override_supports_generic_donors(kind: str) -> None:
     donor_model = resolve_donor_model_override(
         donor, donor, _override_asset(kind)
     )
+    assert set(_override_asset(kind)) >= {"donor", "replacement_slot"}
     visual = _injected_visual(donor_model)
     overridden = apply_injected_entity_model_override(
         visual, "art/pickups/question_mark_a.lwo"
@@ -254,37 +261,173 @@ def test_model_override_rejects_non_injected_entity() -> None:
         )
 
 
-def test_missing_override_bundle_fails_source_preflight(tmp_path: Path) -> None:
-    model = tmp_path / "synthetic" / "art"
-    model.mkdir(parents=True)
-    (model / "ap.lwo").write_bytes(b"model")
-    override = AssetSpec(
-        "override", "synthetic", "donor_model_override", "art/ap.lwo",
-        "synthetic", "synthetic_patch.resources", (), "required",
-        {"kind": "codex", "selection": "per_location_source"},
-        "missing", "injected_entity_only",
-        ("trigger", "collision", "transform", "layers", "interaction"),
+def _importer_override(
+    *,
+    resource_hash: str = "0" * 64,
+    streamdb_hash: str = "0" * 64,
+    streamdb_payload: str = "art/ap_id#123.lwo",
+    provenance: dict | None = None,
+    usage_policy: str = "no_vanilla_entity_references",
+    allowlist: tuple[str, ...] = (),
+) -> AssetSpec:
+    return AssetSpec(
+        key="override",
+        map_key="synthetic",
+        strategy="donor_model_override",
+        model="art/ap.lwo",
+        resource_base="synthetic",
+        resource_owner="synthetic_patch.resources",
+        dependencies=(),
+        dependency_policy="model_importer_bundle",
+        donor={"kind": "codex", "selection": "named_entity", "entity": "donor"},
+        replacement_slot_policy="safe_resident_static_lwo",
+        replacement_slot={
+            "model_path": "art/ap.lwo",
+            "resource_archive": "synthetic",
+            "material2": "art/ap",
+            "import_bundle": "ap_id#123",
+            "asset_id": "123",
+            "streamdb_payload": streamdb_payload,
+            "resource_payload_sha256": resource_hash,
+            "streamdb_payload_sha256": streamdb_hash,
+            "vanilla_reference_allowlist": allowlist,
+            "provenance": provenance or {
+                "producer": "Doom Eternal Model Importer v1.2",
+                "source_obj": "Archipelago.obj",
+                "source_obj_sha256": "1" * 64,
+            },
+        },
+        usage_policy=usage_policy,
+        preserve=(
+            "trigger", "collision", "transform", "layers", "interaction",
+        ),
     )
-    with pytest.raises(AssertionError, match="BUNDLE_MISSING"):
+
+
+def _write_importer_bundle(root: Path) -> tuple[str, str]:
+    resource = root / "synthetic" / "art" / "ap.lwo"
+    streamdb = root / "streamdb" / "art" / "ap_id#123.lwo"
+    resource.parent.mkdir(parents=True)
+    streamdb.parent.mkdir(parents=True)
+    resource.write_bytes(
+        b"\0" * 48 + b"art/ap" + b"\0" * 128
+    )
+    streamdb.write_bytes(b"STREAMDB" + b"\0" * 1024)
+    return (
+        hashlib.sha256(resource.read_bytes()).hexdigest(),
+        hashlib.sha256(streamdb.read_bytes()).hexdigest(),
+    )
+
+
+def test_missing_resource_archive_fails_source_preflight(tmp_path: Path) -> None:
+    override = _importer_override()
+    with pytest.raises(AssertionError, match="IMPORTER_BUNDLE_INCOMPLETE"):
         audit_source_asset_dependencies(tmp_path, (override,))
 
 
-def test_missing_model_payload_fails_with_short_dependency_error(
-    tmp_path: Path,
-) -> None:
-    model = tmp_path / "synthetic" / "art"
-    model.mkdir(parents=True)
-    (model / "ap.lwo").write_bytes(b"model")
-    bundle = AssetSpec(
-        "payload", "synthetic", "streamdb", "art/missing_payload.lwo",
-        "streamdb", "synthetic_patch.resources", (), "embedded",
+def test_missing_streamdb_fails_source_preflight(tmp_path: Path) -> None:
+    resource = tmp_path / "synthetic" / "art" / "ap.lwo"
+    resource.parent.mkdir(parents=True)
+    resource.write_bytes(b"\0" * 48 + b"art/ap" + b"\0" * 128)
+    override = _importer_override()
+    with pytest.raises(AssertionError, match="IMPORTER_BUNDLE_INCOMPLETE"):
+        audit_source_asset_dependencies(tmp_path, (override,))
+
+
+def test_renamed_payload_is_not_a_valid_import_bundle(tmp_path: Path) -> None:
+    resource_hash, streamdb_hash = _write_importer_bundle(tmp_path)
+    override = _importer_override(
+        resource_hash=resource_hash,
+        streamdb_hash=streamdb_hash,
+        streamdb_payload="art/renamed_id#123.lwo",
     )
-    override = AssetSpec(
-        "override", "synthetic", "donor_model_override", "art/ap.lwo",
-        "synthetic", "synthetic_patch.resources", (), "required",
-        {"kind": "codex", "selection": "per_location_source"},
-        "payload", "injected_entity_only",
-        ("trigger", "collision", "transform", "layers", "interaction"),
+    with pytest.raises(AssertionError, match="IMPORTER_IDENTITY_INVALID"):
+        audit_source_asset_dependencies(tmp_path, (override,))
+
+
+def test_stub_without_importer_provenance_fails(tmp_path: Path) -> None:
+    resource_hash, streamdb_hash = _write_importer_bundle(tmp_path)
+    override = _importer_override(
+        resource_hash=resource_hash,
+        streamdb_hash=streamdb_hash,
+        provenance={"producer": "manual stub"},
     )
-    with pytest.raises(AssertionError, match=r"DEPENDENCY_MISSING.*payload"):
-        audit_source_asset_dependencies(tmp_path, (override, bundle))
+    with pytest.raises(AssertionError, match="IMPORTER_IDENTITY_INVALID"):
+        audit_source_asset_dependencies(tmp_path, (override,))
+
+
+def _write_synthetic_source(root: Path, *, vanilla_uses_slot: bool) -> None:
+    root.mkdir()
+    source = _donor_block("codex")
+    if vanilla_uses_slot:
+        source += "\n" + _injected_visual("art/ap.lwo").replace(
+            "ap_location_visual_1", "vanilla_visible_prop"
+        )
+    (root / "synthetic.map").write_text(source, encoding="utf-8")
+
+
+def test_slot_used_by_vanilla_entity_fails(tmp_path: Path) -> None:
+    resource_hash, streamdb_hash = _write_importer_bundle(
+        tmp_path / "assets"
+    )
+    _write_importer_bundle(tmp_path / "mod")
+    _write_synthetic_source(tmp_path / "maps", vanilla_uses_slot=True)
+    override = _importer_override(
+        resource_hash=resource_hash,
+        streamdb_hash=streamdb_hash,
+    )
+    with pytest.raises(AssertionError, match="vanilla references"):
+        audit_resource_packages(
+            tmp_path / "assets",
+            tmp_path / "mod",
+            assets=(override,),
+            source_map_root=tmp_path / "maps",
+        )
+
+
+def test_zero_vanilla_references_passes(tmp_path: Path) -> None:
+    resource_hash, streamdb_hash = _write_importer_bundle(
+        tmp_path / "assets"
+    )
+    _write_importer_bundle(tmp_path / "mod")
+    _write_synthetic_source(tmp_path / "maps", vanilla_uses_slot=False)
+    override = _importer_override(
+        resource_hash=resource_hash,
+        streamdb_hash=streamdb_hash,
+    )
+    records = audit_resource_packages(
+        tmp_path / "assets",
+        tmp_path / "mod",
+        assets=(override,),
+        source_map_root=tmp_path / "maps",
+    )
+    assert records[0]["asset_id"] == "123"
+
+
+def test_final_zip_contains_both_importer_trees(tmp_path: Path) -> None:
+    resource_hash, streamdb_hash = _write_importer_bundle(
+        tmp_path / "assets"
+    )
+    _write_importer_bundle(tmp_path / "mod")
+    _write_synthetic_source(tmp_path / "maps", vanilla_uses_slot=False)
+    zip_path = tmp_path / "mod.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.write(
+            tmp_path / "mod" / "synthetic" / "art" / "ap.lwo",
+            "synthetic/art/ap.lwo",
+        )
+        archive.write(
+            tmp_path / "mod" / "streamdb" / "art" / "ap_id#123.lwo",
+            "streamdb/art/ap_id#123.lwo",
+        )
+    override = _importer_override(
+        resource_hash=resource_hash,
+        streamdb_hash=streamdb_hash,
+    )
+    audit_resource_packages(
+        tmp_path / "assets",
+        tmp_path / "mod",
+        assets=(override,),
+        source_map_root=tmp_path / "maps",
+        zip_path=zip_path,
+    )

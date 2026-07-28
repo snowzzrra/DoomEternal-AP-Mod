@@ -51,6 +51,15 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def thaw_content(value: Any) -> Any:
+    """Return a JSON-serializable copy of normalized catalog data."""
+    if isinstance(value, Mapping):
+        return {key: thaw_content(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [thaw_content(item) for item in value]
+    return value
+
+
 @dataclass(frozen=True)
 class MapSpec:
     key: str
@@ -113,8 +122,11 @@ class AssetSpec:
     donor: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
-    asset_bundle: str | None = None
-    scope: str = ""
+    replacement_slot_policy: str = ""
+    replacement_slot: Mapping[str, Any] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    usage_policy: str = ""
     preserve: tuple[str, ...] = ()
 
 
@@ -253,30 +265,43 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             ))
         for raw_asset in config.get("assets", []):
             assets.append(AssetSpec(
-                raw_asset["key"],
-                key,
-                raw_asset["strategy"],
-                raw_asset["model"],
-                raw_asset.get("resource_base", spec.resource_base),
-                spec.resource_owner,
-                tuple(raw_asset.get("dependencies", [])),
-                raw_asset.get("dependency_policy", "required"),
-                _freeze(raw_asset.get("donor", {})),
-                raw_asset.get("asset_bundle"),
-                raw_asset.get("scope", ""),
-                tuple(raw_asset.get("preserve", [])),
+                key=raw_asset["key"],
+                map_key=key,
+                strategy=raw_asset["strategy"],
+                model=raw_asset["model"],
+                resource_base=raw_asset.get("resource_base", spec.resource_base),
+                resource_owner=spec.resource_owner,
+                dependencies=tuple(raw_asset.get("dependencies", [])),
+                dependency_policy=raw_asset.get("dependency_policy", "required"),
+                donor=_freeze(raw_asset.get("donor", {})),
+                replacement_slot_policy=raw_asset.get(
+                    "replacement_slot_policy", ""
+                ),
+                replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
+                usage_policy=raw_asset.get("usage_policy", ""),
+                preserve=tuple(raw_asset.get("preserve", [])),
             ))
         for raw_asset in package_by_key.get(key, {}).get("assets", {}).get("assets", []):
             assets.append(AssetSpec(
-                raw_asset["key"], key, raw_asset["strategy"], raw_asset["model"],
-                raw_asset.get("resource_base", spec.resource_base),
-                raw_asset.get("resource_owner", spec.resource_owner),
-                tuple(raw_asset.get("dependencies", [])),
-                raw_asset.get("dependency_policy", "required"),
-                _freeze(raw_asset.get("donor", {})),
-                raw_asset.get("asset_bundle"),
-                raw_asset.get("scope", ""),
-                tuple(raw_asset.get("preserve", [])),
+                key=raw_asset["key"],
+                map_key=key,
+                strategy=raw_asset["strategy"],
+                model=raw_asset["model"],
+                resource_base=raw_asset.get("resource_base", spec.resource_base),
+                resource_owner=raw_asset.get(
+                    "resource_owner", spec.resource_owner
+                ),
+                dependencies=tuple(raw_asset.get("dependencies", [])),
+                dependency_policy=raw_asset.get(
+                    "dependency_policy", "required"
+                ),
+                donor=_freeze(raw_asset.get("donor", {})),
+                replacement_slot_policy=raw_asset.get(
+                    "replacement_slot_policy", ""
+                ),
+                replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
+                usage_policy=raw_asset.get("usage_policy", ""),
+                preserve=tuple(raw_asset.get("preserve", [])),
             ))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
@@ -365,8 +390,7 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             raise ValueError(f"{asset.key}: resident_model must not declare copied dependencies")
         if asset.strategy == "donor_model_override":
             if (
-                asset.scope != "injected_entity_only"
-                or not asset.donor.get("kind")
+                not asset.donor.get("kind")
                 or asset.donor.get("selection") not in {
                     "per_location_source", "named_entity",
                 }
@@ -384,11 +408,83 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
                 raise ValueError(
                     f"{asset.key}: donor_model_override preserve contract is incomplete"
                 )
+            if asset.replacement_slot_policy not in {
+                "native_question_mark", "safe_resident_static_lwo",
+            }:
+                raise ValueError(
+                    f"{asset.key}: invalid replacement_slot_policy"
+                )
+            if asset.replacement_slot_policy == "native_question_mark":
+                if (
+                    asset.model != "art/pickups/question_mark_a.lwo"
+                    or asset.replacement_slot
+                ):
+                    raise ValueError(
+                        f"{asset.key}: native_question_mark must use the native slot"
+                    )
+                continue
+            slot = asset.replacement_slot
+            required_slot = {
+                "model_path", "resource_archive", "material2",
+                "import_bundle", "asset_id", "streamdb_payload",
+                "resource_payload_sha256", "streamdb_payload_sha256",
+                "provenance",
+            }
+            if not required_slot <= set(slot):
+                raise ValueError(
+                    f"{asset.key}: incomplete safe resident replacement slot"
+                )
+            asset_id = str(slot["asset_id"])
+            model_path = Path(str(slot["model_path"]))
+            expected_payload = (
+                model_path.parent
+                / f"{model_path.stem}_id#{asset_id}{model_path.suffix}"
+            ).as_posix()
             if (
-                not asset.asset_bundle
-                or (asset.map_key, asset.asset_bundle) not in asset_keys
+                not asset_id.isdecimal()
+                or model_path.as_posix() != asset.model
+                or model_path.suffix.lower() != ".lwo"
+                or model_path.is_absolute()
+                or ".." in model_path.parts
+                or slot["resource_archive"] != asset.resource_base
+                or slot["streamdb_payload"] != expected_payload
+                or slot["import_bundle"]
+                != f"{model_path.stem}_id#{asset_id}"
             ):
-                raise ValueError(f"{asset.key}: unknown asset_bundle")
+                raise ValueError(
+                    f"{asset.key}: incoherent Model Importer asset identity"
+                )
+            provenance = slot["provenance"]
+            if (
+                not isinstance(provenance, Mapping)
+                or provenance.get("producer")
+                != "Doom Eternal Model Importer v1.2"
+                or not re.fullmatch(
+                    r"[0-9a-f]{64}", str(provenance.get("source_obj_sha256", ""))
+                )
+                or not re.fullmatch(
+                    r"[0-9a-f]{64}", str(slot["resource_payload_sha256"])
+                )
+                or not re.fullmatch(
+                    r"[0-9a-f]{64}", str(slot["streamdb_payload_sha256"])
+                )
+            ):
+                raise ValueError(
+                    f"{asset.key}: missing Model Importer provenance"
+                )
+            allowlist = tuple(slot.get("vanilla_reference_allowlist", ()))
+            if asset.usage_policy == "no_vanilla_entity_references":
+                if allowlist:
+                    raise ValueError(
+                        f"{asset.key}: zero-reference policy has an allowlist"
+                    )
+            elif asset.usage_policy == "removed_vanilla_entity_allowlist":
+                if not allowlist or len(allowlist) != len(set(allowlist)):
+                    raise ValueError(
+                        f"{asset.key}: invalid vanilla reference allowlist"
+                    )
+            else:
+                raise ValueError(f"{asset.key}: invalid usage_policy")
     active_goals = [
         publisher
         for publisher in catalog.publishers

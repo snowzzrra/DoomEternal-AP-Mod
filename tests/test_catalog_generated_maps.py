@@ -39,7 +39,6 @@ def test_generated_map_uses_declared_visual_asset_strategy(
             assert visual_blocks
             assert all(
                 f'model = "{asset.model}";' in block
-                and 'model = "art/pickups/codex.lwo";' not in block
                 for block in visual_blocks
             )
             assert "modelDecl" not in generated

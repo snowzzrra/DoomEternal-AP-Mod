@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import zipfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Iterable
 
@@ -13,14 +15,122 @@ from content_catalog import AssetSpec, load_content_catalog
 from tools.maps.ap_map_generator import resolve_donor_model_override
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _replacement_bundle_paths(
+    root: Path,
+    asset: AssetSpec,
+) -> tuple[Path, Path]:
+    slot = asset.replacement_slot
+    return (
+        root / str(slot["resource_archive"]) / asset.model,
+        root / "streamdb" / str(slot["streamdb_payload"]),
+    )
+
+
+def _assert_model_importer_bundle(root: Path, asset: AssetSpec) -> None:
+    slot = asset.replacement_slot
+    required = {
+        "model_path", "resource_archive", "material2", "import_bundle",
+        "asset_id", "streamdb_payload", "resource_payload_sha256",
+        "streamdb_payload_sha256", "provenance",
+    }
+    if not required <= set(slot):
+        raise AssertionError(
+            f"[ASSET] IMPORTER_PROVENANCE_MISSING bundle={asset.key}"
+        )
+    asset_id = str(slot["asset_id"])
+    model = Path(str(slot["model_path"]))
+    expected_payload = (
+        model.parent / f"{model.stem}_id#{asset_id}{model.suffix}"
+    ).as_posix()
+    provenance = slot["provenance"]
+    if (
+        not asset_id.isdecimal()
+        or model.as_posix() != asset.model
+        or str(slot["resource_archive"]) != asset.resource_base
+        or str(slot["import_bundle"]) != f"{model.stem}_id#{asset_id}"
+        or str(slot["streamdb_payload"]) != expected_payload
+        or not isinstance(provenance, Mapping)
+        or provenance.get("producer") != "Doom Eternal Model Importer v1.2"
+        or not re.fullmatch(
+            r"[0-9a-f]{64}", str(provenance.get("source_obj_sha256", ""))
+        )
+    ):
+        raise AssertionError(
+            f"[ASSET] IMPORTER_IDENTITY_INVALID bundle={asset.key}"
+        )
+    resource_payload, streamdb_payload = _replacement_bundle_paths(root, asset)
+    if not resource_payload.is_file() or not streamdb_payload.is_file():
+        raise AssertionError(
+            f"[ASSET] IMPORTER_BUNDLE_INCOMPLETE bundle={asset.key}"
+        )
+    resource_bytes = resource_payload.read_bytes()
+    streamdb_bytes = streamdb_payload.read_bytes()
+    if (
+        len(resource_bytes) < 128
+        or asset.model.removesuffix(".lwo").encode() not in resource_bytes
+        or len(streamdb_bytes) < 1024
+        or not streamdb_bytes.startswith(b"STREAMDB")
+    ):
+        raise AssertionError(
+            f"[ASSET] IMPORTER_PAYLOAD_INVALID bundle={asset.key}"
+        )
+    if (
+        _sha256(resource_payload) != slot["resource_payload_sha256"]
+        or _sha256(streamdb_payload) != slot["streamdb_payload_sha256"]
+    ):
+        raise AssertionError(
+            f"[ASSET] IMPORTER_PAYLOAD_HASH_MISMATCH bundle={asset.key}"
+        )
+
+
+def _model_references(content: str, model: str) -> set[str]:
+    references: set[str] = set()
+    cursor = 0
+    entity_start = re.compile(r"(?m)^\s*entity\s*\{")
+    while match := entity_start.search(content, cursor):
+        start = match.start()
+        index = content.find("{", start) + 1
+        depth = 1
+        quoted = False
+        while index < len(content) and depth:
+            char = content[index]
+            if char == '"' and content[index - 1] != "\\":
+                quoted = not quoted
+            elif not quoted:
+                if char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+            index += 1
+        if depth:
+            raise AssertionError("unterminated entity block during asset audit")
+        block = content[start:index]
+        name_match = re.search(r"\bentityDef\s+([^\s{]+)", block)
+        cursor = index
+        if name_match is None:
+            continue
+        if re.search(
+            rf'\bmodel\s*=\s*"{re.escape(model)}";',
+            block,
+            flags=re.IGNORECASE,
+        ):
+            references.add(name_match.group(1))
+    return references
+
+
 def audit_source_asset_dependencies(
     asset_root: Path,
     assets: Iterable[AssetSpec],
 ) -> None:
     """Fail fast when a declared copied model or linked payload is absent."""
-    selected = tuple(assets)
-    by_key = {(asset.map_key, asset.key): asset for asset in selected}
-    for asset in selected:
+    for asset in tuple(assets):
+        if asset.strategy == "donor_model_override":
+            _assert_model_importer_bundle(asset_root, asset)
+            continue
         if asset.strategy != "resident_model":
             for member in (asset.model, *asset.dependencies):
                 source = asset_root / asset.resource_base / member
@@ -29,18 +139,6 @@ def audit_source_asset_dependencies(
                         f"[ASSET] DEPENDENCY_MISSING bundle={asset.key} "
                         f"dependency={member}"
                     )
-        if asset.strategy == "donor_model_override":
-            bundle = by_key.get((asset.map_key, asset.asset_bundle or ""))
-            if bundle is None:
-                raise AssertionError(
-                    f"[ASSET] BUNDLE_MISSING override={asset.key}"
-                )
-            payload = asset_root / bundle.resource_base / bundle.model
-            if not payload.is_file():
-                raise AssertionError(
-                    f"[ASSET] DEPENDENCY_MISSING bundle={bundle.key} "
-                    f"dependency={bundle.model}"
-                )
 
 
 def audit_resource_packages(
@@ -135,23 +233,56 @@ def audit_resource_packages(
                     )
                 source_text = source_map.read_text(encoding="utf-8")
                 try:
-                    donor_model = resolve_donor_model_override(
+                    resolve_donor_model_override(
                         source_text,
                         source_text,
                         {
                             "strategy": asset.strategy,
-                            "scope": asset.scope,
                             "donor": dict(asset.donor),
+                            "replacement_slot_policy":
+                                asset.replacement_slot_policy,
+                            "replacement_slot": dict(asset.replacement_slot),
+                            "model": asset.model,
                         },
                     )
                 except ValueError as error:
                     raise AssertionError(
                         f"{asset.map_key}: donor unresolved: {error}"
                     ) from error
+                source_references = _model_references(
+                    source_text, asset.model
+                )
+                expected_references = set(
+                    asset.replacement_slot.get(
+                        "vanilla_reference_allowlist", ()
+                    )
+                )
+                if source_references != expected_references:
+                    raise AssertionError(
+                        f"{asset.map_key}: replacement slot vanilla references "
+                        f"expected={sorted(expected_references)} "
+                        f"actual={sorted(source_references)}"
+                    )
                 map_spec = catalog.maps.get(asset.map_key)
                 staged_entities = None
                 entities_member = None
                 if map_spec is not None:
+                    if asset.usage_policy == "removed_vanilla_entity_allowlist":
+                        config = json.loads(
+                            map_spec.level_config_path.read_text(encoding="utf-8")
+                        )
+                        policies = config.get("target_policies", {})
+                        not_removed = sorted(
+                            entity for entity in expected_references
+                            if not policies.get(entity, {}).get(
+                                "remove_original", False
+                            )
+                        )
+                        if not_removed:
+                            raise AssertionError(
+                                f"{asset.map_key}: allowlisted vanilla references "
+                                f"are not removed: {not_removed}"
+                            )
                     entities_member = (
                         f"{Path(asset.resource_owner).stem}/maps/"
                         f"{map_spec.relative_entities_path}"
@@ -163,18 +294,16 @@ def audit_resource_packages(
                     )
                 if staged_entities is not None and staged_entities.is_file():
                     generated = staged_entities.read_text(encoding="utf-8")
-                    visual_blocks = [
-                        block
-                        for block in generated.split("entity {")
-                        if "entityDef ap_location_visual_" in block
-                    ]
-                    if not visual_blocks or any(
-                        f'model = "{asset.model}";' not in block
-                        or f'model = "{donor_model}";' in block
-                        for block in visual_blocks
+                    generated_references = _model_references(
+                        generated, asset.model
+                    )
+                    if not generated_references or any(
+                        not entity.startswith("ap_location_visual_")
+                        for entity in generated_references
                     ):
                         raise AssertionError(
-                            f"{asset.map_key}: injected AP visual override is incomplete"
+                            f"{asset.map_key}: replacement slot is referenced by "
+                            "non-AP generated entities"
                         )
                     if "modelDecl" in generated:
                         raise AssertionError(
@@ -190,6 +319,47 @@ def audit_resource_packages(
                         raise AssertionError(
                             f"{asset.map_key}: final ZIP lacks generated donor override"
                         )
+                source_resource, source_streamdb = _replacement_bundle_paths(
+                    asset_root, asset
+                )
+                packaged_resource, packaged_streamdb = _replacement_bundle_paths(
+                    mod_root, asset
+                )
+                for source, packaged in (
+                    (source_resource, packaged_resource),
+                    (source_streamdb, packaged_streamdb),
+                ):
+                    if not packaged.is_file():
+                        raise AssertionError(
+                            f"[ASSET] IMPORTER_BUNDLE_INCOMPLETE "
+                            f"bundle={asset.key} packaged={packaged}"
+                        )
+                    if _sha256(packaged) != _sha256(source):
+                        raise AssertionError(
+                            f"{asset.map_key}: packaged importer payload hash "
+                            f"mismatch: {packaged.name}"
+                        )
+                    if zip_names is not None:
+                        relative = packaged.relative_to(mod_root).as_posix()
+                        if not any(
+                            name == relative or name.endswith(f"/{relative}")
+                            for name in zip_names
+                        ):
+                            raise AssertionError(
+                                f"[ASSET] IMPORTER_BUNDLE_INCOMPLETE "
+                                f"bundle={asset.key} zip={zip_path} "
+                                f"missing={relative}"
+                            )
+                records.append({
+                    "map_key": asset.map_key,
+                    "strategy": asset.strategy,
+                    "resource_base": asset.resource_base,
+                    "resource_owner": asset.resource_owner,
+                    "asset": asset.model,
+                    "asset_id": str(asset.replacement_slot["asset_id"]),
+                    "sha256": _sha256(source_streamdb),
+                })
+                continue
 
             members = (asset.model, *asset.dependencies)
             for member in members:

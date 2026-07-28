@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from content_catalog import ContentCatalog, load_content_catalog
+from content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from tools.content.compile_content_catalog import compile_catalog
 from tools.maps.ap_map_generator import generate_map, load_item_names
 from tools.maps.map_semantic_baseline import (
@@ -294,8 +294,9 @@ class Pipeline:
                 "dependencies": asset.dependencies,
                 "dependency_policy": asset.dependency_policy,
                 "donor": dict(asset.donor),
-                "asset_bundle": asset.asset_bundle,
-                "scope": asset.scope,
+                "replacement_slot_policy": asset.replacement_slot_policy,
+                "replacement_slot": thaw_content(asset.replacement_slot),
+                "usage_policy": asset.usage_policy,
                 "preserve": asset.preserve,
             }
             for asset in catalog.assets if asset.map_key == map_key

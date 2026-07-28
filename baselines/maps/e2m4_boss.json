@@ -11,14 +11,18 @@
     {
       "content_revision": "v0.3.4-alpha.1",
       "reason": "Sentinel AP entities now use Codex donors with the shared Archipelago model override"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Sentinel AP visual now uses a real map-resident LWO replacement slot imported with the complete Model Importer bundle"
     }
   ],
-  "asset_package_contract_sha256": "548797795ed8cfc000e4213cb0227dc7ac978f837e49d7c7b0c288699c8165ba",
-  "byte_sha256": "c333f31e8683bdd2614dfdbac30966df71401bad14297c294f86c256aa9fce42",
+  "asset_package_contract_sha256": "dae05823008a4e7b8f3f634d778c40047369dc10921f0011e2f3310e19f62c0d",
+  "byte_sha256": "b5fd36629b488c776cd6a71148b7a4bb5261d0359dc306dcf137c1df421ef08a",
   "content_revision": "v0.3.4-alpha.1",
   "generated_entity_metrics": {
     "bind_parents": 11,
-    "byte_size": 2725800,
+    "byte_size": 2725680,
     "classes": 2867,
     "entity_count": 2869,
     "layers": 124,
@@ -48,5 +52,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "1a8df6c63858fe76d1c24201e77ed4881f7040e7753802a80172d63a9ce78b5a",
-  "semantic_sha256": "661dffa4b0dabccce9179e25c0b03c5237f11099f26cff0fb6944a4238722621"
+  "semantic_sha256": "66b07cc9cb10a71ac8c13cd11099c14e972d05d59ad3f03744ad7325eb947d89"
 }
