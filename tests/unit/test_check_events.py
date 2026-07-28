@@ -2685,12 +2685,29 @@ class CheckEventTests(unittest.TestCase):
             ("game/sp/e2m4_boss/e2m4_boss", "game/hub/hub"): 7770290,
         }
         self.assertEqual(
-            {pair: entry["location_id"] for pair, entry in bridge_client.MISSION_COMPLETE_TRANSITIONS.items()},
+            {
+                key[1:]: next(
+                    effect["location_id"]
+                    for publisher in publishers
+                    for effect in publisher.effects
+                    if effect["strategy"] == "location_check"
+                )
+                for key, publishers in bridge_client.PUBLISHER_ENGINE.publishers_by_trigger.items()
+                if key[0] == "native_transition"
+                and any(
+                    effect["strategy"] == "location_check"
+                    for publisher in publishers
+                    for effect in publisher.effects
+                )
+            },
             expected,
         )
-        self.assertNotIn(
-            ("game/sp/e1m1_intro/e1m1_intro", "unknown/map"),
-            bridge_client.MISSION_COMPLETE_TRANSITIONS,
+        self.assertEqual(
+            bridge_client.PUBLISHER_ENGINE.observe(
+                "native_transition",
+                {"from_map": "game/sp/e1m1_intro/e1m1_intro", "to_map": "unknown/map"},
+            ),
+            (),
         )
         terminals = {
             entry["location_id"]: entry["signal"]
@@ -3076,14 +3093,14 @@ class CheckEventTests(unittest.TestCase):
             )
         ))
         self.assertEqual(ctx.sent, [])
-        self.assertNotIn(
-            ("game/sp/e1m2_battle/e1m2_battle", "game/hub/hub"),
-            bridge_client.MISSION_COMPLETE_TRANSITIONS,
-        )
-        self.assertNotIn(
-            ("game/hub/hub", "game/sp/e1m2_battle/e1m2_battle"),
-            bridge_client.MISSION_COMPLETE_TRANSITIONS,
-        )
+        self.assertEqual(bridge_client.PUBLISHER_ENGINE.observe(
+            "native_transition",
+            {"from_map": "game/sp/e1m2_battle/e1m2_battle", "to_map": "game/hub/hub"},
+        ), ())
+        self.assertEqual(bridge_client.PUBLISHER_ENGINE.observe(
+            "native_transition",
+            {"from_map": "game/hub/hub", "to_map": "game/sp/e1m2_battle/e1m2_battle"},
+        ), ())
 
     def test_goal_event_is_preserved_while_disconnected(self):
         with tempfile.TemporaryDirectory() as tmpdir:

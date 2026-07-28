@@ -1,0 +1,48 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Mission Complete moved to generic runtime publisher"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "177419efaaf0fe0448585992ce757cae8b0ef32c33897cdebb6511b6ef3bddbb",
+  "byte_sha256": "b5fd36629b488c776cd6a71148b7a4bb5261d0359dc306dcf137c1df421ef08a",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 11,
+    "byte_size": 2725680,
+    "classes": 2867,
+    "entity_count": 2869,
+    "layers": 124,
+    "targets": 1487,
+    "transforms": 5365,
+    "unique_entity_names": 2868
+  },
+  "manifest_sha256": "331eb16dd9de476d90246045ef49dfdb6d7b9d2fb94cbbd4ecbcad66ace9e1e0",
+  "map_key": "e2m4_boss",
+  "physical_ap_ids": [
+    7770291,
+    7770292,
+    7770293,
+    7770294,
+    7770295,
+    7770296,
+    7770297,
+    7770298,
+    7770299,
+    7770300,
+    7770301,
+    7770302
+  ],
+  "publisher_contract_sha256": "5be7f6f6d0bb8c70a725ca6d6cb3ff3ca837b69cd08edef85bce444aac69bd84",
+  "runtime_location_ids": [
+    7770290
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "1a8df6c63858fe76d1c24201e77ed4881f7040e7753802a80172d63a9ce78b5a",
+  "semantic_sha256": "66b07cc9cb10a71ac8c13cd11099c14e972d05d59ad3f03744ad7325eb947d89"
+}

@@ -1,0 +1,62 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Split monolithic baseline without content change"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "2141401a9b50854155b308179042798ca93c78687f6b3decb90855d55c6c00a7",
+  "byte_sha256": "03aa2d68c012aed5c721ebb0fd3ae4f2c4d7fa4054339e977638581161016e5e",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 347,
+    "byte_size": 17066429,
+    "classes": 13745,
+    "entity_count": 13783,
+    "layers": 6997,
+    "targets": 11442,
+    "transforms": 30260,
+    "unique_entity_names": 13746
+  },
+  "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
+  "map_key": "e2m3_core",
+  "physical_ap_ids": [
+    7770256,
+    7770257,
+    7770258,
+    7770259,
+    7770260,
+    7770261,
+    7770262,
+    7770263,
+    7770264,
+    7770265,
+    7770266,
+    7770267,
+    7770268,
+    7770269,
+    7770270,
+    7770271,
+    7770272,
+    7770273,
+    7770274,
+    7770275,
+    7770276,
+    7770277,
+    7770278,
+    7770279,
+    7770280,
+    7770281,
+    7770283,
+    7770284
+  ],
+  "publisher_contract_sha256": "5b68333007af515c681165cecb856f15f1ff792282c1e229911eb52faa82bb23",
+  "runtime_location_ids": [],
+  "schema_version": 2,
+  "scripted_contract_sha256": "fe140df67dfcbae5f7e1ea9855c9bea7e2ec534dc03e67f5b76928613ebf75ed",
+  "semantic_sha256": "05fbbffed012ca0fbad657cda8b033540bc72000f15d75a050f5e5ad8f96b4c2"
+}

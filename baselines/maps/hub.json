@@ -1,0 +1,53 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Split monolithic baseline without content change"
+    },
+    {
+      "content_revision": "v0.3.4-alpha.1",
+      "reason": "Pipeline aligned with notification-enabled packaged output"
+    }
+  ],
+  "asset_package_contract_sha256": "6d6b1da99bcc84efb9819ded115340814bd1d3769a8ee4fbaac58428817baa62",
+  "byte_sha256": "4f174d6ff0c1575de7b6c255e3fae1aa68019fd99f04b8f9e739432133e58cf8",
+  "content_revision": "v0.3.4-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 143,
+    "byte_size": 4307186,
+    "classes": 4138,
+    "entity_count": 4140,
+    "layers": 156,
+    "targets": 2825,
+    "transforms": 8056,
+    "unique_entity_names": 4139
+  },
+  "manifest_sha256": "aa15ccbd25777a61a6be152a06f5d1d4802fa6061f4038a18c0ede3f70ee6fce",
+  "map_key": "hub",
+  "physical_ap_ids": [
+    7770072,
+    7770073,
+    7770074,
+    7770081,
+    7770086,
+    7770087,
+    7770088,
+    7770163,
+    7770164,
+    7770165,
+    7770166,
+    7770167,
+    7770168,
+    7770169,
+    7770170,
+    7770171,
+    7770253,
+    7770254,
+    7770255
+  ],
+  "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "runtime_location_ids": [],
+  "schema_version": 2,
+  "scripted_contract_sha256": "72ca879c5b3d0f542a8c49f4d0dd3727e3ecac529d56dd73e8d71c4172fb46ed",
+  "semantic_sha256": "84447a302baed25646b09c4084fda06bb6fee7ec88e35e097f95b3f779aec713"
+}

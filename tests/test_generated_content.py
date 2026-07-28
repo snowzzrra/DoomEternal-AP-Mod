@@ -31,3 +31,12 @@ def test_generated_location_ids_and_regions_are_consistent(generated_module) -> 
 def test_generated_route_uses_declared_regions(generated_module) -> None:
     known = set(generated_module.CAMPAIGN_REGIONS)
     assert all(source in known and destination in known for source, destination, _ in generated_module.CAMPAIGN_CONNECTIONS)
+
+
+def test_generated_identity_matches_mod_source(generated_module) -> None:
+    import json
+
+    identity = json.loads((ROOT / "data" / "content_identity.json").read_text(encoding="utf-8"))
+    assert generated_module.CONTENT_SCHEMA_VERSION == identity["content_schema_version"]
+    assert generated_module.CONTENT_REVISION == identity["content_revision"]
+    assert generated_module.BRIDGE_PROTOCOL_VERSION == identity["bridge_protocol_version"]

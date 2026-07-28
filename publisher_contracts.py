@@ -44,6 +44,38 @@ class PublisherContract:
         return tuple(trigger for trigger in self.triggers if trigger["strategy"] == strategy)
 
 
+TriggerKey = tuple[str, ...]
+
+
+def trigger_key(strategy: str, payload: Mapping[str, Any]) -> TriggerKey:
+    """Return the canonical, strategy-owned lookup key for a trigger."""
+    if strategy == "native_transition":
+        return (
+            strategy,
+            canonical_map_name(payload.get("from_map")),
+            canonical_map_name(payload.get("to_map")),
+        )
+    if strategy == "map_event_file":
+        return (strategy, str(payload.get("filename", "")))
+    if strategy == "terminal_owner":
+        return (strategy, str(payload.get("owner", "")))
+    raise ValueError(f"unsupported publisher trigger strategy: {strategy!r}")
+
+
+def publishers_by_trigger(
+    publishers: tuple[PublisherContract, ...],
+) -> Mapping[TriggerKey, tuple[PublisherContract, ...]]:
+    """Index every publisher without assuming an effect count or category."""
+    grouped: dict[TriggerKey, list[PublisherContract]] = {}
+    for publisher in publishers:
+        for trigger in publisher.triggers:
+            grouped.setdefault(trigger_key(trigger["strategy"], trigger), []).append(publisher)
+    return MappingProxyType({
+        key: tuple(sorted(values, key=lambda publisher: publisher.key))
+        for key, values in grouped.items()
+    })
+
+
 def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
     if document.get("schema_version") != 1:
         raise ValueError("publisher contract schema_version must be 1")
@@ -51,8 +83,8 @@ def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
     if not isinstance(publishers, list) or not publishers:
         raise ValueError("publisher contracts require a non-empty publishers list")
     keys: set[str] = set()
-    filenames: set[str] = set()
-    markers: set[str] = set()
+    filename_markers: dict[str, str] = {}
+    marker_filenames: dict[str, str] = {}
     for publisher in publishers:
         key = publisher.get("key")
         if not isinstance(key, str) or not key or key in keys:
@@ -80,10 +112,12 @@ def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
                     raise ValueError(f"{key}: map_event_file requires a .txt filename")
                 if not isinstance(marker, str) or not marker:
                     raise ValueError(f"{key}: map_event_file requires a marker")
-                if filename in filenames or marker in markers:
-                    raise ValueError(f"{key}: map publishers may not share filename or marker")
-                filenames.add(filename)
-                markers.add(marker)
+                if filename in filename_markers and filename_markers[filename] != marker:
+                    raise ValueError(f"{key}: shared filename has a different marker")
+                if marker in marker_filenames and marker_filenames[marker] != filename:
+                    raise ValueError(f"{key}: shared marker has a different filename")
+                filename_markers[filename] = marker
+                marker_filenames[marker] = filename
             elif strategy == "terminal_owner" and not trigger.get("owner"):
                 raise ValueError(f"{key}: terminal_owner requires owner")
         for effect in effects:
@@ -98,8 +132,15 @@ def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
                 raise ValueError(f"{key}: preserved_native_target requires target")
 
 
-def load_publisher_contracts(path: Path = CONTRACT_PATH) -> tuple[PublisherContract, ...]:
-    document = json.loads(path.read_text(encoding="utf-8"))
+def publisher_contracts_from_document(
+    document: Mapping[str, Any],
+    *,
+    allow_empty: bool = False,
+) -> tuple[PublisherContract, ...]:
+    if allow_empty and document.get("publishers") == []:
+        if document.get("schema_version") != 1:
+            raise ValueError("publisher contract schema_version must be 1")
+        return ()
     validate_publisher_contracts(document)
     result = []
     for publisher in document["publishers"]:
@@ -121,20 +162,22 @@ def load_publisher_contracts(path: Path = CONTRACT_PATH) -> tuple[PublisherContr
     return tuple(result)
 
 
+def load_publisher_contracts(path: Path = CONTRACT_PATH) -> tuple[PublisherContract, ...]:
+    return publisher_contracts_from_document(
+        json.loads(path.read_text(encoding="utf-8"))
+    )
+
+
 def publishers_for_transition(
     publishers: tuple[PublisherContract, ...],
     from_map: str,
     to_map: str,
 ) -> tuple[PublisherContract, ...]:
-    edge = (canonical_map_name(from_map), canonical_map_name(to_map))
-    return tuple(
-        publisher
-        for publisher in publishers
-        if any(
-            (trigger["from_map"], trigger["to_map"]) == edge
-            for trigger in publisher.triggers_for("native_transition")
-        )
-    )
+    index = publishers_by_trigger(publishers)
+    return index.get(trigger_key("native_transition", {
+        "from_map": from_map,
+        "to_map": to_map,
+    }), ())
 
 
 def map_publishers_for_owner(

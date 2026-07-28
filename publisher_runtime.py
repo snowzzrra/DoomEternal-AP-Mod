@@ -7,9 +7,28 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
-from publisher_contracts import PublisherContract
+from publisher_contracts import (
+    PublisherContract,
+    publishers_by_trigger,
+    trigger_key,
+)
+
+
+class PublisherEngine:
+    """Generic publisher discovery; effect execution remains caller-owned."""
+
+    def __init__(self, publishers: tuple[PublisherContract, ...]):
+        self.publishers = publishers
+        self.publishers_by_trigger = publishers_by_trigger(publishers)
+
+    def observe(
+        self,
+        strategy: str,
+        payload: Mapping[str, Any],
+    ) -> tuple[PublisherContract, ...]:
+        return self.publishers_by_trigger.get(trigger_key(strategy, payload), ())
 
 
 def effect_acknowledged(

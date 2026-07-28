@@ -48,9 +48,9 @@ from observer_lifecycle import (
 )
 from publisher_contracts import (
     load_publisher_contracts,
-    publishers_for_transition,
 )
 from publisher_runtime import (
+    PublisherEngine,
     publisher_acknowledged,
     quarantine_malformed_event,
     read_map_event,
@@ -1408,19 +1408,7 @@ STICKY_MASTERY_ENTRY = WEAPON_MASTERY_BY_UNLOCKABLE[
 ]
 STICKY_MASTERY_LOCATION = STICKY_MASTERY_ENTRY["location_id"]
 PUBLISHERS = load_publisher_contracts()
-MISSION_COMPLETE_TRANSITIONS = {
-    (trigger["from_map"], trigger["to_map"]): {
-        "location_id": next(
-            effect["location_id"]
-            for effect in publisher.effects
-            if effect["strategy"] == "location_check"
-        ),
-        "publisher_key": publisher.key,
-    }
-    for publisher in PUBLISHERS
-    for trigger in publisher.triggers_for("native_transition")
-    if any(effect["strategy"] == "location_check" for effect in publisher.effects)
-}
+PUBLISHER_ENGINE = PublisherEngine(PUBLISHERS)
 PUBLISHER_MAP_EVENT_FILENAMES = frozenset(
     trigger["filename"]
     for publisher in PUBLISHERS
@@ -3781,46 +3769,57 @@ class DoomEternalContext(CommonContext):
         """Consume independent map files and native transition triggers."""
         observed = False
         quarantine_root = Path(INV_DUMP_DIR) / "quarantine"
-        for publisher in PUBLISHERS:
-            for trigger in publisher.triggers_for("map_event_file"):
-                path = Path(INV_DUMP_DIR) / trigger["filename"]
-                if not path.exists():
-                    continue
-                observed = True
-                valid, contents, digest = read_map_event(path, trigger["marker"])
-                if not valid:
-                    quarantine_malformed_event(
-                        path,
-                        key=publisher.key,
-                        contents=contents,
-                        sha256=digest,
-                        quarantine_root=quarantine_root,
-                    )
-                    logger.warning(
-                        "[PUBLISHER] EVENT_MALFORMED key=%s filename=%s sha256=%s",
-                        publisher.key,
-                        trigger["filename"],
-                        digest,
-                    )
-                    continue
-                complete = await DoomEternalContext.execute_publisher(
+        for trigger_key, publishers in PUBLISHER_ENGINE.publishers_by_trigger.items():
+            if trigger_key[0] != "map_event_file":
+                continue
+            filename = trigger_key[1]
+            trigger = next(
+                item
+                for publisher in publishers
+                for item in publisher.triggers_for("map_event_file")
+                if item["filename"] == filename
+            )
+            path = Path(INV_DUMP_DIR) / filename
+            if not path.exists():
+                continue
+            observed = True
+            valid, contents, digest = read_map_event(path, trigger["marker"])
+            if not valid:
+                quarantine_malformed_event(
+                    path,
+                    key=",".join(publisher.key for publisher in publishers),
+                    contents=contents,
+                    sha256=digest,
+                    quarantine_root=quarantine_root,
+                )
+                logger.warning(
+                    "[PUBLISHER] EVENT_MALFORMED key=%s filename=%s sha256=%s",
+                    ",".join(publisher.key for publisher in publishers),
+                    filename,
+                    digest,
+                )
+                continue
+            completed = [
+                await DoomEternalContext.execute_publisher(
                     self,
                     publisher,
                     "map_event_file",
-                    f"map event {trigger['filename']}",
+                    f"map event {filename}",
                 )
-                if complete:
-                    try:
-                        path.unlink()
-                    except FileNotFoundError:
-                        pass
-                    except OSError as error:
-                        logger.warning(
-                            "[PUBLISHER] EVENT_CLEANUP_RETRY key=%s filename=%s error=%s",
-                            publisher.key,
-                            trigger["filename"],
-                            error,
-                        )
+                for publisher in publishers
+            ]
+            if all(completed):
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as error:
+                    logger.warning(
+                        "[PUBLISHER] EVENT_CLEANUP_RETRY key=%s filename=%s error=%s",
+                        ",".join(publisher.key for publisher in publishers),
+                        filename,
+                        error,
+                    )
 
         for path in goal_event_files():
             observed = True
@@ -3844,9 +3843,7 @@ class DoomEternalContext(CommonContext):
                     digest,
                 )
                 continue
-            matching = publishers_for_transition(
-                PUBLISHERS, event["from_map"], event["to_map"]
-            )
+            matching = PUBLISHER_ENGINE.observe("native_transition", event)
             if not matching:
                 logger.info(
                     "[PUBLISHER] TRANSITION_IGNORED from=%s to=%s reason=no_contract",

@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from content_catalog import discover_maps
+from content_catalog import _map_content_packages, discover_maps
+from tools.content.new_map import create_package
 from tools.content.compile_content_catalog import render
 
 
@@ -34,3 +35,19 @@ def test_synthetic_fixture_is_data_only(discovered_map_specs) -> None:
     assert item["map_key"] not in {spec.key for spec in discovered_map_specs}
     assert item["generated_output"].endswith(".entities")
     assert item["resource_path"].endswith(".resources")
+
+
+def test_map_content_package_scaffolder_is_valid_and_python_free(tmp_path: Path) -> None:
+    directory = create_package(
+        "synthetic_future",
+        "Synthetic Future",
+        "synthetic_future.map",
+        "game/sp/synthetic_future/synthetic_future",
+        "game/sp/synthetic_future/synthetic_future_patch1.resources",
+        root=tmp_path,
+    )
+    assert {path.name for path in directory.iterdir()} == {
+        "descriptor.json", "locations.json", "runtime.json",
+        "publishers.json", "assets.json", "onboarding.json",
+    }
+    assert len(_map_content_packages(tmp_path)) == 1
