@@ -175,6 +175,8 @@
             "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
         },
         "interact_hub_2_battery_station_1": {
+            "independent_ap_trigger": true,
+            "independent_position": [94.25, 58.45, -11.30],
             "native_entity_contract": {
                 "original_targets": [],
                 "required_snippets": [
@@ -188,6 +190,8 @@
             }
         },
         "interact_hub_2_battery_station_2": {
+            "independent_ap_trigger": true,
+            "independent_position": [-92.50, 85.90, -4.00],
             "native_entity_contract": {
                 "original_targets": [],
                 "required_snippets": [
@@ -201,6 +205,8 @@
             }
         },
         "sentinel_battery_room_interact_hub_2_battery_station_1": {
+            "independent_ap_trigger": true,
+            "independent_position": [0.55, -115.57, 6.34],
             "native_entity_contract": {
                 "original_targets": [],
                 "required_snippets": [

@@ -4,14 +4,23 @@
   "status": "static_candidate_pending_runtime_confirmation",
   "source": {
     "path": "vanillamaps/e3m1_slayer.map",
-    "size": 11693231,
-    "sha256": "28dd0ba428859ef8c86d568016d058f7d537770fd50c07ef1cdeead31335248a",
+    "size": 11694102,
+    "sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
     "ap_markers_absent": true,
     "structurally_parsed": true
   },
   "owner": {
-    "resource": "game/sp/e3m1_slayer/e3m1_slayer_patch3.resources",
+    "resource": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
     "status": "static_candidate_pending_runtime_confirmation"
+  },
+  "onboarding_evidence": {
+    "source": "packagemapspec",
+    "winner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
+    "candidates": {
+      "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources": 22,
+      "game/sp/e3m1_slayer/e3m1_slayer_patch3.resources": 131
+    },
+    "packagemapspec_sha256": "82e6981fa6b83a7134c306cb3e3ff5e5f02567ccaf173fa737144b2f087a62c6"
   },
   "reserved_ids": [
     {
@@ -48,7 +57,7 @@
   },
   "checks": [
     "source hash locked",
-    "owner is a static patch3 candidate",
+    "owner is a static patch2 candidate",
     "native question-mark asset ID locked",
     "Crucible grant edge preserved",
     "Automap remains vanilla",

@@ -107,6 +107,7 @@ def main() -> int:
     parser.add_argument("--audit-output", type=Path, required=True)
     args = parser.parse_args()
     audit = build_toy_override(args.mod_root)
+    args.audit_output.parent.mkdir(parents=True, exist_ok=True)
     args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
     return 0
 

@@ -87,8 +87,17 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     return "\n".join(lines)
 
 
-def compile_catalog(output: Path = DEFAULT_OUTPUT, *, check: bool = False, map_key: str | None = None) -> bool:
-    rendered = render(load_content_catalog(), map_key)
+def compile_catalog(
+    output: Path = DEFAULT_OUTPUT,
+    *,
+    output_root: Path | None = None,
+    check: bool = False,
+    map_key: str | None = None,
+) -> bool:
+    catalog = load_content_catalog()
+    rendered = render(catalog, map_key)
+    changed = False
+
     current = output.read_text(encoding="utf-8") if output.exists() else ""
     if check:
         if current != rendered:
@@ -99,11 +108,84 @@ def compile_catalog(output: Path = DEFAULT_OUTPUT, *, check: bool = False, map_k
                 "Fix:\n"
                 "  python -m tools.content.compile_content_catalog"
             )
-        return False
-    if current != rendered:
-        output.write_text(rendered, encoding="utf-8", newline="\n")
-        return True
-    return False
+    else:
+        if current != rendered:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered, encoding="utf-8", newline="\n")
+            changed = True
+
+    if output_root is None:
+        output_root = MOD_ROOT / "build" / "staging" / "runtime_catalog"
+
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    staging_gen = output_root / "generated_content.py"
+    current_gen = staging_gen.read_text(encoding="utf-8") if staging_gen.exists() else ""
+    if current_gen != rendered:
+        if not check:
+            staging_gen.write_text(rendered, encoding="utf-8", newline="\n")
+            changed = True
+
+    for json_name in [
+        "content_identity.json",
+        "items.json",
+        "item_replay_policies.json",
+        "location_names.json",
+        "runtime_locations.json",
+        "publisher_contracts.json",
+        "campaign_goal_contract.json",
+        "challenge_location_registry.json",
+    ]:
+        src = catalog.root / "data" / json_name
+        if src.exists():
+            content_bytes = src.read_bytes()
+            dst = output_root / json_name
+            current_bytes = dst.read_bytes() if dst.exists() else b""
+            if current_bytes != content_bytes:
+                if not check:
+                    dst.write_bytes(content_bytes)
+                    changed = True
+
+    from map_registry import _catalog_registry
+    compiled_sources = _catalog_registry(catalog.root)
+    sources_rendered = json.dumps(compiled_sources, indent=2, sort_keys=True) + "\n"
+    dst_path = output_root / "map_sources.json"
+    curr = dst_path.read_text(encoding="utf-8") if dst_path.exists() else ""
+    if curr != sources_rendered:
+        if not check:
+            dst_path.write_text(sources_rendered, encoding="utf-8", newline="\n")
+            changed = True
+
+    from foundation import load_foundation_contracts
+    compiled_foundation = load_foundation_contracts(authorial=True)
+    foundation_rendered = json.dumps(compiled_foundation, indent=2, sort_keys=True) + "\n"
+    for dst_path in [output_root / "foundation_contracts.json", catalog.root / "data" / "foundation_contracts.json"]:
+        curr = dst_path.read_text(encoding="utf-8") if dst_path.exists() else ""
+        if curr != foundation_rendered:
+            if not check:
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+                dst_path.write_text(foundation_rendered, encoding="utf-8", newline="\n")
+                changed = True
+
+    identity_src = catalog.root / "data" / "content_identity.json"
+    identity_data = json.loads(identity_src.read_text(encoding="utf-8")) if identity_src.exists() else {}
+
+    catalog_dict = {
+        "maps": list(catalog.maps.keys()),
+        "physical_locations_count": len(catalog.physical_locations),
+        "revision": identity_data.get("content_revision", "v0.3.5-alpha.2"),
+        "runtime_locations_count": len(catalog.runtime_locations),
+        "schema_version": identity_data.get("content_schema_version", 2),
+    }
+    catalog_rendered = json.dumps(catalog_dict, indent=2, sort_keys=True) + "\n"
+    staging_catalog = output_root / "catalog.json"
+    current_catalog = staging_catalog.read_text(encoding="utf-8") if staging_catalog.exists() else ""
+    if current_catalog != catalog_rendered:
+        if not check:
+            staging_catalog.write_text(catalog_rendered, encoding="utf-8", newline="\n")
+            changed = True
+
+    return changed
 
 
 def main() -> int:
@@ -111,8 +193,14 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--map", dest="map_key")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output-root", type=Path, default=None)
     args = parser.parse_args()
-    changed = compile_catalog(args.output, check=args.check, map_key=args.map_key)
+    changed = compile_catalog(
+        args.output,
+        output_root=args.output_root,
+        check=args.check,
+        map_key=args.map_key,
+    )
     print("updated" if changed else "up-to-date")
     return 0
 

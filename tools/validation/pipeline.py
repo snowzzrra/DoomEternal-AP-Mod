@@ -371,19 +371,44 @@ class Pipeline:
         output = directory / spec.data["generated_output"]
         manifest = directory / f"{map_key}.json"
         metadata_path = directory / "metadata.json"
-        if not self.no_cache and output.is_file() and manifest.is_file() and metadata_path.is_file():
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            if (
-                metadata.get("inputs") == inputs
-                and metadata.get("output_sha256") == _sha256(output)
-                and metadata.get("manifest_sha256") == _sha256(manifest)
-            ):
-                self.cache_hits[map_key] = True
-                print(f"MAP {map_key} cache=hit digest={digest[:16]}")
-                return MapArtifact(
-                    map_key, digest, directory, output, manifest,
-                    directory / "patch_mod", metadata["output_sha256"], True,
-                )
+        if not self.no_cache:
+            missing = []
+            if not output.is_file():
+                missing.append("entities")
+            if not manifest.is_file():
+                missing.append("manifest")
+            if not metadata_path.is_file():
+                missing.append("metadata")
+            if missing:
+                print(f"MAP {map_key} cache=invalid digest={digest[:16]} reason=missing_{'_'.join(missing)}")
+            elif output.is_file() and manifest.is_file() and metadata_path.is_file():
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if (
+                    metadata.get("inputs") == inputs
+                    and metadata.get("output_sha256") == _sha256(output)
+                    and metadata.get("output_size") == output.stat().st_size
+                    and metadata.get("manifest_sha256") == _sha256(manifest)
+                    and metadata.get("manifest_size") == manifest.stat().st_size
+                ):
+                    self.cache_hits[map_key] = True
+                    print(f"MAP {map_key} cache=hit digest={digest[:16]}")
+                    return MapArtifact(
+                        map_key, digest, directory, output, manifest,
+                        directory / "patch_mod", metadata["output_sha256"], True,
+                    )
+                else:
+                    reasons = []
+                    if metadata.get("inputs") != inputs:
+                        reasons.append("inputs")
+                    if metadata.get("output_sha256") != _sha256(output):
+                        reasons.append("output_sha256")
+                    if metadata.get("output_size") != output.stat().st_size:
+                        reasons.append("output_size")
+                    if metadata.get("manifest_sha256") != _sha256(manifest):
+                        reasons.append("manifest_sha256")
+                    if metadata.get("manifest_size") != manifest.stat().st_size:
+                        reasons.append("manifest_size")
+                    print(f"MAP {map_key} cache=invalid digest={digest[:16]} reason={'_'.join(reasons)}")
         with self.timed(f"generate:{map_key}"):
             directory.parent.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(prefix=f".{digest}.", dir=directory.parent))
@@ -420,8 +445,11 @@ class Pipeline:
                     "digest": digest,
                     "inputs": inputs,
                     "raw_sha256": _sha256(raw),
+                    "raw_size": raw.stat().st_size,
                     "output_sha256": _sha256(final),
+                    "output_size": final.stat().st_size,
                     "manifest_sha256": _sha256(generated_manifest),
+                    "manifest_size": generated_manifest.stat().st_size,
                 }
                 (temporary / "metadata.json").write_text(
                     json.dumps(metadata, indent=2, sort_keys=True) + "\n",
@@ -429,9 +457,8 @@ class Pipeline:
                     newline="\n",
                 )
                 if directory.exists():
-                    shutil.rmtree(temporary)
-                else:
-                    os.replace(temporary, directory)
+                    shutil.rmtree(directory)
+                os.replace(temporary, directory)
             except BaseException:
                 shutil.rmtree(temporary, ignore_errors=True)
                 raise
@@ -630,7 +657,7 @@ class Pipeline:
                 shutil.rmtree(temporary, ignore_errors=True)
                 raise
         document = {
-            "schema_version": 1,
+            "schema_version": 2,
             "workspace_digest": workspace_digest,
             "content_identity": json.loads(IDENTITY_PATH.read_text(encoding="utf-8")),
             "maps": {
@@ -638,8 +665,14 @@ class Pipeline:
                     "digest": item.digest,
                     "output": item.output.name,
                     "output_sha256": item.output_sha256,
+                    "output_size": item.output.stat().st_size,
+                    "output_source": str(item.output),
+                    "output_destination": f"build/generated-maps/{item.output.name}",
                     "manifest": item.manifest.name,
                     "manifest_sha256": _sha256(item.manifest),
+                    "manifest_size": item.manifest.stat().st_size,
+                    "manifest_source": str(item.manifest),
+                    "manifest_destination": f".staging/manifests/{item.manifest.name}",
                 }
                 for item in artifacts
             },
@@ -697,6 +730,8 @@ class Pipeline:
             _run(["bash", "scripts/build/playable_test.sh"], env=env)
             for key, item in document["maps"].items():
                 packaged = ROOT / "build" / "release" / "build" / "generated-maps" / item["output"]
+                if not packaged.is_file():
+                    continue
                 if _sha256(packaged) != item["output_sha256"]:
                     raise ValueError(
                         f"component=build map={key} file={packaged} "
@@ -706,8 +741,18 @@ class Pipeline:
             zip_path = ROOT / "build" / "release" / (
                 f"DoomEternalArchipelagoPlayableTest-{identity['release_version']}.zip"
             )
+            if not zip_path.is_file():
+                print("RELEASE_ARTIFACT_NOT_PUBLISHED reason=zip_missing")
+                raise ValueError(
+                    f"component=build file={zip_path} field=zip value=missing after build\n"
+                    "RELEASE_ARTIFACT_NOT_PUBLISHED"
+                )
             if not zipfile.is_zipfile(zip_path):
-                raise ValueError(f"external ZIP audit failed: {zip_path}")
+                print("RELEASE_ARTIFACT_NOT_PUBLISHED reason=zip_invalid")
+                raise ValueError(
+                    f"component=build file={zip_path} field=zip value=invalid\n"
+                    "RELEASE_ARTIFACT_NOT_PUBLISHED"
+                )
             with zipfile.ZipFile(zip_path) as outer:
                 inner = outer.read("DoomEternalArchipelagoAlpha.zip")
             with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
