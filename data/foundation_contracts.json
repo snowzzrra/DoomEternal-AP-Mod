@@ -18,11 +18,11 @@
   },
   "counts": {
     "items": 116,
-    "locations": 284,
-    "map_checks": 243,
+    "locations": 291,
+    "map_checks": 245,
     "route_sentinel_batteries": 21,
     "runtime_goals": 1,
-    "runtime_locations": 41
+    "runtime_locations": 46
   },
   "family_primitives": {
     "currency": "currency_grant_direct",

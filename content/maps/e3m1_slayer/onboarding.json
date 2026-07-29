@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "map_key": "e3m1_slayer",
-  "status": "static_candidate_pending_runtime_confirmation",
+  "status": "runtime_closed",
   "source": {
     "path": "vanillamaps/e3m1_slayer.map",
     "size": 11694102,
@@ -11,7 +11,7 @@
   },
   "owner": {
     "resource": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-    "status": "static_candidate_pending_runtime_confirmation"
+    "status": "runtime_closed"
   },
   "onboarding_evidence": {
     "source": "packagemapspec",
