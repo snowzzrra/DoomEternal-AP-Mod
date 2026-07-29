@@ -97,7 +97,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 116, "locations": 256, "map_checks": 215, "runtime_locations": 41, "runtime_goals": 1, "route_sentinel_batteries": 21},
+    "counts": {"items": 116, "locations": 289, "map_checks": 243, "runtime_locations": 46, "runtime_goals": 1, "route_sentinel_batteries": 21},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -125,11 +125,28 @@ def load_primitive_registry() -> dict[str, Any]:
     return PRIMITIVE_REGISTRY
 
 
-def load_foundation_contracts() -> dict[str, Any]:
+def load_runtime_foundation_contracts(data_dir: Path | None = None) -> dict[str, Any]:
+    """Load foundation contracts using runtime compiled projections only."""
+    data_dir = data_dir or (Path(__file__).resolve().parent / "data")
     contracts = dict(DELIVERY_CONTRACTS)
-    plans = release_plan(load_map_registry())
+    registry = load_map_registry(root=data_dir.parent, authorial=False)
+    plans = release_plan(registry)
     contracts["active_maps"] = {plan.map_key: plan.runtime_map for plan in plans}
+    foundation_json = data_dir / "foundation_contracts.json"
+    if foundation_json.exists():
+        compiled_contracts = json.loads(foundation_json.read_text(encoding="utf-8"))
+        contracts.update(compiled_contracts)
+    return contracts
+
+
+def load_foundation_contracts(*, data_dir: Path | None = None, authorial: bool = False) -> dict[str, Any]:
+    if not authorial:
+        return load_runtime_foundation_contracts(data_dir)
+    contracts = dict(DELIVERY_CONTRACTS)
     root = Path(__file__).resolve().parent
+    registry = load_map_registry(root=root, authorial=True)
+    plans = release_plan(registry)
+    contracts["active_maps"] = {plan.map_key: plan.runtime_map for plan in plans}
     manifest_counts = [
         len(json.loads((root / plan.manifest).read_text(encoding="utf-8")))
         for plan in plans if (root / plan.manifest).exists()

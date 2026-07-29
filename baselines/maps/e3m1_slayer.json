@@ -11,20 +11,24 @@
     {
       "content_revision": "v0.3.5-alpha.1",
       "reason": "Remove inactive Crucible item RPC from package maps while retaining the vanilla acquisition edge."
+    },
+    {
+      "content_revision": "v0.3.5-alpha.2",
+      "reason": "Migrated e3m1_slayer to patch2 source for resource priority"
     }
   ],
-  "asset_package_contract_sha256": "066e8f506d1346768f54f791677b9694e5e7ee8f2c534f1e4944ba217a851fdc",
-  "byte_sha256": "1c9ece9f2f86bbcbb341d25b4e1fb1dfa1b5fb092858dc5d28456db80fb04baf",
-  "content_revision": "v0.3.5-alpha.1",
+  "asset_package_contract_sha256": "c58470ef0344f12fe6c0c25ad6d7236a13e5df10d26d65bdb50449a6163f6497",
+  "byte_sha256": "f641998b825f6800ca19227207dc2afe0079931303faa2308b3273e66771e890",
+  "content_revision": "v0.3.5-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11975609,
-    "classes": 12150,
-    "entity_count": 12152,
+    "byte_size": 11976478,
+    "classes": 12151,
+    "entity_count": 12153,
     "layers": 1662,
     "targets": 7619,
-    "transforms": 23367,
-    "unique_entity_names": 12151
+    "transforms": 23370,
+    "unique_entity_names": 12152
   },
   "manifest_sha256": "fbd39658cef8856e8f010ca380f2011b3eababc0a673e295c5fa439c2f32fbf9",
   "map_key": "e3m1_slayer",
@@ -68,5 +72,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "d49c77f62f6707294223b8c68daf1e557ea13f221201f8dc2115f7b6ac152b91",
-  "semantic_sha256": "1540b4c17b35376cb9364886e6b99b862811db15dddecc6cdcaa0215f8cd94a8"
+  "semantic_sha256": "11b65fa36b84b1503c73faa1ad5adb8dde25a4ba8510a8906cf1e64255d17f48"
 }

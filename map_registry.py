@@ -80,14 +80,33 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
     }
 
 
-def load_map_registry(path: Path | None = None, *, root: Path = ROOT) -> dict[str, Any]:
-    normalized_path = root / "data" / "map_sources.json"
-    if path is None or path.resolve() == normalized_path.resolve():
-        registry = _catalog_registry(root)
-    else:
-        registry = json.loads(path.read_text(encoding="utf-8"))
+def load_runtime_map_registry(data_dir: Path | None = None) -> dict[str, Any]:
+    """Load compiled map_sources.json projection for runtime/client consumption."""
+    data_dir = data_dir or (Path(__file__).resolve().parent / "data")
+    path = data_dir / "map_sources.json"
+    registry = json.loads(path.read_text(encoding="utf-8"))
     validate_map_registry(registry)
     return registry
+
+
+def load_authorial_map_registry(root: Path = ROOT) -> dict[str, Any]:
+    """Load authorial map registry via content catalog discovery (build/dev only)."""
+    return _catalog_registry(root)
+
+
+def load_map_registry(
+    path: Path | None = None,
+    *,
+    root: Path = ROOT,
+    authorial: bool = False,
+) -> dict[str, Any]:
+    if authorial or root.resolve() != ROOT.resolve():
+        return load_authorial_map_registry(root)
+    if path is not None and path.resolve() != (root / "data" / "map_sources.json").resolve():
+        registry = json.loads(path.read_text(encoding="utf-8"))
+        validate_map_registry(registry)
+        return registry
+    return load_runtime_map_registry(root / "data")
 
 
 def validate_map_registry(registry: dict[str, Any]) -> None:
@@ -180,8 +199,10 @@ def _main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("release-rows", "release-manifest-files"))
     parser.add_argument("--registry", type=Path)
+    parser.add_argument("--authorial", action="store_true",
+                        help="Use content catalog (discovers content/maps packages)")
     args = parser.parse_args()
-    plans = release_plan(load_map_registry(args.registry))
+    plans = release_plan(load_map_registry(args.registry, authorial=args.authorial))
     if args.command == "release-rows":
         for plan in plans:
             print("\t".join((

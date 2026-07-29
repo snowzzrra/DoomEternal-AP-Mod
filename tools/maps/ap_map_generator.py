@@ -471,10 +471,6 @@ def validate_target_policies(config_entities, target_policies, content):
                     f"Native entity contract has unsupported key(s) for {entity_name}: "
                     + ", ".join(unknown_contract)
                 )
-            if policy.get("independent_ap_trigger"):
-                raise ValueError(
-                    f"Native entity contract cannot create an independent trigger: {entity_name}"
-                )
             if (
                 "original_targets" not in contract
                 or not isinstance(contract["original_targets"], list)
@@ -894,7 +890,7 @@ def append_target_to_named_entity(content, entity_name, target_name):
 
 
 def build_universal_physical_policy(
-    ap_check_id, location_id, block, visual_model=AP_QUESTION_MARK_MODEL
+    ap_check_id, location_id, block, visual_model=AP_QUESTION_MARK_MODEL, policy=None
 ):
     """Generate an independent trigger and visual for any generic physical location.
 
@@ -906,17 +902,22 @@ def build_universal_physical_policy(
     visual_name = f"ap_location_visual_{location_id}"
     cleanup_name = f"ap_remove_location_visual_{location_id}"
 
-    position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', block)
-    if not position_block:
-        position = [0.0, 0.0, 0.0]
+    policy = policy or {}
+    configured_position = policy.get("independent_position")
+    if configured_position is not None:
+        position = [configured_position[0], configured_position[1], configured_position[2] + 1.5]
     else:
-        coordinates = []
-        for axis in ("x", "y", "z"):
-            match = re.search(
-                rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)
-            )
-            coordinates.append(float(match.group(1)) if match else 0.0)
-        position = [coordinates[0], coordinates[1], coordinates[2] + 1.5]
+        position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', block)
+        if not position_block:
+            position = [0.0, 0.0, 0.0]
+        else:
+            coordinates = []
+            for axis in ("x", "y", "z"):
+                match = re.search(
+                    rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)
+                )
+                coordinates.append(float(match.group(1)) if match else 0.0)
+            position = [coordinates[0], coordinates[1], coordinates[2] + 1.5]
 
     independent_targets = [ap_check_id, cleanup_name]
 
@@ -954,16 +955,25 @@ def build_independent_targets(block, ap_check_id, policy):
     return list(dict.fromkeys([*retained, *configured]))
 
 
-def generate_automap_location_helper(source_block, location_id):
+def generate_automap_location_helper(source_block, location_id, policy=None):
     """Emit the proven targetless idInfo owner for one physical AP marker."""
-    position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', source_block)
-    if not position_block:
-        raise ValueError(f"Automap helper source position is missing for {location_id}")
-    coordinates = {
-        axis: (re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)).group(1)
-               if re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)) else "0")
-        for axis in ("x", "y", "z")
-    }
+    policy = policy or {}
+    configured_position = policy.get("independent_position")
+    if configured_position is not None:
+        coordinates = {
+            "x": str(configured_position[0]),
+            "y": str(configured_position[1]),
+            "z": str(configured_position[2]),
+        }
+    else:
+        position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', source_block)
+        if not position_block:
+            raise ValueError(f"Automap helper source position is missing for {location_id}")
+        coordinates = {
+            axis: (re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)).group(1)
+                   if re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)) else "0")
+            for axis in ("x", "y", "z")
+        }
     marker = re.search(
         r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
     )
@@ -1633,9 +1643,9 @@ def generate_map(
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 
                 new_blocks.append(
-                    generate_automap_location_helper(block, location_id)
+                    generate_automap_location_helper(block, location_id, policy=target_policy)
                 )
-                if "native_entity_contract" in target_policy:
+                if "native_entity_contract" in target_policy and not target_policy.get("independent_ap_trigger"):
                     native_contract = target_policy["native_entity_contract"]
                     native = apply_native_entity_contract(block, native_contract)
                     native = add_ap_check_target(
@@ -1643,16 +1653,19 @@ def generate_map(
                         entity_name,
                         ap_check_id,
                         {
-                            "preserve_targets": native_contract.get(
+                            "original_targets": native_contract.get(
                                 "original_targets", extract_target_names(block)
-                            )
+                            ),
+                            "drop_targets": target_policy.get("drop_targets", []),
+                            "preserve_targets": target_policy.get("preserve_targets"),
                         },
                     )
                     new_blocks.append("entity {" + native)
-                    new_blocks.append(generate_event_relay(
+                    new_blocks.append(generate_target_relay(
                         ap_check_id,
                         location_id,
                         "",
+                        completion_targets=target_policy.get("completion_targets"),
                         include_notification=include_ap_feedback,
                     ))
                     if include_ap_feedback:
@@ -1677,7 +1690,7 @@ def generate_map(
 
                     if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
                         universal = build_universal_physical_policy(
-                            ap_check_id, location_id, block, default_visual_model
+                            ap_check_id, location_id, block, default_visual_model, policy=target_policy
                         )
                         target_policy["independent_visual"] = universal["independent_visual"]
                         if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("completion_targets", []):

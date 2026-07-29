@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 import uuid
 from pathlib import Path
 from typing import NamedTuple
@@ -1649,7 +1650,7 @@ def goal_event_files():
 def extract_location_id_from_event(path):
     basename = os.path.basename(path)
     filename_match = re.match(
-        rf"^{CHECK_EVENT_PREFIX}(\d+)(?:_\d+)?\.txt$",
+        rf"^{CHECK_EVENT_PREFIX}(\d+)(?:_.*)?\.txt$",
         basename,
     )
     if filename_match:
@@ -1665,6 +1666,60 @@ def extract_location_id_from_event(path):
     if content_match:
         return int(content_match.group(1))
     return None
+
+
+def quarantine_event_file(path, old_state_key=None, new_state_key=None, reason="session_changed"):
+    path = Path(path)
+    if not path.exists():
+        return
+    quarantine_base = Path(INV_DUMP_DIR) / "ap_event_quarantine"
+    timestamp_folder = time.strftime("%Y%m%d_%H%M%S")
+    dest_dir = quarantine_base / timestamp_folder
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    dest_path = dest_dir / path.name
+    try:
+        mtime_ns = path.stat().st_mtime_ns
+    except OSError:
+        mtime_ns = 0
+    location_id = extract_location_id_from_event(path)
+
+    meta = {
+        "filename": path.name,
+        "parsed_location_id": location_id,
+        "mtime_ns": mtime_ns,
+        "old_state_key": old_state_key,
+        "new_state_key": new_state_key,
+        "reason": reason,
+        "quarantined_at": time.time(),
+    }
+
+    try:
+        shutil.move(str(path), str(dest_path))
+        meta_path = dest_dir / f"{path.name}.meta.json"
+        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        logger.warning(
+            "[Quarantine] Quarantined event file %s -> %s (reason: %s, location_id: %s)",
+            path.name, dest_path, reason, location_id,
+        )
+    except Exception as err:
+        logger.error("[Quarantine] Failed to quarantine event file %s: %s", path.name, err)
+
+
+def discover_telemetry_markers():
+    """Discover all suffixed telemetry marker files in INV_DUMP_DIR, ordered by mtime."""
+    pattern = os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt")
+    valid_files = []
+    for path in glob.glob(pattern):
+        basename = os.path.basename(path)
+        if re.match(rf"^{TELEMETRY_DUMP_PREFIX}(?:_.*)?\.txt$", basename):
+            try:
+                st = os.stat(path)
+                valid_files.append((st.st_mtime_ns, path))
+            except OSError:
+                pass
+    valid_files.sort(key=lambda item: item[0])
+    return valid_files
 
 
 def parse_goal_transition_event(path, include_raw=False):
@@ -1887,8 +1942,28 @@ class DoomCommandProcessor(ClientCommandProcessor):
         )
 
     def _cmd_doom_status(self):
-        """Show only the user-facing integration status."""
-        self.output("DOOM integration: running")
+        """Show user-facing integration and tracker status."""
+        ctx = getattr(self, "ctx", None)
+        alive = getattr(ctx, "tracker_alive", False)
+        degraded = getattr(ctx, "tracker_degraded", False) or getattr(ctx, "item_delivery_blocked", False)
+        status_str = "DEGRADED" if degraded else ("running" if alive else "stopped")
+        hb_ts = getattr(ctx, "last_heartbeat_timestamp", None)
+        hb_age = f"{time.time() - hb_ts:.1f}s" if hb_ts else "never"
+        restarts = getattr(ctx, "tracker_restart_count", 0)
+        last_err = getattr(ctx, "last_tracker_error", "none")
+        backoff = getattr(ctx, "tracker_backoff", 1.0)
+        consec_err = getattr(ctx, "consecutive_same_error_count", 0)
+        blocked_info = getattr(ctx, "item_delivery_blocked_info", None)
+
+        self.output(f"DOOM integration status: {status_str}")
+        self.output(f"Tracker alive: {alive}")
+        self.output(f"Last heartbeat age: {hb_age}")
+        self.output(f"Restart count: {restarts}")
+        self.output(f"Consecutive error count: {consec_err}")
+        self.output(f"Current backoff: {backoff:.1f}s")
+        self.output(f"Last error summary: {last_err}")
+        if blocked_info:
+            self.output(f"Blocked item: index={blocked_info.get('index')} id={blocked_info.get('item_id')} name={blocked_info.get('item_name')}")
         self.output(f"Detailed diagnostics: {BRIDGE_LOG_DIR}")
 
     def _cmd_doom_onboarding_status(self):
@@ -2079,6 +2154,11 @@ class DoomEternalContext(CommonContext):
         self.dev_last_action = None
         self.dev_last_correlation = None
         self.tracking_task = None
+        self.tracker_alive = False
+        self.tracker_restart_count = 0
+        self.last_tracker_error = None
+        self.last_heartbeat_timestamp = None
+        self.last_processed_event_id = None
         self.items_processed = 0
         self.item_state_ready = False
         self.client_state = {"version": 1, "sessions": {}}
@@ -2467,6 +2547,58 @@ class DoomEternalContext(CommonContext):
         selected = self.update_save_slot_lifecycle()
         return read_game_details_for_selection(selected) if selected else None
 
+    def get_ap_state_key(self):
+        if not getattr(self, "server", None) or not getattr(self, "auth", None) or not getattr(self, "state_key", None):
+            return None
+        effective_seed_name = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None) or "unknown_seed"
+        team = getattr(self, "team", 0)
+        slot = getattr(self, "slot", 0)
+        auth = str(self.auth or "unknown_auth")
+        return f"{effective_seed_name}:{team}:{slot}:{auth}:{BRIDGE_REVISION}"
+
+    def check_and_update_event_session(self):
+        current_key = self.get_ap_state_key()
+        if not current_key:
+            return False
+
+        session_file = Path(INV_DUMP_DIR) / "ap_event_session.json"
+        old_key = None
+        if session_file.exists():
+            try:
+                data = json.loads(session_file.read_text(encoding="utf-8"))
+                old_key = data.get("ap_state_key")
+            except Exception:
+                pass
+
+        if old_key != current_key:
+            quarantine_reason = "session_changed" if old_key else "unbound_preexisting"
+            self.quarantine_unbound_physical_events(
+                old_state_key=old_key,
+                new_state_key=current_key,
+                reason=quarantine_reason,
+            )
+            tmp = session_file.with_name(f".ap_event_session.{uuid.uuid4().hex}.tmp")
+            tmp.write_text(
+                json.dumps({"ap_state_key": current_key, "updated_at": time.time()}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(tmp, session_file)
+            logger.info("[Session] Persisted new physical event state key: %s (old: %s)", current_key, old_key)
+        return True
+
+    def quarantine_unbound_physical_events(
+        self, old_state_key=None, new_state_key=None, reason="session_changed"
+    ):
+        for path in check_event_files():
+            if os.path.basename(path) in PUBLISHER_MAP_EVENT_FILENAMES:
+                continue
+            quarantine_event_file(
+                path,
+                old_state_key=old_state_key,
+                new_state_key=new_state_key,
+                reason=reason,
+            )
+
     def initialize_item_state(self):
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
@@ -2535,6 +2667,7 @@ class DoomEternalContext(CommonContext):
             f"[State] Loaded {self.items_processed} processed items for "
             f"{self.state_key}."
         )
+        self.check_and_update_event_session()
 
     def persist_session_state(self):
         if not self.item_state_ready:
@@ -3957,6 +4090,11 @@ class DoomEternalContext(CommonContext):
             await asyncio.sleep(1.0)
 
     async def flush_check_event_files(self):
+        get_key = getattr(self, "get_ap_state_key", None)
+        state_key = get_key() if get_key else None
+        if state_key:
+            self.check_and_update_event_session()
+
         event_paths_by_location = {}
         unknown_event_paths = []
         for path in check_event_files():
@@ -3988,11 +4126,23 @@ class DoomEternalContext(CommonContext):
                             f"{os.path.basename(path)} yet: {error}"
                         )
                 continue
+            if getattr(self, "item_state_ready", False) and self.server_locations and location_id not in self.server_locations:
+                logger.warning(
+                    "[Trigger] AP event location %s not in connected slot; quarantining.",
+                    location_id,
+                )
+                for path in paths:
+                    quarantine_event_file(
+                        path,
+                        old_state_key=state_key,
+                        new_state_key=state_key,
+                        reason="location_not_in_connected_slot",
+                    )
+                continue
             if location_id not in self.server_locations:
                 logger.warning(
-                    "[Trigger] AP event location "
-                    f"{location_id} is not part of the connected slot; "
-                    "leaving file in place."
+                    "[Trigger] AP event location %s is not part of the connected slot; leaving file in place.",
+                    location_id,
                 )
                 continue
             if location_id not in self.locations_checked:
@@ -4001,6 +4151,7 @@ class DoomEternalContext(CommonContext):
         if not pending_locations:
             return
 
+        self.last_processed_event_id = pending_locations[-1]
         try:
             await self.send_msgs(
                 [{"cmd": "LocationChecks", "locations": pending_locations}]
@@ -4029,40 +4180,59 @@ class DoomEternalContext(CommonContext):
             "gate permits execution only in safe gameplay. Check delivery prefers "
             "native ap_event files over telemetry polls."
         )
-        while not self.exit_event.is_set():
-            if self.server and self.server.socket and not self.server.socket.closed:
-                migrate_direct_item_command_jobs()
-                self.onboard_bootstrap("on_reconnect")
-                self.reconcile_owned_perks("connect_or_reconnect")
-                self.reconcile_checked_automap_cleanup("connect_or_reconnect")
-                if not self.repair_item_mappings():
-                    await asyncio.sleep(0.25)
-                    continue
+        self.last_heartbeat_timestamp = time.time()
+        self.heartbeat_iteration_count = 0
 
-                # Every level-ready marker opens a fresh idempotent reapply
-                # epoch, even when RPC was already armed.
-                ready_path = os.path.join(INV_DUMP_DIR, "ap_telemetry_ready.txt")
-                if os.path.exists(ready_path):
+        while not self.exit_event.is_set():
+            self.last_heartbeat_timestamp = time.time()
+            self.heartbeat_iteration_count += 1
+            if self.heartbeat_iteration_count % 15 == 0:
+                logger.info(
+                    "[Tracking] TRACKER_HEARTBEAT active_slot=%s map=%s items_processed=%d/%d",
+                    self.active_save_slot or "<none>",
+                    self.current_map_name or "<none>",
+                    self.items_processed,
+                    len(self.items_received),
+                )
+
+            if self.server and self.server.socket and not self.server.socket.closed:
+                try:
+                    migrate_direct_item_command_jobs()
+                    self.onboard_bootstrap("on_reconnect")
+                    self.reconcile_owned_perks("connect_or_reconnect")
+                    self.reconcile_checked_automap_cleanup("connect_or_reconnect")
+                    if not self.repair_item_mappings():
+                        await asyncio.sleep(0.25)
+                        continue
+                except Exception as exc:
+                    logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
+
+                markers = discover_telemetry_markers()
+                if markers:
+                    newest_mtime, newest_path = markers[-1]
                     try:
-                        self.runtime_observation_lease.observe_gameplay_loaded(
-                            os.stat(ready_path).st_mtime_ns
-                        )
-                        os.remove(ready_path)
+                        self.runtime_observation_lease.observe_gameplay_loaded(newest_mtime)
                         if not rpc_execution_enabled():
                             set_rpc_execution(True)
                         epoch = self.advance_reconciliation_epoch("level_ready")
                         logger.info(
-                            "[RPC] Level-ready signal received. RPC armed; "
-                            "perk reconciliation epoch %s queued behind the native safety gate.",
+                            "[RPC] Level-ready signal received (%s). RPC armed; "
+                            "perk reconciliation epoch %s queued behind native safety gate.",
+                            os.path.basename(newest_path),
                             epoch,
                         )
                         self.reconcile_owned_perks("level_ready")
                         self.advance_automap_cleanup_epoch()
                         self.reconcile_checked_automap_cleanup("level_ready")
                     except Exception as e:
-                        logger.error(f"[RPC] Auto-RPC failed to consume telemetry ready file: {e}")
+                        logger.error("[RPC] Auto-RPC failed to consume telemetry ready file %s: %s", newest_path, e)
 
-                # Persist each item only after its durable spool file exists.
+                    for _mtime, path in markers:
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
+
                 while (
                     self.item_state_ready
                     and len(self.items_received) > self.items_processed
@@ -4098,31 +4268,46 @@ class DoomEternalContext(CommonContext):
                         classification = received_item_classification(
                             item_id, getattr(network_item, "flags", None)
                         )
-                    except (TypeError, ValueError) as error:
+                        spooled, description = self.spool_item_commands(
+                            item_id,
+                            item_index,
+                            receipt=ENABLE_ITEM_NOTIFICATIONS,
+                            classification=classification,
+                        )
+                        if not spooled:
+                            item_name = getattr(self, "item_names", {}).get(item_id, f"Item_{item_id}")
+                            logger.error(
+                                "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d item_name=%s description=%s",
+                                item_index, item_id, item_name, description
+                            )
+                            self.item_delivery_blocked = True
+                            self.item_delivery_blocked_info = {
+                                "index": item_index,
+                                "item_id": item_id,
+                                "item_name": item_name,
+                                "description": description,
+                            }
+                            break
+                    except Exception as error:
+                        item_name = getattr(self, "item_names", {}).get(item_id, f"Item_{item_id}")
+                        tb = traceback.format_exc()
                         logger.error(
-                            f"[To Game] Cannot classify item {item_id}: {error}"
+                            "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d item_name=%s type=%s msg=%s\n%s",
+                            item_index, item_id, item_name, type(error).__name__, str(error), tb
                         )
-                        self.output(
-                            f"Invalid item classification for DOOM Eternal "
-                            f"item {item_id}. Check the local bridge logs."
-                        )
+                        self.item_delivery_blocked = True
+                        self.item_delivery_blocked_info = {
+                            "index": item_index,
+                            "item_id": item_id,
+                            "item_name": item_name,
+                            "exception_type": type(error).__name__,
+                            "exception_message": str(error),
+                            "traceback": tb,
+                        }
                         break
-                    spooled, description = self.spool_item_commands(
-                        item_id,
-                        item_index,
-                        receipt=ENABLE_ITEM_NOTIFICATIONS,
-                        classification=classification,
-                    )
-                    if not spooled and description:
-                        logger.error(
-                            f"[To Game] Cannot deliver item {item_id}: {description}"
-                        )
-                    if not spooled:
-                        logger.error(
-                            f"[To Game] Failed to spool item {item_id}; "
-                            "will retry without advancing item state."
-                        )
-                        break
+                    else:
+                        self.item_delivery_blocked = False
+                        self.item_delivery_blocked_info = None
 
                     logger.info(
                         f"[To Game] Item received! {item_id} -> {description}"
@@ -4132,11 +4317,72 @@ class DoomEternalContext(CommonContext):
                     self.onboard_bootstrap("on_item_received")
                     self.reconcile_owned_perks("item_received")
 
-                self.reconcile_owned_perks("post_item_scan")
+                try:
+                    self.reconcile_owned_perks("post_item_scan")
+                except Exception as exc:
+                    logger.warning("[Tracking] Error during post_item_scan perk reconciliation: %s", exc)
 
                 await self.flush_check_event_files()
 
             await asyncio.sleep(4.0)
+
+    async def tracker_supervisor(self):
+        logger.info("[Supervisor] TRACKER_STARTED")
+        self.tracker_alive = True
+        self.tracker_restart_count = getattr(self, "tracker_restart_count", 0)
+        self.last_tracker_error = getattr(self, "last_tracker_error", None)
+        self.last_heartbeat_timestamp = time.time()
+        self.tracker_backoff = getattr(self, "tracker_backoff", 1.0)
+        self.last_error_fingerprint = getattr(self, "last_error_fingerprint", None)
+        self.consecutive_same_error_count = getattr(self, "consecutive_same_error_count", 0)
+        self.tracker_degraded = getattr(self, "tracker_degraded", False)
+
+        while not self.exit_event.is_set():
+            try:
+                await self.tracker_loop()
+                break
+            except asyncio.CancelledError:
+                logger.info("[Supervisor] TRACKER_STOPPED (clean shutdown)")
+                self.tracker_alive = False
+                raise
+            except Exception as exc:
+                self.tracker_restart_count += 1
+                tb = traceback.format_exc()
+                lineno = exc.__traceback__.tb_lineno if exc.__traceback__ else 0
+                fingerprint = f"{type(exc).__name__}:{exc}:{lineno}"
+                if fingerprint == self.last_error_fingerprint:
+                    self.consecutive_same_error_count += 1
+                    self.tracker_backoff = min(30.0, self.tracker_backoff * 2.0)
+                else:
+                    self.last_error_fingerprint = fingerprint
+                    self.consecutive_same_error_count = 1
+                    self.tracker_backoff = 1.0
+
+                self.last_tracker_error = f"{type(exc).__name__}: {exc}"
+                self.tracker_degraded = True
+                if self.consecutive_same_error_count <= 2:
+                    logger.error(
+                        "[Supervisor] TRACKER_CRASH type=%s msg=%s ap_state_key=%s "
+                        "current_map=%s active_save_slot=%s last_processed_event=%s "
+                        "last_heartbeat_age=%.1fs traceback:\n%s",
+                        type(exc).__name__,
+                        str(exc),
+                        self.get_ap_state_key(),
+                        self.current_map_name,
+                        self.active_save_slot,
+                        getattr(self, "last_processed_event_id", None),
+                        time.time() - (self.last_heartbeat_timestamp or time.time()),
+                        tb,
+                    )
+                logger.info(
+                    "[Supervisor] TRACKER_RESTART count=%d backoff=%.1fs consecutive_errors=%d fingerprint=%s",
+                    self.tracker_restart_count,
+                    self.tracker_backoff,
+                    self.consecutive_same_error_count,
+                    fingerprint,
+                )
+                await asyncio.sleep(self.tracker_backoff)
+        self.tracker_alive = False
 
     def make_gui(self):
         from kvui import GameManager
@@ -4157,7 +4403,7 @@ async def amain(launch_args=None):
     ctx = DoomEternalContext(args.connect, args.password)
     ctx.auth = args.name
     set_rpc_execution(False)
-    ctx.tracking_task = asyncio.create_task(ctx.tracker_loop())
+    ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 
     log_mission_bridge_identity()

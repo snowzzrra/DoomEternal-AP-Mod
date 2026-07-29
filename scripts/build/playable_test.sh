@@ -159,7 +159,41 @@ extract_and_build() {
         GENERATOR_ARGS+=(--disable-item-notifications)
     fi
 
-    if [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
+    if [[ -n "${AP_PIPELINE_RECEIPT:-}" ]]; then
+        python3 - "$AP_PIPELINE_RECEIPT" "$map_key" "$generated_file" "$generated_manifest" <<'PYEOF'
+import hashlib
+import json
+import shutil
+import sys
+from pathlib import Path
+
+receipt_path = Path(sys.argv[1])
+map_key = sys.argv[2]
+entities_dest = Path(sys.argv[3])
+manifest_dest = Path(sys.argv[4])
+
+receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+if map_key not in receipt["maps"]:
+    raise SystemExit(f"Receipt missing map={map_key}")
+
+entry = receipt["maps"][map_key]
+entities_source = Path(entry["output_source"])
+manifest_source = Path(entry["manifest_source"])
+
+entities_dest.parent.mkdir(parents=True, exist_ok=True)
+manifest_dest.parent.mkdir(parents=True, exist_ok=True)
+
+shutil.copy2(str(entities_source), str(entities_dest))
+actual_hash = hashlib.sha256(entities_dest.read_bytes()).hexdigest()
+if actual_hash != entry["output_sha256"]:
+    raise SystemExit(f"Entities hash mismatch map={map_key} expected={entry['output_sha256']} got={actual_hash}")
+
+shutil.copy2(str(manifest_source), str(manifest_dest))
+actual_hash = hashlib.sha256(manifest_dest.read_bytes()).hexdigest()
+if actual_hash != entry["manifest_sha256"]:
+    raise SystemExit(f"Manifest hash mismatch map={map_key} expected={entry['manifest_sha256']} got={actual_hash}")
+PYEOF
+    elif [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
         cp "$AP_PIPELINE_ARTIFACT_ROOT/maps/$generated_output" "$generated_file"
         cp "$AP_PIPELINE_ARTIFACT_ROOT/manifests/$map_key.json" "$generated_manifest"
     else
@@ -194,6 +228,7 @@ rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
     "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
     "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
     "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
+    "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" \
     "$STALE_DEV_ZIP" \
     "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
     "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
@@ -224,7 +259,7 @@ fi
 cp -R "$REPO_ROOT/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
 
 mapfile -t MAP_ROWS < <(
-    python3 "$REPO_ROOT/map_registry.py" release-rows --registry "$MAP_SOURCES_FILE"
+    python3 "$REPO_ROOT/map_registry.py" release-rows --authorial --registry "$MAP_SOURCES_FILE"
 )
 MISSION_MAP_ARGS=()
 
@@ -379,13 +414,13 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
+python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
 cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/item_classifications.json" \
     "$REPO_ROOT/data/item_replay_policies.json" \
     "$REPO_ROOT/data/location_names.json" \
     "$TEMP_DIR/challenge_location_registry.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
-    "$REPO_ROOT/data/map_sources.json" \
     "$REPO_ROOT/data/campaign_goal_contract.json" \
     "$REPO_ROOT/data/observer_contracts.json" \
     "$TEMP_DIR/publisher_contracts.json" \
@@ -451,7 +486,7 @@ toolchain_compiler = sys.argv[4]
 sys.path.insert(0, sys.argv[5])
 from map_registry import load_map_registry, release_plan
 map_manifest_files = [
-    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[6])))
+    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[6]), authorial=True))
 ]
 
 validation = json.loads(validation_path.read_text(encoding="utf-8"))
@@ -495,6 +530,9 @@ manifest = {
         "client/data/challenge_location_registry.json",
         "client/data/runtime_locations.json",
         "client/data/map_sources.json",
+        "client/data/foundation_contracts.json",
+        "client/data/catalog.json",
+        "client/data/generated_content.py",
         "client/data/campaign_goal_contract.json",
         "client/data/observer_contracts.json",
         "client/data/publisher_contracts.json",
@@ -631,10 +669,11 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
 
 (
     cd "$OUTPUT_DIR"
-    zip -q -r "$PTB_ZIP_NAME" \
+    zip -q -r "${PTB_ZIP_NAME}.tmp" \
         README.md RELEASE_MANIFEST.json client doometernal.apworld \
         DoomEternalArchipelagoAlpha.zip
 )
+mv "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" "${OUTPUT_DIR}/${PTB_ZIP_NAME}"
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
     rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" "$OUTPUT_DIR/mod" \

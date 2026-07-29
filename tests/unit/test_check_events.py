@@ -2630,7 +2630,13 @@ class CheckEventTests(unittest.TestCase):
         self.assertEqual(
             outputs,
             [
-                "DOOM integration: running",
+                "DOOM integration status: stopped",
+                "Tracker alive: False",
+                "Last heartbeat age: never",
+                "Restart count: 0",
+                "Consecutive error count: 0",
+                "Current backoff: 1.0s",
+                "Last error summary: none",
                 f"Detailed diagnostics: {bridge_client.BRIDGE_LOG_DIR}",
             ],
         )

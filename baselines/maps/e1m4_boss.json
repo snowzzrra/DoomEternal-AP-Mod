@@ -7,14 +7,18 @@
     {
       "content_revision": "v0.3.4-alpha.1",
       "reason": "Pipeline aligned with notification-enabled packaged output"
+    },
+    {
+      "content_revision": "v0.3.5-alpha.2",
+      "reason": "Pipeline aligned with v0.3.5 notification package output"
     }
   ],
   "asset_package_contract_sha256": "a529ec4c08d2866c70540d7193382dcf7d9a0f6333dcc71fcfcbf6ccda9e8bb0",
-  "byte_sha256": "e393d52057154b0e1c8223106e1b6e4c70f5c704a6e0cda85c9d1dc4c3a60625",
-  "content_revision": "v0.3.4-alpha.1",
+  "byte_sha256": "0d744937dd126cf3e7db3be7020b9ae76765f7d01eba873837d847636ed4e233",
+  "content_revision": "v0.3.5-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 706,
-    "byte_size": 10659274,
+    "byte_size": 10659270,
     "classes": 9139,
     "entity_count": 9141,
     "layers": 2353,
@@ -51,5 +55,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "725d66f826d6489ca630b538c28c5faa4ce4a94fd52a7c5c581e2fd2feb265ba",
-  "semantic_sha256": "0649606a9188e851a7201e71b85af3ce14aeabfe7069f122c653f1c9d8ccfb6e"
+  "semantic_sha256": "d2e4aca48b980884e9446e8c67dee3cf24b8d34ba06338a74147ba6ace678d4d"
 }
