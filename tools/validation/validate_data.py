@@ -1032,9 +1032,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 256,
-        "map_checks": 215,
-        "runtime_locations": 41,
+        "locations": 291,
+        "map_checks": 245,
+        "runtime_locations": 46,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
     }:

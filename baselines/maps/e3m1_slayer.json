@@ -15,22 +15,26 @@
     {
       "content_revision": "v0.3.5-alpha.2",
       "reason": "Migrated e3m1_slayer to patch2 source for resource priority"
+    },
+    {
+      "content_revision": "v0.3.5-alpha.3",
+      "reason": "Taras Nabad Mastery Tokens converted from vanilla rewards to AP pickups"
     }
   ],
   "asset_package_contract_sha256": "c58470ef0344f12fe6c0c25ad6d7236a13e5df10d26d65bdb50449a6163f6497",
-  "byte_sha256": "f641998b825f6800ca19227207dc2afe0079931303faa2308b3273e66771e890",
-  "content_revision": "v0.3.5-alpha.2",
+  "byte_sha256": "40e8df9afae49f214ccd3417f988f80fe4146609356caa596656a72f11d2a7cf",
+  "content_revision": "v0.3.5-alpha.3",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11976478,
-    "classes": 12151,
-    "entity_count": 12153,
+    "byte_size": 11980606,
+    "classes": 12163,
+    "entity_count": 12165,
     "layers": 1662,
-    "targets": 7619,
-    "transforms": 23370,
-    "unique_entity_names": 12152
+    "targets": 7631,
+    "transforms": 23374,
+    "unique_entity_names": 12164
   },
-  "manifest_sha256": "fbd39658cef8856e8f010ca380f2011b3eababc0a673e295c5fa439c2f32fbf9",
+  "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
   "map_key": "e3m1_slayer",
   "physical_ap_ids": [
     7770303,
@@ -60,7 +64,9 @@
     7770329,
     7770330,
     7770331,
-    7770332
+    7770332,
+    7770338,
+    7770339
   ],
   "publisher_contract_sha256": "318b56d762ccf7d015bc43f7da08c09c13344c049e55d0d6bd5483e75b8d1c0f",
   "runtime_location_ids": [
@@ -72,5 +78,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "d49c77f62f6707294223b8c68daf1e557ea13f221201f8dc2115f7b6ac152b91",
-  "semantic_sha256": "11b65fa36b84b1503c73faa1ad5adb8dde25a4ba8510a8906cf1e64255d17f48"
+  "semantic_sha256": "2db41b333dd39546986b10eb4a703444b94578f5509ebcbcdefd5c20d5ed6774"
 }

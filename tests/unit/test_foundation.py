@@ -42,9 +42,9 @@ class FoundationRegistryTests(unittest.TestCase):
         self.assertEqual(sum(family_counts(self.definitions).values()), 116)
         contracts = load_foundation_contracts()
         self.assertEqual(contracts["counts"]["items"], 116)
-        self.assertEqual(contracts["counts"]["locations"], 256)
-        self.assertEqual(contracts["counts"]["map_checks"], 215)
-        self.assertEqual(contracts["counts"]["runtime_locations"], 41)
+        self.assertEqual(contracts["counts"]["locations"], 291)
+        self.assertEqual(contracts["counts"]["map_checks"], 245)
+        self.assertEqual(contracts["counts"]["runtime_locations"], 46)
         self.assertEqual(contracts["counts"]["runtime_goals"], 1)
         for override in contracts["map_overrides"].values():
             self.assertTrue(override["justification"])

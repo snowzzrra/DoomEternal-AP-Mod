@@ -29,7 +29,9 @@
     "AP_CHECK_PICKUPS_PROGRESS_CHEATS_POWERUP_INFINITE_OVERDRIVE_1": 7770327,
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_10_1": 7770328,
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_11_1": 7770329,
-    "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770330
+    "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770330,
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M1": 7770338,
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1": 7770339
   },
   "names": {
     "7770303": "Taras Nabad - Sentinel Crystal",
@@ -47,19 +49,21 @@
     "7770317": "Taras Nabad - Toy - Cyber Mancubus",
     "7770318": "Taras Nabad - Toy - Marauder",
     "7770319": "Taras Nabad - Toy - Pain Elemental",
-    "7770320": "Taras Nabad - Codex 1",
-    "7770321": "Taras Nabad - Codex 2",
-    "7770322": "Taras Nabad - Codex 3",
-    "7770323": "Taras Nabad - Codex 4",
-    "7770324": "Taras Nabad - Codex 5",
-    "7770325": "Taras Nabad - Codex 6",
-    "7770326": "Taras Nabad - Codex 7",
+    "7770320": "Taras Nabad - Taras Nabad Codex",
+    "7770321": "Taras Nabad - The Divinity Machine Codex",
+    "7770322": "Taras Nabad - History of the Sentinels Part X Codex",
+    "7770323": "Taras Nabad - History of the Sentinels Part XI Codex",
+    "7770324": "Taras Nabad - History of the Sentinels Part XII Codex",
+    "7770325": "Taras Nabad - History of the Sentinels Part XIII Codex",
+    "7770326": "Taras Nabad - History of the Sentinels Part XIV Codex",
     "7770327": "Taras Nabad - Cheat Code - Powerup Mode: Overdrive",
     "7770328": "Taras Nabad - Album 1",
     "7770329": "Taras Nabad - Album 2",
     "7770330": "Taras Nabad - Slayer Key",
     "7770331": "Taras Nabad - Secret Encounter 1",
-    "7770332": "Taras Nabad - Secret Encounter 2"
+    "7770332": "Taras Nabad - Secret Encounter 2",
+    "7770338": "Taras Nabad - Mastery Token 1",
+    "7770339": "Taras Nabad - Mastery Token 2"
   },
   "location_feedback": {
     "default_policy": "ap_only"

@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from content_catalog import discover_maps
+from tools.maps.ap_map_generator import find_entity_block_bounds
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("map_spec", discover_maps(), ids=lambda spec: spec.key)
@@ -42,3 +48,54 @@ def test_generated_map_uses_declared_visual_asset_strategy(
                 for block in visual_blocks
             )
             assert "modelDecl" not in generated
+
+
+def test_taras_mastery_tokens_replace_vanilla_rewards_once(temporary_generated_maps) -> None:
+    source = (ROOT / "vanillamaps" / "e3m1_slayer.map").read_text(encoding="utf-8")
+    generated = temporary_generated_maps["e3m1_slayer"].read_text(encoding="utf-8")
+    tokens = (
+        (
+            "pickups_progress_mastery_token_weapon_1_e3m1",
+            "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M1",
+            7770338,
+            ("x = -66.1289673;", "y = 310.241547;", "z = -132.311172;"),
+        ),
+        (
+            "pickups_progress_mastery_token_weapon_3_e3m1",
+            "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1",
+            7770339,
+            ("x = -171.009979;", "y = 140.030029;", "z = -42.9099998;"),
+        ),
+    )
+
+    for entity_name, ap_check, location_id, position in tokens:
+        assert source.count(f"entityDef {entity_name} {{") == 1
+        bounds = find_entity_block_bounds(source, entity_name)
+        assert bounds is not None
+        source_block = source[bounds[0]:bounds[1]]
+        assert 'class = "idProp2";' in source_block
+        assert 'useableComponentDecl = "propitem/mastery_token/weapon";' in source_block
+        assert "targets = {" not in source_block
+
+        independent_name = f"ap_independent_{entity_name}"
+        assert generated.count(f"entityDef {entity_name} {{") == 0
+        assert generated.count(f"entityDef {independent_name} {{") == 1
+        assert generated.count(f"entityDef {ap_check} {{") == 1
+        assert generated.count(f"AP_CHECK_EVENT_{location_id}") == 1
+        assert generated.count(f"entityDef ap_location_visual_{location_id} {{") == 1
+
+        trigger_block = next(
+            block for block in generated.split("entity {")
+            if f"entityDef {independent_name} {{" in block
+        )
+        visual_block = next(
+            block for block in generated.split("entity {")
+            if f"entityDef ap_location_visual_{location_id} {{" in block
+        )
+        assert all(coordinate in trigger_block for coordinate in position)
+        assert f'item[0] = "{ap_check}";' in trigger_block
+        assert trigger_block.count(ap_check) == 1
+        assert 'useableComponentDecl = "propitem/mastery_token/weapon";' not in trigger_block
+        assert 'model = "art/pickups/question_mark_a.lwo";' in visual_block
+
+    assert 'useableComponentDecl = "propitem/mastery_token/weapon";' not in generated
