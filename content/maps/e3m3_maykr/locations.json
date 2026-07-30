@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m3_maykr",
+  "level": "e3m3_maykr",
+  "region": "Urdak",
+  "entities": {
+    "AP_CHECK_EXIT_MAINTENANCE_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M3": 7770388,
+    "AP_CHECK_BLUE_CONTROL_TOWER_PROGRESS_CHEATS_POWERUP_INFINITE_BERSERK_1": 7770389,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M3": 7770390,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M3": 7770391,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_KHAN_MAYKR_1": 7770392,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M3": 7770393,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_MAYKR_1": 7770394,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_15_1": 7770395,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_16_1": 7770396,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PROGRESS_PRAETOR_TOKEN_6_E3M3": 7770397,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PROGRESS_PRAETOR_TOKEN_1_E3M3": 7770398,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M4": 7770399,
+    "AP_CHECK_TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_PINKY_SPECTRE_1": 7770400,
+    "AP_CHECK_CODEX_PROGRESS_CODEX_4_E3M3": 7770401,
+    "AP_CHECK_CODEX_PROGRESS_CODEX_2_E3M3": 7770402,
+    "AP_CHECK_CODEX_PROGRESS_CODEX_5_E3M3": 7770403,
+    "AP_CHECK_CODEX_PROGRESS_CODEX_3_E3M3": 7770404
+  },
+  "names": {
+    "7770388": "Urdak - Mastery Token 1",
+    "7770389": "Urdak - Cheat Code - Powerup Mode: Berserk",
+    "7770390": "Urdak - Extra Life 1",
+    "7770391": "Urdak - Mastery Token 2",
+    "7770392": "Urdak - Toy - Khan Maykr",
+    "7770393": "Urdak - Extra Life 2",
+    "7770394": "Urdak - Toy - Maykr Drone",
+    "7770395": "Urdak - Album 1",
+    "7770396": "Urdak - Album 2",
+    "7770397": "Urdak - Praetor Suit Token 1",
+    "7770398": "Urdak - Praetor Suit Token 2",
+    "7770399": "Urdak - Extra Life 3",
+    "7770400": "Urdak - Toy - Spectre",
+    "7770401": "Urdak - Khan Maykr Codex",
+    "7770402": "Urdak - Urdak Codex",
+    "7770403": "Urdak - Icon of Sin Codex",
+    "7770404": "Urdak - Maykr Angels Codex",
+    "7770405": "Urdak - Secret Encounter 1",
+    "7770406": "Urdak - Secret Encounter 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {},
+  "remove_entities": [],
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M3_1",
+      "location_id": 7770405,
+      "manager": "temp_all_scripting_encounter_manager_17",
+      "after_event_index": 5,
+      "automap_owner": "automap_info_null_secret_encounter1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M3_2",
+      "location_id": 7770406,
+      "manager": "temp_all_scripting_encounter_manager_15",
+      "after_event_index": 4,
+      "automap_owner": "automap_info_null_secret_encounter2"
+    }
+  ]
+}
