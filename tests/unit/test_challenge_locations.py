@@ -9,8 +9,19 @@ from tools.decls.mastery_decl_builder import (
     STICKY_DECLS,
     build_mastery_overrides,
 )
-from tools.decls.mission_challenge_decl_builder import REWARD_FIELD, build_mission_challenge_overrides
+from tools.decls.mission_challenge_decl_builder import (
+    AGGREGATE_LIST_PATH,
+    NO_REWARD_CONTAINER,
+    NO_REWARD_CONTAINER_DECL,
+    NO_REWARD_CONTAINER_PATH,
+    REWARD_FIELD,
+    _challenge_paths,
+    _level_blocks,
+    _suppress_aggregate_reward,
+    build_mission_challenge_overrides,
+)
 from tools.decls.rune_decl_builder import GATE_LINE, RUNE_OWNER, build_rune_override
+from tools.validation.validate_challenge_overrides import validate_overrides_from_mod_root
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -260,18 +271,30 @@ class NativeChallengeContracts(unittest.TestCase):
                     *range(7770383, 7770386),
                 },
             )
-            self.assertEqual(audit["aggregate_reward_suppression"], {
-                "strategy": "child_currencyToGive_num_zero",
-                "field": "currencyToGive.num",
-                "value": 0,
-                "suppressed_native_rewards": [
-                    "CURRENCY_PRAETOR_UPGRADE",
-                ],
-                "runtime_evidence": "v0.3.0c.1",
-            })
+            aggregate_audit = audit["aggregate_reward_suppression"]
+            self.assertEqual(
+                {
+                    key: aggregate_audit[key]
+                    for key in (
+                        "strategy", "source_path", "completion_unlock",
+                        "container_path", "aggregate_count",
+                    )
+                },
+                {
+                    "strategy": "completion_unlock_empty_container",
+                    "source_path": AGGREGATE_LIST_PATH,
+                    "completion_unlock": NO_REWARD_CONTAINER,
+                    "container_path": NO_REWARD_CONTAINER_PATH,
+                    "aggregate_count": len(registry["all_mission_challenges"]),
+                },
+            )
+            self.assertEqual(
+                {contract["mission_key"] for contract in aggregate_audit["contracts"]},
+                {entry["mission_key"] for entry in registry["all_mission_challenges"]},
+            )
             self.assertEqual(
                 len(audit["written_paths"]),
-                len(registry["mission_challenges"]),
+                len(registry["mission_challenges"]) + 2,
             )
             for entry in registry["mission_challenges"]:
                 source = (
@@ -291,6 +314,109 @@ class NativeChallengeContracts(unittest.TestCase):
                 root / "gameresources" / "generated" / "decls" /
                 "unlockable/mission_challenge/challenge_base.decl"
             ).exists())
+            aggregate_override = (
+                root / "gameresources" / "generated" / "decls" /
+                AGGREGATE_LIST_PATH
+            ).read_text(encoding="utf-8")
+            aggregate_source = (
+                ROOT / "vanilla_decls" / "owners" / "gameresources" /
+                "generated" / "decls" / AGGREGATE_LIST_PATH
+            ).read_text(encoding="utf-8")
+            self.assertEqual(
+                aggregate_override.replace(
+                    f'\n\t\t\t\tcompletionUnlock = "{NO_REWARD_CONTAINER}";',
+                    "",
+                ),
+                aggregate_source,
+            )
+            production_blocks = {
+                index: block
+                for index, _, _, block in _level_blocks(aggregate_override)
+                if "_dev_" not in block and _challenge_paths(block)
+            }
+            self.assertEqual(
+                sum(
+                    block.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";')
+                    for block in production_blocks.values()
+                ),
+                len(registry["all_mission_challenges"]),
+            )
+            for contract in aggregate_audit["contracts"]:
+                block = production_blocks[contract["level_index"]]
+                self.assertEqual(
+                    set(_challenge_paths(block)),
+                    set(contract["unlockables"]),
+                )
+                self.assertNotRegex(
+                    block,
+                    r"CURRENCY_|inventoryItemReward|currencyToGive",
+                )
+            self.assertEqual(
+                (
+                    root / "gameresources" / "generated" / "decls" /
+                    NO_REWARD_CONTAINER_PATH
+                ).read_text(encoding="utf-8"),
+                NO_REWARD_CONTAINER_DECL,
+            )
+            self.assertFalse((
+                root / "gameresources" / "generated" / "decls" /
+                "propitem/propitem/batteries/sentinel_battery.decl"
+            ).exists())
+            self.assertFalse((
+                root / "gameresources" / "generated" / "decls" /
+                "entitydef/interact/hub/battery_socket_for_engine.decl"
+            ).exists())
+            registry_path = root / "challenge_location_registry.json"
+            registry_path.write_text(json.dumps(registry), encoding="utf-8")
+            self.assertEqual(
+                validate_overrides_from_mod_root(root, registry_path),
+                [],
+            )
+
+    def test_synthetic_aggregate_reward_is_stripped_without_touching_predicate_or_presentation(self):
+        source = """item[42] = {
+\tlevelName = "#str_synthetic";
+\tcompletionUnlock = "currency/CURRENCY_SENTINEL_BATTERY";
+\tchallenges = {
+\t\tnum = 1;
+\t\titem[0] = "mission_challenge/synthetic/challenge_1";
+\t}
+\tfeats = {
+\t\tnum = 1;
+\t\titem[0] = "shell_skybox/synthetic";
+\t}
+}"""
+        override = _suppress_aggregate_reward(source)
+        self.assertNotIn("CURRENCY_SENTINEL_BATTERY", override)
+        self.assertIn(f'completionUnlock = "{NO_REWARD_CONTAINER}";', override)
+        self.assertEqual(_challenge_paths(override), _challenge_paths(source))
+        self.assertIn('levelName = "#str_synthetic";', override)
+        self.assertIn('item[0] = "shell_skybox/synthetic";', override)
+
+    def test_packaged_audit_rejects_residual_aggregate_reward(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build_mission_challenge_overrides(root)
+            registry_path = root / "challenge_location_registry.json"
+            registry_path.write_text(
+                json.dumps(load_challenge_registry()), encoding="utf-8"
+            )
+            aggregate = (
+                root / "gameresources" / "generated" / "decls" /
+                AGGREGATE_LIST_PATH
+            )
+            source = aggregate.read_text(encoding="utf-8")
+            aggregate.write_text(
+                source.replace(
+                    f'completionUnlock = "{NO_REWARD_CONTAINER}";',
+                    'completionUnlock = "currency/CURRENCY_SENTINEL_BATTERY";',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_overrides_from_mod_root(root, registry_path)
+        self.assertTrue(any("aggregate suppression is missing" in error for error in errors))
+        self.assertTrue(any("aggregate retains a vanilla reward" in error for error in errors))
 
     def test_rune_menu_override_preserves_existing_rune_behavior(self):
         source = (
