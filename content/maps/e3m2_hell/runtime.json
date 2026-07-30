@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_challenges",
+      "name": "Nekravol - Mission Challenge - Die by the Sword",
+      "location_id": 7770358,
+      "strategy": "unlockable_record",
+      "mission_key": "e3m2",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e3m2/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_WEAPON_CRUCIBLE_KILL",
+        "rule_0_statCount": 2,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e3m2/challenge_1.decl",
+        "sha256": "7fe4b162eeb6a2e3d066aa25595c310accb50d83f4acab9a2f3e1f07fe9b05b4",
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "category": "mission_challenges",
+      "name": "Nekravol - Mission Challenge - Tricks and Traps",
+      "location_id": 7770359,
+      "strategy": "unlockable_record",
+      "mission_key": "e3m2",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e3m2/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_KILLED_BY_ACTIVATED_CRUSHER",
+        "rule_0_statCount": 8,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e3m2/challenge_2.decl",
+        "sha256": "e2efd209e50ff7780970150595856e766a7aa143419280167922f180f3df8bba",
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "category": "mission_challenges",
+      "name": "Nekravol - Mission Challenge - Doom Hunt",
+      "location_id": 7770360,
+      "strategy": "unlockable_record",
+      "mission_key": "e3m2",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e3m2/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_DOOMHUNTER_GK_LEFT_UPPER",
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e3m2/challenge_3.decl",
+        "sha256": "14b2af1fcfa3e8badec8e2ededec8af27d496a662c5bcc6ff34054856669e243",
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      }
+    },
+    {
+      "category": "all_mission_challenges",
+      "name": "Nekravol - All Mission Challenges Completed",
+      "location_id": 7770361,
+      "strategy": "aggregate",
+      "mission_key": "e3m2",
+      "signal": {
+        "kind": "aggregate",
+        "children": [7770358, 7770359, 7770360],
+        "required_count": 3,
+        "authority": "server_checked_locations"
+      }
+    },
+    {
+      "category": "mission_complete",
+      "name": "Nekravol - Mission Complete",
+      "location_id": 7770362,
+      "strategy": "map_terminal",
+      "mission_key": "e3m2_hell",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+        "owner": "game_target_relay_28",
+        "fallback": {
+          "kind": "native_transition",
+          "from": "game/sp/e3m2_hell/e3m2_hell",
+          "to": "game/sp/e3m2_hell_b/e3m2_hell_b"
+        }
+      }
+    }
+  ]
+}

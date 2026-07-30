@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -50,7 +51,38 @@ def test_generated_map_uses_declared_visual_asset_strategy(
             assert "modelDecl" not in generated
 
 
+def test_onboarded_physical_candidates_remove_vanilla_reward_owners(
+    temporary_generated_maps,
+) -> None:
+    physical_classes = {
+        "idInteractable_GiveItems",
+        "idInteractable_WorldCache",
+        "idProp2",
+    }
+    for map_key, generated_path in temporary_generated_maps.items():
+        onboarding_path = ROOT / "content" / "maps" / map_key / "onboarding.json"
+        if not onboarding_path.is_file():
+            continue
+        inventory = json.loads(onboarding_path.read_text(encoding="utf-8")).get(
+            "candidate_inventory", ()
+        )
+        generated = generated_path.read_text(encoding="utf-8")
+        for candidate in inventory:
+            if (
+                candidate.get("decision") != "include"
+                or candidate.get("class") not in physical_classes
+            ):
+                continue
+            entity_name = candidate["entity"]
+            assert f"entityDef {entity_name} {{" not in generated
+            assert generated.count(
+                f"entityDef ap_independent_{entity_name} {{"
+            ) == 1
+
+
 def test_taras_mastery_tokens_replace_vanilla_rewards_once(temporary_generated_maps) -> None:
+    if "e3m1_slayer" not in temporary_generated_maps:
+        pytest.skip("Taras Nabad was not selected for this focused map run")
     source = (ROOT / "vanillamaps" / "e3m1_slayer.map").read_text(encoding="utf-8")
     generated = temporary_generated_maps["e3m1_slayer"].read_text(encoding="utf-8")
     tokens = (

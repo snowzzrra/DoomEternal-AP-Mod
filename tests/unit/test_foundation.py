@@ -18,6 +18,7 @@ from foundation import (
     validate_primitive_registry,
 )
 from challenge_registry import load_challenge_registry
+from content_catalog import load_content_catalog
 from map_registry import (
     generation_plan, load_map_registry, package_plan, release_plan,
     validate_map_registry, validation_plan,
@@ -38,13 +39,19 @@ class FoundationRegistryTests(unittest.TestCase):
     def test_registry_and_contracts_are_complete(self):
         registry = validate_primitive_registry()
         self.assertEqual(len(registry["primitives"]), 12)
-        self.assertEqual(len(compile_all_item_plans(self.definitions)), 116)
-        self.assertEqual(sum(family_counts(self.definitions).values()), 116)
+        self.assertEqual(
+            len(compile_all_item_plans(self.definitions)),
+            len(self.definitions),
+        )
+        self.assertEqual(
+            sum(family_counts(self.definitions).values()),
+            len(self.definitions),
+        )
         contracts = load_foundation_contracts()
         self.assertEqual(contracts["counts"]["items"], 116)
-        self.assertEqual(contracts["counts"]["locations"], 291)
-        self.assertEqual(contracts["counts"]["map_checks"], 245)
-        self.assertEqual(contracts["counts"]["runtime_locations"], 46)
+        self.assertEqual(contracts["counts"]["locations"], 339)
+        self.assertEqual(contracts["counts"]["map_checks"], 283)
+        self.assertEqual(contracts["counts"]["runtime_locations"], 56)
         self.assertEqual(contracts["counts"]["runtime_goals"], 1)
         for override in contracts["map_overrides"].values():
             self.assertTrue(override["justification"])
@@ -154,9 +161,15 @@ class FoundationRegistryTests(unittest.TestCase):
 
 
 class MapExpansionFoundationTests(unittest.TestCase):
-    def test_nine_release_maps_and_test_only_fixture(self):
-        registry = load_map_registry()
-        self.assertEqual(len(release_plan(registry)), 9)
+    def test_release_plan_matches_authorial_catalog_and_excludes_test_fixture(self):
+        registry = load_map_registry(authorial=True)
+        catalog_keys = [
+            spec.key for spec in load_content_catalog().enabled_maps()
+        ]
+        self.assertEqual(
+            [plan.map_key for plan in release_plan(registry)],
+            catalog_keys,
+        )
         fixture = copy.deepcopy(registry["maps"]["e1m1_intro"])
         fixture.update({
             "display_name": "Registry Sixth Fixture", "test_only": True,

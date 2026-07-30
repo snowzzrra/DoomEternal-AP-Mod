@@ -35,12 +35,10 @@ def load_campaign_goal_contract(path: Path = CONTRACT_PATH) -> dict:
             raise ValueError(f"campaign goal contract has invalid {key}")
     if not contract["event_filename"].endswith(".txt"):
         raise ValueError("campaign goal event_filename must be a .txt file")
-    if not contract["marker"].startswith("AP_GOAL_EVENT_"):
-        raise ValueError("campaign goal marker must use AP_GOAL_EVENT_")
+    if not contract["marker"].startswith(("AP_GOAL_EVENT_", "AP_MISSION_EVENT_")):
+        raise ValueError("campaign goal marker must identify a publisher event")
     if contract["event_target"] != "ap_campaign_goal_event":
         raise ValueError("campaign goal event_target drift")
-    if not contract["publisher_key"].endswith("_campaign_goal"):
-        raise ValueError("campaign goal publisher key must identify a campaign goal")
     if contract["runtime_map"] == contract["destination_map"]:
         raise ValueError("campaign goal transition cannot target its source map")
     return contract

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "nekravol_mission_complete",
+      "map_key": "e3m2_hell",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "game_target_relay_28",
+          "filename": "ap_mission_nekravol_complete.txt",
+          "marker": "AP_MISSION_EVENT_NEKRAVOL_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_target_relay_28"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m2_hell/e3m2_hell",
+          "to_map": "game/sp/e3m2_hell_b/e3m2_hell_b"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770362
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "game_target_level_transition_1"
+        }
+      ],
+      "dedupe_scope": "nekravol_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

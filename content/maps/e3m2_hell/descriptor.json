@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "key": "e3m2_hell",
+  "display_name": "Nekravol",
+  "enabled": true,
+  "source_file": "e3m2_hell.map",
+  "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+  "source_size": 6742072,
+  "generated_output": "e3m2_hell.entities",
+  "manifest": "manifests/e3m2_hell.json",
+  "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+  "resource_base": "e3m2_hell",
+  "resource_path": "game/sp/e3m2_hell/e3m2_hell_patch2.resources",
+  "resource_owner": "game/sp/e3m2_hell/e3m2_hell_patch2.resources",
+  "resource_priority": 6,
+  "relative_entities_path": "game/sp/e3m2_hell/e3m2_hell.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      "Nekravol"
+    ],
+    "connections": [
+      ["Fortress of Doom - Seventh Visit", "Nekravol", "Portal to Nekravol"]
+    ]
+  }
+}

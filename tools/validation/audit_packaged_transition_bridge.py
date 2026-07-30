@@ -186,10 +186,23 @@ async def consume(
         if fail_send:
             if not event.exists() or sent:
                 raise AssertionError("retryable goal must preserve event")
-        elif event.exists() or sent != [
-            {"cmd": "StatusUpdate", "status": module.ClientStatus.CLIENT_GOAL}
-        ]:
-            raise AssertionError(f"packaged Fortress goal event drift: {sent!r}")
+        else:
+            goal_publisher = next(
+                publisher for publisher in module.PUBLISHERS
+                if publisher.key == module.CAMPAIGN_GOAL_CONTRACT["publisher_key"]
+            )
+            expected_messages = [
+                {"cmd": "LocationChecks", "locations": [effect["location_id"]]}
+                for effect in goal_publisher.effects
+                if effect["strategy"] == "location_check"
+            ]
+            expected_messages.append(
+                {"cmd": "StatusUpdate", "status": module.ClientStatus.CLIENT_GOAL}
+            )
+            if event.exists() or sent != expected_messages:
+                raise AssertionError(
+                    f"packaged campaign goal event drift: {sent!r}"
+                )
     elif expected is None:
         if event.exists() or sent:
             raise AssertionError("Hub -> mission transition must be ignored and consumed")
@@ -303,10 +316,23 @@ def main() -> int:
             f"{bridge.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
             encoding="utf-8",
         )
+        goal_publisher = next(
+            publisher for publisher in bridge.PUBLISHERS
+            if publisher.key == bridge.CAMPAIGN_GOAL_CONTRACT["publisher_key"]
+        )
+        goal_locations = {
+            effect["location_id"]
+            for effect in goal_publisher.effects
+            if effect["strategy"] == "location_check"
+        }
         asyncio.run(consume(
-            bridge, goal_event, None, fail_send=True, expect_goal=True
+            bridge, goal_event, None, fail_send=True,
+            allowed_locations=goal_locations, expect_goal=True,
         ))
-        asyncio.run(consume(bridge, goal_event, None, expect_goal=True))
+        asyncio.run(consume(
+            bridge, goal_event, None,
+            allowed_locations=goal_locations, expect_goal=True,
+        ))
     return 0
 
 

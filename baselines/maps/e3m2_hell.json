@@ -1,0 +1,54 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.6-alpha.1",
+      "reason": "Nekravol Part I added as v0.3.6 AP content"
+    }
+  ],
+  "asset_package_contract_sha256": "660ea405519b92edc15588f89ccd46e66712bc59ebcb68ef84d07b4f70de32b1",
+  "byte_sha256": "cf875b00a2e528fbe7e7f97daeffeb87361a2d338ca93762d5100b6280ae41dc",
+  "content_revision": "v0.3.6-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 175,
+    "byte_size": 7008680,
+    "classes": 7628,
+    "entity_count": 7628,
+    "layers": 448,
+    "targets": 3421,
+    "transforms": 15448,
+    "unique_entity_names": 7628
+  },
+  "manifest_sha256": "7c0bbc619316382cdd08bd845b9d3663f8e29126eb796338e8e09dbc2f0cc007",
+  "map_key": "e3m2_hell",
+  "physical_ap_ids": [
+    7770340,
+    7770341,
+    7770342,
+    7770343,
+    7770344,
+    7770345,
+    7770346,
+    7770347,
+    7770348,
+    7770349,
+    7770350,
+    7770351,
+    7770352,
+    7770353,
+    7770354,
+    7770355,
+    7770356,
+    7770357
+  ],
+  "publisher_contract_sha256": "edba89a502113d657666a4463e2ad5b662206b2bd39b61fdefa691c8f5bb18b9",
+  "runtime_location_ids": [
+    7770358,
+    7770359,
+    7770360,
+    7770361,
+    7770362
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "e09548d409a058e4190cc8b3ac78d6246c5f188cf51034151a4b8d2232e0b7e9",
+  "semantic_sha256": "b63770fdf8adf069c02aec472e9d73771c2826dc170c6389141f856a299e43ff"
+}
