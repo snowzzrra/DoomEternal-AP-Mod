@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
+import logging
 import os
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,100 @@ from typing import Callable, Mapping
 
 ROOT = Path(__file__).resolve().parent
 OBSERVER_CONTRACT_PATH = ROOT / "data" / "observer_contracts.json"
+logger = logging.getLogger(__name__)
+
+TH32CS_SNAPPROCESS = 0x00000002
+ERROR_NO_MORE_FILES = 18
+INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+MAX_PATH = 260
+_windows_process_probe_warning_emitted = False
+
+
+class PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_ulong),
+        ("cntUsage", ctypes.c_ulong),
+        ("th32ProcessID", ctypes.c_ulong),
+        ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_ulong),
+        ("cntThreads", ctypes.c_ulong),
+        ("th32ParentProcessID", ctypes.c_ulong),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", ctypes.c_ulong),
+        ("szExeFile", ctypes.c_wchar * MAX_PATH),
+    ]
+
+
+def _load_kernel32():
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
+    kernel32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    kernel32.Process32FirstW.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(PROCESSENTRY32W),
+    ]
+    kernel32.Process32FirstW.restype = ctypes.c_int
+    kernel32.Process32NextW.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(PROCESSENTRY32W),
+    ]
+    kernel32.Process32NextW.restype = ctypes.c_int
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
+    return kernel32
+
+
+def _warn_windows_process_probe_once(message: str) -> None:
+    global _windows_process_probe_warning_emitted
+    if _windows_process_probe_warning_emitted:
+        return
+    _windows_process_probe_warning_emitted = True
+    logger.warning("Windows process detection failed: %s", message)
+
+
+def _windows_process_running(executable: str) -> bool:
+    try:
+        kernel32 = _load_kernel32()
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    except (AttributeError, OSError) as error:
+        _warn_windows_process_probe_once(str(error))
+        return False
+
+    if snapshot in (None, INVALID_HANDLE_VALUE):
+        _warn_windows_process_probe_once("CreateToolhelp32Snapshot")
+        return False
+
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(entry)
+    found = False
+    try:
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+            _warn_windows_process_probe_once("Process32FirstW")
+        else:
+            expected = executable.casefold()
+            while True:
+                if entry.szExeFile.casefold() == expected:
+                    found = True
+                    break
+                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                    error = ctypes.get_last_error()
+                    if error not in (0, ERROR_NO_MORE_FILES):
+                        _warn_windows_process_probe_once(
+                            f"Process32NextW error={error}"
+                        )
+                    break
+    except (AttributeError, OSError) as error:
+        _warn_windows_process_probe_once(str(error))
+        found = False
+    finally:
+        try:
+            if not kernel32.CloseHandle(snapshot):
+                _warn_windows_process_probe_once("CloseHandle")
+                found = False
+        except (AttributeError, OSError) as error:
+            _warn_windows_process_probe_once(str(error))
+            found = False
+    return found
 
 
 @dataclass(frozen=True)
@@ -68,15 +163,7 @@ def unlockable_record_complete(record: Mapping, signal: Mapping) -> bool:
 def doom_process_running() -> bool:
     executable = "doometernalx64vk.exe"
     if os.name == "nt":
-        try:
-            output = subprocess.check_output(
-                ["tasklist", "/FI", "IMAGENAME eq DOOMEternalx64vk.exe"],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return False
-        return executable in output.lower()
+        return _windows_process_running(executable)
     proc = Path("/proc")
     try:
         process_dirs = tuple(proc.iterdir())
