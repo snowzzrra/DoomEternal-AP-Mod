@@ -11,6 +11,7 @@
     "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
     "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
     "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
+    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
     "hub": "game/hub/hub"
   },
   "bootstrap_test_entrypoints": {
@@ -20,11 +21,11 @@
   },
   "counts": {
     "items": 116,
-    "locations": 339,
-    "map_checks": 283,
+    "locations": 363,
+    "map_checks": 302,
     "route_sentinel_batteries": 21,
     "runtime_goals": 1,
-    "runtime_locations": 56
+    "runtime_locations": 61
   },
   "family_primitives": {
     "currency": "currency_grant_direct",

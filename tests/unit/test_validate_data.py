@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
 
 from tools.validation.validate_data import (
     APWORLD, ROOT, extract_frozenset_constant, extract_namedtuple_table,
-    validate_id_namespaces,
+    runtime_automap_families, validate_id_namespaces,
 )
 from bootstrap_actions import SUIT_PAGE_UNLOCKING_ITEM_IDS
 from content_catalog import load_content_catalog
@@ -26,14 +26,7 @@ class ValidateDataNamespaceTests(unittest.TestCase):
         families = json.loads(
             (ROOT / "data" / "automap_family_registry.json").read_text()
         )["families"]
-        classified = {
-            location_id
-            for family_name in (
-                "runtime_mission", "runtime_mastery", "runtime_challenge"
-            )
-            for location_id in families[family_name]["match"]["location_ids"]
-        }
-        self.assertEqual(classified, runtime_ids)
+        self.assertEqual(set(runtime_automap_families(families)), runtime_ids)
 
     def test_mission_challenge_registry_matches_apworld_by_name_and_id(self):
         registry = json.loads(
