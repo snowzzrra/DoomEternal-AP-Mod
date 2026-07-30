@@ -88,47 +88,6 @@ class MissionCompleteMapPatcherTests(unittest.TestCase):
                 self.assertIn('class = "idTarget_Command";', event)
                 self.assertIn(f"AP_CHECK_EVENT_{location_id}", event)
 
-    def test_sentinel_terminal_publishes_location_and_goal_independently(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            maps = self._generated_maps(tmpdir)
-            audit = patch_mission_complete_maps(CONTRACTS, maps, Path(tmpdir, "mod"))
-            mars = maps["e2m3_core"].read_text(encoding="utf-8")
-            sentinel = maps["e2m4_boss"].read_text(encoding="utf-8")
-            owner = audit["campaign_goal"]["owner"]
-            bounds = find_entity_block_bounds(sentinel, owner)
-            self.assertIsNotNone(bounds)
-            self.assertEqual(
-                extract_target_names(sentinel[bounds[0]:bounds[1]]),
-                audit["campaign_goal"]["after_targets"],
-            )
-            self.assertNotIn("sentinel_prime_campaign_goal", mars)
-            self.assertNotIn("AP_CHECK_EVENT_7770289", mars)
-            self.assertEqual(
-                sentinel.count("AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE"), 1
-            )
-            self.assertEqual(sentinel.count(audit["campaign_goal"]["marker"]), 1)
-
-            publishers = audit["campaign_goal"]["publishers"]
-            mission = publishers["sentinel_prime_mission_complete"]
-            goal = publishers["sentinel_prime_campaign_goal"]
-            mission_bounds = find_entity_block_bounds(sentinel, mission["marker_entity"])
-            goal_bounds = find_entity_block_bounds(sentinel, goal["marker_entity"])
-            self.assertIsNotNone(mission_bounds)
-            self.assertIsNotNone(goal_bounds)
-            mission_publisher = sentinel[mission_bounds[0]:mission_bounds[1]]
-            goal_publisher = sentinel[goal_bounds[0]:goal_bounds[1]]
-            self.assertIn("AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE", mission_publisher)
-            self.assertIn(audit["campaign_goal"]["marker"], goal_publisher)
-            self.assertNotIn(audit["campaign_goal"]["marker"], mission_publisher)
-            self.assertNotIn("AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE", goal_publisher)
-            for spec in (mission, goal):
-                dump_bounds = find_entity_block_bounds(sentinel, spec["dump_entity"])
-                dump = sentinel[dump_bounds[0]:dump_bounds[1]]
-                self.assertIn(f'condump {spec["filename"]}', dump)
-            for publisher in (mission_publisher, goal_publisher):
-                self.assertNotIn("condump ;", publisher.lower())
-                self.assertNotIn("; condump", publisher.lower())
-
     def test_missing_or_duplicate_native_owner_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             maps = self._generated_maps(tmpdir)

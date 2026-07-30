@@ -89,7 +89,10 @@ entity {
             encoding="utf-8",
         )
         items_path.write_text(
-            json.dumps({"7770001": "give weapon/player/test"}, indent=4),
+            json.dumps({
+                "7770001": "give weapon/player/test",
+                "7770006": "give weapon/player/compatibility_anchor",
+            }, indent=4),
             encoding="utf-8",
         )
         return input_path, output_path, config_path, manifest_path, items_path

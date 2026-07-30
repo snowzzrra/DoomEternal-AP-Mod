@@ -44,7 +44,10 @@ def challenge_registry_document(catalog=None) -> dict:
     for item in catalog.runtime_locations:
         if not item.category:
             raise ValueError(f"{item.name}: runtime location lacks category")
-        registry[item.category].append(_thaw(item.data))
+        data = _thaw(item.data)
+        if item.category == "mission_challenges" and item.mission_key in catalog.maps:
+            data.setdefault("runtime_map", catalog.maps[item.mission_key].runtime_map)
+        registry[item.category].append(data)
     return registry
 
 

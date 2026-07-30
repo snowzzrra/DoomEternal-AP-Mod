@@ -38,6 +38,46 @@ def _package_runtime_locations(category: str) -> list[dict]:
 
 
 class NativeChallengeContracts(unittest.TestCase):
+    def test_urdak_toy_challenge_uses_one_of_three_physical_checks(self):
+        registry = load_challenge_registry()
+        entry = next(
+            item for item in registry["mission_challenges"]
+            if item["location_id"] == 7770407
+        )
+        self.assertEqual(
+            {
+                "name": entry["name"],
+                "description": entry["description"],
+                "strategy": entry["strategy"],
+                "kind": entry["signal"]["kind"],
+                "physical_location_ids": entry["signal"]["physical_location_ids"],
+                "required_count": entry["signal"]["required_count"],
+            },
+            {
+                "name": "Urdak - Mission Challenge - Accessories Not Included",
+                "description": "Acquire 1 Collectible Toy",
+                "strategy": "physical_event_equivalent",
+                "kind": "physical_event_equivalent",
+                "physical_location_ids": [7770392, 7770394, 7770400],
+                "required_count": 1,
+            },
+        )
+        names = {
+            item["location_id"]: (item["name"], item["description"])
+            for item in registry["mission_challenges"]
+            if item["location_id"] in {7770408, 7770409}
+        }
+        self.assertEqual(names, {
+            7770408: (
+                "Urdak - Mission Challenge - Inflight Devastation",
+                "Kill 12 Demons while in mid-air",
+            ),
+            7770409: (
+                "Urdak - Mission Challenge - Angel of Death",
+                "Kill 5 Maykr Drones with Precision Bolt headshots",
+            ),
+        })
+
     def test_registry_contains_only_proven_runtime_locations(self):
         registry = load_challenge_registry()
         entries = all_location_entries(registry)

@@ -51,7 +51,6 @@ CORE_MAP_INPUTS = (
     "data/content_identity.json",
     "tools/maps/ap_map_generator.py",
     "tools/maps/notification_formatting.py",
-    "tools/maps/notification_lab.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/validation/audit_resource_packages.py",
     "content_catalog.py",
@@ -429,7 +428,6 @@ class Pipeline:
                     items,
                     item_names=item_names,
                     enable_notifications=True,
-                    enable_notification_lab=False,
                 )
                 final = temporary / spec.data["generated_output"]
                 shutil.copyfile(raw, final)

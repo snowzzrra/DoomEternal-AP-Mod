@@ -9,15 +9,8 @@ import re
 from pathlib import Path
 
 from tools.maps.notification_formatting import notification_key, notification_text
-from tools.maps.notification_lab import (
-    notification_lab_enabled,
-    notification_lab_string_entries,
-)
 
 HEADER_KEY_PATTERN = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
-LAB_HEADER_KEY_PATTERN = re.compile(
-    r'header\s*=\s*"(#str_ap_notification_lab_[a-z_]+)";'
-)
 LOCATION_KEY_PATTERN = re.compile(
     r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
 )
@@ -33,7 +26,6 @@ def referenced_notification_keys(maps_dir: Path) -> set[str]:
         for path in map_paths
         for key in (
             HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
-            + LAB_HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
             + LOCATION_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
         )
     }
@@ -111,9 +103,6 @@ def build_string_table(
                         item_id, definition, item_name, stage=stage
                     ),
                 ))
-
-    if notification_lab_enabled():
-        entries.extend(notification_lab_string_entries(output_path.stem))
 
     location_keys = {
         key for key in referenced_keys if key.startswith("#str_ap_location_")

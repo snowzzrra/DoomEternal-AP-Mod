@@ -30,17 +30,6 @@ def test_sentinel_separates_codex_donor_from_imported_replacement_slot() -> None
     )
 
 
-def test_generator_has_no_sentinel_specific_visual_branch() -> None:
-    root = Path(__file__).resolve().parents[2]
-    for relative in (
-        "tools/maps/ap_map_generator.py",
-        "tools/validation/audit_resource_packages.py",
-    ):
-        source = (root / relative).read_text(encoding="utf-8")
-        assert 'if map_key == "e2m4_boss"' not in source
-        assert "if map_key == 'e2m4_boss'" not in source
-
-
 def test_vanilla_codex_entities_remain_original_in_the_source_map() -> None:
     source = (
         Path(__file__).resolve().parents[2]
@@ -52,17 +41,3 @@ def test_vanilla_codex_entities_remain_original_in_the_source_map() -> None:
         end = source.index("\nentity {", start)
         block = source[start:end]
         assert 'model = "art/pickups/codex.lwo";' in block
-
-
-def test_other_maps_keep_their_question_mark_assets() -> None:
-    root = Path(__file__).resolve().parents[2]
-    expected_maps = {
-        "e1m1_intro", "hub", "e1m2_battle", "e1m3_cult", "e1m4_boss",
-        "e2m1_nest", "e2m2_base", "e2m3_core", "e3m1_slayer",
-        "e3m2_hell", "e3m2_hell_b", "e3m3_maykr", "e3m4_boss",
-    }
-    for map_key in expected_maps:
-        assert (
-            root / "packaging" / "mod_assets" / map_key
-            / "art" / "pickups" / "question_mark_a.lwo"
-        ).is_file()

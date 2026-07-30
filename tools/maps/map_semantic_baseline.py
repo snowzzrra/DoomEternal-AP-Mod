@@ -360,7 +360,7 @@ def generate_frozen_outputs(
         config = ROOT / plan.level_config
         generate_map(
             ROOT / "vanillamaps" / plan.source_file, output, config, manifest,
-            items, enable_notification_lab=False,
+            items,
         )
         results[plan.map_key] = (output, manifest, config)
     patch_mission_complete_maps(

@@ -228,6 +228,37 @@ class RuntimeObservationLease:
             return False, "map_mismatch"
         return True, "live"
 
+    def validate_mission_select(
+        self,
+        *,
+        evidence_mtime_ns: int,
+        evidence_state: str,
+        evidence_map: str,
+        current_map: str,
+        mission_map: str,
+        save_mtime_ns: int,
+    ) -> tuple[bool, str]:
+        """Validate a replay without trusting stale campaign game.details."""
+        if not self.process_probe():
+            return False, "game_not_running"
+        if self.gameplay_loaded_ns is None:
+            return False, "gameplay_not_loaded"
+        if evidence_state != "gameplay":
+            return False, "gameplay_not_loaded"
+        if evidence_mtime_ns < self.started_ns:
+            return False, "stale_runtime_proof"
+        if save_mtime_ns < self.gameplay_loaded_ns:
+            return False, "mission_select_save_not_fresh"
+        canonical = lambda value: str(value or "").replace("\\", "/").rstrip("/")
+        maps = {
+            canonical(evidence_map),
+            canonical(current_map),
+            canonical(mission_map),
+        }
+        if "" in maps or len(maps) != 1:
+            return False, "mission_select_map_mismatch"
+        return True, "mission_select_live"
+
 
 def observer_registry_revision(registry_path: Path | Mapping) -> str:
     document = (

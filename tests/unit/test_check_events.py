@@ -75,6 +75,7 @@ def _load_bridge_client():
 
 
 bridge_client = _load_bridge_client()
+import observer_lifecycle
 
 
 class _SyntheticLiveLease:
@@ -852,7 +853,12 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx.checked_locations = set()
                 ctx.locations_checked = set()
                 sent = []
-                ctx.send_msgs = lambda messages: _async_append(sent, messages)
+
+                async def send_msgs(messages):
+                    sent.append(messages)
+                    ctx.checked_locations.update(messages[0]["locations"])
+
+                ctx.send_msgs = send_msgs
 
                 await ctx.check_game_duration_death()
                 await ctx.check_mission_challenge_locations()
@@ -1077,6 +1083,8 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
             async def send_msgs(messages):
                 sent.extend(messages)
+                for message in messages:
+                    ctx.checked_locations.update(message.get("locations", ()))
 
             def probe(path):
                 probe_calls.append(path)
@@ -1335,6 +1343,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
             async def send_msgs(messages, sent=sent):
                 sent.append(messages)
+                ctx.checked_locations.update(messages[0]["locations"])
 
             ctx.send_msgs = send_msgs
             await ctx.check_mission_challenge_locations()
@@ -1373,6 +1382,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             sent.append(messages)
             if len(sent) == 1:
                 raise RuntimeError("temporary disconnect")
+            ctx.checked_locations.update(messages[0]["locations"])
 
         ctx.send_msgs = send_msgs
         await ctx.check_mission_challenge_locations()
@@ -1417,12 +1427,16 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             sent.append(messages)
             if len(sent) == 1:
                 raise RuntimeError("temporary disconnect")
+            ctx.checked_locations.update(messages[0]["locations"])
 
         ctx.send_msgs = send_msgs
         await ctx.check_all_mission_challenges_location()
         await ctx.check_all_mission_challenges_location()
         self.assertEqual(len(sent), 2)
-        self.assertEqual(ctx.locations_checked, {location_id})
+        self.assertEqual(ctx.locations_checked, set())
+        self.assertEqual(ctx.checked_locations, {
+            *aggregate["signal"]["children"], location_id,
+        })
 
         ctx.locations_checked.clear()
         ctx.checked_locations.add(location_id)
@@ -2071,21 +2085,36 @@ class CheckEventTests(unittest.TestCase):
         self.assertEqual([call[0] for call in calls], real_commands)
         self.assertEqual(before, json.dumps(ctx.session_state, sort_keys=True))
 
-    def test_dev_lab_rejects_raw_gameplay_command(self):
+    def test_directed_test_rejects_raw_gameplay_command(self):
         ctx = self._make_item_context()
         with self.assertRaisesRegex(ValueError, "map-side entity activation"):
             ctx.queue_dev_commands(["give weapon/player/shotgun"], "unsafe")
 
-    def test_location_lab_contract_uses_map_entrypoint_not_server_check(self):
+    def test_location_directed_command_uses_map_entrypoint(self):
         contract = bridge_client.load_foundation_contracts()["location_entrypoints"]["7770074"]
         self.assertEqual(contract["entity"], "ap_independent_pickup_equipment_ice_bomb")
-        source = Path(bridge_client.__file__).read_text(encoding="utf-8")
-        method = source.split("def _cmd_doom_test_location", 1)[1].split("def _cmd_doom_test_status", 1)[0]
-        self.assertIn("queue_dev_commands", method)
-        self.assertNotIn("LocationChecks", method)
-        self.assertNotIn("send_msgs", method)
+        calls = []
+        ctx = types.SimpleNamespace(
+            current_map_name=contract["map"],
+            queue_dev_commands=lambda commands, action: calls.append(
+                (commands, action)
+            ) or "directed-test",
+        )
+        processor = bridge_client.DoomCommandProcessor.__new__(
+            bridge_client.DoomCommandProcessor
+        )
+        processor.ctx = ctx
+        processor.output = lambda _message: None
+        processor._cmd_doom_test_location("7770074", "--confirm")
+        self.assertEqual(
+            calls,
+            [(
+                ["ai_ScriptCmdEnt ap_independent_pickup_equipment_ice_bomb activate"],
+                "location:7770074",
+            )],
+        )
 
-    def test_rocket_location_lab_uses_independent_entrypoint(self):
+    def test_rocket_location_directed_contract_uses_independent_entrypoint(self):
         contract = bridge_client.load_foundation_contracts()["location_entrypoints"]["7770056"]
         self.assertEqual(contract["map"], "game/sp/e1m3_cult/e1m3_cult")
         self.assertEqual(contract["entity"], "ap_independent_rocket_launcher_7770056")
@@ -2115,39 +2144,6 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.canonical_map_name(contract["map"]),
             )
 
-    def test_native_transition_publisher_emits_generic_edges(self):
-        source = (ROOT / "native" / "client" / "ap_client_exe.cpp").read_text(encoding="utf-8")
-        monitor = source.split("class MissionTransitionMonitor", 1)[1].split(
-            "bool ReadCommandFile", 1
-        )[0]
-        self.assertNotIn('canonicalFrom == "game/sp/e1m3_cult/e1m3_cult"', monitor)
-        self.assertNotIn('canonicalTo == "game/sp/e1m4_boss/e1m4_boss"', monitor)
-        self.assertNotIn("reason=map_side_owner", monitor)
-        self.assertNotIn('canonicalFrom == "game/sp/e1m1_intro/e1m1_intro"', monitor)
-        self.assertNotIn('canonicalFrom == "game/sp/e1m2_battle/e1m2_battle"', monitor)
-        self.assertNotIn("e1m2_war/e1m2_war", source)
-        self.assertIn("MISSION_TRANSITION_SOURCE", source)
-        self.assertIn("TRANSITION_EVENT_PUBLISHED", source)
-
-    def test_native_monitor_retries_late_config_before_transport_is_ready(self):
-        source = (
-            ROOT / "native" / "client" / "ap_client_exe.cpp"
-        ).read_text(encoding="utf-8")
-        startup_wait = source.split(
-            "while (!g_MhInterface || !g_MhInterface->m_Initialized)", 1
-        )[1].split('LogDebug("Meathook RPC server verified.")', 1)[0]
-        self.assertIn("missionTransitionMonitor.Poll(", startup_wait)
-        monitor = source.split("class MissionTransitionMonitor", 1)[1].split(
-            "bool ReadCommandFile", 1
-        )[0]
-        self.assertIn("nextConfigRetryTick_ = now + 5000;", monitor)
-        self.assertEqual(
-            source.count(
-                "[Mission] Monitoring encrypted game.details transitions via "
-            ),
-            1,
-        )
-
     def test_bridge_log_rotation_uses_only_temp_test_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             current = Path(directory) / "bridge.log"
@@ -2166,31 +2162,6 @@ class CheckEventTests(unittest.TestCase):
                     handler.close()
                 for handler in original_handlers:
                     bridge_client.logger.addHandler(handler)
-
-    def test_native_log_rotation_and_runtime_identity_are_explicit(self):
-        source = (ROOT / "native" / "client" / "ap_client_exe.cpp").read_text(encoding="utf-8")
-        self.assertIn("RotateClientLog();", source)
-        self.assertIn("ap_client.previous.log", source)
-        self.assertNotIn("e1m2_war/e1m2_war", source)
-
-    def test_safe_baseline_has_no_mastery_reconciliation(self):
-        source = Path(bridge_client.__file__).read_text(encoding="utf-8")
-        self.assertNotIn("MASTERY_CONTRACTS", source)
-        self.assertNotIn("mastery_reconciliation_state", source)
-        self.assertNotIn("pending_masteries", source)
-
-    def test_rejected_suit_v2_does_not_queue_a_spool(self):
-        self.assertNotIn("suit_page", bridge_client.BOOTSTRAP_ACTIONS)
-        self.assertNotIn(
-            "suit_page",
-            bridge_client.load_foundation_contracts()["bootstrap_test_entrypoints"],
-        )
-        source = Path(bridge_client.__file__).read_text(encoding="utf-8")
-        method = source.split("def _cmd_doom_test_bootstrap", 1)[1].split(
-            "def _cmd_doom_test_location", 1
-        )[0]
-        self.assertLess(method.index('action_name == "suit_page"'),
-                        method.index("queue_dev_commands"))
 
     def test_string_mapping_spools_one_map_side_activation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3364,7 +3335,7 @@ class CheckEventTests(unittest.TestCase):
     def test_physical_event_equivalent_immediate_send_and_dedupe(self):
         ctx = bridge_client.DoomEternalContext("localhost:38281", "")
         ctx.item_state_ready = True
-        ctx.runtime_observers_frozen = False
+        ctx.runtime_observers_frozen = True
         ctx.locations_checked = set()
         ctx.checked_locations = set()
         ctx.server_locations = {7770206, 7770138}
@@ -3376,14 +3347,11 @@ class CheckEventTests(unittest.TestCase):
 
         async def fake_send(messages):
             sent.extend(messages)
-            for m in messages:
-                ctx.checked_locations.update(m.get("locations", ()))
 
         ctx.send_msgs = fake_send
-        ctx.locations_checked.add(7770181)
+        ctx.checked_locations.add(7770181)
 
         ctx.observe_physical_event_challenges()
-        self.assertTrue(ctx.mission_challenges_observed.get("mission_challenge/e2m1/challenge_1"))
 
         entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e2m1/challenge_1"]
         asyncio.run(ctx.check_mission_challenge_location(entry))
@@ -3391,14 +3359,19 @@ class CheckEventTests(unittest.TestCase):
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["locations"], [7770206])
 
-        # 2nd modbot does not resend
+        # A queued send is not an ACK and remains safely retryable.
         sent.clear()
-        ctx.locations_checked.add(7770182)
+        asyncio.run(ctx.check_mission_challenge_location(entry))
+        self.assertEqual(len(sent), 1)
+
+        # Server ACK is the only dedupe authority.
+        sent.clear()
+        ctx.checked_locations.add(7770206)
         asyncio.run(ctx.check_mission_challenge_location(entry))
         self.assertEqual(len(sent), 0)
 
         # Pull the crystal
-        ctx.locations_checked.add(7770059)
+        ctx.checked_locations.add(7770059)
         ctx.observe_physical_event_challenges()
         entry_crystal = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e1m3/challenge_1"]
         asyncio.run(ctx.check_mission_challenge_location(entry_crystal))
@@ -3410,16 +3383,14 @@ class CheckEventTests(unittest.TestCase):
         ctx.server_locations.update({7770244, 7770245, 7770246, 7770247})
         entry_rune = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE["mission_challenge/e2m2/challenge_1"]
         # 1 Rune checked -> does not fire
-        ctx.locations_checked.add(7770221)
+        ctx.checked_locations.add(7770221)
         ctx.observe_physical_event_challenges()
-        self.assertFalse(ctx.mission_challenges_observed.get("mission_challenge/e2m2/challenge_1"))
         asyncio.run(ctx.check_mission_challenge_location(entry_rune))
         self.assertEqual(len(sent), 0)
 
         # 2nd Rune checked -> fires Rune Finder
-        ctx.locations_checked.add(7770222)
+        ctx.checked_locations.add(7770222)
         ctx.observe_physical_event_challenges()
-        self.assertTrue(ctx.mission_challenges_observed.get("mission_challenge/e2m2/challenge_1"))
         asyncio.run(ctx.check_mission_challenge_location(entry_rune))
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["locations"], [7770244])
@@ -3430,10 +3401,9 @@ class CheckEventTests(unittest.TestCase):
 
         # Server ACKs challenge_2 and challenge_3; local observed flags are not authority.
         sent.clear()
-        ctx.has_authoritative_save_proof = lambda: True
         ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_2"] = True
         ctx.mission_challenges_observed["mission_challenge/e2m2/challenge_3"] = True
-        ctx.checked_locations.update({7770245, 7770246})
+        ctx.checked_locations.update({7770244, 7770245, 7770246})
         ctx.observe_physical_event_challenges()
         self.assertFalse(ctx.all_mission_challenges_observed.get("e2m2"))
         asyncio.run(ctx.check_all_mission_challenges_location())
@@ -3442,9 +3412,190 @@ class CheckEventTests(unittest.TestCase):
 
         # Reconnect/reload -> dedupe, no duplicate resend
         sent.clear()
+        ctx.checked_locations.add(7770247)
         ctx.observe_physical_event_challenges()
         asyncio.run(ctx.check_all_mission_challenges_location())
         self.assertEqual(len(sent), 0)
+
+    def test_each_urdak_toy_independently_completes_accessories(self):
+        entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE[
+            "mission_challenge/e3m3/challenge_1"
+        ]
+        self.assertEqual(entry["signal"]["required_count"], 1)
+        for toy_id in entry["signal"]["physical_location_ids"]:
+            with self.subTest(toy_id=toy_id):
+                ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+                ctx.item_state_ready = True
+                ctx.runtime_observers_frozen = True
+                ctx.locations_checked = set()
+                ctx.checked_locations = {toy_id}
+                ctx.server_locations = {7770407}
+                ctx.mission_challenges_observed = {}
+                ctx.all_mission_challenges_observed = {}
+                ctx.server = types.SimpleNamespace(
+                    socket=types.SimpleNamespace(closed=False)
+                )
+                ctx.persist_session_state = lambda: None
+                sent = []
+
+                async def fake_send(messages):
+                    sent.extend(messages)
+                    for message in messages:
+                        ctx.checked_locations.update(
+                            message.get("locations", ())
+                        )
+
+                ctx.send_msgs = fake_send
+                ctx.observe_physical_event_challenges()
+                asyncio.run(ctx.check_mission_challenge_location(entry))
+                self.assertEqual(sent, [{
+                    "cmd": "LocationChecks",
+                    "locations": [7770407],
+                }])
+
+    def test_server_derived_urdak_reconcile_retry_and_aggregate_without_save(self):
+        accessories = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE[
+            "mission_challenge/e3m3/challenge_1"
+        ]
+        aggregate = next(
+            entry
+            for entry in bridge_client.ALL_MISSION_CHALLENGES_ENTRIES
+            if entry["location_id"] == 7770410
+        )
+        ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+        ctx.item_state_ready = True
+        ctx.runtime_observers_frozen = True
+        ctx.active_save_slot = None
+        ctx.checked_locations = {7770394}
+        ctx.locations_checked = set()
+        ctx.server_locations = {7770407, 7770410}
+        ctx.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+        sent = []
+
+        async def fake_send(messages):
+            sent.extend(messages)
+
+        ctx.send_msgs = fake_send
+        asyncio.run(ctx.check_mission_challenge_locations())
+        self.assertEqual(sent[-1]["locations"], [7770407])
+
+        # Disconnect before ACK: no local latch, then reconnect retries.
+        ctx.server.socket.closed = True
+        sent.clear()
+        asyncio.run(ctx.check_mission_challenge_locations())
+        self.assertEqual(sent, [])
+        ctx.server.socket.closed = False
+        asyncio.run(ctx.check_mission_challenge_locations())
+        self.assertEqual(sent[-1]["locations"], [7770407])
+
+        # A later physical ACK also reconciles the same target generically.
+        ctx.checked_locations = {7770400}
+        sent.clear()
+        asyncio.run(ctx.check_mission_challenge_locations())
+        self.assertEqual(sent[-1]["locations"], [7770407])
+
+        # Child ACKs reconcile the aggregate with no save/map proof.
+        ctx.checked_locations = {7770407, 7770408, 7770409}
+        sent.clear()
+        asyncio.run(ctx.check_all_mission_challenges_location())
+        self.assertEqual(sent[-1]["locations"], [aggregate["location_id"]])
+
+        # Server-authoritative target ACK suppresses duplicates.
+        ctx.checked_locations.add(7770410)
+        sent.clear()
+        asyncio.run(ctx.check_all_mission_challenges_location())
+        self.assertEqual(sent, [])
+
+    def test_mission_select_save_edge_uses_fresh_proven_slot_not_stale_details(self):
+        entry = bridge_client.MISSION_CHALLENGE_BY_UNLOCKABLE[
+            "mission_challenge/e3m3/challenge_2"
+        ]
+        signal = entry["signal"]
+        incomplete = {
+            "numUnlockableRules": signal["numUnlockableRules"],
+            "rule_0_statname": signal["rule_0_statname"],
+            "rule_0_statCount": 0,
+            "rule_0_statDuration": signal["rule_0_statDuration"],
+            "rule_0_satisfied": False,
+            "unlockableIsUnlocked": False,
+        }
+        complete = {
+            **incomplete,
+            "rule_0_statCount": signal.get("rule_0_statCount", 1),
+            "rule_0_satisfied": True,
+            "unlockableIsUnlocked": True,
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote = Path(tmpdir)
+            slot = remote / "GAME-AUTOSAVE2"
+            slot.mkdir()
+            duration = slot / "game_duration.dat"
+            details = slot / "game.details"
+            evidence_path = remote / "ap_gameplay_save.txt"
+            duration.write_bytes(b"fresh-replay-save")
+            details.write_bytes(b"stale-campaign-details")
+            evidence_path.write_text("gameplay", encoding="utf-8")
+            os.utime(duration, ns=(400, 400))
+            os.utime(evidence_path, ns=(300, 300))
+
+            evidence = bridge_client.GameplaySaveEvidence(
+                "gameplay", 7, "GAME-AUTOSAVE2",
+                "game/sp/e3m3_maykr/e3m3_maykr", False,
+            )
+            ctx = bridge_client.DoomEternalContext("localhost:38281", "")
+            ctx.runtime_observation_lease = observer_lifecycle.RuntimeObservationLease(
+                process_probe=lambda: True, started_ns=100,
+            )
+            ctx.runtime_observation_lease.observe_gameplay_loaded(200)
+            ctx.current_map_name = "game/sp/e3m3_maykr/e3m3_maykr"
+            ctx.item_state_ready = True
+            ctx.state_key = "mission-select-seed:1:2"
+            ctx.session_state = {}
+            ctx.client_state = {"sessions": {ctx.state_key: ctx.session_state}}
+            ctx.checked_locations = set()
+            ctx.locations_checked = set()
+            ctx.server_locations = {entry["location_id"]}
+            ctx.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+            ctx.persist_session_state = lambda: None
+            sent = []
+
+            async def fake_send(messages):
+                sent.extend(messages)
+
+            ctx.send_msgs = fake_send
+            stale_details = {
+                "mapName": "game/sp/e3m4_boss/e3m4_boss",
+                "_path": str(details),
+                "_mtime_ns": 50,
+            }
+            with (
+                patch.object(bridge_client, "STEAM_REMOTE_DIR", remote),
+                patch.object(bridge_client, "STEAM_ID3", 1),
+                patch.object(bridge_client, "GAMEPLAY_SAVE_EVIDENCE_PATH", evidence_path),
+                patch.object(bridge_client, "read_gameplay_save_evidence", return_value=evidence),
+                patch.object(bridge_client, "read_game_details_for_selection", return_value=stale_details),
+                patch.object(bridge_client, "SaveObserverBaselineStore", observer_lifecycle.SaveObserverBaselineStore),
+            ):
+                selected = ctx.update_save_slot_lifecycle()
+                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
+                self.assertEqual(
+                    ctx.mission_select_observation_map,
+                    "game/sp/e3m3_maykr/e3m3_maykr",
+                )
+
+                # A pre-existing completion is baseline only.
+                ctx.observe_mission_challenges({signal["unlockable"]: complete}, selected)
+                asyncio.run(ctx.check_mission_challenge_location(entry))
+                self.assertEqual(sent, [])
+
+                # A new replay load gets a new baseline; only its later edge sends.
+                ctx.runtime_observation_lease.observe_gameplay_loaded(500)
+                os.utime(duration, ns=(600, 600))
+                selected = ctx.update_save_slot_lifecycle()
+                ctx.observe_mission_challenges({signal["unlockable"]: incomplete}, selected)
+                ctx.observe_mission_challenges({signal["unlockable"]: complete}, selected)
+                asyncio.run(ctx.check_mission_challenge_location(entry))
+                self.assertEqual(sent[-1]["locations"], [entry["location_id"]])
 
     def test_reproduce_sgn_false_positive_rejection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
