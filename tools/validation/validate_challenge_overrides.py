@@ -17,6 +17,15 @@ from pathlib import Path
 # Add root to sys.path to import from challenge_registry
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from challenge_registry import load_challenge_registry
+from tools.decls.mission_challenge_decl_builder import (
+    AGGREGATE_LIST_PATH,
+    NO_REWARD_CONTAINER,
+    NO_REWARD_CONTAINER_DECL,
+    NO_REWARD_CONTAINER_PATH,
+    _aggregate_contracts,
+    _challenge_paths,
+    _level_blocks,
+)
 
 
 def _load_registry(registry_path: Path) -> list[dict]:
@@ -142,7 +151,59 @@ def validate_overrides_from_mod_root(
     overrides = _find_override_files(mod_root)
     if not overrides:
         return ["No mission challenge override files found under mod root"]
-    return validate_overrides_from_files(list(overrides.values()), registry_path)
+    errors = validate_overrides_from_files(list(overrides.values()), registry_path)
+    registry = load_challenge_registry(registry_path)
+    decl_root = mod_root / "gameresources" / "generated" / "decls"
+    aggregate_path = decl_root / AGGREGATE_LIST_PATH
+    container_path = decl_root / NO_REWARD_CONTAINER_PATH
+    if not aggregate_path.is_file():
+        errors.append(f"Missing aggregate Mission Challenge override: {AGGREGATE_LIST_PATH}")
+        return errors
+    if not container_path.is_file():
+        errors.append(f"Missing aggregate no-reward container: {NO_REWARD_CONTAINER_PATH}")
+        return errors
+    if container_path.read_text(encoding="utf-8") != NO_REWARD_CONTAINER_DECL:
+        errors.append("Aggregate no-reward container contract drift")
+
+    aggregate_source = aggregate_path.read_text(encoding="utf-8")
+    blocks = [
+        (index, block)
+        for index, _, _, block in _level_blocks(aggregate_source)
+        if "_dev_" not in block
+    ]
+    matched_indexes: set[int] = set()
+    forbidden_rewards = re.compile(
+        r"\bCURRENCY_|inventoryItemReward|currencyToGive|"
+        r"gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]"
+    )
+    for contract in _aggregate_contracts(registry):
+        matches = [
+            (index, block)
+            for index, block in blocks
+            if set(_challenge_paths(block)) == set(contract["unlockables"])
+        ]
+        if len(matches) != 1:
+            errors.append(
+                f"{contract['name']}: packaged aggregate owner count is {len(matches)}"
+            )
+            continue
+        index, block = matches[0]
+        matched_indexes.add(index)
+        if block.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";') != 1:
+            errors.append(f"{contract['name']}: aggregate suppression is missing")
+        if forbidden_rewards.search(block):
+            errors.append(f"{contract['name']}: aggregate retains a vanilla reward")
+    if len(matched_indexes) != len(registry["all_mission_challenges"]):
+        errors.append("Packaged aggregate suppression set is incomplete")
+
+    protected_paths = (
+        "propitem/propitem/batteries/sentinel_battery.decl",
+        "entitydef/interact/hub/battery_socket_for_engine.decl",
+    )
+    for protected in protected_paths:
+        if (decl_root / protected).exists():
+            errors.append(f"Protected Sentinel Battery contract was overridden: {protected}")
+    return errors
 
 
 def main() -> int:
