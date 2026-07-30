@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "release": "v0.3.6-alpha",
-  "publisher_key": "nekravol_part_ii_mission_complete",
-  "event_filename": "ap_mission_nekravol_part_ii_complete.txt",
-  "marker": "AP_MISSION_EVENT_NEKRAVOL_PART_II_COMPLETE",
+  "release": "v0.3.7-alpha",
+  "publisher_key": "urdak_mission_complete",
+  "event_filename": "ap_mission_urdak_complete.txt",
+  "marker": "AP_MISSION_EVENT_URDAK_COMPLETE",
   "event_target": "ap_campaign_goal_event",
-  "owner": "game_target_level_transition_1",
-  "source": "vanillamaps/e3m2_hell_b.map",
-  "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
-  "destination_map": "game/sp/e3m3_maykr/e3m3_maykr"
+  "owner": "temp_all_scripting_target_level_transition_1",
+  "source": "vanillamaps/e3m3_maykr.map",
+  "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
+  "destination_map": "game/sp/e3m4_boss/e3m4_boss"
 }

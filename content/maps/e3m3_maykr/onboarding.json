@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m3_maykr",
+  "status": "static_candidate",
+  "source": {
+    "path": "vanillamaps/e3m3_maykr.map",
+    "size": 9512155,
+    "sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+    "owner_payload_sha256": "04d63610adec916cae6310e45fa8cbbbcf2971bd27a324de606c69a61a449df9",
+    "owner_payload_decompressed_match": true,
+    "ap_markers_absent": true,
+    "structurally_parsed": true,
+    "entity_count": 9146
+  },
+  "owner": {
+    "resource": "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources",
+    "status": "packagemapspec_winner"
+  },
+  "onboarding_evidence": {
+    "source": "packagemapspec",
+    "winner": "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources",
+    "candidates": {
+      "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources": 24,
+      "game/sp/e3m3_maykr/e3m3_maykr_patch1.resources": 155,
+      "game/sp/e3m3_maykr/e3m3_maykr_patch2.resources": 173,
+      "game/sp/e3m3_maykr/e3m3_maykr.resources": 243
+    },
+    "packagemapspec_sha256": "82e6981fa6b83a7134c306cb3e3ff5e5f02567ccaf173fa737144b2f087a62c6",
+    "priority_rule": "lowest packagemapspec files-array index wins"
+  },
+  "category_audit": {
+    "praetor_suit_tokens": 2,
+    "sentinel_batteries": 0,
+    "sentinel_crystals": 0,
+    "runes": 0,
+    "extra_lives": 3,
+    "toys": 3,
+    "albums": 2,
+    "codex_entries": 4,
+    "cheat_codes": 1,
+    "slayer_keys": 0,
+    "slayer_gate_completions": 0,
+    "mastery_tokens": 2,
+    "secret_encounters": 2,
+    "mission_challenges": 3,
+    "all_challenges_aggregate": 1,
+    "mission_complete": 1,
+    "automap_stations_excluded": 1
+  },
+  "candidate_inventory": [
+    {"entity": "exit_maintenance_progress_mastery_token_weapon_1_e3m3", "class": "idProp2", "transform": [64.0, 294.0, -129.299973], "target_chain": [], "vanilla_reward": "propitem/mastery_token/weapon", "decision": "include", "reason": "physical Mastery Token; grant removed by generic pickup conversion"},
+    {"entity": "blue_control_tower_progress_cheats_powerup_infinite_berserk_1", "class": "idProp2", "transform": [-312.500031, 751.399963, -106.949997], "target_chain": [], "vanilla_reward": "cheatcode_infinite_berserk_powerup", "decision": "include", "reason": "physical Cheat Code"},
+    {"entity": "temp_all_scripting_pickup_extra_life_extra_life_1_2_e3m3", "class": "idProp2", "transform": [70.8000031, 195.5, -150.500015], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life"},
+    {"entity": "temp_all_scripting_progress_mastery_token_weapon_1_e3m3", "class": "idProp2", "transform": [110.0, -125.0, -108.5], "target_chain": [], "vanilla_reward": "propitem/mastery_token/weapon", "decision": "include", "reason": "physical Mastery Token; grant removed by generic pickup conversion"},
+    {"entity": "temp_all_scripting_pickup_collectible_toys_khan_maykr_1", "class": "idProp2", "transform": [-24.8999977, 393.700043, -153.700043], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/khan_maykr", "decision": "include", "reason": "physical Toy"},
+    {"entity": "temp_all_scripting_pickup_extra_life_extra_life_1_1_e3m3", "class": "idProp2", "transform": [110.119995, 410.000031, -187.979996], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life"},
+    {"entity": "temp_all_scripting_pickup_collectible_toys_zombie_maykr_1", "class": "idProp2", "transform": [137.860107, 576.399902, -151.720001], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/zombie_maykr", "decision": "include", "reason": "physical Toy"},
+    {"entity": "temp_all_scripting_pickup_collectible_albums_album_15_1", "class": "idProp2", "transform": [81.399971, 154.899994, -156.799988], "target_chain": [], "vanilla_reward": "propitem/collectible/albums/album_15", "decision": "include", "reason": "physical Album"},
+    {"entity": "temp_all_scripting_pickup_collectible_albums_album_16_1", "class": "idProp2", "transform": [84.3299561, 252.919952, -133.779999], "target_chain": [], "vanilla_reward": "propitem/collectible/albums/album_16", "decision": "include", "reason": "physical Album"},
+    {"entity": "temp_all_scripting_progress_praetor_token_6_e3m3", "class": "idInteractable_GiveItems", "transform": [-197.939957, 476.540039, -149.0], "target_chain": [], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "physical Praetor Suit Token"},
+    {"entity": "temp_all_scripting_progress_praetor_token_1_e3m3", "class": "idInteractable_GiveItems", "transform": [-357.500122, 722.409607, -149.639908], "target_chain": [], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "physical Praetor Suit Token"},
+    {"entity": "temp_all_scripting_pickup_extra_life_extra_life_1_1_e3m4", "class": "idProp2", "transform": [488.940033, 687.600281, -112.799995], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life despite inherited Final Sin entity suffix"},
+    {"entity": "temp_all_scripting_pickup_collectible_toys_pinky_spectre_1", "class": "idProp2", "transform": [772.399536, 452.399719, -82.3400192], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/pinky_spectre", "decision": "include", "reason": "physical Toy"},
+    {"entity": "codex_progress_codex_4_e3m3", "class": "idProp2", "transform": [31.7199898, 293.079956, -116.389999], "target_chain": [], "vanilla_reward": "propitem/codex/maykr/khan_maykr", "decision": "include", "reason": "physical Codex entry"},
+    {"entity": "codex_progress_codex_2_e3m3", "class": "idProp2", "transform": [227.440063, -467.360077, -73.1999969], "target_chain": [], "vanilla_reward": "propitem/codex/maykr/urdak_1", "decision": "include", "reason": "physical Codex entry"},
+    {"entity": "codex_progress_codex_5_e3m3", "class": "idProp2", "transform": [99.3399963, 175.009933, -161.399994], "target_chain": [], "vanilla_reward": "propitem/codex/hell/icon_of_sin", "decision": "include", "reason": "physical Codex entry"},
+    {"entity": "codex_progress_codex_3_e3m3", "class": "idProp2", "transform": [144.580002, 542.640015, -157.979996], "target_chain": [], "vanilla_reward": "propitem/codex/maykr/maykr_angels", "decision": "include", "reason": "physical Codex entry"},
+    {"entity": "temp_all_scripting_encounter_manager_17", "class": "idEncounterManager", "transform": null, "target_chain": ["completion event item[5]"], "vanilla_reward": "native Secret Encounter completion", "decision": "include", "reason": "generic Secret Encounter completion hook"},
+    {"entity": "temp_all_scripting_encounter_manager_15", "class": "idEncounterManager", "transform": null, "target_chain": ["completion event item[4]"], "vanilla_reward": "native Secret Encounter completion", "decision": "include", "reason": "generic Secret Encounter completion hook"},
+    {"entity": "unlockable/mission_challenge/e3m3/challenge_1.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_DOOM_TOY_FOUND >= 1"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
+    {"entity": "unlockable/mission_challenge/e3m3/challenge_2.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_AERIAL_KILLS >= 12"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
+    {"entity": "unlockable/mission_challenge/e3m3/challenge_3.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_CHARGEBALL_MATCH_WON >= 5"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
+    {"entity": "Urdak challenge aggregate", "class": "AP aggregate", "transform": null, "target_chain": [7770407, 7770408, 7770409], "vanilla_reward": "native mission-list aggregate Sentinel Battery", "decision": "include", "reason": "server-authoritative checked-locations aggregate; generic aggregate override strips only the vanilla reward"},
+    {"entity": "temp_all_scripting_target_level_transition_1", "class": "idTarget_LevelTransition", "transform": [241.0, 1561.59998, -65.2000046], "target_chain": ["game/sp/e3m4_boss/e3m4_boss"], "vanilla_reward": "native transition to Final Sin boundary", "decision": "include", "reason": "Mission Complete terminal and sole campaign-goal publisher; native transition remains owned by the original entity"},
+    {"entity": "temple_interior_interact_automap_1_e3m3", "class": "idInteractable_Automap", "transform": [84.7400055, -124.989998, -124.320023], "target_chain": [], "vanilla_reward": "STAT_AUTOMAP", "decision": "exclude", "reason": "Automap Station excluded by existing repository policy"},
+    {"entity": "cine_light_slayer_key1", "class": "idLight", "transform": [110.341583, 522.371277, 4.30957699], "target_chain": [], "vanilla_reward": "none", "decision": "exclude", "reason": "cosmetic cinematic light; not a functional Slayer Key or player reward"},
+    {"entity": "temp_all_scripting_trigger_level_transition", "class": "idTrigger", "transform": [107.900002, 1559.6001, -148.800003], "target_chain": [], "vanilla_reward": "none", "decision": "exclude", "reason": "scripted progression collision volume; native terminal owner provides the Mission Complete contract"},
+    {"entity": "temp_all_scripting_target_relay_65", "class": "idTarget_Count", "transform": [241.0, 1562.0, -65.2000046], "target_chain": ["temp_all_scripting_target_level_transition_1"], "vanilla_reward": "native delayed transition relay", "decision": "exclude", "reason": "scripted progression relay preserved unchanged; terminal transition owner is the unambiguous runtime boundary"}
+  ],
+  "vanilla_guards": {
+    "forbidden_ap_terms": ["automap station"],
+    "required_source_edge": {
+      "from": "temp_all_scripting_target_level_transition_1",
+      "to": "maps/game/sp/e3m4_boss/e3m4_boss.map"
+    },
+    "excluded_entities": [
+      "temple_interior_interact_automap_1_e3m3",
+      "cine_light_slayer_key1",
+      "temp_all_scripting_trigger_level_transition",
+      "temp_all_scripting_target_relay_65"
+    ]
+  },
+  "checks": [
+    "source hash locked and byte-identical to decompressed patch3 owner payload",
+    "packagemapspec owner priority proven; lower files-array index wins",
+    "all pickup transforms sourced from vanilla entities",
+    "each converted physical reward owner is removed and replaced by one independent AP entity",
+    "Automap remains vanilla and non-public",
+    "no functional Slayer Key or Slayer Gate reward candidate exists in the authoritative payload",
+    "Mission Complete preserves the exact native transition to Final Sin",
+    "Mission Complete location effect precedes the separate campaign goal effect",
+    "Mission Challenge rewards use the existing scoped currency neutralizer",
+    "All Mission Challenges aggregate reward uses the generic data-driven suppressor"
+  ]
+}

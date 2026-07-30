@@ -30,6 +30,12 @@ class APWorldIconTests(unittest.TestCase):
             )
             with zipfile.ZipFile(output) as archive:
                 self.assertIn("doometernal/doom_logo.png", archive.namelist())
+                self.assertFalse(
+                    any(
+                        "test" in Path(name).parts
+                        for name in archive.namelist()
+                    )
+                )
 
 
 if __name__ == "__main__":

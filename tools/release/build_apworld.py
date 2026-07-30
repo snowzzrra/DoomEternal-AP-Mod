@@ -28,13 +28,15 @@ def main() -> None:
     ) as archive:
         archive.writestr("archipelago.json", json.dumps(manifest))
         for path in sorted(source.rglob("*")):
+            relative = path.relative_to(source)
             if (
                 not path.is_file()
                 or "__pycache__" in path.parts
                 or path.suffix == ".pyc"
+                or "test" in relative.parts
             ):
                 continue
-            archive.write(path, Path(source.name) / path.relative_to(source))
+            archive.write(path, Path(source.name) / relative)
 
 
 if __name__ == "__main__":

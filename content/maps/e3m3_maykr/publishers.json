@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "urdak_mission_complete",
+      "map_key": "e3m3_maykr",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "temp_all_scripting_target_level_transition_1",
+          "filename": "ap_mission_urdak_complete.txt",
+          "marker": "AP_MISSION_EVENT_URDAK_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "temp_all_scripting_target_level_transition_1"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m3_maykr/e3m3_maykr",
+          "to_map": "game/sp/e3m4_boss/e3m4_boss"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770411
+        },
+        {
+          "strategy": "campaign_goal"
+        }
+      ],
+      "dedupe_scope": "urdak_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.7-alpha.1",
+      "reason": "Urdak added as v0.3.7 AP content"
+    }
+  ],
+  "asset_package_contract_sha256": "a9083c41882b9d3ab2fbc8a357fa18d554d70acd71af411e51370dd96bd06995",
+  "byte_sha256": "f07302dc2331a384d4c32bb649a3b98350bd8c1c44c986b6e0f684f5a04bc715",
+  "content_revision": "v0.3.7-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 400,
+    "byte_size": 9787066,
+    "classes": 9628,
+    "entity_count": 9654,
+    "layers": 2025,
+    "targets": 7269,
+    "transforms": 20053,
+    "unique_entity_names": 9629
+  },
+  "manifest_sha256": "c151cebe8c1a411b5b0ee79191cf9f7d21ce5c48ee7e4ed29eedfd5cd851d78d",
+  "map_key": "e3m3_maykr",
+  "physical_ap_ids": [
+    7770388,
+    7770389,
+    7770390,
+    7770391,
+    7770392,
+    7770393,
+    7770394,
+    7770395,
+    7770396,
+    7770397,
+    7770398,
+    7770399,
+    7770400,
+    7770401,
+    7770402,
+    7770403,
+    7770404,
+    7770405,
+    7770406
+  ],
+  "publisher_contract_sha256": "8229311f94fee26cbbed68b2ca7304baf1cfa87cf1aeb171d3e99281ad4080a4",
+  "runtime_location_ids": [
+    7770407,
+    7770408,
+    7770409,
+    7770410,
+    7770411
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "24d4c88a52f591129912a34df1a99e1c8151a342b0e5dc1ecdc85bf5842371cc",
+  "semantic_sha256": "226436e2a8d39198c00bf56ed187f336c6fe7cea56f6efb228f6d70f85daef12"
+}
