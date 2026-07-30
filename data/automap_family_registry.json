@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evidence": {
-    "maps": "vanillamaps/{e1m1_intro,e1m2_war,hub,e1m3_cult,e1m4_boss,e2m1_nest,e2m2_base,e2m3_core,e2m4_boss}.map",
+    "maps": "vanillamaps/{e1m1_intro,e1m2_war,hub,e1m3_cult,e1m4_boss,e2m1_nest,e2m2_base,e2m3_core,e2m4_boss,e3m1_slayer,e3m2_hell,e3m2_hell_b}.map",
     "base_decls": "../Tools/gameresources_decl_analysis_20260710_201519/files/generated/decls",
     "patch_decls": "../Tools/gameresources_patch2_decl_analysis_20260710_210928.zip",
     "package_order": "DOOMEternal/base/packagemapspec.json",
@@ -11,7 +11,10 @@
       "game/hub/hub_patch2.resources",
       "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
       "game/sp/e2m3_core/e2m3_core_patch2.resources",
-      "game/sp/e2m4_boss/e2m4_boss_patch2.resources"
+      "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+      "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
+      "game/sp/e3m2_hell/e3m2_hell_patch2.resources",
+      "game/sp/e3m2_hell_b/e3m2_hell_b_patch2.resources"
     ]
   },
   "families": {
@@ -366,7 +369,10 @@
           7770210,
           7770248,
           7770289,
-          7770290
+          7770290,
+          7770337,
+          7770362,
+          7770387
         ]
       },
       "vanilla_class": "save transition reader",
@@ -429,7 +435,19 @@
           7770285,
           7770286,
           7770287,
-          7770288
+          7770288,
+          7770333,
+          7770334,
+          7770335,
+          7770336,
+          7770358,
+          7770359,
+          7770360,
+          7770361,
+          7770383,
+          7770384,
+          7770385,
+          7770386
         ]
       },
       "vanilla_class": "native mission-challenge record reader",

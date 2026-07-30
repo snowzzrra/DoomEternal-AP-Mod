@@ -28,11 +28,12 @@ class NativeChallengeContracts(unittest.TestCase):
                 7770206, 7770207, 7770208, 7770209,
                 7770244, 7770245, 7770246, 7770247,
                 7770285, 7770286, 7770287, 7770288, 7770289, 7770290,
+                *range(7770333, 7770338),
+                *range(7770358, 7770363),
+                *range(7770383, 7770388),
             },
         )
-        self.assertEqual(
-            [(entry["name"], entry["location_id"]) for entry in registry["mission_challenges"]],
-            [
+        legacy_challenges = [
                 ("Cultist Base - Mission Challenge - Pull the Crystal", 7770138),
                 ("Cultist Base - Mission Challenge - Armored Rain", 7770139),
                 ("Cultist Base - Mission Challenge - Master of Turrets", 7770140),
@@ -48,10 +49,23 @@ class NativeChallengeContracts(unittest.TestCase):
                 ("Mars Core - Mission Challenge - Big Ba-Da Boom", 7770285),
                 ("Mars Core - Mission Challenge - Disarmament", 7770286),
                 ("Mars Core - Mission Challenge - Lock and Key", 7770287),
-            ],
+        ]
+        challenge_pairs = [
+            (entry["name"], entry["location_id"])
+            for entry in registry["mission_challenges"]
+        ]
+        self.assertEqual(challenge_pairs[:len(legacy_challenges)], legacy_challenges)
+        self.assertEqual(len(challenge_pairs), 24)
+        self.assertEqual(
+            {location_id for _name, location_id in challenge_pairs[15:]},
+            {
+                *range(7770333, 7770336),
+                *range(7770358, 7770361),
+                *range(7770383, 7770386),
+            },
         )
         self.assertEqual(
-            len(registry["all_mission_challenges"]), 5,
+            len(registry["all_mission_challenges"]), 8,
         )
         self.assertEqual(
             registry["all_mission_challenges"][0],
@@ -123,6 +137,26 @@ class NativeChallengeContracts(unittest.TestCase):
                 },
             },
         )
+        package_challenges = registry["mission_challenges"][15:]
+        package_aggregates = registry["all_mission_challenges"][5:]
+        self.assertEqual(
+            {entry["location_id"] for entry in package_aggregates},
+            {7770336, 7770361, 7770386},
+        )
+        for aggregate in package_aggregates:
+            with self.subTest(aggregate=aggregate["name"]):
+                children = [
+                    entry["location_id"]
+                    for entry in package_challenges
+                    if entry["mission_key"] == aggregate["mission_key"]
+                ]
+                self.assertEqual(aggregate["strategy"], "aggregate")
+                self.assertEqual(aggregate["signal"], {
+                    "kind": "aggregate",
+                    "children": children,
+                    "required_count": len(children),
+                    "authority": "server_checked_locations",
+                })
         self.assertEqual(len(registry["weapon_masteries"]), 13)
         self.assertEqual(
             [entry["name"] for entry in registry["weapon_masteries"]],
@@ -210,15 +244,21 @@ class NativeChallengeContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             audit = build_mission_challenge_overrides(root)
-            self.assertEqual(
-                audit["location_ids"],
-                [
+            legacy_ids = [
                     7770138, 7770139, 7770140,
                     7770172, 7770173, 7770174,
                     7770206, 7770207, 7770208,
                     7770244, 7770245, 7770246,
                     7770285, 7770286, 7770287,
-                ],
+            ]
+            self.assertEqual(audit["location_ids"][:len(legacy_ids)], legacy_ids)
+            self.assertEqual(
+                set(audit["location_ids"][len(legacy_ids):]),
+                {
+                    *range(7770333, 7770336),
+                    *range(7770358, 7770361),
+                    *range(7770383, 7770386),
+                },
             )
             self.assertEqual(audit["aggregate_reward_suppression"], {
                 "strategy": "child_currencyToGive_num_zero",
@@ -229,7 +269,10 @@ class NativeChallengeContracts(unittest.TestCase):
                 ],
                 "runtime_evidence": "v0.3.0c.1",
             })
-            self.assertEqual(len(audit["written_paths"]), 15)
+            self.assertEqual(
+                len(audit["written_paths"]),
+                len(registry["mission_challenges"]),
+            )
             for entry in registry["mission_challenges"]:
                 source = (
                     ROOT / "vanilla_decls" / "owners" / "gameresources" /

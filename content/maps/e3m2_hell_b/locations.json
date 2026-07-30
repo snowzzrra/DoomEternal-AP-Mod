@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m2_hell_b",
+  "level": "e3m2_hell_b",
+  "region": "Nekravol Part II",
+  "entities": {
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_TYRANT_1": 7770363,
+    "AP_CHECK_GAME_PROGRESS_CODEX_3_E3M2B": 7770364,
+    "AP_CHECK_GAME_PROGRESS_CODEX_2_E3M2B": 7770365,
+    "AP_CHECK_GAME_PROGRESS_CODEX_1_E3M2B": 7770366,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M2B": 7770367,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_14_1": 7770368,
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1": 7770369,
+    "AP_CHECK_PICKUPS_PROGRESS_CHEATS_CONFETTI_INSTAGIB_1": 7770370,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_13_1": 7770371,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_DREADKNIGHT_1": 7770372,
+    "AP_CHECK_PICKUPS_PROGRESS_CHEATS_ONE_SHOT_STAGGER_1": 7770373,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770374,
+    "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_693519488_E3M2_B": 7770375,
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_ARCHVILE_1": 7770376,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M2B": 7770377,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_4_E3M2B": 7770378,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_3_E3M2B": 7770379,
+    "AP_CHECK_VIS_PROGRESS_PRAETOR_TOKEN_1_E3M2B": 7770380
+  },
+  "names": {
+    "7770363": "Nekravol Part II - Toy - Tyrant",
+    "7770364": "Nekravol Part II - Fuel the Eternal Flame Part III Codex",
+    "7770365": "Nekravol Part II - Fuel the Eternal Flame Part II Codex",
+    "7770366": "Nekravol Part II - Nekravol Part II Codex",
+    "7770367": "Nekravol Part II - Extra Life 1",
+    "7770368": "Nekravol Part II - Album 1",
+    "7770369": "Nekravol Part II - Mastery Token",
+    "7770370": "Nekravol Part II - Cheat Code - Party Mode",
+    "7770371": "Nekravol Part II - Album 2",
+    "7770372": "Nekravol Part II - Toy - Dread Knight",
+    "7770373": "Nekravol Part II - Cheat Code - Instant Stagger Mode",
+    "7770374": "Nekravol Part II - Extra Life 2",
+    "7770375": "Nekravol Part II - Sentinel Crystal",
+    "7770376": "Nekravol Part II - Toy - Archvile",
+    "7770377": "Nekravol Part II - Extra Life 3",
+    "7770378": "Nekravol Part II - Praetor Suit Token 1",
+    "7770379": "Nekravol Part II - Praetor Suit Token 2",
+    "7770380": "Nekravol Part II - Praetor Suit Token 3",
+    "7770381": "Nekravol Part II - Secret Encounter 1",
+    "7770382": "Nekravol Part II - Secret Encounter 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "pickups_progress_argent_cell_1_693519488_e3m2_b": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": ["pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b": []
+      },
+      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+    }
+  },
+  "remove_entities": [],
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M2_B_1",
+      "location_id": 7770381,
+      "manager": "ai_encounter_manager_towertop_secret",
+      "after_event_index": 6,
+      "automap_owner": "automap_info_null_secret_encounter_1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M2_B_2",
+      "location_id": 7770382,
+      "manager": "ai_encounter_manager_conveyor_secret",
+      "after_event_index": 5,
+      "automap_owner": "automap_info_null_secret_encounter_2"
+    }
+  ]
+}

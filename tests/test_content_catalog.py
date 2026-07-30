@@ -10,10 +10,13 @@ import pytest
 
 from challenge_registry import challenge_registry_document, validate_challenge_registry
 from content_catalog import _map_content_packages, discover_maps, load_content_catalog
-from map_registry import generation_plan, load_map_registry
+from map_registry import generation_plan, load_map_registry, release_plan
 from publisher_contracts import publishers_by_trigger
 from tools.content.new_map import create_package
 from tools.content.compile_content_catalog import render
+
+
+ROOT = Path(__file__).parents[1]
 
 
 @pytest.mark.parametrize("map_spec", discover_maps(), ids=lambda item: item.key)
@@ -31,6 +34,30 @@ def test_catalog_locations_and_assets_are_generic(content_catalog, generated_con
     assert all(item.ap_check.startswith("AP_CHECK_") for item in catalog.physical_locations)
     assert all("_patch" not in item.resource_base for item in catalog.assets)
     assert render(catalog) == generated_content_snapshot
+
+
+def test_enabled_catalog_matches_release_plan_and_authorial_surfaces(content_catalog) -> None:
+    specs = tuple(content_catalog.enabled_maps())
+    catalog_keys = [spec.key for spec in specs]
+    assert [
+        plan.map_key
+        for plan in release_plan(load_map_registry(authorial=True))
+    ] == catalog_keys
+    for spec in specs:
+        assert spec.manifest_path.is_file()
+        assert (ROOT / "baselines" / "maps" / f"{spec.key}.json").is_file()
+        package = spec.data.get("package_directory")
+        if package:
+            assert {
+                path.name for path in (ROOT / package).glob("*.json")
+            } == {
+                "assets.json",
+                "descriptor.json",
+                "locations.json",
+                "onboarding.json",
+                "publishers.json",
+                "runtime.json",
+            }
 
 
 def test_synthetic_fixture_is_data_only(discovered_map_specs) -> None:

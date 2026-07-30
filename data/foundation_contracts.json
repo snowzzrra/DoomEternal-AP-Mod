@@ -9,6 +9,8 @@
     "e2m3_core": "game/sp/e2m3_core/e2m3_core",
     "e2m4_boss": "game/sp/e2m4_boss/e2m4_boss",
     "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
+    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
+    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
     "hub": "game/hub/hub"
   },
   "bootstrap_test_entrypoints": {
@@ -18,11 +20,11 @@
   },
   "counts": {
     "items": 116,
-    "locations": 291,
-    "map_checks": 245,
+    "locations": 339,
+    "map_checks": 283,
     "route_sentinel_batteries": 21,
     "runtime_goals": 1,
-    "runtime_locations": 46
+    "runtime_locations": 56
   },
   "family_primitives": {
     "currency": "currency_grant_direct",

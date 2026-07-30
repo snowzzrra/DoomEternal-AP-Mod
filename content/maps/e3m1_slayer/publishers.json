@@ -56,9 +56,6 @@
       ],
       "effects": [
         {
-          "strategy": "campaign_goal"
-        },
-        {
           "strategy": "preserved_native_target",
           "target": "ai_target_level_transition_1"
         }

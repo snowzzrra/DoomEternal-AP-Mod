@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "nekravol_part_ii_mission_complete",
+      "map_key": "e3m2_hell_b",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "game_target_level_transition_1",
+          "filename": "ap_mission_nekravol_part_ii_complete.txt",
+          "marker": "AP_MISSION_EVENT_NEKRAVOL_PART_II_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_target_level_transition_1"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+          "to_map": "game/sp/e3m3_maykr/e3m3_maykr"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770387
+        },
+        {
+          "strategy": "campaign_goal"
+        }
+      ],
+      "dedupe_scope": "nekravol_part_ii_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

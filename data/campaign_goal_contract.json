@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "release": "v0.3.5-alpha",
-  "publisher_key": "taras_nabad_campaign_goal",
-  "event_filename": "ap_goal_taras_nabad_complete.txt",
-  "marker": "AP_GOAL_EVENT_TARAS_NABAD_COMPLETE",
+  "release": "v0.3.6-alpha",
+  "publisher_key": "nekravol_part_ii_mission_complete",
+  "event_filename": "ap_mission_nekravol_part_ii_complete.txt",
+  "marker": "AP_MISSION_EVENT_NEKRAVOL_PART_II_COMPLETE",
   "event_target": "ap_campaign_goal_event",
-  "owner": "game_map_exit_level_transition_relay_852698944",
-  "source": "vanillamaps/e3m1_slayer.map",
-  "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
-  "destination_map": "game/hub/hub"
+  "owner": "game_target_level_transition_1",
+  "source": "vanillamaps/e3m2_hell_b.map",
+  "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+  "destination_map": "game/sp/e3m3_maykr/e3m3_maykr"
 }

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m2_hell",
+  "level": "e3m2_hell",
+  "region": "Nekravol",
+  "entities": {
+    "AP_CHECK_PICKUPS_PROGRESS_CHEATS_NO_HEALTH_ARMOR_DROPS_1": 7770340,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M2": 7770341,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E3M2": 7770342,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_BARON_OF_HELL_1": 7770343,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E3M2": 7770344,
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M2": 7770345,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M2": 7770346,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E3M2": 7770347,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E3M2": 7770348,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_GLADIATOR_1": 7770349,
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_2_E3M2": 7770350,
+    "AP_CHECK_PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E3M2": 7770351,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_12_1": 7770352,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_DOOM_HUNTER_1": 7770353,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M3": 7770354,
+    "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1984538249": 7770355
+  },
+  "names": {
+    "7770340": "Nekravol - Cheat Code - Famine Mode",
+    "7770341": "Nekravol - Extra Life 1",
+    "7770342": "Nekravol - Praetor Suit Token 1",
+    "7770343": "Nekravol - Toy - Baron of Hell",
+    "7770344": "Nekravol - Praetor Suit Token 2",
+    "7770345": "Nekravol - Mastery Token 1",
+    "7770346": "Nekravol - Extra Life 2",
+    "7770347": "Nekravol - Nekravol Part I Codex",
+    "7770348": "Nekravol - Fuel the Eternal Flame Part I Codex",
+    "7770349": "Nekravol - Toy - Gladiator",
+    "7770350": "Nekravol - Mastery Token 2",
+    "7770351": "Nekravol - Praetor Suit Token 3",
+    "7770352": "Nekravol - Album",
+    "7770353": "Nekravol - Toy - Doom Hunter",
+    "7770354": "Nekravol - Extra Life 3",
+    "7770355": "Nekravol - Sentinel Crystal",
+    "7770356": "Nekravol - Secret Encounter 1",
+    "7770357": "Nekravol - Secret Encounter 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "pickups_progress_cheats_no_health_armor_drops_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [],
+      "drop_targets": []
+    },
+    "pickups_progress_argent_cell_1_1984538249": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": ["pickups_destructible_interact_argent_cell_1_1984538249"],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "pickups_destructible_interact_argent_cell_1_1984538249": []
+      },
+      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+    }
+  },
+  "remove_entities": [],
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M2_1",
+      "location_id": 7770356,
+      "manager": "ai_encounter_manager_torture2_secret_e3m2",
+      "after_event_index": 5,
+      "automap_owner": "automap_info_null_secret_encounter1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M2_2",
+      "location_id": 7770357,
+      "manager": "ai_encounter_manager_torture1_secret_e3m2",
+      "after_event_index": 4,
+      "automap_owner": "automap_info_null_secret_encounter2"
+    }
+  ]
+}
