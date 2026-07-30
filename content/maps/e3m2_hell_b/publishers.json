@@ -25,9 +25,6 @@
         {
           "strategy": "location_check",
           "location_id": 7770387
-        },
-        {
-          "strategy": "campaign_goal"
         }
       ],
       "dedupe_scope": "nekravol_part_ii_mission_complete_location",

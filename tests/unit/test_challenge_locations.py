@@ -26,23 +26,39 @@ from tools.validation.validate_challenge_overrides import validate_overrides_fro
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def _package_runtime_locations(category: str) -> list[dict]:
+    entries = []
+    for path in sorted((ROOT / "content" / "maps").glob("*/runtime.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        entries.extend(
+            entry for entry in document["locations"]
+            if entry["category"] == category
+        )
+    return entries
+
+
 class NativeChallengeContracts(unittest.TestCase):
     def test_registry_contains_only_proven_runtime_locations(self):
         registry = load_challenge_registry()
         entries = all_location_entries(registry)
+        legacy = load_challenge_registry(
+            ROOT / "data" / "challenge_location_registry.json"
+        )
+        expected_ids = {
+            entry["location_id"]
+            for entry in all_location_entries(legacy)
+        } | {
+            entry["location_id"]
+            for category in (
+                "mission_challenges",
+                "all_mission_challenges",
+                "mission_complete",
+            )
+            for entry in _package_runtime_locations(category)
+        }
         self.assertEqual(
             {entry["location_id"] for entry in entries},
-            {
-                7770122, 7770123, 7770124, 7770162, 7770210, 7770248,
-                *range(7770125, 7770142),
-                7770172, 7770173, 7770174, 7770175,
-                7770206, 7770207, 7770208, 7770209,
-                7770244, 7770245, 7770246, 7770247,
-                7770285, 7770286, 7770287, 7770288, 7770289, 7770290,
-                *range(7770333, 7770338),
-                *range(7770358, 7770363),
-                *range(7770383, 7770388),
-            },
+            expected_ids,
         )
         legacy_challenges = [
                 ("Cultist Base - Mission Challenge - Pull the Crystal", 7770138),
@@ -66,17 +82,28 @@ class NativeChallengeContracts(unittest.TestCase):
             for entry in registry["mission_challenges"]
         ]
         self.assertEqual(challenge_pairs[:len(legacy_challenges)], legacy_challenges)
-        self.assertEqual(len(challenge_pairs), 24)
+        package_challenge_ids = {
+            entry["location_id"]
+            for entry in _package_runtime_locations("mission_challenges")
+        }
         self.assertEqual(
-            {location_id for _name, location_id in challenge_pairs[15:]},
-            {
-                *range(7770333, 7770336),
-                *range(7770358, 7770361),
-                *range(7770383, 7770386),
-            },
+            len(challenge_pairs),
+            len(legacy_challenges) + len(package_challenge_ids),
         )
         self.assertEqual(
-            len(registry["all_mission_challenges"]), 8,
+            {
+                location_id for _name, location_id in challenge_pairs
+                if location_id in package_challenge_ids
+            },
+            package_challenge_ids,
+        )
+        package_aggregate_ids = {
+            entry["location_id"]
+            for entry in _package_runtime_locations("all_mission_challenges")
+        }
+        self.assertEqual(
+            len(registry["all_mission_challenges"]),
+            5 + len(package_aggregate_ids),
         )
         self.assertEqual(
             registry["all_mission_challenges"][0],
@@ -148,11 +175,17 @@ class NativeChallengeContracts(unittest.TestCase):
                 },
             },
         )
-        package_challenges = registry["mission_challenges"][15:]
-        package_aggregates = registry["all_mission_challenges"][5:]
+        package_challenges = [
+            entry for entry in registry["mission_challenges"]
+            if entry["location_id"] in package_challenge_ids
+        ]
+        package_aggregates = [
+            entry for entry in registry["all_mission_challenges"]
+            if entry["location_id"] in package_aggregate_ids
+        ]
         self.assertEqual(
             {entry["location_id"] for entry in package_aggregates},
-            {7770336, 7770361, 7770386},
+            package_aggregate_ids,
         )
         for aggregate in package_aggregates:
             with self.subTest(aggregate=aggregate["name"]):
@@ -266,9 +299,10 @@ class NativeChallengeContracts(unittest.TestCase):
             self.assertEqual(
                 set(audit["location_ids"][len(legacy_ids):]),
                 {
-                    *range(7770333, 7770336),
-                    *range(7770358, 7770361),
-                    *range(7770383, 7770386),
+                    entry["location_id"]
+                    for entry in _package_runtime_locations(
+                        "mission_challenges"
+                    )
                 },
             )
             aggregate_audit = audit["aggregate_reward_suppression"]

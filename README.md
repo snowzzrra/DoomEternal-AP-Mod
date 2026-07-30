@@ -14,17 +14,18 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current `v0.3.5-alpha` scope:
+Current `v0.3.7-alpha` scope:
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
   Nest -> Fortress visit 4 -> ARC Complex -> Fortress visit 5 -> Mars Core ->
-  Sentinel Prime -> Fortress visit 6 -> Taras Nabad -> Fortress visit 7`.
-- Public content: `245` generated map checks + `46` runtime locations = `291`
+  Sentinel Prime -> Fortress visit 6 -> Taras Nabad -> Fortress visit 7 ->
+  Nekravol -> Nekravol Part II -> Urdak`.
+- Public content: `302` generated map checks + `61` runtime locations = `363`
   Archipelago locations, plus `1` separate campaign goal.
-- The BFG-9000 and Super Shotgun remain vanilla scripted acquisitions.
-- Nekravol, Nekravol Part II, Urdak, Final Sin, DLC, Master Levels, Horde Mode,
-  enemy randomization, and final balancing remain future milestones.
+- `12` of the `13` base-campaign missions are supported. Final Sin is the only
+  remaining base mission; DLC, Master Levels, Horde Mode, enemy randomization,
+  and final balancing remain future milestones.
 
 The current alpha validates map checks, item delivery, DeathLink, save-derived
 locations, Fortress progression, runtime gating, and APWorld generation across
@@ -143,7 +144,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.5-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.7-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoAlpha.zip
@@ -171,15 +172,28 @@ configuration, seeds, logs, and local paths.
 
 - `randomize_chainsaw`, `randomize_dash`, and `randomize_first_battery`
   default to `false`; Dash remains experimental.
-- Super Shotgun and Meat Hook remain one vanilla scripted acquisition in
-  Cultist Base.
-- The BFG-9000 remains a vanilla cutscene acquisition in Mars Core.
 - Secret Encounters are normal AP locations on supported missions.
 - Mission Challenge and Weapon Mastery locations use native save state.
+- The generic All Mission Challenges override removes the vanilla aggregate
+  Sentinel Battery reward for every cataloged mission while preserving the
+  challenge HUD, native completion predicate, save state, and AP checks.
 - Weapon Point rewards remain vanilla until a safe revision-gated hook owns
   their conversion.
 - Received progression/useful/trap items use the Current major card; filler
   uses the lateral Codex card. Location feedback uses the Codex presentation.
+
+### Vanilla scripted weapon acquisitions
+
+These acquisitions remain fully vanilla in `v0.3.7-alpha`:
+
+- Super Shotgun — Cultist Base cutscene `5008`.
+- BFG-9000 — Mars Core cutscene `4701`.
+- Crucible — Taras Nabad cutscene `4137`.
+
+The cutscene IDs are recorded for future inventory-grant stripping. That work
+must remove only the weapon inventory grant while preserving each cutscene,
+animation, progression edge, script, and owning mission; it is not implemented
+in this release.
 
 ## Known probable issues
 

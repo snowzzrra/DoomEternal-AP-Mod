@@ -140,6 +140,29 @@ def entity_scalar(block: str, property_name: str) -> str | None:
     return match.group(1) if match else None
 
 
+def runtime_automap_families(families: dict) -> dict[int, str]:
+    """Classify runtime locations from their generated contract categories."""
+    challenge_registry = load_challenge_registry()
+    classified: dict[int, str] = {}
+    for family_name, family in families.items():
+        for category in family.get("match", {}).get("runtime_categories", []):
+            if category not in challenge_registry:
+                raise ValueError(
+                    f"Automap family {family_name} references unknown runtime category "
+                    f"{category}"
+                )
+            for entry in challenge_registry[category]:
+                location_id = entry["location_id"]
+                previous = classified.get(location_id)
+                if previous is not None:
+                    raise ValueError(
+                        f"Runtime location {location_id} overlaps Automap families "
+                        f"{previous} and {family_name}"
+                    )
+                classified[location_id] = family_name
+    return classified
+
+
 def validate_automap_family_registry(
     location_ids: dict[str, int], runtime_locations: set[int]
 ) -> list[str]:
@@ -219,12 +242,18 @@ def validate_automap_family_registry(
                 errors.append(f"Secret encounter {location_id} overlaps exact Automap family")
             classified[location_id] = "secret_encounters"
 
-    for location_id in runtime_locations:
-        family_name = exact_families.get(location_id)
-        if family_name not in {"runtime_mission", "runtime_mastery", "runtime_challenge"}:
-            errors.append(f"Runtime location {location_id} lacks exact Automap family")
-        else:
-            classified[location_id] = family_name
+    try:
+        runtime_families = runtime_automap_families(families)
+    except ValueError as exc:
+        errors.append(str(exc))
+        runtime_families = {}
+    if set(runtime_families) != runtime_locations:
+        errors.append(
+            "Runtime Automap family coverage drift: missing="
+            f"{sorted(runtime_locations - set(runtime_families))}, extra="
+            f"{sorted(set(runtime_families) - runtime_locations)}"
+        )
+    classified.update(runtime_families)
 
     all_location_values = set(location_ids.values())
     if set(classified) != all_location_values:

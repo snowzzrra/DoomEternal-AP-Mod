@@ -361,18 +361,8 @@
     },
     "runtime_mission": {
       "match": {
-        "location_ids": [
-          7770122,
-          7770123,
-          7770124,
-          7770162,
-          7770210,
-          7770248,
-          7770289,
-          7770290,
-          7770337,
-          7770362,
-          7770387
+        "runtime_categories": [
+          "mission_complete"
         ]
       },
       "vanilla_class": "save transition reader",
@@ -387,20 +377,8 @@
     },
     "runtime_mastery": {
       "match": {
-        "location_ids": [
-          7770125,
-          7770126,
-          7770127,
-          7770128,
-          7770129,
-          7770130,
-          7770131,
-          7770132,
-          7770133,
-          7770134,
-          7770135,
-          7770136,
-          7770137
+        "runtime_categories": [
+          "weapon_masteries"
         ]
       },
       "vanilla_class": "native unlockable record reader",
@@ -415,39 +393,9 @@
     },
     "runtime_challenge": {
       "match": {
-        "location_ids": [
-          7770138,
-          7770139,
-          7770140,
-          7770141,
-          7770172,
-          7770173,
-          7770174,
-          7770175,
-          7770206,
-          7770207,
-          7770208,
-          7770209,
-          7770244,
-          7770245,
-          7770246,
-          7770247,
-          7770285,
-          7770286,
-          7770287,
-          7770288,
-          7770333,
-          7770334,
-          7770335,
-          7770336,
-          7770358,
-          7770359,
-          7770360,
-          7770361,
-          7770383,
-          7770384,
-          7770385,
-          7770386
+        "runtime_categories": [
+          "mission_challenges",
+          "all_mission_challenges"
         ]
       },
       "vanilla_class": "native mission-challenge record reader",
