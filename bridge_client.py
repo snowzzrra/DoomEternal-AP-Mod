@@ -1399,6 +1399,14 @@ MISSION_CHALLENGE_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
     for entry in MISSION_CHALLENGE_ENTRIES
 }
+MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
+    entry["signal"]["unlockable"]: canonical_map_name(entry.get("runtime_map"))
+    for entry in MISSION_CHALLENGE_ENTRIES
+    if entry.get("runtime_map")
+}
+MISSION_CHALLENGE_RUNTIME_MAPS = frozenset(
+    MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.values()
+)
 ALL_MISSION_CHALLENGES_ENTRIES = list(
     CHALLENGE_LOCATION_REGISTRY.get("all_mission_challenges", [])
 )
@@ -2177,6 +2185,8 @@ class DoomEternalContext(CommonContext):
         # same-process, gameplay-loaded RuntimeObservationLease.
         self.runtime_observers_frozen = True
         self.runtime_observation_lease = RuntimeObservationLease()
+        self.mission_select_observation_map = None
+        self.mission_select_observation_epoch = None
         self.last_observer_lease_block = None
         self.save_candidate_tokens = {}
         self.last_save_slot_rejection = None
@@ -2251,8 +2261,10 @@ class DoomEternalContext(CommonContext):
             )
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
+            asyncio.create_task(self.check_mission_challenge_locations())
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.reconcile_checked_automap_cleanup("server_checked_update")
+            asyncio.create_task(self.check_mission_challenge_locations())
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             if (
@@ -2399,6 +2411,8 @@ class DoomEternalContext(CommonContext):
 
         def fail_proof(reason, details_map=None):
             self.runtime_observers_frozen = True
+            self.mission_select_observation_map = None
+            self.mission_select_observation_epoch = None
             self.log_save_proof_rejected(
                 reason,
                 evidence_slot=evidence.slot_directory if evidence else None,
@@ -2411,6 +2425,8 @@ class DoomEternalContext(CommonContext):
             return None
 
         def continue_authoritative_active():
+            if self.mission_select_observation_map:
+                return None
             if (
                 not getattr(self, "active_save_proof_authoritative", False)
                 or getattr(self, "active_save_proof_slot", None)
@@ -2480,7 +2496,40 @@ class DoomEternalContext(CommonContext):
                 current_map=canonical_map_name(self.current_map_name or ""),
                 details_map=details_map,
             )
+            if live:
+                self.mission_select_observation_map = None
+                self.mission_select_observation_epoch = None
             if not live:
+                mission_select_live = False
+                if (
+                    reason == "map_mismatch"
+                    and expected_map in MISSION_CHALLENGE_RUNTIME_MAPS
+                    and details_map != expected_map
+                ):
+                    mission_select_live, reason = lease.validate_mission_select(
+                        evidence_mtime_ns=evidence_mtime_ns,
+                        evidence_state=evidence.state,
+                        evidence_map=evidence.map_name,
+                        current_map=canonical_map_name(self.current_map_name or ""),
+                        mission_map=expected_map,
+                        save_mtime_ns=selected.mtime_ns,
+                    )
+                if mission_select_live:
+                    self.mission_select_observation_map = expected_map
+                    self.mission_select_observation_epoch = lease.gameplay_loaded_ns
+                    logger.info(
+                        "[OBSERVER] MISSION_SELECT_LEASE_ACCEPTED slot=%s map=%s "
+                        "load_epoch=%s save_mtime_ns=%s stale_details_map=%s",
+                        selected.slot_directory,
+                        expected_map,
+                        lease.gameplay_loaded_ns,
+                        selected.mtime_ns,
+                        details_map,
+                    )
+                else:
+                    self.mission_select_observation_map = None
+                    self.mission_select_observation_epoch = None
+            if not live and not mission_select_live:
                 if reason != self.last_observer_lease_block:
                     logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=%s", reason)
                     self.last_observer_lease_block = reason
@@ -2488,7 +2537,9 @@ class DoomEternalContext(CommonContext):
             self.last_observer_lease_block = None
 
         # SECTION B: STRICT CANONICAL MAP COHERENCE (NO HUB WILDCARD FOR SGN / MISSION MAPS)
-        if expected_map == "game/hub/hub":
+        if self.mission_select_observation_map:
+            pass
+        elif expected_map == "game/hub/hub":
             if details_map != "game/hub/hub":
                 return fail_proof("map_mismatch", details_map=details_map)
         else:
@@ -2523,6 +2574,8 @@ class DoomEternalContext(CommonContext):
             self.runtime_observers_frozen = False
             return selected
         else:
+            if not self.mission_select_observation_map:
+                self.mission_select_observation_epoch = None
             if self.active_gameplay_epoch != evidence.epoch:
                 self.log_save_proof_accepted(
                     selected.slot_directory,
@@ -3391,13 +3444,9 @@ class DoomEternalContext(CommonContext):
                 self.last_sticky_record = observed_record[1:]
 
     def observe_physical_event_challenges(self):
-        """Observe physical_event_equivalent challenge predicates independently of save files."""
-        for unlockable in MISSION_CHALLENGE_BY_UNLOCKABLE:
-            self.mission_challenges_observed.setdefault(unlockable, False)
-
-        locations_checked = getattr(self, "locations_checked", set())
+        """Return server-derived predicates without mutating completion state."""
         checked_locations = getattr(self, "checked_locations", set())
-        all_checks = locations_checked | checked_locations
+        ready = set()
 
         for entry in MISSION_CHALLENGE_ENTRIES:
             signal = entry["signal"]
@@ -3406,22 +3455,10 @@ class DoomEternalContext(CommonContext):
                 phys_ids = signal.get("physical_location_ids", [])
                 required_count = signal.get("required_count", 1)
                 source_ids = set(phys_ids)
-                matched_ids = source_ids.intersection(all_checks)
+                matched_ids = source_ids.intersection(checked_locations)
                 if len(matched_ids) >= required_count:
-                    if not self.mission_challenges_observed.get(unlockable):
-                        self.mission_challenges_observed[unlockable] = True
-                        if self.item_state_ready:
-                            self.persist_session_state()
-                        logger.info(
-                            "[Challenge] PHYSICAL_EVENT_COMPLETE unlockable=%s location_id=%s "
-                            "predicate=physical_event_equivalent physical_ids=%s "
-                            "required_count=%s matched=%s",
-                            unlockable,
-                            entry["location_id"],
-                            phys_ids,
-                            required_count,
-                            sorted(matched_ids),
-                        )
+                    ready.add(unlockable)
+        return ready
 
     def observe_mission_challenges(self, records, path):
         """Observe durable native records and derive the all-challenges check."""
@@ -3436,6 +3473,11 @@ class DoomEternalContext(CommonContext):
             unlockable: entry
             for unlockable, entry in MISSION_CHALLENGE_BY_UNLOCKABLE.items()
             if entry["signal"]["kind"] in {"unlockable_record", "stat_threshold"}
+            and (
+                not self.mission_select_observation_map
+                or MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.get(unlockable)
+                == self.mission_select_observation_map
+            )
         }
         completion_states = {
             unlockable: (
@@ -3444,8 +3486,15 @@ class DoomEternalContext(CommonContext):
             )
             for unlockable, entry in save_entries.items()
         }
+        observer_key = "mission_challenges"
+        if self.mission_select_observation_map:
+            observer_key = (
+                f"mission_challenges:mission_select:"
+                f"{self.mission_select_observation_epoch}:"
+                f"{self.mission_select_observation_map}"
+            )
         pending_edges = self.observe_save_edges(
-            "mission_challenges",
+            observer_key,
             completion_states,
             save_entries,
             slot_directory,
@@ -3561,16 +3610,21 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_location(entry)
 
     async def check_mission_challenge_location(self, entry):
-        if not self.item_state_ready or self.runtime_observers_frozen:
+        if not self.item_state_ready:
             return
         is_physical = entry["signal"].get("kind") == "physical_event_equivalent"
         if not is_physical and not self.has_authoritative_save_proof():
             return
         unlockable = entry["signal"]["unlockable"]
-        if not self.mission_challenges_observed.get(unlockable):
+        if is_physical:
+            physical_ids = set(entry["signal"].get("physical_location_ids", ()))
+            required_count = int(entry["signal"].get("required_count", 1))
+            if len(physical_ids.intersection(self.checked_locations)) < required_count:
+                return
+        elif not self.mission_challenges_observed.get(unlockable):
             return
         location_id = entry["location_id"]
-        if location_id in self.checked_locations or location_id in self.locations_checked:
+        if location_id in self.checked_locations:
             return
         if location_id not in self.server_locations:
             if location_id not in self.mission_challenge_slot_warnings:
@@ -3604,8 +3658,7 @@ class DoomEternalContext(CommonContext):
                 error,
             )
             return
-        self.locations_checked.add(location_id)
-        logger.info("[Challenge] LOCATION_CHECK_ACK id=%s", location_id)
+        logger.info("[Challenge] LOCATION_CHECK_QUEUED id=%s awaiting=server_ack", location_id)
 
     async def check_mission_challenge_locations(self):
         self.observe_physical_event_challenges()
@@ -3615,7 +3668,7 @@ class DoomEternalContext(CommonContext):
 
     async def check_all_mission_challenges_location(self):
         """Publish aggregates only from server-authoritative checked children."""
-        if not self.item_state_ready or not self.has_authoritative_save_proof():
+        if not self.item_state_ready:
             return
         checked = set(self.checked_locations)
         for aggregate in ALL_MISSION_CHALLENGES_ENTRIES:
@@ -3624,7 +3677,7 @@ class DoomEternalContext(CommonContext):
             if not aggregate_ready(signal, checked):
                 continue
             location_id = aggregate["location_id"]
-            if location_id in checked or location_id in self.locations_checked:
+            if location_id in checked:
                 continue
             if location_id not in self.server_locations:
                 if location_id not in self.mission_challenge_slot_warnings:
@@ -3652,7 +3705,10 @@ class DoomEternalContext(CommonContext):
                     error,
                 )
                 continue
-            self.locations_checked.add(location_id)
+            logger.info(
+                "[Challenge] ALL_LOCATION_CHECK_QUEUED id=%s awaiting=server_ack",
+                location_id,
+            )
 
     async def check_sticky_mastery_location(self):
         """Sticky compatibility wrapper preserving its exact send contract."""
@@ -4201,6 +4257,7 @@ class DoomEternalContext(CommonContext):
                     self.onboard_bootstrap("on_reconnect")
                     self.reconcile_owned_perks("connect_or_reconnect")
                     self.reconcile_checked_automap_cleanup("connect_or_reconnect")
+                    await self.check_mission_challenge_locations()
                     if not self.repair_item_mappings():
                         await asyncio.sleep(0.25)
                         continue

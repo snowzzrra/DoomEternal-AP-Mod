@@ -3,12 +3,15 @@
   "locations": [
     {
       "category": "mission_challenges",
-      "name": "Urdak - Mission Challenge - The Stuff of Dreams",
+      "name": "Urdak - Mission Challenge - Accessories Not Included",
+      "description": "Acquire 1 Collectible Toy",
       "location_id": 7770407,
-      "strategy": "unlockable_record",
+      "strategy": "physical_event_equivalent",
       "mission_key": "e3m3",
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
+        "physical_location_ids": [7770392, 7770394, 7770400],
+        "required_count": 1,
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e3m3/challenge_1",
         "numUnlockableRules": 1,
@@ -31,7 +34,8 @@
     },
     {
       "category": "mission_challenges",
-      "name": "Urdak - Mission Challenge - Blood Bath",
+      "name": "Urdak - Mission Challenge - Inflight Devastation",
+      "description": "Kill 12 Demons while in mid-air",
       "location_id": 7770408,
       "strategy": "unlockable_record",
       "mission_key": "e3m3",
@@ -59,7 +63,8 @@
     },
     {
       "category": "mission_challenges",
-      "name": "Urdak - Mission Challenge - Heavenly Host",
+      "name": "Urdak - Mission Challenge - Angel of Death",
+      "description": "Kill 5 Maykr Drones with Precision Bolt headshots",
       "location_id": 7770409,
       "strategy": "unlockable_record",
       "mission_key": "e3m3",

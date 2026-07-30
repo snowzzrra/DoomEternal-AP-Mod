@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "release": "v0.3.7-alpha",
+  "release": "v0.3.7-alpha.2",
   "publisher_key": "urdak_mission_complete",
   "event_filename": "ap_mission_urdak_complete.txt",
   "marker": "AP_MISSION_EVENT_URDAK_COMPLETE",

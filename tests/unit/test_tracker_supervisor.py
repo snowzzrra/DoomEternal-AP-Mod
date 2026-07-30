@@ -1,9 +1,7 @@
 """Pytest unit tests for tracker supervisor and health status."""
 
 import asyncio
-import importlib
 import sys
-import types
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -11,38 +9,25 @@ ROOT = Path(__file__).parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-sys.modules.setdefault("Utils", types.SimpleNamespace(init_logging=lambda *args, **kwargs: None))
-sys.modules.setdefault("colorama", types.SimpleNamespace(init=lambda: None, deinit=lambda: None))
-
-class _DummyCommonContext:
-    def __init__(self, server_address=None, password=None):
-        self.server_address = server_address
-        self.password = password
-        self.exit_event = asyncio.Event()
-
-class _DummyClientCommandProcessor:
-    def __init__(self, ctx):
-        self.ctx = ctx
-
-common_client = types.ModuleType("CommonClient")
-common_client.CommonContext = _DummyCommonContext
-common_client.server_loop = lambda ctx: None
-common_client.gui_enabled = False
-common_client.ClientCommandProcessor = _DummyClientCommandProcessor
-common_client.get_base_parser = lambda: __import__("argparse").ArgumentParser()
-common_client.logger = types.SimpleNamespace(info=lambda *a, **k: None, warning=lambda *a, **k: None, error=lambda *a, **k: None)
-sys.modules.setdefault("CommonClient", common_client)
-
-net_utils = types.ModuleType("NetUtils")
-net_utils.ClientStatus = types.SimpleNamespace(CLIENT_GOAL=30)
-sys.modules.setdefault("NetUtils", net_utils)
-
 import bridge_client
+
+
+def _new_context():
+    ctx = bridge_client.DoomEternalContext.__new__(
+        bridge_client.DoomEternalContext
+    )
+    ctx.exit_event = asyncio.Event()
+    ctx.current_map_name = None
+    ctx.active_save_slot = None
+    ctx.last_processed_event_id = None
+    ctx.server = None
+    ctx.auth = None
+    return ctx
 
 
 def test_tracker_supervisor_clean_shutdown():
     async def run():
-        ctx = bridge_client.DoomEternalContext(None, None)
+        ctx = _new_context()
         ctx.exit_event.set()
         
         task = asyncio.create_task(ctx.tracker_supervisor())
@@ -54,7 +39,7 @@ def test_tracker_supervisor_clean_shutdown():
 
 def test_tracker_supervisor_restarts_on_exception():
     async def run():
-        ctx = bridge_client.DoomEternalContext(None, None)
+        ctx = _new_context()
         call_count = 0
 
         async def mock_tracker_loop():
@@ -78,14 +63,17 @@ def test_tracker_supervisor_restarts_on_exception():
 
 
 def test_doom_status_command():
-    ctx = bridge_client.DoomEternalContext(None, None)
+    ctx = _new_context()
     ctx.tracker_alive = True
     ctx.tracker_restart_count = 3
     ctx.last_tracker_error = "ValueError: test error"
     ctx.last_heartbeat_timestamp = 100.0
 
     output_lines = []
-    processor = bridge_client.DoomCommandProcessor(ctx)
+    processor = bridge_client.DoomCommandProcessor.__new__(
+        bridge_client.DoomCommandProcessor
+    )
+    processor.ctx = ctx
     processor.output = lambda msg: output_lines.append(msg)
 
     with patch("time.time", return_value=110.0):

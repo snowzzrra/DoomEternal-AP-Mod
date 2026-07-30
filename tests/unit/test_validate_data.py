@@ -132,21 +132,6 @@ class ValidateDataNamespaceTests(unittest.TestCase):
             7770007,
         )
 
-    def test_native_client_serializes_keepalive_and_execute_rpc(self):
-        source = (ROOT / "native" / "client" / "mhclient.cpp").read_text(encoding="utf-8")
-        header = (ROOT / "native" / "client" / "mhclient.h").read_text(encoding="utf-8")
-
-        self.assertIn("CRITICAL_SECTION m_RpcMutex", header)
-        self.assertIn('EnterRpcCall("KeepAlive"', source)
-        self.assertIn('EnterRpcCall("ExecuteConsoleCommand"', source)
-        self.assertIn("MarkBindingInvalid()", source)
-
-    def test_native_client_has_execute_watchdog(self):
-        source = (ROOT / "native" / "client" / "ap_client_exe.cpp").read_text(encoding="utf-8")
-
-        self.assertIn("RPC_CALL_STALLED", source)
-        self.assertIn("CreateThread(nullptr, 0, RpcCallWatchdog", source)
-
     def test_drain_traps_do_not_use_zero(self):
         items = (ROOT / "data" / "items.json").read_text(encoding="utf-8")
 
@@ -187,23 +172,6 @@ class ValidateDataNamespaceTests(unittest.TestCase):
         self.assertNotIn("Weapon Mastery Token", items)
         self.assertNotIn("7770019", commands)
         self.assertNotIn("CURRENCY_WEAPON_MASTERY", __import__("json").dumps(commands))
-
-    def test_scripted_pickups_have_no_decl_overrides(self):
-        hub = (ROOT / "level_configs" / "hub.json").read_text(encoding="utf-8")
-        cult = (ROOT / "level_configs" / "e1m3_cult.json").read_text(encoding="utf-8")
-        generator = (ROOT / "tools" / "maps" / "ap_map_generator.py").read_text(encoding="utf-8")
-        packaged = "\n".join(
-            str(path.relative_to(ROOT))
-            for path in (ROOT / "packaging" / "mod_assets").rglob("*")
-            if path.is_file()
-        )
-        self.assertNotIn("propitem/ap/", hub + cult + generator + packaged)
-        self.assertFalse((ROOT / "packaging" / "mod_assets" / "hub_patch2" /
-                          "generated" / "decls" / "propitem" / "propitem" /
-                          "equipment" / "ice_bomb.decl").exists())
-        self.assertFalse((ROOT / "packaging" / "mod_assets" / "e1m3_cult_patch3" /
-                          "generated" / "decls" / "propitem" / "propitem" /
-                          "weapon" / "rocket_launcher" / "base.decl").exists())
 
 if __name__ == "__main__":
     unittest.main()

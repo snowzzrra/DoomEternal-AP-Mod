@@ -1,4 +1,4 @@
-"""Independent v0.3.7 release-boundary expectations."""
+"""Permanent campaign-goal and public-location boundary expectations."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from content_catalog import load_content_catalog
 ROOT = Path(__file__).parents[2]
 
 
-def test_v037_goal_and_public_locations_are_independent() -> None:
+def test_campaign_goal_and_public_locations_are_independent() -> None:
     catalog = load_content_catalog()
     public = list(catalog.physical_locations) + list(catalog.runtime_locations)
     public_ids = [location.location_id for location in public]

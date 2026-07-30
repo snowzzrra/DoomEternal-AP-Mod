@@ -14,7 +14,7 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current `v0.3.7-alpha` scope:
+Current `v0.3.7-alpha.2` scope:
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -144,7 +144,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.7-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.7-alpha.2.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoAlpha.zip
@@ -173,7 +173,10 @@ configuration, seeds, logs, and local paths.
 - `randomize_chainsaw`, `randomize_dash`, and `randomize_first_battery`
   default to `false`; Dash remains experimental.
 - Secret Encounters are normal AP locations on supported missions.
-- Mission Challenge and Weapon Mastery locations use native save state.
+- Mission Challenges use native save state when their vanilla writer survives;
+  converted physical rewards use server-checked
+  `physical_event_equivalent` predicates. Weapon Masteries use native save
+  state.
 - The generic All Mission Challenges override removes the vanilla aggregate
   Sentinel Battery reward for every cataloged mission while preserving the
   challenge HUD, native completion predicate, save state, and AP checks.
@@ -184,7 +187,7 @@ configuration, seeds, logs, and local paths.
 
 ### Vanilla scripted weapon acquisitions
 
-These acquisitions remain fully vanilla in `v0.3.7-alpha`:
+These acquisitions remain fully vanilla in `v0.3.7-alpha.2`:
 
 - Super Shotgun — Cultist Base cutscene `5008`.
 - BFG-9000 — Mars Core cutscene `4701`.

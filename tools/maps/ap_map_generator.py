@@ -18,7 +18,6 @@ from item_classification import (
     notification_style_for_item,
 )
 from tools.maps.notification_formatting import notification_key
-from tools.maps.notification_lab import generate_notification_lab
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -1432,7 +1431,6 @@ def generate_map(
     item_names=None,
     item_classifications=None,
     enable_notifications=True,
-    enable_notification_lab=None,
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
@@ -1847,7 +1845,6 @@ def generate_map(
         )
         + generate_bootstrap_entities()
         + generate_system_command_entities()
-        + generate_notification_lab(map_key, enabled=enable_notification_lab)
     )
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
 
