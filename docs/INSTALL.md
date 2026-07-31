@@ -390,13 +390,8 @@ extracted directory was reused.
 Fix:
 
 1. Delete the extracted alpha release directory.
-2. Extract `DoomEternalArchipelagoPlayableTest-v0.3.5-alpha.zip` again into a
+2. Extract the current release ZIP again into a
    brand-new empty directory.
-3. Confirm that `client/` does not contain:
-   - `version.dll`;
-   - `dinput8.dll`;
-   - `dxgi.dll`;
-   - `xinput1_4.dll`.
 
 ### The memory gate never opens
 

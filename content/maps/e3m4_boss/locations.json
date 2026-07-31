@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m4_boss",
+  "level": "e3m4_boss",
+  "region": "Final Sin",
+  "entities": {
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M4": 7770412,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_2_E3M4": 7770413
+  },
+  "names": {
+    "7770412": "Final Sin - Extra Life 1",
+    "7770413": "Final Sin - Icon of Sin Codex"
+  },
+  "location_feedback": {"default_policy": "ap_only"},
+  "target_policies": {},
+  "remove_entities": [],
+  "secret_encounters": []
+}
