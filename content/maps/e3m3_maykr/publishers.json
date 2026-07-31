@@ -25,9 +25,6 @@
         {
           "strategy": "location_check",
           "location_id": 7770411
-        },
-        {
-          "strategy": "campaign_goal"
         }
       ],
       "dedupe_scope": "urdak_mission_complete_location",

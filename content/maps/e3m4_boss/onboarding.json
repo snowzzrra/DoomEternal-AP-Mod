@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "map_key": "e3m4_boss",
+  "status": "static_candidate",
+  "source": {"path": "vanillamaps/e3m4_boss.map", "size": 15044764, "sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398", "owner_payload_sha256": "6b37d3fa8222f53ec280b6eaba0691b26e523896adc09c68d39f61824277d190", "owner_payload_size": 479186, "owner_payload_decompressed_match": false, "ap_markers_absent": true, "structurally_parsed": true, "entity_count": 12512},
+  "owner": {"resource": "game/sp/e3m4_boss/e3m4_boss_patch3.resources", "status": "packagemapspec_winner"},
+  "onboarding_evidence": {"source": "packagemapspec", "winner": "game/sp/e3m4_boss/e3m4_boss_patch3.resources", "candidates": {"game/sp/e3m4_boss/e3m4_boss_patch3.resources": 38, "game/sp/e3m4_boss/e3m4_boss_patch2.resources": 159, "game/sp/e3m4_boss/e3m4_boss_patch1.resources": 205, "game/sp/e3m4_boss/e3m4_boss.resources": 235}, "packagemapspec_sha256": "82e6981fa6b83a7134c306cb3e3ff5e5f02567ccaf173fa737144b2f087a62c6", "priority_rule": "lowest packagemapspec files-array index wins"},
+  "category_audit": {"extra_lives": 1, "codex_entries": 1, "mission_challenges": 0, "secret_encounters": 0, "mission_complete": 1},
+  "candidate_inventory": [
+    {"entity": "pickups_pickup_extra_life_extra_life_1_1_e3m4", "class": "idProp2", "transform": [-462.439972, -493.519928, -34.5196762], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "sole real campaign Extra Life; generic physical conversion removes its vanilla grant"},
+    {"entity": "pickups_progress_codex_2_e3m4", "class": "idProp2", "transform": [-386.520996, -580.98999, -29.9547997], "target_chain": [], "vanilla_reward": "propitem/codex/earth/icon_of_sin", "decision": "include", "reason": "sole real Codex collectible; generic physical conversion removes its vanilla grant"},
+    {"entity": "pickups_pickup_ammo_bfg_12", "class": "idProp2", "transform": null, "target_chain": [], "vanilla_reward": "BFG ammo", "decision": "exclude", "reason": "combat ammo is not a collectible/reward location under existing policy"},
+    {"entity": "pickups_pickup_ammo_crucible_2", "class": "idProp2", "transform": null, "target_chain": [], "vanilla_reward": "Crucible ammo", "decision": "exclude", "reason": "combat ammo is not a collectible/reward location under existing policy"},
+    {"entity": "stage1_encounter_manager_progression", "class": "idEncounterManager", "transform": null, "target_chain": [], "vanilla_reward": "boss state", "decision": "exclude", "reason": "Icon of Sin phase helper, not a native Secret Encounter record"},
+    {"entity": "icon_of_sin_death_light_point_1", "class": "idLight", "transform": null, "target_chain": [], "vanilla_reward": "none", "decision": "exclude", "reason": "cinematic light, not a location"},
+    {"entity": "icon_arena_target_relay_7", "class": "idTarget_Count", "transform": null, "target_chain": [], "vanilla_reward": "boss state", "decision": "exclude", "reason": "boss-state relay preserved unchanged; not a location"},
+    {"entity": "icon_of_sin_death_target_relay_post_destruction_idle", "class": "idTarget_Count", "transform": [793.299988, -602.400024, 28.2000008], "target_chain": [], "vanilla_reward": "native post-Icon terminal", "decision": "include", "reason": "native terminal after Icon of Sin destruction; publisher preserves ending/credits flow and emits Mission Complete before the separate goal"}
+  ],
+  "vanilla_guards": {"forbidden_ap_terms": ["cinematic light", "boss-state relay"], "required_source_edge": {"from": "player_start_boss_outro", "to": "icon_of_sin_death_target_relay_post_destruction_idle"}, "excluded_entities": ["icon_of_sin_death_light_point_1", "icon_arena_target_relay_7", "stage1_encounter_manager_progression"]},
+  "checks": ["source and owner payload hashes recorded", "packagemapspec priority proven; lower files-array index wins", "native Mission Challenges and Secret Encounters absent", "Icon phases, checkpoints, cinematics, credits and return-to-menu flow are untouched", "Mission Complete publishes before the separate campaign goal"]
+}

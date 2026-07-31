@@ -14,18 +14,16 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current `v0.3.7-alpha.2` scope:
+Current `v0.3.8-alpha` scope:
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
   Nest -> Fortress visit 4 -> ARC Complex -> Fortress visit 5 -> Mars Core ->
   Sentinel Prime -> Fortress visit 6 -> Taras Nabad -> Fortress visit 7 ->
-  Nekravol -> Nekravol Part II -> Urdak`.
-- Public content: `302` generated map checks + `61` runtime locations = `363`
+  Nekravol -> Nekravol Part II -> Urdak -> Final Sin`.
+- Public content: `304` generated map checks + `62` runtime locations = `366`
   Archipelago locations, plus `1` separate campaign goal.
-- `12` of the `13` base-campaign missions are supported. Final Sin is the only
-  remaining base mission; DLC, Master Levels, Horde Mode, enemy randomization,
-  and final balancing remain future milestones.
+- All `13` base-campaign missions are supported.
 
 The current alpha validates map checks, item delivery, DeathLink, save-derived
 locations, Fortress progression, runtime gating, and APWorld generation across
@@ -144,7 +142,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.7-alpha.2.zip
+DoomEternalArchipelagoPlayableTest-v0.3.8-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoAlpha.zip
@@ -187,7 +185,7 @@ configuration, seeds, logs, and local paths.
 
 ### Vanilla scripted weapon acquisitions
 
-These acquisitions remain fully vanilla in `v0.3.7-alpha.2`:
+These acquisitions remain fully vanilla in `v0.3.8-alpha`:
 
 - Super Shotgun — Cultist Base cutscene `5008`.
 - BFG-9000 — Mars Core cutscene `4701`.
@@ -245,13 +243,22 @@ in this release.
 - Generalized manifests, mission completion, regions, and per-map validation.
 - Established optional systems and expanded the base campaign incrementally.
 
-### 0.3.x–0.5.x Alpha — Full base campaign — IN PROGRESS
+### 0.3.x Alpha — Base campaign map expansion — DONE
 
-- Make all `13` base-game missions playable end to end.
-- Complete progression logic, persistent upgrades, optional checks, and the
-  base-game Unmaykr Protocol goal.
-- Reach feature-complete base-game scope with no known default-configuration
-  progression blockers.
+- `0.3.8`: Final Sin.
+- `0.3.9`: complete base-campaign regression, cleanup, documentation and
+  release stabilization; no major new system.
+
+### 0.4.0 Beta — Installation, logic and option architecture
+
+- Windows + Linux installer/launcher; game-path/version, dependency, injection
+  and client-identity validation; seed/options-generated mod; final scripted
+  weapon stripping (SSG `5008`, BFG `4701`, Crucible `4137`); subregions;
+  hard/soft/combat logic options; hardcore DeathLink fix; and option-driven
+  features such as randomize starting weapon.
+- These are specifications for future work and are not implemented in `0.3.8`.
+
+### 0.5.x Beta — The Ancient Gods Part One
 
 ### 0.7.x Beta — Content freeze and polish
 

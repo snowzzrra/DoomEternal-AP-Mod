@@ -2,6 +2,6 @@
     "name": "DOOM Eternal Archipelago",
     "author": "snow",
     "description": "Multiplayer randomized item progression for DOOM Eternal (through Taras Nabad)",
-    "version": "v0.3.7-alpha.2",
+    "version": "v0.3.8-alpha",
     "loadPriority": 0
 }

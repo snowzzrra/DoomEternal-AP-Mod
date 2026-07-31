@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "v0.3.8-alpha.1",
+      "reason": "Final Sin added as v0.3.8-alpha content; preserves native post-Icon ending terminal"
+    }
+  ],
+  "asset_package_contract_sha256": "a5e88c090d91b77e9c4fa27779a655bc543c780db78e52511d2421f7e508a23d",
+  "byte_sha256": "35d095f140fbbf09168e005ce6aebce67248ed51f05001622cb86116dce7a645",
+  "content_revision": "v0.3.8-alpha.1",
+  "generated_entity_metrics": {
+    "bind_parents": 2,
+    "byte_size": 15290581,
+    "classes": 12924,
+    "entity_count": 12924,
+    "layers": 1639,
+    "targets": 45511,
+    "transforms": 26180,
+    "unique_entity_names": 12924
+  },
+  "manifest_sha256": "a0bdda17134a27176f456a64840a2ab180d434c0a749c87135e99694cabf5f7e",
+  "map_key": "e3m4_boss",
+  "physical_ap_ids": [
+    7770412,
+    7770413
+  ],
+  "publisher_contract_sha256": "a7768f320ddd741e8d7d975af9ba9d130319e49402802d3e333e757fc18f5a6c",
+  "runtime_location_ids": [
+    7770414
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "c28804ce9b0a7847e6a9f71a67a9f33fc4dd6d32d6c90dccacb46889b8fbe301",
+  "semantic_sha256": "692e7e5029c3b647f3d1fc9927d2129281195586bc53dcfa8b444c91eec9258a"
+}

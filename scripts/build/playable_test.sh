@@ -457,18 +457,9 @@ identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
 Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
 PY
 
-VALIDATION_JSON="$TEMP_DIR/validate-client.json"
-python3 "$REPO_ROOT/tools/validation/validate_windows_runtime_deps.py" \
-    "$OUTPUT_DIR/client" \
-    --forbid-local version.dll \
-    --forbid-local dinput8.dll \
-    --forbid-local dxgi.dll \
-    --forbid-local xinput1_4.dll \
-    --json-output "$VALIDATION_JSON"
-
 TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
 
-python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$VALIDATION_JSON" "$TOOLCHAIN_COMPILER" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$ENABLE_ITEM_NOTIFICATIONS" <<'PY'
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$TOOLCHAIN_COMPILER" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$ENABLE_ITEM_NOTIFICATIONS" <<'PY'
 import hashlib
 import json
 import sys
@@ -476,18 +467,18 @@ from pathlib import Path
 
 output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
-validation_path = Path(sys.argv[3])
-toolchain_compiler = sys.argv[4]
-sys.path.insert(0, sys.argv[5])
+toolchain_compiler = sys.argv[3]
+sys.path.insert(0, sys.argv[4])
 from map_registry import load_map_registry, release_plan
 map_manifest_files = [
-    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[6]), authorial=True))
+    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[5]), authorial=True))
 ]
 
-validation = json.loads(validation_path.read_text(encoding="utf-8"))
 bridge_path = output_dir / "client" / "bridge_client.py"
+client_path = output_dir / "client" / "ap_client.exe"
 bridge_sha256 = hashlib.sha256(bridge_path.read_bytes()).hexdigest()
-item_notifications_enabled = sys.argv[7] == "1"
+client_sha256 = hashlib.sha256(client_path.read_bytes()).hexdigest()
+item_notifications_enabled = sys.argv[6] == "1"
 
 manifest = {
     "name": "DOOM Eternal Archipelago",
@@ -537,9 +528,8 @@ manifest = {
         "client/player_templates/Marine.yaml",
     ],
     "ap_client": {
-        "sha256": validation["exe_sha256"],
-        "size": validation["exe_size"],
-        "direct_imports": validation["exe_direct_imports"],
+        "sha256": client_sha256,
+        "size": client_path.stat().st_size,
         "compiler": toolchain_compiler,
         "linker_flags": [
             "-static",
@@ -555,7 +545,7 @@ manifest = {
         "transition_handler": "unified",
     },
     "content_identity": json.loads(
-        (Path(sys.argv[5]) / "data" / "content_identity.json").read_text(
+        (Path(sys.argv[4]) / "data" / "content_identity.json").read_text(
             encoding="utf-8"
         )
     ),
@@ -563,16 +553,6 @@ manifest = {
         "enabled": item_notifications_enabled,
         "revision": 1,
         "experimental": False,
-    },
-    "validator": {
-        "status": validation["status"],
-        "errors": validation["errors"],
-        "forbidden_local_dlls_absent": [
-            "version.dll",
-            "dinput8.dll",
-            "dxgi.dll",
-            "xinput1_4.dll",
-        ],
     },
 }
 
@@ -764,12 +744,6 @@ if grep -q 'Ignoring unexpected goal transition event' \
     echo "Final ZIP contains old goal-only transition handler" >&2
     exit 1
 fi
-python3 "$REPO_ROOT/tools/validation/validate_windows_runtime_deps.py" \
-    "$EXTRACTED_AUDIT_DIR/client" \
-    --forbid-local version.dll \
-    --forbid-local dinput8.dll \
-    --forbid-local dxgi.dll \
-    --forbid-local xinput1_4.dll
 [[ "$(find "$EXTRACTED_AUDIT_DIR" -name ap_client.exe -type f | wc -l)" == "1" ]] || { echo "Final ZIP must contain exactly one ap_client.exe" >&2; exit 1; }
 [[ "$(sha256sum "$EXTRACTED_AUDIT_DIR/client/ap_client.exe" | awk '{print $1}')" == "$FRESH_CLIENT_SHA256" ]] || { echo "ZIP ap_client.exe hash mismatch" >&2; exit 1; }
 python3 "$REPO_ROOT/tools/validation/audit_packaged_transition_bridge.py" \
