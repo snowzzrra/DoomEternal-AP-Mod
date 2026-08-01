@@ -7,14 +7,22 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Final Sin Extra Lives locations 7770415..7770417 added and resident codex visual fallback"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Final Sin (e3m4_boss) updated to donor_model_override safe_resident_static_lwo asset strategy matching Sentinel Prime"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Final Sin (e3m4_boss) target_policies remove_original added for pickups_progress_codex_2_e3m4"
     }
   ],
-  "asset_package_contract_sha256": "41d88492f7d99fd3b1384fce074ce823ad0a859631e2bf5a3fef59aabc8d7117",
-  "byte_sha256": "ec7ad491cf9d448ebf96d4659e96980e3460de337c8d9fcae71de9be7b77f39c",
+  "asset_package_contract_sha256": "f79822e789ca11f661aa3f13584ed11641284d2d64aab2d4841e48002f750636",
+  "byte_sha256": "d7c6689e1bc2f89929ab2406c21ac4c663cf6df18c5a05111e54bccb2489f8ee",
   "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15298043,
+    "byte_size": 15298037,
     "classes": 12942,
     "entity_count": 12942,
     "layers": 1645,
@@ -36,6 +44,6 @@
     7770414
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "c28804ce9b0a7847e6a9f71a67a9f33fc4dd6d32d6c90dccacb46889b8fbe301",
-  "semantic_sha256": "ca033fa1562f2314bf74567c321588fb8c65bba5f7670435614f8f806baee99e"
+  "scripted_contract_sha256": "80f7ceb630a7c544c491c1df2f132a8bba88d80f0e5b779453dd83590cdac241",
+  "semantic_sha256": "58dbc0add9bb1a647df5f77d72a44bd28d6ac6ee764df53e3e512ef66f1b6053"
 }

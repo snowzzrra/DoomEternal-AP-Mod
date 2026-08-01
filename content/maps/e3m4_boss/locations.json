@@ -18,7 +18,12 @@
     "7770417": "Final Sin - Extra Life 4"
   },
   "location_feedback": {"default_policy": "ap_only"},
-  "target_policies": {},
+  "target_policies": {
+    "pickups_progress_codex_2_e3m4": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    }
+  },
   "remove_entities": [],
   "secret_encounters": []
 }
