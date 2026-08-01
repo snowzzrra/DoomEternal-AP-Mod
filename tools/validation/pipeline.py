@@ -708,6 +708,16 @@ class Pipeline:
         ], cwd=ROOT, env=env)
 
     def release(self, *, build: bool = False) -> tuple[Path, list[MapArtifact]]:
+        catalog = self.preflight()
+        pending_imports = [
+            asset.key for asset in catalog.assets
+            if asset.dependency_policy == "model_importer_bundle_pending"
+        ]
+        if pending_imports:
+            raise ValueError(
+                "component=assets map=* field=model_importer value=pending "
+                f"bundles={pending_imports}"
+            )
         artifacts = self.integration()
         self.apworld_smoke()
         _run([

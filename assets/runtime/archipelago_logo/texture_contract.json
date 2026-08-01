@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "converter": {
+    "name": "Auto Heckin' Texture Converter",
+    "version": "5.5.1",
+    "repository": "https://github.com/brunoanc/AutoHeckinTextureConverter",
+    "revision": "a3139646f8567673ae552d16fc046998b2e815c8",
+    "source_png": "assets/source/archipelago_logo/archipelago_logo_atlas.png",
+    "source_png_sha256": "a25bb8b630dafe0dd4a5ad2863fa4ad41296277cf63818c4a7a2b4c1712b1a3a",
+    "output": "assets/runtime/archipelago_logo/archipelago_logo_atlas.tga",
+    "output_sha256": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
+    "container_magic": "DIVINITY",
+    "bimage": {
+      "signature": "BIM",
+      "version": 21,
+      "material_kind": "albedo",
+      "material_kind_id": 1,
+      "width": 256,
+      "height": 256,
+      "mip_count": 9,
+      "texture_format": "FMT_BC1_SRGB",
+      "texture_format_id": 33,
+      "no_mips": false
+    }
+  },
+  "slots": [
+    {
+      "map_key": "e3m3_maykr",
+      "model": "art/pickups/question_mark_a.lwo",
+      "material2": "generated/decls/material2/art/pickups/question.decl",
+      "material2_sha256": "486463d18ba3a3f385941cfc1bea1941a7cf63b6c58e9f4178fc0a97e684b5c6",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/question.tga",
+      "true_filename": "art/pickups/question.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m3_maykr.resources",
+      "resource_base": "e3m3_maykr",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m3_maykr_patch3.resources": 24,
+        "e3m3_maykr_patch1.resources": 155,
+        "e3m3_maykr_patch2.resources": 173,
+        "e3m3_maykr.resources": 243
+      },
+      "preserved": {
+        "normal": "art/pickups/question_n.tga",
+        "specular": "art/pickups/question_s.tga",
+        "smoothness": "art/pickups/question_g.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/question_e.tga"
+      }
+    },
+    {
+      "map_key": "e2m4_boss",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e2m4_boss.resources",
+      "resource_base": "e2m4_boss",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e2m4_boss_patch2.resources": 60,
+        "e2m4_boss_patch1.resources": 183,
+        "e2m4_boss.resources": 185
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e3m4_boss",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m4_boss.resources",
+      "resource_base": "e3m4_boss",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m4_boss_patch3.resources": 38,
+        "e3m4_boss_patch2.resources": 159,
+        "e3m4_boss_patch1.resources": 205,
+        "e3m4_boss.resources": 235
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    }
+  ]
+}

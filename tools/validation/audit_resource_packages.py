@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import re
+import struct
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,6 +18,41 @@ from tools.maps.ap_map_generator import resolve_donor_model_override
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _audit_texture_contract(asset_root: Path) -> None:
+    repo_root = asset_root.parent.parent
+    contract_path = (
+        repo_root / "assets" / "runtime" / "archipelago_logo"
+        / "texture_contract.json"
+    )
+    if not contract_path.is_file():
+        return
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    converter = contract["converter"]
+    source_png = repo_root / converter["source_png"]
+    runtime_tga = repo_root / converter["output"]
+    runtime_bytes = runtime_tga.read_bytes()
+    if (
+        _sha256(source_png) != converter["source_png_sha256"]
+        or _sha256(runtime_tga) != converter["output_sha256"]
+        or not runtime_bytes.startswith(b"DIVINITY")
+        or runtime_bytes.endswith(b"TRUEVISION-XFILE.\x00")
+    ):
+        raise AssertionError("[ASSET] AUTOHECKIN_OUTPUT_INVALID")
+    expected = {
+        asset_root / slot["resource_base"] / slot["true_filename"]
+        for slot in contract["slots"]
+        if slot["packaged"]
+    }
+    actual = set(asset_root.rglob("*.tga*"))
+    if actual != expected:
+        raise AssertionError(
+            "[ASSET] TEXTURE_CONSUMER_SET_INVALID "
+            f"expected={sorted(map(str, expected))} actual={sorted(map(str, actual))}"
+        )
+    if any(path.read_bytes() != runtime_bytes for path in expected):
+        raise AssertionError("[ASSET] AUTOHECKIN_PAYLOAD_MISMATCH")
 
 
 def _replacement_bundle_paths(
@@ -78,6 +114,21 @@ def _assert_model_importer_bundle(root: Path, asset: AssetSpec) -> None:
         raise AssertionError(
             f"[ASSET] IMPORTER_PAYLOAD_INVALID bundle={asset.key}"
         )
+    is_v3_streamdb = (
+        len(streamdb_bytes) >= 36
+        and struct.unpack_from("<II", streamdb_bytes, 8) == (3, 36)
+    )
+    if is_v3_streamdb:
+        stream_block_size = struct.unpack_from("<I", streamdb_bytes, 16)[0]
+        if (
+            len(streamdb_bytes) != 36 + stream_block_size
+            or resource_bytes.count(struct.pack("<I", stream_block_size)) < 4
+            or struct.pack("<I", stream_block_size * 2) not in resource_bytes
+            or resource_bytes.count(struct.pack("<I", stream_block_size * 3)) < 2
+        ):
+            raise AssertionError(
+                f"[ASSET] IMPORTER_BUNDLE_LAYOUT_MISMATCH bundle={asset.key}"
+            )
     if (
         _sha256(resource_payload) != slot["resource_payload_sha256"]
         or _sha256(streamdb_payload) != slot["streamdb_payload_sha256"]
@@ -127,8 +178,19 @@ def audit_source_asset_dependencies(
     assets: Iterable[AssetSpec],
 ) -> None:
     """Fail fast when a declared copied model or linked payload is absent."""
+    _audit_texture_contract(asset_root)
     for asset in tuple(assets):
         if asset.strategy == "donor_model_override":
+            if asset.dependency_policy == "model_importer_bundle_pending":
+                resource_payload = (
+                    asset_root / asset.resource_base / asset.model
+                )
+                if resource_payload.exists():
+                    raise AssertionError(
+                        f"[ASSET] PENDING_IMPORT_HAS_UNPROVEN_PAYLOAD "
+                        f"bundle={asset.key} payload={resource_payload}"
+                    )
+                continue
             _assert_model_importer_bundle(asset_root, asset)
             continue
         if asset.strategy != "resident_model":
@@ -223,6 +285,10 @@ def audit_resource_packages(
                 continue
 
             if asset.strategy == "donor_model_override":
+                if asset.dependency_policy == "model_importer_bundle_pending":
+                    raise AssertionError(
+                        f"[ASSET] MODEL_IMPORT_PENDING bundle={asset.key}"
+                    )
                 maps_root = source_map_root or (
                     Path(__file__).resolve().parents[2] / "vanillamaps"
                 )

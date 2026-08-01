@@ -550,6 +550,48 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
                     )
                 continue
             slot = asset.replacement_slot
+            if asset.dependency_policy == "model_importer_bundle_pending":
+                required_pending = {
+                    "model_path", "resource_archive", "material2",
+                    "pending_import", "vanilla_reference_allowlist",
+                }
+                pending = slot.get("pending_import", {})
+                model_path = Path(str(slot.get("model_path", "")))
+                if (
+                    not required_pending <= set(slot)
+                    or model_path.as_posix() != asset.model
+                    or model_path.suffix.lower() != ".lwo"
+                    or slot.get("resource_archive") != asset.resource_base
+                    or not slot.get("material2")
+                    or not isinstance(pending, Mapping)
+                    or pending.get("producer")
+                    != "Doom Eternal Model Importer v1.2"
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        str(pending.get("source_obj_sha256", "")),
+                    )
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        str(pending.get("vanilla_lwo_sha256", "")),
+                    )
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        str(pending.get("material2_decl_sha256", "")),
+                    )
+                ):
+                    raise ValueError(
+                        f"{asset.key}: invalid pending Model Importer contract"
+                    )
+                allowlist = tuple(slot["vanilla_reference_allowlist"])
+                if (
+                    asset.usage_policy != "removed_vanilla_entity_allowlist"
+                    or not allowlist
+                    or len(allowlist) != len(set(allowlist))
+                ):
+                    raise ValueError(
+                        f"{asset.key}: invalid pending importer allowlist"
+                    )
+                continue
             required_slot = {
                 "model_path", "resource_archive", "material2",
                 "import_bundle", "asset_id", "streamdb_payload",
