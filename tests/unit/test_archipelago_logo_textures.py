@@ -8,6 +8,8 @@ import os
 import zipfile
 from pathlib import Path
 
+from content_catalog import load_content_catalog
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "assets" / "source" / "archipelago_logo"
@@ -97,7 +99,13 @@ def test_runtime_textures_use_only_real_material2_albedo_entries() -> None:
         assert slot["resource_archive"] in slot["resource_priority_indices"]
 
 
-def test_material2_non_albedo_maps_are_preserved_by_absence_of_decl_overrides() -> None:
+def test_opaque_material_overrides_preserve_only_non_vfx_texture_maps() -> None:
+    catalog = load_content_catalog()
+    policies = {
+        asset.map_key: asset.visual_presentation_policy
+        for asset in catalog.assets
+        if asset.visual_presentation_policy
+    }
     for slot in CONTRACT["slots"]:
         assert slot["inherit"] == "template/pbr_pickup"
         assert slot["render_layers"] == 1
@@ -105,9 +113,20 @@ def test_material2_non_albedo_maps_are_preserved_by_absence_of_decl_overrides() 
         assert set(slot["preserved"]) >= {
             "normal", "specular", "smoothness", "heightmap", "emissive"
         }
-        assert not (
+        policy = policies[slot["map_key"]]
+        decl = (
             MOD_ASSETS / slot["resource_base"] / slot["material2"]
-        ).exists()
+        ).read_text(encoding="utf-8")
+        for map_kind in (
+            "albedo", "normal", "specular", "smoothness", "heightmap",
+        ):
+            assert (
+                f'filePath = "{policy["preserve_maps"][map_kind]}";'
+                in decl
+            )
+        assert slot["preserved"]["emissive"] not in decl
+        if "cover" in slot["preserved"]:
+            assert "cover =" not in decl
         assert not (
             MOD_ASSETS / slot["resource_base"] / "EternalMod" / "assetsinfo"
         ).exists()

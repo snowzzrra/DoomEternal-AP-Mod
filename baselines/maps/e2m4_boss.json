@@ -19,9 +19,13 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Sentinel codex slot updated to the coordinated Final Sin Model Importer payload and shared streamdb"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Sentinel AP-only visual material removes Codex pickup shader VFX while preserving generated entities"
     }
   ],
-  "asset_package_contract_sha256": "bd6b9a3b35f99dfd3e85cdc138a99134b8305d00a238cf0262a6708ecbb3c5c2",
+  "asset_package_contract_sha256": "901e7468fe165a01d4a29cb462e5dff16a90f7c9ba4aff7d40954a0814fd5768",
   "byte_sha256": "b5fd36629b488c776cd6a71148b7a4bb5261d0359dc306dcf137c1df421ef08a",
   "content_revision": "v0.3.4-alpha.1",
   "generated_entity_metrics": {

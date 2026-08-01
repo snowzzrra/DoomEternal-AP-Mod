@@ -173,6 +173,104 @@ def _model_references(content: str, model: str) -> set[str]:
     return references
 
 
+def _audit_visual_presentation(
+    asset_root: Path,
+    mod_root: Path,
+    asset: AssetSpec,
+    *,
+    generated_maps_root: Path | None,
+    zip_names: set[str] | None,
+) -> None:
+    policy = asset.visual_presentation_policy
+    if not policy:
+        return
+    relative_decl = Path(str(policy["material_decl"]))
+    source_decl = asset_root / asset.resource_base / relative_decl
+    packaged_decl = mod_root / asset.resource_base / relative_decl
+    expected_hash = str(policy["material_sha256"])
+    for path in (source_decl, packaged_decl):
+        if not path.is_file() or _sha256(path) != expected_hash:
+            raise AssertionError(
+                f"[ASSET] AP_OPAQUE_MATERIAL_MISMATCH bundle={asset.key} "
+                f"path={path}"
+            )
+    decl = source_decl.read_text(encoding="utf-8")
+    forbidden = {
+        'inherit = "template/pbr_pickup"',
+        'prog = "pickup"',
+        "surfaceemissivetiledmask",
+        "bloommaskmap",
+        "surfacesheencolor",
+        "alphatestthreshold",
+        "prezdrawalpha",
+        "cover =",
+    }
+    if (
+        'inherit = "template/pbr"' not in decl
+        or "surfaceemissivescale = 0;" not in decl
+        or any(token in decl for token in forbidden)
+        or any(
+            f'filePath = "{path}";' not in decl
+            for path in policy["preserve_maps"].values()
+        )
+    ):
+        raise AssertionError(
+            f"[ASSET] AP_OPAQUE_MATERIAL_INVALID bundle={asset.key}"
+        )
+
+    map_spec = load_content_catalog().maps.get(asset.map_key)
+    staged_entities = None
+    if map_spec is not None:
+        entities_member = (
+            f"{Path(asset.resource_owner).stem}/maps/"
+            f"{map_spec.relative_entities_path}"
+        )
+        staged_entities = (
+            generated_maps_root / map_spec.data["generated_output"]
+            if generated_maps_root is not None
+            else mod_root / entities_member
+        )
+    if staged_entities is not None and staged_entities.is_file():
+        generated = staged_entities.read_text(encoding="utf-8")
+        references = _model_references(generated, asset.model)
+        if not references or any(
+            not entity.startswith("ap_location_visual_")
+            for entity in references
+        ):
+            raise AssertionError(
+                f"[ASSET] AP_OPAQUE_MATERIAL_SCOPE_INVALID bundle={asset.key}"
+            )
+        for entity in references:
+            marker = f"entityDef {entity} {{"
+            start = generated.index(marker)
+            end = generated.index("\nentity {", start)
+            block = generated[start:end]
+            if (
+                f'thinkComponentDecl = "{policy["think_component"]}";'
+                not in block
+                or any(
+                    token in block
+                    for token in (
+                        "fxDecl", "updateFX", "renderLight", "particle",
+                        "bindInfo", "targets =", "renderParms",
+                    )
+                )
+            ):
+                raise AssertionError(
+                    f"[ASSET] AP_VISUAL_ENTITY_PRESENTATION_INVALID "
+                    f"bundle={asset.key} entity={entity}"
+                )
+    if zip_names is not None:
+        member = (Path(asset.resource_base) / relative_decl).as_posix()
+        if not any(
+            name == member or name.endswith(f"/{member}")
+            for name in zip_names
+        ):
+            raise AssertionError(
+                f"[ASSET] AP_OPAQUE_MATERIAL_MISSING bundle={asset.key}"
+            )
+
+
 def audit_source_asset_dependencies(
     asset_root: Path,
     assets: Iterable[AssetSpec],
@@ -229,6 +327,13 @@ def audit_resource_packages(
         zip_names = set(zip_archive.namelist())
     try:
         for asset in selected_assets:
+            _audit_visual_presentation(
+                asset_root,
+                mod_root,
+                asset,
+                generated_maps_root=generated_maps_root,
+                zip_names=zip_names,
+            )
             if asset.strategy == "resident_model":
                 if source_map_root is None:
                     source_map_root = Path(__file__).resolve().parents[2] / "vanillamaps"

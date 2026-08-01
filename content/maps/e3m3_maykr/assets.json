@@ -20,7 +20,26 @@
         "streamdb_payload_sha256": "e41e0a3310996ee1c7c062ad4385176a151500ca688f71d1f3d3527fad796e81"
       },
       "usage_policy": "ap_entities_only",
-      "preserve": ["transform", "layers", "interaction", "vanilla_presentation"]
+      "preserve": ["transform", "layers", "interaction"],
+      "visual_presentation_policy": {
+        "scope": "ap_generated_entities_only",
+        "preserve_motion": true,
+        "preserve_bobbing": true,
+        "preserve_rotation": true,
+        "think_component": "bob_rotate_fast",
+        "material_mode": "resource_scoped_opaque_override",
+        "material_decl": "generated/decls/material2/art/pickups/question.decl",
+        "material_sha256": "d236110470ecff0cae19e091c999420426462e9223b48a02b8722aec31604356",
+        "opaque_template": "template/pbr",
+        "strip": ["pickup_shader", "animated_emissive_mask", "bloom", "sheen"],
+        "preserve_maps": {
+          "albedo": "art/pickups/question.tga",
+          "normal": "art/pickups/question_n.tga",
+          "specular": "art/pickups/question_s.tga",
+          "smoothness": "art/pickups/question_g.tga",
+          "heightmap": "textures/system/constant_color/grey_md.tga"
+        }
+      }
     },
     {
       "key": "urdak_archipelago_question_mark_streamdb",

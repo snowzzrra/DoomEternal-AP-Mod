@@ -134,6 +134,9 @@ class AssetSpec:
     )
     usage_policy: str = ""
     preserve: tuple[str, ...] = ()
+    visual_presentation_policy: Mapping[str, Any] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 @dataclass(frozen=True)
@@ -345,6 +348,9 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
                 usage_policy=raw_asset.get("usage_policy", ""),
                 preserve=tuple(raw_asset.get("preserve", [])),
+                visual_presentation_policy=_freeze(
+                    raw_asset.get("visual_presentation_policy", {})
+                ),
             ))
         for raw_asset in package_by_key.get(key, {}).get("assets", {}).get("assets", []):
             assets.append(AssetSpec(
@@ -367,6 +373,9 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
                 usage_policy=raw_asset.get("usage_policy", ""),
                 preserve=tuple(raw_asset.get("preserve", [])),
+                visual_presentation_policy=_freeze(
+                    raw_asset.get("visual_presentation_policy", {})
+                ),
             ))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
@@ -510,6 +519,44 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             raise ValueError("invalid asset specification")
         if "_patch" in asset.resource_base:
             raise ValueError(f"asset resource_base must not be a patch owner: {asset.resource_base}")
+        presentation = asset.visual_presentation_policy
+        if presentation:
+            material_decl = Path(str(presentation.get("material_decl", "")))
+            preserved_maps = presentation.get("preserve_maps", {})
+            allowed_strips = {
+                "pickup_shader", "animated_emissive_mask", "bloom", "sheen",
+                "cover_alpha_test",
+            }
+            strip = set(presentation.get("strip", ()))
+            required_maps = {
+                "albedo", "normal", "specular", "smoothness", "heightmap",
+            }
+            if (
+                presentation.get("scope") != "ap_generated_entities_only"
+                or presentation.get("material_mode")
+                != "resource_scoped_opaque_override"
+                or presentation.get("opaque_template") != "template/pbr"
+                or presentation.get("think_component") != "bob_rotate_fast"
+                or any(
+                    presentation.get(key) is not True
+                    for key in (
+                        "preserve_motion", "preserve_bobbing", "preserve_rotation",
+                    )
+                )
+                or material_decl.is_absolute()
+                or ".." in material_decl.parts
+                or material_decl.suffix != ".decl"
+                or not strip
+                or not strip <= allowed_strips
+                or not isinstance(preserved_maps, Mapping)
+                or set(preserved_maps) != required_maps
+                or not re.fullmatch(
+                    r"[0-9a-f]{64}", str(presentation.get("material_sha256", ""))
+                )
+            ):
+                raise ValueError(
+                    f"{asset.key}: invalid AP visual presentation policy"
+                )
         if asset.strategy == "packaged_bundle" and not asset.dependencies:
             raise ValueError(f"{asset.key}: packaged_bundle requires declared dependencies")
         if asset.strategy == "resident_model" and asset.dependencies:

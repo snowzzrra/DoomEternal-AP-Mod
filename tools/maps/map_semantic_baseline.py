@@ -95,6 +95,15 @@ def _asset_package_payload(catalog: ContentCatalog, map_key: str) -> dict:
                 "replacement_slot": thaw_content(asset.replacement_slot),
                 "usage_policy": asset.usage_policy,
                 "preserve": asset.preserve,
+                **(
+                    {
+                        "visual_presentation_policy": thaw_content(
+                            asset.visual_presentation_policy
+                        )
+                    }
+                    if asset.visual_presentation_policy
+                    else {}
+                ),
             }
             for asset in catalog.assets if asset.map_key == map_key
         ],
