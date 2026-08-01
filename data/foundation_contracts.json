@@ -22,8 +22,8 @@
   },
   "counts": {
     "items": 116,
-    "locations": 366,
-    "map_checks": 304,
+    "locations": 369,
+    "map_checks": 307,
     "route_sentinel_batteries": 21,
     "runtime_goals": 1,
     "runtime_locations": 62

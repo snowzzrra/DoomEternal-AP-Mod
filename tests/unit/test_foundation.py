@@ -49,8 +49,8 @@ class FoundationRegistryTests(unittest.TestCase):
         )
         contracts = load_foundation_contracts()
         self.assertEqual(contracts["counts"]["items"], 116)
-        self.assertEqual(contracts["counts"]["locations"], 366)
-        self.assertEqual(contracts["counts"]["map_checks"], 304)
+        self.assertEqual(contracts["counts"]["locations"], 369)
+        self.assertEqual(contracts["counts"]["map_checks"], 307)
         self.assertEqual(contracts["counts"]["runtime_locations"], 62)
         self.assertEqual(contracts["counts"]["runtime_goals"], 1)
         for override in contracts["map_overrides"].values():

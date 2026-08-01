@@ -15,11 +15,11 @@ def test_campaign_goal_and_public_locations_are_independent() -> None:
     catalog = load_content_catalog()
     public = list(catalog.physical_locations) + list(catalog.runtime_locations)
     public_ids = [location.location_id for location in public]
-    assert len(public_ids) == 366
+    assert len(public_ids) == 369
     assert len(public_ids) == len(set(public_ids))
     assert set(range(7770340, 7770388)) <= set(public_ids)
     assert set(range(7770388, 7770412)) <= set(public_ids)
-    assert set(range(7770412, 7770415)) <= set(public_ids)
+    assert set(range(7770412, 7770418)) <= set(public_ids)
     assert catalog.location_names[7770337] == "Taras Nabad - Mission Complete"
     assert catalog.location_names[7770387] == "Nekravol Part II - Mission Complete"
 
