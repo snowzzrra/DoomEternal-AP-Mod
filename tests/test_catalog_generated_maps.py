@@ -9,6 +9,7 @@ import pytest
 
 from content_catalog import discover_maps
 from tools.maps.ap_map_generator import find_entity_block_bounds
+from tools.validation.audit_resource_packages import _model_references
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +50,81 @@ def test_generated_map_uses_declared_visual_asset_strategy(
                 for block in visual_blocks
             )
             assert "modelDecl" not in generated
+
+
+@pytest.mark.parametrize("map_spec", discover_maps(), ids=lambda spec: spec.key)
+def test_ap_visual_presentation_preserves_motion_and_functional_contracts(
+    map_spec, content_catalog, temporary_generated_maps
+) -> None:
+    assets = [
+        asset for asset in content_catalog.assets
+        if asset.map_key == map_spec.key and asset.visual_presentation_policy
+    ]
+    if not assets:
+        return
+    assert len(assets) == 1
+    asset = assets[0]
+    policy = asset.visual_presentation_policy
+    generated = temporary_generated_maps[map_spec.key].read_text(encoding="utf-8")
+    source = (ROOT / "vanillamaps" / map_spec.source_file).read_text(
+        encoding="utf-8"
+    )
+    references = _model_references(generated, asset.model)
+    locations = [
+        item for item in content_catalog.physical_locations
+        if item.map_key == map_spec.key
+    ]
+    visual_ids = {
+        int(name.removeprefix("ap_location_visual_")) for name in references
+    }
+    locations = [
+        location for location in locations if location.location_id in visual_ids
+    ]
+    assert references == {
+        f"ap_location_visual_{location.location_id}" for location in locations
+    }
+
+    for location in locations:
+        source_entity = location.ap_check.removeprefix("AP_CHECK_").lower()
+        source_bounds = find_entity_block_bounds(source, source_entity)
+        visual_name = f"ap_location_visual_{location.location_id}"
+        trigger_name = f"ap_independent_{source_entity}"
+        cleanup_name = f"ap_remove_location_visual_{location.location_id}"
+        check_name = location.ap_check
+        assert source_bounds is not None
+        source_block = source[source_bounds[0]:source_bounds[1]]
+        blocks = {}
+        for name in (visual_name, trigger_name, cleanup_name, check_name):
+            bounds = find_entity_block_bounds(generated, name)
+            assert bounds is not None, f"{map_spec.key}: missing {name}"
+            blocks[name] = generated[bounds[0]:bounds[1]]
+
+        visual = blocks[visual_name]
+        trigger = blocks[trigger_name]
+        cleanup = blocks[cleanup_name]
+        check = blocks[check_name]
+        assert 'class = "idProp2";' in visual
+        assert f'model = "{asset.model}";' in visual
+        assert (
+            f'thinkComponentDecl = "{policy["think_component"]}";'
+            in visual
+        )
+        assert 'type = "CLIPMODEL_NONE";' in visual
+        assert all(
+            token not in visual
+            for token in (
+                "fxDecl", "updateFX", "particle", "renderLight", "bindInfo",
+                "targets =", "renderParms", "shaderParm", "materialOverride",
+            )
+        )
+        assert "triggerOnce = true;" in trigger
+        assert 'type = "CLIPMODEL_BOX";' in trigger
+        assert f'item[0] = "{check_name}";' in trigger
+        assert f'item[1] = "{cleanup_name}";' in trigger
+        assert f'item[0] = "{visual_name}";' in cleanup
+        assert f'"ap_event_{location.location_id}";' in check
+        assert f'"ap_notify_location_{location.location_id}";' in check
+        assert f"entityDef {source_entity} {{" in source_block
 
 
 def test_onboarded_physical_candidates_remove_vanilla_reward_owners(

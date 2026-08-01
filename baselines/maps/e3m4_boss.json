@@ -23,9 +23,13 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Final Sin map-specific Model Importer bundle supplied and validated with its coordinated streamdb"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Final Sin AP-only visual material removes Codex pickup shader VFX while preserving generated entities"
     }
   ],
-  "asset_package_contract_sha256": "c9152c72f5119770adae463b15f46b3937ee27b735975072a127c113b4b4b1b1",
+  "asset_package_contract_sha256": "85eeaddeca418d108a402c63480c5d73a7d4bff6d4860880767054fbf64081db",
   "byte_sha256": "d7c6689e1bc2f89929ab2406c21ac4c663cf6df18c5a05111e54bccb2489f8ee",
   "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {

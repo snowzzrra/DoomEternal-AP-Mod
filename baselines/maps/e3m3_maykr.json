@@ -3,9 +3,13 @@
     {
       "content_revision": "v0.3.7-alpha.1",
       "reason": "Urdak added as v0.3.7 AP content"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Urdak AP-only visual material removes pickup shader VFX while preserving generated entities"
     }
   ],
-  "asset_package_contract_sha256": "a9083c41882b9d3ab2fbc8a357fa18d554d70acd71af411e51370dd96bd06995",
+  "asset_package_contract_sha256": "d27488bfacdba301906ea860e876582c964764eb21b2dd482eb9a09ece7ac91b",
   "byte_sha256": "f07302dc2331a384d4c32bb649a3b98350bd8c1c44c986b6e0f684f5a04bc715",
   "content_revision": "v0.3.7-alpha.1",
   "generated_entity_metrics": {

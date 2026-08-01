@@ -1,0 +1,36 @@
+{
+	inherit = "template/pbr";
+	edit = {
+		RenderLayers = {
+			item[0] = {
+				parms = {
+					heightmap = {
+						filePath = "textures/system/constant_color/grey_md.tga";
+					}
+					smoothness = {
+						filePath = "art/pickups/question_g.tga";
+					}
+					normal = {
+						filePath = "art/pickups/question_n.tga";
+					}
+					specular = {
+						filePath = "art/pickups/question_s.tga";
+					}
+					albedo = {
+						filePath = "art/pickups/question.tga";
+					}
+				}
+			}
+		}
+		Parms = {
+			surfaceemissivescale = 0;
+			surfaceemissivecolor = {
+				x = 0;
+				y = 0;
+				z = 0;
+				w = 1;
+			}
+		}
+		SurfaceType = "SURFTYPE_METAL";
+	}
+}
