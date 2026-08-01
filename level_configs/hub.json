@@ -120,7 +120,7 @@
         "progress_praetor_point_hub_1": {
             "independent_ap_trigger": true,
             "remove_original": true,
-            "drop_targets": ["target_relay_complete_praetor_obj"]
+            "preserve_targets": ["target_relay_complete_praetor_obj"]
         },
         "sentinel_battery_room_progress_praetor_token_1": {
             "independent_ap_trigger": true,

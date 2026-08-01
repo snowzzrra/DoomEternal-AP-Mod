@@ -15,18 +15,26 @@
     {
       "content_revision": "v0.3.5-alpha.2",
       "reason": "Fortress suit AP pickups now use verified room-local spawn anchors"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Fortress post-Ripatorium Ice Bomb progression relay target added"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Fortress first story Praetor Token progression relay target_relay_complete_praetor_obj preserved"
     }
   ],
   "asset_package_contract_sha256": "6d6b1da99bcc84efb9819ded115340814bd1d3769a8ee4fbaac58428817baa62",
-  "byte_sha256": "cb27bc8476a83b998c703b47d43dc896b791830a440e8dde262a2f4fd2df1143",
-  "content_revision": "v0.3.5-alpha.2",
+  "byte_sha256": "29a075f2263758f43a2d332bd0bb4981c884c453a8e51ad869f281efb0279551",
+  "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 143,
-    "byte_size": 4312419,
+    "byte_size": 4312471,
     "classes": 4147,
     "entity_count": 4149,
     "layers": 156,
-    "targets": 2834,
+    "targets": 2835,
     "transforms": 8071,
     "unique_entity_names": 4148
   },
@@ -56,6 +64,6 @@
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "d8dad1bb4b4701f043c8880210fc4d477fa09cd48d995275ee1b4361960c7388",
-  "semantic_sha256": "e8edca33278787a57e4c627d4d0c996375048e69a93cd7ee95a874755c87e5db"
+  "scripted_contract_sha256": "45ae7ff3f6e82f440eb01219ea7c55735fb44a57ecbf9d55fa80f4d782e7f079",
+  "semantic_sha256": "1eaf7535d2c0e878889e8521b1b10c5c4f994ab61c89e66c980e94cdcd1cdc05"
 }

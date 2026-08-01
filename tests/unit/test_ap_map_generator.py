@@ -452,6 +452,7 @@ entity {
             self.assertEqual(
                 extract_target_names(trigger),
                 [
+                    "target_relay_complete_praetor_obj",
                     "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1",
                     "ap_remove_location_visual_7770081",
                 ],
