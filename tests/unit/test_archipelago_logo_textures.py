@@ -1,68 +1,142 @@
-"""Unit tests for Archipelago logo source validation, texture replacements, and package contract."""
+"""Contracts for the converted Archipelago albedo and its real consumers."""
+
+from __future__ import annotations
 
 import hashlib
 import json
+import os
 import zipfile
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "assets" / "source" / "archipelago_logo"
+RUNTIME_DIR = ROOT / "assets" / "runtime" / "archipelago_logo"
+MOD_ASSETS = ROOT / "packaging" / "mod_assets"
+CONTRACT = json.loads(
+    (RUNTIME_DIR / "texture_contract.json").read_text(encoding="utf-8")
+)
+SOURCE_TGA_SHA256 = (
+    "6e76b08e7e3e6dfb318b9ea80791a7ea15ed47de848912843cb3967246a6db3f"
+)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_prepared_source_files_hashes() -> None:
     expected_hashes = {
-        "ArchipelagoLogo_prepared.obj": "ab6a1f3d8fb833070889c80ef800a8ea9f55a1aa9dc905fb4599df32e5f9c659",
-        "ArchipelagoLogo_prepared.mtl": "803221b0dbc9fff8d1789fbb114a6542b29aaecac000970b2535d68d87b9d76a",
-        "archipelago_logo_atlas.png": "a25bb8b630dafe0dd4a5ad2863fa4ad41296277cf63818c4a7a2b4c1712b1a3a",
-        "archipelago_logo_atlas_direct_kd.png": "af656a1f1cd34ae8f953f96262526869ae0e3b280ead771504377acf823947b2",
-        "archipelago_logo_atlas_source.tga": "6e76b08e7e3e6dfb318b9ea80791a7ea15ed47de848912843cb3967246a6db3f",
+        "ArchipelagoLogo_prepared.obj": (
+            "ab6a1f3d8fb833070889c80ef800a8ea9f55a1aa9dc905fb4599df32e5f9c659"
+        ),
+        "ArchipelagoLogo_prepared.mtl": (
+            "803221b0dbc9fff8d1789fbb114a6542b29aaecac000970b2535d68d87b9d76a"
+        ),
+        "archipelago_logo_atlas.png": (
+            "a25bb8b630dafe0dd4a5ad2863fa4ad41296277cf63818c4a7a2b4c1712b1a3a"
+        ),
     }
     for filename, expected in expected_hashes.items():
-        file_path = SOURCE_DIR / filename
-        assert file_path.exists(), f"Missing source file: {filename}"
-        actual = hashlib.sha256(file_path.read_bytes()).hexdigest()
-        assert actual == expected, f"Hash mismatch for {filename}: {actual} != {expected}"
+        assert _sha256(SOURCE_DIR / filename) == expected
 
 
-def test_mod_assets_contain_tga_texture_replacements() -> None:
-    mod_assets = ROOT / "packaging" / "mod_assets"
-    expected_tga_hash = "6e76b08e7e3e6dfb318b9ea80791a7ea15ed47de848912843cb3967246a6db3f"
+def test_conventional_source_tga_is_not_a_runtime_texture() -> None:
+    source_tga = SOURCE_DIR / "archipelago_logo_atlas_source.tga"
+    data = source_tga.read_bytes()
+    assert _sha256(source_tga) == SOURCE_TGA_SHA256
+    assert data[:3] == b"\x00\x00\x02"
+    assert data[-18:] == b"TRUEVISION-XFILE.\x00"
 
-    # Sentinel Prime and Final Sin must contain codex.tga
-    for map_key in ("e2m4_boss", "e3m4_boss"):
-        codex_tga = mod_assets / map_key / "art" / "pickups" / "codex.tga"
-        assert codex_tga.exists(), f"Missing codex.tga for {map_key}"
-        assert hashlib.sha256(codex_tga.read_bytes()).hexdigest() == expected_tga_hash
+    runtime_members = tuple(MOD_ASSETS.rglob("*.tga*"))
+    assert runtime_members
+    assert all(_sha256(path) != SOURCE_TGA_SHA256 for path in runtime_members)
 
-    # All campaign map directories must contain question_mark_a.tga
-    for map_dir in mod_assets.iterdir():
-        if not map_dir.is_dir() or map_dir.name == "streamdb":
+
+def test_autoheckin_output_has_divinity_container_and_verified_bimage_contract() -> None:
+    converter = CONTRACT["converter"]
+    runtime_tga = ROOT / converter["output"]
+    data = runtime_tga.read_bytes()
+    assert _sha256(ROOT / converter["source_png"]) == converter["source_png_sha256"]
+    assert _sha256(runtime_tga) == converter["output_sha256"]
+    assert data[:8] == b"DIVINITY"
+    assert data[:3] != b"\x00\x00\x02"
+    assert data[-18:] != b"TRUEVISION-XFILE.\x00"
+    assert converter["bimage"] == {
+        "signature": "BIM",
+        "version": 21,
+        "material_kind": "albedo",
+        "material_kind_id": 1,
+        "width": 256,
+        "height": 256,
+        "mip_count": 9,
+        "texture_format": "FMT_BC1_SRGB",
+        "texture_format_id": 33,
+        "no_mips": False,
+    }
+
+
+def test_runtime_textures_use_only_real_material2_albedo_entries() -> None:
+    expected = {
+        MOD_ASSETS / slot["resource_base"] / slot["true_filename"]
+        for slot in CONTRACT["slots"]
+        if slot["packaged"]
+    }
+    actual = set(MOD_ASSETS.rglob("*.tga*"))
+    assert actual == expected
+
+    canonical = RUNTIME_DIR / "archipelago_logo_atlas.tga"
+    for slot in CONTRACT["slots"]:
+        if not slot["packaged"]:
+            assert slot["package_blocker"] == "model_importer_bundle_pending"
             continue
-        qm_tga = map_dir / "art" / "pickups" / "question_mark_a.tga"
-        assert qm_tga.exists(), f"Missing question_mark_a.tga for {map_dir.name}"
-        assert hashlib.sha256(qm_tga.read_bytes()).hexdigest() == expected_tga_hash
+        target = MOD_ASSETS / slot["resource_base"] / slot["true_filename"]
+        assert target.read_bytes() == canonical.read_bytes()
+        assert slot["true_filename"].startswith(slot["albedo_path"])
+        assert slot["higher_patch_copies"] == []
+        assert slot["resource_archive"] in slot["resource_priority_indices"]
 
 
-def test_release_zip_excludes_source_and_preparation_files() -> None:
-    release_dir = ROOT / "build" / "release"
-    zips = list(release_dir.glob("*.zip"))
-    if not zips:
-        return  # Skip if release build has not run yet
+def test_material2_non_albedo_maps_are_preserved_by_absence_of_decl_overrides() -> None:
+    for slot in CONTRACT["slots"]:
+        assert slot["inherit"] == "template/pbr_pickup"
+        assert slot["render_layers"] == 1
+        assert len(slot["material2_sha256"]) == 64
+        assert set(slot["preserved"]) >= {
+            "normal", "specular", "smoothness", "heightmap", "emissive"
+        }
+        assert not (
+            MOD_ASSETS / slot["resource_base"] / slot["material2"]
+        ).exists()
+        assert not (
+            MOD_ASSETS / slot["resource_base"] / "EternalMod" / "assetsinfo"
+        ).exists()
 
-    forbidden = {
-        "ArchipelagoLogo_prepared.obj",
-        "ArchipelagoLogo_prepared.mtl",
+
+def test_release_zip_contains_only_runtime_visual_assets() -> None:
+    configured = os.environ.get("AP_RELEASE_MOD_ZIP")
+    zip_path = Path(configured) if configured else (
+        ROOT / "build" / "release" / "DoomEternalArchipelagoAlpha.zip"
+    )
+    assert zip_path.is_file(), f"Expected release artifact is missing: {zip_path}"
+
+    forbidden_suffixes = (".obj", ".mtl", ".blend")
+    forbidden_names = {
         "archipelago_logo_atlas.png",
         "archipelago_logo_atlas_direct_kd.png",
         "archipelago_logo_atlas_source.tga",
-        "PREPARATION_REPORT.md",
         "archipelago_logo_prepared_bundle.zip",
     }
-
-    for zip_path in zips:
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            names = zf.namelist()
-            for forbidden_name in forbidden:
-                assert not any(forbidden_name in name for name in names), (
-                    f"Forbidden source file {forbidden_name} found in release artifact {zip_path.name}"
-                )
+    expected_textures = {
+        f'{slot["resource_base"]}/{slot["true_filename"]}'
+        for slot in CONTRACT["slots"]
+        if slot["packaged"]
+    }
+    with zipfile.ZipFile(zip_path) as archive:
+        names = set(archive.namelist())
+        assert expected_textures <= names
+        assert {
+            name for name in names if ".tga" in name
+        } == expected_textures
+        assert not any(name.lower().endswith(forbidden_suffixes) for name in names)
+        assert not any(Path(name).name in forbidden_names for name in names)

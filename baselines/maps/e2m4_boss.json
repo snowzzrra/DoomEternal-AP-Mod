@@ -15,9 +15,13 @@
     {
       "content_revision": "v0.3.4-alpha.1",
       "reason": "Sentinel AP visual now uses a real map-resident LWO replacement slot imported with the complete Model Importer bundle"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Sentinel codex slot updated to the coordinated Final Sin Model Importer payload and shared streamdb"
     }
   ],
-  "asset_package_contract_sha256": "dae05823008a4e7b8f3f634d778c40047369dc10921f0011e2f3310e19f62c0d",
+  "asset_package_contract_sha256": "bd6b9a3b35f99dfd3e85cdc138a99134b8305d00a238cf0262a6708ecbb3c5c2",
   "byte_sha256": "b5fd36629b488c776cd6a71148b7a4bb5261d0359dc306dcf137c1df421ef08a",
   "content_revision": "v0.3.4-alpha.1",
   "generated_entity_metrics": {

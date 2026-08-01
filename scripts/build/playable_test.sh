@@ -642,6 +642,11 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" .
 )
 
+AP_RELEASE_MOD_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
+    python3 -m pytest \
+    "$REPO_ROOT/tests/unit/test_archipelago_logo_textures.py" \
+    -q --maxfail=1
+
 (
     cd "$OUTPUT_DIR"
     zip -q -r "${PTB_ZIP_NAME}.tmp" \
