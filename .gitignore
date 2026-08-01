@@ -47,6 +47,8 @@ gameresources/
 !packaging/mod_assets/e2m4_boss_patch2/art/
 !packaging/mod_assets/e2m4_boss_patch2/art/pickups/
 !packaging/mod_assets/e2m4_boss_patch2/art/pickups/question_mark_a.lwo
+!assets/source/archipelago_logo/ArchipelagoLogo.obj
+!assets/source/archipelago_logo/ArchipelagoLogo_prepared.obj
 
 # Local investigation
 debug_matches.py
