@@ -4,12 +4,44 @@
   "assets": [
     {
       "key": "final_sin_archipelago_codex",
-      "strategy": "resident_model",
+      "strategy": "donor_model_override",
       "model": "art/pickups/codex.lwo",
       "resource_base": "e3m4_boss",
       "resource_owner": "game/sp/e3m4_boss/e3m4_boss_patch3.resources",
       "dependencies": [],
-      "dependency_policy": "required"
+      "dependency_policy": "model_importer_bundle",
+      "donor": {
+        "kind": "codex",
+        "selection": "named_entity",
+        "entity": "pickups_progress_codex_2_e3m4"
+      },
+      "replacement_slot_policy": "safe_resident_static_lwo",
+      "replacement_slot": {
+        "model_path": "art/pickups/codex.lwo",
+        "resource_archive": "e3m4_boss",
+        "material2": "art/pickups/codex",
+        "import_bundle": "codex_id#13626551837332538432",
+        "asset_id": "13626551837332538432",
+        "streamdb_payload": "art/pickups/codex_id#13626551837332538432.lwo",
+        "resource_payload_sha256": "b35312754e76fe37fd059fc8481d8cb269c7e30e2f858c12fd8bd61b608bb14f",
+        "streamdb_payload_sha256": "e41e0a3310996ee1c7c062ad4385176a151500ca688f71d1f3d3527fad796e81",
+        "vanilla_reference_allowlist": [
+          "pickups_progress_codex_2_e3m4"
+        ],
+        "provenance": {
+          "producer": "Doom Eternal Model Importer v1.2",
+          "source_obj": "Archipelago.obj",
+          "source_obj_sha256": "9a6255bfb72694ffcf3447f16fa12ad374c3b0d71a1dedd6f4aefe9630990e0c"
+        }
+      },
+      "usage_policy": "removed_vanilla_entity_allowlist",
+      "preserve": [
+        "trigger",
+        "collision",
+        "transform",
+        "layers",
+        "interaction"
+      ]
     }
   ]
 }
