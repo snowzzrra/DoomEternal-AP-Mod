@@ -1,0 +1,1168 @@
+{
+  "schema_version": 1,
+  "source": "Junk/DOOM_ETERNAL_CONTEXTUAL_LOCATION_NAMES.md",
+  "locations": [
+    {
+      "location_id": 7770014,
+      "current_name": "Hell on Earth - Modbot 1",
+      "contextual_name": "Hell on Earth - Modbot - Barge Upper Floor",
+      "map": "Hell on Earth",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770015,
+      "current_name": "Hell on Earth - Modbot 2",
+      "contextual_name": "Hell on Earth - Modbot - Mech Street Ruined House",
+      "map": "Hell on Earth",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770016,
+      "current_name": "Hell on Earth - Modbot 3",
+      "contextual_name": "Hell on Earth - Modbot - Subway Train Wreck",
+      "map": "Hell on Earth",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770035,
+      "current_name": "Exultia - Sentinel Crystal 1",
+      "contextual_name": "Exultia - Sentinel Crystal - Purple-Goo Cave after the Third Celestial Core",
+      "map": "Exultia",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770043,
+      "current_name": "Exultia - Weapon Modbot 1",
+      "contextual_name": "Exultia - Modbot - Purple-Goo Power-Core Cave",
+      "map": "Exultia",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770044,
+      "current_name": "Exultia - Rune 1",
+      "contextual_name": "Exultia - Rune - First Ruined Hall",
+      "map": "Exultia",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770045,
+      "current_name": "Exultia - Slayer Gate Key",
+      "contextual_name": "Exultia - Slayer Key - Falling-Platform Overlook",
+      "map": "Exultia",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770084,
+      "current_name": "Exultia - Sentinel Battery",
+      "contextual_name": "Exultia - Sentinel Battery - King Novik Return Path",
+      "map": "Exultia",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770057,
+      "current_name": "Cultist Base - Sentinel Battery 1",
+      "contextual_name": "Cultist Base - Sentinel Battery - First Arena Blue-Vent Ledge",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770058,
+      "current_name": "Cultist Base - Sentinel Crystal 1",
+      "contextual_name": "Cultist Base - Sentinel Crystal - Skull-Gate Chamber",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770061,
+      "current_name": "Cultist Base - Weapon Modbot 1",
+      "contextual_name": "Cultist Base - Modbot - Whiplash Corridor",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770062,
+      "current_name": "Cultist Base - Praetor Suit Token 1",
+      "contextual_name": "Cultist Base - Praetor Suit Token - First Mancubus Arena Exit",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770063,
+      "current_name": "Cultist Base - Praetor Suit Token 3",
+      "contextual_name": "Cultist Base - Praetor Suit Token - Icy-Slope Cracked Wall",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770064,
+      "current_name": "Cultist Base - Praetor Suit Token 4",
+      "contextual_name": "Cultist Base - Praetor Suit Token - Elevator-Shaft Crates",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770065,
+      "current_name": "Cultist Base - Praetor Suit Token 5",
+      "contextual_name": "Cultist Base - Praetor Suit Token - Raised-Skull Chamber",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770066,
+      "current_name": "Cultist Base - Praetor Suit Token 6",
+      "contextual_name": "Cultist Base - Praetor Suit Token - Deag Ranak Statue Exit",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770067,
+      "current_name": "Cultist Base - Rune 2",
+      "contextual_name": "Cultist Base - Rune - Main Story Path",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770069,
+      "current_name": "Cultist Base - Sentinel Battery 2",
+      "contextual_name": "Cultist Base - Sentinel Battery - Post-Arena Interior",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770070,
+      "current_name": "Cultist Base - Sentinel Battery 3",
+      "contextual_name": "Cultist Base - Sentinel Battery - Moving Elevator Shaft",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770071,
+      "current_name": "Cultist Base - Slayer Key",
+      "contextual_name": "Cultist Base - Slayer Key - Giant Yellow Wall Route",
+      "map": "Cultist Base",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770081,
+      "current_name": "Fortress of Doom - Praetor Suit Token 1",
+      "contextual_name": "Fortress of Doom - Praetor Suit Token - Story Suit Tutorial",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770086,
+      "current_name": "Fortress of Doom - Sentinel Crystal 1",
+      "contextual_name": "Fortress of Doom - Sentinel Crystal - Bridge Story Pickup",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770087,
+      "current_name": "Fortress of Doom - Sentinel Crystal 2",
+      "contextual_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower East",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770088,
+      "current_name": "Fortress of Doom - Sentinel Crystal 3",
+      "contextual_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower West",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770163,
+      "current_name": "Fortress of Doom - Praetor Suit Token 2",
+      "contextual_name": "Fortress of Doom - Praetor Suit Token - Battery Room Upper East",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770164,
+      "current_name": "Fortress of Doom - Praetor Suit Token 3",
+      "contextual_name": "Fortress of Doom - Praetor Suit Token - Battery Room Upper West",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770165,
+      "current_name": "Fortress of Doom - Weapon Modbot 1",
+      "contextual_name": "Fortress of Doom - Modbot - Battery Room Upper West",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770166,
+      "current_name": "Fortress of Doom - Weapon Modbot 2",
+      "contextual_name": "Fortress of Doom - Modbot - Battery Room Upper East",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770167,
+      "current_name": "Fortress of Doom - Praetor Suit Token 4",
+      "contextual_name": "Fortress of Doom - Praetor Suit Token - Elevator Room West",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770168,
+      "current_name": "Fortress of Doom - Praetor Suit Token 5",
+      "contextual_name": "Fortress of Doom - Praetor Suit Token - Elevator Room East",
+      "map": "Fortress of Doom",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770143,
+      "current_name": "Doom Hunter Base - Extra Life - Opening",
+      "contextual_name": "Doom Hunter Base - Extra Life - Red Generator Interior",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770144,
+      "current_name": "Doom Hunter Base - Praetor Suit Token 1",
+      "contextual_name": "Doom Hunter Base - Praetor Suit Token - Opening Hologram Platform",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770148,
+      "current_name": "Doom Hunter Base - Sentinel Battery 1",
+      "contextual_name": "Doom Hunter Base - Sentinel Battery - First Combat Room Vent",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770149,
+      "current_name": "Doom Hunter Base - Praetor Suit Token 2",
+      "contextual_name": "Doom Hunter Base - Praetor Suit Token - Red-Key Laser Side Room",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770150,
+      "current_name": "Doom Hunter Base - Extra Life - Furnace",
+      "contextual_name": "Doom Hunter Base - Extra Life - Coffin-Wall Platform",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770151,
+      "current_name": "Doom Hunter Base - Sentinel Battery 2",
+      "contextual_name": "Doom Hunter Base - Sentinel Battery - Above the Coffin-Wall Platform",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770152,
+      "current_name": "Doom Hunter Base - Sentinel Crystal",
+      "contextual_name": "Doom Hunter Base - Sentinel Crystal - Coffin-Wall Platform",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770153,
+      "current_name": "Doom Hunter Base - Extra Life - Moving Platform",
+      "contextual_name": "Doom Hunter Base - Extra Life - Train Dock Moving Platform",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770154,
+      "current_name": "Doom Hunter Base - Weapon Modbot",
+      "contextual_name": "Doom Hunter Base - Modbot - Train Dock",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770155,
+      "current_name": "Doom Hunter Base - Praetor Suit Token 3",
+      "contextual_name": "Doom Hunter Base - Praetor Suit Token - Electrified Hexagonal Structure",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770158,
+      "current_name": "Doom Hunter Base - Praetor Suit Token 4",
+      "contextual_name": "Doom Hunter Base - Praetor Suit Token - Coffin Cylinder Interior",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770161,
+      "current_name": "Doom Hunter Base - Rune",
+      "contextual_name": "Doom Hunter Base - Rune - Deag Ranak Hall",
+      "map": "Doom Hunter Base",
+      "source_note": "Source-confirmed"
+    },
+    {
+      "location_id": 7770176,
+      "current_name": "Super Gore Nest - Praetor Suit Token 1",
+      "contextual_name": "Super Gore Nest - Praetor Suit Token - Zombie Wall Opening",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770177,
+      "current_name": "Super Gore Nest - Praetor Suit Token 2",
+      "contextual_name": "Super Gore Nest - Praetor Suit Token - Buff-Totem Arena Corner",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770178,
+      "current_name": "Super Gore Nest - Praetor Suit Token 3",
+      "contextual_name": "Super Gore Nest - Praetor Suit Token - Red-Key Acid Corridor",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770179,
+      "current_name": "Super Gore Nest - Praetor Suit Token 4",
+      "contextual_name": "Super Gore Nest - Praetor Suit Token - Punch-Cube Story Path",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770180,
+      "current_name": "Super Gore Nest - Praetor Suit Token 5",
+      "contextual_name": "Super Gore Nest - Praetor Suit Token - Final Acid-Wall Climb",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770181,
+      "current_name": "Super Gore Nest - Weapon Modbot 1",
+      "contextual_name": "Super Gore Nest - Modbot - Twin-Elevator Room",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770182,
+      "current_name": "Super Gore Nest - Weapon Modbot 2",
+      "contextual_name": "Super Gore Nest - Modbot - Green-Skull Side Path",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770183,
+      "current_name": "Super Gore Nest - Rune 1",
+      "contextual_name": "Super Gore Nest - Rune - Yellow-Key Blue Vent",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770184,
+      "current_name": "Super Gore Nest - Rune 2",
+      "contextual_name": "Super Gore Nest - Rune - Post-Fire-Trap Green Wall",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770190,
+      "current_name": "Super Gore Nest - Extra Life 1",
+      "contextual_name": "Super Gore Nest - Extra Life - Upper-Floor Breakable Wall",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770191,
+      "current_name": "Super Gore Nest - Extra Life 2",
+      "contextual_name": "Super Gore Nest - Extra Life - Below the Yellow-Key Pedestal",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770192,
+      "current_name": "Super Gore Nest - Extra Life 3",
+      "contextual_name": "Super Gore Nest - Extra Life - Above the Green Toxic Waterfall",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770193,
+      "current_name": "Super Gore Nest - Extra Life 4",
+      "contextual_name": "Super Gore Nest - Extra Life - Buff-Totem Drop Tunnel",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770197,
+      "current_name": "Super Gore Nest - Sentinel Battery 1",
+      "contextual_name": "Super Gore Nest - Sentinel Battery - Radioactive Tunnel",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770198,
+      "current_name": "Super Gore Nest - Sentinel Battery 2",
+      "contextual_name": "Super Gore Nest - Sentinel Battery - Post-Fire-Trap Building",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770199,
+      "current_name": "Super Gore Nest - Sentinel Battery 3",
+      "contextual_name": "Super Gore Nest - Sentinel Battery - Blue-Key Slayer-Key Room",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770202,
+      "current_name": "Super Gore Nest - Secret Encounter 1",
+      "contextual_name": "Super Gore Nest - Secret Encounter - Yellow-Key Return Portal",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770203,
+      "current_name": "Super Gore Nest - Secret Encounter 2",
+      "contextual_name": "Super Gore Nest - Secret Encounter - Below the Red Key",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770204,
+      "current_name": "Super Gore Nest - Sentinel Crystal",
+      "contextual_name": "Super Gore Nest - Sentinel Crystal - Yellow-Key Story Path",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770205,
+      "current_name": "Super Gore Nest - Slayer Key",
+      "contextual_name": "Super Gore Nest - Slayer Key - Blue-Vent Upper Route",
+      "map": "Super Gore Nest",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770211,
+      "current_name": "ARC Complex - Praetor Suit Token 1",
+      "contextual_name": "ARC Complex - Praetor Suit Token - Ground-Floor Glass Room",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770212,
+      "current_name": "ARC Complex - Praetor Suit Token 2",
+      "contextual_name": "ARC Complex - Praetor Suit Token - UAC Hologram Platform",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770213,
+      "current_name": "ARC Complex - Praetor Suit Token 3",
+      "contextual_name": "ARC Complex - Praetor Suit Token - Samuel Hayden Gap",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770214,
+      "current_name": "ARC Complex - Praetor Suit Token 4",
+      "contextual_name": "ARC Complex - Praetor Suit Token - Generator Room Exit",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770215,
+      "current_name": "ARC Complex - Praetor Suit Token 5",
+      "contextual_name": "ARC Complex - Praetor Suit Token - Garage Lower Floor",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770216,
+      "current_name": "ARC Complex - Weapon Modbot 1",
+      "contextual_name": "ARC Complex - Modbot - Escalator Building",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770217,
+      "current_name": "ARC Complex - Weapon Modbot 2",
+      "contextual_name": "ARC Complex - Modbot - IDKFA Building Cracked Wall",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770218,
+      "current_name": "ARC Complex - Sentinel Battery 1",
+      "contextual_name": "ARC Complex - Sentinel Battery - Escalator Building Roof Gap",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770219,
+      "current_name": "ARC Complex - Sentinel Battery 2",
+      "contextual_name": "ARC Complex - Sentinel Battery - East Turret Room",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770220,
+      "current_name": "ARC Complex - Sentinel Battery 3",
+      "contextual_name": "ARC Complex - Sentinel Battery - Purple-Ooze Bar Route",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770221,
+      "current_name": "ARC Complex - Rune 1",
+      "contextual_name": "ARC Complex - Rune - Burning Corridor Drop",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770222,
+      "current_name": "ARC Complex - Rune 2",
+      "contextual_name": "ARC Complex - Rune - Collapsed Floor",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770223,
+      "current_name": "ARC Complex - Extra Life 1",
+      "contextual_name": "ARC Complex - Extra Life - Voice-Terminal Climb",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770224,
+      "current_name": "ARC Complex - Extra Life 2",
+      "contextual_name": "ARC Complex - Extra Life - Next-Building Ground Floor",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770225,
+      "current_name": "ARC Complex - Extra Life 3",
+      "contextual_name": "ARC Complex - Extra Life - Return Part II Side Room",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770237,
+      "current_name": "ARC Complex - Slayer Key",
+      "contextual_name": "ARC Complex - Slayer Key - Upper Mall Wall Route",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770240,
+      "current_name": "ARC Complex - Sentinel Crystal",
+      "contextual_name": "ARC Complex - Sentinel Crystal - ARC Part I Stairwell",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770242,
+      "current_name": "ARC Complex - Secret Encounter 1",
+      "contextual_name": "ARC Complex - Secret Encounter - Samuel Hayden Gap",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770243,
+      "current_name": "ARC Complex - Secret Encounter 2",
+      "contextual_name": "ARC Complex - Secret Encounter - Generator Room",
+      "map": "ARC Complex",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770249,
+      "current_name": "ARC Complex - Dr. Elena Richardson Log 1",
+      "contextual_name": "ARC Complex - Dr. Elena Richardson Log - IDKFA Stairwell Console",
+      "map": "ARC Complex",
+      "source_note": "Guide/source sequence"
+    },
+    {
+      "location_id": 7770250,
+      "current_name": "ARC Complex - Dr. Elena Richardson Log 2",
+      "contextual_name": "ARC Complex - Dr. Elena Richardson Log - Voice-Terminal Climb Console",
+      "map": "ARC Complex",
+      "source_note": "Guide/source sequence"
+    },
+    {
+      "location_id": 7770251,
+      "current_name": "ARC Complex - Dr. Elena Richardson Log 3",
+      "contextual_name": "ARC Complex - Dr. Elena Richardson Log - Garage Side-Room Console",
+      "map": "ARC Complex",
+      "source_note": "Guide/source sequence"
+    },
+    {
+      "location_id": 7770252,
+      "current_name": "ARC Complex - Dr. Elena Richardson Log 4",
+      "contextual_name": "ARC Complex - Dr. Elena Richardson Log - ARC Building Entrance Console",
+      "map": "ARC Complex",
+      "source_note": "Guide/source sequence"
+    },
+    {
+      "location_id": 7770256,
+      "current_name": "Mars Core - Praetor Suit Token 1",
+      "contextual_name": "Mars Core - Praetor Suit Token - Post-BFG Cracked Wall",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770257,
+      "current_name": "Mars Core - Praetor Suit Token 2",
+      "contextual_name": "Mars Core - Praetor Suit Token - Tentacle Control Room",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770258,
+      "current_name": "Mars Core - Praetor Suit Token 3",
+      "contextual_name": "Mars Core - Praetor Suit Token - Green-Piston Walkway",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770259,
+      "current_name": "Mars Core - Praetor Suit Token 4",
+      "contextual_name": "Mars Core - Praetor Suit Token - Sentinel Hologram Platform",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770260,
+      "current_name": "Mars Core - Praetor Suit Token 5",
+      "contextual_name": "Mars Core - Praetor Suit Token - Hebeth Catacombs",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770261,
+      "current_name": "Mars Core - Sentinel Battery 1",
+      "contextual_name": "Mars Core - Sentinel Battery - Flying Island",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770262,
+      "current_name": "Mars Core - Sentinel Battery 2",
+      "contextual_name": "Mars Core - Sentinel Battery - Exterior Arena Gap",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770263,
+      "current_name": "Mars Core - Sentinel Battery 3",
+      "contextual_name": "Mars Core - Sentinel Battery - Mars Core Landing",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770264,
+      "current_name": "Mars Core - Rune 1",
+      "contextual_name": "Mars Core - Rune - First Teleporter",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770265,
+      "current_name": "Mars Core - Rune 2",
+      "contextual_name": "Mars Core - Rune - Post-Prowler Elevator",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770266,
+      "current_name": "Mars Core - Extra Life 1",
+      "contextual_name": "Mars Core - Extra Life - Second Outdoor Arena",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770267,
+      "current_name": "Mars Core - Extra Life 2",
+      "contextual_name": "Mars Core - Extra Life - Post-BFG Burning Building",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770268,
+      "current_name": "Mars Core - Extra Life 3",
+      "contextual_name": "Mars Core - Extra Life - Hanging-Bar Breakable Wall",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770269,
+      "current_name": "Mars Core - Extra Life 4",
+      "contextual_name": "Mars Core - Extra Life - Pillar Combat Section",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770270,
+      "current_name": "Mars Core - Extra Life 5",
+      "contextual_name": "Mars Core - Extra Life - Under the Flying Island",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770271,
+      "current_name": "Mars Core - Extra Life 6",
+      "contextual_name": "Mars Core - Extra Life - Final Hebeth Arena",
+      "map": "Mars Core",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770280,
+      "current_name": "Mars Core - Slayer Key",
+      "contextual_name": "Mars Core - Slayer Key - Tentacle Control-Panel Vent",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770281,
+      "current_name": "Mars Core - Sentinel Crystal",
+      "contextual_name": "Mars Core - Sentinel Crystal - Flying-Island Blue-Vent Landing",
+      "map": "Mars Core",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770283,
+      "current_name": "Mars Core - Secret Encounter 1",
+      "contextual_name": "Mars Core - Secret Encounter - Post-BFG Cracked-Wall Side Room",
+      "map": "Mars Core",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770284,
+      "current_name": "Mars Core - Secret Encounter 2",
+      "contextual_name": "Mars Core - Secret Encounter - Tentacle Portal Arena",
+      "map": "Mars Core",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770300,
+      "current_name": "Sentinel Prime - Praetor Suit Token",
+      "contextual_name": "Sentinel Prime - Praetor Suit Token - Gladiator Approach Gap",
+      "map": "Sentinel Prime",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770301,
+      "current_name": "Sentinel Prime - Extra Life 1",
+      "contextual_name": "Sentinel Prime - Extra Life - Switch-Opened Wall Alcove",
+      "map": "Sentinel Prime",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770302,
+      "current_name": "Sentinel Prime - Extra Life 2",
+      "contextual_name": "Sentinel Prime - Extra Life - Beside the Gladiator Approach Token",
+      "map": "Sentinel Prime",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770303,
+      "current_name": "Taras Nabad - Sentinel Crystal",
+      "contextual_name": "Taras Nabad - Sentinel Crystal - Broken-Bridge Lower Room",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770306,
+      "current_name": "Taras Nabad - Praetor Suit Token 1",
+      "contextual_name": "Taras Nabad - Praetor Suit Token - First Marauder Courtyard Exit",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770307,
+      "current_name": "Taras Nabad - Praetor Suit Token 2",
+      "contextual_name": "Taras Nabad - Praetor Suit Token - First Swim Exit",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770308,
+      "current_name": "Taras Nabad - Praetor Suit Token 3",
+      "contextual_name": "Taras Nabad - Praetor Suit Token - Titan-Leg Pool",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770309,
+      "current_name": "Taras Nabad - Praetor Suit Token 4",
+      "contextual_name": "Taras Nabad - Praetor Suit Token - Post-Marauder Elevator Building",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770310,
+      "current_name": "Taras Nabad - Praetor Suit Token 5",
+      "contextual_name": "Taras Nabad - Praetor Suit Token - Rad-Suit Back Room",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770311,
+      "current_name": "Taras Nabad - Sentinel Battery 1",
+      "contextual_name": "Taras Nabad - Sentinel Battery - Starting Bridge Breakable Wall",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770312,
+      "current_name": "Taras Nabad - Sentinel Battery 2",
+      "contextual_name": "Taras Nabad - Sentinel Battery - Archvile Courtyard Statue Roof",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770313,
+      "current_name": "Taras Nabad - Sentinel Battery 3",
+      "contextual_name": "Taras Nabad - Sentinel Battery - Titan-Climb Ledge",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770314,
+      "current_name": "Taras Nabad - Extra Life 1",
+      "contextual_name": "Taras Nabad - Extra Life - Divinity Machine Flashback Room",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770315,
+      "current_name": "Taras Nabad - Extra Life 2",
+      "contextual_name": "Taras Nabad - Extra Life - Post-Marauder Circular Stair",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770316,
+      "current_name": "Taras Nabad - Extra Life 3",
+      "contextual_name": "Taras Nabad - Extra Life - Broken-Bridge Swing-Bar Hole",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770328,
+      "current_name": "Taras Nabad - Album 1",
+      "contextual_name": "Taras Nabad - Album - Marauder Gate Lower Platform",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770329,
+      "current_name": "Taras Nabad - Album 2",
+      "contextual_name": "Taras Nabad - Album - Vault Vent Breakable Wall",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770330,
+      "current_name": "Taras Nabad - Slayer Key",
+      "contextual_name": "Taras Nabad - Slayer Key - Second Swim Exit",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770331,
+      "current_name": "Taras Nabad - Secret Encounter 1",
+      "contextual_name": "Taras Nabad - Secret Encounter - Archvile Courtyard Breakable Wall",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770332,
+      "current_name": "Taras Nabad - Secret Encounter 2",
+      "contextual_name": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770338,
+      "current_name": "Taras Nabad - Mastery Token 1",
+      "contextual_name": "Taras Nabad - Mastery Token - Archvile Courtyard Button Gate",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770339,
+      "current_name": "Taras Nabad - Mastery Token 2",
+      "contextual_name": "Taras Nabad - Mastery Token - Crucible Room Opposite Walkway",
+      "map": "Taras Nabad",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770341,
+      "current_name": "Nekravol - Extra Life 1",
+      "contextual_name": "Nekravol - Extra Life - First Arena Tower Window",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770342,
+      "current_name": "Nekravol - Praetor Suit Token 1",
+      "contextual_name": "Nekravol - Praetor Suit Token - Kalibas Exit",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770344,
+      "current_name": "Nekravol - Praetor Suit Token 2",
+      "contextual_name": "Nekravol - Praetor Suit Token - Crusher-Trap Exit",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770345,
+      "current_name": "Nekravol - Mastery Token 1",
+      "contextual_name": "Nekravol - Mastery Token - Crusher-Trap Room",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770346,
+      "current_name": "Nekravol - Extra Life 2",
+      "contextual_name": "Nekravol - Extra Life - Post-Fourth-Arena Hall",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770350,
+      "current_name": "Nekravol - Mastery Token 2",
+      "contextual_name": "Nekravol - Mastery Token - Doom Hunter Toy Wall",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770351,
+      "current_name": "Nekravol - Praetor Suit Token 3",
+      "contextual_name": "Nekravol - Praetor Suit Token - Final Statue Path",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770352,
+      "current_name": "Nekravol - Album",
+      "contextual_name": "Nekravol - Album - Second Secret Encounter Stair",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770354,
+      "current_name": "Nekravol - Extra Life 3",
+      "contextual_name": "Nekravol - Extra Life - Final Arena Rear Platform",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770355,
+      "current_name": "Nekravol - Sentinel Crystal",
+      "contextual_name": "Nekravol - Sentinel Crystal - Opening Wall-Cannon Fork",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770356,
+      "current_name": "Nekravol - Secret Encounter 1",
+      "contextual_name": "Nekravol - Secret Encounter - Prison-Cage Gap",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770357,
+      "current_name": "Nekravol - Secret Encounter 2",
+      "contextual_name": "Nekravol - Secret Encounter - Green-Skull Gate Return",
+      "map": "Nekravol",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770367,
+      "current_name": "Nekravol Part II - Extra Life 1",
+      "contextual_name": "Nekravol Part II - Extra Life - Starting Bridge Boost Pad",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770368,
+      "current_name": "Nekravol Part II - Album 1",
+      "contextual_name": "Nekravol Part II - Album - Starting Bridge Side Platforms",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770369,
+      "current_name": "Nekravol Part II - Mastery Token",
+      "contextual_name": "Nekravol Part II - Mastery Token - Starting Bridge Side Platforms",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770371,
+      "current_name": "Nekravol Part II - Album 2",
+      "contextual_name": "Nekravol Part II - Album - Post-Fourth-Arena Breakable Wall",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770374,
+      "current_name": "Nekravol Part II - Extra Life 2",
+      "contextual_name": "Nekravol Part II - Extra Life - Rotating-Pillar Room Exit",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770375,
+      "current_name": "Nekravol Part II - Sentinel Crystal",
+      "contextual_name": "Nekravol Part II - Sentinel Crystal - Second-Arena Right Hall",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770377,
+      "current_name": "Nekravol Part II - Extra Life 3",
+      "contextual_name": "Nekravol Part II - Extra Life - Boost-Pad Room Top",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770378,
+      "current_name": "Nekravol Part II - Praetor Suit Token 1",
+      "contextual_name": "Nekravol Part II - Praetor Suit Token - Final Arena Elevator Undercroft",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770379,
+      "current_name": "Nekravol Part II - Praetor Suit Token 2",
+      "contextual_name": "Nekravol Part II - Praetor Suit Token - Post-Boost-Pad Back Room",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770380,
+      "current_name": "Nekravol Part II - Praetor Suit Token 3",
+      "contextual_name": "Nekravol Part II - Praetor Suit Token - Blue-Energy Room Breakable Wall",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770381,
+      "current_name": "Nekravol Part II - Secret Encounter 1",
+      "contextual_name": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770382,
+      "current_name": "Nekravol Part II - Secret Encounter 2",
+      "contextual_name": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall",
+      "map": "Nekravol Part II",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770388,
+      "current_name": "Urdak - Mastery Token 1",
+      "contextual_name": "Urdak - Mastery Token - First Forcefield Room Upper Ledge",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770390,
+      "current_name": "Urdak - Extra Life 1",
+      "contextual_name": "Urdak - Extra Life - Vent before the Second Arena",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770391,
+      "current_name": "Urdak - Mastery Token 2",
+      "contextual_name": "Urdak - Mastery Token - Vent after the Second Album",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770393,
+      "current_name": "Urdak - Extra Life 2",
+      "contextual_name": "Urdak - Extra Life - Eighth-Arena Breakable Wall",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770395,
+      "current_name": "Urdak - Album 1",
+      "contextual_name": "Urdak - Album - Dark Wall after the Icon of Sin Codex",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770396,
+      "current_name": "Urdak - Album 2",
+      "contextual_name": "Urdak - Album - Bar-and-Grate Side Platform",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770397,
+      "current_name": "Urdak - Praetor Suit Token 1",
+      "contextual_name": "Urdak - Praetor Suit Token - Fifth-Arena Window Ledge",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770398,
+      "current_name": "Urdak - Praetor Suit Token 2",
+      "contextual_name": "Urdak - Praetor Suit Token - Seventh-Arena Elevator Door",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770399,
+      "current_name": "Urdak - Extra Life 3",
+      "contextual_name": "Urdak - Extra Life - Water-Filled Icon Room",
+      "map": "Urdak",
+      "source_note": "Guide-order; verify ID"
+    },
+    {
+      "location_id": 7770405,
+      "current_name": "Urdak - Secret Encounter 1",
+      "contextual_name": "Urdak - Secret Encounter - Statue-Puzzle Upper Door",
+      "map": "Urdak",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770406,
+      "current_name": "Urdak - Secret Encounter 2",
+      "contextual_name": "Urdak - Secret Encounter - Eighth-Arena Breakable Wall",
+      "map": "Urdak",
+      "source_note": "Guide-order"
+    },
+    {
+      "location_id": 7770412,
+      "current_name": "Final Sin - Extra Life 1",
+      "contextual_name": "Final Sin - Extra Life - First Building Vent",
+      "map": "Final Sin",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770415,
+      "current_name": "Final Sin - Extra Life 2",
+      "contextual_name": "Final Sin - Extra Life - Second Building Lower Vent",
+      "map": "Final Sin",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770416,
+      "current_name": "Final Sin - Extra Life 3",
+      "contextual_name": "Final Sin - Extra Life - Twin-Elevator Vent",
+      "map": "Final Sin",
+      "source_note": "Source/guide"
+    },
+    {
+      "location_id": 7770417,
+      "current_name": "Final Sin - Extra Life 4",
+      "contextual_name": "Final Sin - Extra Life - Fourth-Arena Gore Room",
+      "map": "Final Sin",
+      "source_note": "Source/guide"
+    }
+  ]
+}

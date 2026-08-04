@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +16,9 @@ RUNE_SLOT_OWNER = {
     "path": "entitydef/player.decl",
     "sha256": "4f06051e78e1a4b4cac3ed2f7c34aade613627c35537e3f5fe10cc83e2949c95",
 }
+ENCODED_SOURCE = (
+    ROOT / "assets" / "native_decl_sources" / "player.decl.base64"
+)
 SOURCE_SLOT_REQUIREMENTS = """\t\t\t\truneSlotReq = {
 \t\t\t\t\tptr = {
 \t\t\t\t\t\tptr[0] = 1;
@@ -33,12 +37,14 @@ PATCHED_SLOT_REQUIREMENTS = """\t\t\t\truneSlotReq = {
 """
 
 
+def load_rune_slot_source() -> bytes:
+    """Decode the byte-preserved native owner without newline conversion."""
+    encoded = b"".join(ENCODED_SOURCE.read_bytes().split())
+    return base64.b64decode(encoded, validate=True)
+
+
 def build_rune_slot_override(mod_root: Path) -> dict:
-    source = (
-        ROOT / "assets" / "native_decl_sources" / "base"
-        / "generated" / "decls" / RUNE_SLOT_OWNER["path"]
-    )
-    payload = source.read_bytes()
+    payload = load_rune_slot_source()
     actual_hash = hashlib.sha256(payload).hexdigest()
     if actual_hash != RUNE_SLOT_OWNER["sha256"]:
         raise ValueError(f"Rune slot owner hash drift: {actual_hash}")

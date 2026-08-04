@@ -547,7 +547,11 @@ class Pipeline:
             "tests/test_content_strategies.py",
             "tests/test_publisher_runtime.py",
             "tests/test_aggregate_contract.py",
+            "tests/test_contextual_location_names.py",
             "tests/test_observer_lifecycle.py",
+            "tests/unit/test_039a_static_contracts.py",
+            "tests/unit/test_delivery_diagnostics.py",
+            "tests/unit/test_game_identity.py",
             "-q", "--maxfail=1",
         ])
 

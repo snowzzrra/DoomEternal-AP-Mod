@@ -1,6 +1,6 @@
 name: Marine
-game: Doom Eternal
-Doom Eternal:
+game: DOOM Eternal
+DOOM Eternal:
   randomize_chainsaw: false
   randomize_dash: false
   randomize_first_battery: false

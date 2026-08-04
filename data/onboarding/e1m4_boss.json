@@ -31,7 +31,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770143,
-      "ap_name": "Doom Hunter Base - Extra Life - Opening",
+      "ap_name": "Doom Hunter Base - Extra Life - Red Generator Interior",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -60,7 +60,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770144,
-      "ap_name": "Doom Hunter Base - Praetor Suit Token 1",
+      "ap_name": "Doom Hunter Base - Praetor Suit Token - Opening Hologram Platform",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -168,7 +168,7 @@
       "class": "idProp2",
       "inherit": "progress/sentinel_battery",
       "ap_id": 7770148,
-      "ap_name": "Doom Hunter Base - Sentinel Battery 1",
+      "ap_name": "Doom Hunter Base - Sentinel Battery - First Combat Room Vent",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -195,7 +195,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770149,
-      "ap_name": "Doom Hunter Base - Praetor Suit Token 2",
+      "ap_name": "Doom Hunter Base - Praetor Suit Token - Red-Key Laser Side Room",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -222,7 +222,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770150,
-      "ap_name": "Doom Hunter Base - Extra Life - Furnace",
+      "ap_name": "Doom Hunter Base - Extra Life - Coffin-Wall Platform",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -251,7 +251,7 @@
       "class": "idProp2",
       "inherit": "progress/sentinel_battery",
       "ap_id": 7770151,
-      "ap_name": "Doom Hunter Base - Sentinel Battery 2",
+      "ap_name": "Doom Hunter Base - Sentinel Battery - Above the Coffin-Wall Platform",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -278,7 +278,7 @@
       "class": "idInteractable_WorldCache",
       "inherit": "progress/argent_cell",
       "ap_id": 7770152,
-      "ap_name": "Doom Hunter Base - Sentinel Crystal",
+      "ap_name": "Doom Hunter Base - Sentinel Crystal - Coffin-Wall Platform",
       "entity_match_count": 1,
       "original_targets": [
         {
@@ -319,7 +319,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770153,
-      "ap_name": "Doom Hunter Base - Extra Life - Moving Platform",
+      "ap_name": "Doom Hunter Base - Extra Life - Train Dock Moving Platform",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -350,7 +350,7 @@
       "class": "idInteractable_WeaponModBot",
       "inherit": "progress/mod_bot",
       "ap_id": 7770154,
-      "ap_name": "Doom Hunter Base - Weapon Modbot",
+      "ap_name": "Doom Hunter Base - Modbot - Train Dock",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -377,7 +377,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770155,
-      "ap_name": "Doom Hunter Base - Praetor Suit Token 3",
+      "ap_name": "Doom Hunter Base - Praetor Suit Token - Electrified Hexagonal Structure",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -460,7 +460,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770158,
-      "ap_name": "Doom Hunter Base - Praetor Suit Token 4",
+      "ap_name": "Doom Hunter Base - Praetor Suit Token - Coffin Cylinder Interior",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -543,7 +543,7 @@
       "class": "idInteractable_Rune",
       "inherit": "progress/rune",
       "ap_id": 7770161,
-      "ap_name": "Doom Hunter Base - Rune",
+      "ap_name": "Doom Hunter Base - Rune - Deag Ranak Hall",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [

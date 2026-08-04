@@ -14,7 +14,8 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current `v0.3.8-alpha` scope:
+Current `0.3.9b` development scope (the packaged release identity remains
+`v0.3.8-alpha.1` until a later release):
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -28,6 +29,17 @@ Current `v0.3.8-alpha` scope:
 The current alpha validates map checks, item delivery, DeathLink, save-derived
 locations, Fortress progression, runtime gating, and APWorld generation across
 the supported campaign route.
+
+### Identity compatibility
+
+New seeds use the game identity `DOOM Eternal`. Existing `Doom Eternal` seeds
+and APWorlds remain paired with the prior client/APWorld; mixing the two is
+rejected before launch rather than silently connecting.
+
+### Contextual location names
+
+Physical collectible checks now use concise landmark names in the tracker and
+log instead of generic numbered labels.
 
 ## Installation
 
@@ -142,7 +154,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.8-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.8-alpha.1.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoAlpha.zip

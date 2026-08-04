@@ -34,18 +34,18 @@
     "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1": 7770339
   },
   "names": {
-    "7770303": "Taras Nabad - Sentinel Crystal",
-    "7770306": "Taras Nabad - Praetor Suit Token 1",
-    "7770307": "Taras Nabad - Praetor Suit Token 2",
-    "7770308": "Taras Nabad - Praetor Suit Token 3",
-    "7770309": "Taras Nabad - Praetor Suit Token 4",
-    "7770310": "Taras Nabad - Praetor Suit Token 5",
-    "7770311": "Taras Nabad - Sentinel Battery 1",
-    "7770312": "Taras Nabad - Sentinel Battery 2",
-    "7770313": "Taras Nabad - Sentinel Battery 3",
-    "7770314": "Taras Nabad - Extra Life 1",
-    "7770315": "Taras Nabad - Extra Life 2",
-    "7770316": "Taras Nabad - Extra Life 3",
+    "7770303": "Taras Nabad - Sentinel Crystal - Broken-Bridge Lower Room",
+    "7770306": "Taras Nabad - Praetor Suit Token - First Marauder Courtyard Exit",
+    "7770307": "Taras Nabad - Praetor Suit Token - First Swim Exit",
+    "7770308": "Taras Nabad - Praetor Suit Token - Titan-Leg Pool",
+    "7770309": "Taras Nabad - Praetor Suit Token - Post-Marauder Elevator Building",
+    "7770310": "Taras Nabad - Praetor Suit Token - Rad-Suit Back Room",
+    "7770311": "Taras Nabad - Sentinel Battery - Starting Bridge Breakable Wall",
+    "7770312": "Taras Nabad - Sentinel Battery - Archvile Courtyard Statue Roof",
+    "7770313": "Taras Nabad - Sentinel Battery - Titan-Climb Ledge",
+    "7770314": "Taras Nabad - Extra Life - Divinity Machine Flashback Room",
+    "7770315": "Taras Nabad - Extra Life - Post-Marauder Circular Stair",
+    "7770316": "Taras Nabad - Extra Life - Broken-Bridge Swing-Bar Hole",
     "7770317": "Taras Nabad - Toy - Cyber Mancubus",
     "7770318": "Taras Nabad - Toy - Marauder",
     "7770319": "Taras Nabad - Toy - Pain Elemental",
@@ -57,13 +57,13 @@
     "7770325": "Taras Nabad - History of the Sentinels Part XIII Codex",
     "7770326": "Taras Nabad - History of the Sentinels Part XIV Codex",
     "7770327": "Taras Nabad - Cheat Code - Powerup Mode: Overdrive",
-    "7770328": "Taras Nabad - Album 1",
-    "7770329": "Taras Nabad - Album 2",
-    "7770330": "Taras Nabad - Slayer Key",
-    "7770331": "Taras Nabad - Secret Encounter 1",
-    "7770332": "Taras Nabad - Secret Encounter 2",
-    "7770338": "Taras Nabad - Mastery Token 1",
-    "7770339": "Taras Nabad - Mastery Token 2"
+    "7770328": "Taras Nabad - Album - Marauder Gate Lower Platform",
+    "7770329": "Taras Nabad - Album - Vault Vent Breakable Wall",
+    "7770330": "Taras Nabad - Slayer Key - Second Swim Exit",
+    "7770331": "Taras Nabad - Secret Encounter - Archvile Courtyard Breakable Wall",
+    "7770332": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall",
+    "7770338": "Taras Nabad - Mastery Token - Archvile Courtyard Button Gate",
+    "7770339": "Taras Nabad - Mastery Token - Crucible Room Opposite Walkway"
   },
   "location_feedback": {
     "default_policy": "ap_only"
@@ -72,22 +72,38 @@
     "game_progress_argent_cell_1_498834914": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": ["game_destructible_interact_argent_cell_1_498834914"],
+      "preserve_targets": [
+        "game_destructible_interact_argent_cell_1_498834914"
+      ],
       "drop_targets": [],
       "safe_target_graph": {
         "game_destructible_interact_argent_cell_1_498834914": []
       },
-      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
     },
     "pickups_pickup_keycard_slayer_key_1": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": ["target_changelayer_slayergate_1"],
+      "preserve_targets": [
+        "target_changelayer_slayergate_1"
+      ],
       "drop_targets": [],
       "safe_target_graph": {
         "target_changelayer_slayergate_1": []
       },
-      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
     }
   },
   "remove_entities": [],

@@ -28,22 +28,22 @@
     "7770364": "Nekravol Part II - Fuel the Eternal Flame Part III Codex",
     "7770365": "Nekravol Part II - Fuel the Eternal Flame Part II Codex",
     "7770366": "Nekravol Part II - Nekravol Part II Codex",
-    "7770367": "Nekravol Part II - Extra Life 1",
-    "7770368": "Nekravol Part II - Album 1",
-    "7770369": "Nekravol Part II - Mastery Token",
+    "7770367": "Nekravol Part II - Extra Life - Starting Bridge Boost Pad",
+    "7770368": "Nekravol Part II - Album - Starting Bridge Side Platforms",
+    "7770369": "Nekravol Part II - Mastery Token - Starting Bridge Side Platforms",
     "7770370": "Nekravol Part II - Cheat Code - Party Mode",
-    "7770371": "Nekravol Part II - Album 2",
+    "7770371": "Nekravol Part II - Album - Post-Fourth-Arena Breakable Wall",
     "7770372": "Nekravol Part II - Toy - Dread Knight",
     "7770373": "Nekravol Part II - Cheat Code - Instant Stagger Mode",
-    "7770374": "Nekravol Part II - Extra Life 2",
-    "7770375": "Nekravol Part II - Sentinel Crystal",
+    "7770374": "Nekravol Part II - Extra Life - Rotating-Pillar Room Exit",
+    "7770375": "Nekravol Part II - Sentinel Crystal - Second-Arena Right Hall",
     "7770376": "Nekravol Part II - Toy - Archvile",
-    "7770377": "Nekravol Part II - Extra Life 3",
-    "7770378": "Nekravol Part II - Praetor Suit Token 1",
-    "7770379": "Nekravol Part II - Praetor Suit Token 2",
-    "7770380": "Nekravol Part II - Praetor Suit Token 3",
-    "7770381": "Nekravol Part II - Secret Encounter 1",
-    "7770382": "Nekravol Part II - Secret Encounter 2"
+    "7770377": "Nekravol Part II - Extra Life - Boost-Pad Room Top",
+    "7770378": "Nekravol Part II - Praetor Suit Token - Final Arena Elevator Undercroft",
+    "7770379": "Nekravol Part II - Praetor Suit Token - Post-Boost-Pad Back Room",
+    "7770380": "Nekravol Part II - Praetor Suit Token - Blue-Energy Room Breakable Wall",
+    "7770381": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms",
+    "7770382": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall"
   },
   "location_feedback": {
     "default_policy": "ap_only"
@@ -52,12 +52,20 @@
     "pickups_progress_argent_cell_1_693519488_e3m2_b": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": ["pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"],
+      "preserve_targets": [
+        "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"
+      ],
       "drop_targets": [],
       "safe_target_graph": {
         "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b": []
       },
-      "forbidden_target_terms": ["currency", "give", "grant", "inventory", "perk"]
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
     }
   },
   "remove_entities": [],
