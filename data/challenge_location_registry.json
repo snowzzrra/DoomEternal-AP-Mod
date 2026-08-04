@@ -1,879 +1,1595 @@
 {
-  "schema_version": 10,
-  "mission_complete": [
+  "all_mission_challenges": [
     {
-      "name": "Hell on Earth - Mission Complete",
-      "location_id": 7770122,
+      "category": "all_mission_challenges",
+      "location_id": 7770141,
+      "mission_key": "e1m3",
+      "name": "Cultist Base - All Mission Challenges Completed",
+      "order": 36,
       "signal": {
-        "kind": "map_terminal",
-        "runtime_map": "game/sp/e1m1_intro/e1m1_intro"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770138,
+          7770139,
+          7770140
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Exultia - Mission Complete",
-      "location_id": 7770123,
+      "category": "all_mission_challenges",
+      "location_id": 7770175,
+      "mission_key": "e1m4",
+      "name": "Doom Hunter Base - All Mission Challenges Completed",
+      "order": 37,
       "signal": {
-        "kind": "map_terminal",
-        "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770172,
+          7770173,
+          7770174
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Cultist Base - Mission Complete",
-      "location_id": 7770124,
+      "category": "all_mission_challenges",
+      "location_id": 7770209,
+      "mission_key": "e2m1",
+      "name": "Super Gore Nest - All Mission Challenges Completed",
+      "order": 38,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e1m3_cult/e1m3_cult",
-        "to": "game/sp/e1m4_boss/e1m4_boss"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770206,
+          7770207,
+          7770208
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Doom Hunter Base - Mission Complete",
-      "location_id": 7770162,
+      "category": "all_mission_challenges",
+      "location_id": 7770247,
+      "mission_key": "e2m2",
+      "name": "ARC Complex - All Mission Challenges Completed",
+      "order": 39,
       "signal": {
-        "kind": "map_terminal",
-        "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770244,
+          7770245,
+          7770246
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Super Gore Nest - Mission Complete",
-      "location_id": 7770210,
+      "category": "all_mission_challenges",
+      "location_id": 7770288,
+      "mission_key": "e2m3",
+      "name": "Mars Core - All Mission Challenges Completed",
+      "order": 40,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e2m1_nest/e2m1_nest",
-        "to": "game/hub/hub"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770285,
+          7770286,
+          7770287
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "ARC Complex - Mission Complete",
-      "location_id": 7770248,
+      "category": "all_mission_challenges",
+      "location_id": 7770336,
+      "mission_key": "e3m1_slayer",
+      "name": "Taras Nabad - All Mission Challenges Completed",
+      "order": 44,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e2m2_base/e2m2_base",
-        "to": "game/hub/hub"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770333,
+          7770334,
+          7770335
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Mars Core - Mission Complete",
-      "location_id": 7770289,
+      "category": "all_mission_challenges",
+      "location_id": 7770361,
+      "mission_key": "e3m2_hell",
+      "name": "Nekravol - All Mission Challenges Completed",
+      "order": 49,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e2m3_core/e2m3_core",
-        "to": "game/sp/e2m4_boss/e2m4_boss"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770358,
+          7770359,
+          7770360
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     },
     {
-      "name": "Sentinel Prime - Mission Complete",
-      "location_id": 7770290,
+      "category": "all_mission_challenges",
+      "location_id": 7770386,
+      "mission_key": "e3m2_hell_b",
+      "name": "Nekravol Part II - All Mission Challenges Completed",
+      "order": 54,
       "signal": {
-        "kind": "map_terminal",
-        "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
-        "owner": "e2m4_endoflevel_transition"
-      }
+        "authority": "server_checked_locations",
+        "children": [
+          7770383,
+          7770384,
+          7770385
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
+    },
+    {
+      "category": "all_mission_challenges",
+      "location_id": 7770410,
+      "mission_key": "e3m3_maykr",
+      "name": "Urdak - All Mission Challenges Completed",
+      "order": 59,
+      "signal": {
+        "authority": "server_checked_locations",
+        "children": [
+          7770407,
+          7770408,
+          7770409
+        ],
+        "kind": "aggregate",
+        "required_count": 3
+      },
+      "strategy": "aggregate"
     }
   ],
   "mission_challenges": [
     {
-      "name": "Cultist Base - Mission Challenge - Pull the Crystal",
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e1m3/challenge_1.decl",
+        "sha256": "8963fd1c4a94903bf5cd649ac390e35f9f141afc60e61dc72ab750945f187b91"
+      },
       "location_id": 7770138,
+      "mission_key": "e1m3",
+      "name": "Cultist Base - Mission Challenge - Pull the Crystal",
+      "order": 21,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "physical_event_equivalent",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
         "physical_location_ids": [
           7770059
         ],
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m3/challenge_1",
-        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_ARGENT_UPGRADED",
-        "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "unlockable": "mission_challenge/e1m3/challenge_1",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e1m3/challenge_1.decl",
-        "sha256": "8963fd1c4a94903bf5cd649ac390e35f9f141afc60e61dc72ab750945f187b91",
-        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_1"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "physical_event_equivalent"
     },
     {
-      "name": "Cultist Base - Mission Challenge - Armored Rain",
-      "location_id": 7770139,
-      "signal": {
-        "kind": "unlockable_record",
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m3/challenge_2",
-        "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_ON_FIRE_MULTI_FLAME",
-        "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
-        "unlockableIsUnlocked": true
-      },
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_2",
         "path": "unlockable/mission_challenge/e1m3/challenge_2.decl",
-        "sha256": "f502055e1534b70c4de3411973f1149f83301181b3ec762afef6eb7401b8598c",
-        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_2"
+        "sha256": "f502055e1534b70c4de3411973f1149f83301181b3ec762afef6eb7401b8598c"
       },
+      "location_id": 7770139,
+      "mission_key": "e1m3",
+      "name": "Cultist Base - Mission Challenge - Armored Rain",
+      "order": 22,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "Cultist Base - Mission Challenge - Master of Turrets",
-      "location_id": 7770140,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m3/challenge_3",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_ARACHNOTRON",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_ON_FIRE_MULTI_FLAME",
+        "unlockable": "mission_challenge/e1m3/challenge_2",
         "unlockableIsUnlocked": true
       },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_3",
         "path": "unlockable/mission_challenge/e1m3/challenge_3.decl",
-        "sha256": "fae5e067cbc5d3534fa3624cc538c47aa70aac1e7e71cf951c3d0f11c5b3e38e",
-        "completion_stat": "STAT_COMPLETED_E1M3_CHALLENGE_3"
+        "sha256": "fae5e067cbc5d3534fa3624cc538c47aa70aac1e7e71cf951c3d0f11c5b3e38e"
       },
+      "location_id": 7770140,
+      "mission_key": "e1m3",
+      "name": "Cultist Base - Mission Challenge - Master of Turrets",
+      "order": 23,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "Doom Hunter Base - Mission Challenge - Musical Interlude",
-      "location_id": 7770172,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m4/challenge_1",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_ARACHNOTRON",
+        "unlockable": "mission_challenge/e1m3/challenge_3",
         "unlockableIsUnlocked": true
       },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_1",
         "path": "unlockable/mission_challenge/e1m4/challenge_1.decl",
-        "sha256": "ee79868c1f8a182466bda0b9fa450a8bb2cdec0fb6fbff34160966a6b4f55ebe",
-        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_1"
+        "sha256": "ee79868c1f8a182466bda0b9fa450a8bb2cdec0fb6fbff34160966a6b4f55ebe"
       },
+      "location_id": 7770172,
+      "mission_key": "e1m4",
+      "name": "Doom Hunter Base - Mission Challenge - Musical Interlude",
+      "order": 24,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "Doom Hunter Base - Mission Challenge - Big Reveal",
-      "location_id": 7770173,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m4/challenge_2",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_AUTOMAP",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
+        "unlockable": "mission_challenge/e1m4/challenge_1",
         "unlockableIsUnlocked": true
       },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_2",
         "path": "unlockable/mission_challenge/e1m4/challenge_2.decl",
-        "sha256": "bfc15814c6e64332231b0069a2514b5cab4b82b090efb0e7308f94f32105383c",
-        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_2"
+        "sha256": "bfc15814c6e64332231b0069a2514b5cab4b82b090efb0e7308f94f32105383c"
       },
+      "location_id": 7770173,
+      "mission_key": "e1m4",
+      "name": "Doom Hunter Base - Mission Challenge - Big Reveal",
+      "order": 25,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "Doom Hunter Base - Mission Challenge - Fire in the Hole",
-      "location_id": 7770174,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e1m4/challenge_3",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_KILL_N_ENEMIES_ONE_GRENADE",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_AUTOMAP",
+        "unlockable": "mission_challenge/e1m4/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e1m4/challenge_3.decl",
-        "sha256": "e919b8ca770fa15627bec6efafbd4a6579499cee863d4b18c07a461ce5674b50",
-        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_3"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "unlockable_record"
     },
     {
-      "name": "Super Gore Nest - Mission Challenge - Weaponslave",
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e1m4/challenge_3.decl",
+        "sha256": "e919b8ca770fa15627bec6efafbd4a6579499cee863d4b18c07a461ce5674b50"
+      },
+      "location_id": 7770174,
+      "mission_key": "e1m4",
+      "name": "Doom Hunter Base - Mission Challenge - Fire in the Hole",
+      "order": 26,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_KILL_N_ENEMIES_ONE_GRENADE",
+        "unlockable": "mission_challenge/e1m4/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e2m1/challenge_1.decl",
+        "sha256": "736f921d3981d9952a6ab86ed84b37784a2543ff25c2968a57be00133945c22c"
+      },
       "location_id": 7770206,
+      "mission_key": "e2m1",
+      "name": "Super Gore Nest - Mission Challenge - Weaponslave",
+      "order": 27,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "physical_event_equivalent",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
         "physical_location_ids": [
           7770181,
           7770182
         ],
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m1/challenge_1",
-        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_DLE_WEAPON_MOD_PURCHASE",
-        "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "unlockable": "mission_challenge/e2m1/challenge_1",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m1/challenge_1.decl",
-        "sha256": "736f921d3981d9952a6ab86ed84b37784a2543ff25c2968a57be00133945c22c",
-        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_1"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "physical_event_equivalent"
     },
     {
-      "name": "Super Gore Nest - Mission Challenge - A Bloody Secret",
-      "location_id": 7770207,
-      "signal": {
-        "kind": "unlockable_record",
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m1/challenge_2",
-        "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_SGN_CHALLENGE_NEST",
-        "rule_0_statDuration": 1,
-        "rule_0_satisfied": true,
-        "unlockableIsUnlocked": true
-      },
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_2",
         "path": "unlockable/mission_challenge/e2m1/challenge_2.decl",
-        "sha256": "bdb843ed7af7b340ed861be126d62ae5a93c8a15b35c31863bca21437a4c190e",
-        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_2"
+        "sha256": "bdb843ed7af7b340ed861be126d62ae5a93c8a15b35c31863bca21437a4c190e"
       },
+      "location_id": 7770207,
+      "mission_key": "e2m1",
+      "name": "Super Gore Nest - Mission Challenge - A Bloody Secret",
+      "order": 28,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "Super Gore Nest - Mission Challenge - War Pinkies",
-      "location_id": 7770208,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m1/challenge_3",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_PINKY_GLORYKILL_STYLES",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 1,
+        "rule_0_statname": "STAT_SGN_CHALLENGE_NEST",
+        "unlockable": "mission_challenge/e2m1/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m1/challenge_3.decl",
-        "sha256": "9fb09b0c87245f748b7c87ebf625e16ecc58f5a5942c00d9a95b05c01e4bbb0d",
-        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_3"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "unlockable_record"
     },
     {
-      "name": "ARC Complex - Mission Challenge - Rune Finder",
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e2m1/challenge_3.decl",
+        "sha256": "9fb09b0c87245f748b7c87ebf625e16ecc58f5a5942c00d9a95b05c01e4bbb0d"
+      },
+      "location_id": 7770208,
+      "mission_key": "e2m1",
+      "name": "Super Gore Nest - Mission Challenge - War Pinkies",
+      "order": 29,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_PINKY_GLORYKILL_STYLES",
+        "unlockable": "mission_challenge/e2m1/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e2m2/challenge_1.decl",
+        "sha256": "9d0902c4035bd0dbb28c086a0d3ec1de9e70bac2eb13c9f30af82ffa9e9bb1f0"
+      },
       "location_id": 7770244,
+      "mission_key": "e2m2",
+      "name": "ARC Complex - Mission Challenge - Rune Finder",
+      "order": 30,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "physical_event_equivalent",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
         "physical_location_ids": [
           7770221,
           7770222
         ],
         "required_count": 2,
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m2/challenge_1",
-        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_DLE_RUNE_ACQUIRED_E2M2",
-        "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "unlockable": "mission_challenge/e2m2/challenge_1",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m2/challenge_1.decl",
-        "sha256": "9d0902c4035bd0dbb28c086a0d3ec1de9e70bac2eb13c9f30af82ffa9e9bb1f0",
-        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_1"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "physical_event_equivalent"
     },
     {
-      "name": "ARC Complex - Mission Challenge - External Combustion",
-      "location_id": 7770245,
-      "signal": {
-        "kind": "unlockable_record",
-        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m2/challenge_2",
-        "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_KILL_N_ENEMIES_SHIELD_OVERLOAD",
-        "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
-        "unlockableIsUnlocked": true
-      },
+      "category": "mission_challenges",
       "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_2",
         "path": "unlockable/mission_challenge/e2m2/challenge_2.decl",
-        "sha256": "cc7eba46da6f9d8c03eebf89c98eb8602ff8b8ec3ce08018cd4df01d2f2b8db8",
-        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_2"
+        "sha256": "cc7eba46da6f9d8c03eebf89c98eb8602ff8b8ec3ce08018cd4df01d2f2b8db8"
       },
+      "location_id": 7770245,
+      "mission_key": "e2m2",
+      "name": "ARC Complex - Mission Challenge - External Combustion",
+      "order": 31,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    },
-    {
-      "name": "ARC Complex - Mission Challenge - Solitary Confinement",
-      "location_id": 7770246,
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m2/challenge_3",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_REVENANT",
-        "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_KILL_N_ENEMIES_SHIELD_OVERLOAD",
+        "unlockable": "mission_challenge/e2m2/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m2/challenge_3.decl",
-        "sha256": "a347e0f4e9665e5eb0e1400f96df2f9af06f13678948c475114bb2aea4af709d",
-        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_3"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "unlockable_record"
     },
     {
-      "name": "Mars Core - Mission Challenge - Big Ba-Da Boom",
-      "location_id": 7770285,
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M2_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e2m2/challenge_3.decl",
+        "sha256": "a347e0f4e9665e5eb0e1400f96df2f9af06f13678948c475114bb2aea4af709d"
+      },
+      "location_id": 7770246,
+      "mission_key": "e2m2",
+      "name": "ARC Complex - Mission Challenge - Solitary Confinement",
+      "order": 32,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m3/challenge_1",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_WEAPON_BFG_KILLS",
+        "rule_0_satisfied": true,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_REVENANT",
+        "unlockable": "mission_challenge/e2m2/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_1",
+        "display_name_key": "#str_decl_challenges_e2m3_index1_title_2_GHOST53259",
+        "path": "unlockable/mission_challenge/e2m3/challenge_1.decl",
+        "sha256": "bc2fdc5f7077aea0fe3a8b9c3ba19fb3b49992e4a30639c83015a479b162069e"
+      },
+      "location_id": 7770285,
+      "mission_key": "e2m3",
+      "name": "Mars Core - Mission Challenge - Big Ba-Da Boom",
+      "order": 33,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
         "rule_0_statCount": 40,
         "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "rule_0_statname": "STAT_WEAPON_BFG_KILLS",
+        "unlockable": "mission_challenge/e2m3/challenge_1",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m3/challenge_1.decl",
-        "sha256": "bc2fdc5f7077aea0fe3a8b9c3ba19fb3b49992e4a30639c83015a479b162069e",
-        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_1",
-        "display_name_key": "#str_decl_challenges_e2m3_index1_title_2_GHOST53259"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "unlockable_record"
     },
     {
-      "name": "Mars Core - Mission Challenge - Disarmament",
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_2",
+        "display_name_key": "#str_decl_challenges_e2m3_index2_title_2_GHOST53264",
+        "path": "unlockable/mission_challenge/e2m3/challenge_2.decl",
+        "sha256": "fdb2a60ce10d86d06f027f71ea6cddc9f7464bb112a13a58ecff79912b6a9215"
+      },
       "location_id": 7770286,
+      "mission_key": "e2m3",
+      "name": "Mars Core - Mission Challenge - Disarmament",
+      "order": 34,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m3/challenge_2",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_MANCUBUS",
+        "rule_0_satisfied": true,
         "rule_0_statCount": 3,
         "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_MANCUBUS",
+        "unlockable": "mission_challenge/e2m3/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m3/challenge_2.decl",
-        "sha256": "fdb2a60ce10d86d06f027f71ea6cddc9f7464bb112a13a58ecff79912b6a9215",
-        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_2",
-        "display_name_key": "#str_decl_challenges_e2m3_index2_title_2_GHOST53264"
-      },
-      "reward_owner": {
-        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      "strategy": "unlockable_record"
     },
     {
-      "name": "Mars Core - Mission Challenge - Lock and Key",
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_3",
+        "display_name_key": "#str_decl_challenges_e2m3_index0_title_2_GHOST53254",
+        "path": "unlockable/mission_challenge/e2m3/challenge_3.decl",
+        "sha256": "c83dc3b5168f296e7cf344e093398be523d0b552fde3f4ab51a70e5343640860"
+      },
       "location_id": 7770287,
+      "mission_key": "e2m3",
+      "name": "Mars Core - Mission Challenge - Lock and Key",
+      "order": 35,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
       "signal": {
         "kind": "physical_event_equivalent",
-        "physical_location_ids": [7770280],
-        "required_count": 1,
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "mission_challenge/e2m3/challenge_3",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_SLAYER_KEY_PICKUP",
+        "physical_location_ids": [
+          7770280
+        ],
+        "required_count": 1,
+        "rule_0_satisfied": true,
         "rule_0_statCount": 1,
         "rule_0_statDuration": 5,
-        "rule_0_satisfied": true,
+        "rule_0_statname": "STAT_SLAYER_KEY_PICKUP",
+        "unlockable": "mission_challenge/e2m3/challenge_3",
         "unlockableIsUnlocked": true
       },
+      "strategy": "physical_event_equivalent"
+    },
+    {
+      "category": "mission_challenges",
       "completion_owner": {
-        "path": "unlockable/mission_challenge/e2m3/challenge_3.decl",
-        "sha256": "c83dc3b5168f296e7cf344e093398be523d0b552fde3f4ab51a70e5343640860",
-        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_3",
-        "display_name_key": "#str_decl_challenges_e2m3_index0_title_2_GHOST53254"
+        "completion_stat": "STAT_COMPLETED_E3M1_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e3m1/challenge_1.decl",
+        "sha256": "823630e3678d499a5de31ec945fecb99fc85eb75f968f59f0274775b17d6713a"
       },
+      "location_id": 7770333,
+      "mission_key": "e3m1_slayer",
+      "name": "Taras Nabad - Mission Challenge - Man Made Wiki",
+      "order": 41,
       "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
-        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
-        "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
-    }
-  ],
-  "all_mission_challenges": [
-    {
-      "name": "Cultist Base - All Mission Challenges Completed",
-      "location_id": 7770141,
-      "mission_key": "e1m3",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "signal": {
-        "kind": "aggregate",
-        "children": [7770138, 7770139, 7770140],
-        "required_count": 3,
-        "authority": "server_checked_locations"
-      }
+        "kind": "physical_event_equivalent",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "physical_location_ids": [
+          7770320,
+          7770321,
+          7770322,
+          7770323,
+          7770324,
+          7770325
+        ],
+        "required_count": 6,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 6,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_CODEX_PICKUP_FOUND_E3M1",
+        "unlockable": "mission_challenge/e3m1/challenge_1",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "physical_event_equivalent"
     },
     {
-      "name": "Doom Hunter Base - All Mission Challenges Completed",
-      "location_id": 7770175,
-      "mission_key": "e1m4",
-      "signal": {
-        "kind": "aggregate",
-        "children": [7770172, 7770173, 7770174],
-        "required_count": 3,
-        "authority": "server_checked_locations"
-      }
-    },
-    {
-      "name": "Super Gore Nest - All Mission Challenges Completed",
-      "location_id": 7770209,
-      "mission_key": "e2m1",
-      "signal": {
-        "kind": "aggregate",
-        "children": [7770206, 7770207, 7770208],
-        "required_count": 3,
-        "authority": "server_checked_locations"
-      }
-    },
-    {
-      "name": "ARC Complex - All Mission Challenges Completed",
-      "location_id": 7770247,
-      "mission_key": "e2m2",
-      "signal": {
-        "kind": "aggregate",
-        "children": [7770244, 7770245, 7770246],
-        "required_count": 3,
-        "authority": "server_checked_locations"
-      }
-    },
-    {
-      "name": "Mars Core - All Mission Challenges Completed",
-      "location_id": 7770288,
-      "mission_key": "e2m3",
-      "signal": {
-        "kind": "aggregate",
-        "children": [7770285, 7770286, 7770287],
-        "required_count": 3,
-        "authority": "server_checked_locations"
-      }
-    }
-  ],
-  "weapon_masteries": [
-    {
-      "name": "Sticky Bombs - Weapon Mastery Challenge",
-      "location_id": 7770125,
-      "item_id": 7770070,
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M1_CHALLENGE_2",
+        "path": "unlockable/mission_challenge/e3m1/challenge_2.decl",
+        "sha256": "1f152fccae67d2b0e38d90447573668093e957c566296cdf6a5c3f01fca94efa"
+      },
+      "location_id": 7770334,
+      "mission_key": "e3m1_slayer",
+      "name": "Taras Nabad - Mission Challenge - Keeping Cool",
+      "order": 42,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/shotgun/sticky_bomb",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_ARACHNOTRON_STICKYBOMB",
-        "rule_0_statCount": 25,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 10,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_ICE_BOMB_FROZEN",
+        "unlockable": "mission_challenge/e3m1/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/shotgun/pop_rocket_more_bombs",
-      "typed_perk_delivery_valid": true,
-      "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/shotgun/sticky_bomb.decl",
-          "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M1_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e3m1/challenge_3.decl",
+        "sha256": "95a907b1a4389c8c0248a4686f614efacb4f1e9e1304a90394e07b164ee3929a"
+      },
+      "location_id": 7770335,
+      "mission_key": "e3m1_slayer",
+      "name": "Taras Nabad - Mission Challenge - Painkiller",
+      "order": 43,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 3,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_PAIN_ELEMENTAL_GLORYKILL_STYLES",
+        "unlockable": "mission_challenge/e3m1/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e3m2/challenge_1.decl",
+        "sha256": "7fe4b162eeb6a2e3d066aa25595c310accb50d83f4acab9a2f3e1f07fe9b05b4"
+      },
+      "location_id": 7770358,
+      "mission_key": "e3m2_hell",
+      "name": "Nekravol - Mission Challenge - Die by the Sword",
+      "order": 46,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 2,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_WEAPON_CRUCIBLE_KILL",
+        "unlockable": "mission_challenge/e3m2/challenge_1",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_2",
+        "path": "unlockable/mission_challenge/e3m2/challenge_2.decl",
+        "sha256": "e2efd209e50ff7780970150595856e766a7aa143419280167922f180f3df8bba"
+      },
+      "location_id": 7770359,
+      "mission_key": "e3m2_hell",
+      "name": "Nekravol - Mission Challenge - Tricks and Traps",
+      "order": 47,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 8,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_KILLED_BY_ACTIVATED_CRUSHER",
+        "unlockable": "mission_challenge/e3m2/challenge_2",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e3m2/challenge_3.decl",
+        "sha256": "14b2af1fcfa3e8badec8e2ededec8af27d496a662c5bcc6ff34054856669e243"
+      },
+      "location_id": 7770360,
+      "mission_key": "e3m2_hell",
+      "name": "Nekravol - Mission Challenge - Doom Hunt",
+      "order": 48,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_DOOMHUNTER_GK_LEFT_UPPER",
+        "unlockable": "mission_challenge/e3m2/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_B_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e3m2_b/challenge_1.decl",
+        "sha256": "c4f18f53812cb9cf59bd86e4b72e10a18b6e61a3baba32602270cd7e8e7808c2"
+      },
+      "location_id": 7770383,
+      "mission_key": "e3m2_hell_b",
+      "name": "Nekravol Part II - Mission Challenge - Punched by Blood",
+      "order": 51,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 5,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_BLOOD_PUNCH_MULTI_KILLS",
+        "unlockable": "mission_challenge/e3m2_b/challenge_1",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_B_CHALLENGE_2",
+        "path": "unlockable/mission_challenge/e3m2_b/challenge_2.decl",
+        "sha256": "aba9bcf6a7cc34059c43282b4f653f2a6a61baf37ace3413b5834cfd57b3a910"
+      },
+      "location_id": 7770384,
+      "mission_key": "e3m2_hell_b",
+      "name": "Nekravol Part II - Mission Challenge - Cut Down to Size",
+      "order": 52,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_TYRANT_GK_BACK_UPPER",
+        "unlockable": "mission_challenge/e3m2_b/challenge_2",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M2_B_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e3m2_b/challenge_3.decl",
+        "sha256": "6bb60491c0ca048f8f5e13e48705c3c26ee15f13ef0d8951f7c5cd20b6a3b03b"
+      },
+      "location_id": 7770385,
+      "mission_key": "e3m2_hell_b",
+      "name": "Nekravol Part II - Mission Challenge - Resurrect No More",
+      "order": 53,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_ARCHVILE_GK_LEFT_UPPER",
+        "unlockable": "mission_challenge/e3m2_b/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M3_CHALLENGE_1",
+        "path": "unlockable/mission_challenge/e3m3/challenge_1.decl",
+        "sha256": "7090bb1d71c35fa3d63527052cc24161cc19105df32102cc93d08248ae88a5f2"
+      },
+      "description": "Acquire 1 Collectible Toy",
+      "location_id": 7770407,
+      "mission_key": "e3m3_maykr",
+      "name": "Urdak - Mission Challenge - Accessories Not Included",
+      "order": 56,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
+      "signal": {
+        "kind": "physical_event_equivalent",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "physical_location_ids": [
+          7770392,
+          7770394,
+          7770400
+        ],
+        "required_count": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_DOOM_TOY_FOUND",
+        "unlockable": "mission_challenge/e3m3/challenge_1",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "physical_event_equivalent"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M3_CHALLENGE_2",
+        "path": "unlockable/mission_challenge/e3m3/challenge_2.decl",
+        "sha256": "7249a716460869cb2e55aaaae88f540ab26653ed3a2be0c4ae0f056679326bad"
+      },
+      "description": "Kill 12 Demons while in mid-air",
+      "location_id": 7770408,
+      "mission_key": "e3m3_maykr",
+      "name": "Urdak - Mission Challenge - Inflight Devastation",
+      "order": 57,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 12,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_AERIAL_KILLS",
+        "unlockable": "mission_challenge/e3m3/challenge_2",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    },
+    {
+      "category": "mission_challenges",
+      "completion_owner": {
+        "completion_stat": "STAT_COMPLETED_E3M3_CHALLENGE_3",
+        "path": "unlockable/mission_challenge/e3m3/challenge_3.decl",
+        "sha256": "fd33753de57fca3538eec565954c3a298a2e1d02c0885aa0f5b135385c7c20be"
+      },
+      "description": "Kill 5 Maykr Drones with Precision Bolt headshots",
+      "location_id": 7770409,
+      "mission_key": "e3m3_maykr",
+      "name": "Urdak - Mission Challenge - Angel of Death",
+      "order": 58,
+      "reward_owner": {
+        "currency": "CURRENCY_PRAETOR_UPGRADE",
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34"
+      },
+      "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 5,
+        "rule_0_statDuration": 5,
+        "rule_0_statname": "STAT_CHARGEBALL_MATCH_WON",
+        "unlockable": "mission_challenge/e3m3/challenge_3",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record"
+    }
+  ],
+  "mission_complete": [
+    {
+      "category": "mission_complete",
+      "location_id": 7770122,
+      "mission_key": "e1m1_intro",
+      "name": "Hell on Earth - Mission Complete",
+      "order": 0,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m1_intro/e1m1_intro"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770123,
+      "mission_key": "e1m2_war",
+      "name": "Exultia - Mission Complete",
+      "order": 1,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770124,
+      "name": "Cultist Base - Mission Complete",
+      "order": 2,
+      "signal": {
+        "from": "game/sp/e1m3_cult/e1m3_cult",
+        "kind": "native_transition",
+        "to": "game/sp/e1m4_boss/e1m4_boss"
+      },
+      "strategy": "native_transition"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770162,
+      "mission_key": "e1m4_boss",
+      "name": "Doom Hunter Base - Mission Complete",
+      "order": 3,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770210,
+      "name": "Super Gore Nest - Mission Complete",
+      "order": 4,
+      "signal": {
+        "from": "game/sp/e2m1_nest/e2m1_nest",
+        "kind": "native_transition",
+        "to": "game/hub/hub"
+      },
+      "strategy": "native_transition"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770248,
+      "name": "ARC Complex - Mission Complete",
+      "order": 5,
+      "signal": {
+        "from": "game/sp/e2m2_base/e2m2_base",
+        "kind": "native_transition",
+        "to": "game/hub/hub"
+      },
+      "strategy": "native_transition"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770289,
+      "name": "Mars Core - Mission Complete",
+      "order": 6,
+      "signal": {
+        "from": "game/sp/e2m3_core/e2m3_core",
+        "kind": "native_transition",
+        "to": "game/sp/e2m4_boss/e2m4_boss"
+      },
+      "strategy": "native_transition"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770290,
+      "mission_key": "e2m4_boss",
+      "name": "Sentinel Prime - Mission Complete",
+      "order": 7,
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "e2m4_endoflevel_transition",
+        "runtime_map": "game/sp/e2m4_boss/e2m4_boss"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770337,
+      "mission_key": "e3m1_slayer",
+      "name": "Taras Nabad - Mission Complete",
+      "order": 45,
+      "signal": {
+        "fallback": {
+          "from": "game/sp/e3m1_slayer/e3m1_slayer",
+          "kind": "native_transition",
+          "to": "game/hub/hub"
         },
+        "kind": "map_terminal",
+        "owner": "game_map_exit_level_transition_relay_852698944",
+        "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770362,
+      "mission_key": "e3m2_hell",
+      "name": "Nekravol - Mission Complete",
+      "order": 50,
+      "signal": {
+        "fallback": {
+          "from": "game/sp/e3m2_hell/e3m2_hell",
+          "kind": "native_transition",
+          "to": "game/sp/e3m2_hell_b/e3m2_hell_b"
+        },
+        "kind": "map_terminal",
+        "owner": "game_target_relay_28",
+        "runtime_map": "game/sp/e3m2_hell/e3m2_hell"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770387,
+      "mission_key": "e3m2_hell_b",
+      "name": "Nekravol Part II - Mission Complete",
+      "order": 55,
+      "signal": {
+        "fallback": {
+          "from": "game/sp/e3m2_hell_b/e3m2_hell_b",
+          "kind": "native_transition",
+          "to": "game/sp/e3m3_maykr/e3m3_maykr"
+        },
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_1",
+        "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770411,
+      "mission_key": "e3m3_maykr",
+      "name": "Urdak - Mission Complete",
+      "order": 60,
+      "signal": {
+        "fallback": {
+          "from": "game/sp/e3m3_maykr/e3m3_maykr",
+          "kind": "native_transition",
+          "to": "game/sp/e3m4_boss/e3m4_boss"
+        },
+        "kind": "map_terminal",
+        "owner": "temp_all_scripting_target_level_transition_1",
+        "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770414,
+      "mission_key": "e3m4_boss",
+      "name": "Final Sin - Mission Complete",
+      "order": 61,
+      "signal": {
+        "fallback": {
+          "kind": "terminal_owner",
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle"
+        },
+        "kind": "map_terminal",
+        "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
+        "runtime_map": "game/sp/e3m4_boss/e3m4_boss"
+      },
+      "strategy": "map_terminal"
+    }
+  ],
+  "schema_version": 10,
+  "weapon_masteries": [
+    {
+      "category": "weapon_masteries",
+      "decls": {
         "perk": {
           "path": "perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl",
           "sha256": "c3759c999ec3762eeb416d5b585f11b5f778c2f6dd3f95071acf5d7ce0af77b3"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/shotgun/sticky_bomb.decl",
+          "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"
         }
-      }
-    },
-    {
-      "name": "Full Auto - Weapon Mastery Challenge",
-      "location_id": 7770126,
-      "item_id": 7770069,
+      },
+      "gameplay_perk": "perk/player/weapons/shotgun/pop_rocket_more_bombs",
+      "item_id": 7770070,
+      "location_id": 7770125,
+      "mission_key": "shotgun",
+      "name": "Sticky Bombs - Weapon Mastery Challenge",
+      "order": 8,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/shotgun/full_auto",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_SHOTGUN_FULL_AUTO_MASTERY",
-        "rule_0_statCount": 15,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 25,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_ARACHNOTRON_STICKYBOMB",
+        "unlockable": "weapon_mastery/shotgun/sticky_bomb",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/shotgun/full_auto.decl",
-          "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback.decl",
           "sha256": "0d0be45c6d67780bb5614e68f554fe84dffbb3c2f60f94821f7f68ad88296931"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/shotgun/full_auto.decl",
+          "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"
         }
-      }
-    },
-    {
-      "name": "Precision Bolt - Weapon Mastery Challenge",
-      "location_id": 7770127,
-      "item_id": 7770067,
+      },
+      "gameplay_perk": "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
+      "item_id": 7770069,
+      "location_id": 7770126,
+      "mission_key": "shotgun",
+      "name": "Full Auto - Weapon Mastery Challenge",
+      "order": 9,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/heavy_cannon/piercing_bolt",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_HAR_SCOPE_MASTERY",
-        "rule_0_statCount": 75,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 15,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_SHOTGUN_FULL_AUTO_MASTERY",
+        "unlockable": "weapon_mastery/shotgun/full_auto",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/heavy_cannon/piercing_bolt.decl",
-          "sha256": "bd1daf53b3a345fbacd297db1f3bd623b12ea90a6b7661e6e1153f5c66cf7b20"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades.decl",
           "sha256": "0622c4e57cb78fdef5f00d4cea126280ef86506b989cb8b70ec7fef45c36f6eb"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/heavy_cannon/piercing_bolt.decl",
+          "sha256": "bd1daf53b3a345fbacd297db1f3bd623b12ea90a6b7661e6e1153f5c66cf7b20"
         }
-      }
-    },
-    {
-      "name": "Micro Missiles - Weapon Mastery Challenge",
-      "location_id": 7770128,
-      "item_id": 7770068,
+      },
+      "gameplay_perk": "perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades",
+      "item_id": 7770067,
+      "location_id": 7770127,
+      "mission_key": "heavy_cannon",
+      "name": "Precision Bolt - Weapon Mastery Challenge",
+      "order": 10,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/heavy_cannon/micro_missiles",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_HAR_MICROMISSILE_MASTERY",
-        "rule_0_statCount": 15,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 75,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_HAR_SCOPE_MASTERY",
+        "unlockable": "weapon_mastery/heavy_cannon/piercing_bolt",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/heavy_cannon/burst_detonate_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/heavy_cannon/micro_missiles.decl",
-          "sha256": "baa3e75ea269dd8810fc9d3d070af2fc20c9372f5c7ddbb9142e3f6a9d75f536"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/heavy_cannon/burst_detonate_mastery.decl",
           "sha256": "a3cb75366e34f08a33ee431bbe39b0260199c5205d55e2bb90e24ee2e101d9f5"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/heavy_cannon/micro_missiles.decl",
+          "sha256": "baa3e75ea269dd8810fc9d3d070af2fc20c9372f5c7ddbb9142e3f6a9d75f536"
         }
-      }
-    },
-    {
-      "name": "Heat Blast - Weapon Mastery Challenge",
-      "location_id": 7770129,
-      "item_id": 7770063,
+      },
+      "gameplay_perk": "perk/player/weapons/heavy_cannon/burst_detonate_mastery",
+      "item_id": 7770068,
+      "location_id": 7770128,
+      "mission_key": "heavy_cannon",
+      "name": "Micro Missiles - Weapon Mastery Challenge",
+      "order": 11,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/plasma_rifle/heat_blast",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_PLASMA_HEATWAVE_MASTERY",
-        "rule_0_statCount": 30,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 15,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_HAR_MICROMISSILE_MASTERY",
+        "unlockable": "weapon_mastery/heavy_cannon/micro_missiles",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_aoe_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/plasma_rifle/heat_blast.decl",
-          "sha256": "17d3a291e98eb4a1d163d66275fe84598d1e1e4e996f298391ad1dc301f6753b"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/plasma_rifle/secondary_aoe_mastery.decl",
           "sha256": "b2a8b63b2b85fd33c650321ad03f1ed39fef524aa7b77b90cf8bcb67805584ee"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/plasma_rifle/heat_blast.decl",
+          "sha256": "17d3a291e98eb4a1d163d66275fe84598d1e1e4e996f298391ad1dc301f6753b"
         }
-      }
-    },
-    {
-      "name": "Microwave Beam - Weapon Mastery Challenge",
-      "location_id": 7770130,
-      "item_id": 7770065,
+      },
+      "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_aoe_mastery",
+      "item_id": 7770063,
+      "location_id": 7770129,
+      "mission_key": "plasma_rifle",
+      "name": "Heat Blast - Weapon Mastery Challenge",
+      "order": 12,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/plasma_rifle/microwave",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_PLASMA_MICROWAVE_MASTERY",
-        "rule_0_statCount": 15,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 30,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_PLASMA_HEATWAVE_MASTERY",
+        "unlockable": "weapon_mastery/plasma_rifle/heat_blast",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_microwave_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/plasma_rifle/microwave.decl",
-          "sha256": "2ec2475155561d1e685d9dfbce2ae23ef1a788f242677353ea7620c829faa53c"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/plasma_rifle/secondary_microwave_mastery.decl",
           "sha256": "c2364291a062bea70c89f3dc61509dba349d573dc499eb5cf43e0a403c4d5e78"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/plasma_rifle/microwave.decl",
+          "sha256": "2ec2475155561d1e685d9dfbce2ae23ef1a788f242677353ea7620c829faa53c"
         }
-      }
-    },
-    {
-      "name": "Lock-on Burst - Weapon Mastery Challenge",
-      "location_id": 7770131,
-      "item_id": 7770074,
+      },
+      "gameplay_perk": "perk/player/weapons/plasma_rifle/secondary_microwave_mastery",
+      "item_id": 7770065,
+      "location_id": 7770130,
+      "mission_key": "plasma_rifle",
+      "name": "Microwave Beam - Weapon Mastery Challenge",
+      "order": 13,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/rocket_launcher/lock_on",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_ROCKET_LAUNCHER_LOCKON_MASTERY",
+        "rule_0_satisfied": true,
         "rule_0_statCount": 15,
         "rule_0_statDuration": 4,
-        "rule_0_satisfied": true,
+        "rule_0_statname": "STAT_PLASMA_MICROWAVE_MASTERY",
+        "unlockable": "weapon_mastery/plasma_rifle/microwave",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/rocket_launcher/lockon_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/rocket_launcher/lock_on.decl",
-          "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/rocket_launcher/lockon_mastery.decl",
           "sha256": "ea90c3cc08b3030f8f4e778ca1dadef65c92c8658a057fa25040aed68b01f351"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/rocket_launcher/lock_on.decl",
+          "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"
         }
-      }
-    },
-    {
-      "name": "Remote Detonate - Weapon Mastery Challenge",
-      "location_id": 7770132,
-      "item_id": 7770072,
+      },
+      "gameplay_perk": "perk/player/weapons/rocket_launcher/lockon_mastery",
+      "item_id": 7770074,
+      "location_id": 7770131,
+      "mission_key": "rocket_launcher",
+      "name": "Lock-on Burst - Weapon Mastery Challenge",
+      "order": 14,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/rocket_launcher/detonate",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_ROCKET_LAUNCHER_DETONATE_MASTERY",
-        "rule_0_statCount": 60,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 15,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_ROCKET_LAUNCHER_LOCKON_MASTERY",
+        "unlockable": "weapon_mastery/rocket_launcher/lock_on",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/rocket_launcher/detonate.decl",
-          "sha256": "5ddc2fc2ba6dd14040f0695708a5652b700dfd7429fe85cc3ab19ff6bee6bc21"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal.decl",
           "sha256": "363d934e78a9bd7d6eb05191a6f1ef9153c09a6e1afea8437e4aaf7cfa3e575c"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/rocket_launcher/detonate.decl",
+          "sha256": "5ddc2fc2ba6dd14040f0695708a5652b700dfd7429fe85cc3ab19ff6bee6bc21"
         }
-      }
-    },
-    {
-      "name": "Destroyer Blade - Weapon Mastery Challenge",
-      "location_id": 7770133,
-      "item_id": 7770078,
+      },
+      "gameplay_perk": "perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
+      "item_id": 7770072,
+      "location_id": 7770132,
+      "mission_key": "rocket_launcher",
+      "name": "Remote Detonate - Weapon Mastery Challenge",
+      "order": 15,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/ballista/destroyer",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_BALLISTA_DESTROYER_MASTERY",
-        "rule_0_statCount": 15,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 60,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_ROCKET_LAUNCHER_DETONATE_MASTERY",
+        "unlockable": "weapon_mastery/rocket_launcher/detonate",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/gauss_cannon/destroyer_charge_levels",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/ballista/destroyer.decl",
-          "sha256": "2eea3df20de915953f1b35c670c9a5521a7098a56f2b893e061e07f1a586fb14"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/gauss_cannon/destroyer_charge_levels.decl",
           "sha256": "0576ca87c488fce218e966ff012e817206079aabb1f3c0e9cb87644e77c5ca20"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/ballista/destroyer.decl",
+          "sha256": "2eea3df20de915953f1b35c670c9a5521a7098a56f2b893e061e07f1a586fb14"
         }
-      }
-    },
-    {
-      "name": "Arbalest - Weapon Mastery Challenge",
-      "location_id": 7770134,
-      "item_id": 7770076,
+      },
+      "gameplay_perk": "perk/player/weapons/gauss_cannon/destroyer_charge_levels",
+      "item_id": 7770078,
+      "location_id": 7770133,
+      "mission_key": "ballista",
+      "name": "Destroyer Blade - Weapon Mastery Challenge",
+      "order": 16,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/ballista/arbalest",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_BALLISTA_ARBALEST_MASTERY",
-        "rule_0_statCount": 20,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 15,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_BALLISTA_DESTROYER_MASTERY",
+        "unlockable": "weapon_mastery/ballista/destroyer",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/gauss_cannon/ballista_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/ballista/arbalest.decl",
-          "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/gauss_cannon/ballista_mastery.decl",
           "sha256": "3ed88607b68a3b55c99fe831e0f7411523039b5c3cbf87d9f007989435f7a66a"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/ballista/arbalest.decl",
+          "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"
         }
-      }
-    },
-    {
-      "name": "Mobile Turret - Weapon Mastery Challenge",
-      "location_id": 7770135,
-      "item_id": 7770082,
+      },
+      "gameplay_perk": "perk/player/weapons/gauss_cannon/ballista_mastery",
+      "item_id": 7770076,
+      "location_id": 7770134,
+      "mission_key": "ballista",
+      "name": "Arbalest - Weapon Mastery Challenge",
+      "order": 17,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/chaingun/mobile_turret",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_CHAINGUN_TURRET_MASTERY",
-        "rule_0_statCount": 10,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 20,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_BALLISTA_ARBALEST_MASTERY",
+        "unlockable": "weapon_mastery/ballista/arbalest",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/chaingun/turret_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/chaingun/mobile_turret.decl",
-          "sha256": "9f0b2698ec673ee4fe132d35ade41af4dd0e94282c84bd3a5c6e4bce636f02a5"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/chaingun/turret_mastery.decl",
           "sha256": "d90be106461cde08e134cd4e4456a980c93aabf74404650fb227de00d6fa6cb4"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/chaingun/mobile_turret.decl",
+          "sha256": "9f0b2698ec673ee4fe132d35ade41af4dd0e94282c84bd3a5c6e4bce636f02a5"
         }
-      }
-    },
-    {
-      "name": "Energy Shield - Weapon Mastery Challenge",
-      "location_id": 7770136,
-      "item_id": 7770080,
+      },
+      "gameplay_perk": "perk/player/weapons/chaingun/turret_mastery",
+      "item_id": 7770082,
+      "location_id": 7770135,
+      "mission_key": "chaingun",
+      "name": "Mobile Turret - Weapon Mastery Challenge",
+      "order": 18,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/chaingun/energy_shield",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_CHAINGUN_ENERGY_SHIELD_MASTERY",
-        "rule_0_statCount": 20000,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 10,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_CHAINGUN_TURRET_MASTERY",
+        "unlockable": "weapon_mastery/chaingun/mobile_turret",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/chaingun/energy_shell_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/chaingun/energy_shield.decl",
-          "sha256": "aca0e406418408cf326cb348ce8d152fe7bb4db45d725529920514157c869299"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/chaingun/energy_shell_mastery.decl",
           "sha256": "86d7ca4e99f43fc2dfd56f529cae8cac22ef4471b18e17357f87bf953c42646c"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/chaingun/energy_shield.decl",
+          "sha256": "aca0e406418408cf326cb348ce8d152fe7bb4db45d725529920514157c869299"
         }
-      }
-    },
-    {
-      "name": "Meat Hook - Weapon Mastery Challenge",
-      "location_id": 7770137,
-      "item_id": 7770084,
+      },
+      "gameplay_perk": "perk/player/weapons/chaingun/energy_shell_mastery",
+      "item_id": 7770080,
+      "location_id": 7770136,
+      "mission_key": "chaingun",
+      "name": "Energy Shield - Weapon Mastery Challenge",
+      "order": 19,
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
-        "unlockable": "weapon_mastery/double_barrel/meat_hook",
         "numUnlockableRules": 1,
-        "rule_0_statname": "STAT_DOUBLE_BARREL_MASTERY",
-        "rule_0_statCount": 50,
-        "rule_0_statDuration": 4,
         "rule_0_satisfied": true,
+        "rule_0_statCount": 20000,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_CHAINGUN_ENERGY_SHIELD_MASTERY",
+        "unlockable": "weapon_mastery/chaingun/energy_shield",
         "unlockableIsUnlocked": true
       },
-      "gameplay_perk": "perk/player/weapons/double_barrel/meat_hook_mastery",
-      "typed_perk_delivery_valid": true,
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
+    },
+    {
+      "category": "weapon_masteries",
       "decls": {
-        "unlockable": {
-          "path": "unlockable/weapon_mastery/double_barrel/meat_hook.decl",
-          "sha256": "5179ed8790b00ff4173ae09e408910f4743cf81551ace8f0265c53c3f510f076"
-        },
         "perk": {
           "path": "perks/perk/player/weapons/double_barrel/meat_hook_mastery.decl",
           "sha256": "d794404f5d707b058e62b9e57e268a3391d6294635bf1042f0a10fe89a3ee1a7"
+        },
+        "unlockable": {
+          "path": "unlockable/weapon_mastery/double_barrel/meat_hook.decl",
+          "sha256": "5179ed8790b00ff4173ae09e408910f4743cf81551ace8f0265c53c3f510f076"
         }
-      }
+      },
+      "gameplay_perk": "perk/player/weapons/double_barrel/meat_hook_mastery",
+      "item_id": 7770084,
+      "location_id": 7770137,
+      "mission_key": "double_barrel",
+      "name": "Meat Hook - Weapon Mastery Challenge",
+      "order": 20,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "numUnlockableRules": 1,
+        "rule_0_satisfied": true,
+        "rule_0_statCount": 50,
+        "rule_0_statDuration": 4,
+        "rule_0_statname": "STAT_DOUBLE_BARREL_MASTERY",
+        "unlockable": "weapon_mastery/double_barrel/meat_hook",
+        "unlockableIsUnlocked": true
+      },
+      "strategy": "unlockable_record",
+      "typed_perk_delivery_valid": true
     }
   ]
 }

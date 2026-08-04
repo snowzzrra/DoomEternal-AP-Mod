@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "name": "Mars Core - Mission Complete",
+      "location_id": 7770289,
+      "signal": {
+        "kind": "native_transition",
+        "from": "game/sp/e2m3_core/e2m3_core",
+        "to": "game/sp/e2m4_boss/e2m4_boss"
+      },
+      "order": 6,
+      "strategy": "native_transition",
+      "category": "mission_complete"
+    },
+    {
+      "name": "Mars Core - Mission Challenge - Big Ba-Da Boom",
+      "location_id": 7770285,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m3/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_WEAPON_BFG_KILLS",
+        "rule_0_statCount": 40,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m3/challenge_1.decl",
+        "sha256": "bc2fdc5f7077aea0fe3a8b9c3ba19fb3b49992e4a30639c83015a479b162069e",
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_1",
+        "display_name_key": "#str_decl_challenges_e2m3_index1_title_2_GHOST53259"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 33,
+      "strategy": "unlockable_record",
+      "category": "mission_challenges",
+      "mission_key": "e2m3"
+    },
+    {
+      "name": "Mars Core - Mission Challenge - Disarmament",
+      "location_id": 7770286,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m3/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_WEAKPOINT_DISABLE_MANCUBUS",
+        "rule_0_statCount": 3,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m3/challenge_2.decl",
+        "sha256": "fdb2a60ce10d86d06f027f71ea6cddc9f7464bb112a13a58ecff79912b6a9215",
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_2",
+        "display_name_key": "#str_decl_challenges_e2m3_index2_title_2_GHOST53264"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 34,
+      "strategy": "unlockable_record",
+      "category": "mission_challenges",
+      "mission_key": "e2m3"
+    },
+    {
+      "name": "Mars Core - Mission Challenge - Lock and Key",
+      "location_id": 7770287,
+      "signal": {
+        "kind": "physical_event_equivalent",
+        "physical_location_ids": [
+          7770280
+        ],
+        "required_count": 1,
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e2m3/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_SLAYER_KEY_PICKUP",
+        "rule_0_statCount": 1,
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e2m3/challenge_3.decl",
+        "sha256": "c83dc3b5168f296e7cf344e093398be523d0b552fde3f4ab51a70e5343640860",
+        "completion_stat": "STAT_COMPLETED_E2M3_CHALLENGE_3",
+        "display_name_key": "#str_decl_challenges_e2m3_index0_title_2_GHOST53254"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 35,
+      "strategy": "physical_event_equivalent",
+      "category": "mission_challenges",
+      "mission_key": "e2m3"
+    },
+    {
+      "name": "Mars Core - All Mission Challenges Completed",
+      "location_id": 7770288,
+      "mission_key": "e2m3",
+      "signal": {
+        "kind": "aggregate",
+        "children": [
+          7770285,
+          7770286,
+          7770287
+        ],
+        "required_count": 3,
+        "authority": "server_checked_locations"
+      },
+      "order": 40,
+      "strategy": "aggregate",
+      "category": "all_mission_challenges"
+    }
+  ]
+}

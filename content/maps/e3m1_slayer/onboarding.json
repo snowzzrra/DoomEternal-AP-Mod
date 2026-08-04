@@ -1,17 +1,15 @@
 {
   "schema_version": 1,
   "map_key": "e3m1_slayer",
-  "status": "runtime_closed",
+  "status": "implementation_candidate",
   "source": {
     "path": "vanillamaps/e3m1_slayer.map",
     "size": 11694102,
-    "sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
-    "ap_markers_absent": true,
-    "structurally_parsed": true
+    "sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705"
   },
   "owner": {
     "resource": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-    "status": "runtime_closed"
+    "priority": 34
   },
   "onboarding_evidence": {
     "source": "packagemapspec",
@@ -43,15 +41,26 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": ["crucible"],
+    "forbidden_ap_terms": [
+      "crucible"
+    ],
     "required_source_edge": {
       "from": "game_target_relay_getcrucible",
       "to": "game_target_give_item_1"
     },
-    "excluded_entities": ["interact_automap_1_e3m1"]
+    "excluded_entities": [
+      "interact_automap_1_e3m1"
+    ]
   },
   "challenge_notes": {
-    "man_made_wiki_sources": [7770320, 7770321, 7770322, 7770323, 7770324, 7770325],
+    "man_made_wiki_sources": [
+      7770320,
+      7770321,
+      7770322,
+      7770323,
+      7770324,
+      7770325
+    ],
     "excluded_codex": 7770326,
     "reason": "The vanilla DECL requires six tracked Codex pickups; Codex 7 is outside that six-source equivalence."
   },

@@ -1,201 +1,381 @@
 {
-  "schema_version": 1,
   "publishers": [
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770122,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "hell_on_earth_mission_complete",
       "map_key": "e1m1_intro",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "3509104422",
           "filename": "ap_event_7770122.txt",
-          "marker": "AP_CHECK_EVENT_7770122"
+          "marker": "AP_CHECK_EVENT_7770122",
+          "owner": "3509104422",
+          "strategy": "map_event_file"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770122
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770123,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "exultia_mission_complete",
       "map_key": "e1m2_war",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "extraction_map_exit_level_transition_relay_1723732033",
           "filename": "ap_event_7770123.txt",
-          "marker": "AP_CHECK_EVENT_7770123"
+          "marker": "AP_CHECK_EVENT_7770123",
+          "owner": "extraction_map_exit_level_transition_relay_1723732033",
+          "strategy": "map_event_file"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770123
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770124,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "cultist_base_mission_complete",
       "map_key": "e1m3_cult",
       "triggers": [
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e1m3_cult/e1m3_cult",
+          "strategy": "native_transition",
           "to_map": "game/sp/e1m4_boss/e1m4_boss"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770124
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770162,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "doom_hunter_base_mission_complete",
       "map_key": "e1m4_boss",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "checkpoints_target_relay_65",
           "filename": "ap_event_7770162.txt",
-          "marker": "AP_CHECK_EVENT_7770162"
+          "marker": "AP_CHECK_EVENT_7770162",
+          "owner": "checkpoints_target_relay_65",
+          "strategy": "map_event_file"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770162
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770210,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "super_gore_nest_mission_complete",
       "map_key": "e2m1_nest",
       "triggers": [
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e2m1_nest/e2m1_nest",
+          "strategy": "native_transition",
           "to_map": "game/hub/hub"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770210
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770248,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "arc_complex_mission_complete",
       "map_key": "e2m2_base",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "fort_map_exit_level_transition_relay_393966306",
           "filename": "ap_event_7770248.txt",
-          "marker": "AP_CHECK_EVENT_7770248"
+          "marker": "AP_CHECK_EVENT_7770248",
+          "owner": "fort_map_exit_level_transition_relay_393966306",
+          "strategy": "map_event_file"
         },
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e2m2_base/e2m2_base",
+          "strategy": "native_transition",
           "to_map": "game/hub/hub"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770248
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770289,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "mars_core_mission_complete",
       "map_key": "e2m3_core",
       "triggers": [
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e2m3_core/e2m3_core",
+          "strategy": "native_transition",
           "to_map": "game/sp/e2m4_boss/e2m4_boss"
         }
-      ],
-      "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770289
-        }
-      ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
+      ]
     },
     {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7770290,
+          "strategy": "location_check"
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "e2m4_endoflevel_transition_native"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
       "key": "sentinel_prime_mission_complete",
       "map_key": "e2m4_boss",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "e2m4_endoflevel_transition",
           "filename": "ap_mission_sentinel_prime_complete.txt",
-          "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE"
+          "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE",
+          "owner": "e2m4_endoflevel_transition",
+          "strategy": "map_event_file"
         },
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "strategy": "native_transition",
           "to_map": "game/hub/hub"
         }
-      ],
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_goal",
       "effects": [
-        {
-          "strategy": "location_check",
-          "location_id": 7770290
-        },
         {
           "strategy": "preserved_native_target",
           "target": "e2m4_endoflevel_transition_native"
         }
       ],
-      "dedupe_scope": "ap_session_location",
-      "fallback_policy": "first_success_wins"
-    },
-    {
+      "fallback_policy": "first_success_wins",
       "key": "sentinel_prime_campaign_goal",
       "map_key": "e2m4_boss",
       "triggers": [
         {
-          "strategy": "map_event_file",
-          "owner": "e2m4_endoflevel_transition",
           "filename": "ap_goal_sentinel_prime_complete.txt",
-          "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE"
+          "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE",
+          "owner": "e2m4_endoflevel_transition",
+          "strategy": "map_event_file"
         },
         {
-          "strategy": "native_transition",
           "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "strategy": "native_transition",
           "to_map": "game/hub/hub"
         }
+      ]
+    },
+    {
+      "dedupe_scope": "taras_nabad_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770337,
+          "strategy": "location_check"
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "ai_target_level_transition_1"
+        }
       ],
+      "fallback_policy": "first_success_wins",
+      "key": "taras_nabad_mission_complete",
+      "map_key": "e3m1_slayer",
+      "triggers": [
+        {
+          "filename": "ap_mission_taras_nabad_complete.txt",
+          "marker": "AP_MISSION_EVENT_TARAS_NABAD_COMPLETE",
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
+          "strategy": "native_transition",
+          "to_map": "game/hub/hub"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "taras_nabad_campaign_goal",
       "effects": [
         {
           "strategy": "preserved_native_target",
-          "target": "e2m4_endoflevel_transition_native"
+          "target": "ai_target_level_transition_1"
         }
       ],
-      "dedupe_scope": "ap_session_goal",
-      "fallback_policy": "first_success_wins"
+      "fallback_policy": "first_success_wins",
+      "key": "taras_nabad_campaign_goal",
+      "map_key": "e3m1_slayer",
+      "triggers": [
+        {
+          "filename": "ap_goal_taras_nabad_complete.txt",
+          "marker": "AP_GOAL_EVENT_TARAS_NABAD_COMPLETE",
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_map_exit_level_transition_relay_852698944",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
+          "strategy": "native_transition",
+          "to_map": "game/hub/hub"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "nekravol_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770362,
+          "strategy": "location_check"
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "game_target_level_transition_1"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "nekravol_mission_complete",
+      "map_key": "e3m2_hell",
+      "triggers": [
+        {
+          "filename": "ap_mission_nekravol_complete.txt",
+          "marker": "AP_MISSION_EVENT_NEKRAVOL_COMPLETE",
+          "owner": "game_target_relay_28",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_relay_28",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m2_hell/e3m2_hell",
+          "strategy": "native_transition",
+          "to_map": "game/sp/e3m2_hell_b/e3m2_hell_b"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "nekravol_part_ii_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770387,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "nekravol_part_ii_mission_complete",
+      "map_key": "e3m2_hell_b",
+      "triggers": [
+        {
+          "filename": "ap_mission_nekravol_part_ii_complete.txt",
+          "marker": "AP_MISSION_EVENT_NEKRAVOL_PART_II_COMPLETE",
+          "owner": "game_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+          "strategy": "native_transition",
+          "to_map": "game/sp/e3m3_maykr/e3m3_maykr"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "urdak_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770411,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "urdak_mission_complete",
+      "map_key": "e3m3_maykr",
+      "triggers": [
+        {
+          "filename": "ap_mission_urdak_complete.txt",
+          "marker": "AP_MISSION_EVENT_URDAK_COMPLETE",
+          "owner": "temp_all_scripting_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "temp_all_scripting_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m3_maykr/e3m3_maykr",
+          "strategy": "native_transition",
+          "to_map": "game/sp/e3m4_boss/e3m4_boss"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "final_sin_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770414,
+          "strategy": "location_check"
+        },
+        {
+          "strategy": "campaign_goal"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "final_sin_mission_complete",
+      "map_key": "e3m4_boss",
+      "triggers": [
+        {
+          "filename": "ap_mission_final_sin_complete.txt",
+          "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
+          "strategy": "terminal_owner"
+        }
+      ]
     }
-  ]
+  ],
+  "schema_version": 1
 }

@@ -128,9 +128,15 @@ the memory gate confirms safe gameplay.
 
 ## Map content and validation
 
-`data/map_sources.json` and normalized `content/maps/*` packages define enabled
-maps, vanilla source hashes, manifests, runtime identities, resource owners,
-package layout, and release metadata.
+Every enabled map is authored only in
+`content/maps/<map_key>/{descriptor,locations,runtime,publishers,assets,onboarding}.json`.
+`data/map_sources.json`, manifests and runtime registries are compiled
+projections for the client/package and are checked, never hand-edited.
+
+To add a map, scaffold its package with `python -m tools.content.new_map`, fill
+the six files, then run `scripts/pipeline.sh fast`, `scripts/pipeline.sh map
+<map_key>`, `scripts/pipeline.sh changed`, and integration before a candidate
+build.
 
 Each accepted map has an independent semantic baseline in
 `baselines/maps/<map_key>.json`. To accept one intentional map change:

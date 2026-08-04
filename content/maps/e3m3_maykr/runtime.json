@@ -7,10 +7,14 @@
       "description": "Acquire 1 Collectible Toy",
       "location_id": 7770407,
       "strategy": "physical_event_equivalent",
-      "mission_key": "e3m3",
+      "mission_key": "e3m3_maykr",
       "signal": {
         "kind": "physical_event_equivalent",
-        "physical_location_ids": [7770392, 7770394, 7770400],
+        "physical_location_ids": [
+          7770392,
+          7770394,
+          7770400
+        ],
         "required_count": 1,
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e3m3/challenge_1",
@@ -30,7 +34,8 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 56
     },
     {
       "category": "mission_challenges",
@@ -38,7 +43,7 @@
       "description": "Kill 12 Demons while in mid-air",
       "location_id": 7770408,
       "strategy": "unlockable_record",
-      "mission_key": "e3m3",
+      "mission_key": "e3m3_maykr",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -59,7 +64,8 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 57
     },
     {
       "category": "mission_challenges",
@@ -67,7 +73,7 @@
       "description": "Kill 5 Maykr Drones with Precision Bolt headshots",
       "location_id": 7770409,
       "strategy": "unlockable_record",
-      "mission_key": "e3m3",
+      "mission_key": "e3m3_maykr",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -88,20 +94,26 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 58
     },
     {
       "category": "all_mission_challenges",
       "name": "Urdak - All Mission Challenges Completed",
       "location_id": 7770410,
       "strategy": "aggregate",
-      "mission_key": "e3m3",
+      "mission_key": "e3m3_maykr",
       "signal": {
         "kind": "aggregate",
-        "children": [7770407, 7770408, 7770409],
+        "children": [
+          7770407,
+          7770408,
+          7770409
+        ],
         "required_count": 3,
         "authority": "server_checked_locations"
-      }
+      },
+      "order": 59
     },
     {
       "category": "mission_complete",
@@ -118,7 +130,8 @@
           "from": "game/sp/e3m3_maykr/e3m3_maykr",
           "to": "game/sp/e3m4_boss/e3m4_boss"
         }
-      }
+      },
+      "order": 60
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e2m4_boss",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e2m4_boss.map",
+    "size": 0,
+    "sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390"
+  },
+  "owner": {
+    "resource": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+    "priority": 76
+  }
+}

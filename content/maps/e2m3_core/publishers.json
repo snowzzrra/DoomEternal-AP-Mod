@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "mars_core_mission_complete",
+      "map_key": "e2m3_core",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m3_core/e2m3_core",
+          "to_map": "game/sp/e2m4_boss/e2m4_boss"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770289
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

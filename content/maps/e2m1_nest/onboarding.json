@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e2m1_nest",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e2m1_nest.map",
+    "size": 0,
+    "sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7"
+  },
+  "owner": {
+    "resource": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
+    "priority": 30
+  }
+}

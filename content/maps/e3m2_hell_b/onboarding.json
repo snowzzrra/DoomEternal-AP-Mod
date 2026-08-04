@@ -1,19 +1,15 @@
 {
   "schema_version": 1,
   "map_key": "e3m2_hell_b",
-  "status": "static_candidate",
+  "status": "implementation_candidate",
   "source": {
     "path": "vanillamaps/e3m2_hell_b.map",
     "size": 6577895,
-    "sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
-    "owner_payload_sha256": "9865cd8dfe3653938dab377edf5fcf255be413842bd852c096b011a967ef3272",
-    "owner_payload_decompressed_match": true,
-    "ap_markers_absent": true,
-    "structurally_parsed": true
+    "sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb"
   },
   "owner": {
     "resource": "game/sp/e3m2_hell_b/e3m2_hell_b_patch2.resources",
-    "status": "packagemapspec_winner"
+    "priority": 72
   },
   "onboarding_evidence": {
     "source": "packagemapspec",
@@ -45,40 +41,350 @@
     "automap_stations_excluded": 1
   },
   "candidate_inventory": [
-    {"entity": "game_pickup_collectible_toys_tyrant_1", "class": "idProp2", "transform": [-848.000061, -7.50000048, -35.9900093], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/tyrant", "decision": "include", "reason": "physical Toy"},
-    {"entity": "game_progress_codex_3_e3m2b", "class": "idProp2", "transform": [-755.959961, -9.23999977, 117.075233], "target_chain": [], "vanilla_reward": "propitem/codex/hell/fuel_eternal_flame_3", "decision": "include", "reason": "physical Codex entry"},
-    {"entity": "game_progress_codex_2_e3m2b", "class": "idProp2", "transform": [-845.040039, 23.7999992, -20.9747639], "target_chain": [], "vanilla_reward": "propitem/codex/hell/fuel_eternal_flame_2", "decision": "include", "reason": "physical Codex entry"},
-    {"entity": "game_progress_codex_1_e3m2b", "class": "idProp2", "transform": [-838.700012, -47.8499985, 33.0999985], "target_chain": [], "vanilla_reward": "propitem/codex/hell/nekravol_2", "decision": "include", "reason": "physical Codex entry"},
-    {"entity": "pickups_pickup_extra_life_extra_life_1_1_e3m2b", "class": "idProp2", "transform": [-870.0, -7.5, 1.0], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life"},
-    {"entity": "pickups_pickup_collectible_albums_album_14_1", "class": "idProp2", "transform": [-837.000122, 10.500001, -19.9000015], "target_chain": [], "vanilla_reward": "propitem/collectible/albums/album_14", "decision": "include", "reason": "physical Album"},
-    {"entity": "pickups_progress_mastery_token_weapon_1", "class": "idProp2", "transform": [-681.050171, -89.4200058, 30.0], "target_chain": [], "vanilla_reward": "propitem/mastery_token/weapon", "decision": "include", "reason": "physical Mastery Token; grant removed by generic pickup conversion"},
-    {"entity": "pickups_progress_cheats_confetti_instagib_1", "class": "idProp2", "transform": [-815.419983, -67.0, 18.1499996], "target_chain": [], "vanilla_reward": "cheatcode_confetti_instagib", "decision": "include", "reason": "physical Cheat Code"},
-    {"entity": "pickups_pickup_collectible_albums_album_13_1", "class": "idProp2", "transform": [-690.129883, -36.4199715, 33.8164482], "target_chain": [], "vanilla_reward": "propitem/collectible/albums/album_13", "decision": "include", "reason": "physical Album"},
-    {"entity": "pickups_pickup_collectible_toys_dreadknight_1", "class": "idProp2", "transform": [-822.400024, -68.5999985, 28.7164478], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/dreadknight", "decision": "include", "reason": "physical Toy"},
-    {"entity": "pickups_progress_cheats_one_shot_stagger_1", "class": "idProp2", "transform": [-734.0, -7.5, 298.0], "target_chain": [], "vanilla_reward": "cheatcode_one_shot_stagger", "decision": "include", "reason": "physical Cheat Code"},
-    {"entity": "pickups_pickup_extra_life_extra_life_1_1", "class": "idProp2", "transform": [-641.5, -63.5, 23.1016579], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life"},
-    {"entity": "pickups_progress_argent_cell_1_693519488_e3m2_b", "class": "idInteractable_WorldCache", "transform": [-755.639893, 35.729992, 32.067383], "target_chain": ["pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"], "vanilla_reward": "Sentinel Crystal world-cache grant", "decision": "include", "reason": "physical Sentinel Crystal; preserve only destructible presentation target"},
-    {"entity": "game_pickup_collectible_toys_archvile_1", "class": "idProp2", "transform": [-729.0, -7.5, 149.001282], "target_chain": [], "vanilla_reward": "propitem/collectible/toys/archvile", "decision": "include", "reason": "physical Toy"},
-    {"entity": "game_pickup_extra_life_extra_life_1_1_e3m2b", "class": "idProp2", "transform": [-721.0, -7.5, 171.851669], "target_chain": [], "vanilla_reward": "sp_extra_life_1", "decision": "include", "reason": "campaign Extra Life"},
-    {"entity": "game_progress_praetor_token_4_e3m2b", "class": "idInteractable_GiveItems", "transform": [-751.80011, -7.5, 298.118866], "target_chain": [], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "physical Praetor Suit Token"},
-    {"entity": "game_progress_praetor_token_3_e3m2b", "class": "idInteractable_GiveItems", "transform": [-800.0, 18.9999943, 117.201439], "target_chain": [], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "physical Praetor Suit Token"},
-    {"entity": "vis_progress_praetor_token_1_e3m2b", "class": "idInteractable_GiveItems", "transform": [-813.279968, -7.49992323, 175.410004], "target_chain": [], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "functional physical Praetor Token; vis_ prefix is spatial authoring, not a cosmetic-only entity"},
-    {"entity": "ai_encounter_manager_towertop_secret", "class": "idEncounterManager", "transform": null, "target_chain": ["completion event item[6]"], "vanilla_reward": "native Secret Encounter completion", "decision": "include", "reason": "generic Secret Encounter completion hook"},
-    {"entity": "ai_encounter_manager_conveyor_secret", "class": "idEncounterManager", "transform": null, "target_chain": ["completion event item[5]"], "vanilla_reward": "native Secret Encounter completion", "decision": "include", "reason": "generic Secret Encounter completion hook"},
-    {"entity": "unlockable/mission_challenge/e3m2_b/challenge_1.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_BLOOD_PUNCH_MULTI_KILLS >= 5"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
-    {"entity": "unlockable/mission_challenge/e3m2_b/challenge_2.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_TYRANT_GK_BACK_UPPER >= 1"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
-    {"entity": "unlockable/mission_challenge/e3m2_b/challenge_3.decl", "class": "unlockable", "transform": null, "target_chain": ["STAT_ARCHVILE_GK_LEFT_UPPER >= 1"], "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE", "decision": "include", "reason": "native durable unlockable record; inherited currency neutralized"},
-    {"entity": "Nekravol Part II challenge aggregate", "class": "AP aggregate", "transform": null, "target_chain": [7770383, 7770384, 7770385], "vanilla_reward": "none", "decision": "include", "reason": "server-authoritative checked-locations aggregate"},
-    {"entity": "game_target_level_transition_1", "class": "idTarget_LevelTransition", "transform": [-800.0, -7.5, 322.0], "target_chain": ["game/sp/e3m3_maykr/e3m3_maykr"], "vanilla_reward": "native transition to Urdak boundary", "decision": "include", "reason": "Mission Complete terminal; native transition remains owned by the original entity"},
-    {"entity": "game_interact_automap_1_e3m2b", "class": "idInteractable_Automap", "transform": [-845.509827, -9.53019714, -2.00126076], "target_chain": [], "vanilla_reward": "STAT_AUTOMAP", "decision": "exclude", "reason": "Automap Station excluded by existing repository policy"}
+    {
+      "entity": "game_pickup_collectible_toys_tyrant_1",
+      "class": "idProp2",
+      "transform": [
+        -848.000061,
+        -7.50000048,
+        -35.9900093
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/collectible/toys/tyrant",
+      "decision": "include",
+      "reason": "physical Toy"
+    },
+    {
+      "entity": "game_progress_codex_3_e3m2b",
+      "class": "idProp2",
+      "transform": [
+        -755.959961,
+        -9.23999977,
+        117.075233
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/codex/hell/fuel_eternal_flame_3",
+      "decision": "include",
+      "reason": "physical Codex entry"
+    },
+    {
+      "entity": "game_progress_codex_2_e3m2b",
+      "class": "idProp2",
+      "transform": [
+        -845.040039,
+        23.7999992,
+        -20.9747639
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/codex/hell/fuel_eternal_flame_2",
+      "decision": "include",
+      "reason": "physical Codex entry"
+    },
+    {
+      "entity": "game_progress_codex_1_e3m2b",
+      "class": "idProp2",
+      "transform": [
+        -838.700012,
+        -47.8499985,
+        33.0999985
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/codex/hell/nekravol_2",
+      "decision": "include",
+      "reason": "physical Codex entry"
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_1_e3m2b",
+      "class": "idProp2",
+      "transform": [
+        -870.0,
+        -7.5,
+        1.0
+      ],
+      "target_chain": [],
+      "vanilla_reward": "sp_extra_life_1",
+      "decision": "include",
+      "reason": "campaign Extra Life"
+    },
+    {
+      "entity": "pickups_pickup_collectible_albums_album_14_1",
+      "class": "idProp2",
+      "transform": [
+        -837.000122,
+        10.500001,
+        -19.9000015
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/collectible/albums/album_14",
+      "decision": "include",
+      "reason": "physical Album"
+    },
+    {
+      "entity": "pickups_progress_mastery_token_weapon_1",
+      "class": "idProp2",
+      "transform": [
+        -681.050171,
+        -89.4200058,
+        30.0
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/mastery_token/weapon",
+      "decision": "include",
+      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+    },
+    {
+      "entity": "pickups_progress_cheats_confetti_instagib_1",
+      "class": "idProp2",
+      "transform": [
+        -815.419983,
+        -67.0,
+        18.1499996
+      ],
+      "target_chain": [],
+      "vanilla_reward": "cheatcode_confetti_instagib",
+      "decision": "include",
+      "reason": "physical Cheat Code"
+    },
+    {
+      "entity": "pickups_pickup_collectible_albums_album_13_1",
+      "class": "idProp2",
+      "transform": [
+        -690.129883,
+        -36.4199715,
+        33.8164482
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/collectible/albums/album_13",
+      "decision": "include",
+      "reason": "physical Album"
+    },
+    {
+      "entity": "pickups_pickup_collectible_toys_dreadknight_1",
+      "class": "idProp2",
+      "transform": [
+        -822.400024,
+        -68.5999985,
+        28.7164478
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/collectible/toys/dreadknight",
+      "decision": "include",
+      "reason": "physical Toy"
+    },
+    {
+      "entity": "pickups_progress_cheats_one_shot_stagger_1",
+      "class": "idProp2",
+      "transform": [
+        -734.0,
+        -7.5,
+        298.0
+      ],
+      "target_chain": [],
+      "vanilla_reward": "cheatcode_one_shot_stagger",
+      "decision": "include",
+      "reason": "physical Cheat Code"
+    },
+    {
+      "entity": "pickups_pickup_extra_life_extra_life_1_1",
+      "class": "idProp2",
+      "transform": [
+        -641.5,
+        -63.5,
+        23.1016579
+      ],
+      "target_chain": [],
+      "vanilla_reward": "sp_extra_life_1",
+      "decision": "include",
+      "reason": "campaign Extra Life"
+    },
+    {
+      "entity": "pickups_progress_argent_cell_1_693519488_e3m2_b",
+      "class": "idInteractable_WorldCache",
+      "transform": [
+        -755.639893,
+        35.729992,
+        32.067383
+      ],
+      "target_chain": [
+        "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"
+      ],
+      "vanilla_reward": "Sentinel Crystal world-cache grant",
+      "decision": "include",
+      "reason": "physical Sentinel Crystal; preserve only destructible presentation target"
+    },
+    {
+      "entity": "game_pickup_collectible_toys_archvile_1",
+      "class": "idProp2",
+      "transform": [
+        -729.0,
+        -7.5,
+        149.001282
+      ],
+      "target_chain": [],
+      "vanilla_reward": "propitem/collectible/toys/archvile",
+      "decision": "include",
+      "reason": "physical Toy"
+    },
+    {
+      "entity": "game_pickup_extra_life_extra_life_1_1_e3m2b",
+      "class": "idProp2",
+      "transform": [
+        -721.0,
+        -7.5,
+        171.851669
+      ],
+      "target_chain": [],
+      "vanilla_reward": "sp_extra_life_1",
+      "decision": "include",
+      "reason": "campaign Extra Life"
+    },
+    {
+      "entity": "game_progress_praetor_token_4_e3m2b",
+      "class": "idInteractable_GiveItems",
+      "transform": [
+        -751.80011,
+        -7.5,
+        298.118866
+      ],
+      "target_chain": [],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "physical Praetor Suit Token"
+    },
+    {
+      "entity": "game_progress_praetor_token_3_e3m2b",
+      "class": "idInteractable_GiveItems",
+      "transform": [
+        -800.0,
+        18.9999943,
+        117.201439
+      ],
+      "target_chain": [],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "physical Praetor Suit Token"
+    },
+    {
+      "entity": "vis_progress_praetor_token_1_e3m2b",
+      "class": "idInteractable_GiveItems",
+      "transform": [
+        -813.279968,
+        -7.49992323,
+        175.410004
+      ],
+      "target_chain": [],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "functional physical Praetor Token; vis_ prefix is spatial authoring, not a cosmetic-only entity"
+    },
+    {
+      "entity": "ai_encounter_manager_towertop_secret",
+      "class": "idEncounterManager",
+      "transform": null,
+      "target_chain": [
+        "completion event item[6]"
+      ],
+      "vanilla_reward": "native Secret Encounter completion",
+      "decision": "include",
+      "reason": "generic Secret Encounter completion hook"
+    },
+    {
+      "entity": "ai_encounter_manager_conveyor_secret",
+      "class": "idEncounterManager",
+      "transform": null,
+      "target_chain": [
+        "completion event item[5]"
+      ],
+      "vanilla_reward": "native Secret Encounter completion",
+      "decision": "include",
+      "reason": "generic Secret Encounter completion hook"
+    },
+    {
+      "entity": "unlockable/mission_challenge/e3m2_b/challenge_1.decl",
+      "class": "unlockable",
+      "transform": null,
+      "target_chain": [
+        "STAT_BLOOD_PUNCH_MULTI_KILLS >= 5"
+      ],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "native durable unlockable record; inherited currency neutralized"
+    },
+    {
+      "entity": "unlockable/mission_challenge/e3m2_b/challenge_2.decl",
+      "class": "unlockable",
+      "transform": null,
+      "target_chain": [
+        "STAT_TYRANT_GK_BACK_UPPER >= 1"
+      ],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "native durable unlockable record; inherited currency neutralized"
+    },
+    {
+      "entity": "unlockable/mission_challenge/e3m2_b/challenge_3.decl",
+      "class": "unlockable",
+      "transform": null,
+      "target_chain": [
+        "STAT_ARCHVILE_GK_LEFT_UPPER >= 1"
+      ],
+      "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
+      "decision": "include",
+      "reason": "native durable unlockable record; inherited currency neutralized"
+    },
+    {
+      "entity": "Nekravol Part II challenge aggregate",
+      "class": "AP aggregate",
+      "transform": null,
+      "target_chain": [
+        7770383,
+        7770384,
+        7770385
+      ],
+      "vanilla_reward": "none",
+      "decision": "include",
+      "reason": "server-authoritative checked-locations aggregate"
+    },
+    {
+      "entity": "game_target_level_transition_1",
+      "class": "idTarget_LevelTransition",
+      "transform": [
+        -800.0,
+        -7.5,
+        322.0
+      ],
+      "target_chain": [
+        "game/sp/e3m3_maykr/e3m3_maykr"
+      ],
+      "vanilla_reward": "native transition to Urdak boundary",
+      "decision": "include",
+      "reason": "Mission Complete terminal; native transition remains owned by the original entity"
+    },
+    {
+      "entity": "game_interact_automap_1_e3m2b",
+      "class": "idInteractable_Automap",
+      "transform": [
+        -845.509827,
+        -9.53019714,
+        -2.00126076
+      ],
+      "target_chain": [],
+      "vanilla_reward": "STAT_AUTOMAP",
+      "decision": "exclude",
+      "reason": "Automap Station excluded by existing repository policy"
+    }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": ["automap station"],
+    "forbidden_ap_terms": [
+      "automap station"
+    ],
     "required_source_edge": {
       "from": "game_target_level_transition_1",
       "to": "game/sp/e3m3_maykr/e3m3_maykr.map"
     },
-    "excluded_entities": ["game_interact_automap_1_e3m2b"]
+    "excluded_entities": [
+      "game_interact_automap_1_e3m2b"
+    ]
   },
   "checks": [
     "source hash locked and byte-identical to decompressed patch2 owner payload",

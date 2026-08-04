@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "key": "hub",
+  "display_name": "Fortress/Hub",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "hub.map",
+  "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b",
+  "source_size": 0,
+  "source_owner": "vanillamaps/hub.map",
+  "generated_output": "hub.entities",
+  "runtime_map": "game/hub/hub",
+  "resource_base": "hub",
+  "resource_path": "game/hub/hub_patch2.resources",
+  "resource_owner": "game/hub/hub_patch2.resources",
+  "resource_priority": 70,
+  "relative_entities_path": "game/hub/hub.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Fortress of Doom - First Visit",
+        "order": 3
+      },
+      {
+        "name": "Fortress of Doom - Second Visit",
+        "order": 5
+      },
+      {
+        "name": "Fortress of Doom - Third Visit",
+        "order": 8
+      },
+      {
+        "name": "Fortress of Doom - Fourth Visit",
+        "order": 10
+      },
+      {
+        "name": "Fortress of Doom - Fifth Visit",
+        "order": 12
+      },
+      {
+        "name": "Fortress of Doom - Sixth Visit",
+        "order": 15
+      },
+      {
+        "name": "Fortress of Doom - Seventh Visit",
+        "order": 17
+      }
+    ],
+    "connections": [
+      {
+        "from": "Fortress of Doom - First Visit",
+        "to": "Exultia",
+        "rule": "Portal to Exultia",
+        "order": 3
+      },
+      {
+        "from": "Fortress of Doom - Second Visit",
+        "to": "Cultist Base",
+        "rule": "Portal to Cultist Base",
+        "order": 5
+      },
+      {
+        "from": "Fortress of Doom - Third Visit",
+        "to": "Super Gore Nest",
+        "rule": "Portal to Super Gore Nest",
+        "order": 8
+      },
+      {
+        "from": "Fortress of Doom - Fourth Visit",
+        "to": "ARC Complex",
+        "rule": "Portal to ARC Complex",
+        "order": 10
+      },
+      {
+        "from": "Fortress of Doom - Fifth Visit",
+        "to": "Mars Core",
+        "rule": "Portal to Mars Core",
+        "order": 12
+      },
+      {
+        "from": "Fortress of Doom - Sixth Visit",
+        "to": "Taras Nabad",
+        "rule": "Portal to Taras Nabad",
+        "order": 15
+      },
+      {
+        "from": "Fortress of Doom - Seventh Visit",
+        "to": "Nekravol",
+        "rule": "Portal to Nekravol",
+        "order": 17
+      }
+    ],
+    "virtual_locations": [
+      {
+        "name": "Fortress of Doom - Super Gore Nest Transition",
+        "region": "Fortress of Doom - Third Visit",
+        "order": 0
+      }
+    ]
+  },
+  "order": 2
+}

@@ -15,13 +15,8 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from ap_visual_contract import load_ap_visual_contract
-from publisher_contracts import (
-    EFFECT_STRATEGIES,
-    TRIGGER_STRATEGIES,
-    PublisherContract,
-    load_publisher_contracts,
-    publisher_contracts_from_document,
-)
+from publisher_contracts import (EFFECT_STRATEGIES, TRIGGER_STRATEGIES,
+                                 PublisherContract, publisher_contracts_from_document)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -192,321 +187,173 @@ def _resource_base(resource_path: str) -> str:
 
 
 def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
-    """Load opt-in authoring packages without changing legacy map inputs."""
+    """Discover the one complete authoring package for every map."""
+    component_names = ("locations", "runtime", "publishers", "assets", "onboarding")
+    required = {
+        "schema_version", "key", "display_name", "enabled", "test_only",
+        "onboarding_status", "source_file", "source_sha256", "source_size",
+        "source_owner", "generated_output", "runtime_map", "resource_base",
+        "resource_path", "resource_owner", "resource_priority",
+        "relative_entities_path", "supported_game_revision", "route", "order",
+    }
+    root_path = root / "content" / "maps"
+    if not root_path.is_dir():
+        raise ValueError("component=map_package file=content/maps value=missing")
     packages = []
-    packages_root = root / "content" / "maps"
-    if not packages_root.exists():
-        return ()
-    for directory in sorted(path for path in packages_root.iterdir() if path.is_dir()):
-        descriptor_path = directory / "descriptor.json"
-        if not descriptor_path.exists():
-            continue
-        descriptor = _json(descriptor_path)
+    keys: set[str] = set()
+    for directory in sorted(path for path in root_path.iterdir() if path.is_dir()):
+        paths = {name: directory / f"{name}.json" for name in ("descriptor", *component_names)}
+        missing = [str(path.name) for path in paths.values() if not path.is_file()]
+        if missing:
+            raise ValueError(f"component=map_package map={directory.name} field=components value=missing {missing}")
+        descriptor = _json(paths["descriptor"])
         key = descriptor.get("key")
-        if descriptor.get("schema_version") != 1 or key != directory.name:
-            raise ValueError(
-                f"component=map_package map={directory.name} file={descriptor_path} "
-                f"field=key value={key!r}: descriptor schema/key mismatch"
-            )
-        documents = {
-            name: _json(directory / f"{name}.json")
-            for name in ("locations", "runtime", "publishers", "assets", "onboarding")
-        }
+        unknown = set(descriptor) - required
+        missing_fields = required - set(descriptor)
+        if descriptor.get("schema_version") != 1 or key != directory.name or unknown or missing_fields:
+            raise ValueError(f"component=map_package map={directory.name} field=descriptor value=invalid key/schema/fields")
+        if key in keys:
+            raise ValueError(f"component=map_package map={key} field=key value=duplicate")
+        keys.add(key)
+        documents = {name: _json(path) for name, path in paths.items() if name != "descriptor"}
         if any(document.get("schema_version") != 1 for document in documents.values()):
-            raise ValueError(
-                f"component=map_package map={key} file={directory} "
-                "field=schema_version value!=1"
-            )
-        packages.append({
-            "directory": directory,
-            "descriptor": descriptor,
-            **documents,
-        })
-    return tuple(packages)
+            raise ValueError(f"component=map_package map={key} field=schema_version value!=1")
+        packages.append({"directory": directory, "descriptor": descriptor, **documents})
+    if not packages:
+        raise ValueError("component=map_package file=content/maps value=empty")
+    if any(not isinstance(item["descriptor"]["order"], int) for item in packages):
+        raise ValueError("component=map_package field=order value=non-integer")
+    if len({item["descriptor"]["order"] for item in packages}) != len(packages):
+        raise ValueError("component=map_package field=order value=duplicate")
+    return tuple(sorted(packages, key=lambda item: item["descriptor"]["order"]))
 
 
-def _normalized_route(
-    root: Path,
-    packages: tuple[dict[str, Any], ...],
-) -> Mapping[str, Any]:
-    legacy = _json(root / "data" / "campaign_route.json")
-    regions = list(legacy.get("regions", []))
-    connections = [list(row) for row in legacy.get("connections", [])]
-    virtual_locations = [dict(row) for row in legacy.get("virtual_locations", [])]
+def _normalized_route(packages: tuple[dict[str, Any], ...]) -> Mapping[str, Any]:
+    regions: list[tuple[int, str]] = []
+    connections: list[tuple[int, list[str]]] = []
+    virtual: list[tuple[int, dict[str, Any]]] = []
     for package in packages:
-        raw = package["descriptor"].get("route", {})
-        if isinstance(raw, list):
-            raw = {"connections": raw}
+        raw = package["descriptor"]["route"]
         if not isinstance(raw, Mapping):
-            raise ValueError(
-                f"{package['descriptor']['key']}: route must be an object or connection list"
-            )
-        for region in raw.get("regions", []):
-            if region not in regions:
-                regions.append(region)
+            raise ValueError(f"{package['descriptor']['key']}: route must be an object")
+        for row in raw.get("regions", []):
+            if not isinstance(row, Mapping) or set(row) != {"name", "order"}:
+                raise ValueError(f"{package['descriptor']['key']}: invalid route region")
+            regions.append((row["order"], row["name"]))
         for row in raw.get("connections", []):
-            normalized = list(row)
-            if len(normalized) != 3:
-                raise ValueError(
-                    f"{package['descriptor']['key']}: route connection must have three fields"
-                )
-            if normalized not in connections:
-                connections.append(normalized)
+            if not isinstance(row, Mapping) or set(row) != {"from", "to", "rule", "order"}:
+                raise ValueError(f"{package['descriptor']['key']}: invalid route connection")
+            connections.append((row["order"], [row["from"], row["to"], row["rule"]]))
         for row in raw.get("virtual_locations", []):
-            normalized = dict(row)
-            if normalized not in virtual_locations:
-                virtual_locations.append(normalized)
-    known = set(regions)
-    for source, destination, _rule in connections:
-        if source not in known or destination not in known:
-            raise ValueError(
-                f"route references undeclared region: {source!r} -> {destination!r}"
-            )
-    return _freeze({
-        "schema_version": legacy.get("schema_version", 1),
-        "regions": regions,
-        "connections": connections,
-        "virtual_locations": virtual_locations,
-    })
+            if not isinstance(row, Mapping) or "order" not in row:
+                raise ValueError(f"{package['descriptor']['key']}: invalid route virtual location")
+            virtual.append((row["order"], {key: value for key, value in row.items() if key != "order"}))
+    def ordered(values):
+        if len({order for order, _ in values}) != len(values):
+            raise ValueError("route order values must be unique")
+        return [value for _, value in sorted(values)]
+    normalized_regions, normalized_connections, normalized_virtual = map(ordered, (regions, connections, virtual))
+    known = set(normalized_regions)
+    if len(known) != len(normalized_regions) or any(a not in known or b not in known for a, b, _ in normalized_connections):
+        raise ValueError("route has duplicate or undeclared regions")
+    return _freeze({"schema_version": 1, "regions": normalized_regions,
+                    "connections": normalized_connections, "virtual_locations": normalized_virtual})
+
+
+def _asset(raw_asset: Mapping[str, Any], spec: MapSpec) -> AssetSpec:
+    return AssetSpec(raw_asset["key"], spec.key, raw_asset["strategy"], raw_asset["model"],
+        raw_asset.get("resource_base", spec.resource_base), raw_asset.get("resource_owner", spec.resource_owner),
+        tuple(raw_asset.get("dependencies", [])), raw_asset.get("dependency_policy", "required"),
+        _freeze(raw_asset.get("donor", {})), raw_asset.get("replacement_slot_policy", ""),
+        _freeze(raw_asset.get("replacement_slot", {})), raw_asset.get("usage_policy", ""),
+        tuple(raw_asset.get("preserve", [])), _freeze(raw_asset.get("visual_presentation_policy", {})))
 
 
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
-    map_source_data = _json(root / "data" / "map_sources.json")
     canonical_visual = load_ap_visual_contract(root)
     packages = _map_content_packages(root)
-    package_by_key = {
-        package["descriptor"]["key"]: package
-        for package in packages
-    }
-    source_maps = dict(map_source_data["maps"])
-    for key, package in package_by_key.items():
-        if key in source_maps:
-            raise ValueError(f"map package duplicates legacy map key: {key}")
-        descriptor = dict(package["descriptor"])
-        directory = package["directory"]
-        resource_path = descriptor["resource_owner"]
-        source_maps[key] = {
-            **descriptor,
-            "level_config": str(directory / "locations.json"),
-            "manifest": descriptor.get("manifest", f"manifests/{key}.json"),
-            "onboarding_audit": str(directory / "onboarding.json"),
-            "resource_path": resource_path,
-            "source_owner": descriptor.get("source_owner", descriptor["source_file"]),
-            "onboarding_status": descriptor.get(
-                "onboarding_status", "implementation_candidate"
-            ),
-            "test_only": False,
-            "package_directory": str(directory.relative_to(root)),
-        }
     maps: dict[str, MapSpec] = {}
     physical: list[PhysicalLocationSpec] = []
+    runtime: list[RuntimeLocationSpec] = []
+    challenges: list[ChallengeSpec] = []
     assets: list[AssetSpec] = []
-    for key, source in source_maps.items():
-        config_path = Path(source["level_config"])
-        if not config_path.is_absolute():
-            config_path = root / config_path
-        onboarding = source.get("onboarding_audit")
-        onboarding_path = Path(onboarding) if onboarding else None
-        if onboarding_path is not None and not onboarding_path.is_absolute():
-            onboarding_path = root / onboarding_path
+    publishers: list[PublisherSpec] = []
+    names: dict[int, str] = {}
+    reserved: dict[int, Mapping[str, Any]] = {}
+    goal: Mapping[str, Any] | None = None
+    for package in packages:
+        source = package["descriptor"]
+        key = source["key"]
+        directory = package["directory"]
         spec = MapSpec(
-            key, source["display_name"], source["source_file"], config_path,
-            root / source["manifest"], onboarding_path,
-            source["runtime_map"], source.get("resource_base", _resource_base(source["resource_path"])),
-            source["resource_owner"], source["relative_entities_path"],
-            bool(source.get("enabled", True)), _freeze(source),
-            str(source.get("source_sha256", "")),
-            int(source.get("source_size", 0)),
-            str(source.get("resource_path", source["resource_owner"])),
-            int(source.get("resource_priority", 0)),
-            str(source.get("supported_game_revision", "")),
+            key, source["display_name"], source["source_file"], directory / "locations.json",
+            root / "manifests" / f"{key}.json", directory / "onboarding.json",
+            source["runtime_map"], source["resource_base"], source["resource_owner"],
+            source["relative_entities_path"], bool(source["enabled"]),
+            _freeze({**source, "package_directory": str(directory.relative_to(root))}),
+            source["source_sha256"], source["source_size"], source["resource_path"],
+            source["resource_priority"], source["supported_game_revision"],
         )
         maps[key] = spec
-        config = _json(config_path)
-        policies = config.get("target_policies", {})
-        regions = config.get("region_overrides", {})
-        default_region = config.get("region", source["display_name"])
+        config = package["locations"]
+        policies, regions = config.get("target_policies", {}), config.get("region_overrides", {})
+        default_region = config.get("region", spec.display_name)
+        package_ids = set(config.get("entities", {}).values()) | {item["location_id"] for item in config.get("secret_encounters", [])}
+        package_names = {int(location_id): name for location_id, name in config.get("names", {}).items()}
+        if set(package_names) != package_ids:
+            raise ValueError(f"{key}: package physical names must match physical location IDs")
+        names.update(package_names)
         for ap_check, location_id in config.get("entities", {}).items():
             entity = ap_check.removeprefix("AP_CHECK_").lower()
             policy = _freeze(policies.get(entity, {}))
-            physical.append(PhysicalLocationSpec(
-                "", location_id, key, ap_check, regions.get(str(location_id), default_region),
-                _strategy_for_policy(policy, ap_check), policy,
-            ))
-        for raw_asset in config.get("assets", []):
-            assets.append(AssetSpec(
-                key=raw_asset["key"],
-                map_key=key,
-                strategy=raw_asset["strategy"],
-                model=raw_asset["model"],
-                resource_base=raw_asset.get("resource_base", spec.resource_base),
-                resource_owner=spec.resource_owner,
-                dependencies=tuple(raw_asset.get("dependencies", [])),
-                dependency_policy=raw_asset.get("dependency_policy", "required"),
-                donor=_freeze(raw_asset.get("donor", {})),
-                replacement_slot_policy=raw_asset.get(
-                    "replacement_slot_policy", ""
-                ),
-                replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
-                usage_policy=raw_asset.get("usage_policy", ""),
-                preserve=tuple(raw_asset.get("preserve", [])),
-                visual_presentation_policy=_freeze(
-                    raw_asset.get("visual_presentation_policy", {})
-                ),
-            ))
-        for raw_asset in package_by_key.get(key, {}).get("assets", {}).get("assets", []):
-            assets.append(AssetSpec(
-                key=raw_asset["key"],
-                map_key=key,
-                strategy=raw_asset["strategy"],
-                model=raw_asset["model"],
-                resource_base=raw_asset.get("resource_base", spec.resource_base),
-                resource_owner=raw_asset.get(
-                    "resource_owner", spec.resource_owner
-                ),
-                dependencies=tuple(raw_asset.get("dependencies", [])),
-                dependency_policy=raw_asset.get(
-                    "dependency_policy", "required"
-                ),
-                donor=_freeze(raw_asset.get("donor", {})),
-                replacement_slot_policy=raw_asset.get(
-                    "replacement_slot_policy", ""
-                ),
-                replacement_slot=_freeze(raw_asset.get("replacement_slot", {})),
-                usage_policy=raw_asset.get("usage_policy", ""),
-                preserve=tuple(raw_asset.get("preserve", [])),
-                visual_presentation_policy=_freeze(
-                    raw_asset.get("visual_presentation_policy", {})
-                ),
-            ))
-        if spec.enabled:
-            slot = {
-                **canonical_visual["replacement_slot"],
-                "resource_archive": spec.resource_base,
-            }
-            assets.append(AssetSpec(
-                key=canonical_visual["key"],
-                map_key=key,
-                strategy=canonical_visual["strategy"],
-                model=canonical_visual["model"],
-                resource_base=spec.resource_base,
-                resource_owner=spec.resource_owner,
-                dependencies=tuple(canonical_visual["dependencies"]),
-                dependency_policy=canonical_visual["dependency_policy"],
-                replacement_slot_policy=canonical_visual[
-                    "replacement_slot_policy"
-                ],
-                replacement_slot=_freeze(slot),
-                usage_policy=canonical_visual["usage_policy"],
-                preserve=tuple(canonical_visual["preserve"]),
-                visual_presentation_policy=_freeze(
-                    canonical_visual["visual_presentation_policy"]
-                ),
-            ))
+            physical.append(PhysicalLocationSpec("", location_id, key, ap_check,
+                regions.get(str(location_id), default_region), _strategy_for_policy(policy, ap_check), policy))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
-            physical.append(PhysicalLocationSpec(
-                "", location_id, key, encounter.get("ap_check", f"AP_CHECK_SECRET_{location_id}"),
-                default_region, "secret_encounter", _freeze(encounter),
-            ))
-
-    names = {
-        int(location_id): name
-        for location_id, name in
-        _json(root / "data" / "location_names.json")["locations"].items()
-    }
-    for key, package in package_by_key.items():
-        package_names = package["locations"].get("names", {})
-        package_ids = {
-            int(location_id)
-            for location_id in package["locations"].get("entities", {}).values()
-        } | {
-            int(entry["location_id"])
-            for entry in package["locations"].get("secret_encounters", [])
-        }
-        normalized_names = {
-            int(location_id): name
-            for location_id, name in package_names.items()
-        }
-        if set(normalized_names) != package_ids:
-            raise ValueError(
-                f"{key}: package physical names must match physical location IDs"
-            )
-        for location_id, name in normalized_names.items():
-            if location_id in names and names[location_id] != name:
-                raise ValueError(
-                    f"{key}: package/legacy location name divergence for {location_id}"
-                )
-            names[location_id] = name
-    physical = [PhysicalLocationSpec(names.get(p.location_id, ""), p.location_id, p.map_key, p.ap_check, p.region, p.strategy, p.policy) for p in physical]
-    challenge_registry = _json(root / "data" / "challenge_location_registry.json")
-    runtime: list[RuntimeLocationSpec] = []
-    challenges: list[ChallengeSpec] = []
-    for category in (
-        "mission_complete", "weapon_masteries",
-        "mission_challenges", "all_mission_challenges",
-    ):
-        for entry in challenge_registry.get(category, []):
-            signal = _freeze(entry.get("signal", {}))
-            strategy = signal.get("kind", "")
-            mission_key = entry.get("mission_key") or next(
-                (
-                    key for key, spec in maps.items()
-                    if signal.get("runtime_map") == spec.runtime_map
-                ),
-                None,
-            ) or (
-                str(signal.get("unlockable", "")).split("/")[1]
-                if str(signal.get("unlockable", "")).count("/") >= 2 else None
-            )
-            item = RuntimeLocationSpec(
-                entry["name"], entry["location_id"], strategy, mission_key,
-                signal, _freeze(entry), category,
-            )
+            physical.append(PhysicalLocationSpec("", location_id, key,
+                encounter.get("ap_check", f"AP_CHECK_SECRET_{location_id}"), default_region,
+                "secret_encounter", _freeze(encounter)))
+        assets.extend(_asset(asset, spec) for asset in package["assets"].get("assets", []))
+        if spec.enabled:
+            assets.append(AssetSpec(canonical_visual["key"], key, canonical_visual["strategy"],
+                canonical_visual["model"], spec.resource_base, spec.resource_owner,
+                tuple(canonical_visual["dependencies"]), canonical_visual["dependency_policy"],
+                replacement_slot_policy=canonical_visual["replacement_slot_policy"],
+                replacement_slot=_freeze({**canonical_visual["replacement_slot"], "resource_archive": spec.resource_base}),
+                usage_policy=canonical_visual["usage_policy"], preserve=tuple(canonical_visual["preserve"]),
+                visual_presentation_policy=_freeze(canonical_visual["visual_presentation_policy"])))
+        for entry in package["runtime"].get("locations", []):
+            signal, category = _freeze(entry.get("signal", {})), entry.get("category", "")
+            item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category)
             runtime.append(item)
             if category != "mission_complete":
-                challenges.append(ChallengeSpec(
-                    item.name, item.location_id, mission_key, strategy, signal
-                ))
-    for key, package in package_by_key.items():
-        for entry in package["runtime"].get("locations", []):
-            signal = _freeze(entry.get("signal", {}))
-            category = entry.get("category", "")
-            item = RuntimeLocationSpec(
-                entry["name"], entry["location_id"], entry["strategy"], key,
-                signal, _freeze(entry), category,
-            )
-            runtime.append(item)
-            if category in {
-                "weapon_masteries", "mission_challenges",
-                "all_mission_challenges",
-            }:
-                challenges.append(ChallengeSpec(
-                    item.name, item.location_id, key, item.strategy, signal
-                ))
-
-    goal = _freeze(_json(root / "data" / "campaign_goal_contract.json"))
-    publishers = list(load_publisher_contracts(root / "data" / "publisher_contracts.json"))
-    for package in package_by_key.values():
-        publishers.extend(publisher_contracts_from_document(
-            package["publishers"], allow_empty=True
-        ))
-    reserved: dict[int, Mapping[str, Any]] = {}
-    for key, package in package_by_key.items():
+                challenges.append(ChallengeSpec(item.name, item.location_id, item.mission_key, item.strategy, signal))
+        publishers.extend(publisher_contracts_from_document(package["publishers"], allow_empty=True))
         for entry in package["onboarding"].get("reserved_ids", []):
             location_id = int(entry["id"])
             if location_id in reserved:
                 raise ValueError(f"duplicate reserved location ID: {location_id}")
             reserved[location_id] = _freeze({**entry, "map_key": key})
-    catalog = ContentCatalog(
-        root, MappingProxyType(maps), tuple(physical), tuple(runtime),
-        tuple(challenges), tuple(publishers), tuple(assets),
-        MappingProxyType(names), goal, _normalized_route(root, packages),
-        MappingProxyType(reserved),
-    )
+        if "campaign_goal" in package["onboarding"]:
+            if goal is not None:
+                raise ValueError("campaign goal must have exactly one package owner")
+            goal = _freeze(package["onboarding"]["campaign_goal"])
+    for entry in _json(root / "content" / "global_runtime.json").get("locations", []):
+        signal, category = _freeze(entry.get("signal", {})), entry.get("category", "")
+        item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category)
+        runtime.append(item)
+        if category != "mission_complete":
+            challenges.append(ChallengeSpec(item.name, item.location_id, item.mission_key, item.strategy, signal))
+    if goal is None:
+        raise ValueError("campaign goal has no package owner")
+    runtime.sort(key=lambda item: item.data.get("order", len(runtime)))
+    physical = [PhysicalLocationSpec(names.get(item.location_id, ""), item.location_id,
+        item.map_key, item.ap_check, item.region, item.strategy, item.policy) for item in physical]
+    catalog = ContentCatalog(root, MappingProxyType(maps), tuple(physical), tuple(runtime),
+        tuple(challenges), tuple(publishers), tuple(assets), MappingProxyType(names), goal,
+        _normalized_route(packages), MappingProxyType(reserved))
     validate_content_catalog(catalog)
     return catalog
-
 
 def validate_content_catalog(catalog: ContentCatalog) -> None:
     ids = [spec.location_id for spec in (*catalog.physical_locations, *catalog.runtime_locations)]

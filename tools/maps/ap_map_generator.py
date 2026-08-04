@@ -1534,11 +1534,11 @@ def generate_map(
             "default_visual_asset": asset_document.get("default_visual_asset"),
         }
     legacy_compatibility = {}
-    if config_path.name != "locations.json":
+    if level_config.get("generator_compatibility") == "crucible_item":
         compatibility_path = (
             Path(__file__).resolve().parents[2]
             / "data"
-            / "generator_legacy_item_compatibility.json"
+            / "generator_item_compatibility.json"
         )
         legacy_compatibility = json.loads(
             compatibility_path.read_text(encoding="utf-8")

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "cultist_base_mission_complete",
+      "map_key": "e1m3_cult",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e1m3_cult/e1m3_cult",
+          "to_map": "game/sp/e1m4_boss/e1m4_boss"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770124
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "arc_complex_mission_complete",
+      "map_key": "e2m2_base",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "fort_map_exit_level_transition_relay_393966306",
+          "filename": "ap_event_7770248.txt",
+          "marker": "AP_CHECK_EVENT_7770248"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m2_base/e2m2_base",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770248
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

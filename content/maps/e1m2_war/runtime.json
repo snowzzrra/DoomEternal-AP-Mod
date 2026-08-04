@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "name": "Exultia - Mission Complete",
+      "location_id": 7770123,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
+      },
+      "mission_key": "e1m2_war",
+      "category": "mission_complete",
+      "strategy": "map_terminal",
+      "order": 1
+    }
+  ]
+}

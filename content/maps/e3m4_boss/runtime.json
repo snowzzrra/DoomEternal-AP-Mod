@@ -11,8 +11,12 @@
         "kind": "map_terminal",
         "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
         "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
-        "fallback": {"kind": "terminal_owner", "owner": "icon_of_sin_death_target_relay_post_destruction_idle"}
-      }
+        "fallback": {
+          "kind": "terminal_owner",
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle"
+        }
+      },
+      "order": 61
     }
   ]
 }

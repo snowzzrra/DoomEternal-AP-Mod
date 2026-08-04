@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e2m4_boss",
+  "display_name": "Sentinel Prime",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e2m4_boss.map",
+  "source_sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e2m4_boss.map",
+  "generated_output": "e2m4_boss.entities",
+  "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+  "resource_base": "e2m4_boss",
+  "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+  "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
+  "resource_priority": 76,
+  "relative_entities_path": "game/sp/e2m4_boss/e2m4_boss.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Sentinel Prime",
+        "order": 14
+      }
+    ],
+    "connections": [
+      {
+        "from": "Sentinel Prime",
+        "to": "Fortress of Doom - Sixth Visit",
+        "rule": "Return to Fortress after Sentinel Prime",
+        "order": 14
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 8
+}

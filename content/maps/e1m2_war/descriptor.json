@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e1m2_war",
+  "display_name": "Exultia",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e1m2_war.map",
+  "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e1m2_war.map",
+  "generated_output": "e1m2_war.entities",
+  "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
+  "resource_base": "e1m2_battle",
+  "resource_path": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+  "resource_owner": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+  "resource_priority": 20,
+  "relative_entities_path": "game/sp/e1m2_battle/e1m2_battle.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Exultia",
+        "order": 4
+      }
+    ],
+    "connections": [
+      {
+        "from": "Exultia",
+        "to": "Fortress of Doom - Second Visit",
+        "rule": "Return to Fortress after Exultia",
+        "order": 4
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 1
+}
