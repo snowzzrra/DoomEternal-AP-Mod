@@ -6,6 +6,28 @@
         "7770086": "Fortress of Doom - First Visit",
         "7770170": "Fortress of Doom - Third Visit"
     },
+    "inline_currency_removals": [
+        {
+            "entity": "interact_hub_battery_socket_for_engine",
+            "class": "idInteractable_GiveItems",
+            "property": "currencyList",
+            "currency": "CURRENCY_SENTINEL_BATTERY",
+            "count": -1,
+            "original_targets": [
+                "target_timeline_restore_power",
+                "target_relay_power_on",
+                "target_relay_engine_light_on"
+            ],
+            "preserved_requirement": {
+                "owner": "game/hub/hub.resources",
+                "path": "generated/decls/logicentity/maps/game/hub/hub_game_sentinel_battery_room/sentinel_battery_room_info_logic_1.decl",
+                "variable": "sentinel_battery_available",
+                "reader": "idLogicNodeModelPlayerInventoryCheck",
+                "currency": "CURRENCY_SENTINEL_BATTERY",
+                "minimum_count": 1
+            }
+        }
+    ],
     "entities": {
         "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
         "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,

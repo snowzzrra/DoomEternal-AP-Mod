@@ -3324,7 +3324,7 @@ class CheckEventTests(unittest.TestCase):
             self.assertIsNotNone(check_block)
 
             self.assertIn('class = "idProp2";', visual_block)
-            self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual_block)
+            self.assertIn('model = "art/pickups/codex.lwo";', visual_block)
             self.assertIn('x = 1.5;', trigger_block)
             self.assertIn('y = 1.5;', trigger_block)
             self.assertIn('z = 1.5;', trigger_block)

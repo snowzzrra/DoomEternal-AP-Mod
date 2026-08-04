@@ -1,9 +1,10 @@
-"""Focused data selection for the generic donor-model override."""
+"""Focused data selection for the global Codex-derived AP visual bundle."""
 
 import hashlib
 import struct
 from pathlib import Path
 
+from ap_visual_contract import load_ap_visual_contract
 from content_catalog import load_content_catalog
 
 
@@ -14,15 +15,16 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_sentinel_separates_codex_donor_from_imported_replacement_slot() -> None:
+def test_sentinel_is_a_proven_reference_for_the_global_imported_slot() -> None:
     catalog = load_content_catalog()
+    bundle = load_ap_visual_contract()
     override = next(
         asset for asset in catalog.assets
         if asset.map_key == "e2m4_boss"
-        and asset.strategy == "donor_model_override"
+        and asset.key == bundle["key"]
     )
-    assert override.donor["kind"] == "codex"
-    assert override.donor["selection"] == "named_entity"
+    assert "e2m4_boss" in bundle["runtime_references"]
+    assert override.strategy == "packaged_bundle"
     assert override.replacement_slot_policy == "safe_resident_static_lwo"
     assert override.replacement_slot["model_path"] == "art/pickups/codex.lwo"
     assert override.replacement_slot["resource_archive"] == "e2m4_boss"
@@ -31,28 +33,24 @@ def test_sentinel_separates_codex_donor_from_imported_replacement_slot() -> None
     assert override.replacement_slot["import_bundle"] == (
         "codex_id#13626551837332538432"
     )
-    assert override.usage_policy == "removed_vanilla_entity_allowlist"
-    assert all(
-        asset.strategy != "donor_model_override"
-        for asset in catalog.assets
-        if asset.map_key not in ("e2m4_boss", "e3m4_boss")
-    )
+    assert override.usage_policy == "ap_entities_only"
 
 
-def test_final_sin_uses_its_own_model_importer_output() -> None:
+def test_final_sin_remains_a_proven_reference_for_the_same_bundle() -> None:
     catalog = load_content_catalog()
+    bundle = load_ap_visual_contract()
     override = next(
         asset for asset in catalog.assets
         if asset.map_key == "e3m4_boss"
-        and asset.strategy == "donor_model_override"
+        and asset.key == bundle["key"]
     )
-    assert override.donor["kind"] == "codex"
-    assert override.donor["selection"] == "named_entity"
+    assert "e3m4_boss" in bundle["runtime_references"]
+    assert override.strategy == "packaged_bundle"
     assert override.replacement_slot_policy == "safe_resident_static_lwo"
     assert override.replacement_slot["model_path"] == "art/pickups/codex.lwo"
     assert override.replacement_slot["resource_archive"] == "e3m4_boss"
     assert override.replacement_slot["material2"] == "art/pickups/codex"
-    assert override.dependency_policy == "model_importer_bundle"
+    assert override.dependency_policy == "canonical_model_importer_bundle"
     assert override.replacement_slot["asset_id"] == "13626551837332538432"
     assert override.replacement_slot["import_bundle"] == (
         "codex_id#13626551837332538432"
@@ -66,18 +64,18 @@ def test_final_sin_uses_its_own_model_importer_output() -> None:
     assert provenance["vanilla_lwo_sha256"] == (
         "206df1fb8e0c8b93fdded962647630f9db2e953bd49da3dc63ed03c256301b79"
     )
-    assert override.usage_policy == "removed_vanilla_entity_allowlist"
+    assert override.usage_policy == "ap_entities_only"
 
 
-def test_codex_importer_payload_is_coherent_for_both_registered_base_slots() -> None:
+def test_codex_importer_payload_is_coherent_for_every_enabled_resource_base() -> None:
     catalog = load_content_catalog()
     overrides = {
         asset.map_key: asset
         for asset in catalog.assets
-        if asset.strategy == "donor_model_override"
+        if asset.key == "archipelago_world_visual"
         and asset.model == "art/pickups/codex.lwo"
     }
-    assert set(overrides) == {"e2m4_boss", "e3m4_boss"}
+    assert set(overrides) == {spec.key for spec in catalog.enabled_maps()}
 
     stream_path = (
         ROOT / "packaging/mod_assets/streamdb/art/pickups"
@@ -92,7 +90,8 @@ def test_codex_importer_payload_is_coherent_for_both_registered_base_slots() -> 
     for map_key, override in overrides.items():
         slot = override.replacement_slot
         resource_path = (
-            ROOT / "packaging/mod_assets" / map_key / "art/pickups/codex.lwo"
+            ROOT / "packaging/mod_assets" / override.resource_base
+            / "art/pickups/codex.lwo"
         )
         resource_bytes = resource_path.read_bytes()
         resource_hashes.add(_sha256(resource_path))

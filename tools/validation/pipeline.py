@@ -49,6 +49,8 @@ CORE_MAP_INPUTS = (
     "data/mission_complete_map_contracts.json",
     "data/scripted_location_contracts.json",
     "data/content_identity.json",
+    "data/ap_visual_bundle.json",
+    "ap_visual_contract.py",
     "tools/maps/ap_map_generator.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
@@ -57,6 +59,7 @@ CORE_MAP_INPUTS = (
     "publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
+    "ap_visual_contract.py",
     "bridge_client.py",
     "content_catalog.py",
     "publisher_contracts.py",
@@ -67,6 +70,7 @@ PREFLIGHT_PYTHON = (
     "tools/maps/ap_map_generator.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/maps/map_semantic_baseline.py",
+    "tools/decls/rune_slot_builder.py",
     "tools/validation/pipeline.py",
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",

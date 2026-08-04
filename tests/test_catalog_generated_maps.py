@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -35,8 +36,23 @@ def test_generated_map_uses_declared_visual_asset_strategy(
         return
     generated = temporary_generated_maps[map_spec.key].read_text(encoding="utf-8")
     for asset in assets:
-        if asset.strategy in {"resident_model", "donor_model_override"}:
+        if asset.strategy in {
+            "resident_model", "donor_model_override", "packaged_bundle",
+        }:
             assert f'model = "{asset.model}";' in generated
+        if asset.strategy == "packaged_bundle":
+            visual_blocks = [
+                block for block in generated.split("entity {")
+                if "entityDef ap_location_visual_" in block
+            ]
+            assert visual_blocks
+            assert all(
+                f'model = "{asset.model}";' in block
+                for block in visual_blocks
+            )
+            assert "art/pickups/question_mark_a.lwo" not in "".join(
+                visual_blocks
+            )
         if asset.strategy == "resident_model":
             assert not asset.dependencies
         if asset.strategy == "donor_model_override":
@@ -69,6 +85,7 @@ def test_ap_visual_presentation_preserves_motion_and_functional_contracts(
     source = (ROOT / "vanillamaps" / map_spec.source_file).read_text(
         encoding="utf-8"
     )
+    map_config = json.loads(map_spec.level_config_path.read_text(encoding="utf-8"))
     references = _model_references(generated, asset.model)
     locations = [
         item for item in content_catalog.physical_locations
@@ -86,9 +103,14 @@ def test_ap_visual_presentation_preserves_motion_and_functional_contracts(
 
     for location in locations:
         source_entity = location.ap_check.removeprefix("AP_CHECK_").lower()
+        location_policy = map_config.get("target_policies", {}).get(
+            source_entity, {}
+        )
         source_bounds = find_entity_block_bounds(source, source_entity)
         visual_name = f"ap_location_visual_{location.location_id}"
-        trigger_name = f"ap_independent_{source_entity}"
+        trigger_name = location_policy.get(
+            "independent_entity_name", f"ap_independent_{source_entity}"
+        )
         cleanup_name = f"ap_remove_location_visual_{location.location_id}"
         check_name = location.ap_check
         assert source_bounds is not None
@@ -103,7 +125,12 @@ def test_ap_visual_presentation_preserves_motion_and_functional_contracts(
         trigger = blocks[trigger_name]
         cleanup = blocks[cleanup_name]
         check = blocks[check_name]
-        assert 'class = "idProp2";' in visual
+        configured_visual = location_policy.get("independent_visual")
+        expected_class = (
+            configured_visual.get("class", "idDynamicEntity")
+            if configured_visual else "idProp2"
+        )
+        assert f'class = "{expected_class}";' in visual
         assert f'model = "{asset.model}";' in visual
         assert (
             f'thinkComponentDecl = "{policy["think_component"]}";'
@@ -111,19 +138,28 @@ def test_ap_visual_presentation_preserves_motion_and_functional_contracts(
         )
         assert 'type = "CLIPMODEL_NONE";' in visual
         assert all(
-            token not in visual
-            for token in (
-                "fxDecl", "updateFX", "particle", "renderLight", "bindInfo",
-                "targets =", "renderParms", "shaderParm", "materialOverride",
+                token not in visual
+                for token in (
+                    "fxDecl", "updateFX", "particle", "renderLight",
+                    "targets =", "renderParms", "shaderParm", "materialOverride",
+                )
             )
-        )
+        source_bind = re.search(r'bindParent\s*=\s*"([^"]+)";', source_block)
+        if source_bind:
+            assert f'bindParent = "{source_bind.group(1)}";' in visual
+        else:
+            assert "bindInfo" not in visual
         assert "triggerOnce = true;" in trigger
         assert 'type = "CLIPMODEL_BOX";' in trigger
-        assert f'item[0] = "{check_name}";' in trigger
-        assert f'item[1] = "{cleanup_name}";' in trigger
+        assert f'"{check_name}";' in trigger
+        assert f'"{cleanup_name}";' in trigger
         assert f'item[0] = "{visual_name}";' in cleanup
         assert f'"ap_event_{location.location_id}";' in check
-        assert f'"ap_notify_location_{location.location_id}";' in check
+        feedback = map_config.get("location_feedback", {}).get(check_name, {})
+        notification = f'"ap_notify_location_{location.location_id}";'
+        assert (notification in check) is not (
+            feedback.get("policy") == "vanilla_only"
+        )
         assert f"entityDef {source_entity} {{" in source_block
 
 
@@ -204,6 +240,6 @@ def test_taras_mastery_tokens_replace_vanilla_rewards_once(temporary_generated_m
         assert f'item[0] = "{ap_check}";' in trigger_block
         assert trigger_block.count(ap_check) == 1
         assert 'useableComponentDecl = "propitem/mastery_token/weapon";' not in trigger_block
-        assert 'model = "art/pickups/question_mark_a.lwo";' in visual_block
+        assert 'model = "art/pickups/codex.lwo";' in visual_block
 
     assert 'useableComponentDecl = "propitem/mastery_token/weapon";' not in generated

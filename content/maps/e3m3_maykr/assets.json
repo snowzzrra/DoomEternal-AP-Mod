@@ -1,54 +1,5 @@
 {
   "schema_version": 1,
-  "default_visual_asset": "urdak_archipelago_question_mark",
-  "assets": [
-    {
-      "key": "urdak_archipelago_question_mark",
-      "strategy": "map_resource",
-      "model": "art/pickups/question_mark_a.lwo",
-      "resource_base": "e3m3_maykr",
-      "resource_owner": "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources",
-      "dependencies": [],
-      "dependency_policy": "required",
-      "replacement_slot_policy": "native_question_mark",
-      "replacement_slot": {
-        "model_path": "art/pickups/question_mark_a.lwo",
-        "resource_archive": "e3m3_maykr.resources",
-        "asset_id": "3385987379760210816",
-        "resource_payload_sha256": "9bc94a7d92fa10d31298883700dc0131db6149c6f8acfc3873671a9e3c9e94d2",
-        "streamdb_payload": "art/pickups/question_mark_a_id#3385987379760210816.lwo",
-        "streamdb_payload_sha256": "e41e0a3310996ee1c7c062ad4385176a151500ca688f71d1f3d3527fad796e81"
-      },
-      "usage_policy": "ap_entities_only",
-      "preserve": ["transform", "layers", "interaction"],
-      "visual_presentation_policy": {
-        "scope": "ap_generated_entities_only",
-        "preserve_motion": true,
-        "preserve_bobbing": true,
-        "preserve_rotation": true,
-        "think_component": "bob_rotate_fast",
-        "material_mode": "resource_scoped_opaque_override",
-        "material_decl": "generated/decls/material2/art/pickups/question.decl",
-        "material_sha256": "d236110470ecff0cae19e091c999420426462e9223b48a02b8722aec31604356",
-        "opaque_template": "template/pbr",
-        "strip": ["pickup_shader", "animated_emissive_mask", "bloom", "sheen"],
-        "preserve_maps": {
-          "albedo": "art/pickups/question.tga",
-          "normal": "art/pickups/question_n.tga",
-          "specular": "art/pickups/question_s.tga",
-          "smoothness": "art/pickups/question_g.tga",
-          "heightmap": "textures/system/constant_color/grey_md.tga"
-        }
-      }
-    },
-    {
-      "key": "urdak_archipelago_question_mark_streamdb",
-      "strategy": "streamdb",
-      "model": "art/pickups/question_mark_a_id#3385987379760210816.lwo",
-      "resource_base": "streamdb",
-      "resource_owner": "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources",
-      "dependencies": [],
-      "dependency_policy": "required"
-    }
-  ]
+  "default_visual_asset": "archipelago_world_visual",
+  "assets": []
 }
