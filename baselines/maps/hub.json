@@ -27,11 +27,15 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Canonical Codex-derived AP visual bundle applied globally; mandatory engine socket inline Battery consumption removed"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "update 7770074 codex visual contract"
     }
   ],
   "asset_package_contract_sha256": "ce785644bbfc80f99443669dd8499eeb7ec9f36167985e18b8339867220f39ba",
   "byte_sha256": "5cf527aae2d9c26d95bb368e7774a40756dcf83d54f22c64f710b31e8e2e8caf",
-  "content_revision": "v0.3.8-alpha.2",
+  "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 143,
     "byte_size": 4312165,
@@ -68,6 +72,6 @@
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "beed5c3b2f92b0eb245c6d0a7a84d9ef46df885fe1ea7acba24e6ac2c2917c1e",
+  "scripted_contract_sha256": "3c88e7f2d7777a6d31cb6f9cc2816548bcad51ee5088b9150dd9fc1afe798052",
   "semantic_sha256": "9cf577d9b389d983db8e33b369a9cb6d998c408caa47410622ff133576083424"
 }

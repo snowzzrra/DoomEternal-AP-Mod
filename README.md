@@ -14,8 +14,7 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current `0.3.9b` development scope (the packaged release identity remains
-`v0.3.8-alpha.1` until a later release):
+Current `v0.3.9-alpha` release scope:
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -160,7 +159,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.8-alpha.1.zip
+DoomEternalArchipelagoPlayableTest-v0.3.9-alpha.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
 ├── DoomEternalArchipelagoAlpha.zip
@@ -206,7 +205,7 @@ configuration, seeds, logs, and local paths.
 
 ### Vanilla scripted weapon acquisitions
 
-These acquisitions remain fully vanilla in `v0.3.8-alpha`:
+These acquisitions remain fully vanilla in `v0.3.9-alpha`:
 
 - Super Shotgun — Cultist Base cutscene `5008`.
 - BFG-9000 — Mars Core cutscene `4701`.
@@ -274,7 +273,7 @@ in this release.
   weapon stripping (SSG `5008`, BFG `4701`, Crucible `4137`); subregions;
   hard/soft/combat logic options; hardcore DeathLink fix; and option-driven
   features such as randomize starting weapon.
-- These are specifications for future work and are not implemented in `0.3.8`.
+- These are specifications for future work and are not implemented in `0.3.9`.
 
 ### 0.5.x Beta — The Ancient Gods Part One
 

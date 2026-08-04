@@ -1,65 +1,42 @@
 #!/usr/bin/env python3
-"""Build the hash-locked native Rune slot-threshold override."""
+"""Build the Rune slot-threshold override."""
 
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
 import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent.parent.parent
 RUNE_SLOT_OWNER = {
     "container": "gameresources",
     "path": "entitydef/player.decl",
-    "sha256": "4f06051e78e1a4b4cac3ed2f7c34aade613627c35537e3f5fe10cc83e2949c95",
 }
-ENCODED_SOURCE = (
-    ROOT / "assets" / "native_decl_sources" / "player.decl.base64"
-)
-SOURCE_SLOT_REQUIREMENTS = """\t\t\t\truneSlotReq = {
-\t\t\t\t\tptr = {
-\t\t\t\t\t\tptr[0] = 1;
-\t\t\t\t\t\tptr[1] = 2;
-\t\t\t\t\t\tptr[2] = 3;
-\t\t\t\t\t}
-\t\t\t\t}
-"""
-PATCHED_SLOT_REQUIREMENTS = """\t\t\t\truneSlotReq = {
-\t\t\t\t\tptr = {
-\t\t\t\t\t\tptr[0] = 0;
-\t\t\t\t\t\tptr[1] = 0;
-\t\t\t\t\t\tptr[2] = 0;
-\t\t\t\t\t}
-\t\t\t\t}
-"""
 
-
-def load_rune_slot_source() -> bytes:
-    """Decode the byte-preserved native owner without newline conversion."""
-    encoded = b"".join(ENCODED_SOURCE.read_bytes().split())
-    return base64.b64decode(encoded, validate=True)
+OVERRIDE_CONTENT = """\
+{
+\tedit = {
+\t\truneManager = {
+\t\t\truneSlotReq = {
+\t\t\t\tptr = {
+\t\t\t\t\tptr[0] = 0;
+\t\t\t\t\tptr[1] = 0;
+\t\t\t\t\tptr[2] = 0;
+\t\t\t\t}
+\t\t\t}
+\t\t}
+\t}
+}
+"""
 
 
 def build_rune_slot_override(mod_root: Path) -> dict:
-    payload = load_rune_slot_source()
-    actual_hash = hashlib.sha256(payload).hexdigest()
-    if actual_hash != RUNE_SLOT_OWNER["sha256"]:
-        raise ValueError(f"Rune slot owner hash drift: {actual_hash}")
-    newline = "\r\n" if b"\r\n" in payload else "\n"
-    source_thresholds = SOURCE_SLOT_REQUIREMENTS.replace("\n", newline).encode()
-    patched_thresholds = PATCHED_SLOT_REQUIREMENTS.replace("\n", newline).encode()
-    if payload.count(source_thresholds) != 1:
-        raise ValueError("Rune slot owner must contain exactly one [1,2,3] threshold")
-    patched = payload.replace(source_thresholds, patched_thresholds, 1)
     target = (
         mod_root / "gameresources_patch1" / "generated" / "decls"
         / RUNE_SLOT_OWNER["path"]
     )
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(patched)
+    target.write_text(OVERRIDE_CONTENT, encoding="utf-8", newline="\r\n")
     return {
         "owner": RUNE_SLOT_OWNER,
         "source_requirements": [1, 2, 3],
