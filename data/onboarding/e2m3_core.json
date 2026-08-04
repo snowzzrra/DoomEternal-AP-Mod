@@ -54,7 +54,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770256,
-      "ap_name": "Mars Core - Praetor Suit Token 1",
+      "ap_name": "Mars Core - Praetor Suit Token - Post-BFG Cracked Wall",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -86,7 +86,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770257,
-      "ap_name": "Mars Core - Praetor Suit Token 2",
+      "ap_name": "Mars Core - Praetor Suit Token - Tentacle Control Room",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -118,7 +118,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770258,
-      "ap_name": "Mars Core - Praetor Suit Token 3",
+      "ap_name": "Mars Core - Praetor Suit Token - Green-Piston Walkway",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -150,7 +150,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770259,
-      "ap_name": "Mars Core - Praetor Suit Token 4",
+      "ap_name": "Mars Core - Praetor Suit Token - Sentinel Hologram Platform",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -182,7 +182,7 @@
       "class": "idInteractable_GiveItems",
       "inherit": "progress/praetor_token",
       "ap_id": 7770260,
-      "ap_name": "Mars Core - Praetor Suit Token 5",
+      "ap_name": "Mars Core - Praetor Suit Token - Hebeth Catacombs",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -214,7 +214,7 @@
       "class": "idProp2",
       "inherit": "progress/sentinel_battery",
       "ap_id": 7770261,
-      "ap_name": "Mars Core - Sentinel Battery 1",
+      "ap_name": "Mars Core - Sentinel Battery - Flying Island",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -246,7 +246,7 @@
       "class": "idProp2",
       "inherit": "progress/sentinel_battery",
       "ap_id": 7770262,
-      "ap_name": "Mars Core - Sentinel Battery 2",
+      "ap_name": "Mars Core - Sentinel Battery - Exterior Arena Gap",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -278,7 +278,7 @@
       "class": "idProp2",
       "inherit": "progress/sentinel_battery",
       "ap_id": 7770263,
-      "ap_name": "Mars Core - Sentinel Battery 3",
+      "ap_name": "Mars Core - Sentinel Battery - Mars Core Landing",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -310,7 +310,7 @@
       "class": "idInteractable_Rune",
       "inherit": "progress/rune",
       "ap_id": 7770264,
-      "ap_name": "Mars Core - Rune 1",
+      "ap_name": "Mars Core - Rune - First Teleporter",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -342,7 +342,7 @@
       "class": "idInteractable_Rune",
       "inherit": "progress/rune",
       "ap_id": 7770265,
-      "ap_name": "Mars Core - Rune 2",
+      "ap_name": "Mars Core - Rune - Post-Prowler Elevator",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -374,7 +374,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770266,
-      "ap_name": "Mars Core - Extra Life 1",
+      "ap_name": "Mars Core - Extra Life - Second Outdoor Arena",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -406,7 +406,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770267,
-      "ap_name": "Mars Core - Extra Life 2",
+      "ap_name": "Mars Core - Extra Life - Post-BFG Burning Building",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -438,7 +438,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770268,
-      "ap_name": "Mars Core - Extra Life 3",
+      "ap_name": "Mars Core - Extra Life - Hanging-Bar Breakable Wall",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -470,7 +470,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770269,
-      "ap_name": "Mars Core - Extra Life 4",
+      "ap_name": "Mars Core - Extra Life - Pillar Combat Section",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -502,7 +502,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770270,
-      "ap_name": "Mars Core - Extra Life 5",
+      "ap_name": "Mars Core - Extra Life - Under the Flying Island",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -534,7 +534,7 @@
       "class": "idProp2",
       "inherit": "pickup/extra_life/extra_life_1",
       "ap_id": 7770271,
-      "ap_name": "Mars Core - Extra Life 6",
+      "ap_name": "Mars Core - Extra Life - Final Hebeth Arena",
       "entity_match_count": 1,
       "original_targets": [],
       "reward_grant_currency_ownership_edges": [
@@ -822,7 +822,7 @@
       "class": "idProp2",
       "inherit": "pickup/keycard/slayer_key",
       "ap_id": 7770280,
-      "ap_name": "Mars Core - Slayer Key",
+      "ap_name": "Mars Core - Slayer Key - Tentacle Control-Panel Vent",
       "entity_match_count": 1,
       "original_targets": [
         {
@@ -881,7 +881,7 @@
       "class": "idInteractable_WorldCache",
       "inherit": "progress/argent_cell",
       "ap_id": 7770281,
-      "ap_name": "Mars Core - Sentinel Crystal",
+      "ap_name": "Mars Core - Sentinel Crystal - Flying-Island Blue-Vent Landing",
       "entity_match_count": 1,
       "original_targets": [
         {
@@ -923,7 +923,7 @@
       "class": "idInteractable_GoreNest",
       "inherit": "interact/gore_nest",
       "ap_id": 7770283,
-      "ap_name": "Mars Core - Secret Encounter 1",
+      "ap_name": "Mars Core - Secret Encounter - Post-BFG Cracked-Wall Side Room",
       "entity_match_count": 1,
       "original_targets": [
         {
@@ -967,7 +967,7 @@
       "class": "idInteractable_GoreNest",
       "inherit": "interact/gore_nest",
       "ap_id": 7770284,
-      "ap_name": "Mars Core - Secret Encounter 2",
+      "ap_name": "Mars Core - Secret Encounter - Tentacle Portal Arena",
       "entity_match_count": 1,
       "original_targets": [
         {

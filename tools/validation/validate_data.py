@@ -48,12 +48,12 @@ APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
 MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
 AUTOMAP_FAMILY_REGISTRY_PATH = ROOT / "data" / "automap_family_registry.json"
 BATTERY_LOCATIONS = {
-    "Exultia - Sentinel Battery": 7770084,
-    "Cultist Base - Sentinel Battery 1": 7770057,
-    "Cultist Base - Sentinel Battery 2": 7770069,
-    "Cultist Base - Sentinel Battery 3": 7770070,
-    "Doom Hunter Base - Sentinel Battery 1": 7770148,
-    "Doom Hunter Base - Sentinel Battery 2": 7770151,
+    "Exultia - Sentinel Battery - King Novik Return Path": 7770084,
+    "Cultist Base - Sentinel Battery - First Arena Blue-Vent Ledge": 7770057,
+    "Cultist Base - Sentinel Battery - Post-Arena Interior": 7770069,
+    "Cultist Base - Sentinel Battery - Moving Elevator Shaft": 7770070,
+    "Doom Hunter Base - Sentinel Battery - First Combat Room Vent": 7770148,
+    "Doom Hunter Base - Sentinel Battery - Above the Coffin-Wall Platform": 7770151,
 }
 BATTERY_ITEM_COMMANDS = {
     7770016: 1,

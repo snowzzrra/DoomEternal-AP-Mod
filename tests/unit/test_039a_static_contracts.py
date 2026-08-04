@@ -13,6 +13,7 @@ from tools.decls.rune_slot_builder import (
     RUNE_SLOT_OWNER,
     SOURCE_SLOT_REQUIREMENTS,
     build_rune_slot_override,
+    load_rune_slot_source,
 )
 from tools.maps.ap_map_generator import (
     extract_target_names,
@@ -115,19 +116,22 @@ def test_mandatory_battery_socket_removes_only_its_inline_transaction() -> None:
 
 def test_rune_slot_override_changes_only_the_three_threshold_values(tmp_path: Path) -> None:
     audit = build_rune_slot_override(tmp_path)
-    source = (
-        ROOT / "assets/native_decl_sources/base"
-        / "generated/decls" / RUNE_SLOT_OWNER["path"]
-    ).read_text(encoding="utf-8")
+    source_bytes = load_rune_slot_source()
+    assert hashlib.sha256(source_bytes).hexdigest() == RUNE_SLOT_OWNER["sha256"]
+    assert b"\r\n" in source_bytes
+    source = source_bytes.decode("utf-8").replace("\r\n", "\n")
     target = Path(audit["written_path"])
-    patched = target.read_text(encoding="utf-8")
+    patched_bytes = target.read_bytes()
+    patched = patched_bytes.decode("utf-8").replace("\r\n", "\n")
 
     assert SOURCE_SLOT_REQUIREMENTS in source
     assert SOURCE_SLOT_REQUIREMENTS not in patched
     assert PATCHED_SLOT_REQUIREMENTS in patched
-    assert patched == source.replace(
-        SOURCE_SLOT_REQUIREMENTS, PATCHED_SLOT_REQUIREMENTS, 1
+    assert patched_bytes == source_bytes.replace(
+        SOURCE_SLOT_REQUIREMENTS.replace("\n", "\r\n").encode(),
+        PATCHED_SLOT_REQUIREMENTS.replace("\n", "\r\n").encode(), 1
     )
+    assert _sha256(target) == "a42074ac147f3cd9924b6e6ab062a4654c42c1601bda9483c5f89ee9a3ce4352"
     assert patched.count("runeSlotReq") == 1
     assert re.findall(r"ptr\[(\d+)\] = (\d+);", PATCHED_SLOT_REQUIREMENTS) == [
         ("0", "0"), ("1", "0"), ("2", "0")

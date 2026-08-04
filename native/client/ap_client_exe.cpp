@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include "ap_client_path_utils.h"
@@ -56,7 +57,11 @@ struct CommandJob {
     std::string command;
     unsigned int retryAttempt = 0;
     DWORD nextAttemptTick = 0;
+    std::string source = "cmd";
+    DWORD importedTick = 0;
 };
+
+using CommandSourceMap = std::unordered_map<std::string, std::string>;
 
 struct RpcWatchdogContext {
     volatile LONG completed = 0;
@@ -451,6 +456,28 @@ const char* RpcCallResultName(RpcCallResult result) {
     default:
         return "RPC_CALL_RESULT_NONE";
     }
+}
+
+const char* ReceiptCommandKind(const std::string& commandId) {
+    return commandId.find("-notify") != std::string::npos ? "notification" : "effect";
+}
+
+std::string DeliveryContextFields() {
+    return " active_map=unavailable slot=unavailable bridge_revision=unavailable"
+        " protocol_version=3 helper_sha=unavailable injector_sha=unavailable";
+}
+
+std::string RpcGateReason(
+    bool rpcArmed,
+    bool rpcTransportReady,
+    const GameStateProbe& gameStateProbe
+) {
+    if (!rpcArmed) return "rpc_disarmed";
+    if (!rpcTransportReady) return "rpc_unavailable";
+    if (gameStateProbe.IsLoading()) return "loading";
+    if (!gameStateProbe.IsGameplayLoaded()) return "menu_or_no_active_map";
+    if (!gameStateProbe.IsSafeForRpc()) return "player_unavailable";
+    return "ready";
 }
 
 MeathookPreflightResult InspectMeathookInstallation(const RuntimePathInfo& runtimePaths) {
@@ -1368,7 +1395,7 @@ std::optional<std::string> MigratedDirectItemCommand(
         + "_" + std::to_string(std::stoi(commandIndex)) + " activate";
 }
 
-void EnsureQueueDirectory() {
+void EnsureQueueDirectory(CommandSourceMap& recoveredSources) {
     CreateDirectoryA(kQueueDirectory, nullptr);
     // Telemetry is a disposable poll, not a gameplay command. Never recover a
     // stale condump across a pause, loading screen, crash, or new game session.
@@ -1404,7 +1431,18 @@ void EnsureQueueDirectory() {
                     }
                 }
             }
-            MoveFileExA(processingPath.c_str(), queuedPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+            if (MoveFileExA(
+                    processingPath.c_str(), queuedPath.c_str(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+                )) {
+                const std::string commandId = CommandIdFromPath(processingPath);
+                recoveredSources[commandId] = "recovered_processing";
+                LogDebug(
+                    "QUEUE_RECOVER command_id=" + commandId
+                    + " source=recovered_processing"
+                    + DeliveryContextFields()
+                );
+            }
         }
     } while (FindNextFileA(find, &data));
     FindClose(find);
@@ -1429,7 +1467,8 @@ std::vector<std::string> FindQueuedFiles() {
 
 void ImportSpoolFiles(
     std::deque<CommandJob>& queue,
-    std::unordered_set<std::string>& knownCommandIds
+    std::unordered_set<std::string>& knownCommandIds,
+    CommandSourceMap& recoveredSources
 ) {
     size_t duplicateCount = 0;
     for (const std::string& queuedPath : FindQueuedFiles()) {
@@ -1443,12 +1482,24 @@ void ImportSpoolFiles(
             const std::string commandId = CommandIdFromPath(processingPath);
             if (!RememberRpcCommandId(knownCommandIds, commandId)) {
                 ++duplicateCount;
+                LogDebug(
+                    "QUEUE_DUPLICATE_REJECT command_id=" + commandId
+                    + " reason=known_command_id"
+                    + DeliveryContextFields()
+                );
                 continue;
             }
-            queue.push_back({processingPath, command, 0, 0});
+            const auto recovered = recoveredSources.find(commandId);
+            const std::string source = recovered == recoveredSources.end()
+                ? "cmd" : recovered->second;
+            if (recovered != recoveredSources.end()) {
+                recoveredSources.erase(recovered);
+            }
+            queue.push_back({processingPath, command, 0, 0, source, GetTickCount()});
             LogDebug(
-                "Queued command: command_id=" + commandId
-                + " command=" + command
+                "QUEUE_IMPORT command_id=" + commandId
+                + " source=" + source
+                + DeliveryContextFields()
             );
         } else {
             LogDebug("Discarding unreadable/empty queue file: " + processingPath);
@@ -1516,7 +1567,7 @@ void QuarantineFailedJob(const CommandJob& job) {
 bool ExecuteCommand(const CommandJob& job) {
     const std::string commandId = CommandIdFromPath(job.path);
     const std::string& command = job.command;
-    LogDebug("Executing queued command: " + command);
+    LogDebug("RPC_EXECUTE command_id=" + commandId + DeliveryContextFields());
     if (g_MhInterface) {
         g_MhInterface->SetCurrentCommandId(commandId);
     }
@@ -1617,7 +1668,8 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    EnsureQueueDirectory();
+    CommandSourceMap recoveredSources;
+    EnsureQueueDirectory(recoveredSources);
     DeleteFileA(kRpcGatePath);
     const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
     const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
@@ -1665,6 +1717,8 @@ int main(int argc, char** argv) {
     bool queueWasActive = false;
     bool lastRpcArmed = false;
     bool lastRpcEnabled = false;
+    std::string lastGateReason;
+    DWORD lastStallLog = 0;
 
     while (true) {
         gameStateProbe.Poll();
@@ -1672,7 +1726,7 @@ int main(int argc, char** argv) {
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading()
         );
-        ImportSpoolFiles(queue, knownCommandIds);
+        ImportSpoolFiles(queue, knownCommandIds, recoveredSources);
 
         const DWORD now = GetTickCount();
         bool rpcArmed = IsRpcExecutionEnabled();
@@ -1686,6 +1740,9 @@ int main(int argc, char** argv) {
             meathookPreflightPassed && g_MhInterface && g_MhInterface->m_Initialized;
         const bool rpcEnabled =
             rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
+        const std::string gateReason = RpcGateReason(
+            rpcArmed, rpcTransportReady, gameStateProbe
+        );
         if (rpcArmed != lastRpcArmed) {
             LogDebug(rpcArmed
                 ? "RPC command execution ARMED; waiting for safe gameplay."
@@ -1697,6 +1754,14 @@ int main(int argc, char** argv) {
                 ? "RPC memory gate OPEN; command execution ENABLED."
                 : "RPC memory gate CLOSED; queued commands are preserved.");
             lastRpcEnabled = rpcEnabled;
+        }
+        if (gateReason != lastGateReason) {
+            LogDebug(
+                "GATE_TRANSITION state=" + std::string(rpcEnabled ? "open" : "closed")
+                + " reason=" + gateReason
+                + DeliveryContextFields()
+            );
+            lastGateReason = gateReason;
         }
         if (!rpcEnabled) {
             DiscardTelemetryJobs(queue);
@@ -1712,6 +1777,19 @@ int main(int argc, char** argv) {
         }
         queueWasActive = queueActive;
 
+        if (!queue.empty() && !rpcEnabled && now - lastStallLog >= kRpcStallWarnMs) {
+            const DWORD oldestAge = now - queue.front().importedTick;
+            const QueueSnapshot diskQueue = CountQueueFiles();
+            LogDebug(
+                "QUEUE_STALL oldest_age_ms=" + std::to_string(oldestAge)
+                + " pending_count=" + std::to_string(queue.size())
+                + " processing_count=" + std::to_string(diskQueue.processing)
+                + " in_flight_id=none gate=" + gateReason
+                + DeliveryContextFields()
+            );
+            lastStallLog = now;
+        }
+
         bool dispatchNextImmediately = false;
         if (!queue.empty() && rpcEnabled && g_MhInterface->m_Initialized) {
             CommandJob& job = queue.front();
@@ -1725,28 +1803,45 @@ int main(int argc, char** argv) {
                 continue;
             }
             if (GetFileAttributesA(job.path.c_str()) == INVALID_FILE_ATTRIBUTES) {
-                LogDebug("Discarded externally cancelled command: " + job.command);
+                LogDebug(
+                    "QUEUE_CANCELLED command_id=" + commandId + DeliveryContextFields()
+                );
                 knownCommandIds.erase(commandId);
                 queue.pop_front();
                 continue;
             }
             const DWORD dispatchTick = GetTickCount();
             if (normalReceipt) {
-                LogDebug("RPC_DISPATCH id=" + commandId);
+                LogDebug(
+                    "RPC_DISPATCH command_id=" + commandId
+                    + " kind=" + ReceiptCommandKind(commandId)
+                    + " source=" + job.source
+                    + " age_ms=" + std::to_string(now - job.importedTick)
+                    + DeliveryContextFields()
+                );
             }
             if (ExecuteCommand(job)) {
                 DeleteFileA(job.path.c_str());
                 if (normalReceipt) {
                     LogDebug(
-                        "RPC_ACK id=" + commandId
+                        "RPC_RESULT command_id=" + commandId
+                        + " kind=" + ReceiptCommandKind(commandId)
+                        + " result=ack_executed_persistence_unknown"
                         + " elapsed_ms="
                         + std::to_string(GetTickCount() - dispatchTick)
+                        + DeliveryContextFields()
+                    );
+                    LogDebug(
+                        "ACK_REMOVE command_id=" + commandId
+                        + " path=" + std::filesystem::path(job.path).filename().string()
+                        + DeliveryContextFields()
                     );
                     dispatchNextImmediately = true;
                 } else {
                     LogDebug(
-                        "RPC_DELIVERED_EFFECT_UNKNOWN: command_id="
-                        + commandId + " command=" + job.command
+                        "RPC_RESULT command_id=" + commandId
+                        + " kind=non_receipt result=ack_executed_persistence_unknown"
+                        + DeliveryContextFields()
                     );
                 }
                 ++acknowledgedCommands;
@@ -1758,19 +1853,23 @@ int main(int argc, char** argv) {
                     const DWORD delay = ReceiptRetryDelayMs(job.retryAttempt);
                     job.nextAttemptTick = GetTickCount() + delay;
                     LogDebug(
-                        "RPC_RETRY id=" + commandId
+                        "RPC_RESULT command_id=" + commandId
+                        + " kind=" + ReceiptCommandKind(commandId)
+                        + " result=retry"
                         + " attempt=" + std::to_string(job.retryAttempt)
                         + " delay_ms=" + std::to_string(delay)
                         + " reason="
                         + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
                         + "/" + std::to_string(g_MhInterface->m_LastTransportError)
+                        + DeliveryContextFields()
                     );
                 } else {
                     LogDebug(
-                        "Command deferred for retry: command_id=" + commandId
-                        + " command=" + job.command
-                        + " result=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
+                        "RPC_RESULT command_id=" + commandId
+                        + " kind=non_receipt result=retry"
+                        + " transport=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
                         + " wait_error=" + std::to_string(g_MhInterface->m_LastTransportError)
+                        + DeliveryContextFields()
                     );
                     DeleteFileA(kRpcGatePath);
                 }

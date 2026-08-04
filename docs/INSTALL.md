@@ -27,7 +27,7 @@ You will also install:
 
 | Setting or file | What it must point to | Typical Windows example |
 | --- | --- | --- |
-| `doom_eternal_options.client_directory` | Extracted release `client/` folder containing `bridge_client.py`, `bridge_identity.json`, and `ap_client.exe` | `C:\Games\DoomEternalArchipelago-v0.3.5\client` |
+| `doom_eternal_options.client_directory` | Extracted release `client/` folder containing `bridge_client.py`, `bridge_identity.json`, and `ap_client.exe` | `C:\Games\DoomEternalArchipelago-v0.3.8-alpha.1\client` |
 | Game Base Path | DOOM Eternal `base/` folder containing `classicwads` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base` |
 | Saved Games Path | DOOM Eternal save `base/` folder | `C:\Users\YOUR_NAME\Saved Games\id Software\DOOMEternal\base` |
 | `XINPUT1_3.dll` | Real game root, beside `DOOMEternalx64vk.exe` | `C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\XINPUT1_3.dll` |
@@ -37,7 +37,7 @@ Examples:
 
 ```text
 CLIENT DIRECTORY:
-C:\Games\DoomEternalArchipelago-v0.3.5\client
+C:\Games\DoomEternalArchipelago-v0.3.8-alpha.1\client
 
 GAME BASE PATH:
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal\base
@@ -53,7 +53,7 @@ These paths are not interchangeable.
 Locate:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.5-alpha.zip
+DoomEternalArchipelagoPlayableTest-v0.3.8-alpha.1.zip
 ```
 
 Extract it into a brand-new empty directory.
@@ -68,7 +68,7 @@ Do not:
 Expected layout:
 
 ```text
-DoomEternalArchipelago-v0.3.5/
+DoomEternalArchipelago-v0.3.8-alpha.1/
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoAlpha.zip
 ├── README.md
@@ -110,14 +110,14 @@ The selected directory must contain:
 Correct:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.3.5\client
+C:\Games\DoomEternalArchipelago-v0.3.8-alpha.1\client
 ```
 
 Incorrect:
 
 ```text
 C:\Program Files (x86)\Steam\steamapps\common\DOOMEternal
-C:\Games\DoomEternalArchipelago-v0.3.5
+C:\Games\DoomEternalArchipelago-v0.3.8-alpha.1
 ```
 
 The first path is the game installation. The second is the parent release
@@ -301,7 +301,7 @@ Saved Games Path: /var/home/YOUR_NAME/.local/share/Steam/steamapps/compatdata/78
 Windows:
 
 ```text
-C:\Games\DoomEternalArchipelago-v0.3.5\
+C:\Games\DoomEternalArchipelago-v0.3.8-alpha.1\
 ├── doometernal.apworld
 ├── DoomEternalArchipelagoAlpha.zip
 ├── README.md
@@ -333,7 +333,7 @@ Native log:
 Expected lines:
 
 ```text
-v0.3.5-alpha
+v0.3.8-alpha.1
 Meathook RPC server verified.
 RPC memory gate OPEN
 ```
@@ -368,7 +368,7 @@ If the setting is not visible, use `Open host.yaml` in the launcher and set:
 
 ```yaml
 doom_eternal_options:
-  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.5/client"
+  client_directory: "C:/Games/DoomEternalArchipelago-v0.3.8-alpha.1/client"
 ```
 
 Forward slashes are valid in Windows YAML paths.

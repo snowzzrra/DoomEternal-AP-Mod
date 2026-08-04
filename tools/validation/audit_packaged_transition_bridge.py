@@ -70,9 +70,13 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
         raise AssertionError("RELEASE_MANIFEST does not declare unified transition handler")
     if recorded.get("protocol") != 3:
         raise AssertionError("RELEASE_MANIFEST does not declare bridge protocol 3")
+    if recorded.get("game") != "DOOM Eternal":
+        raise AssertionError("RELEASE_MANIFEST does not declare current game identity")
     identity = json.loads((client_dir / "bridge_identity.json").read_text(encoding="utf-8"))
     if identity.get("protocol") != 3:
         raise AssertionError("unpacked bridge identity protocol diverges")
+    if identity.get("game") != "DOOM Eternal":
+        raise AssertionError("unpacked bridge identity game diverges")
     if identity.get("sha256") != actual:
         raise AssertionError("unpacked bridge identity sha256 diverges")
     if identity.get("revision") != f"mission-unified-{actual[:12]}":
@@ -120,6 +124,18 @@ def assert_packaged_launcher(apworld_path: Path, client_dir: Path, bridge_sha256
                     raise AssertionError("launcher protocol rejection is not clear") from error
             else:
                 raise AssertionError("launcher accepted incompatible bridge protocol")
+            finally:
+                identity_path.write_text(original_identity, encoding="utf-8")
+            legacy_identity = json.loads(original_identity)
+            legacy_identity["game"] = "Doom Eternal"
+            identity_path.write_text(json.dumps(legacy_identity), encoding="utf-8")
+            try:
+                launcher._bridge_identity(resolved / "bridge_client.py")
+            except RuntimeError as error:
+                if "Old 'Doom Eternal' seeds require the prior client/APWorld" not in str(error):
+                    raise AssertionError("launcher game-identity rejection is not clear") from error
+            else:
+                raise AssertionError("launcher accepted a legacy bridge identity")
             finally:
                 identity_path.write_text(original_identity, encoding="utf-8")
         finally:
@@ -269,6 +285,7 @@ def main() -> int:
             f"BRIDGE_FILE={client_dir / 'bridge_client.py'}",
             f"BRIDGE_SHA256={bridge_sha256}",
             "BRIDGE_PROTOCOL=3",
+            "GAME_NAME=DOOM Eternal",
             "TRANSITION_HANDLER=unified",
         ]
         if identity_lines != expected_identity:

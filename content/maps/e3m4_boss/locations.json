@@ -11,13 +11,15 @@
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M6": 7770417
   },
   "names": {
-    "7770412": "Final Sin - Extra Life 1",
+    "7770412": "Final Sin - Extra Life - First Building Vent",
     "7770413": "Final Sin - Icon of Sin Codex",
-    "7770415": "Final Sin - Extra Life 2",
-    "7770416": "Final Sin - Extra Life 3",
-    "7770417": "Final Sin - Extra Life 4"
+    "7770415": "Final Sin - Extra Life - Second Building Lower Vent",
+    "7770416": "Final Sin - Extra Life - Twin-Elevator Vent",
+    "7770417": "Final Sin - Extra Life - Fourth-Arena Gore Room"
   },
-  "location_feedback": {"default_policy": "ap_only"},
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
   "target_policies": {
     "pickups_progress_codex_2_e3m4": {
       "independent_ap_trigger": true,

@@ -70,6 +70,7 @@ BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
 BRIDGE_PROTOCOL = 3
 BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
 TRANSITION_HANDLER = "unified"
+GAME_NAME = "DOOM Eternal"
 
 ENABLE_ITEM_NOTIFICATIONS = False
 try:
@@ -1441,6 +1442,13 @@ AUTOMAP_COMPLETION_BY_MAP = {
 
 poll_counter = 0
 
+
+def log_delivery_event(event: str, **fields) -> None:
+    """Emit bounded, correlation-friendly delivery diagnostics only."""
+    record = {"event": event, **{key: value for key, value in fields.items() if value is not None}}
+    logger.info("DELIVERY_EVENT %s", json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
 def command_spool_exists(command_id):
     queued_path = os.path.join(QUEUE_DIR, f"{command_id}.cmd")
     processing_path = os.path.join(QUEUE_DIR, f"{command_id}.processing")
@@ -1488,7 +1496,13 @@ def bootstrap_activation(action_name):
     return f"ai_ScriptCmdEnt {action['entity_name']} activate"
 
 
-def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
+def send_command(
+    cmd,
+    coalesce_key=None,
+    arm_rpc=True,
+    already_queued_ok=False,
+    delivery_fields=None,
+):
     """Atomically enqueue one command without overwriting another command.
 
     A coalesced command has at most one queued or in-flight spool file. This is
@@ -1500,6 +1514,13 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
         command_id = coalesce_key or f"{time.time_ns():020d}-{uuid.uuid4().hex}"
         if coalesce_key:
             if command_spool_exists(coalesce_key):
+                if delivery_fields is not None:
+                    log_delivery_event(
+                        "QUEUE_DUPLICATE_REJECT",
+                        command_id=command_id,
+                        reason="spool_exists",
+                        **delivery_fields,
+                    )
                 return already_queued_ok
 
         temporary_path = os.path.join(
@@ -1514,6 +1535,13 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
             try:
                 os.link(temporary_path, command_path)
             except FileExistsError:
+                if delivery_fields is not None:
+                    log_delivery_event(
+                        "QUEUE_DUPLICATE_REJECT",
+                        command_id=command_id,
+                        reason="cmd_exists",
+                        **delivery_fields,
+                    )
                 return already_queued_ok
             finally:
                 try:
@@ -1526,13 +1554,25 @@ def send_command(cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False):
                     os.remove(command_path)
                 except FileNotFoundError:
                     pass
+                if delivery_fields is not None:
+                    log_delivery_event(
+                        "QUEUE_DUPLICATE_REJECT",
+                        command_id=command_id,
+                        reason="processing_exists",
+                        **delivery_fields,
+                    )
                 return already_queued_ok
         else:
             os.replace(temporary_path, command_path)
         if arm_rpc:
             set_rpc_execution(True)
-        if command_id.startswith("recv-"):
-            logger.info("RPC_ENQUEUE id=%s", command_id)
+        if delivery_fields is not None:
+            log_delivery_event(
+                "SPOOL_CREATE",
+                command_id=command_id,
+                path=Path(command_path).name,
+                **delivery_fields,
+            )
         return True
     except Exception as e:
         logger.error(f"[Error] Failed to enqueue game command: {e}")
@@ -1760,6 +1800,7 @@ def log_mission_bridge_identity():
     logger.info("BRIDGE_FILE=%s", BRIDGE_FILE)
     logger.info("BRIDGE_SHA256=%s", BRIDGE_SHA256)
     logger.info("BRIDGE_PROTOCOL=%s", BRIDGE_PROTOCOL)
+    logger.info("GAME_NAME=%s", GAME_NAME)
     logger.info("TRANSITION_HANDLER=%s", TRANSITION_HANDLER)
 
 
@@ -2149,7 +2190,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
-    game = "Doom Eternal"
+    game = GAME_NAME
     items_handling = 0b111
 
     def __init__(self, server_address, password):
@@ -3215,6 +3256,11 @@ class DoomEternalContext(CommonContext):
             suffix = f"effect-{command_index:02d}"
         return f"recv-{item_index:06d}-item-{item_id}-{suffix}"
 
+    def delivery_item_name(self, item_id):
+        return getattr(self, "item_names", {}).get(
+            item_id, ITEM_CLASSIFICATION_IDENTITY[item_id]["name"]
+        )
+
     def spool_item_commands(
         self,
         item_id,
@@ -3257,6 +3303,17 @@ class DoomEternalContext(CommonContext):
                 commands[command_index],
                 coalesce_key=command_id,
                 already_queued_ok=True,
+                delivery_fields={
+                    "receipt_index": item_index,
+                    "item_id": item_id,
+                    "item_name": self.delivery_item_name(item_id),
+                    "command_ordinal": command_index,
+                    "source": "cmd",
+                    "active_map": getattr(self, "current_map_name", None),
+                    "slot": getattr(self, "active_save_slot", None),
+                    "bridge_revision": BRIDGE_REVISION,
+                    "protocol_version": BRIDGE_PROTOCOL,
+                },
             ):
                 return False, description
             group["next_command"] = command_index + 1
@@ -4297,6 +4354,17 @@ class DoomEternalContext(CommonContext):
                     item_index = self.items_processed
                     network_item = self.items_received[item_index]
                     item_id = network_item.item
+                    log_delivery_event(
+                        "ITEM_RECEIPT",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        item_name=self.delivery_item_name(item_id)
+                        if item_id in ITEM_CLASSIFICATION_IDENTITY else None,
+                        active_map=self.current_map_name,
+                        slot=self.active_save_slot,
+                        bridge_revision=BRIDGE_REVISION,
+                        protocol_version=BRIDGE_PROTOCOL,
+                    )
                     if item_id not in ITEM_ID_TO_COMMAND:
                         logger.error(
                             f"[To Game] No command mapping for item {item_id}; "

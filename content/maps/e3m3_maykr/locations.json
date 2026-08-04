@@ -23,25 +23,25 @@
     "AP_CHECK_CODEX_PROGRESS_CODEX_3_E3M3": 7770404
   },
   "names": {
-    "7770388": "Urdak - Mastery Token 1",
+    "7770388": "Urdak - Mastery Token - First Forcefield Room Upper Ledge",
     "7770389": "Urdak - Cheat Code - Powerup Mode: Berserk",
-    "7770390": "Urdak - Extra Life 1",
-    "7770391": "Urdak - Mastery Token 2",
+    "7770390": "Urdak - Extra Life - Vent before the Second Arena",
+    "7770391": "Urdak - Mastery Token - Vent after the Second Album",
     "7770392": "Urdak - Toy - Khan Maykr",
-    "7770393": "Urdak - Extra Life 2",
+    "7770393": "Urdak - Extra Life - Eighth-Arena Breakable Wall",
     "7770394": "Urdak - Toy - Maykr Drone",
-    "7770395": "Urdak - Album 1",
-    "7770396": "Urdak - Album 2",
-    "7770397": "Urdak - Praetor Suit Token 1",
-    "7770398": "Urdak - Praetor Suit Token 2",
-    "7770399": "Urdak - Extra Life 3",
+    "7770395": "Urdak - Album - Dark Wall after the Icon of Sin Codex",
+    "7770396": "Urdak - Album - Bar-and-Grate Side Platform",
+    "7770397": "Urdak - Praetor Suit Token - Fifth-Arena Window Ledge",
+    "7770398": "Urdak - Praetor Suit Token - Seventh-Arena Elevator Door",
+    "7770399": "Urdak - Extra Life - Water-Filled Icon Room",
     "7770400": "Urdak - Toy - Spectre",
     "7770401": "Urdak - Khan Maykr Codex",
     "7770402": "Urdak - Urdak Codex",
     "7770403": "Urdak - Icon of Sin Codex",
     "7770404": "Urdak - Maykr Angels Codex",
-    "7770405": "Urdak - Secret Encounter 1",
-    "7770406": "Urdak - Secret Encounter 2"
+    "7770405": "Urdak - Secret Encounter - Statue-Puzzle Upper Door",
+    "7770406": "Urdak - Secret Encounter - Eighth-Arena Breakable Wall"
   },
   "location_feedback": {
     "default_policy": "ap_only"

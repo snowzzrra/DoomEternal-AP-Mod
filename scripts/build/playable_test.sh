@@ -449,6 +449,7 @@ from pathlib import Path
 bridge = Path(sys.argv[1])
 identity = {
     "protocol": 3,
+    "game": "DOOM Eternal",
     "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(),
     "item_notifications": {
         "enabled": sys.argv[3] == "1",
@@ -543,6 +544,7 @@ manifest = {
     },
     "mission_bridge": {
         "protocol": 3,
+        "game": "DOOM Eternal",
         "sha256": bridge_sha256,
         "revision": f"mission-unified-{bridge_sha256[:12]}",
         "transition_handler": "unified",
