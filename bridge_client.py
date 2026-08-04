@@ -3257,9 +3257,10 @@ class DoomEternalContext(CommonContext):
         return f"recv-{item_index:06d}-item-{item_id}-{suffix}"
 
     def delivery_item_name(self, item_id):
-        return getattr(self, "item_names", {}).get(
-            item_id, ITEM_CLASSIFICATION_IDENTITY[item_id]["name"]
-        )
+        identity = ITEM_CLASSIFICATION_IDENTITY.get(item_id)
+        if identity is not None:
+            return identity["name"]
+        return f"Unknown item (ID: {item_id})"
 
     def spool_item_commands(
         self,
