@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m2_war",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e1m2_war.map",
+    "size": 0,
+    "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65"
+  },
+  "owner": {
+    "resource": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
+    "priority": 20
+  }
+}

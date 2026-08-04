@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e1m3_cult",
+  "display_name": "Cultist Base",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e1m3_cult.map",
+  "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e1m3_cult.map",
+  "generated_output": "e1m3_cult.entities",
+  "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
+  "resource_base": "e1m3_cult",
+  "resource_path": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+  "resource_owner": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+  "resource_priority": 42,
+  "relative_entities_path": "game/sp/e1m3_cult/e1m3_cult.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Cultist Base",
+        "order": 6
+      }
+    ],
+    "connections": [
+      {
+        "from": "Cultist Base",
+        "to": "Doom Hunter Base",
+        "rule": "Portal to Doom Hunter Base",
+        "order": 6
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 3
+}

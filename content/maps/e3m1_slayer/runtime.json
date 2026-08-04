@@ -9,7 +9,14 @@
       "mission_key": "e3m1_slayer",
       "signal": {
         "kind": "physical_event_equivalent",
-        "physical_location_ids": [7770320, 7770321, 7770322, 7770323, 7770324, 7770325],
+        "physical_location_ids": [
+          7770320,
+          7770321,
+          7770322,
+          7770323,
+          7770324,
+          7770325
+        ],
         "required_count": 6,
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e3m1/challenge_1",
@@ -29,7 +36,8 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 41
     },
     {
       "category": "mission_challenges",
@@ -57,7 +65,8 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 42
     },
     {
       "category": "mission_challenges",
@@ -85,7 +94,8 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 43
     },
     {
       "category": "all_mission_challenges",
@@ -95,10 +105,15 @@
       "mission_key": "e3m1_slayer",
       "signal": {
         "kind": "aggregate",
-        "children": [7770333, 7770334, 7770335],
+        "children": [
+          7770333,
+          7770334,
+          7770335
+        ],
         "required_count": 3,
         "authority": "server_checked_locations"
-      }
+      },
+      "order": 44
     },
     {
       "category": "mission_complete",
@@ -115,7 +130,8 @@
           "from": "game/sp/e3m1_slayer/e3m1_slayer",
           "to": "game/hub/hub"
         }
-      }
+      },
+      "order": 45
     }
   ]
 }

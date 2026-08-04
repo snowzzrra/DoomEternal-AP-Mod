@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "super_gore_nest_mission_complete",
+      "map_key": "e2m1_nest",
+      "triggers": [
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m1_nest/e2m1_nest",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770210
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

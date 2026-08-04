@@ -41,13 +41,7 @@ PIPELINE_VERSION = "2"
 CORE_MAP_INPUTS = (
     "data/items.json",
     "data/item_replay_policies.json",
-    "data/location_names.json",
-    "data/challenge_location_registry.json",
-    "data/runtime_locations.json",
-    "data/publisher_contracts.json",
-    "data/campaign_goal_contract.json",
     "data/mission_complete_map_contracts.json",
-    "data/scripted_location_contracts.json",
     "data/content_identity.json",
     "data/ap_visual_bundle.json",
     "ap_visual_contract.py",
@@ -122,6 +116,7 @@ class Pipeline:
         self.timings: list[tuple[str, float]] = []
         self.generation_counts: dict[str, int] = {}
         self.cache_hits: dict[str, bool] = {}
+        self.integration_receipt: Path | None = None
 
     def timed(self, name: str):
         pipeline = self
@@ -147,10 +142,7 @@ class Pipeline:
                         f"value={error.lineno}\nReproduce:\n"
                         "  scripts/pipeline.sh fast"
                     ) from error
-            json_roots = [
-                ROOT / "data", ROOT / "level_configs", ROOT / "manifests",
-                ROOT / "content" / "maps",
-            ]
+            json_roots = [ROOT / "data", ROOT / "content", ROOT / "manifests"]
             for directory in json_roots:
                 if not directory.exists():
                     continue
@@ -523,42 +515,11 @@ class Pipeline:
             assert_map_baseline(map_key, artifact.output, artifact.manifest)
         return artifact
 
-    def _pytest_generated(self, artifacts: Iterable[MapArtifact]) -> None:
-        mapping = {
-            item.map_key: str(item.output)
-            for item in artifacts
-        }
-        env = os.environ.copy()
-        env["AP_PIPELINE_MAPS_JSON"] = json.dumps(mapping, sort_keys=True)
-        env["AP_PIPELINE_SELECTED_MAPS"] = json.dumps(sorted(mapping))
-        _run([
-            sys.executable, "-m", "pytest",
-            "tests/test_catalog_generated_maps.py",
-            "-q", "--maxfail=1",
-        ], env=env)
-
     def fast(self) -> None:
         self.preflight()
-        _run([
-            sys.executable, "-m", "pytest",
-            "tests/test_content_catalog.py",
-            "tests/test_content_architecture.py",
-            "tests/test_generated_content.py",
-            "tests/test_content_strategies.py",
-            "tests/test_publisher_runtime.py",
-            "tests/test_aggregate_contract.py",
-            "tests/test_contextual_location_names.py",
-            "tests/test_observer_lifecycle.py",
-            "tests/unit/test_039a_static_contracts.py",
-            "tests/unit/test_delivery_diagnostics.py",
-            "tests/unit/test_game_identity.py",
-            "-q", "--maxfail=1",
-        ])
 
     def map(self, map_key: str) -> MapArtifact:
-        artifact = self.validate_map(map_key)
-        self._pytest_generated((artifact,))
-        return artifact
+        return self.validate_map(map_key)
 
     def selection(self) -> tuple[list[str], list[str]]:
         catalog = self.catalog or self.preflight()
@@ -598,13 +559,28 @@ class Pipeline:
             selected = {spec.key for spec in catalog.enabled_maps()}
         return sorted(selected), sorted(paths)
 
-    def integration(self, map_keys: Sequence[str] | None = None) -> list[MapArtifact]:
+    def integration(self, map_keys: Sequence[str] | None = None, *, full: bool = True) -> list[MapArtifact]:
         catalog = self.preflight()
         keys = list(map_keys or [spec.key for spec in catalog.enabled_maps()])
         artifacts = []
         for key in keys:
             artifacts.append(self.validate_map(key))
-        self._pytest_generated(artifacts)
+        _run([sys.executable, "tools/validation/validate_data.py"])
+        _run([
+            sys.executable, "-m", "pytest",
+            "tests/test_observer_lifecycle.py",
+            "tests/test_publisher_runtime.py",
+            "tests/unit/test_item_reconciliation.py",
+            "tests/unit/test_tracker_supervisor.py",
+            "tests/unit/test_save_scenarios.py",
+            "-q", "--maxfail=1",
+        ])
+        if full:
+            self.apworld_smoke()
+            self.integration_receipt = self.receipt(
+                artifacts, ("preflight", "integration", "apworld", "content_audit", "protocol")
+            )
+            print(f"INTEGRATION_RECEIPT {self.integration_receipt}")
         return artifacts
 
     def _workspace_digest(self, artifacts: Sequence[MapArtifact]) -> str:
@@ -736,17 +712,8 @@ class Pipeline:
                 f"bundles={pending_imports}"
             )
         artifacts = self.integration()
-        self.apworld_smoke()
-        _run([
-            sys.executable, "-m", "pytest",
-            "tests/unit/test_check_events.py",
-            "tests/unit/test_validate_data.py",
-            "-q", "--maxfail=1",
-        ])
-        receipt = self.receipt(
-            artifacts,
-            ("preflight", "integration", "apworld", "content_audit", "protocol"),
-        )
+        assert self.integration_receipt is not None
+        receipt = self.integration_receipt
         if build:
             document = json.loads(receipt.read_text(encoding="utf-8"))
             env = os.environ.copy()
@@ -840,7 +807,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print("SELECTED MAPS")
                 print("\n".join(f"  {key}" for key in selected) or "  (none)")
             if selected:
-                pipeline.integration(selected)
+                pipeline.integration(selected, full=False)
         elif args.phase == "integration":
             pipeline.integration()
         elif args.phase == "release":

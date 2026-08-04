@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "name": "Doom Hunter Base - Mission Complete",
+      "location_id": 7770162,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
+      },
+      "mission_key": "e1m4_boss",
+      "category": "mission_complete",
+      "strategy": "map_terminal",
+      "order": 3
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Musical Interlude",
+      "location_id": 7770172,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_1",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_1.decl",
+        "sha256": "ee79868c1f8a182466bda0b9fa450a8bb2cdec0fb6fbff34160966a6b4f55ebe",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_1"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 24,
+      "strategy": "unlockable_record",
+      "category": "mission_challenges",
+      "mission_key": "e1m4"
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Big Reveal",
+      "location_id": 7770173,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_2",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_AUTOMAP",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_2.decl",
+        "sha256": "bfc15814c6e64332231b0069a2514b5cab4b82b090efb0e7308f94f32105383c",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_2"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 25,
+      "strategy": "unlockable_record",
+      "category": "mission_challenges",
+      "mission_key": "e1m4"
+    },
+    {
+      "name": "Doom Hunter Base - Mission Challenge - Fire in the Hole",
+      "location_id": 7770174,
+      "signal": {
+        "kind": "unlockable_record",
+        "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
+        "unlockable": "mission_challenge/e1m4/challenge_3",
+        "numUnlockableRules": 1,
+        "rule_0_statname": "STAT_KILL_N_ENEMIES_ONE_GRENADE",
+        "rule_0_statDuration": 5,
+        "rule_0_satisfied": true,
+        "unlockableIsUnlocked": true
+      },
+      "completion_owner": {
+        "path": "unlockable/mission_challenge/e1m4/challenge_3.decl",
+        "sha256": "e919b8ca770fa15627bec6efafbd4a6579499cee863d4b18c07a461ce5674b50",
+        "completion_stat": "STAT_COMPLETED_E1M4_CHALLENGE_3"
+      },
+      "reward_owner": {
+        "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
+        "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
+        "currency": "CURRENCY_PRAETOR_UPGRADE"
+      },
+      "order": 26,
+      "strategy": "unlockable_record",
+      "category": "mission_challenges",
+      "mission_key": "e1m4"
+    },
+    {
+      "name": "Doom Hunter Base - All Mission Challenges Completed",
+      "location_id": 7770175,
+      "mission_key": "e1m4",
+      "signal": {
+        "kind": "aggregate",
+        "children": [
+          7770172,
+          7770173,
+          7770174
+        ],
+        "required_count": 3,
+        "authority": "server_checked_locations"
+      },
+      "order": 37,
+      "strategy": "aggregate",
+      "category": "all_mission_challenges"
+    }
+  ]
+}

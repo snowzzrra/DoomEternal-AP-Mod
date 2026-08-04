@@ -3,11 +3,13 @@
   "key": "e3m1_slayer",
   "display_name": "Taras Nabad",
   "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
   "source_file": "e3m1_slayer.map",
   "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
   "source_size": 11694102,
+  "source_owner": "e3m1_slayer.map",
   "generated_output": "e3m1_slayer.entities",
-  "manifest": "manifests/e3m1_slayer.json",
   "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
   "resource_base": "e3m1_slayer",
   "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
@@ -17,14 +19,20 @@
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {
     "regions": [
-      "Fortress of Doom - Sixth Visit",
-      "Taras Nabad",
-      "Fortress of Doom - Seventh Visit"
+      {
+        "name": "Taras Nabad",
+        "order": 16
+      }
     ],
     "connections": [
-      ["Sentinel Prime", "Fortress of Doom - Sixth Visit", "Return to Fortress after Sentinel Prime"],
-      ["Fortress of Doom - Sixth Visit", "Taras Nabad", "Portal to Taras Nabad"],
-      ["Taras Nabad", "Fortress of Doom - Seventh Visit", "Return to Fortress after Taras Nabad"]
-    ]
-  }
+      {
+        "from": "Taras Nabad",
+        "to": "Fortress of Doom - Seventh Visit",
+        "rule": "Return to Fortress after Taras Nabad",
+        "order": 16
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 9
 }

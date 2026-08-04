@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "hell_on_earth_mission_complete",
+      "map_key": "e1m1_intro",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "3509104422",
+          "filename": "ap_event_7770122.txt",
+          "marker": "AP_CHECK_EVENT_7770122"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770122
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

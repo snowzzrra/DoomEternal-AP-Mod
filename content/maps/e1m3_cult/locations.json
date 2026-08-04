@@ -1,0 +1,193 @@
+{
+  "map_key": "e1m3_cult",
+  "level": "e1m3_cult",
+  "region": "Cultist Base",
+  "entities": {
+    "AP_CHECK_GAME_PROGRESS_ARGENT_CELL_1_1313774949": 7770058,
+    "AP_CHECK_GAME_PICKUP_WEAPON_ROCKET_LAUNCHER_1": 7770056,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10_E1M3": 7770052,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_5_E1M3": 7770065,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11_E1M3": 7770053,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_12_E1M3": 7770054,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_1_E1M3": 7770062,
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_02_2": 7770049,
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_SOLDIER": 7770051,
+    "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_1_E1M3": 7770057,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_4_E1M3": 7770064,
+    "AP_CHECK_GAME_PROGRESS_CODEX_1_E1M3": 7770060,
+    "AP_CHECK_GAME_PROGRESS_RUNE_1_E1M3": 7770067,
+    "AP_CHECK_GAME_PROGRESS_MOD_BOT_2_E1M3": 7770061,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_6_E1M3": 7770066,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E1M3": 7770046,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E1M3": 7770048,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M3": 7770047,
+    "AP_CHECK_PICKUP_KEYCARD_SLAYER_KEY_1": 7770071,
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_GARGOYLE_1": 7770050,
+    "AP_CHECK_GAME_PROGRESS_CHEATS_SENTINEL_ARMOR_2": 7770059,
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_3_E1M3": 7770063,
+    "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_2_E1M3": 7770069,
+    "AP_CHECK_GAME_PROGRESS_SENTINEL_BATTERY_3_E1M3": 7770070
+  },
+  "location_feedback": {
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "game_target_secret_10_e1m3"
+    },
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "game_target_secret_25_e1m3"
+    },
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_12_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "game_target_secret_18_e1m3"
+    },
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "game_target_secret_13_e1m3"
+    },
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "game_target_secret_1_e1m3"
+    },
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M3": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "extralives_target_secret_2_e1m3"
+    },
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_5_E1M3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_1_E1M3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_02_2": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_SOLDIER": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_4_E1M3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_6_E1M3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_GAME_PICKUP_COLLECTIBLE_TOYS_GARGOYLE_1": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_GAME_PROGRESS_CHEATS_SENTINEL_ARMOR_2": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_GAME_PROGRESS_PRAETOR_TOKEN_3_E1M3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_CAVE_MANCUBUS": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_TORTURE_PIT": {
+      "policy": "vanilla_only"
+    }
+  },
+  "neutralize_pickups": [
+    "pickups_pickup_weapon_plasma_rifle_1"
+  ],
+  "target_removals": {
+    "game_player_start_6": [
+      "game_target_give_item_1"
+    ]
+  },
+  "remove_entities": [
+    "game_target_give_item_1"
+  ],
+  "target_policies": {
+    "game_pickup_weapon_rocket_launcher_1": {
+      "independent_ap_trigger": true,
+      "independent_entity_name": "ap_independent_rocket_launcher_7770056",
+      "remove_original": true,
+      "no_auto_visual": true,
+      "preserve_layers": false,
+      "preserve_targets": [
+        "game_target_relay_1244"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "game_target_relay_1244": [
+          "movers_func_mover_162",
+          "movers_func_mover_163"
+        ],
+        "movers_func_mover_162": [],
+        "movers_func_mover_163": []
+      },
+      "forbidden_target_terms": [
+        "rocket_launcher",
+        "ammo/rocket",
+        "inventory",
+        "give",
+        "equip"
+      ],
+      "checkpoint_cleanup": {
+        "source_entity": "game_target_timeline_6",
+        "source_sha256": "affc0be75c36d27cb477554477783b21ad242c4bfd7a153da30f4e50af640935",
+        "event_index": 1,
+        "event_def": "remove",
+        "original_target": "game_pickup_weapon_rocket_launcher_1",
+        "replacement_target": "ap_independent_rocket_launcher_7770056",
+        "original_targets": [
+          "game_target_timeline_5",
+          "game_pickup_weapon_rocket_launcher_1",
+          "game_trigger_trigger_990",
+          "game_trigger_trigger_994"
+        ],
+        "replacement_targets": [
+          "game_target_timeline_5",
+          "ap_independent_rocket_launcher_7770056",
+          "game_trigger_trigger_990",
+          "game_trigger_trigger_994"
+        ]
+      }
+    }
+  },
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_CAVE_MANCUBUS",
+      "location_id": 7770091,
+      "manager": "game_encounter_manager_crusher_15",
+      "after_event_index": 8
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_CULTIST_BASE_TORTURE_PIT",
+      "location_id": 7770092,
+      "manager": "game_encounter_manager_crusher_21",
+      "after_event_index": 12
+    }
+  ],
+  "schema_version": 1,
+  "names": {
+    "7770058": "Cultist Base - Sentinel Crystal - Skull-Gate Chamber",
+    "7770056": "Cultist Base - Rocket Launcher",
+    "7770052": "Cultist Base - Extra Life - Hanging Cage",
+    "7770065": "Cultist Base - Praetor Suit Token - Raised-Skull Chamber",
+    "7770053": "Cultist Base - Extra Life - Dopefish 2",
+    "7770054": "Cultist Base - Extra Life - Dopefish 3",
+    "7770062": "Cultist Base - Praetor Suit Token - First Mancubus Arena Exit",
+    "7770049": "Cultist Base - Into Sandy's City Vinyl Record",
+    "7770051": "Cultist Base - Soldier (Blaster) Toy",
+    "7770057": "Cultist Base - Sentinel Battery - First Arena Blue-Vent Ledge",
+    "7770064": "Cultist Base - Praetor Suit Token - Elevator-Shaft Crates",
+    "7770060": "Cultist Base - Cultist Base Codex Entry",
+    "7770067": "Cultist Base - Rune - Main Story Path",
+    "7770061": "Cultist Base - Modbot - Whiplash Corridor",
+    "7770066": "Cultist Base - Praetor Suit Token - Deag Ranak Statue Exit",
+    "7770046": "Cultist Base - Extra Life - Spike Crushers",
+    "7770048": "Cultist Base - Extra Life - Before Cultist Key",
+    "7770047": "Cultist Base - Extra Life - After Big Fight Outside",
+    "7770071": "Cultist Base - Slayer Key - Giant Yellow Wall Route",
+    "7770050": "Cultist Base - Gargoyle Toy",
+    "7770059": "Cultist Base - IDDQD Cheat Code",
+    "7770063": "Cultist Base - Praetor Suit Token - Icy-Slope Cracked Wall",
+    "7770069": "Cultist Base - Sentinel Battery - Post-Arena Interior",
+    "7770070": "Cultist Base - Sentinel Battery - Moving Elevator Shaft",
+    "7770091": "Cultist Base - Secret Encounter - Cave Mancubus",
+    "7770092": "Cultist Base - Secret Encounter - Torture Pit"
+  },
+  "generator_compatibility": "crucible_item"
+}

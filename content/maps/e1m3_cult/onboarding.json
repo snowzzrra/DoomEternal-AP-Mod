@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m3_cult",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e1m3_cult.map",
+    "size": 0,
+    "sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866"
+  },
+  "owner": {
+    "resource": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
+    "priority": 42
+  }
+}

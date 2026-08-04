@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m1_intro",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e1m1_intro.map",
+    "size": 0,
+    "sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"
+  },
+  "owner": {
+    "resource": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+    "priority": 62
+  }
+}

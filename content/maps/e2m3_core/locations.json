@@ -1,0 +1,123 @@
+{
+  "map_key": "e2m3_core",
+  "level": "e2m3_core",
+  "region": "Mars Core",
+  "entities": {
+    "AP_CHECK_HELL_CHUNK_2_PROGRESS_PRAETOR_TOKEN_1_E3M2": 7770256,
+    "AP_CHECK_UAC_CHUNK_1_PROGRESS_PRAETOR_TOKEN_1_E2M3": 7770257,
+    "AP_CHECK_PHOBOS_PROGRESS_PRAETOR_TOKEN_1_E2M3": 7770258,
+    "AP_CHECK_METEORS_PROGRESS_PRAETOR_TOKEN_1_E2M3": 7770259,
+    "AP_CHECK_METEORS_PROGRESS_PRAETOR_TOKEN_1_E3M2": 7770260,
+    "AP_CHECK_HELL_CHUNK_2_PROGRESS_SENTINEL_BATTERY_1_E2M3": 7770261,
+    "AP_CHECK_PHOBOS_PROGRESS_SENTINEL_BATTERY_1_E2M3": 7770262,
+    "AP_CHECK_METEORS_PROGRESS_SENTINEL_BATTERY_1_E2M3": 7770263,
+    "AP_CHECK_PICKUPS_PROGRESS_RUNE_1_E2M3": 7770264,
+    "AP_CHECK_UAC_CHUNK_1_PROGRESS_RUNE_1_E2M3": 7770265,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E2M3": 7770266,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E2M3": 7770267,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_4_E2M3": 7770268,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E2M3": 7770269,
+    "AP_CHECK_HELL_CHUNK_2_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E2M3": 7770270,
+    "AP_CHECK_UAC_CHUNK_1_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E2M3": 7770271,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_PROWLER_1": 7770272,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CARCASS_1": 7770273,
+    "AP_CHECK_SLAYER_GATE_PICKUP_COLLECTIBLE_TOYS_PINKY_1": 7770274,
+    "AP_CHECK_METEORS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_08_1": 7770275,
+    "AP_CHECK_SLAYER_GATE_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_09_1": 7770276,
+    "AP_CHECK_METEORS_PROGRESS_CHEATS_POWERUP_INFINITE_ONSLAUGHT_1": 7770277,
+    "AP_CHECK_PHOBOS_PROGRESS_CODEX_1": 7770278,
+    "AP_CHECK_HELL_CHUNK_2_PROGRESS_CODEX_1": 7770279,
+    "AP_CHECK_SLAYER_ARENA_PICKUP_KEYCARD_SLAYER_KEY_1": 7770280,
+    "AP_CHECK_SLAYER_GATE_PROGRESS_ARGENT_CELL_1_1335273921_E2M3": 7770281
+  },
+  "location_feedback": {},
+  "target_policies": {
+    "slayer_arena_pickup_keycard_slayer_key_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "slayer_arena_target_changelayer_slayergate_1",
+        "slayer_gate_func_mover_key_grate"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "slayer_arena_target_changelayer_slayergate_1": [],
+        "slayer_gate_func_mover_key_grate": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
+    },
+    "slayer_gate_progress_argent_cell_1_1335273921_e2m3": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "slayer_gate_destructible_interact_argent_cell_1_1335273921_e2m3": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
+    }
+  },
+  "remove_entities": [],
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E2M3_1",
+      "location_id": 7770283,
+      "manager": "uac_chunk_1_encounter_manager_4",
+      "after_event_index": 11,
+      "automap_owner": "automap_info_null_secret_enc_1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E2M3_2",
+      "location_id": 7770284,
+      "manager": "meteors_encounter_manager_secret_enc_01",
+      "after_event_index": 8,
+      "automap_owner": "automap_info_null_secret_enc_2"
+    }
+  ],
+  "schema_version": 1,
+  "names": {
+    "7770256": "Mars Core - Praetor Suit Token - Post-BFG Cracked Wall",
+    "7770257": "Mars Core - Praetor Suit Token - Tentacle Control Room",
+    "7770258": "Mars Core - Praetor Suit Token - Green-Piston Walkway",
+    "7770259": "Mars Core - Praetor Suit Token - Sentinel Hologram Platform",
+    "7770260": "Mars Core - Praetor Suit Token - Hebeth Catacombs",
+    "7770261": "Mars Core - Sentinel Battery - Flying Island",
+    "7770262": "Mars Core - Sentinel Battery - Exterior Arena Gap",
+    "7770263": "Mars Core - Sentinel Battery - Mars Core Landing",
+    "7770264": "Mars Core - Rune - First Teleporter",
+    "7770265": "Mars Core - Rune - Post-Prowler Elevator",
+    "7770266": "Mars Core - Extra Life - Second Outdoor Arena",
+    "7770267": "Mars Core - Extra Life - Post-BFG Burning Building",
+    "7770268": "Mars Core - Extra Life - Hanging-Bar Breakable Wall",
+    "7770269": "Mars Core - Extra Life - Pillar Combat Section",
+    "7770270": "Mars Core - Extra Life - Under the Flying Island",
+    "7770271": "Mars Core - Extra Life - Final Hebeth Arena",
+    "7770272": "Mars Core - Prowler Toy",
+    "7770273": "Mars Core - Carcass Toy",
+    "7770274": "Mars Core - Pinky Toy",
+    "7770275": "Mars Core - DOOM 64 - Main Theme Vinyl Record",
+    "7770276": "Mars Core - Quake Champions - Goroth Vinyl Record",
+    "7770277": "Mars Core - Infinite Onslaught Cheat Code",
+    "7770278": "Mars Core - BFG-10000 Codex",
+    "7770279": "Mars Core - Lost City of Hebeth Codex",
+    "7770280": "Mars Core - Slayer Key - Tentacle Control-Panel Vent",
+    "7770281": "Mars Core - Sentinel Crystal - Flying-Island Blue-Vent Landing",
+    "7770283": "Mars Core - Secret Encounter - Post-BFG Cracked-Wall Side Room",
+    "7770284": "Mars Core - Secret Encounter - Tentacle Portal Arena"
+  },
+  "generator_compatibility": "crucible_item"
+}

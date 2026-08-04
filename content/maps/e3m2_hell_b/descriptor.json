@@ -3,11 +3,13 @@
   "key": "e3m2_hell_b",
   "display_name": "Nekravol Part II",
   "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
   "source_file": "e3m2_hell_b.map",
   "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
   "source_size": 6577895,
+  "source_owner": "e3m2_hell_b.map",
   "generated_output": "e3m2_hell_b.entities",
-  "manifest": "manifests/e3m2_hell_b.json",
   "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
   "resource_base": "e3m2_hell_b",
   "resource_path": "game/sp/e3m2_hell_b/e3m2_hell_b_patch2.resources",
@@ -17,10 +19,20 @@
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {
     "regions": [
-      "Nekravol Part II"
+      {
+        "name": "Nekravol Part II",
+        "order": 19
+      }
     ],
     "connections": [
-      ["Nekravol", "Nekravol Part II", "Continue to Nekravol Part II"]
-    ]
-  }
+      {
+        "from": "Nekravol Part II",
+        "to": "Urdak",
+        "rule": "Continue to Urdak",
+        "order": 19
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 11
 }

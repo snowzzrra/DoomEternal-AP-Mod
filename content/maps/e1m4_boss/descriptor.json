@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e1m4_boss",
+  "display_name": "Doom Hunter Base",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e1m4_boss.map",
+  "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e1m4_boss.map",
+  "generated_output": "e1m4_boss.entities",
+  "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
+  "resource_base": "e1m4_boss",
+  "resource_path": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+  "resource_owner": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+  "resource_priority": 74,
+  "relative_entities_path": "game/sp/e1m4_boss/e1m4_boss.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Doom Hunter Base",
+        "order": 7
+      }
+    ],
+    "connections": [
+      {
+        "from": "Doom Hunter Base",
+        "to": "Fortress of Doom - Third Visit",
+        "rule": "Return to Fortress after Doom Hunter Base",
+        "order": 7
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 4
+}

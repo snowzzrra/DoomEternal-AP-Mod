@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e2m3_core",
+  "display_name": "Mars Core",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e2m3_core.map",
+  "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e2m3_core.map",
+  "generated_output": "e2m3_core.entities",
+  "runtime_map": "game/sp/e2m3_core/e2m3_core",
+  "resource_base": "e2m3_core",
+  "resource_path": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+  "resource_owner": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+  "resource_priority": 10,
+  "relative_entities_path": "game/sp/e2m3_core/e2m3_core.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Mars Core",
+        "order": 13
+      }
+    ],
+    "connections": [
+      {
+        "from": "Mars Core",
+        "to": "Sentinel Prime",
+        "rule": "Portal to Sentinel Prime",
+        "order": 13
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 7
+}

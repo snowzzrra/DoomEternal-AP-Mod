@@ -1,0 +1,110 @@
+{
+  "map_key": "e1m2_war",
+  "level": "e1m2_war",
+  "region": "Exultia",
+  "entities": {
+    "AP_CHECK_PICKUPS_PROGRESS_RUNE_1_E1M2": 7770044,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ARACHNOTRON_1": 7770031,
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CACODEMON_1": 7770032,
+    "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E1M2": 7770043,
+    "AP_CHECK_PICKUPS_PICKUP_WEAPON_PLASMA_RIFLE_3": 7770034,
+    "AP_CHECK_PICKUPS_ALBUM_E1M2": 7770030,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_1_E1M2": 7770036,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_2_E1M2": 7770037,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_3_E1M2": 7770038,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_4_E1M2": 7770039,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_5_E1M2": 7770040,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_6_E1M2": 7770041,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_7_E1M2": 7770042,
+    "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1318987582_E1M2": 7770035,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E1M2": 7770025,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_4_E1M2": 7770026,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E1M2": 7770027,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_6_E1M2": 7770028,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_9_E1M2": 7770029,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10_E1M2": 7770023,
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E1M2": 7770024,
+    "AP_CHECK_CAPITOL_PROGRESS_BLOOD_PUNCH_1": 7770021,
+    "AP_CHECK_CAPITOL_PROGRESS_DASH_1": 7770083,
+    "AP_CHECK_CAPITOL_PROGRESS_SENTINEL_BATTERY_1_E1M2": 7770084,
+    "AP_CHECK_SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770045
+  },
+  "location_feedback": {
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ARACHNOTRON_1": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CACODEMON_1": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_PICKUPS_ALBUM_E1M2": {
+      "policy": "vanilla_only",
+      "vanilla_feedback_proof": "The retained native idProp2 album transaction writes STAT_COLLECTIBLE_ALBUM_FOUND and provides the album UI feedback."
+    },
+    "AP_CHECK_PICKUPS_PROGRESS_MOD_BOT_1_E1M2": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "pickups_target_secret_3_e1m2"
+    },
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_4_E1M2": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "extralives_target_secret_2_e1m2"
+    },
+    "AP_CHECK_EXTRALIVES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E1M2": {
+      "policy": "vanilla_only",
+      "vanilla_owner": "extralives_target_secret_1_e1m2"
+    },
+    "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_CAPITOL_ARENA": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_GORE_NEST_ARENA": {
+      "policy": "vanilla_only"
+    }
+  },
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_CAPITOL_ARENA",
+      "location_id": 7770089,
+      "manager_entity": "capitol_encounter_manager_4",
+      "after_event_index": 3
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_EXULTIA_GORE_NEST_ARENA",
+      "location_id": 7770090,
+      "manager_entity": "battle_encounter_manager_3",
+      "after_event_index": 11
+    }
+  ],
+  "remove_entities": [
+    "pickups_pickup_weapon_heavy_cannon_1"
+  ],
+  "schema_version": 1,
+  "names": {
+    "7770044": "Exultia - Rune - First Ruined Hall",
+    "7770031": "Exultia - Arachnotron Toy",
+    "7770032": "Exultia - Cacodemon Toy",
+    "7770043": "Exultia - Modbot - Purple-Goo Power-Core Cave",
+    "7770034": "Exultia - Hidden Plasma Rifle",
+    "7770030": "Exultia - At Doom's Gate Vinyl Record",
+    "7770036": "Exultia - Exultia Codex Entry",
+    "7770037": "Exultia - The Wolf Codex Entry",
+    "7770038": "Exultia - History of the Sentinels Part One Codex Entry",
+    "7770039": "Exultia - King Novik Codex Entry",
+    "7770040": "Exultia - History of the Sentinels Part Two Codex Entry",
+    "7770041": "Exultia - History of the Sentinels Part Three Codex Entry",
+    "7770042": "Exultia - The Betrayer Codex Entry",
+    "7770035": "Exultia - Sentinel Crystal - Purple-Goo Cave after the Third Celestial Core",
+    "7770025": "Exultia - Extra Life - After Dash",
+    "7770026": "Exultia - Extra Life - Under Level Start",
+    "7770027": "Exultia - Extra Life - Close to First Rune",
+    "7770028": "Exultia - Extra Life - Under Floating Platform",
+    "7770029": "Exultia - Extra Life - Floating in Goo Room",
+    "7770023": "Exultia - Extra Life - Behind King Novik's Throne",
+    "7770024": "Exultia - Extra Life - Inside Electric Trap",
+    "7770021": "Exultia - Blood Punch",
+    "7770083": "Exultia - Dash",
+    "7770084": "Exultia - Sentinel Battery - King Novik Return Path",
+    "7770045": "Exultia - Slayer Key - Falling-Platform Overlook",
+    "7770089": "Exultia - Secret Encounter - Capitol Arena",
+    "7770090": "Exultia - Secret Encounter - Gore Nest Arena"
+  },
+  "generator_compatibility": "crucible_item"
+}

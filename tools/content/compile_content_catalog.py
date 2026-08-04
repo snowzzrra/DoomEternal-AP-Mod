@@ -98,6 +98,17 @@ def compile_catalog(
     rendered = render(catalog, map_key)
     changed = False
 
+    def write_artifact(path: Path, payload: str) -> None:
+        nonlocal changed
+        current = path.read_text(encoding="utf-8") if path.exists() else ""
+        if check:
+            if current != payload:
+                raise ValueError(f"component=compiled_content file={path} field=synchronization value=stale")
+        elif current != payload:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(payload, encoding="utf-8", newline="\n")
+            changed = True
+
     current = output.read_text(encoding="utf-8") if output.exists() else ""
     if check:
         if current != rendered:
@@ -126,16 +137,7 @@ def compile_catalog(
             staging_gen.write_text(rendered, encoding="utf-8", newline="\n")
             changed = True
 
-    for json_name in [
-        "content_identity.json",
-        "items.json",
-        "item_replay_policies.json",
-        "location_names.json",
-        "runtime_locations.json",
-        "publisher_contracts.json",
-        "campaign_goal_contract.json",
-        "challenge_location_registry.json",
-    ]:
+    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json"]:
         src = catalog.root / "data" / json_name
         if src.exists():
             content_bytes = src.read_bytes()
@@ -146,15 +148,36 @@ def compile_catalog(
                     dst.write_bytes(content_bytes)
                     changed = True
 
+    from challenge_registry import challenge_registry_document
     from map_registry import _catalog_registry
+    from publisher_contracts import publisher_contracts_document
     compiled_sources = _catalog_registry(catalog.root)
     sources_rendered = json.dumps(compiled_sources, indent=2, sort_keys=True) + "\n"
-    dst_path = output_root / "map_sources.json"
-    curr = dst_path.read_text(encoding="utf-8") if dst_path.exists() else ""
-    if curr != sources_rendered:
-        if not check:
-            dst_path.write_text(sources_rendered, encoding="utf-8", newline="\n")
-            changed = True
+    generated_data = {
+        "map_sources.json": compiled_sources,
+        "location_names.json": {
+            "schema_version": 1,
+            "source": "content/maps/*/locations.json + runtime.json",
+            "locations": {str(item.location_id): item.name for item in (*catalog.physical_locations, *catalog.runtime_locations)},
+        },
+        "runtime_locations.json": {item.name: item.location_id for item in catalog.runtime_locations},
+        "challenge_location_registry.json": challenge_registry_document(catalog),
+        "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
+        "campaign_goal_contract.json": dict(catalog.campaign_goal),
+    }
+    for name, value in generated_data.items():
+        rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"
+        write_artifact(catalog.root / "data" / name, rendered_json)
+        write_artifact(output_root / name, rendered_json)
+    for spec in catalog.maps.values():
+        locations = json.loads(spec.level_config_path.read_text(encoding="utf-8"))
+        manifest = dict(locations.get("entities", {}))
+        manifest.update({
+            item.get("ap_check", f"AP_CHECK_SECRET_{item['location_id']}"): item["location_id"]
+            for item in locations.get("secret_encounters", [])
+        })
+        write_artifact(catalog.root / "manifests" / f"{spec.key}.json",
+                       json.dumps(manifest, indent=4) + "\n")
 
     from foundation import load_foundation_contracts
     compiled_foundation = load_foundation_contracts(authorial=True)

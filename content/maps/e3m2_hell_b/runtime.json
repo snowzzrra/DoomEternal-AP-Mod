@@ -6,7 +6,7 @@
       "name": "Nekravol Part II - Mission Challenge - Punched by Blood",
       "location_id": 7770383,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2_b",
+      "mission_key": "e3m2_hell_b",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -27,14 +27,15 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 51
     },
     {
       "category": "mission_challenges",
       "name": "Nekravol Part II - Mission Challenge - Cut Down to Size",
       "location_id": 7770384,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2_b",
+      "mission_key": "e3m2_hell_b",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -55,14 +56,15 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 52
     },
     {
       "category": "mission_challenges",
       "name": "Nekravol Part II - Mission Challenge - Resurrect No More",
       "location_id": 7770385,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2_b",
+      "mission_key": "e3m2_hell_b",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -83,20 +85,26 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 53
     },
     {
       "category": "all_mission_challenges",
       "name": "Nekravol Part II - All Mission Challenges Completed",
       "location_id": 7770386,
       "strategy": "aggregate",
-      "mission_key": "e3m2_b",
+      "mission_key": "e3m2_hell_b",
       "signal": {
         "kind": "aggregate",
-        "children": [7770383, 7770384, 7770385],
+        "children": [
+          7770383,
+          7770384,
+          7770385
+        ],
         "required_count": 3,
         "authority": "server_checked_locations"
-      }
+      },
+      "order": 54
     },
     {
       "category": "mission_complete",
@@ -113,7 +121,8 @@
           "from": "game/sp/e3m2_hell_b/e3m2_hell_b",
           "to": "game/sp/e3m3_maykr/e3m3_maykr"
         }
-      }
+      },
+      "order": 55
     }
   ]
 }

@@ -1,0 +1,319 @@
+{
+  "map_key": "hub",
+  "region": "Fortress of Doom - Second Visit",
+  "region_overrides": {
+    "7770073": "Fortress of Doom - First Visit",
+    "7770086": "Fortress of Doom - First Visit",
+    "7770170": "Fortress of Doom - Third Visit"
+  },
+  "inline_currency_removals": [
+    {
+      "entity": "interact_hub_battery_socket_for_engine",
+      "class": "idInteractable_GiveItems",
+      "property": "currencyList",
+      "currency": "CURRENCY_SENTINEL_BATTERY",
+      "count": -1,
+      "original_targets": [
+        "target_timeline_restore_power",
+        "target_relay_power_on",
+        "target_relay_engine_light_on"
+      ],
+      "preserved_requirement": {
+        "owner": "game/hub/hub.resources",
+        "path": "generated/decls/logicentity/maps/game/hub/hub_game_sentinel_battery_room/sentinel_battery_room_info_logic_1.decl",
+        "variable": "sentinel_battery_available",
+        "reader": "idLogicNodeModelPlayerInventoryCheck",
+        "currency": "CURRENCY_SENTINEL_BATTERY",
+        "minimum_count": 1
+      }
+    }
+  ],
+  "entities": {
+    "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770072,
+    "AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1": 7770073,
+    "AP_CHECK_PICKUP_EQUIPMENT_ICE_BOMB": 7770074,
+    "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848": 7770086,
+    "AP_CHECK_PROGRESS_ARGENT_CELL_1_750400652": 7770087,
+    "AP_CHECK_PROGRESS_ARGENT_CELL_1_2075197287": 7770088,
+    "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": 7770081,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_1": 7770163,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_2": 7770164,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_MOD_BOT_3": 7770165,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_MOD_BOT_4": 7770166,
+    "AP_CHECK_PROGRESS_PRAETOR_TOKEN_3": 7770167,
+    "AP_CHECK_PROGRESS_PRAETOR_TOKEN_4": 7770168,
+    "AP_CHECK_PROGRESS_CHEATS_ALL_MASTERED_RUNES_1": 7770169,
+    "AP_CHECK_PICKUP_WEAPON_GAUSS_RIFLE_HUB_1": 7770170,
+    "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171,
+    "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_1": 7770253,
+    "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_2": 7770254,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_2_BATTERY_STATION_1": 7770255
+  },
+  "location_feedback": {
+    "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_1": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_2": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_PROGRESS_PRAETOR_TOKEN_3": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_PROGRESS_PRAETOR_TOKEN_4": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_PROGRESS_CHEATS_ALL_MASTERED_RUNES_1": {
+      "policy": "vanilla_only"
+    },
+    "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": {
+      "policy": "vanilla_only"
+    }
+  },
+  "target_removals": {
+    "target_relay_pickup_ballista": [
+      "target_give_item_ballista"
+    ]
+  },
+  "remove_entities": [
+    "target_give_item_ballista"
+  ],
+  "target_policies": {
+    "pickup_equipment_flame_belch_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "no_auto_visual": true,
+      "preserve_targets": [
+        "target_relay_pickup_flame_belch"
+      ],
+      "drop_targets": [
+        "target_give_item_flame_belch"
+      ]
+    },
+    "pickup_equipment_ice_bomb": {
+      "independent_ap_trigger": true,
+      "independent_position": [
+        0.47,
+        -22.27,
+        -14.38
+      ],
+      "independent_size": [
+        4.0,
+        3.0,
+        3.5
+      ],
+      "independent_visual": {
+        "entity_name": "ap_location_visual_7770074",
+        "cleanup_entity": "ap_remove_location_visual_7770074",
+        "model": "art/pickups/question_mark_a.lwo",
+        "thinkComponentDecl": "bob_rotate_fast",
+        "position": [
+          0.47,
+          -22.27,
+          -15.38
+        ],
+        "scale": [
+          1.75,
+          1.75,
+          1.75
+        ]
+      },
+      "drop_targets": [
+        "target_give_item_ice_bomb"
+      ]
+    },
+    "progress_argent_cell_1_1072112848": {
+      "gate_relay": "target_relay_argent_cell_useable",
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "progress_argent_cell_1_750400652": {
+      "gate_relay": "target_relay_argent_cell_useable",
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "progress_argent_cell_1_2075197287": {
+      "gate_relay": "target_relay_argent_cell_useable",
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "progress_praetor_point_hub_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "target_relay_complete_praetor_obj"
+      ]
+    },
+    "sentinel_battery_room_progress_praetor_token_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used1"
+      ]
+    },
+    "sentinel_battery_room_progress_praetor_token_2": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used2"
+      ]
+    },
+    "sentinel_battery_room_progress_mod_bot_3": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "sentinel_battery_room_target_relay_item_used3"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "sentinel_battery_room_target_relay_item_used3": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
+    },
+    "sentinel_battery_room_progress_mod_bot_4": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "sentinel_battery_room_target_relay_item_used"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "sentinel_battery_room_target_relay_item_used": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
+    },
+    "progress_praetor_token_3": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used_24"
+      ]
+    },
+    "progress_praetor_token_4": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "drop_targets": [
+        "sentinel_battery_room_target_relay_item_used_25"
+      ]
+    },
+    "pickup_weapon_gauss_rifle_hub_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [
+        "target_relay_pickup_ballista"
+      ],
+      "drop_targets": [
+        "target_give_item_ballista"
+      ],
+      "safe_target_graph": {
+        "target_relay_pickup_ballista": [
+          "target_relay_complete_ballista_obj"
+        ],
+        "target_relay_complete_ballista_obj": [
+          "target_objective_complete_ballista"
+        ],
+        "target_objective_complete_ballista": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
+    },
+    "interact_hub_2_battery_station_1": {
+      "independent_ap_trigger": true,
+      "independent_position": [
+        94.25,
+        58.45,
+        -11.3
+      ],
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/hub/2_battery_station\";",
+          "class = \"idInteractable_Obstacle\";",
+          "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+          "stat = \"STAT_SLAYER_HUB_MILESTONE_3\";",
+          "whenToSave = \"SGT_NORMAL\";",
+          "saveType = \"SGS_GAME_DATA\";"
+        ]
+      }
+    },
+    "interact_hub_2_battery_station_2": {
+      "independent_ap_trigger": true,
+      "independent_position": [
+        -92.5,
+        85.9,
+        -4.0
+      ],
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/hub/2_battery_station\";",
+          "class = \"idInteractable_Obstacle\";",
+          "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+          "stat = \"STAT_SLAYER_HUB_MILESTONE_2\";",
+          "whenToSave = \"SGT_NORMAL\";",
+          "saveType = \"SGS_GAME_DATA\";"
+        ]
+      }
+    },
+    "sentinel_battery_room_interact_hub_2_battery_station_1": {
+      "independent_ap_trigger": true,
+      "independent_position": [
+        0.55,
+        -115.57,
+        6.34
+      ],
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/hub/2_battery_station\";",
+          "class = \"idInteractable_Obstacle\";",
+          "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+          "whenToSave = \"SGT_NORMAL\";",
+          "saveType = \"SGS_GAME_DATA\";"
+        ]
+      }
+    }
+  },
+  "schema_version": 1,
+  "names": {
+    "7770072": "Fortress of Doom - Fortress of Doom Codex Entry",
+    "7770073": "Fortress of Doom - Flame Belch",
+    "7770074": "Fortress of Doom - Ice Bomb",
+    "7770086": "Fortress of Doom - Sentinel Crystal - Bridge Story Pickup",
+    "7770087": "Fortress of Doom - Sentinel Crystal - Battery Room Lower East",
+    "7770088": "Fortress of Doom - Sentinel Crystal - Battery Room Lower West",
+    "7770081": "Fortress of Doom - Praetor Suit Token - Story Suit Tutorial",
+    "7770163": "Fortress of Doom - Praetor Suit Token - Battery Room Upper East",
+    "7770164": "Fortress of Doom - Praetor Suit Token - Battery Room Upper West",
+    "7770165": "Fortress of Doom - Modbot - Battery Room Upper West",
+    "7770166": "Fortress of Doom - Modbot - Battery Room Upper East",
+    "7770167": "Fortress of Doom - Praetor Suit Token - Elevator Room West",
+    "7770168": "Fortress of Doom - Praetor Suit Token - Elevator Room East",
+    "7770169": "Fortress of Doom - All Runes Cheat Code",
+    "7770170": "Fortress of Doom - Ballista",
+    "7770171": "Fortress of Doom - Fully Upgraded Suit Cheat Code",
+    "7770253": "Fortress of Doom - Praetor Suit",
+    "7770254": "Fortress of Doom - Sentinel Armor",
+    "7770255": "Fortress of Doom - Classic Marine Suit"
+  },
+  "generator_compatibility": "crucible_item"
+}

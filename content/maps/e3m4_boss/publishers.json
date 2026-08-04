@@ -5,12 +5,25 @@
       "key": "final_sin_mission_complete",
       "map_key": "e3m4_boss",
       "triggers": [
-        {"strategy": "map_event_file", "owner": "icon_of_sin_death_target_relay_post_destruction_idle", "filename": "ap_mission_final_sin_complete.txt", "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE"},
-        {"strategy": "terminal_owner", "owner": "icon_of_sin_death_target_relay_post_destruction_idle"}
+        {
+          "strategy": "map_event_file",
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
+          "filename": "ap_mission_final_sin_complete.txt",
+          "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "icon_of_sin_death_target_relay_post_destruction_idle"
+        }
       ],
       "effects": [
-        {"strategy": "location_check", "location_id": 7770414},
-        {"strategy": "campaign_goal"}
+        {
+          "strategy": "location_check",
+          "location_id": 7770414
+        },
+        {
+          "strategy": "campaign_goal"
+        }
       ],
       "dedupe_scope": "final_sin_mission_complete_location",
       "fallback_policy": "first_success_wins"

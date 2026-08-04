@@ -60,10 +60,10 @@
     "7770328": "Taras Nabad - Album - Marauder Gate Lower Platform",
     "7770329": "Taras Nabad - Album - Vault Vent Breakable Wall",
     "7770330": "Taras Nabad - Slayer Key - Second Swim Exit",
-    "7770331": "Taras Nabad - Secret Encounter - Archvile Courtyard Breakable Wall",
-    "7770332": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall",
     "7770338": "Taras Nabad - Mastery Token - Archvile Courtyard Button Gate",
-    "7770339": "Taras Nabad - Mastery Token - Crucible Room Opposite Walkway"
+    "7770339": "Taras Nabad - Mastery Token - Crucible Room Opposite Walkway",
+    "7770331": "Taras Nabad - Secret Encounter - Archvile Courtyard Breakable Wall",
+    "7770332": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall"
   },
   "location_feedback": {
     "default_policy": "ap_only"

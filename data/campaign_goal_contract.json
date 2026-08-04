@@ -1,12 +1,12 @@
 {
-  "schema_version": 1,
-  "release": "v0.3.8-alpha",
-  "publisher_key": "final_sin_mission_complete",
+  "destination_map": "game/sp/e3m4_boss/e3m4_boss/end_game",
   "event_filename": "ap_mission_final_sin_complete.txt",
-  "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
   "event_target": "ap_campaign_goal_event",
+  "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
   "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
-  "source": "vanillamaps/e3m4_boss.map",
+  "publisher_key": "final_sin_mission_complete",
+  "release": "v0.3.8-alpha",
   "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
-  "destination_map": "game/sp/e3m4_boss/e3m4_boss/end_game"
+  "schema_version": 1,
+  "source": "vanillamaps/e3m4_boss.map"
 }

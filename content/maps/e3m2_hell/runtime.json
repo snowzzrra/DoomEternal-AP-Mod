@@ -6,7 +6,7 @@
       "name": "Nekravol - Mission Challenge - Die by the Sword",
       "location_id": 7770358,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2",
+      "mission_key": "e3m2_hell",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -27,14 +27,15 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 46
     },
     {
       "category": "mission_challenges",
       "name": "Nekravol - Mission Challenge - Tricks and Traps",
       "location_id": 7770359,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2",
+      "mission_key": "e3m2_hell",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -55,14 +56,15 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 47
     },
     {
       "category": "mission_challenges",
       "name": "Nekravol - Mission Challenge - Doom Hunt",
       "location_id": 7770360,
       "strategy": "unlockable_record",
-      "mission_key": "e3m2",
+      "mission_key": "e3m2_hell",
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -83,20 +85,26 @@
         "inherited_path": "unlockable/mission_challenge/challenge_base.decl",
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
-      }
+      },
+      "order": 48
     },
     {
       "category": "all_mission_challenges",
       "name": "Nekravol - All Mission Challenges Completed",
       "location_id": 7770361,
       "strategy": "aggregate",
-      "mission_key": "e3m2",
+      "mission_key": "e3m2_hell",
       "signal": {
         "kind": "aggregate",
-        "children": [7770358, 7770359, 7770360],
+        "children": [
+          7770358,
+          7770359,
+          7770360
+        ],
         "required_count": 3,
         "authority": "server_checked_locations"
-      }
+      },
+      "order": 49
     },
     {
       "category": "mission_complete",
@@ -113,7 +121,8 @@
           "from": "game/sp/e3m2_hell/e3m2_hell",
           "to": "game/sp/e3m2_hell_b/e3m2_hell_b"
         }
-      }
+      },
+      "order": 50
     }
   ]
 }

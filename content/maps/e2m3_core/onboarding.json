@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e2m3_core",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e2m3_core.map",
+    "size": 0,
+    "sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff"
+  },
+  "owner": {
+    "resource": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+    "priority": 10
+  }
+}

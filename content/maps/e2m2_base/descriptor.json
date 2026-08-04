@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "key": "e2m2_base",
+  "display_name": "ARC Complex",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e2m2_base.map",
+  "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e2m2_base.map",
+  "generated_output": "e2m2_base.entities",
+  "runtime_map": "game/sp/e2m2_base/e2m2_base",
+  "resource_base": "e2m2_base",
+  "resource_path": "game/sp/e2m2_base/e2m2_base_patch3.resources",
+  "resource_owner": "game/sp/e2m2_base/e2m2_base_patch3.resources",
+  "resource_priority": 12,
+  "relative_entities_path": "game/sp/e2m2_base/e2m2_base.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "ARC Complex",
+        "order": 11
+      }
+    ],
+    "connections": [
+      {
+        "from": "ARC Complex",
+        "to": "Fortress of Doom - Fifth Visit",
+        "rule": "Return to Fortress after ARC Complex",
+        "order": 11
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 6
+}

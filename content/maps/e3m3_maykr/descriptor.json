@@ -3,11 +3,13 @@
   "key": "e3m3_maykr",
   "display_name": "Urdak",
   "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
   "source_file": "e3m3_maykr.map",
   "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
   "source_size": 9512155,
+  "source_owner": "e3m3_maykr.map",
   "generated_output": "e3m3_maykr.entities",
-  "manifest": "manifests/e3m3_maykr.json",
   "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
   "resource_base": "e3m3_maykr",
   "resource_path": "game/sp/e3m3_maykr/e3m3_maykr_patch3.resources",
@@ -17,12 +19,20 @@
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {
     "regions": [
-      "Urdak",
-      "Final Sin"
+      {
+        "name": "Urdak",
+        "order": 20
+      }
     ],
     "connections": [
-      ["Nekravol Part II", "Urdak", "Continue to Urdak"],
-      ["Urdak", "Final Sin", "Continue to Final Sin"]
-    ]
-  }
+      {
+        "from": "Urdak",
+        "to": "Final Sin",
+        "rule": "Continue to Final Sin",
+        "order": 20
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 12
 }

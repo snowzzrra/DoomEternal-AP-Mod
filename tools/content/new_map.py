@@ -35,22 +35,35 @@ def create_package(
         raise FileExistsError(f"map package already exists: {directory}")
     directory.mkdir(parents=True)
     runtime_map = resource_base.removesuffix(".resources")
+    orders = [
+        json.loads(path.read_text(encoding="utf-8")).get("order", -1)
+        for path in (root / "content" / "maps").glob("*/descriptor.json")
+    ]
     _write(directory / "descriptor.json", {
         "schema_version": 1,
         "key": key,
+        "order": max(orders, default=-1) + 1,
         "display_name": name,
         "enabled": False,
+        "test_only": True,
+        "onboarding_status": "onboarding",
         "source_file": source,
+        "source_sha256": "",
+        "source_size": 0,
+        "source_owner": f"vanillamaps/{source}",
         "generated_output": f"{key}.entities",
         "runtime_map": runtime_map,
-        "resource_base": Path(resource_base).stem,
+        "resource_base": Path(resource_base).stem.removesuffix("_patch1"),
+        "resource_path": owner,
         "resource_owner": owner,
+        "resource_priority": 0,
         "relative_entities_path": f"{runtime_map}/{key}.entities",
         "supported_game_revision": "UNSET",
-        "route": [],
+        "route": {"regions": [], "connections": [], "virtual_locations": []},
     })
     _write(directory / "locations.json", {
         "schema_version": 1,
+        "map_key": key,
         "region": name,
         "entities": {},
         "target_policies": {},
@@ -62,7 +75,7 @@ def create_package(
     _write(directory / "onboarding.json", {
         "schema_version": 1,
         "map_key": key,
-        "status": "scaffolded",
+        "status": "onboarding",
         "checks": [],
     })
     return directory

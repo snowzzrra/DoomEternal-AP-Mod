@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "name": "Hell on Earth - Mission Complete",
+      "location_id": 7770122,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e1m1_intro/e1m1_intro"
+      },
+      "mission_key": "e1m1_intro",
+      "category": "mission_complete",
+      "strategy": "map_terminal",
+      "order": 0
+    }
+  ]
+}

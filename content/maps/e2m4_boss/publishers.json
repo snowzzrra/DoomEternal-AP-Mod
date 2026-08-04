@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "sentinel_prime_mission_complete",
+      "map_key": "e2m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "e2m4_endoflevel_transition",
+          "filename": "ap_mission_sentinel_prime_complete.txt",
+          "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770290
+        },
+        {
+          "strategy": "preserved_native_target",
+          "target": "e2m4_endoflevel_transition_native"
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    },
+    {
+      "key": "sentinel_prime_campaign_goal",
+      "map_key": "e2m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "e2m4_endoflevel_transition",
+          "filename": "ap_goal_sentinel_prime_complete.txt",
+          "marker": "AP_GOAL_EVENT_SENTINEL_PRIME_COMPLETE"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e2m4_boss/e2m4_boss",
+          "to_map": "game/hub/hub"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "preserved_native_target",
+          "target": "e2m4_endoflevel_transition_native"
+        }
+      ],
+      "dedupe_scope": "ap_session_goal",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

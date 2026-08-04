@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "name": "Sentinel Prime - Mission Complete",
+      "location_id": 7770290,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+        "owner": "e2m4_endoflevel_transition"
+      },
+      "mission_key": "e2m4_boss",
+      "category": "mission_complete",
+      "strategy": "map_terminal",
+      "order": 7
+    }
+  ]
+}

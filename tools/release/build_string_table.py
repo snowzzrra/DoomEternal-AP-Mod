@@ -61,7 +61,7 @@ def build_string_table(
     compatibility_path = (
         Path(__file__).resolve().parents[2]
         / "data"
-        / "generator_legacy_item_compatibility.json"
+        / "generator_item_compatibility.json"
     )
     if compatibility_path.is_file():
         compatibility = json.loads(

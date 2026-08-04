@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "doom_hunter_base_mission_complete",
+      "map_key": "e1m4_boss",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "checkpoints_target_relay_65",
+          "filename": "ap_event_7770162.txt",
+          "marker": "AP_CHECK_EVENT_7770162"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770162
+        }
+      ],
+      "dedupe_scope": "ap_session_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

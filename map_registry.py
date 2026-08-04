@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_REGISTRY_PATH = ROOT / "data" / "map_sources.json"
+DEFAULT_REGISTRY_PATH = ROOT / "data" / "map_sources.json"  # compiled runtime projection
 ROOT_KEYS = {"schema_version", "baseline_map_keys", "maps"}
 MAP_KEYS = {
     "display_name", "enabled", "test_only", "onboarding_status",
@@ -44,11 +44,8 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
     from content_catalog import load_content_catalog
 
     catalog = load_content_catalog(root)
-    legacy = json.loads((root / "data" / "map_sources.json").read_text(encoding="utf-8"))
-    maps = dict(legacy["maps"])
+    maps = {}
     for key, spec in catalog.maps.items():
-        if key in maps:
-            continue
         raw = dict(spec.data)
         maps[key] = {
             field: raw.get(field)
@@ -75,7 +72,10 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
         })
     return {
         "schema_version": 1,
-        "baseline_map_keys": list(legacy["baseline_map_keys"]),
+        "baseline_map_keys": [
+            key for key, spec in catalog.maps.items()
+            if spec.data.get("onboarding_status") == "frozen_baseline"
+        ],
         "maps": maps,
     }
 

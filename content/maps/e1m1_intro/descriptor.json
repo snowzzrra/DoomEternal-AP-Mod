@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "key": "e1m1_intro",
+  "display_name": "Hell on Earth",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e1m1_intro.map",
+  "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+  "source_size": 0,
+  "source_owner": "vanillamaps/e1m1_intro.map",
+  "generated_output": "e1m1_intro.entities",
+  "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
+  "resource_base": "e1m1_intro",
+  "resource_path": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+  "resource_owner": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
+  "resource_priority": 62,
+  "relative_entities_path": "game/sp/e1m1_intro/e1m1_intro.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Menu",
+        "order": 0
+      },
+      {
+        "name": "Weapon Masteries",
+        "order": 1
+      },
+      {
+        "name": "Hell on Earth",
+        "order": 2
+      }
+    ],
+    "connections": [
+      {
+        "from": "Menu",
+        "to": "Hell on Earth",
+        "rule": "",
+        "order": 0
+      },
+      {
+        "from": "Menu",
+        "to": "Weapon Masteries",
+        "rule": "",
+        "order": 1
+      },
+      {
+        "from": "Hell on Earth",
+        "to": "Fortress of Doom - First Visit",
+        "rule": "Return to Fortress after Hell on Earth",
+        "order": 2
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 0
+}
