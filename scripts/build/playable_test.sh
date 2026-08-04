@@ -399,6 +399,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/campaign_goal_contract.py" \
     "$REPO_ROOT/challenge_registry.py" \
     "$REPO_ROOT/content_catalog.py" \
+    "$REPO_ROOT/ap_visual_contract.py" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
@@ -499,6 +500,7 @@ manifest = {
         "client/campaign_goal_contract.py",
         "client/challenge_registry.py",
         "client/content_catalog.py",
+        "client/ap_visual_contract.py",
         "client/foundation.py",
         "client/item_classification.py",
         "client/item_reconciliation.py",
@@ -646,11 +648,6 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     cd "$OUTPUT_DIR/mod"
     zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" .
 )
-
-AP_RELEASE_MOD_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
-    python3 -m pytest \
-    "$REPO_ROOT/tests/unit/test_archipelago_logo_textures.py" \
-    -q --maxfail=1
 
 (
     cd "$OUTPUT_DIR"

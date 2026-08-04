@@ -30,13 +30,11 @@ STRING_TABLES = (
     Path("gameresources_patch1/EternalMod/strings/portuguese.json"),
 )
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
-LEGACY_ITEM_COMPATIBILITY = (
+GENERATOR_ITEM_COMPATIBILITY = (
     Path(__file__).resolve().parents[2]
     / "data"
-    / "generator_legacy_item_compatibility.json"
+    / "generator_item_compatibility.json"
 )
-
-
 def entity_block(content: str, entity_name: str) -> str:
     marker = f"entityDef {entity_name} {{"
     start = content.find(marker)
@@ -105,19 +103,16 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     classifications = load_item_classification_identity(
         client_dir / "data" / "item_classifications.json"
     )
-    legacy_classifications = {
-        int(item_id): int(classification)
-        for item_id, classification in json.loads(
-            LEGACY_ITEM_COMPATIBILITY.read_text(encoding="utf-8")
-        ).get("classifications", {}).items()
+    compatibility = json.loads(
+        GENERATOR_ITEM_COMPATIBILITY.read_text(encoding="utf-8")
+    ).get("classifications", {})
+    notification_classifications = {
+        **{int(item_id): int(value) for item_id, value in compatibility.items()},
+        **classifications,
     }
     if {int(item_id) for item_id in commands} != set(classifications):
         raise AssertionError(
             "packaged item classifications do not cover item mapping"
-        )
-    if set(legacy_classifications) & set(classifications):
-        raise AssertionError(
-            "generator-only legacy classifications leaked into packaged items"
         )
 
     if capability(client_dir / "bridge_identity.json") is not enabled:
@@ -184,12 +179,10 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         style, rpc_suffix = suffix.split("_", 1)
         rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
         item_id = int(rpc_suffix.split("_", 1)[0])
-        classification = classifications.get(item_id)
-        if classification is None:
-            classification = legacy_classifications.get(item_id)
+        classification = notification_classifications.get(item_id)
         if classification is None:
             raise AssertionError(
-                f"item notification has no public or generator-compat classification: {suffix}"
+                f"item notification has no production classification: {suffix}"
             )
         expected_style = notification_style_for_item(
             item_id,

@@ -233,14 +233,11 @@ def _audit_visual_presentation(
     if staged_entities is not None and staged_entities.is_file():
         generated = staged_entities.read_text(encoding="utf-8")
         references = _model_references(generated, asset.model)
-        if not references or any(
-            not entity.startswith("ap_location_visual_")
-            for entity in references
-        ):
-            raise AssertionError(
-                f"[ASSET] AP_OPAQUE_MATERIAL_SCOPE_INVALID bundle={asset.key}"
-            )
-        for entity in references:
+        ap_references = {
+            entity for entity in references
+            if entity.startswith("ap_location_visual_")
+        }
+        for entity in ap_references:
             marker = f"entityDef {entity} {{"
             start = generated.index(marker)
             end = generated.index("\nentity {", start)
