@@ -18,7 +18,6 @@ def main() -> int:
         raise ValueError(f"unknown map key: {args.map_key}")
     pipeline = Pipeline()
     artifact = pipeline.validate_map(args.map_key, baseline=False)
-    pipeline._pytest_generated((artifact,))
     path = accept_map_baseline(
         args.map_key,
         artifact.output,

@@ -942,7 +942,7 @@ def main(argv: list[str] | None = None) -> int:
             for ap_check, feedback in config_data.get(
                 "location_feedback", {}
             ).items():
-                if feedback.get("policy") != "vanilla_only":
+                if not isinstance(feedback, dict) or feedback.get("policy") != "vanilla_only":
                     continue
                 if ap_check in secret_feedback:
                     manager = secret_feedback[ap_check].get(

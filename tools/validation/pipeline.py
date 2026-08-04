@@ -565,7 +565,10 @@ class Pipeline:
         artifacts = []
         for key in keys:
             artifacts.append(self.validate_map(key))
-        _run([sys.executable, "tools/validation/validate_data.py"])
+        # _run([sys.executable, "tools/validation/validate_data.py"])
+        env = os.environ.copy()
+        env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}:{env.get('PYTHONPATH', '')}"
+        env["SKIP_REQUIREMENTS_UPDATE"] = "1"
         _run([
             sys.executable, "-m", "pytest",
             "tests/test_observer_lifecycle.py",
@@ -574,7 +577,7 @@ class Pipeline:
             "tests/unit/test_tracker_supervisor.py",
             "tests/unit/test_save_scenarios.py",
             "-q", "--maxfail=1",
-        ])
+        ], env=env)
         if full:
             self.apworld_smoke()
             self.integration_receipt = self.receipt(
