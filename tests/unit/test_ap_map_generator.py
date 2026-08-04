@@ -462,7 +462,7 @@ entity {
             )
             self.assertIsNotNone(visual_bounds)
             visual = generated[visual_bounds[0]:visual_bounds[1]]
-            self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual)
+            self.assertIn('model = "art/pickups/codex.lwo";', visual)
             self.assertIn('x = 1.0;', visual)
             self.assertIn('y = 1.0;', visual)
             self.assertIn('z = 1.0;', visual)
@@ -526,7 +526,7 @@ entity {
                 )
                 self.assertIsNotNone(visual_bounds)
                 visual = generated[visual_bounds[0]:visual_bounds[1]]
-                self.assertIn('model = "art/pickups/question_mark_a.lwo";', visual)
+                self.assertIn('model = "art/pickups/codex.lwo";', visual)
                 self.assertIn("x = 1.0;", visual)
                 self.assertIn("y = 1.0;", visual)
                 self.assertIn("z = 1.0;", visual)
@@ -699,7 +699,7 @@ entity {
             )
             self.assertEqual(
                 hashlib.sha256(prior_output).hexdigest(),
-                "7d03e0e3d688e2caad10198a887cd9a004bd28009054338b482669c977347f78",
+                "f6f22fc2a37035511b7b98b4862f6edd5f99690c6e9000bca1124020dcf7bb1c",
             )
 
     def test_rocket_checkpoint_cleanup_contract_fails_closed_on_drift(self):

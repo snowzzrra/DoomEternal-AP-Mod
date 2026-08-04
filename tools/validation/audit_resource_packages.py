@@ -252,7 +252,7 @@ def _audit_visual_presentation(
                     token in block
                     for token in (
                         "fxDecl", "updateFX", "renderLight", "particle",
-                        "bindInfo", "targets =", "renderParms",
+                        "targets =", "renderParms",
                     )
                 )
             ):
@@ -278,7 +278,10 @@ def audit_source_asset_dependencies(
     """Fail fast when a declared copied model or linked payload is absent."""
     _audit_texture_contract(asset_root)
     for asset in tuple(assets):
-        if asset.strategy == "donor_model_override":
+        if (
+            asset.strategy == "donor_model_override"
+            or asset.dependency_policy == "canonical_model_importer_bundle"
+        ):
             if asset.dependency_policy == "model_importer_bundle_pending":
                 resource_payload = (
                     asset_root / asset.resource_base / asset.model
@@ -290,7 +293,8 @@ def audit_source_asset_dependencies(
                     )
                 continue
             _assert_model_importer_bundle(asset_root, asset)
-            continue
+            if asset.strategy == "donor_model_override":
+                continue
         if asset.strategy != "resident_model":
             for member in (asset.model, *asset.dependencies):
                 source = asset_root / asset.resource_base / member
@@ -532,10 +536,18 @@ def audit_resource_packages(
                 })
                 continue
 
-            members = (asset.model, *asset.dependencies)
-            for member in members:
-                source = asset_root / asset.resource_base / member
-                packaged = mod_root / asset.resource_base / member
+            members = [
+                (asset.resource_base, member)
+                for member in (asset.model, *asset.dependencies)
+            ]
+            if asset.dependency_policy == "canonical_model_importer_bundle":
+                members.append((
+                    "streamdb",
+                    str(asset.replacement_slot["streamdb_payload"]),
+                ))
+            for resource_base, member in members:
+                source = asset_root / resource_base / member
+                packaged = mod_root / resource_base / member
                 if not source.is_file():
                     raise AssertionError(
                         f"[ASSET] DEPENDENCY_MISSING bundle={asset.key} dependency={member} source={source}"
@@ -550,8 +562,8 @@ def audit_resource_packages(
                         f"{asset.map_key}: packaged asset hash mismatch: {member}"
                     )
                 if zip_names is not None and not any(
-                    name.endswith(f"/{asset.resource_base}/{member}")
-                    or name == f"{asset.resource_base}/{member}"
+                    name.endswith(f"/{resource_base}/{member}")
+                    or name == f"{resource_base}/{member}"
                     for name in zip_names
                 ):
                     raise AssertionError(

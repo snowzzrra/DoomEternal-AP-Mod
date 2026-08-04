@@ -27,9 +27,13 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Final Sin AP-only visual material removes Codex pickup shader VFX while preserving generated entities"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Canonical Codex-derived AP visual bundle applied globally"
     }
   ],
-  "asset_package_contract_sha256": "85eeaddeca418d108a402c63480c5d73a7d4bff6d4860880767054fbf64081db",
+  "asset_package_contract_sha256": "26a2c9a87c5428771c8a71ed2613fc15314e55bece57bd1d369bf03e7fb2df9d",
   "byte_sha256": "d7c6689e1bc2f89929ab2406c21ac4c663cf6df18c5a05111e54bccb2489f8ee",
   "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
@@ -56,6 +60,6 @@
     7770414
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "80f7ceb630a7c544c491c1df2f132a8bba88d80f0e5b779453dd83590cdac241",
+  "scripted_contract_sha256": "e20dc9ad9aef0693b5ab4f6160991e76cd1f0ecc025961eabc15f70e37978f4a",
   "semantic_sha256": "58dbc0add9bb1a647df5f77d72a44bd28d6ac6ee764df53e3e512ef66f1b6053"
 }

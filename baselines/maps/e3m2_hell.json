@@ -3,14 +3,18 @@
     {
       "content_revision": "v0.3.6-alpha.1",
       "reason": "Nekravol Part I added as v0.3.6 AP content"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Canonical Codex-derived AP visual bundle applied globally"
     }
   ],
-  "asset_package_contract_sha256": "660ea405519b92edc15588f89ccd46e66712bc59ebcb68ef84d07b4f70de32b1",
-  "byte_sha256": "cf875b00a2e528fbe7e7f97daeffeb87361a2d338ca93762d5100b6280ae41dc",
-  "content_revision": "v0.3.6-alpha.1",
+  "asset_package_contract_sha256": "72471cdcc64d478556872821583a709e172c3989989de7ef3eda56d79f045caa",
+  "byte_sha256": "3c0f728e1e70e2b56d76775fbb55e8063fc0f6c6e25913f584b6abb36714fba1",
+  "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 175,
-    "byte_size": 7008680,
+    "byte_size": 7008520,
     "classes": 7628,
     "entity_count": 7628,
     "layers": 448,
@@ -49,6 +53,6 @@
     7770362
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "e09548d409a058e4190cc8b3ac78d6246c5f188cf51034151a4b8d2232e0b7e9",
-  "semantic_sha256": "b63770fdf8adf069c02aec472e9d73771c2826dc170c6389141f856a299e43ff"
+  "scripted_contract_sha256": "70f5931c15d0f9190e30970e8ee3913911cfc7c7685d56770b9cb769ed614bf6",
+  "semantic_sha256": "1bf72e95f2d8ce365f37b38b058fdf58882f5e69d68509b5bca898bb7c81e29a"
 }

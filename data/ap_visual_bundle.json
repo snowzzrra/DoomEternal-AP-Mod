@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "key": "archipelago_world_visual",
+  "strategy": "packaged_bundle",
+  "model": "art/pickups/codex.lwo",
+  "dependencies": [
+    "art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "generated/decls/material2/art/pickups/codex.decl"
+  ],
+  "dependency_policy": "canonical_model_importer_bundle",
+  "source_resource_base": "e2m4_boss",
+  "replacement_slot_policy": "safe_resident_static_lwo",
+  "replacement_slot": {
+    "model_path": "art/pickups/codex.lwo",
+    "material2": "art/pickups/codex",
+    "import_bundle": "codex_id#13626551837332538432",
+    "asset_id": "13626551837332538432",
+    "streamdb_payload": "art/pickups/codex_id#13626551837332538432.lwo",
+    "resource_payload_sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
+    "streamdb_payload_sha256": "ef49160da53774ff7c952ba5f6d939e292f16d16f084558c899821d567459630",
+    "albedo_payload_sha256": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
+    "provenance": {
+      "producer": "Doom Eternal Model Importer v1.2",
+      "source_obj": "assets/source/archipelago_logo/ArchipelagoLogo_prepared.obj",
+      "source_obj_sha256": "ab6a1f3d8fb833070889c80ef800a8ea9f55a1aa9dc905fb4599df32e5f9c659",
+      "source_resource": "game/sp/e3m4_boss/e3m4_boss.resources.backup",
+      "vanilla_lwo_sha256": "206df1fb8e0c8b93fdded962647630f9db2e953bd49da3dc63ed03c256301b79"
+    }
+  },
+  "usage_policy": "ap_entities_only",
+  "preserve": [
+    "trigger",
+    "collision",
+    "transform",
+    "layers",
+    "interaction",
+    "bind_parent",
+    "entity_motion"
+  ],
+  "visual_presentation_policy": {
+    "scope": "ap_generated_entities_only",
+    "preserve_motion": true,
+    "preserve_bobbing": true,
+    "preserve_rotation": true,
+    "think_component": "bob_rotate_fast",
+    "material_mode": "resource_scoped_opaque_override",
+    "material_decl": "generated/decls/material2/art/pickups/codex.decl",
+    "material_sha256": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
+    "opaque_template": "template/pbr",
+    "strip": [
+      "pickup_shader",
+      "animated_emissive_mask",
+      "bloom",
+      "sheen",
+      "cover_alpha_test"
+    ],
+    "preserve_maps": {
+      "albedo": "art/pickups/codex.tga",
+      "normal": "art/pickups/codex_n.tga",
+      "specular": "textures/system/specular/flatspec_35.tga",
+      "smoothness": "textures/system/constant_color/grey_dk.tga",
+      "heightmap": "textures/system/constant_color/grey_md.tga"
+    }
+  },
+  "runtime_references": [
+    "e2m4_boss",
+    "e3m4_boss"
+  ],
+  "forbidden_geometry": "art/pickups/question_mark_a.lwo",
+  "forbidden_streamdb_payload": "art/pickups/question_mark_a_id#3385987379760210816.lwo"
+}

@@ -25,30 +25,211 @@
   },
   "slots": [
     {
-      "map_key": "e3m3_maykr",
-      "model": "art/pickups/question_mark_a.lwo",
-      "material2": "generated/decls/material2/art/pickups/question.decl",
-      "material2_sha256": "486463d18ba3a3f385941cfc1bea1941a7cf63b6c58e9f4178fc0a97e684b5c6",
+      "map_key": "e1m1_intro",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
       "inherit": "template/pbr_pickup",
       "render_layers": 1,
-      "albedo_path": "art/pickups/question.tga",
-      "true_filename": "art/pickups/question.tga$streamed$mtlkind=albedo",
-      "resource_archive": "e3m3_maykr.resources",
-      "resource_base": "e3m3_maykr",
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e1m1_intro.resources",
+      "resource_base": "e1m1_intro",
       "packaged": true,
       "higher_patch_copies": [],
       "resource_priority_indices": {
-        "e3m3_maykr_patch3.resources": 24,
-        "e3m3_maykr_patch1.resources": 155,
-        "e3m3_maykr_patch2.resources": 173,
-        "e3m3_maykr.resources": 243
+        "e1m1_intro_patch3.resources": 62,
+        "e1m1_intro.resources": 62
       },
       "preserved": {
-        "normal": "art/pickups/question_n.tga",
-        "specular": "art/pickups/question_s.tga",
-        "smoothness": "art/pickups/question_g.tga",
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
         "heightmap": "textures/system/constant_color/grey_md.tga",
-        "emissive": "art/pickups/question_e.tga"
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e1m2_war",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e1m2_battle.resources",
+      "resource_base": "e1m2_battle",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m2_battle_patch3.resources": 20,
+        "e1m2_battle.resources": 20
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "hub",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "hub.resources",
+      "resource_base": "hub",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "hub_patch2.resources": 70,
+        "hub.resources": 70
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e1m3_cult",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e1m3_cult.resources",
+      "resource_base": "e1m3_cult",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m3_cult_patch3.resources": 42,
+        "e1m3_cult.resources": 42
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e1m4_boss",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e1m4_boss.resources",
+      "resource_base": "e1m4_boss",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m4_boss_patch2.resources": 74,
+        "e1m4_boss.resources": 74
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e2m1_nest",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e2m1_nest.resources",
+      "resource_base": "e2m1_nest",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e2m1_nest_patch2.resources": 30,
+        "e2m1_nest.resources": 30
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e2m2_base",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e2m2_base.resources",
+      "resource_base": "e2m2_base",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e2m2_base_patch3.resources": 12,
+        "e2m2_base.resources": 12
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e2m3_core",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e2m3_core.resources",
+      "resource_base": "e2m3_core",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e2m3_core_patch2.resources": 10,
+        "e2m3_core.resources": 10
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
       }
     },
     {
@@ -68,6 +249,112 @@
         "e2m4_boss_patch2.resources": 60,
         "e2m4_boss_patch1.resources": 183,
         "e2m4_boss.resources": 185
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e3m1_slayer",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m1_slayer.resources",
+      "resource_base": "e3m1_slayer",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m1_slayer_patch2.resources": 34,
+        "e3m1_slayer.resources": 34
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e3m2_hell",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m2_hell.resources",
+      "resource_base": "e3m2_hell",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m2_hell_patch2.resources": 6,
+        "e3m2_hell.resources": 6
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e3m2_hell_b",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m2_hell_b.resources",
+      "resource_base": "e3m2_hell_b",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m2_hell_b_patch2.resources": 72,
+        "e3m2_hell_b.resources": 72
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e3m3_maykr",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e3m3_maykr.resources",
+      "resource_base": "e3m3_maykr",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e3m3_maykr_patch3.resources": 24,
+        "e3m3_maykr_patch1.resources": 155,
+        "e3m3_maykr_patch2.resources": 173,
+        "e3m3_maykr.resources": 243
       },
       "preserved": {
         "normal": "art/pickups/codex_n.tga",

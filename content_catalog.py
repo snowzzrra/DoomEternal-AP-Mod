@@ -14,6 +14,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from ap_visual_contract import load_ap_visual_contract
 from publisher_contracts import (
     EFFECT_STRATEGIES,
     TRIGGER_STRATEGIES,
@@ -271,6 +272,7 @@ def _normalized_route(
 
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
     map_source_data = _json(root / "data" / "map_sources.json")
+    canonical_visual = load_ap_visual_contract(root)
     packages = _map_content_packages(root)
     package_by_key = {
         package["descriptor"]["key"]: package
@@ -375,6 +377,30 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 preserve=tuple(raw_asset.get("preserve", [])),
                 visual_presentation_policy=_freeze(
                     raw_asset.get("visual_presentation_policy", {})
+                ),
+            ))
+        if spec.enabled:
+            slot = {
+                **canonical_visual["replacement_slot"],
+                "resource_archive": spec.resource_base,
+            }
+            assets.append(AssetSpec(
+                key=canonical_visual["key"],
+                map_key=key,
+                strategy=canonical_visual["strategy"],
+                model=canonical_visual["model"],
+                resource_base=spec.resource_base,
+                resource_owner=spec.resource_owner,
+                dependencies=tuple(canonical_visual["dependencies"]),
+                dependency_policy=canonical_visual["dependency_policy"],
+                replacement_slot_policy=canonical_visual[
+                    "replacement_slot_policy"
+                ],
+                replacement_slot=_freeze(slot),
+                usage_policy=canonical_visual["usage_policy"],
+                preserve=tuple(canonical_visual["preserve"]),
+                visual_presentation_policy=_freeze(
+                    canonical_visual["visual_presentation_policy"]
                 ),
             ))
         for encounter in config.get("secret_encounters", []):

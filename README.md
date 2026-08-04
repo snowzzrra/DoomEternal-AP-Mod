@@ -175,6 +175,9 @@ configuration, seeds, logs, and local paths.
   converted physical rewards use server-checked
   `physical_event_equivalent` predicates. Weapon Masteries use native save
   state.
+- Some Mission Challenges are completed by equivalent Archipelago checks when
+  randomization replaces the vanilla collectible or upgrade action that
+  normally advances them.
 - The generic All Mission Challenges override removes the vanilla aggregate
   Sentinel Battery reward for every cataloged mission while preserving the
   challenge HUD, native completion predicate, save state, and AP checks.
@@ -200,9 +203,6 @@ in this release.
 
 - Reloading the current checkpoint remains the recommended first recovery step
   for rare vanilla scripting desynchronization.
-- Rune slots and equipped-state visuals may occasionally appear inconsistent,
-  even when Rune effects are active. Reload the current checkpoint before
-  configuring Runes.
 - Sentinel Battery HUD or Dossier counts may temporarily disagree with actual
   progression. Fortress socket requirements are authoritative.
 - The in-game notification shows the received item name, but not the complete

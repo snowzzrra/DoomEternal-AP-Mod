@@ -348,6 +348,9 @@ python3 "$REPO_ROOT/tools/maps/automap_native_decl_builder.py" \
 python3 "$REPO_ROOT/tools/decls/rune_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/rune-menu-override.json"
+python3 "$REPO_ROOT/tools/decls/rune_slot_builder.py" \
+    --mod-root "$OUTPUT_DIR/mod" \
+    --audit-output "$TEMP_DIR/rune-slot-override.json"
 python3 "$REPO_ROOT/tools/decls/mastery_decl_builder.py" \
     --mod-root "$OUTPUT_DIR/mod" \
     --audit-output "$TEMP_DIR/base-mastery-overrides.json"

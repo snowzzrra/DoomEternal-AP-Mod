@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 
+from ap_visual_contract import load_ap_visual_contract
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from foundation import (
     ITEM_NOTIFICATION_PREFIX,
@@ -37,6 +38,18 @@ GENERATED_NAME_PREFIXES = (
 SECRET_ENCOUNTER_ARG_LABEL = ""
 FORBIDDEN_WEAPON_MASTERY_CURRENCY = "CURRENCY_WEAPON_MASTERY"
 AP_QUESTION_MARK_MODEL = "art/pickups/question_mark_a.lwo"
+
+
+def canonical_ap_visual_for_map(map_key):
+    """Resolve the global AP visual only for registry-enabled campaign maps."""
+    if not map_key:
+        return None
+    from content_catalog import load_content_catalog
+
+    catalog = load_content_catalog()
+    if map_key not in {spec.key for spec in catalog.enabled_maps()}:
+        return None
+    return load_ap_visual_contract()
 
 def compute_file_sha256(path):
     digest = hashlib.sha256()
@@ -211,6 +224,83 @@ def find_entity_block_bounds(content, entity_name):
     open_brace_index = content.find("{", block_start)
     block_end = find_matching_brace(content, open_brace_index)
     return block_start, block_end
+
+
+def remove_inline_currency_transaction(content, contract):
+    """Remove one exact inline GiveItems currency mutation, fail closed."""
+    required = {
+        "entity", "class", "property", "currency", "count",
+        "original_targets", "preserved_requirement",
+    }
+    if not isinstance(contract, dict) or set(contract) != required:
+        raise ValueError("Inline currency removal contract schema drift")
+    bounds = find_entity_block_bounds(content, contract["entity"])
+    if bounds is None:
+        raise ValueError(
+            f"Inline currency owner not found: {contract['entity']}"
+        )
+    start, end = bounds
+    block = content[start:end]
+    class_line = f'class = "{contract["class"]}";'
+    if block.count(class_line) != 1:
+        raise ValueError("Inline currency owner class drift")
+    targets = extract_target_names(block)
+    if targets != contract["original_targets"]:
+        raise ValueError(
+            f"Inline currency owner target drift: {targets}"
+        )
+
+    pattern = re.compile(
+        rf'\n\s*{re.escape(contract["property"])}\s*=\s*\{{'
+    )
+    matches = list(pattern.finditer(block))
+    if len(matches) != 1:
+        raise ValueError("Inline currency transaction must occur exactly once")
+    match = matches[0]
+    open_brace = block.find("{", match.start())
+    close_exclusive = find_matching_brace(block, open_brace)
+    transaction = block[match.start():close_exclusive]
+    expected_currency = (
+        f'currencyType = "{contract["currency"]}";'
+    )
+    expected_count = f'count = {contract["count"]};'
+    if (
+        transaction.count("num = 1;") != 1
+        or transaction.count("item[0] = {") != 1
+        or transaction.count(expected_currency) != 1
+        or transaction.count(expected_count) != 1
+    ):
+        raise ValueError("Inline currency transaction payload drift")
+    updated = block[:match.start()] + block[close_exclusive:]
+    if contract["property"] in updated or contract["currency"] in updated:
+        raise ValueError("Inline currency transaction was not fully removed")
+    if extract_target_names(updated) != contract["original_targets"]:
+        raise ValueError("Inline currency removal changed target ordering")
+    if updated.count(class_line) != 1:
+        raise ValueError("Inline currency removal changed owner class")
+    return content[:start] + updated + content[end:]
+
+
+def assert_canonical_ap_visuals(content, map_key, contract):
+    """Fail closed if any generated visual escapes the canonical UV bundle."""
+    names = re.findall(r"entityDef (ap_location_visual_\d+) \{", content)
+    if not names:
+        raise ValueError(f"Enabled map has no generated AP visuals: {map_key}")
+    for name in names:
+        bounds = find_entity_block_bounds(content, name)
+        if bounds is None:
+            raise ValueError(f"Canonical AP visual entity missing: {name}")
+        block = content[bounds[0]:bounds[1]]
+        models = re.findall(r'\bmodel\s*=\s*"([^"]+)";', block)
+        if models != [contract["model"]]:
+            raise ValueError(
+                f"AP visual {name} is not canonical: {models}"
+            )
+        if (
+            contract["forbidden_geometry"] in block
+            or contract["forbidden_streamdb_payload"] in block
+        ):
+            raise ValueError(f"AP visual {name} uses question-mark UV payload")
 
 
 def neutralize_conditional_pickup(content, entity_name):
@@ -1487,12 +1577,17 @@ def generate_map(
         **item_classifications,
     }
 
+    map_key = level_config.get("map_key")
+    canonical_visual = canonical_ap_visual_for_map(map_key)
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
     asset_specs = {
         asset["key"]: asset for asset in level_config.get("assets", [])
     }
     default_visual_asset = level_config.get("default_visual_asset")
+    if canonical_visual:
+        asset_specs[canonical_visual["key"]] = canonical_visual
+        default_visual_asset = canonical_visual["key"]
     if default_visual_asset and default_visual_asset not in asset_specs:
         raise ValueError(f"Unknown default_visual_asset: {default_visual_asset}")
     default_visual_model = (
@@ -1515,10 +1610,11 @@ def generate_map(
         declared_checks,
     )
     manifest_data = {}
-    map_key = level_config.get("map_key")
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
+    for contract in level_config.get("inline_currency_removals", []):
+        content = remove_inline_currency_transaction(content, contract)
     validate_target_policies(config_entities, target_policies, content)
     for entity_name, policy in target_policies.items():
         gate_relay = policy.get("gate_relay")
@@ -1847,6 +1943,8 @@ def generate_map(
         + generate_system_command_entities()
     )
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
+    if canonical_visual:
+        assert_canonical_ap_visuals(final_content, map_key, canonical_visual)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:

@@ -19,14 +19,18 @@
     {
       "content_revision": "v0.3.5-alpha.3",
       "reason": "Taras Nabad Mastery Tokens converted from vanilla rewards to AP pickups"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Canonical Codex-derived AP visual bundle applied globally"
     }
   ],
-  "asset_package_contract_sha256": "c58470ef0344f12fe6c0c25ad6d7236a13e5df10d26d65bdb50449a6163f6497",
-  "byte_sha256": "40e8df9afae49f214ccd3417f988f80fe4146609356caa596656a72f11d2a7cf",
-  "content_revision": "v0.3.5-alpha.3",
+  "asset_package_contract_sha256": "1f1478e688520d20aa566cb3cf90b28faa19c3504d9f583caf4e89e41bd2940c",
+  "byte_sha256": "8bbdceb4369d63425a076b29652bb4510500421d72a7a6e6fd1208cbf7faa27e",
+  "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11980606,
+    "byte_size": 11980326,
     "classes": 12163,
     "entity_count": 12165,
     "layers": 1662,
@@ -68,7 +72,7 @@
     7770338,
     7770339
   ],
-  "publisher_contract_sha256": "318b56d762ccf7d015bc43f7da08c09c13344c049e55d0d6bd5483e75b8d1c0f",
+  "publisher_contract_sha256": "a50412649f266096bd4baa51b1112ff1284f39a4044d2f0973c97933aec1792d",
   "runtime_location_ids": [
     7770333,
     7770334,
@@ -77,6 +81,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "d49c77f62f6707294223b8c68daf1e557ea13f221201f8dc2115f7b6ac152b91",
-  "semantic_sha256": "2db41b333dd39546986b10eb4a703444b94578f5509ebcbcdefd5c20d5ed6774"
+  "scripted_contract_sha256": "5557d0e7416c5d3a1e67f456edae8a19446b5e1a145166d97f0b37dc68bf6f87",
+  "semantic_sha256": "d81720cc64074b3dbfbc3e7c29b78372fff11ee3ba602b725d52c7f13856a020"
 }

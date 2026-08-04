@@ -27,17 +27,13 @@ EXPECTED_ASSET_HASHES = {
     "packaging/mod_assets/e3m4_boss/art/pickups/codex.lwo": (
         "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1"
     ),
+    "packaging/mod_assets/e3m3_maykr/art/pickups/codex.lwo": (
+        "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1"
+    ),
     (
         "packaging/mod_assets/streamdb/art/pickups/"
         "codex_id#13626551837332538432.lwo"
     ): "ef49160da53774ff7c952ba5f6d939e292f16d16f084558c899821d567459630",
-    "packaging/mod_assets/e3m3_maykr/art/pickups/question_mark_a.lwo": (
-        "9bc94a7d92fa10d31298883700dc0131db6149c6f8acfc3873671a9e3c9e94d2"
-    ),
-    (
-        "packaging/mod_assets/streamdb/art/pickups/"
-        "question_mark_a_id#3385987379760210816.lwo"
-    ): "e41e0a3310996ee1c7c062ad4385176a151500ca688f71d1f3d3527fad796e81",
 }
 VANILLA_MAP_HASHES = {
     "e3m3_maykr": (
@@ -78,14 +74,14 @@ def test_visual_binary_and_autoheckin_payload_hashes_are_unchanged() -> None:
     )
 
 
-def test_all_three_maps_declare_one_opaque_ap_only_material_policy() -> None:
+def test_all_enabled_maps_declare_one_opaque_ap_only_material_policy() -> None:
     catalog = load_content_catalog()
     policies = {
         asset.map_key: asset
         for asset in catalog.assets
         if asset.visual_presentation_policy
     }
-    assert set(policies) == {"e2m4_boss", "e3m3_maykr", "e3m4_boss"}
+    assert set(policies) == {spec.key for spec in catalog.enabled_maps()}
     for asset in policies.values():
         policy = asset.visual_presentation_policy
         assert policy["scope"] == "ap_generated_entities_only"
@@ -121,19 +117,13 @@ def test_opaque_materials_preserve_maps_and_strip_pickup_shader_contract() -> No
 
 
 def test_vanilla_material_contracts_are_not_packaged_outside_ap_resources() -> None:
+    catalog = load_content_catalog()
     expected = {
         (
-            "e3m3_maykr",
-            "generated/decls/material2/art/pickups/question.decl",
-        ),
-        (
-            "e2m4_boss",
+            spec.resource_base,
             "generated/decls/material2/art/pickups/codex.decl",
-        ),
-        (
-            "e3m4_boss",
-            "generated/decls/material2/art/pickups/codex.decl",
-        ),
+        )
+        for spec in catalog.enabled_maps()
     }
     actual = {
         (path.relative_to(MOD_ASSETS).parts[0], path.relative_to(MOD_ASSETS / path.relative_to(MOD_ASSETS).parts[0]).as_posix())
@@ -145,16 +135,9 @@ def test_vanilla_material_contracts_are_not_packaged_outside_ap_resources() -> N
         slot["map_key"]: slot["material2_sha256"]
         for slot in TEXTURE_CONTRACT["slots"]
     }
-    assert vanilla_hashes == {
-        "e3m3_maykr": (
-            "486463d18ba3a3f385941cfc1bea1941a7cf63b6c58e9f4178fc0a97e684b5c6"
-        ),
-        "e2m4_boss": (
-            "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562"
-        ),
-        "e3m4_boss": (
-            "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562"
-        ),
+    assert set(vanilla_hashes) == {spec.key for spec in catalog.enabled_maps()}
+    assert set(vanilla_hashes.values()) == {
+        "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562"
     }
 
 

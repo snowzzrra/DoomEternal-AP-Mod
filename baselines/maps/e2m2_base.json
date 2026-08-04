@@ -7,14 +7,18 @@
     {
       "content_revision": "v0.3.4-alpha.1",
       "reason": "Pipeline aligned with notification-enabled packaged output"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Canonical Codex-derived AP visual bundle applied globally"
     }
   ],
-  "asset_package_contract_sha256": "4d2293a482400005ab7d0b0af1ff61d7a1bce60b1a2c7ae91f0498629cf20e59",
-  "byte_sha256": "4025fdb0ded94076b0f5a5a7a7c13e3bbc5046d8dfa8fc1e449f3ebbb10ed027",
-  "content_revision": "v0.3.4-alpha.1",
+  "asset_package_contract_sha256": "229e53dac6f890364c30fc312a58965140c19453e8b7f6108a25a15bbcc50fef",
+  "byte_sha256": "6ac3bcbb66150acc2e507f327645ce80d1938591d36765d26e6b3650bef3b34a",
+  "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 126,
-    "byte_size": 28809474,
+    "byte_size": 28809194,
     "classes": 19131,
     "entity_count": 19135,
     "layers": 3691,
@@ -63,6 +67,6 @@
   "publisher_contract_sha256": "e4ad5ba9a17917e66aaf094c317043a584ab26ee663cc4301702dda89ed80cd9",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "040c342e4226f996b98b3d3b6b6569e6b5772b96924fa25c7358fa0d1f41e1ae",
-  "semantic_sha256": "990d17e10f6167a40ab406f16b0ae0d74603ae48050c52a9cdf65b4397dde5c3"
+  "scripted_contract_sha256": "56dc310c7b71697d117bc9966052ef060c85bb25b4e5cfc3fd67b90b89a8f678",
+  "semantic_sha256": "bc7dccde3999adf2b7362c8df966c073334208a2f9e869cf10a71eeb93ce9df3"
 }

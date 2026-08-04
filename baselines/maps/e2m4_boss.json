@@ -23,11 +23,15 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Sentinel AP-only visual material removes Codex pickup shader VFX while preserving generated entities"
+    },
+    {
+      "content_revision": "v0.3.8-alpha.2",
+      "reason": "Canonical Codex-derived AP visual bundle applied globally"
     }
   ],
-  "asset_package_contract_sha256": "901e7468fe165a01d4a29cb462e5dff16a90f7c9ba4aff7d40954a0814fd5768",
+  "asset_package_contract_sha256": "9714ff2b2f3e58ab607143728e21b6ab80fc6134e7b535ac3d97ae5ea923e4be",
   "byte_sha256": "b5fd36629b488c776cd6a71148b7a4bb5261d0359dc306dcf137c1df421ef08a",
-  "content_revision": "v0.3.4-alpha.1",
+  "content_revision": "v0.3.8-alpha.2",
   "generated_entity_metrics": {
     "bind_parents": 11,
     "byte_size": 2725680,
@@ -54,11 +58,11 @@
     7770301,
     7770302
   ],
-  "publisher_contract_sha256": "5be7f6f6d0bb8c70a725ca6d6cb3ff3ca837b69cd08edef85bce444aac69bd84",
+  "publisher_contract_sha256": "086777a1394aa13d4782726594626e06dc0882bf48c3d33d7a2c40a127ba3e7c",
   "runtime_location_ids": [
     7770290
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "1a8df6c63858fe76d1c24201e77ed4881f7040e7753802a80172d63a9ce78b5a",
+  "scripted_contract_sha256": "69a5dbcb266564968aadcd841058f55a297d7c5d94144fe5557d8650a4459742",
   "semantic_sha256": "66b07cc9cb10a71ac8c13cd11099c14e972d05d59ad3f03744ad7325eb947d89"
 }
