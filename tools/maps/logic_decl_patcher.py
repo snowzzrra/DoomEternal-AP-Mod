@@ -70,6 +70,21 @@ def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
     result = edge_pattern.sub(
         rf'\g<1>{patch["preserved_destination"]}\g<2>', text, count=1
     )
+    battery_patch = patch.get("battery_reset_patch")
+    if battery_patch:
+        bat_pattern = re.compile(
+            rf'(id\s*=\s*{battery_patch["edge_id"]};\s*'
+            rf'fromNodeId\s*=\s*{battery_patch["from_node"]};\s*'
+            rf'fromPinId\s*=\s*{battery_patch["from_pin"]};\s*'
+            rf'toNodeId\s*=\s*){battery_patch["old_destination"]}(;\s*toPinId\s*=\s*0;)',
+            re.MULTILINE,
+        )
+        bat_matches = list(bat_pattern.finditer(result))
+        if len(bat_matches) != 1:
+            raise ValueError(f"expected one battery reset edge, found {len(bat_matches)}")
+        result = bat_pattern.sub(
+            rf'\g<1>{battery_patch["preserved_destination"]}\g<2>', result, count=1
+        )
     if result.count(inventory_signature) != 1 or result.count(patch["inventory_decl"]) != 1:
         raise ValueError("patch changed the Ice inventory-check identity")
     if architecture and count_link(
@@ -90,8 +105,9 @@ def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
         for index, (before, after) in enumerate(zip(before_lines, after_lines))
         if before != after
     ]
-    if len(before_lines) != len(after_lines) or len(changed) != 1:
-        raise ValueError(f"logic patch is not a one-line edge rewrite: {changed}")
+    expected_changes = 2 if battery_patch else 1
+    if len(before_lines) != len(after_lines) or len(changed) != expected_changes:
+        raise ValueError(f"logic patch diff size mismatch: expected {expected_changes}, got {len(changed)}: {changed}")
     if str(patch["old_destination"]) not in changed[0]["before"] or str(patch["preserved_destination"]) not in changed[0]["after"]:
         raise ValueError("unexpected structural logic patch diff")
 
