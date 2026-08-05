@@ -80,7 +80,7 @@
         "source_path": "vanilla_decls/generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl",
         "decl_path": "generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl",
         "source_sha256": "f099cd81d004ca7eece7e0ac129e38eda551fd5db439ccff2f9e8b36e59950ca",
-        "override_sha256": "6444f3ef197a6cdad3e79638fec763248250309d4b1265656aa9f3c2902ddf07",
+        "override_sha256": "dbf21dc28285365d25ebdff198b56078b62511442d23f494b6d957bcc7e3c3a3",
         "logic_owner": "info_logic_hub_from_e1m2",
         "observed_event": "target_relay_pickup_ice_bomb",
         "inventory_check_node": 1252079672,
@@ -89,6 +89,13 @@
         "bypassed_pin": 4,
         "old_destination": 2191342619,
         "preserved_destination": 1344507903,
+        "battery_reset_patch": {
+          "edge_id": 4118218629,
+          "from_node": 2081435385,
+          "from_pin": 3,
+          "old_destination": 459463166,
+          "preserved_destination": 2769383771
+        },
         "condition_removed": "owned Ice early-exit branch",
         "branch_preserved": "unowned Ice full vanilla transaction",
         "preserved_references": [

@@ -88,7 +88,8 @@
     }
   },
   "neutralize_pickups": [
-    "pickups_pickup_weapon_plasma_rifle_1"
+    "pickups_pickup_weapon_plasma_rifle_1",
+    "pickups_pickup_weapon_heavy_cannon_1"
   ],
   "target_removals": {
     "game_player_start_6": [
