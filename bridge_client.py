@@ -1755,6 +1755,22 @@ def quarantine_event_file(path, old_state_key=None, new_state_key=None, reason="
 
 
 ACTIVE_MAP_MARKER_PREFIX = "ap_active_map"
+KNOWN_CATALOG_MAPS = {
+    "e1m1_intro": "game/sp/e1m1_intro/e1m1_intro",
+    "e1m2_war": "game/sp/e1m2_war/e1m2_war",
+    "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult",
+    "e1m4_boss": "game/sp/e1m4_boss/e1m4_boss",
+    "e2m1_nest": "game/sp/e2m1_nest/e2m1_nest",
+    "e2m2_base": "game/sp/e2m2_base/e2m2_base",
+    "e2m3_core": "game/sp/e2m3_core/e2m3_core",
+    "e2m4_boss": "game/sp/e2m4_boss/e2m4_boss",
+    "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
+    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
+    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
+    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
+    "e3m4_boss": "game/sp/e3m4_boss/e3m4_boss",
+    "hub": "game/hub/hub",
+}
 
 
 def discover_active_map_markers():
@@ -1780,17 +1796,35 @@ def parse_active_map_marker(path, mtime_ns):
     except OSError:
         return None
 
-    match = re.search(
-        r"AP_ACTIVE_MAP_V1\s+map_key=(\S+)\s+runtime_map=(\S+)\s+marker=(\S+)",
-        content,
+    matches = list(
+        re.finditer(
+            r"AP_ACTIVE_MAP_V1\s+map_key=(\S+)\s+runtime_map=(\S+)\s+marker=(\S+)",
+            content,
+        )
     )
-    if not match:
+    if not matches:
+        return None
+
+    last_match = matches[-1]
+    map_key = last_match.group(1)
+    runtime_map = canonical_map_name(last_match.group(2))
+    marker = last_match.group(3)
+
+    if map_key not in KNOWN_CATALOG_MAPS:
+        return None
+
+    expected_runtime = KNOWN_CATALOG_MAPS[map_key]
+    if runtime_map != expected_runtime:
+        return None
+
+    expected_marker = f"AP_MAP_START_{map_key.upper()}"
+    if marker != expected_marker:
         return None
 
     return {
-        "map_key": match.group(1),
-        "runtime_map": canonical_map_name(match.group(2)),
-        "marker": match.group(3),
+        "map_key": map_key,
+        "runtime_map": runtime_map,
+        "marker": marker,
         "mtime_ns": mtime_ns,
         "path": path,
     }
@@ -2450,12 +2484,22 @@ class DoomEternalContext(CommonContext):
             candidate_slot or "<none>",
         )
 
-    def read_active_map_identity(self):
+    def read_active_map_identity(self, evidence=None):
         lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None and not lease.process_probe():
             if getattr(self, "last_marker_reject_reason", None) != "game_not_running":
                 logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=game_not_running")
                 self.last_marker_reject_reason = "game_not_running"
+            return None
+
+        if evidence is None or getattr(evidence, "state", None) != "gameplay":
+            reason = "menu" if (evidence and getattr(evidence, "state", None) == "menu") else "gameplay_not_loaded"
+            if getattr(self, "last_marker_reject_reason", None) != reason:
+                logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
+                self.last_marker_reject_reason = reason
+            self.mission_select_observation_map = None
+            self.mission_select_observation_epoch = None
+            self.current_map_name = None
             return None
 
         markers = discover_active_map_markers()
@@ -2543,8 +2587,21 @@ class DoomEternalContext(CommonContext):
                 )
 
         evidence = read_gameplay_save_evidence()
-        marker = self.read_active_map_identity()
+        marker = self.read_active_map_identity(evidence=evidence)
         marker_map = marker["runtime_map"] if marker else None
+
+        evidence_slot = evidence.slot_directory if (evidence and getattr(evidence, "slot_directory", None)) else None
+        evidence_state = evidence.state if (evidence and getattr(evidence, "state", None)) else None
+        evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
+
+        lease = getattr(self, "runtime_observation_lease", None)
+        lease_epoch = lease.gameplay_loaded_ns if (lease and getattr(lease, "gameplay_loaded_ns", None)) else None
+
+        proof_epoch = (
+            evidence_epoch
+            if evidence_epoch is not None
+            else (lease_epoch if lease_epoch is not None else (marker["mtime_ns"] if marker else 0))
+        )
 
         newest = candidates[0] if candidates else None
         active = primary_save_for_slot(self.active_save_slot) if self.active_save_slot else None
@@ -2564,7 +2621,7 @@ class DoomEternalContext(CommonContext):
             self.mission_select_observation_epoch = None
             self.log_save_proof_rejected(
                 reason,
-                evidence_slot=evidence.slot_directory if evidence else None,
+                evidence_slot=evidence_slot,
                 evidence_map=marker_map or (evidence.map_name if evidence else None),
                 candidate_slot=candidate_slot,
                 candidate_mtime=candidate_mtime,
@@ -2591,7 +2648,6 @@ class DoomEternalContext(CommonContext):
             self.runtime_observers_frozen = False
             return active
 
-        lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None and not lease.process_probe():
             if self.last_observer_lease_block != "game_not_running":
                 logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=game_not_running")
@@ -2612,14 +2668,13 @@ class DoomEternalContext(CommonContext):
                 return continued
             return fail_proof("menu")
 
-        # SECTION A: PROVISIONAL EVIDENCE NEVER PROMOTES OR SWITCHES A SAVE SLOT
         if evidence and evidence.provisional and marker is None:
             continued = continue_authoritative_active()
             if continued is not None:
                 return continued
             return fail_proof("provisional")
 
-        target_slot = (evidence.slot_directory if evidence else None) or (active.slot_directory if active else None) or candidate_slot
+        target_slot = evidence_slot or (active.slot_directory if active else None) or candidate_slot
         if not target_slot or not re.match(r"^GAME-AUTOSAVE[0-9]+$", target_slot):
             return fail_proof("invalid_evidence_slot")
 
@@ -2633,7 +2688,6 @@ class DoomEternalContext(CommonContext):
 
         details_map = canonical_map_name(details.get("mapName"))
         expected_map = marker_map or (evidence.map_name if evidence else None) or canonical_map_name(self.current_map_name or "")
-        lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None:
             try:
                 evidence_mtime_ns = Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
@@ -2688,7 +2742,6 @@ class DoomEternalContext(CommonContext):
                 return fail_proof(reason, details_map=details_map)
             self.last_observer_lease_block = None
 
-        # SECTION B: STRICT CANONICAL MAP COHERENCE (NO HUB WILDCARD FOR SGN / MISSION MAPS)
         if self.mission_select_observation_map:
             pass
         elif expected_map == "game/hub/hub":
@@ -2706,23 +2759,23 @@ class DoomEternalContext(CommonContext):
         details_token = details.get("_mtime_ns", selected.mtime_ns)
 
         if not is_current_active_slot:
-            if self.active_gameplay_epoch == evidence.epoch and self.active_save_slot is not None:
+            if self.active_gameplay_epoch == proof_epoch and self.active_save_slot is not None:
                 return fail_proof("unproven_epoch", details_map=details_map)
 
             # SAVE_PROOF_ACCEPTED MUST precede SAVE_SLOT_ACTIVE
             self.log_save_proof_accepted(
                 selected.slot_directory,
                 expected_map,
-                evidence.epoch,
+                proof_epoch,
                 selected.mtime_ns,
                 details_token,
                 proof="non_provisional_fresh_map_match",
             )
             self.activate_save_selection(selected)
-            self.active_gameplay_epoch = evidence.epoch
+            self.active_gameplay_epoch = proof_epoch
             self.active_save_proof_authoritative = True
             self.active_save_proof_slot = selected.slot_directory
-            self.active_save_proof_epoch = evidence.epoch
+            self.active_save_proof_epoch = proof_epoch
             self.runtime_observers_frozen = False
             return selected
         else:
