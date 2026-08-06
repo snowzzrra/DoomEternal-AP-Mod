@@ -153,10 +153,10 @@ def validate_overrides_from_mod_root(
     """Find and validate all challenge overrides under mod_root.
     
     Enforces that overrides reside strictly in the winning owner container
-    (gameresources_patch3), with zero competing copies in lower priority archives.
+    (gameresources), with zero competing copies in higher priority archives.
     """
     errors: list[str] = []
-    winning_owner = "gameresources_patch3"
+    winning_owner = "gameresources"
     winning_decl_root = mod_root / winning_owner / "generated" / "decls"
     
     if not winning_decl_root.is_dir():
@@ -170,8 +170,8 @@ def validate_overrides_from_mod_root(
         if decls.is_dir():
             for fpath in decls.rglob("*.decl"):
                 rel = fpath.relative_to(decls).as_posix()
-                if rel.startswith("unlockable/mission_challenge/") or rel == AGGREGATE_LIST_PATH:
-                    errors.append(f"Competing override found in lower-priority container {candidate.name}: {rel}")
+                if rel.startswith("unlockable/mission_challenge/") or rel == AGGREGATE_LIST_PATH or rel == NO_REWARD_CONTAINER_PATH:
+                    errors.append(f"Competing override found in alternate container {candidate.name}: {rel}")
 
     overrides = _find_override_files(mod_root)
     if not overrides:
@@ -240,6 +240,7 @@ def validate_vanilla_source_equivalence(
 ) -> list[str]:
     """Verify that source DECL templates from vanilla_decls/owners/ represent the winning
     vanilla copies and that generated overrides permit line-by-line drift ONLY in reward fields.
+    Also verifies invariant: generated_decl_paths ⊆ vanilla_decl_paths.
     """
     errors: list[str] = []
     repo_root = mod_root.parent
@@ -250,10 +251,23 @@ def validate_vanilla_source_equivalence(
     if not vanilla_base.is_dir():
         return errors
 
-    winning_owner = "gameresources_patch3"
+    winning_owner = "gameresources"
     candidate_owners = ["gameresources_patch3", "gameresources_patch2", "gameresources_patch1", "gameresources"]
     registry = load_challenge_registry(registry_path)
     entries = registry.get("mission_challenges", [])
+
+    for candidate in mod_root.glob("gameresources*"):
+        decls_dir = candidate / "generated" / "decls"
+        if decls_dir.is_dir():
+            for fpath in decls_dir.rglob("*.decl"):
+                rel_path = fpath.relative_to(decls_dir).as_posix()
+                if rel_path.startswith("unlockable/mission_challenge/") or rel_path == AGGREGATE_LIST_PATH or rel_path == NO_REWARD_CONTAINER_PATH or rel_path.startswith("warehouseofflinecontainer/"):
+                    found_vanilla = any(
+                        (vanilla_base / owner / "generated" / "decls" / rel_path).is_file()
+                        for owner in candidate_owners
+                    )
+                    if not found_vanilla:
+                        errors.append(f"Generated DECL path does not exist in vanilla corpus: {rel_path}")
 
     for entry in entries:
         rel_path = entry["completion_owner"]["path"]
