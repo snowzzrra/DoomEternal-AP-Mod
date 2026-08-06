@@ -13,12 +13,12 @@ from challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SOURCE_OWNER = "gameresources"
-TARGET_OWNER = "gameresources_patch3"
+TARGET_OWNER = "gameresources"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
 AGGREGATE_LIST_SHA256 = "947b00ddbb443eed74901baad7550a42e123017ce5df1f628e682e6d529f8629"
-NO_REWARD_CONTAINER = "ap/mission_challenge_aggregate_suppressed"
+NO_REWARD_CONTAINER = "warehouseofflinecontainer/campaign/e1m3_complete_challenges_reward_0"
 NO_REWARD_CONTAINER_PATH = (
-    "warehouseofflinecontainer/ap/mission_challenge_aggregate_suppressed.decl"
+    "warehouseofflinecontainer/campaign/e1m3_complete_challenges_reward_0.decl"
 )
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
@@ -192,7 +192,7 @@ def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
         if _challenge_paths(replacement) != _challenge_paths(block):
             raise ValueError(f"{contract['name']}: completion predicate changed")
         for presentation in ("levelName", "challenges"):
-            if replacement.count(presentation) != block.count(presentation):
+            if len(re.findall(r"\b" + presentation + r"\b", replacement)) != len(re.findall(r"\b" + presentation + r"\b", block)):
                 raise ValueError(f"{contract['name']}: presentation changed")
         if replacement.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";') != 1:
             raise ValueError(f"{contract['name']}: aggregate reward suppression failed")

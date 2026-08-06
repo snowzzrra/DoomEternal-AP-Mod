@@ -145,13 +145,13 @@ def test_mission_challenge_overrides_winner_isolation_and_validator():
         
         audit = build_mission_challenge_overrides(mod_root)
         
-        assert audit["owner"] == "gameresources_patch3"
+        assert audit["owner"] == "gameresources"
         assert audit["challenge_count"] == 27
         assert audit["aggregate_reward_suppression"]["aggregate_count"] == 9
         
         for p in audit["written_paths"]:
-            assert "gameresources_patch3" in p
-            assert "gameresources_patch2" not in p
+            assert "gameresources" in p
+            assert "gameresources_patch3" not in p
 
         errors = validate_overrides_from_mod_root(mod_root, registry_path)
         assert errors == [], f"Validation failed with errors: {errors}"
