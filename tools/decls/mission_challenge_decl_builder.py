@@ -24,14 +24,6 @@ REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
 \t\t}
 """
-NO_REWARD_CONTAINER_DECL = """{
-\tedit = {
-\t\tgainedItems = {
-\t\t\tnum = 0;
-\t\t}
-\t}
-}
-"""
 
 
 def _source(path: str, expected_sha256: str) -> str:
@@ -143,26 +135,15 @@ def _aggregate_contracts(registry: dict) -> list[dict]:
 
 
 def _suppress_aggregate_reward(block: str) -> str:
-    """Route the native all-challenges fallback to an empty completion container."""
-    field = re.compile(r'(?m)^(\s*)completionUnlock\s*=\s*"[^"]*";')
-    matches = list(field.finditer(block))
-    if len(matches) > 1:
-        raise ValueError("aggregate completionUnlock is ambiguous")
-    replacement = (
-        f'{matches[0].group(1)}completionUnlock = "{NO_REWARD_CONTAINER}";'
-        if matches else ""
-    )
-    if matches:
-        return field.sub(replacement, block, count=1)
-    level_name = re.search(r'(?m)^(\s*)levelName\s*=\s*"[^"]+";\s*$', block)
-    if not level_name:
-        raise ValueError("aggregate level item has no levelName")
-    indent = level_name.group(1)
-    return (
-        block[:level_name.end()]
-        + f'\n{indent}completionUnlock = "{NO_REWARD_CONTAINER}";'
-        + block[level_name.end():]
-    )
+    """Remove native aggregate challenges block to suppress default Sentinel Battery reward."""
+    challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
+    if not challenge_match:
+        return block
+    start = challenge_match.start()
+    end = _block_end(block, start)
+    while end < len(block) and block[end] in " \t\r\n":
+        end += 1
+    return block[:start] + block[end:]
 
 
 def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
@@ -189,26 +170,30 @@ def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
             raise ValueError(f"{contract['name']}: aggregate owner reused")
         used_indexes.add(index)
         replacement = _suppress_aggregate_reward(block)
-        if _challenge_paths(replacement) != _challenge_paths(block):
-            raise ValueError(f"{contract['name']}: completion predicate changed")
-        for presentation in ("levelName", "challenges"):
+        if _challenge_paths(replacement) != ():
+            raise ValueError(f"{contract['name']}: completion challenges block not removed")
+        for presentation in ("levelName",):
             if len(re.findall(r"\b" + presentation + r"\b", replacement)) != len(re.findall(r"\b" + presentation + r"\b", block)):
                 raise ValueError(f"{contract['name']}: presentation changed")
-        if replacement.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";') != 1:
-            raise ValueError(f"{contract['name']}: aggregate reward suppression failed")
+        if re.search(r"\bchallenges\s*=\s*\{", replacement):
+            raise ValueError(f"{contract['name']}: aggregate challenges block remains")
         if re.search(r"CURRENCY_|inventoryItemReward|currencyToGive|gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]", replacement):
             raise ValueError(f"{contract['name']}: vanilla aggregate reward remains")
-        replacements.append((start, end, replacement))
+        replacements.append((block, replacement))
         audit_contracts.append({
             **contract,
             "level_index": index,
-            "completion_unlock": NO_REWARD_CONTAINER,
+            "challenges_suppressed": True,
         })
     override = source
-    for start, end, replacement in sorted(replacements, reverse=True):
-        override = override[:start] + replacement + override[end:]
-    if override.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";') != len(contracts):
-        raise ValueError("Mission Challenge aggregate override set is incomplete")
+    for block, replacement in replacements:
+        override = override.replace(block, replacement, 1)
+    for _, _, _, block in _level_blocks(override):
+        if "_dev_" in block:
+            continue
+        for contract in contracts:
+            if set(_challenge_paths(block)) == set(contract["unlockables"]):
+                raise ValueError(f"{contract['name']}: aggregate challenges block remains")
     return override, audit_contracts
 
 
@@ -256,19 +241,14 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
     aggregate_target = mod_root / TARGET_OWNER / "generated" / "decls" / AGGREGATE_LIST_PATH
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
     aggregate_target.write_text(aggregate_override, encoding="utf-8")
-    no_reward_target = mod_root / TARGET_OWNER / "generated" / "decls" / NO_REWARD_CONTAINER_PATH
-    no_reward_target.parent.mkdir(parents=True, exist_ok=True)
-    no_reward_target.write_text(NO_REWARD_CONTAINER_DECL, encoding="utf-8")
-    written_paths.extend((aggregate_target.as_posix(), no_reward_target.as_posix()))
+    written_paths.append(aggregate_target.as_posix())
     return {
         "owner": TARGET_OWNER,
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
         "aggregate_reward_suppression": {
-            "strategy": "completion_unlock_empty_container",
+            "strategy": "suppress_aggregate_challenges_in_main_decl",
             "source_path": AGGREGATE_LIST_PATH,
-            "completion_unlock": NO_REWARD_CONTAINER,
-            "container_path": NO_REWARD_CONTAINER_PATH,
             "aggregate_count": len(aggregate_contracts),
             "contracts": aggregate_contracts,
         },

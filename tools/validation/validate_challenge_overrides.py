@@ -20,7 +20,6 @@ from challenge_registry import load_challenge_registry
 from tools.decls.mission_challenge_decl_builder import (
     AGGREGATE_LIST_PATH,
     NO_REWARD_CONTAINER,
-    NO_REWARD_CONTAINER_DECL,
     NO_REWARD_CONTAINER_PATH,
     _aggregate_contracts,
     _challenge_paths,
@@ -181,15 +180,12 @@ def validate_overrides_from_mod_root(
     registry = load_challenge_registry(registry_path)
 
     aggregate_path = winning_decl_root / AGGREGATE_LIST_PATH
-    container_path = winning_decl_root / NO_REWARD_CONTAINER_PATH
     if not aggregate_path.is_file():
         errors.append(f"Missing aggregate Mission Challenge override in {winning_owner}: {AGGREGATE_LIST_PATH}")
         return errors
-    if not container_path.is_file():
-        errors.append(f"Missing aggregate no-reward container in {winning_owner}: {NO_REWARD_CONTAINER_PATH}")
-        return errors
-    if container_path.read_text(encoding="utf-8") != NO_REWARD_CONTAINER_DECL:
-        errors.append("Aggregate no-reward container contract drift")
+
+    if (winning_decl_root / NO_REWARD_CONTAINER_PATH).is_file():
+        errors.append(f"Forbidden non-vanilla warehouse DECL path found: {NO_REWARD_CONTAINER_PATH}")
 
     aggregate_source = aggregate_path.read_text(encoding="utf-8")
     blocks = [
@@ -200,13 +196,18 @@ def validate_overrides_from_mod_root(
     matched_indexes: set[int] = set()
     forbidden_rewards = re.compile(
         r"\bCURRENCY_|inventoryItemReward|currencyToGive|"
-        r"gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]"
+        r"gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]|completionUnlock"
     )
     for contract in _aggregate_contracts(registry):
+        mkey = contract["mission_key"]
+        if mkey == "e3m2_hell_b":
+            short_key = "e3m2_b"
+        else:
+            short_key = mkey.split("_")[0]
         matches = [
             (index, block)
             for index, block in blocks
-            if set(_challenge_paths(block)) == set(contract["unlockables"])
+            if re.search(rf'levelName\s*=\s*"[^"]*{short_key}_name"', block)
         ]
         if len(matches) != 1:
             errors.append(
@@ -215,10 +216,10 @@ def validate_overrides_from_mod_root(
             continue
         index, block = matches[0]
         matched_indexes.add(index)
-        if block.count(f'completionUnlock = "{NO_REWARD_CONTAINER}";') != 1:
-            errors.append(f"{contract['name']}: aggregate suppression is missing")
+        if _challenge_paths(block) != ():
+            errors.append(f"{contract['name']}: aggregate challenges block was not suppressed")
         if forbidden_rewards.search(block):
-            errors.append(f"{contract['name']}: aggregate retains a vanilla reward")
+            errors.append(f"{contract['name']}: aggregate retains a vanilla reward or completionUnlock")
     if len(matched_indexes) != len(registry["all_mission_challenges"]):
         errors.append("Packaged aggregate suppression set is incomplete")
 
