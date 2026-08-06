@@ -150,25 +150,43 @@ def validate_overrides_from_mod_root(
     mod_root: Path,
     registry_path: Path,
 ) -> list[str]:
-    """Find and validate all challenge overrides under mod_root."""
+    """Find and validate all challenge overrides under mod_root.
+    
+    Enforces that overrides reside strictly in the winning owner container
+    (gameresources_patch3), with zero competing copies in lower priority archives.
+    """
+    errors: list[str] = []
+    winning_owner = "gameresources_patch3"
+    winning_decl_root = mod_root / winning_owner / "generated" / "decls"
+    
+    if not winning_decl_root.is_dir():
+        errors.append(f"Winning owner directory missing: {winning_owner}")
+        return errors
+
+    for candidate in mod_root.glob("gameresources*"):
+        if candidate.name == winning_owner:
+            continue
+        decls = candidate / "generated" / "decls"
+        if decls.is_dir():
+            for fpath in decls.rglob("*.decl"):
+                rel = fpath.relative_to(decls).as_posix()
+                if rel.startswith("unlockable/mission_challenge/") or rel == AGGREGATE_LIST_PATH:
+                    errors.append(f"Competing override found in lower-priority container {candidate.name}: {rel}")
+
     overrides = _find_override_files(mod_root)
     if not overrides:
         return ["No mission challenge override files found under mod root"]
-    errors = validate_overrides_from_files(list(overrides.values()), registry_path)
+    
+    errors.extend(validate_overrides_from_files(list(overrides.values()), registry_path))
     registry = load_challenge_registry(registry_path)
-    decl_root = mod_root / "gameresources" / "generated" / "decls"
-    for candidate in mod_root.glob("gameresources*"):
-        target = candidate / "generated" / "decls" / AGGREGATE_LIST_PATH
-        if target.is_file():
-            decl_root = candidate / "generated" / "decls"
-            break
-    aggregate_path = decl_root / AGGREGATE_LIST_PATH
-    container_path = decl_root / NO_REWARD_CONTAINER_PATH
+
+    aggregate_path = winning_decl_root / AGGREGATE_LIST_PATH
+    container_path = winning_decl_root / NO_REWARD_CONTAINER_PATH
     if not aggregate_path.is_file():
-        errors.append(f"Missing aggregate Mission Challenge override: {AGGREGATE_LIST_PATH}")
+        errors.append(f"Missing aggregate Mission Challenge override in {winning_owner}: {AGGREGATE_LIST_PATH}")
         return errors
     if not container_path.is_file():
-        errors.append(f"Missing aggregate no-reward container: {NO_REWARD_CONTAINER_PATH}")
+        errors.append(f"Missing aggregate no-reward container in {winning_owner}: {NO_REWARD_CONTAINER_PATH}")
         return errors
     if container_path.read_text(encoding="utf-8") != NO_REWARD_CONTAINER_DECL:
         errors.append("Aggregate no-reward container contract drift")
@@ -209,7 +227,7 @@ def validate_overrides_from_mod_root(
         "entitydef/interact/hub/battery_socket_for_engine.decl",
     )
     for protected in protected_paths:
-        if (decl_root / protected).exists():
+        if (winning_decl_root / protected).exists():
             errors.append(f"Protected Sentinel Battery contract was overridden: {protected}")
     return errors
 
