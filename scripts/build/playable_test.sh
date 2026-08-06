@@ -589,6 +589,10 @@ if grep -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridg
     echo "Old goal-only transition handler entered build" >&2
     exit 1
 fi
+if strings "$CLIENT_BUILD_DIR/ap_client.exe" | grep -q 'v0\.3\.8-alpha'; then
+    echo "Active v0.3.8-alpha version string found in ap_client.exe" >&2
+    exit 1
+fi
 mapfile -t MASTERY_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \( \
     -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
     -path '*/generated/decls/perks/perk/player/weapons/*' \

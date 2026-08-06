@@ -76,6 +76,11 @@
           "marker": "AP_CHECK_EVENT_7770162",
           "owner": "checkpoints_target_relay_65",
           "strategy": "map_event_file"
+        },
+        {
+          "from_map": "game/sp/e1m4_boss/e1m4_boss",
+          "strategy": "native_transition",
+          "to_map": "game/hub/hub"
         }
       ]
     },
@@ -373,6 +378,11 @@
         {
           "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
           "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/sp/e3m4_boss/e3m4_boss",
+          "strategy": "native_transition",
+          "to_map": "game/sp/e3m4_boss/e3m4_boss/end_game"
         }
       ]
     }

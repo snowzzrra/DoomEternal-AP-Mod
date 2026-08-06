@@ -12,7 +12,8 @@ from pathlib import Path
 from challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-OWNER = "gameresources"
+SOURCE_OWNER = "gameresources"
+TARGET_OWNER = "gameresources_patch2"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
 AGGREGATE_LIST_SHA256 = "947b00ddbb443eed74901baad7550a42e123017ce5df1f628e682e6d529f8629"
 NO_REWARD_CONTAINER = "ap/mission_challenge_aggregate_suppressed"
@@ -34,7 +35,7 @@ NO_REWARD_CONTAINER_DECL = """{
 
 
 def _source(path: str, expected_sha256: str) -> str:
-    source = ROOT / "vanilla_decls" / "owners" / OWNER / "generated" / "decls" / path
+    source = ROOT / "vanilla_decls" / "owners" / SOURCE_OWNER / "generated" / "decls" / path
     payload = source.read_bytes()
     actual = hashlib.sha256(payload).hexdigest()
     if actual != expected_sha256:
@@ -245,22 +246,22 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
     written_paths = []
     for entry in entries:
         relative = entry["completion_owner"]["path"]
-        target = mod_root / OWNER / "generated" / "decls" / relative
+        target = mod_root / TARGET_OWNER / "generated" / "decls" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_reward_free_override(entry), encoding="utf-8")
         written_paths.append(target.as_posix())
     if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
         raise ValueError("Mission Challenge override set is incomplete or has duplicates")
     aggregate_override, aggregate_contracts = _aggregate_reward_free_override(registry)
-    aggregate_target = mod_root / OWNER / "generated" / "decls" / AGGREGATE_LIST_PATH
+    aggregate_target = mod_root / TARGET_OWNER / "generated" / "decls" / AGGREGATE_LIST_PATH
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
     aggregate_target.write_text(aggregate_override, encoding="utf-8")
-    no_reward_target = mod_root / OWNER / "generated" / "decls" / NO_REWARD_CONTAINER_PATH
+    no_reward_target = mod_root / TARGET_OWNER / "generated" / "decls" / NO_REWARD_CONTAINER_PATH
     no_reward_target.parent.mkdir(parents=True, exist_ok=True)
     no_reward_target.write_text(NO_REWARD_CONTAINER_DECL, encoding="utf-8")
     written_paths.extend((aggregate_target.as_posix(), no_reward_target.as_posix()))
     return {
-        "owner": OWNER,
+        "owner": TARGET_OWNER,
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
         "aggregate_reward_suppression": {

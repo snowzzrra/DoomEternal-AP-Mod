@@ -10,6 +10,11 @@
           "owner": "checkpoints_target_relay_65",
           "filename": "ap_event_7770162.txt",
           "marker": "AP_CHECK_EVENT_7770162"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e1m4_boss/e1m4_boss",
+          "to_map": "game/hub/hub"
         }
       ],
       "effects": [

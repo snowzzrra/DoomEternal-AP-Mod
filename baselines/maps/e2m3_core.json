@@ -11,19 +11,23 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Canonical Codex-derived AP visual bundle applied globally"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "neutralize backup chainguns"
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "9484acb7736de8cc938942fb9b00353a7a97d3f464373aed8a81df33e0650b33",
-  "content_revision": "v0.3.8-alpha.2",
+  "byte_sha256": "cc6351f1a54c852c1eb2989c02f0ab3968e568669d4dde4e1a6728fcd16c23a9",
+  "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17066169,
+    "byte_size": 17065576,
     "classes": 13745,
     "entity_count": 13783,
     "layers": 6997,
     "targets": 11442,
-    "transforms": 30260,
+    "transforms": 30258,
     "unique_entity_names": 13746
   },
   "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
@@ -61,6 +65,6 @@
   "publisher_contract_sha256": "5b68333007af515c681165cecb856f15f1ff792282c1e229911eb52faa82bb23",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "96505aa57f9a26573eb80da5d215f3898a94b025842a36c3c9ab18469c54f211",
-  "semantic_sha256": "bad7aaf8750e068cc6483b24fca3ab6b2c64333b4e24b4f96159cdcc79b6969c"
+  "scripted_contract_sha256": "e4dd607788016a934e1c20ce3a142e5076398a000d58a73df561c97fd1c1b346",
+  "semantic_sha256": "eb0abbbacdfdb28e37e55f8f3cb9fcf503c39f9e4969785f656d17ab2e1b9423"
 }
