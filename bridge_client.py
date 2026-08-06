@@ -2484,23 +2484,23 @@ class DoomEternalContext(CommonContext):
             candidate_slot or "<none>",
         )
 
+    def invalidate_map_identity(self, reason):
+        if getattr(self, "last_marker_reject_reason", None) != reason:
+            logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
+            self.last_marker_reject_reason = reason
+        self.mission_select_observation_map = None
+        self.mission_select_observation_epoch = None
+        self.current_map_name = None
+        return None
+
     def read_active_map_identity(self, evidence=None):
         lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None and not lease.process_probe():
-            if getattr(self, "last_marker_reject_reason", None) != "game_not_running":
-                logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=game_not_running")
-                self.last_marker_reject_reason = "game_not_running"
-            return None
+            return self.invalidate_map_identity("game_not_running")
 
         if evidence is None or getattr(evidence, "state", None) != "gameplay":
             reason = "menu" if (evidence and getattr(evidence, "state", None) == "menu") else "gameplay_not_loaded"
-            if getattr(self, "last_marker_reject_reason", None) != reason:
-                logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
-                self.last_marker_reject_reason = reason
-            self.mission_select_observation_map = None
-            self.mission_select_observation_epoch = None
-            self.current_map_name = None
-            return None
+            return self.invalidate_map_identity(reason)
 
         markers = discover_active_map_markers()
         if not markers:
@@ -4353,7 +4353,7 @@ class DoomEternalContext(CommonContext):
 
     def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()
-        marker = self.read_active_map_identity()
+        marker = self.read_active_map_identity(evidence=evidence)
 
         if marker is not None:
             map_name = marker["runtime_map"]

@@ -76,24 +76,53 @@ def test_marker_rejected_on_menu_loading_or_game_closed(monkeypatch):
     from bridge_client import DoomEternalContext
 
     ctx = DoomEternalContext("localhost:38281", "")
-
-    # 1. Evidence is None (e.g. loading or no gameplay evidence)
     assert ctx.read_active_map_identity(evidence=None) is None
     assert ctx.current_map_name is None
 
-    # 2. Evidence state is menu
     menu_evidence = GameplaySaveEvidence("menu", 100, "GAME-AUTOSAVE1", "game/hub/hub")
     assert ctx.read_active_map_identity(evidence=menu_evidence) is None
     assert ctx.current_map_name is None
 
-    # 3. Game process probe returns False
     class MockLease:
         def process_probe(self):
             return False
 
     ctx.runtime_observation_lease = MockLease()
+    ctx.current_map_name = "game/sp/e1m4_boss/e1m4_boss"
+    ctx.mission_select_observation_map = "game/sp/e1m4_boss/e1m4_boss"
+    ctx.mission_select_observation_epoch = 123
+
     gameplay_evidence = GameplaySaveEvidence("gameplay", 100, "GAME-AUTOSAVE1", "game/sp/e1m4_boss/e1m4_boss")
     assert ctx.read_active_map_identity(evidence=gameplay_evidence) is None
+    assert ctx.current_map_name is None
+    assert ctx.mission_select_observation_map is None
+    assert ctx.mission_select_observation_epoch is None
+
+
+def test_check_rpc_autopause_passes_evidence_and_handles_menu(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(asyncio, "create_task", lambda *a, **kw: None)
+    from bridge_client import DoomEternalContext, GameplaySaveEvidence
+
+    ctx = DoomEternalContext("localhost:38281", "")
+
+    marker_data = {
+        "map_key": "e1m4_boss",
+        "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
+        "marker": "AP_MAP_START_E1M4_BOSS",
+        "mtime_ns": time.time_ns(),
+        "path": "/dummy/path.txt",
+    }
+
+    monkeypatch.setattr("bridge_client.read_gameplay_save_evidence", lambda: GameplaySaveEvidence("gameplay", 100, "GAME-AUTOSAVE1", "game/hub/hub"))
+    monkeypatch.setattr(ctx, "read_active_map_identity", lambda evidence=None: marker_data if (evidence and getattr(evidence, "state", None) == "gameplay") else None)
+
+    ctx.check_rpc_autopause()
+    assert ctx.current_map_name == "game/sp/e1m4_boss/e1m4_boss"
+
+    monkeypatch.setattr("bridge_client.read_gameplay_save_evidence", lambda: GameplaySaveEvidence("menu", 100, "GAME-AUTOSAVE1", "game/hub/hub"))
+    ctx.check_rpc_autopause()
+    assert ctx.current_map_name is None
 
 
 def test_update_save_slot_lifecycle_safe_when_evidence_is_none(monkeypatch):
@@ -104,7 +133,6 @@ def test_update_save_slot_lifecycle_safe_when_evidence_is_none(monkeypatch):
     ctx = DoomEternalContext("localhost:38281", "")
     ctx.active_save_slot = "GAME-AUTOSAVE1"
 
-    # Call update_save_slot_lifecycle when evidence is None -> MUST NOT raise AttributeError
     res = ctx.update_save_slot_lifecycle()
     assert res is None
     assert ctx.runtime_observers_frozen is True
