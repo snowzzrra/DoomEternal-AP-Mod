@@ -1754,6 +1754,48 @@ def quarantine_event_file(path, old_state_key=None, new_state_key=None, reason="
         logger.error("[Quarantine] Failed to quarantine event file %s: %s", path.name, err)
 
 
+ACTIVE_MAP_MARKER_PREFIX = "ap_active_map"
+
+
+def discover_active_map_markers():
+    """Discover all suffixed map start identity files in INV_DUMP_DIR, ordered by mtime."""
+    pattern = os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt")
+    valid_files = []
+    for path in glob.glob(pattern):
+        basename = os.path.basename(path)
+        if re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
+            try:
+                st = os.stat(path)
+                valid_files.append((st.st_mtime_ns, path))
+            except OSError:
+                pass
+    valid_files.sort(key=lambda item: item[0])
+    return valid_files
+
+
+def parse_active_map_marker(path, mtime_ns):
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    except OSError:
+        return None
+
+    match = re.search(
+        r"AP_ACTIVE_MAP_V1\s+map_key=(\S+)\s+runtime_map=(\S+)\s+marker=(\S+)",
+        content,
+    )
+    if not match:
+        return None
+
+    return {
+        "map_key": match.group(1),
+        "runtime_map": canonical_map_name(match.group(2)),
+        "marker": match.group(3),
+        "mtime_ns": mtime_ns,
+        "path": path,
+    }
+
+
 def discover_telemetry_markers():
     """Discover all suffixed telemetry marker files in INV_DUMP_DIR, ordered by mtime."""
     pattern = os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt")
@@ -2408,6 +2450,70 @@ class DoomEternalContext(CommonContext):
             candidate_slot or "<none>",
         )
 
+    def read_active_map_identity(self):
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None and not lease.process_probe():
+            if getattr(self, "last_marker_reject_reason", None) != "game_not_running":
+                logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=game_not_running")
+                self.last_marker_reject_reason = "game_not_running"
+            return None
+
+        markers = discover_active_map_markers()
+        if not markers:
+            return None
+
+        newest_mtime, newest_path = markers[-1]
+        marker_data = parse_active_map_marker(newest_path, newest_mtime)
+        if marker_data is None:
+            if getattr(self, "last_marker_reject_reason", None) != "malformed_marker":
+                logger.info(
+                    "[MAP] MAP_IDENTITY_MARKER_REJECTED reason=malformed_marker path=%s",
+                    os.path.basename(newest_path),
+                )
+                self.last_marker_reject_reason = "malformed_marker"
+            return None
+
+        if lease is not None and lease.started_ns and newest_mtime < lease.started_ns:
+            if getattr(self, "last_marker_reject_reason", None) != "stale_marker":
+                logger.info(
+                    "[MAP] MAP_IDENTITY_MARKER_REJECTED reason=stale_marker path=%s mtime=%s started_ns=%s",
+                    os.path.basename(newest_path),
+                    newest_mtime,
+                    lease.started_ns,
+                )
+                self.last_marker_reject_reason = "stale_marker"
+            return None
+
+        if (
+            lease is not None
+            and lease.gameplay_loaded_ns
+            and newest_mtime < (lease.gameplay_loaded_ns - 10_000_000_000)
+        ):
+            if getattr(self, "last_marker_reject_reason", None) != "epoch_mismatch":
+                logger.info(
+                    "[MAP] MAP_IDENTITY_MARKER_REJECTED reason=epoch_mismatch path=%s mtime=%s load_epoch=%s",
+                    os.path.basename(newest_path),
+                    newest_mtime,
+                    lease.gameplay_loaded_ns,
+                )
+                self.last_marker_reject_reason = "epoch_mismatch"
+            return None
+
+        runtime_map = marker_data["runtime_map"]
+        map_key = marker_data["map_key"]
+
+        if getattr(self, "last_accepted_marker_mtime", None) != newest_mtime:
+            self.last_accepted_marker_mtime = newest_mtime
+            self.last_marker_reject_reason = None
+            logger.info(
+                "[MAP] MAP_IDENTITY_MARKER_ACCEPTED map=%s runtime_map=%s source=map_start_event epoch=%s",
+                map_key,
+                runtime_map,
+                lease.gameplay_loaded_ns if lease else newest_mtime,
+            )
+
+        return marker_data
+
     def log_save_proof_accepted(
         self, slot, map_name, epoch, duration_token, details_token, proof="non_provisional_fresh_map_match"
     ):
@@ -2437,6 +2543,9 @@ class DoomEternalContext(CommonContext):
                 )
 
         evidence = read_gameplay_save_evidence()
+        marker = self.read_active_map_identity()
+        marker_map = marker["runtime_map"] if marker else None
+
         newest = candidates[0] if candidates else None
         active = primary_save_for_slot(self.active_save_slot) if self.active_save_slot else None
         candidate_slot = newest.slot_directory if newest else None
@@ -2456,7 +2565,7 @@ class DoomEternalContext(CommonContext):
             self.log_save_proof_rejected(
                 reason,
                 evidence_slot=evidence.slot_directory if evidence else None,
-                evidence_map=evidence.map_name if evidence else None,
+                evidence_map=marker_map or (evidence.map_name if evidence else None),
                 candidate_slot=candidate_slot,
                 candidate_mtime=candidate_mtime,
                 active_slot=self.active_save_slot,
@@ -2489,7 +2598,7 @@ class DoomEternalContext(CommonContext):
                 self.last_observer_lease_block = "game_not_running"
             return fail_proof("game_not_running")
 
-        if evidence is None:
+        if evidence is None and marker is None:
             if newer_unproven_candidate:
                 return fail_proof("no_gameplay_evidence")
             continued = continue_authoritative_active()
@@ -2497,23 +2606,24 @@ class DoomEternalContext(CommonContext):
                 return continued
             return fail_proof("no_gameplay_evidence")
 
-        if evidence.state != "gameplay":
+        if evidence and evidence.state != "gameplay" and marker is None:
             continued = continue_authoritative_active()
             if continued is not None:
                 return continued
             return fail_proof("menu")
 
         # SECTION A: PROVISIONAL EVIDENCE NEVER PROMOTES OR SWITCHES A SAVE SLOT
-        if evidence.provisional:
+        if evidence and evidence.provisional and marker is None:
             continued = continue_authoritative_active()
             if continued is not None:
                 return continued
             return fail_proof("provisional")
 
-        if not evidence.slot_directory or not re.match(r"^GAME-AUTOSAVE[0-9]+$", evidence.slot_directory):
+        target_slot = (evidence.slot_directory if evidence else None) or (active.slot_directory if active else None) or candidate_slot
+        if not target_slot or not re.match(r"^GAME-AUTOSAVE[0-9]+$", target_slot):
             return fail_proof("invalid_evidence_slot")
 
-        selected = primary_save_for_slot(evidence.slot_directory)
+        selected = primary_save_for_slot(target_slot)
         if selected is None:
             return fail_proof("no_gameplay_evidence")
 
@@ -2522,18 +2632,18 @@ class DoomEternalContext(CommonContext):
             return fail_proof("no_game_details")
 
         details_map = canonical_map_name(details.get("mapName"))
-        expected_map = evidence.map_name or canonical_map_name(self.current_map_name or "")
+        expected_map = marker_map or (evidence.map_name if evidence else None) or canonical_map_name(self.current_map_name or "")
         lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None:
             try:
                 evidence_mtime_ns = Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
             except OSError:
-                evidence_mtime_ns = 0
+                evidence_mtime_ns = marker["mtime_ns"] if marker else 0
             live, reason = lease.validate(
                 evidence_mtime_ns=evidence_mtime_ns,
-                evidence_state=evidence.state,
-                evidence_map=evidence.map_name,
-                current_map=canonical_map_name(self.current_map_name or ""),
+                evidence_state=evidence.state if evidence else "gameplay",
+                evidence_map=marker_map or (evidence.map_name if evidence else ""),
+                current_map=expected_map,
                 details_map=details_map,
             )
             if live:
@@ -2542,30 +2652,32 @@ class DoomEternalContext(CommonContext):
             if not live:
                 mission_select_live = False
                 if (
-                    reason == "map_mismatch"
+                    (reason == "map_mismatch" or marker_map is not None)
                     and expected_map in MISSION_CHALLENGE_RUNTIME_MAPS
                     and details_map != expected_map
                 ):
                     mission_select_live, reason = lease.validate_mission_select(
-                        evidence_mtime_ns=evidence_mtime_ns,
-                        evidence_state=evidence.state,
-                        evidence_map=evidence.map_name,
-                        current_map=canonical_map_name(self.current_map_name or ""),
+                        evidence_mtime_ns=evidence_mtime_ns or (marker["mtime_ns"] if marker else 0),
+                        evidence_state=evidence.state if evidence else "gameplay",
+                        evidence_map=expected_map,
+                        current_map=expected_map,
                         mission_map=expected_map,
                         save_mtime_ns=selected.mtime_ns,
                     )
                 if mission_select_live:
                     self.mission_select_observation_map = expected_map
                     self.mission_select_observation_epoch = lease.gameplay_loaded_ns
-                    logger.info(
-                        "[OBSERVER] MISSION_SELECT_LEASE_ACCEPTED slot=%s map=%s "
-                        "load_epoch=%s save_mtime_ns=%s stale_details_map=%s",
-                        selected.slot_directory,
-                        expected_map,
-                        lease.gameplay_loaded_ns,
-                        selected.mtime_ns,
-                        details_map,
-                    )
+                    if getattr(self, "last_accepted_mission_select_epoch", None) != lease.gameplay_loaded_ns:
+                        self.last_accepted_mission_select_epoch = lease.gameplay_loaded_ns
+                        logger.info(
+                            "[OBSERVER] MISSION_SELECT_LEASE_ACCEPTED slot=%s map=%s "
+                            "load_epoch=%s save_mtime_ns=%s stale_details_map=%s",
+                            selected.slot_directory,
+                            expected_map,
+                            lease.gameplay_loaded_ns,
+                            selected.mtime_ns,
+                            details_map,
+                        )
                 else:
                     self.mission_select_observation_map = None
                     self.mission_select_observation_epoch = None
@@ -4188,12 +4300,17 @@ class DoomEternalContext(CommonContext):
 
     def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()
-        if not evidence or evidence.state != "gameplay":
+        marker = self.read_active_map_identity()
+
+        if marker is not None:
+            map_name = marker["runtime_map"]
+        elif evidence and evidence.state == "gameplay":
+            map_name = evidence.map_name
+        else:
             self.last_rpc_map_name = None
             self.current_map_name = None
             return
 
-        map_name = evidence.map_name
         self.current_map_name = map_name
         if self.last_rpc_map_name is None:
             self.last_rpc_map_name = map_name

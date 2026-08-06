@@ -13,7 +13,7 @@ from challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SOURCE_OWNER = "gameresources"
-TARGET_OWNER = "gameresources_patch2"
+TARGET_OWNER = "gameresources_patch3"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
 AGGREGATE_LIST_SHA256 = "947b00ddbb443eed74901baad7550a42e123017ce5df1f628e682e6d529f8629"
 NO_REWARD_CONTAINER = "ap/mission_challenge_aggregate_suppressed"

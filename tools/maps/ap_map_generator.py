@@ -1446,33 +1446,39 @@ def generate_rpc_command_entities(
         )
     return generated
 
-def generate_system_command_entities():
-    return """entity {
-	entityDef ap_deathlink {
+def generate_system_command_entities(map_key="", runtime_map=""):
+    cmd_text = "condump ap_telemetry_ready.txt"
+    if map_key and runtime_map:
+        cmd_text = (
+            f"echo AP_ACTIVE_MAP_V1 map_key={map_key} runtime_map={runtime_map} "
+            f"marker=AP_MAP_START_{map_key.upper()}; condump ap_active_map.txt; condump ap_telemetry_ready.txt"
+        )
+    return f"""entity {{
+	entityDef ap_deathlink {{
 		class = "idTarget_Command";
 		expandInheritance = false;
 		poolCount = 0;
 		poolGranularity = 2;
 		networkReplicated = false;
 		disableAIPooling = false;
-		edit = {
+		edit = {{
 			commandText = "kill";
-		}
-	}
-}
-entity {
-	entityDef ap_rpc_auto_enable {
+		}}
+	}}
+}}
+entity {{
+	entityDef ap_rpc_auto_enable {{
 		class = "idTarget_Command";
 		expandInheritance = false;
 		poolCount = 0;
 		poolGranularity = 2;
 		networkReplicated = false;
 		disableAIPooling = false;
-		edit = {
-			commandText = "condump ap_telemetry_ready.txt";
-		}
-	}
-}
+		edit = {{
+			commandText = "{cmd_text}";
+		}}
+	}}
+}}
 """
 
 
@@ -1940,7 +1946,7 @@ def generate_map(
             enable_notifications=enable_notifications,
         )
         + generate_bootstrap_entities()
-        + generate_system_command_entities()
+        + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
     )
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual:
