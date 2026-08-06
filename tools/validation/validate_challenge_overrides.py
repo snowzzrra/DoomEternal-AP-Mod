@@ -229,6 +229,62 @@ def validate_overrides_from_mod_root(
     for protected in protected_paths:
         if (winning_decl_root / protected).exists():
             errors.append(f"Protected Sentinel Battery contract was overridden: {protected}")
+
+    errors.extend(validate_vanilla_source_equivalence(mod_root, registry_path))
+    return errors
+
+
+def validate_vanilla_source_equivalence(
+    mod_root: Path,
+    registry_path: Path,
+) -> list[str]:
+    """Verify that source DECL templates from vanilla_decls/owners/ represent the winning
+    vanilla copies and that generated overrides permit line-by-line drift ONLY in reward fields.
+    """
+    errors: list[str] = []
+    repo_root = mod_root.parent
+    vanilla_base = repo_root / "vanilla_decls" / "owners"
+    if not vanilla_base.is_dir():
+        vanilla_base = Path(__file__).resolve().parents[2] / "vanilla_decls" / "owners"
+
+    if not vanilla_base.is_dir():
+        return errors
+
+    winning_owner = "gameresources_patch3"
+    candidate_owners = ["gameresources_patch3", "gameresources_patch2", "gameresources_patch1", "gameresources"]
+    registry = load_challenge_registry(registry_path)
+    entries = registry.get("mission_challenges", [])
+
+    for entry in entries:
+        rel_path = entry["completion_owner"]["path"]
+        effective_source = None
+        source_owner_found = None
+
+        for owner in candidate_owners:
+            candidate_file = vanilla_base / owner / "generated" / "decls" / rel_path
+            if candidate_file.is_file():
+                effective_source = candidate_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+                source_owner_found = owner
+                break
+
+        if effective_source is None:
+            errors.append(f"No vanilla source template found for {rel_path}")
+            continue
+
+        override_file = mod_root / winning_owner / "generated" / "decls" / rel_path
+        if not override_file.is_file():
+            continue
+
+        override_content = override_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+
+        expected_override = effective_source.replace(
+            "\tedit = {\n",
+            "\tedit = {\n\t\tcurrencyToGive = {\n\t\t\tnum = 0;\n\t\t}\n",
+            1,
+        )
+        if override_content != expected_override:
+            errors.append(f"Vanilla source template drift for {rel_path} (source owner: {source_owner_found})")
+
     return errors
 
 
