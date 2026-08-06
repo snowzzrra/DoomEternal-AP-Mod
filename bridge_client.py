@@ -1775,16 +1775,27 @@ KNOWN_CATALOG_MAPS = {
 
 def discover_active_map_markers():
     """Discover all suffixed map start identity files in INV_DUMP_DIR, ordered by mtime."""
-    pattern = os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt")
+    patterns = [
+        os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt"),
+        os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt"),
+    ]
     valid_files = []
-    for path in glob.glob(pattern):
-        basename = os.path.basename(path)
-        if re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
-            try:
-                st = os.stat(path)
-                valid_files.append((st.st_mtime_ns, path))
-            except OSError:
-                pass
+    seen_paths = set()
+    for pattern in patterns:
+        for path in glob.glob(pattern):
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            basename = os.path.basename(path)
+            if (
+                re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename)
+                or re.match(rf"^{TELEMETRY_DUMP_PREFIX}(?:_.*)?\.txt$", basename)
+            ):
+                try:
+                    st = os.stat(path)
+                    valid_files.append((st.st_mtime_ns, path))
+                except OSError:
+                    pass
     valid_files.sort(key=lambda item: item[0])
     return valid_files
 

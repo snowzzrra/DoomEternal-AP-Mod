@@ -155,3 +155,23 @@ def test_mission_challenge_overrides_winner_isolation_and_validator():
 
         errors = validate_overrides_from_mod_root(mod_root, registry_path)
         assert errors == [], f"Validation failed with errors: {errors}"
+
+
+def test_discover_active_map_markers_finds_telemetry_dump_markers(monkeypatch):
+    import bridge_client
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setattr(bridge_client, "INV_DUMP_DIR", tmpdir)
+        telemetry_file = os.path.join(tmpdir, "ap_telemetry_ready.txt")
+        marker_line = "AP_ACTIVE_MAP_V1 map_key=e1m4_boss runtime_map=game/sp/e1m4_boss/e1m4_boss marker=AP_MAP_START_E1M4_BOSS\n"
+        with open(telemetry_file, "w", encoding="utf-8") as f:
+            f.write(marker_line)
+
+        markers = discover_active_map_markers()
+        assert len(markers) == 1
+        mtime_ns, path = markers[0]
+        assert path == telemetry_file
+        parsed = parse_active_map_marker(path, mtime_ns)
+        assert parsed is not None
+        assert parsed["map_key"] == "e1m4_boss"
+        assert parsed["runtime_map"] == "game/sp/e1m4_boss/e1m4_boss"
+        assert parsed["marker"] == "AP_MAP_START_E1M4_BOSS"
