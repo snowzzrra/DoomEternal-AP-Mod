@@ -30,7 +30,7 @@ static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "v0.3.8-alpha";
+static const char* kReleaseVersion = "v0.3.9-alpha";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kItemMappingRevision = 7;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
@@ -681,6 +681,9 @@ void LogStartupHeader(
     }
     if (preflight.multipleSuspiciousLoaders) {
         LogDebug("WARNING: multiple proxy DLL candidates are present in the DOOM root.");
+    }
+    if (!preflight.probableProton && getenv("DOOM_AP_STARTED_BY_WINDOWS_BATCH") == nullptr) {
+        LogDebug("WARNING: ap_client.exe was opened directly. On Windows, please launch using start_injector_windows.bat for full automated environment setup.");
     }
     LogDebug("=== End startup header ===");
 }

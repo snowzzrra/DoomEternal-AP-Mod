@@ -62,6 +62,9 @@
       "policy": "vanilla_only"
     }
   },
+  "neutralize_pickups": [
+    "pickups_pickup_weapon_chaingun_1"
+  ],
   "target_policies": {
     "echoes_interact_use_panel_lore_kiosk_console_1": {
       "native_entity_contract": {

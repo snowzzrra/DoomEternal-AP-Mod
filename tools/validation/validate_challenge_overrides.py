@@ -44,16 +44,19 @@ def _derive_expected_ids(entries: list[dict]) -> set[int]:
 def _find_override_files(mod_root: Path) -> dict[str, Path]:
     """Find all mission challenge override files in mod_root.
 
-    Returns dict mapping relative path (under gameresources/generated/decls/)
+    Returns dict mapping relative path (under gameresources*/generated/decls/)
     to absolute Path.
     """
     results: dict[str, Path] = {}
     prefix = "unlockable/mission_challenge/"
-    base = mod_root / "gameresources" / "generated" / "decls"
-    for fpath in base.rglob("*.decl"):
-        rel = fpath.relative_to(base).as_posix()
-        if rel.startswith(prefix):
-            results[rel] = fpath
+    for base in mod_root.glob("gameresources*"):
+        decls = base / "generated" / "decls"
+        if not decls.is_dir():
+            continue
+        for fpath in decls.rglob("*.decl"):
+            rel = fpath.relative_to(decls).as_posix()
+            if rel.startswith(prefix):
+                results[rel] = fpath
     return results
 
 
@@ -154,6 +157,11 @@ def validate_overrides_from_mod_root(
     errors = validate_overrides_from_files(list(overrides.values()), registry_path)
     registry = load_challenge_registry(registry_path)
     decl_root = mod_root / "gameresources" / "generated" / "decls"
+    for candidate in mod_root.glob("gameresources*"):
+        target = candidate / "generated" / "decls" / AGGREGATE_LIST_PATH
+        if target.is_file():
+            decl_root = candidate / "generated" / "decls"
+            break
     aggregate_path = decl_root / AGGREGATE_LIST_PATH
     container_path = decl_root / NO_REWARD_CONTAINER_PATH
     if not aggregate_path.is_file():

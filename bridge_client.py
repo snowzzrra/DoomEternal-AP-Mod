@@ -2222,12 +2222,11 @@ class DoomEternalContext(CommonContext):
         self.active_save_path = None
         self.active_save_token = None
         self.active_gameplay_epoch = None
-        # Save/challenge observers start closed and are opened only by a
-        # same-process, gameplay-loaded RuntimeObservationLease.
         self.runtime_observers_frozen = True
         self.runtime_observation_lease = RuntimeObservationLease()
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
+        self.session_map_completion_states = {}
         self.last_observer_lease_block = None
         self.save_candidate_tokens = {}
         self.last_save_slot_rejection = None
@@ -4135,6 +4134,17 @@ class DoomEternalContext(CommonContext):
 
         details_path = details.get("_path")
         map_name = canonical_map_name(details.get("mapName"))
+        if not details_path or not map_name:
+            return
+
+        is_completed = details.get("completed") == "1"
+        key = (details_path, map_name)
+        prev_status = self.session_map_completion_states.get(key)
+        self.session_map_completion_states[key] = "1" if is_completed else "0"
+
+        # Edge fallback triggers only on a fresh in-session transition from incomplete to completed
+        fresh_completion = (prev_status == "0" and is_completed)
+
         if map_name == CULTIST_BASE_MAP:
             if self.cultist_autosave_path != details_path:
                 self.cultist_autosave_path = details_path
@@ -4146,13 +4156,25 @@ class DoomEternalContext(CommonContext):
 
         completed_cultist_base = (
             map_name != CULTIST_BASE_MAP
-            and details.get("completed") == "1"
+            and is_completed
             and details_path == self.cultist_autosave_path
         )
-        if not completed_cultist_base:
-            return
+        if completed_cultist_base:
+            await self.send_campaign_goal("legacy save fallback")
 
-        await self.send_campaign_goal("legacy save fallback")
+        if fresh_completion and map_name in {"e3m4_boss", "game/sp/e3m4_boss/e3m4_boss"}:
+            matching = [p for p in PUBLISHERS if p.key == "final_sin_mission_complete"]
+            for publisher in matching:
+                await DoomEternalContext.execute_publisher(
+                    self, publisher, "save_fallback", "Final Sin save fallback"
+                )
+
+        if fresh_completion and map_name in {"e1m4_boss", "game/sp/e1m4_boss/e1m4_boss"}:
+            matching = [p for p in PUBLISHERS if p.key == "doom_hunter_base_mission_complete"]
+            for publisher in matching:
+                await DoomEternalContext.execute_publisher(
+                    self, publisher, "save_fallback", "Doom Hunter Base save fallback"
+                )
 
     async def check_campaign_goal(self):
         if not self.item_state_ready:
@@ -4162,8 +4184,7 @@ class DoomEternalContext(CommonContext):
         if await self.check_campaign_goal_event():
             return
 
-        # The goal is owned only by the from_e1m4 portal trigger. Save polling
-        # cannot distinguish Mission Select and must never complete a seed.
+        await self.check_campaign_goal_save_fallback()
 
     def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()

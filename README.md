@@ -21,7 +21,7 @@ Current `v0.3.9-alpha` release scope:
   Nest -> Fortress visit 4 -> ARC Complex -> Fortress visit 5 -> Mars Core ->
   Sentinel Prime -> Fortress visit 6 -> Taras Nabad -> Fortress visit 7 ->
   Nekravol -> Nekravol Part II -> Urdak -> Final Sin`.
-- Public content: `304` generated map checks + `62` runtime locations = `366`
+- Public content: `307` generated map checks + `62` runtime locations = `369`
   Archipelago locations, plus `1` separate campaign goal.
 - All `13` base-campaign missions are supported.
 

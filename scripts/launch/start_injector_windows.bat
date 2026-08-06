@@ -112,6 +112,7 @@ echo.
 echo Starting ap_client.exe...
 echo.
 
+set "DOOM_AP_STARTED_BY_WINDOWS_BATCH=1"
 "%~dp0ap_client.exe" "!DOOM_ROOT!"
 
 set "CLIENT_EXIT_CODE=!ERRORLEVEL!"

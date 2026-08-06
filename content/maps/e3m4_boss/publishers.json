@@ -14,6 +14,11 @@
         {
           "strategy": "terminal_owner",
           "owner": "icon_of_sin_death_target_relay_post_destruction_idle"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/sp/e3m4_boss/e3m4_boss",
+          "to_map": "game/sp/e3m4_boss/e3m4_boss/end_game"
         }
       ],
       "effects": [

@@ -31,6 +31,9 @@
     "AP_CHECK_SLAYER_GATE_PROGRESS_ARGENT_CELL_1_1335273921_E2M3": 7770281
   },
   "location_feedback": {},
+  "neutralize_pickups": [
+    "phobos_pickup_weapon_chaingun_1_e2m3"
+  ],
   "target_policies": {
     "slayer_arena_pickup_keycard_slayer_key_1": {
       "independent_ap_trigger": true,
