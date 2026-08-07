@@ -670,7 +670,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx.activate_save_selection(bridge_client.PrimarySaveSelection(
                     "GAME-AUTOSAVE2", slots["GAME-AUTOSAVE2"], 100
                 ))
-                ctx.active_gameplay_epoch = 9
+                ctx.active_native_evidence_epoch = 9
                 ctx.item_state_ready = True
                 ctx.persist_session_state = lambda: None
                 ctx.server = types.SimpleNamespace(socket=Socket())
@@ -1941,7 +1941,7 @@ class CheckEventTests(unittest.TestCase):
         ctx.team = 1
         ctx.slot = 2
         ctx.active_save_slot = "GAME-AUTOSAVE2"
-        ctx.active_gameplay_epoch = 14
+        ctx.active_native_evidence_epoch = 14
         ctx.runtime_observers_frozen = False
         ctx.current_map_name = "game/sp/e1m3_cult/e1m3_cult"
         ctx.items_received = [
@@ -3618,7 +3618,7 @@ class CheckEventTests(unittest.TestCase):
             ctx.active_save_slot = None
             ctx.active_save_path = None
             ctx.active_save_token = None
-            ctx.active_gameplay_epoch = None
+            ctx.active_native_evidence_epoch = None
             ctx.save_candidate_tokens = {}
             ctx.current_map_name = "game/sp/e2m1_nest/e2m1_nest"
             ctx.item_state_ready = True
@@ -3709,7 +3709,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertFalse(ctx.runtime_observers_frozen)
                 self.assertTrue(ctx.has_authoritative_save_proof())
 
-    def test_newer_unproven_other_slot_freezes_without_revoking_authority(self):
+    def test_newer_unproven_other_slot_freezes_and_revokes_menu_authority(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             remote = Path(tmpdir)
             slot0 = remote / "GAME-AUTOSAVE0"
@@ -3743,7 +3743,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertIsNone(ctx.update_save_slot_lifecycle())
                 self.assertEqual(ctx.active_save_slot, "GAME-AUTOSAVE2")
                 self.assertTrue(ctx.runtime_observers_frozen)
-                self.assertTrue(ctx.active_save_proof_authoritative)
+                self.assertFalse(ctx.active_save_proof_authoritative)
 
     def test_non_provisional_exact_slot_map_epoch_promotes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3773,7 +3773,7 @@ class CheckEventTests(unittest.TestCase):
                 self.assertFalse(ctx.runtime_observers_frozen)
                 self.assertTrue(ctx.has_authoritative_save_proof())
 
-    def test_menu_mtime_update_keeps_authoritative_same_slot_readable(self):
+    def test_menu_mtime_update_does_not_keep_same_slot_authoritative(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             remote = Path(tmpdir)
             slot2 = remote / "GAME-AUTOSAVE2"
@@ -3809,11 +3809,10 @@ class CheckEventTests(unittest.TestCase):
                 ),
             ):
                 selected = ctx.update_save_slot_lifecycle()
-                self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE2")
-                self.assertEqual(ctx.active_save_token, 200)
-                self.assertFalse(ctx.runtime_observers_frozen)
-                self.assertTrue(ctx.has_authoritative_save_proof())
-                self.assertFalse(ctx.mission_challenges_observed[challenge])
+                self.assertIsNone(selected)
+                self.assertEqual(ctx.active_save_token, 100)
+                self.assertTrue(ctx.runtime_observers_frozen)
+                self.assertFalse(ctx.has_authoritative_save_proof())
 
     def test_hub_does_not_act_as_wildcard_for_sgn(self):
         with tempfile.TemporaryDirectory() as tmpdir:

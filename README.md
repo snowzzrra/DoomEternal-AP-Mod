@@ -29,16 +29,11 @@ The current alpha validates map checks, item delivery, DeathLink, save-derived
 locations, Fortress progression, runtime gating, and APWorld generation across
 the supported campaign route.
 
-### Identity compatibility
+### Version compatibility
 
-New seeds use the game identity `DOOM Eternal`. Existing `Doom Eternal` seeds
-and APWorlds remain paired with the prior client/APWorld; mixing the two is
-rejected before launch rather than silently connecting.
-
-### Contextual location names
-
-Physical collectible checks now use concise landmark names in the tracker and
-log instead of generic numbered labels.
+Moving to a newer release may require generating a new world. Changes to IDs,
+logic, options, or runtime contracts frequently mean that worlds created for an
+older version are not compatible with the new client and APWorld.
 
 ## Installation
 
@@ -257,8 +252,11 @@ in this release.
 
 ### 0.2.x — Campaign expansion and systems foundation — DONE
 
-- Generalized manifests, mission completion, regions, and per-map validation.
-- Established optional systems and expanded the base campaign incrementally.
+- Expanded the playable campaign route mission by mission while generalizing
+  manifests, regions, mission completion, map checks, and per-map validation.
+- Established the native `.entities` generation pipeline and the shared runtime
+  foundations used for Archipelago locations, item delivery, and optional
+  systems in later releases.
 
 ### 0.3.x Alpha — Base campaign map expansion — DONE
 
@@ -272,37 +270,45 @@ in this release.
   and client-identity validation; seed/options-generated mod; final scripted
   weapon stripping (SSG `5008`, BFG `4701`, Crucible `4137`); subregions;
   hard/soft/combat logic options; hardcore DeathLink fix; and option-driven
-  features such as randomize starting weapon.
-- These are specifications for future work and are not implemented in `0.3.9`.
+  features such as randomized starting weapons and configurable starting
+  inventory.
 
-### 0.5.x Beta — The Ancient Gods Part One
+### 0.5.x Beta — The Ancient Gods
 
-### 0.7.x Beta — Content freeze and polish
+- Add The Ancient Gods Part One and Part Two campaigns, including their
+  missions, regions, locations, items, progression rules, and completion flow.
+- Extend the existing generation, runtime, and validation architecture to cover
+  DLC-specific mechanics without weakening base-campaign behavior.
+
+### 0.6.x Beta — Mission Access as Items
+
+- Turn mission access into Archipelago progression items. A seed can unlock
+  missions in a randomized order instead of following the vanilla campaign
+  sequence, while generation guarantees a valid starting mission and reachable
+  progression.
+
+### 0.7.x Beta — Enemizer
+
+- Add an enemy randomizer that changes enemy placements and encounter
+  compositions while respecting arenas, progression-critical encounters, and
+  runtime safety constraints.
+
+### 0.8.x–0.9.x — Content freeze and polish
 
 - Freeze the planned `1.0` scope and stabilize IDs and data formats.
 - Focus on balance, installation, compatibility, save/reconnect behavior,
   discoverability, and broader community testing.
-- Finish documentation, diagnostics, and support tooling.
-
-### 0.9.x Release Candidate
-
-- Ship the intended `1.0` feature set for final validation.
-- Accept only blocker and regression fixes.
+- Finish documentation, diagnostics, support tooling, and release-candidate
+  validation; late `0.9.x` changes are limited to blockers and regressions.
 
 ### 1.0
 
-- Stable public release of the complete base campaign.
-- Base-game Unmaykr Protocol goal:
-  `Slayer Gate Keys -> Slayer Gates -> Empyrean Keys -> Unmaykr -> Final Sin`.
+- Final stable public release of the completed supported campaigns and systems.
 
 ### Post-1.0 / 2.0
 
-- The Ancient Gods campaigns and Seal Hunt goal.
-- Mission Access items.
 - Horde Mode and Master Levels.
-- Enemy randomizer.
 - Hard Mode / checkpoint removal.
-- Starting inventory and starting weapon options.
 
 ## Credits
 
