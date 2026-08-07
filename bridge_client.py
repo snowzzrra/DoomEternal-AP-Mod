@@ -1400,13 +1400,31 @@ MISSION_CHALLENGE_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
     for entry in MISSION_CHALLENGE_ENTRIES
 }
+KNOWN_CATALOG_MAPS = {
+    "e1m1_intro": "game/sp/e1m1_intro/e1m1_intro",
+    "e1m2_war": "game/sp/e1m2_war/e1m2_war",
+    "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult",
+    "e1m4_boss": "game/sp/e1m4_boss/e1m4_boss",
+    "e2m1_nest": "game/sp/e2m1_nest/e2m1_nest",
+    "e2m2_base": "game/sp/e2m2_base/e2m2_base",
+    "e2m3_core": "game/sp/e2m3_core/e2m3_core",
+    "e2m4_boss": "game/sp/e2m4_boss/e2m4_boss",
+    "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
+    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
+    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
+    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
+    "e3m4_boss": "game/sp/e3m4_boss/e3m4_boss",
+    "hub": "game/hub/hub",
+}
+
 MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: canonical_map_name(entry.get("runtime_map"))
     for entry in MISSION_CHALLENGE_ENTRIES
     if entry.get("runtime_map")
 }
 MISSION_CHALLENGE_RUNTIME_MAPS = frozenset(
-    MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.values()
+    (set(MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.values()) | set(KNOWN_CATALOG_MAPS.values()))
+    - {"game/hub/hub", ""}
 )
 ALL_MISSION_CHALLENGES_ENTRIES = list(
     CHALLENGE_LOCATION_REGISTRY.get("all_mission_challenges", [])
@@ -1755,24 +1773,6 @@ def quarantine_event_file(path, old_state_key=None, new_state_key=None, reason="
 
 
 ACTIVE_MAP_MARKER_PREFIX = "ap_active_map"
-KNOWN_CATALOG_MAPS = {
-    "e1m1_intro": "game/sp/e1m1_intro/e1m1_intro",
-    "e1m2_war": "game/sp/e1m2_war/e1m2_war",
-    "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult",
-    "e1m4_boss": "game/sp/e1m4_boss/e1m4_boss",
-    "e2m1_nest": "game/sp/e2m1_nest/e2m1_nest",
-    "e2m2_base": "game/sp/e2m2_base/e2m2_base",
-    "e2m3_core": "game/sp/e2m3_core/e2m3_core",
-    "e2m4_boss": "game/sp/e2m4_boss/e2m4_boss",
-    "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
-    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
-    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
-    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
-    "e3m4_boss": "game/sp/e3m4_boss/e3m4_boss",
-    "hub": "game/hub/hub",
-}
-
-
 def discover_active_map_markers():
     """Discover all suffixed map start identity files in INV_DUMP_DIR, ordered by mtime."""
     patterns = [
@@ -2499,9 +2499,8 @@ class DoomEternalContext(CommonContext):
         if getattr(self, "last_marker_reject_reason", None) != reason:
             logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
             self.last_marker_reject_reason = reason
-        self.mission_select_observation_map = None
-        self.mission_select_observation_epoch = None
         self.current_map_name = None
+        self.cached_map_identity = None
         return None
 
     def read_active_map_identity(self, evidence=None):
@@ -2515,6 +2514,18 @@ class DoomEternalContext(CommonContext):
 
         markers = discover_active_map_markers()
         if not markers:
+            cached = getattr(self, "cached_map_identity", None)
+            if cached is not None:
+                cached_mtime = cached.get("mtime_ns", 0)
+                if lease is not None and lease.started_ns and cached_mtime < lease.started_ns:
+                    return self.invalidate_map_identity("stale_marker")
+                if (
+                    lease is not None
+                    and lease.gameplay_loaded_ns
+                    and cached_mtime < (lease.gameplay_loaded_ns - 10_000_000_000)
+                ):
+                    return self.invalidate_map_identity("epoch_mismatch")
+                return cached
             return None
 
         newest_mtime, newest_path = markers[-1]
@@ -2556,6 +2567,8 @@ class DoomEternalContext(CommonContext):
 
         runtime_map = marker_data["runtime_map"]
         map_key = marker_data["map_key"]
+
+        self.cached_map_identity = marker_data
 
         if getattr(self, "last_accepted_marker_mtime", None) != newest_mtime:
             self.last_accepted_marker_mtime = newest_mtime
@@ -4529,6 +4542,10 @@ class DoomEternalContext(CommonContext):
                     newest_mtime, newest_path = markers[-1]
                     try:
                         self.runtime_observation_lease.observe_gameplay_loaded(newest_mtime)
+                        marker_data = parse_active_map_marker(newest_path, newest_mtime)
+                        if marker_data is not None:
+                            self.cached_map_identity = marker_data
+                            self.last_accepted_marker_mtime = newest_mtime
                         if not rpc_execution_enabled():
                             set_rpc_execution(True)
                         epoch = self.advance_reconciliation_epoch("level_ready")

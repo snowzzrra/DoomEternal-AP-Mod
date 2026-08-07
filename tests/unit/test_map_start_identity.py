@@ -95,8 +95,6 @@ def test_marker_rejected_on_menu_loading_or_game_closed(monkeypatch):
     gameplay_evidence = GameplaySaveEvidence("gameplay", 100, "GAME-AUTOSAVE1", "game/sp/e1m4_boss/e1m4_boss")
     assert ctx.read_active_map_identity(evidence=gameplay_evidence) is None
     assert ctx.current_map_name is None
-    assert ctx.mission_select_observation_map is None
-    assert ctx.mission_select_observation_epoch is None
 
 
 def test_check_rpc_autopause_passes_evidence_and_handles_menu(monkeypatch):
@@ -175,3 +173,76 @@ def test_discover_active_map_markers_finds_telemetry_dump_markers(monkeypatch):
         assert parsed["map_key"] == "e1m4_boss"
         assert parsed["runtime_map"] == "game/sp/e1m4_boss/e1m4_boss"
         assert parsed["marker"] == "AP_MAP_START_E1M4_BOSS"
+
+
+def test_map_identity_persists_in_cache_across_telemetry_file_deletion_and_menu_invalidates(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(asyncio, "create_task", lambda *a, **kw: None)
+    import bridge_client
+    from bridge_client import DoomEternalContext, GameplaySaveEvidence, PrimarySaveSelection
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setattr(bridge_client, "INV_DUMP_DIR", tmpdir)
+        ctx = DoomEternalContext("localhost:38281", "")
+
+        now_ns = time.time_ns()
+        telemetry_file = os.path.join(tmpdir, "ap_telemetry_ready.txt")
+        marker_line = "AP_ACTIVE_MAP_V1 map_key=e1m4_boss runtime_map=game/sp/e1m4_boss/e1m4_boss marker=AP_MAP_START_E1M4_BOSS\n"
+        with open(telemetry_file, "w", encoding="utf-8") as f:
+            f.write(marker_line)
+        os.utime(telemetry_file, (now_ns / 1e9, now_ns / 1e9))
+
+        class MockLease:
+            started_ns = now_ns - 10_000_000_000
+            gameplay_loaded_ns = now_ns
+            def process_probe(self):
+                return True
+            def validate(self, **kwargs):
+                return (False, "map_mismatch")
+            def validate_mission_select(self, **kwargs):
+                return (True, "mission_select_lease_valid")
+
+        ctx.runtime_observation_lease = MockLease()
+
+        mock_evidence = GameplaySaveEvidence("gameplay", 100, "GAME-AUTOSAVE2", "game/hub/hub")
+        save_candidate = PrimarySaveSelection("GAME-AUTOSAVE2", Path(tmpdir) / "save", now_ns)
+
+        monkeypatch.setattr("bridge_client.read_gameplay_save_evidence", lambda: mock_evidence)
+        monkeypatch.setattr("bridge_client.primary_save_candidates", lambda: [save_candidate])
+        monkeypatch.setattr("bridge_client.primary_save_for_slot", lambda slot: save_candidate)
+        monkeypatch.setattr("bridge_client.read_game_details_for_selection", lambda s: {"mapName": "game/hub/hub", "_mtime_ns": now_ns})
+
+        marker = ctx.read_active_map_identity(evidence=mock_evidence)
+        assert marker is not None
+        assert marker["map_key"] == "e1m4_boss"
+        assert ctx.cached_map_identity is not None
+
+        active_save = ctx.update_save_slot_lifecycle()
+        assert active_save is not None
+        assert ctx.mission_select_observation_map == "game/sp/e1m4_boss/e1m4_boss"
+        assert ctx.runtime_observers_frozen is False
+
+        os.remove(telemetry_file)
+        assert not os.path.exists(telemetry_file)
+
+        for _ in range(5):
+            marker_cached = ctx.read_active_map_identity(evidence=mock_evidence)
+            assert marker_cached is not None
+            assert marker_cached["map_key"] == "e1m4_boss"
+
+            active_save_cached = ctx.update_save_slot_lifecycle()
+            assert active_save_cached is not None
+            assert ctx.mission_select_observation_map == "game/sp/e1m4_boss/e1m4_boss"
+            assert ctx.runtime_observers_frozen is False
+
+        menu_evidence = GameplaySaveEvidence("menu", 100, "GAME-AUTOSAVE2", "game/hub/hub")
+        monkeypatch.setattr("bridge_client.read_gameplay_save_evidence", lambda: menu_evidence)
+
+        marker_menu = ctx.read_active_map_identity(evidence=menu_evidence)
+        assert marker_menu is None
+        assert ctx.cached_map_identity is None
+
+        active_save_menu = ctx.update_save_slot_lifecycle()
+        assert active_save_menu is None
+        assert ctx.mission_select_observation_map is None
+        assert ctx.runtime_observers_frozen is True
