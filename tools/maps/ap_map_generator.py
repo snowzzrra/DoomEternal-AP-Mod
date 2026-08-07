@@ -1451,7 +1451,8 @@ def generate_system_command_entities(map_key="", runtime_map=""):
     if map_key and runtime_map:
         cmd_text = (
             f"echo AP_ACTIVE_MAP_V1 map_key={map_key} runtime_map={runtime_map} "
-            f"marker=AP_MAP_START_{map_key.upper()}; condump ap_active_map.txt; condump ap_telemetry_ready.txt"
+            f"marker=AP_MAP_START_{map_key.upper()}; "
+            f"condump ap_active_map_{map_key}.txt; condump ap_telemetry_ready.txt"
         )
     return f"""entity {{
 	entityDef ap_deathlink {{

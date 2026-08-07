@@ -12,22 +12,25 @@ from pathlib import Path
 from challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SOURCE_OWNER = "gameresources"
-TARGET_OWNER = "gameresources"
+CHILD_SOURCE_OWNER = "gameresources"
+CHILD_TARGET_OWNER = "gameresources"
+AGGREGATE_SOURCE_OWNER = "gameresources_patch2"
+AGGREGATE_TARGET_OWNER = "gameresources_patch2"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
-AGGREGATE_LIST_SHA256 = "947b00ddbb443eed74901baad7550a42e123017ce5df1f628e682e6d529f8629"
-NO_REWARD_CONTAINER = "warehouseofflinecontainer/campaign/e1m3_complete_challenges_reward_0"
-NO_REWARD_CONTAINER_PATH = (
-    "warehouseofflinecontainer/campaign/e1m3_complete_challenges_reward_0.decl"
-)
+AGGREGATE_LIST_SHA256 = "e4528a4751e40f1237224989c0357df4bdd8d0f6d86fee8c502eeed5ff393ff4"
+AGGREGATE_SUPPRESSION_MISSION_KEYS = frozenset({
+    "e1m4",
+    "e3m2_hell",
+    "e3m2_hell_b",
+})
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
 \t\t}
 """
 
 
-def _source(path: str, expected_sha256: str) -> str:
-    source = ROOT / "vanilla_decls" / "owners" / SOURCE_OWNER / "generated" / "decls" / path
+def _source(owner: str, path: str, expected_sha256: str) -> str:
+    source = ROOT / "vanilla_decls" / "owners" / owner / "generated" / "decls" / path
     payload = source.read_bytes()
     actual = hashlib.sha256(payload).hexdigest()
     if actual != expected_sha256:
@@ -46,7 +49,7 @@ def _assert_reward_owner(entries: list[dict]) -> None:
         raise ValueError("refusing an unscoped Mission Challenge reward override")
     if len(hashes) != 1 or currencies != {"CURRENCY_PRAETOR_UPGRADE"}:
         raise ValueError("Mission Challenge reward owner contract drift")
-    base = _source(next(iter(owners)), next(iter(hashes)))
+    base = _source(CHILD_SOURCE_OWNER, next(iter(owners)), next(iter(hashes)))
     if base.count("CURRENCY_PRAETOR_UPGRADE") != 1 or base.count("currencyToGive") != 1:
         raise ValueError("inherited Mission Challenge Suit Point reward is ambiguous")
 
@@ -134,6 +137,20 @@ def _aggregate_contracts(registry: dict) -> list[dict]:
     return contracts
 
 
+def _aggregate_suppression_contracts(registry: dict) -> list[dict]:
+    contracts = [
+        contract for contract in _aggregate_contracts(registry)
+        if contract["mission_key"] in AGGREGATE_SUPPRESSION_MISSION_KEYS
+    ]
+    found = {contract["mission_key"] for contract in contracts}
+    if found != AGGREGATE_SUPPRESSION_MISSION_KEYS:
+        raise ValueError(
+            "Mission Challenge native aggregate suppression scope drift: "
+            f"expected {sorted(AGGREGATE_SUPPRESSION_MISSION_KEYS)}, found {sorted(found)}"
+        )
+    return contracts
+
+
 def _suppress_aggregate_reward(block: str) -> str:
     """Remove native aggregate challenges block to suppress default Sentinel Battery reward."""
     challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
@@ -147,9 +164,13 @@ def _suppress_aggregate_reward(block: str) -> str:
 
 
 def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
-    source = _source(AGGREGATE_LIST_PATH, AGGREGATE_LIST_SHA256).replace("\r\n", "\n")
+    source = _source(
+        AGGREGATE_SOURCE_OWNER,
+        AGGREGATE_LIST_PATH,
+        AGGREGATE_LIST_SHA256,
+    ).replace("\r\n", "\n")
     blocks = _level_blocks(source)
-    contracts = _aggregate_contracts(registry)
+    contracts = _aggregate_suppression_contracts(registry)
     replacements: list[tuple[int, int, str]] = []
     audit_contracts = []
     used_indexes: set[int] = set()
@@ -199,7 +220,11 @@ def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
 
 def _reward_free_override(entry: dict) -> str:
     owner = entry["completion_owner"]
-    source = _source(owner["path"], owner["sha256"]).replace("\r\n", "\n")
+    source = _source(
+        CHILD_SOURCE_OWNER,
+        owner["path"],
+        owner["sha256"],
+    ).replace("\r\n", "\n")
     signal = entry["signal"]
     required = (
         'inherit = "mission_challenge/challenge_base";',
@@ -231,23 +256,32 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
     written_paths = []
     for entry in entries:
         relative = entry["completion_owner"]["path"]
-        target = mod_root / TARGET_OWNER / "generated" / "decls" / relative
+        target = mod_root / CHILD_TARGET_OWNER / "generated" / "decls" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_reward_free_override(entry), encoding="utf-8")
         written_paths.append(target.as_posix())
     if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
         raise ValueError("Mission Challenge override set is incomplete or has duplicates")
     aggregate_override, aggregate_contracts = _aggregate_reward_free_override(registry)
-    aggregate_target = mod_root / TARGET_OWNER / "generated" / "decls" / AGGREGATE_LIST_PATH
+    aggregate_target = (
+        mod_root
+        / AGGREGATE_TARGET_OWNER
+        / "generated"
+        / "decls"
+        / AGGREGATE_LIST_PATH
+    )
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
     aggregate_target.write_text(aggregate_override, encoding="utf-8")
     written_paths.append(aggregate_target.as_posix())
     return {
-        "owner": TARGET_OWNER,
+        "child_owner": CHILD_TARGET_OWNER,
+        "aggregate_owner": AGGREGATE_TARGET_OWNER,
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
         "aggregate_reward_suppression": {
             "strategy": "suppress_aggregate_challenges_in_main_decl",
+            "source_owner": AGGREGATE_SOURCE_OWNER,
+            "target_owner": AGGREGATE_TARGET_OWNER,
             "source_path": AGGREGATE_LIST_PATH,
             "aggregate_count": len(aggregate_contracts),
             "contracts": aggregate_contracts,

@@ -18,12 +18,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from challenge_registry import load_challenge_registry
 from tools.decls.mission_challenge_decl_builder import (
+    AGGREGATE_SOURCE_OWNER,
+    AGGREGATE_TARGET_OWNER,
     AGGREGATE_LIST_PATH,
-    NO_REWARD_CONTAINER,
-    NO_REWARD_CONTAINER_PATH,
-    _aggregate_contracts,
+    CHILD_SOURCE_OWNER,
+    CHILD_TARGET_OWNER,
+    _aggregate_suppression_contracts,
     _challenge_paths,
     _level_blocks,
+    _suppress_aggregate_reward,
 )
 
 
@@ -41,21 +44,16 @@ def _derive_expected_ids(entries: list[dict]) -> set[int]:
 
 
 def _find_override_files(mod_root: Path) -> dict[str, Path]:
-    """Find all mission challenge override files in mod_root.
-
-    Returns dict mapping relative path (under gameresources*/generated/decls/)
-    to absolute Path.
-    """
+    """Find child Mission Challenge overrides in their canonical owner."""
     results: dict[str, Path] = {}
     prefix = "unlockable/mission_challenge/"
-    for base in mod_root.glob("gameresources*"):
-        decls = base / "generated" / "decls"
-        if not decls.is_dir():
-            continue
-        for fpath in decls.rglob("*.decl"):
-            rel = fpath.relative_to(decls).as_posix()
-            if rel.startswith(prefix):
-                results[rel] = fpath
+    decls = mod_root / CHILD_TARGET_OWNER / "generated" / "decls"
+    if not decls.is_dir():
+        return results
+    for fpath in decls.rglob("*.decl"):
+        rel = fpath.relative_to(decls).as_posix()
+        if rel.startswith(prefix):
+            results[rel] = fpath
     return results
 
 
@@ -149,28 +147,38 @@ def validate_overrides_from_mod_root(
     mod_root: Path,
     registry_path: Path,
 ) -> list[str]:
-    """Find and validate all challenge overrides under mod_root.
-    
-    Enforces that overrides reside strictly in the winning owner container
-    (gameresources), with zero competing copies in higher priority archives.
-    """
+    """Validate the distinct child and aggregate vanilla owner contracts."""
     errors: list[str] = []
-    winning_owner = "gameresources"
-    winning_decl_root = mod_root / winning_owner / "generated" / "decls"
+    child_decl_root = mod_root / CHILD_TARGET_OWNER / "generated" / "decls"
+    aggregate_decl_root = mod_root / AGGREGATE_TARGET_OWNER / "generated" / "decls"
     
-    if not winning_decl_root.is_dir():
-        errors.append(f"Winning owner directory missing: {winning_owner}")
+    if not child_decl_root.is_dir():
+        errors.append(f"Child owner directory missing: {CHILD_TARGET_OWNER}")
         return errors
 
     for candidate in mod_root.glob("gameresources*"):
-        if candidate.name == winning_owner:
-            continue
         decls = candidate / "generated" / "decls"
-        if decls.is_dir():
-            for fpath in decls.rglob("*.decl"):
-                rel = fpath.relative_to(decls).as_posix()
-                if rel.startswith("unlockable/mission_challenge/") or rel == AGGREGATE_LIST_PATH or rel == NO_REWARD_CONTAINER_PATH:
-                    errors.append(f"Competing override found in alternate container {candidate.name}: {rel}")
+        if not decls.is_dir():
+            continue
+        for fpath in decls.rglob("*.decl"):
+            rel = fpath.relative_to(decls).as_posix()
+            if (
+                rel.startswith("unlockable/mission_challenge/")
+                and candidate.name != CHILD_TARGET_OWNER
+            ):
+                errors.append(
+                    f"Child override found outside {CHILD_TARGET_OWNER}: "
+                    f"{candidate.name}: {rel}"
+                )
+            if rel == AGGREGATE_LIST_PATH and candidate.name != AGGREGATE_TARGET_OWNER:
+                errors.append(
+                    f"Aggregate main.decl found outside {AGGREGATE_TARGET_OWNER}: "
+                    f"{candidate.name}: {rel}"
+                )
+            if rel.startswith("warehouseofflinecontainer/"):
+                errors.append(
+                    f"Forbidden warehouse aggregate override found in {candidate.name}: {rel}"
+                )
 
     overrides = _find_override_files(mod_root)
     if not overrides:
@@ -179,13 +187,13 @@ def validate_overrides_from_mod_root(
     errors.extend(validate_overrides_from_files(list(overrides.values()), registry_path))
     registry = load_challenge_registry(registry_path)
 
-    aggregate_path = winning_decl_root / AGGREGATE_LIST_PATH
+    aggregate_path = aggregate_decl_root / AGGREGATE_LIST_PATH
     if not aggregate_path.is_file():
-        errors.append(f"Missing aggregate Mission Challenge override in {winning_owner}: {AGGREGATE_LIST_PATH}")
+        errors.append(
+            f"Missing aggregate Mission Challenge override in "
+            f"{AGGREGATE_TARGET_OWNER}: {AGGREGATE_LIST_PATH}"
+        )
         return errors
-
-    if (winning_decl_root / NO_REWARD_CONTAINER_PATH).is_file():
-        errors.append(f"Forbidden non-vanilla warehouse DECL path found: {NO_REWARD_CONTAINER_PATH}")
 
     aggregate_source = aggregate_path.read_text(encoding="utf-8")
     blocks = [
@@ -198,7 +206,7 @@ def validate_overrides_from_mod_root(
         r"\bCURRENCY_|inventoryItemReward|currencyToGive|"
         r"gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]|completionUnlock"
     )
-    for contract in _aggregate_contracts(registry):
+    for contract in _aggregate_suppression_contracts(registry):
         mkey = contract["mission_key"]
         if mkey == "e3m2_hell_b":
             short_key = "e3m2_b"
@@ -220,16 +228,21 @@ def validate_overrides_from_mod_root(
             errors.append(f"{contract['name']}: aggregate challenges block was not suppressed")
         if forbidden_rewards.search(block):
             errors.append(f"{contract['name']}: aggregate retains a vanilla reward or completionUnlock")
-    if len(matched_indexes) != len(registry["all_mission_challenges"]):
+    if len(matched_indexes) != len(_aggregate_suppression_contracts(registry)):
         errors.append("Packaged aggregate suppression set is incomplete")
 
     protected_paths = (
         "propitem/propitem/batteries/sentinel_battery.decl",
         "entitydef/interact/hub/battery_socket_for_engine.decl",
     )
-    for protected in protected_paths:
-        if (winning_decl_root / protected).exists():
-            errors.append(f"Protected Sentinel Battery contract was overridden: {protected}")
+    for candidate in mod_root.glob("gameresources*"):
+        decls = candidate / "generated" / "decls"
+        for protected in protected_paths:
+            if (decls / protected).exists():
+                errors.append(
+                    f"Protected Sentinel Battery contract was overridden in "
+                    f"{candidate.name}: {protected}"
+                )
 
     errors.extend(validate_vanilla_source_equivalence(mod_root, registry_path))
     return errors
@@ -252,7 +265,6 @@ def validate_vanilla_source_equivalence(
     if not vanilla_base.is_dir():
         return errors
 
-    winning_owner = "gameresources"
     candidate_owners = ["gameresources_patch3", "gameresources_patch2", "gameresources_patch1", "gameresources"]
     registry = load_challenge_registry(registry_path)
     entries = registry.get("mission_challenges", [])
@@ -262,7 +274,7 @@ def validate_vanilla_source_equivalence(
         if decls_dir.is_dir():
             for fpath in decls_dir.rglob("*.decl"):
                 rel_path = fpath.relative_to(decls_dir).as_posix()
-                if rel_path.startswith("unlockable/mission_challenge/") or rel_path == AGGREGATE_LIST_PATH or rel_path == NO_REWARD_CONTAINER_PATH or rel_path.startswith("warehouseofflinecontainer/"):
+                if rel_path.startswith("unlockable/mission_challenge/") or rel_path == AGGREGATE_LIST_PATH or rel_path.startswith("warehouseofflinecontainer/"):
                     found_vanilla = any(
                         (vanilla_base / owner / "generated" / "decls" / rel_path).is_file()
                         for owner in candidate_owners
@@ -272,21 +284,21 @@ def validate_vanilla_source_equivalence(
 
     for entry in entries:
         rel_path = entry["completion_owner"]["path"]
-        effective_source = None
-        source_owner_found = None
-
-        for owner in candidate_owners:
-            candidate_file = vanilla_base / owner / "generated" / "decls" / rel_path
-            if candidate_file.is_file():
-                effective_source = candidate_file.read_text(encoding="utf-8").replace("\r\n", "\n")
-                source_owner_found = owner
-                break
-
-        if effective_source is None:
-            errors.append(f"No vanilla source template found for {rel_path}")
+        source_file = (
+            vanilla_base
+            / CHILD_SOURCE_OWNER
+            / "generated"
+            / "decls"
+            / rel_path
+        )
+        if not source_file.is_file():
+            errors.append(
+                f"No vanilla child source template found in {CHILD_SOURCE_OWNER}: {rel_path}"
+            )
             continue
+        effective_source = source_file.read_text(encoding="utf-8").replace("\r\n", "\n")
 
-        override_file = mod_root / winning_owner / "generated" / "decls" / rel_path
+        override_file = mod_root / CHILD_TARGET_OWNER / "generated" / "decls" / rel_path
         if not override_file.is_file():
             continue
 
@@ -298,7 +310,59 @@ def validate_vanilla_source_equivalence(
             1,
         )
         if override_content != expected_override:
-            errors.append(f"Vanilla source template drift for {rel_path} (source owner: {source_owner_found})")
+            errors.append(
+                f"Vanilla child source template drift for {rel_path} "
+                f"(source owner: {CHILD_SOURCE_OWNER})"
+            )
+
+    aggregate_source_file = (
+        vanilla_base
+        / AGGREGATE_SOURCE_OWNER
+        / "generated"
+        / "decls"
+        / AGGREGATE_LIST_PATH
+    )
+    if not aggregate_source_file.is_file():
+        errors.append(
+            f"Canonical aggregate source missing in {AGGREGATE_SOURCE_OWNER}: "
+            f"{AGGREGATE_LIST_PATH}"
+        )
+        return errors
+
+    aggregate_override_file = (
+        mod_root
+        / AGGREGATE_TARGET_OWNER
+        / "generated"
+        / "decls"
+        / AGGREGATE_LIST_PATH
+    )
+    if aggregate_override_file.is_file():
+        aggregate_source = aggregate_source_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+        expected_aggregate = aggregate_source
+        source_blocks = _level_blocks(aggregate_source)
+        for contract in _aggregate_suppression_contracts(registry):
+            expected_children = set(contract["unlockables"])
+            matches = [
+                block for _, _, _, block in source_blocks
+                if set(_challenge_paths(block)) == expected_children and "_dev_" not in block
+            ]
+            if len(matches) != 1:
+                errors.append(
+                    f"{contract['name']}: canonical patch2 source owner count is {len(matches)}"
+                )
+                continue
+            source_block = matches[0]
+            expected_aggregate = expected_aggregate.replace(
+                source_block,
+                _suppress_aggregate_reward(source_block),
+                1,
+            )
+        aggregate_override = aggregate_override_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+        if aggregate_override != expected_aggregate:
+            errors.append(
+                "Aggregate main.decl differs from canonical patch2 outside the three "
+                "approved challenges blocks"
+            )
 
     return errors
 
