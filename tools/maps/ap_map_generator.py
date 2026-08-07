@@ -1532,6 +1532,11 @@ def generate_map(
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
     config_path = Path(config_file)
+    descriptor_path = config_path.with_name("descriptor.json")
+    if descriptor_path.is_file():
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        level_config.setdefault("runtime_map", descriptor.get("runtime_map", ""))
+        level_config.setdefault("map_key", descriptor.get("key", ""))
     package_assets = config_path.with_name("assets.json")
     if config_path.name == "locations.json" and package_assets.is_file():
         asset_document = json.loads(package_assets.read_text(encoding="utf-8"))

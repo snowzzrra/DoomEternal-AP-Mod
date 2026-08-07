@@ -1817,9 +1817,9 @@ def parse_active_map_marker(path, mtime_ns):
         return None
 
     last_match = matches[-1]
-    map_key = last_match.group(1)
-    runtime_map = canonical_map_name(last_match.group(2))
-    marker = last_match.group(3)
+    map_key = last_match.group(1).rstrip(";")
+    runtime_map = canonical_map_name(last_match.group(2).rstrip(";"))
+    marker = last_match.group(3).rstrip(";")
 
     if map_key not in KNOWN_CATALOG_MAPS:
         return None

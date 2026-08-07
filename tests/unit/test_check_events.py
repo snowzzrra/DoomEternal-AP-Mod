@@ -58,14 +58,18 @@ def _load_bridge_client():
     sys.modules.setdefault("Utils", types.SimpleNamespace(init_logging=lambda *args, **kwargs: None))
     sys.modules.setdefault("colorama", types.SimpleNamespace(init=lambda: None, deinit=lambda: None))
 
-    common_client = types.ModuleType("CommonClient")
-    common_client.CommonContext = _DummyCommonContext
-    common_client.server_loop = lambda ctx: None
-    common_client.gui_enabled = False
-    common_client.ClientCommandProcessor = object
-    common_client.get_base_parser = lambda: __import__("argparse").ArgumentParser()
-    common_client.logger = _DummyLogger()
-    sys.modules.setdefault("CommonClient", common_client)
+    common_client = sys.modules.get("CommonClient")
+    if common_client is None:
+        common_client = types.ModuleType("CommonClient")
+        common_client.CommonContext = _DummyCommonContext
+        common_client.server_loop = lambda ctx: None
+        common_client.gui_enabled = False
+        common_client.ClientCommandProcessor = object
+        common_client.get_base_parser = lambda: __import__("argparse").ArgumentParser()
+        common_client.logger = _DummyLogger()
+        sys.modules["CommonClient"] = common_client
+    else:
+        common_client.CommonContext.__init__ = _DummyCommonContext.__init__
 
     net_utils = types.ModuleType("NetUtils")
     net_utils.ClientStatus = types.SimpleNamespace(CLIENT_GOAL=30)
@@ -75,6 +79,8 @@ def _load_bridge_client():
 
 
 bridge_client = _load_bridge_client()
+bridge_client.INV_DUMP_DIR = str(_FAKE_SAVE_BASE)
+bridge_client.SAVE_GAMES_DIR = str(_FAKE_SAVE_BASE)
 import observer_lifecycle
 
 
@@ -82,18 +88,24 @@ class _SyntheticLiveLease:
     """Legacy bridge tests isolate save logic; lease behavior has its own suite."""
 
     last_block_reason = None
+    started_ns = None
+    gameplay_loaded_ns = None
 
     @staticmethod
     def process_probe():
         return True
 
-    @staticmethod
-    def observe_gameplay_loaded(*args, **kwargs):
-        return None
+    @classmethod
+    def observe_gameplay_loaded(cls, epoch):
+        cls.gameplay_loaded_ns = epoch
 
     @staticmethod
     def validate(**kwargs):
         return True, "live"
+
+    @staticmethod
+    def validate_mission_select(**kwargs):
+        return True, "mission_select_lease_valid"
 
 
 bridge_client.RuntimeObservationLease = _SyntheticLiveLease
@@ -135,6 +147,15 @@ async def _async_append(target, value):
 
 
 class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        super().setUp()
+        self._task_patch = unittest.mock.patch("asyncio.create_task", return_value=None)
+        self._task_patch.start()
+
+    def tearDown(self):
+        self._task_patch.stop()
+        super().tearDown()
+
     @staticmethod
     def _record(count, satisfied, unlocked, entry=None):
         entry = entry or bridge_client.STICKY_MASTERY_ENTRY
@@ -215,6 +236,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
             ctx.runtime_observers_frozen = False
+            ctx.active_save_proof_authoritative = True
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             ctx.observe_weapon_masteries(incomplete, "incomplete-native-fixture")
@@ -239,6 +261,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.session_state = {}
         ctx.persist_session_state = lambda: None
         ctx.observe_weapon_masteries(
@@ -277,6 +300,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.session_state = {}
         ctx.client_state = {"version": 1, "sessions": {}}
         ctx.state_key = "seed:1:2"
@@ -982,6 +1006,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.session_state = {}
         ctx.persist_session_state = lambda: None
         ctx.activate_save_selection(bridge_client.PrimarySaveSelection(
@@ -1024,6 +1049,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         new_seed = bridge_client.DoomEternalContext(None, None)
         new_seed.item_state_ready = True
         new_seed.runtime_observers_frozen = False
+        new_seed.active_save_proof_authoritative = True
         new_seed.session_state = {}
         new_seed.persist_session_state = lambda: None
         new_seed.activate_save_selection(bridge_client.PrimarySaveSelection(
@@ -1223,6 +1249,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
             ctx.runtime_observers_frozen = False
+            ctx.active_save_proof_authoritative = True
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             ctx.observe_mission_challenges(incomplete, "incomplete-challenge")
@@ -1263,6 +1290,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
             ctx.runtime_observers_frozen = False
+            ctx.active_save_proof_authoritative = True
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             ctx.observe_mission_challenges(
@@ -1287,6 +1315,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
                 ctx = bridge_client.DoomEternalContext(None, None)
                 ctx.item_state_ready = True
                 ctx.runtime_observers_frozen = False
+                ctx.active_save_proof_authoritative = True
                 ctx.session_state = {}
                 ctx.persist_session_state = lambda: None
                 ctx.server = types.SimpleNamespace(socket=Socket())
@@ -1321,6 +1350,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
             ctx = bridge_client.DoomEternalContext(None, None)
             ctx.item_state_ready = True
             ctx.runtime_observers_frozen = False
+            ctx.active_save_proof_authoritative = True
             ctx.session_state = {}
             ctx.persist_session_state = lambda: None
             records = bridge_client.read_mission_challenge_records(
@@ -1360,6 +1390,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.session_state = {}
         ctx.persist_session_state = lambda: None
         ctx.activate_save_selection(bridge_client.PrimarySaveSelection(
@@ -1414,6 +1445,7 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.item_state_ready = True
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.session_state = {}
         ctx.state_key = "aggregate-seed:1:2"
         ctx.persist_session_state = lambda: None
@@ -1553,6 +1585,13 @@ class StickySaveMetricTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def setUp(self):
+        self._task_patch = unittest.mock.patch("asyncio.create_task", return_value=None)
+        self._task_patch.start()
+
+    def tearDown(self):
+        self._task_patch.stop()
+
     def _make_context(self, *received_item_ids):
         ctx = bridge_client.DoomEternalContext(None, None)
         ctx.session_state = {"bootstrap": {"revision": 1, "actions": {}}}
@@ -1600,6 +1639,18 @@ class BootstrapTests(unittest.TestCase):
         }
         with self.assertRaises(ValueError):
             validate_bootstrap_catalogue(unknown)
+
+
+class CheckEventTests(unittest.TestCase):
+    def setUp(self):
+        self._task_patch = unittest.mock.patch("asyncio.create_task", return_value=None)
+        self._task_patch.start()
+        self.original_item_notifications = bridge_client.ENABLE_ITEM_NOTIFICATIONS
+        bridge_client.ENABLE_ITEM_NOTIFICATIONS = True
+
+    def tearDown(self):
+        bridge_client.ENABLE_ITEM_NOTIFICATIONS = self.original_item_notifications
+        self._task_patch.stop()
 
     def test_rune_page_requires_received_rune(self):
         self.assertFalse(self._make_context().bootstrap_eligible("rune_page"))
@@ -1943,6 +1994,7 @@ class CheckEventTests(unittest.TestCase):
         ctx.active_save_slot = "GAME-AUTOSAVE2"
         ctx.active_native_evidence_epoch = 14
         ctx.runtime_observers_frozen = False
+        ctx.active_save_proof_authoritative = True
         ctx.current_map_name = "game/sp/e1m3_cult/e1m3_cult"
         ctx.items_received = [
             types.SimpleNamespace(item=7770005),
@@ -3298,7 +3350,7 @@ class CheckEventTests(unittest.TestCase):
             generate_map(
                 "vanillamaps/e2m1_nest.map",
                 str(out_map),
-                "level_configs/e2m1_nest.json",
+                "content/maps/e2m1_nest/locations.json",
                 str(out_json),
                 items,
             )

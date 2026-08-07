@@ -7,14 +7,18 @@
     {
       "content_revision": "v0.3.8-alpha.2",
       "reason": "Canonical Codex-derived AP visual bundle applied globally"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "v0.3.9-alpha: per-map authoritative Mission Select identity marker"
     }
   ],
   "asset_package_contract_sha256": "a43cba94a0a9b3b1bc5111140501dea4833642da8d09b1ca4cab8da6f40c4c08",
-  "byte_sha256": "09a7a49b8816929ff1f772d4d2c2f61d87bd9e81e42dd6f1211ddf92c4419805",
-  "content_revision": "v0.3.8-alpha.2",
+  "byte_sha256": "b6be00a8b2545d3bb6381c3069733e68229efc882bf03f655510a7698e264e5b",
+  "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 387,
-    "byte_size": 6848238,
+    "byte_size": 6848396,
     "classes": 7320,
     "entity_count": 7320,
     "layers": 432,
@@ -56,5 +60,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "ff71930583525a3af2dc7fa6a2a2e527c70866162a3a12c84e004a340bd89654",
-  "semantic_sha256": "52629b6243fad381de2d50c7a951b463b514a153a950814865bc0dcef12fcbb7"
+  "semantic_sha256": "aed17474eaf29222d2cc27ebdfd8f65dc03bcf847d7ada46efb5e7e436038cd7"
 }

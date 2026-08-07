@@ -15,14 +15,18 @@
     {
       "content_revision": "v0.3.9-alpha",
       "reason": "neutralize backup chainguns"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "v0.3.9-alpha: per-map authoritative Mission Select identity marker"
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "cc6351f1a54c852c1eb2989c02f0ab3968e568669d4dde4e1a6728fcd16c23a9",
+  "byte_sha256": "9719af5d9489800024acde6ce4ed55cac3b9648a2b19b61fcb6bb5b87db16dc5",
   "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17065576,
+    "byte_size": 17065724,
     "classes": 13745,
     "entity_count": 13783,
     "layers": 6997,
@@ -66,5 +70,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "e4dd607788016a934e1c20ce3a142e5076398a000d58a73df561c97fd1c1b346",
-  "semantic_sha256": "eb0abbbacdfdb28e37e55f8f3cb9fcf503c39f9e4969785f656d17ab2e1b9423"
+  "semantic_sha256": "7431a2a156e2ce7dcacbb4f88431413908030290f601f65d01f63bff380d2704"
 }

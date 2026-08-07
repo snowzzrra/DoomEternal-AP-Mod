@@ -15,14 +15,18 @@
     {
       "content_revision": "v0.3.9-alpha",
       "reason": "Neutralize Heavy Cannon backup grant in Cultist Base"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "v0.3.9-alpha: per-map authoritative Mission Select identity marker"
     }
   ],
   "asset_package_contract_sha256": "f0186074dd8a2fdcc54cc5bdf4bafd0b4106051af1f9132d04b1655d7c8dc3ee",
-  "byte_sha256": "3883a5a5227d65d053580ea2b509411023efe7f86ea8f8f37e0994d401a77c51",
+  "byte_sha256": "40303c8c7e4bdfc8636f7ba406eae49b93e7b31101ecc67fcbdcfa76d05bd9dd",
   "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 1177,
-    "byte_size": 20088318,
+    "byte_size": 20088466,
     "classes": 18298,
     "entity_count": 18298,
     "layers": 4802,
@@ -64,5 +68,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "f82ffa83bf9a1ca0846146479cb9e7324337c08f5873fe85f6ae194ce4392842"
+  "semantic_sha256": "e64db322628012d048e9c7e8533d9c3966b22e3b94bda788680fa58f14bcbfd3"
 }
