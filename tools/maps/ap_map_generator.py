@@ -1955,7 +1955,7 @@ def generate_map(
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
     )
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
-    if canonical_visual:
+    if canonical_visual and modified_count:
         assert_canonical_ap_visuals(final_content, map_key, canonical_visual)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)

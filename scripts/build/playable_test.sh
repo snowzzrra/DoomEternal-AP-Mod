@@ -396,6 +396,7 @@ cp "$REPO_ROOT/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
 cp "$REPO_ROOT/README.md" "$OUTPUT_DIR/README.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
+    "$REPO_ROOT/deathlink_receive.py" \
     "$REPO_ROOT/campaign_goal_contract.py" \
     "$REPO_ROOT/challenge_registry.py" \
     "$REPO_ROOT/content_catalog.py" \
@@ -403,6 +404,8 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
+    "$REPO_ROOT/launcher_cli.py" "$REPO_ROOT/launcher_core.py" \
+    "$REPO_ROOT/launcher_supervisor.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
     "$REPO_ROOT/publisher_contracts.py" \
@@ -496,6 +499,7 @@ manifest = {
         "client/ap_client.exe",
         "client/bridge_client.py",
         "client/bridge_identity.json",
+        "client/deathlink_receive.py",
         "client/bootstrap_actions.py",
         "client/campaign_goal_contract.py",
         "client/challenge_registry.py",
@@ -504,6 +508,9 @@ manifest = {
         "client/foundation.py",
         "client/item_classification.py",
         "client/item_reconciliation.py",
+        "client/launcher_cli.py",
+        "client/launcher_core.py",
+        "client/launcher_supervisor.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
         "client/publisher_contracts.py",

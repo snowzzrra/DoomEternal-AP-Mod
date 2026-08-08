@@ -20,6 +20,7 @@ dist/
 *.apworld
 DoomEternalArchipelago*.zip
 *.entities
+!tests/fixtures/exultia_dash_minimal.entities
 
 # Runtime configuration/state
 ap_config.json

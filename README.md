@@ -2,19 +2,19 @@
 
 Game-side repository for the DOOM Eternal Archipelago integration.
 
-This repository owns the alpha mod package, Python bridge, external RPC client,
+This repository owns the mod package, Python bridge, external RPC client,
 runtime manifests, map-generation and validation tools, and release packaging.
 The APWorld source lives in the sibling Archipelago repository and is compiled
 into `doometernal.apworld` during release builds.
 
 > [!CAUTION]
-> This project is an alpha, not a finished 1.0 release. Windows is the primary
+> This project is a beta, not a finished 1.0 release. Windows is the primary
 > public target. Linux/Proton remains supported for development and early
 > validation.
 
 ## Project status
 
-Current `v0.3.9-alpha` release scope:
+Current public baseline is `v0.3.9-alpha`.
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore

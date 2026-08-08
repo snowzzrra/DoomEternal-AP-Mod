@@ -28,6 +28,7 @@ from challenge_registry import (
     canonical_map_name,
     load_challenge_registry,
 )
+from deathlink_receive import DeathLinkReceiver, ReceiveState
 from foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
@@ -83,6 +84,14 @@ DEATHLINK_MESSAGES = (
     "{player} picked a fight with Hell and lost.",
     "{player}'s ripping and tearing privileges were revoked.",
 )
+LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
+
+
+def emit_launcher_event(event_type: str, **payload):
+    if not LAUNCHER_EVENTS_ENABLED:
+        return
+    event = {"type": event_type, **payload}
+    print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
 
 ENABLE_ITEM_NOTIFICATIONS = False
 try:
@@ -2354,9 +2363,10 @@ class DoomEternalContext(CommonContext):
         self.last_details_path = None
         # Receive state is deliberately process-local. A restart drops pending
         # DeathLink delivery instead of replaying an old lethal command.
-        self.received_deathlink_event = None
-        self.recent_deathlink_ids = {}
-        self.deathlink_echo_suppression_event_id = None
+        self.deathlink_receiver = DeathLinkReceiver(
+            wait_timeout=DEATHLINK_RECEIVE_TIMEOUT,
+            confirm_timeout=DEATHLINK_CONFIRM_TIMEOUT,
+        )
         self.last_goal_details_mtime = None
         self.final_sin_completion_candidate = None
         self.cultist_autosave_path = None
@@ -2412,6 +2422,21 @@ class DoomEternalContext(CommonContext):
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
             asyncio.create_task(self.check_mission_challenge_locations())
+            emit_launcher_event(
+                "connected",
+                seed_name=self.room_seed_name,
+                team=args.get("team", self.team),
+                slot=args.get("slot", self.slot),
+                slot_data=args.get("slot_data", {}),
+                missing_locations=sorted(args.get("missing_locations", [])),
+                checked_locations=sorted(args.get("checked_locations", [])),
+            )
+        elif cmd == "ConnectionRefused":
+            emit_launcher_event(
+                "error",
+                code="connection_refused",
+                message="Archipelago connection was refused",
+            )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.reconcile_checked_automap_cleanup("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
@@ -3688,48 +3713,34 @@ class DoomEternalContext(CommonContext):
         event_id = hashlib.sha256(
             json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
-        self.recent_deathlink_ids = {
-            key: expiry for key, expiry in self.recent_deathlink_ids.items() if expiry > now
-        }
-        if event_id in self.recent_deathlink_ids:
+        result = self.deathlink_receiver.receive(event_id, now)
+        if result.detail == "duplicate":
             logger.info("[DeathLink] Ignored duplicate received event %s.", event_id[:12])
             return
-        self.recent_deathlink_ids[event_id] = now + DEATHLINK_RECEIVE_TIMEOUT + DEATHLINK_CONFIRM_TIMEOUT
-        self.received_deathlink_event = {
-            "id": event_id,
-            "state": "RECEIVED",
-            "deadline": now + DEATHLINK_RECEIVE_TIMEOUT,
-        }
-        logger.info("[DeathLink] Received %s; waiting for safe gameplay.", event_id[:12])
+        if result.state is ReceiveState.FAILED:
+            logger.warning("[DeathLink] Rejected %s: bounded receive queue is full.", event_id[:12])
+            return
+        logger.info("[DeathLink] Received %s; queued for safe gameplay.", event_id[:12])
 
     def queue_received_deathlink(self):
-        event = self.received_deathlink_event
-        if not self.death_link_enabled or event is None:
+        if not self.death_link_enabled:
             return
-        now = time.monotonic()
-        if now >= event["deadline"]:
-            logger.warning("[DeathLink] %s expired in %s; no lethal retry will occur.", event["id"][:12], event["state"])
-            self.received_deathlink_event = None
-            return
-        if event["state"] == "RECEIVED":
-            event["state"] = "WAITING_FOR_SAFE_GAMEPLAY"
-        if event["state"] == "WAITING_FOR_SAFE_GAMEPLAY":
-            if self.runtime_observers_frozen or not self.has_authoritative_save_proof():
-                return
-        elif event["state"] == "DISPATCHED_ONCE":
-            return
-        else:
-            logger.error("[DeathLink] Dropped invalid receive state %r.", event["state"])
-            self.received_deathlink_event = None
-            return
-        if send_command(
-            "ai_ScriptCmdEnt ap_deathlink activate",
-            coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
-        ):
-            event["state"] = "DISPATCHED_ONCE"
-            event["deadline"] = now + DEATHLINK_CONFIRM_TIMEOUT
-            self.deathlink_echo_suppression_event_id = event["id"]
-            logger.info("[DeathLink] %s dispatched once; awaiting confirmation.", event["id"][:12])
+        result = self.deathlink_receiver.advance(
+            now=time.monotonic(),
+            safe_gameplay=(
+                not self.runtime_observers_frozen
+                and self.has_authoritative_save_proof()
+            ),
+            dispatch=lambda: send_command(
+                "ai_ScriptCmdEnt ap_deathlink activate",
+                coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
+            ),
+        )
+        if result.state is ReceiveState.DISPATCHED_ONCE and result.detail == "dispatched":
+            logger.info("[DeathLink] %s dispatched once; awaiting confirmation.", (result.event_id or "unknown")[:12])
+        elif result.state in {ReceiveState.EXPIRED, ReceiveState.FAILED}:
+            state_name = result.state.value.lower() if result.state else "unknown"
+            logger.warning("[DeathLink] %s %s (%s); receive state cleared.", (result.event_id or "unknown")[:12], state_name, result.detail)
 
     async def check_game_duration_death(self):
         selected = self.update_save_slot_lifecycle()
@@ -4185,12 +4196,10 @@ class DoomEternalContext(CommonContext):
     async def report_local_death(self):
         if not self.death_link_enabled:
             return
-        if self.deathlink_echo_suppression_event_id:
-            event_id = self.deathlink_echo_suppression_event_id
+        receive_result = self.deathlink_receiver.confirm_local_death()
+        if receive_result.state is ReceiveState.CONFIRMED:
             discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
-            self.deathlink_echo_suppression_event_id = None
-            self.received_deathlink_event = None
-            logger.info("[DeathLink] %s confirmed; suppressed linked echo.", event_id[:12])
+            logger.info("[DeathLink] %s confirmed; suppressed linked echo.", (receive_result.event_id or "unknown")[:12])
             return
         player = self.auth or "The Doom Slayer"
         await self.send_death(random.choice(DEATHLINK_MESSAGES).format(player=player))
@@ -5033,6 +5042,7 @@ async def amain(launch_args=None):
     parser = get_base_parser()
     parser.add_argument('--name', default=None, help="Player name no Archipelago")
     args = parser.parse_args(launch_args)
+    args.password = args.password or os.environ.get("DOOM_AP_PASSWORD")
 
     ctx = DoomEternalContext(args.connect, args.password)
     ctx.auth = args.name
@@ -5041,6 +5051,7 @@ async def amain(launch_args=None):
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 
     log_mission_bridge_identity()
+    emit_launcher_event("client_started")
     logger.info("=== DOOM ETERNAL ARCHIPELAGO CLIENT ===")
     if not args.connect or not args.name:
         logger.info(
@@ -5049,14 +5060,32 @@ async def amain(launch_args=None):
         )
     else:
         logger.info(f"Auto-connecting to {args.connect} as {args.name}...")
+        emit_launcher_event("connecting")
 
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
+    def report_server_stop(task):
+        if ctx.exit_event.is_set():
+            return
+        try:
+            error = task.exception()
+        except asyncio.CancelledError:
+            error = None
+        if error is not None:
+            emit_launcher_event(
+                "error",
+                code="server_loop_failed",
+                message=f"{type(error).__name__}: {error}",
+            )
+        else:
+            emit_launcher_event("disconnected")
+    ctx.server_task.add_done_callback(report_server_stop)
 
     if gui_enabled:
         ctx.run_gui()
     ctx.run_cli()
 
     await ctx.exit_event.wait()
+    emit_launcher_event("client_stopping")
     await ctx.shutdown()
     await asyncio.gather(
         ctx.tracking_task,
