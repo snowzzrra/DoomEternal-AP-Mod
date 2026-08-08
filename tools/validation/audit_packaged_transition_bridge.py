@@ -68,12 +68,13 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
         raise AssertionError("unpacked bridge revision diverges from RELEASE_MANIFEST")
     if recorded.get("transition_handler") != "unified":
         raise AssertionError("RELEASE_MANIFEST does not declare unified transition handler")
-    if recorded.get("protocol") != 3:
-        raise AssertionError("RELEASE_MANIFEST does not declare bridge protocol 3")
+    expected_protocol = manifest.get("content_identity", {}).get("bridge_protocol_version")
+    if recorded.get("protocol") != expected_protocol:
+        raise AssertionError("RELEASE_MANIFEST bridge protocol diverges from content identity")
     if recorded.get("game") != "DOOM Eternal":
         raise AssertionError("RELEASE_MANIFEST does not declare current game identity")
     identity = json.loads((client_dir / "bridge_identity.json").read_text(encoding="utf-8"))
-    if identity.get("protocol") != 3:
+    if identity.get("protocol") != expected_protocol:
         raise AssertionError("unpacked bridge identity protocol diverges")
     if identity.get("game") != "DOOM Eternal":
         raise AssertionError("unpacked bridge identity game diverges")
@@ -91,7 +92,7 @@ def assert_packaged_launcher(apworld_path: Path, client_dir: Path, bridge_sha256
         root = Path(directory)
         with zipfile.ZipFile(apworld_path) as archive:
             archive.extractall(root)
-        client_path = root / "doometernal" / "Client.py"
+        client_path = root / "doometernal" / "client.py"
         if not client_path.is_file():
             raise AssertionError("unpacked APWorld lacks normal DOOM launcher")
         settings = types.ModuleType("settings")
@@ -284,7 +285,7 @@ def main() -> int:
             f"BRIDGE_REVISION=mission-unified-{bridge_sha256[:12]}",
             f"BRIDGE_FILE={client_dir / 'bridge_client.py'}",
             f"BRIDGE_SHA256={bridge_sha256}",
-            "BRIDGE_PROTOCOL=3",
+            f"BRIDGE_PROTOCOL={bridge.BRIDGE_PROTOCOL}",
             "GAME_NAME=DOOM Eternal",
             "TRANSITION_HANDLER=unified",
         ]

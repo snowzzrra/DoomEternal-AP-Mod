@@ -3,6 +3,7 @@
 No sibling APWorld, staging directory, vanilla maps, build output, or release
 artifact may be read or written by this module.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -11,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 from content_catalog import load_content_catalog
-
 
 ROOT = Path(__file__).resolve().parents[2]
 JSON_ROOTS = ("content", "data", "level_configs", "manifests")
@@ -46,11 +46,7 @@ def read_json(path: Path) -> Any:
 
 
 def check_authorial() -> dict[str, int]:
-    json_paths = sorted(
-        path
-        for root_name in JSON_ROOTS
-        for path in (ROOT / root_name).rglob("*.json")
-    )
+    json_paths = sorted(path for root_name in JSON_ROOTS for path in (ROOT / root_name).rglob("*.json"))
     for path in json_paths:
         read_json(path)
 
@@ -63,19 +59,15 @@ def check_authorial() -> dict[str, int]:
             raise ValueError(f"data/content_identity.json: invalid {field}")
     if identity["game"] != "DOOM Eternal":
         raise ValueError("data/content_identity.json: invalid game identity")
-    revisions = {
-        identity[field] for field in (
-            "apworld_revision", "content_revision", "release_version",
-        )
-    }
-    if len(revisions) != 1:
-        raise ValueError("data/content_identity.json: public revisions diverge")
+    if identity["apworld_revision"] != "0.4.0":
+        raise ValueError("data/content_identity.json: invalid official APWorld revision")
+    if identity["content_revision"] != identity["release_version"]:
+        raise ValueError("data/content_identity.json: content and release revisions diverge")
+    if identity["release_version"] != "0.4.0-beta.1":
+        raise ValueError("data/content_identity.json: invalid beta release revision")
 
     catalog = load_content_catalog(ROOT)
-    location_ids = [
-        location.location_id
-        for location in (*catalog.physical_locations, *catalog.runtime_locations)
-    ]
+    location_ids = [location.location_id for location in (*catalog.physical_locations, *catalog.runtime_locations)]
     if any(location_id < 7_770_000 or location_id >= 7_780_000 for location_id in location_ids):
         raise ValueError("location ID outside reserved DOOM Eternal range")
 
@@ -90,10 +82,9 @@ def check_authorial() -> dict[str, int]:
     for map_key, spec in catalog.maps.items():
         config = read_json(spec.level_config_path)
         expected = dict(config.get("entities", {}))
-        expected.update({
-            encounter["ap_check"]: encounter["location_id"]
-            for encounter in config.get("secret_encounters", [])
-        })
+        expected.update(
+            {encounter["ap_check"]: encounter["location_id"] for encounter in config.get("secret_encounters", [])}
+        )
         expected_manifests[map_key] = expected
         actual = read_json(ROOT / "manifests" / f"{map_key}.json")
         if actual != expected:

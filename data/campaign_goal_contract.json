@@ -5,7 +5,7 @@
   "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
   "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
   "publisher_key": "final_sin_mission_complete",
-  "release": "v0.3.9-alpha",
+  "release": "0.4.0-beta.1",
   "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
   "schema_version": 1,
   "source": "vanillamaps/e3m4_boss.map"

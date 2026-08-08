@@ -1,4 +1,5 @@
 """Subprocess supervisor used by CLI now and future PySide6 UI."""
+
 from __future__ import annotations
 
 import json
@@ -9,10 +10,10 @@ import threading
 from collections import deque
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from launcher_core import LaunchWorkflow, RoomSnapshot
-
+from launcher_platform import redact_secrets
 
 EVENT_PREFIX = "AP_EVENT "
 
@@ -28,10 +29,12 @@ class BridgeState(str, Enum):
 
 
 class BridgeSupervisor:
-    _profiles: set[str] = set()
+    _profiles: ClassVar[set[str]] = set()
     _profiles_lock = threading.Lock()
 
-    def __init__(self, *, client: Path, workflow: LaunchWorkflow, install_root: Path, profile_id: str, log_limit: int = 200):
+    def __init__(
+        self, *, client: Path, workflow: LaunchWorkflow, install_root: Path, profile_id: str, log_limit: int = 200
+    ):
         if log_limit < 1:
             raise ValueError("log_limit must be positive")
         self.client = client
@@ -86,7 +89,7 @@ class BridgeSupervisor:
         threading.Thread(target=self._watch_process, daemon=True).start()
 
     def _redact(self, line: str) -> str:
-        return line.replace(self._password, "[REDACTED]") if self._password else line
+        return redact_secrets(line, [self._password])
 
     def _read_stream(self, stream, structured: bool, endpoint: str) -> None:
         if stream is None:
@@ -95,7 +98,7 @@ class BridgeSupervisor:
             line = raw.rstrip("\r\n")
             if structured and line.startswith(EVENT_PREFIX):
                 try:
-                    event = json.loads(line[len(EVENT_PREFIX):])
+                    event = json.loads(line[len(EVENT_PREFIX) :])
                     self._handle_event(event, endpoint)
                 except Exception as error:
                     self.last_error = {"code": "invalid_bridge_event", "message": str(error)}

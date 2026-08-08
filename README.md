@@ -8,13 +8,12 @@ The APWorld source lives in the sibling Archipelago repository and is compiled
 into `doometernal.apworld` during release builds.
 
 > [!CAUTION]
-> This project is a beta, not a finished 1.0 release. Windows is the primary
-> public target. Linux/Proton remains supported for development and early
-> validation.
+> This project is a beta, not a finished 1.0 release. Windows and Linux/Proton
+> are supported.
 
 ## Project status
 
-Current public baseline is `v0.3.9-alpha`.
+Current beta gate is `0.4.0-beta.1`.
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -25,7 +24,7 @@ Current public baseline is `v0.3.9-alpha`.
   Archipelago locations, plus `1` separate campaign goal.
 - All `13` base-campaign missions are supported.
 
-The current alpha validates map checks, item delivery, DeathLink, save-derived
+The current beta validates map checks, item delivery, DeathLink, save-derived
 locations, Fortress progression, runtime gating, and APWorld generation across
 the supported campaign route.
 
@@ -154,10 +153,10 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-v0.3.9-alpha.zip
+DoomEternalArchipelagoPlayableTest-0.4.0-beta.1.zip
 ├── README.md
 ├── RELEASE_MANIFEST.json
-├── DoomEternalArchipelagoAlpha.zip
+├── DoomEternalArchipelagoBeta.zip
 ├── doometernal.apworld
 └── client/
     ├── ap_client.exe
@@ -166,7 +165,9 @@ DoomEternalArchipelagoPlayableTest-v0.3.9-alpha.zip
     ├── save_death_probe.exe
     ├── save_decrypt.py
     ├── run_bridge.sh
-    ├── start_injector_windows.bat
+    ├── launcher_core.py
+    ├── launcher_platform.py
+    ├── launcher_supervisor.py
     ├── validate_runtime_install.sh
     ├── ap_config.example.json
     ├── data/
@@ -178,7 +179,7 @@ The release excludes APWorld source, native source, map-generation source,
 tests, vanilla maps, extraction tooling, workspace memory, personal
 configuration, seeds, logs, and local paths.
 
-## Current alpha logic
+## Current beta logic
 
 - `randomize_chainsaw`, `randomize_dash`, and `randomize_first_battery`
   default to `false`; Dash remains experimental.
@@ -202,7 +203,7 @@ configuration, seeds, logs, and local paths.
 
 ### Vanilla scripted weapon acquisitions
 
-These acquisitions remain fully vanilla in `v0.3.9-alpha`:
+These acquisitions remain fully vanilla in `0.4.0-beta.1`:
 
 - Super Shotgun — Cultist Base cutscene `5008`.
 - BFG-9000 — Mars Core cutscene `4701`.
@@ -269,7 +270,8 @@ in this release.
 ### 0.4.0 Beta — Installation, logic and option architecture
 
 - Windows + Linux installer/launcher; game-path/version, dependency, injection
-  and client-identity validation; seed/options-generated mod; final scripted
+  and client-identity validation. Launcher never starts DOOM Eternal; player
+  opens game through Steam when ready. Includes seed/options-generated mod; final scripted
   weapon stripping (SSG `5008`, BFG `4701`, Crucible `4137`); subregions;
   hard/soft/combat logic options; hardcore DeathLink fix; and option-driven
   features such as randomized starting weapons and configurable starting

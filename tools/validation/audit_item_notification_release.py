@@ -169,7 +169,7 @@ def audit_release(
 def _extract_playable_zip(playable_zip: Path, destination: Path) -> tuple[Path, Path, Path]:
     with zipfile.ZipFile(playable_zip) as archive:
         archive.extractall(destination)
-    mod_zip = destination / "DoomEternalArchipelagoAlpha.zip"
+    mod_zip = destination / "DoomEternalArchipelagoBeta.zip"
     if not mod_zip.is_file():
         raise AssertionError("playable ZIP lacks its injector mod ZIP")
     mod_root = destination / "mod"

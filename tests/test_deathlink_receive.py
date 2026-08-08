@@ -23,6 +23,16 @@ def test_duplicate_packet_is_ignored():
     assert receiver.queued_event_ids == ("one",)
 
 
+def test_reconnect_does_not_requeue_confirmed_event():
+    receiver = DeathLinkReceiver()
+    receiver.receive("one", 0.0)
+    receiver.advance(now=1.0, safe_gameplay=True, dispatch=lambda: True)
+    assert receiver.confirm_local_death().state is ReceiveState.CONFIRMED
+    assert receiver.receive("one", 2.0).detail == "duplicate"
+    assert receiver.active is None
+    assert receiver.queued_event_ids == ()
+
+
 def test_expiry_clears_active_event_and_suppression():
     receiver = DeathLinkReceiver(confirm_timeout=2.0)
     receiver.receive("one", 0.0)

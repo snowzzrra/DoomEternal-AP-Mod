@@ -683,7 +683,7 @@ void LogStartupHeader(
         LogDebug("WARNING: multiple proxy DLL candidates are present in the DOOM root.");
     }
     if (!preflight.probableProton && getenv("DOOM_AP_STARTED_BY_WINDOWS_BATCH") == nullptr) {
-        LogDebug("WARNING: ap_client.exe was opened directly. On Windows, please launch using start_injector_windows.bat for full automated environment setup.");
+        LogDebug("WARNING: ap_client.exe was opened directly. Start the integrated DOOM Eternal Client from Archipelago Launcher.");
     }
     LogDebug("=== End startup header ===");
 }

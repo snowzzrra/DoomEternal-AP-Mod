@@ -94,7 +94,16 @@ run_build_step() {
     fi
 }
 
-trap 'rm -rf "$TEMP_DIR"' EXIT
+cleanup_build() {
+    local status=$?
+    rm -rf "$TEMP_DIR"
+    if [[ "$status" -ne 0 ]]; then
+        rm -f "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
+            "$OUTPUT_DIR/$PTB_ZIP_NAME" "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp"
+    fi
+    return "$status"
+}
+trap cleanup_build EXIT
 trap 'report_build_failure "$LINENO" "$BASH_COMMAND"' ERR
 
 mkdir -p "$(dirname "$BUILD_LOG")"
@@ -225,7 +234,7 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 }
 
 rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
-    "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
     "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
     "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
     "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" \
@@ -233,8 +242,7 @@ rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
     "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
     "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
 find "$OUTPUT_DIR/build" -mindepth 1 -maxdepth 1 ! -name build.log -exec rm -rf -- {} +
-mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld/worlds" \
-    "$GENERATED_MAPS_DIR" "$TEMP_DIR"
+mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$GENERATED_MAPS_DIR" "$TEMP_DIR"
 echo "Build log: $BUILD_LOG"
 if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
     echo "ITEM_NOTIFICATIONS=enabled"
@@ -405,13 +413,12 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
     "$REPO_ROOT/launcher_cli.py" "$REPO_ROOT/launcher_core.py" \
-    "$REPO_ROOT/launcher_supervisor.py" \
+    "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
     "$REPO_ROOT/publisher_contracts.py" \
     "$REPO_ROOT/publisher_runtime.py" \
     "$REPO_ROOT/scripts/launch/run_bridge.sh" "$REPO_ROOT/save_decrypt.py" \
-    "$REPO_ROOT/scripts/launch/start_injector_windows.bat" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
@@ -433,26 +440,29 @@ for map_row in "${MAP_ROWS[@]}"; do
     cp "$REPO_ROOT/$manifest_path" "$OUTPUT_DIR/client/manifests/"
 done
 cp -R "$REPO_ROOT/player_templates" "$OUTPUT_DIR/client/"
-cp -R "$WORKSPACE/Archipelago/worlds/doometernal" \
-    "$OUTPUT_DIR/apworld/worlds/doometernal"
-find "$OUTPUT_DIR/apworld" -type d -name __pycache__ -prune -exec rm -rf {} +
-python3 "$REPO_ROOT/tools/release/build_apworld.py" \
-    "$OUTPUT_DIR/apworld/worlds/doometernal" \
+(
+    cd "$WORKSPACE/Archipelago"
+    SKIP_REQUIREMENTS_UPDATE=1 "${ARCHIPELAGO_PYTHON:-python3}" \
+        Launcher.py "Build APWorlds" -- "DOOM Eternal" --skip_open_folder
+)
+cp "$WORKSPACE/Archipelago/build/apworlds/doometernal.apworld" \
     "$OUTPUT_DIR/doometernal.apworld"
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 
 cp "$REPO_ROOT/scripts/validate/runtime_install.sh" "$OUTPUT_DIR/client/validate_runtime_install.sh"
 chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
 
-python3 - "$OUTPUT_DIR/client/bridge_client.py" "$OUTPUT_DIR/client/bridge_identity.json" "$ENABLE_ITEM_NOTIFICATIONS" <<'PY'
+python3 - "$OUTPUT_DIR/client/bridge_client.py" "$OUTPUT_DIR/client/bridge_identity.json" \
+    "$ENABLE_ITEM_NOTIFICATIONS" "$REPO_ROOT/data/content_identity.json" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
 bridge = Path(sys.argv[1])
+content_identity = json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
 identity = {
-    "protocol": 3,
+    "protocol": content_identity["bridge_protocol_version"],
     "game": "DOOM Eternal",
     "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(),
     "item_notifications": {
@@ -487,6 +497,9 @@ client_path = output_dir / "client" / "ap_client.exe"
 bridge_sha256 = hashlib.sha256(bridge_path.read_bytes()).hexdigest()
 client_sha256 = hashlib.sha256(client_path.read_bytes()).hexdigest()
 item_notifications_enabled = sys.argv[6] == "1"
+content_identity = json.loads(
+    (Path(sys.argv[4]) / "data" / "content_identity.json").read_text(encoding="utf-8")
+)
 
 manifest = {
     "name": "DOOM Eternal Archipelago",
@@ -494,7 +507,7 @@ manifest = {
     "files": [
         "README.md",
         "RELEASE_MANIFEST.json",
-        "DoomEternalArchipelagoAlpha.zip",
+        "DoomEternalArchipelagoBeta.zip",
         "doometernal.apworld",
         "client/ap_client.exe",
         "client/bridge_client.py",
@@ -510,6 +523,7 @@ manifest = {
         "client/item_reconciliation.py",
         "client/launcher_cli.py",
         "client/launcher_core.py",
+        "client/launcher_platform.py",
         "client/launcher_supervisor.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
@@ -518,7 +532,6 @@ manifest = {
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/run_bridge.sh",
-        "client/start_injector_windows.bat",
         "client/runtime_install.sh",
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
@@ -552,17 +565,13 @@ manifest = {
         ],
     },
     "mission_bridge": {
-        "protocol": 3,
+        "protocol": content_identity["bridge_protocol_version"],
         "game": "DOOM Eternal",
         "sha256": bridge_sha256,
         "revision": f"mission-unified-{bridge_sha256[:12]}",
         "transition_handler": "unified",
     },
-    "content_identity": json.loads(
-        (Path(sys.argv[4]) / "data" / "content_identity.json").read_text(
-            encoding="utf-8"
-        )
-    ),
+    "content_identity": content_identity,
     "item_notifications": {
         "enabled": item_notifications_enabled,
         "revision": 1,
@@ -657,21 +666,21 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
 
 (
     cd "$OUTPUT_DIR/mod"
-    zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" .
+    zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" .
 )
 
 (
     cd "$OUTPUT_DIR"
     zip -q -r "${PTB_ZIP_NAME}.tmp" \
         README.md RELEASE_MANIFEST.json client doometernal.apworld \
-        DoomEternalArchipelagoAlpha.zip
+        DoomEternalArchipelagoBeta.zip
 )
 mv "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" "${OUTPUT_DIR}/${PTB_ZIP_NAME}"
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
     rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" "$OUTPUT_DIR/mod" \
         "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/doometernal.apworld" \
-        "$OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip" \
+        "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
         "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
     echo "Automap prototype ZIP created at: $OUTPUT_DIR/$PTB_ZIP_NAME"
     exit 0
@@ -702,13 +711,13 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoBeta.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoAlpha.zip"
+    --zip "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoBeta.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
@@ -770,6 +779,11 @@ python3 "$REPO_ROOT/tools/validation/audit_packaged_transition_bridge.py" \
     "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
     "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
 mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | grep -v '/$' | LC_ALL=C sort)
+if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q \
+    '(^|/)(XINPUT1_3\.dll|EternalModManager[^/]*|EternalModInjectorShell[^/]*|Meathook[^/]*)(/|$)'; then
+    echo "Final ZIP contains a prohibited external dependency" >&2
+    exit 1
+fi
 mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
 import json
 import sys
@@ -802,6 +816,6 @@ if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"
-echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoAlpha.zip"
+echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoBeta.zip"
 echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"

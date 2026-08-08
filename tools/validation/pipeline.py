@@ -571,11 +571,12 @@ class Pipeline:
         env["SKIP_REQUIREMENTS_UPDATE"] = "1"
         _run([
             sys.executable, "-m", "pytest",
-            "tests/test_observer_lifecycle.py",
-            "tests/test_publisher_runtime.py",
-            "tests/unit/test_item_reconciliation.py",
-            "tests/unit/test_tracker_supervisor.py",
-            "tests/unit/test_save_scenarios.py",
+            "tests/test_beta_contracts.py",
+            "tests/test_bridge_supervisor.py",
+            "tests/test_dash_physical.py",
+            "tests/test_deathlink_receive.py",
+            "tests/test_install_workflow.py",
+            "tests/test_platform_adapters.py",
             "-q", "--maxfail=1",
         ], env=env)
         if full:
@@ -689,6 +690,7 @@ class Pipeline:
         python = ARCHIPELAGO / ".venv" / "bin" / "python"
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
+        env["AP_TEST_WORLDS"] = "doometernal"
         _run([
             str(python), "-m", "pytest", "-c", str(ARCHIPELAGO / "pytest.ini"),
             str(ARCHIPELAGO / "worlds" / "doometernal" / "test"),
@@ -749,7 +751,7 @@ class Pipeline:
                     "RELEASE_ARTIFACT_NOT_PUBLISHED"
                 )
             with zipfile.ZipFile(zip_path) as outer:
-                inner = outer.read("DoomEternalArchipelagoAlpha.zip")
+                inner = outer.read("DoomEternalArchipelagoBeta.zip")
             with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
                 handle.write(inner)
                 handle.flush()
