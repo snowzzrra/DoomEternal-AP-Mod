@@ -190,9 +190,11 @@ configuration, seeds, logs, and local paths.
 - Some Mission Challenges are completed by equivalent Archipelago checks when
   randomization replaces the vanilla collectible or upgrade action that
   normally advances them.
-- The generic All Mission Challenges override removes the vanilla aggregate
-  Sentinel Battery reward for every cataloged mission while preserving the
-  challenge HUD, native completion predicate, save state, and AP checks.
+- Native Mission Challenge registration remains owned by the canonical
+  `gameresources_patch2` `main.decl`; removing registration is runtime-rejected
+  because it removes HUD and tracking. Individual child overrides suppress only
+  Praetor rewards. DHB currently tests one fourth, impossible vanilla Horde
+  registration to block native aggregate Battery completion; runtime pending.
 - Weapon Point rewards remain vanilla until a safe revision-gated hook owns
   their conversion.
 - Received progression/useful/trap items use the Current major card; filler

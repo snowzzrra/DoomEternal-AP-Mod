@@ -23,10 +23,10 @@ from tools.decls.mission_challenge_decl_builder import (
     AGGREGATE_LIST_PATH,
     CHILD_SOURCE_OWNER,
     CHILD_TARGET_OWNER,
-    _aggregate_suppression_contracts,
+    DHB_DUMMY_PATH,
     _challenge_paths,
+    _dhb_dummy_override,
     _level_blocks,
-    _suppress_aggregate_reward,
 )
 
 
@@ -195,41 +195,53 @@ def validate_overrides_from_mod_root(
         )
         return errors
 
-    aggregate_source = aggregate_path.read_text(encoding="utf-8")
+    aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    expected_aggregate, dhb_contract = _dhb_dummy_override(registry)
+    if aggregate_source != expected_aggregate:
+        errors.append(
+            "Aggregate main.decl differs from canonical patch2 outside the approved "
+            "DHB fourth-challenge registration"
+        )
+
     blocks = [
         (index, block)
         for index, _, _, block in _level_blocks(aggregate_source)
         if "_dev_" not in block
     ]
-    matched_indexes: set[int] = set()
-    forbidden_rewards = re.compile(
-        r"\bCURRENCY_|inventoryItemReward|currencyToGive|"
-        r"gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]|completionUnlock"
-    )
-    for contract in _aggregate_suppression_contracts(registry):
-        mkey = contract["mission_key"]
-        if mkey == "e3m2_hell_b":
-            short_key = "e3m2_b"
-        else:
-            short_key = mkey.split("_")[0]
-        matches = [
-            (index, block)
-            for index, block in blocks
-            if re.search(rf'levelName\s*=\s*"[^"]*{short_key}_name"', block)
-        ]
-        if len(matches) != 1:
+    dhb_matches = [
+        (index, block)
+        for index, block in blocks
+        if index == dhb_contract["level_index"]
+    ]
+    if len(dhb_matches) != 1:
+        errors.append(f"DHB packaged registration count is {len(dhb_matches)}")
+    else:
+        registered = _challenge_paths(dhb_matches[0][1])
+        approved = (*dhb_contract["real_challenges"], DHB_DUMMY_PATH)
+        if registered != approved:
             errors.append(
-                f"{contract['name']}: packaged aggregate owner count is {len(matches)}"
+                f"DHB packaged registration is {registered}, expected {approved}"
             )
-            continue
-        index, block = matches[0]
-        matched_indexes.add(index)
-        if _challenge_paths(block) != ():
-            errors.append(f"{contract['name']}: aggregate challenges block was not suppressed")
-        if forbidden_rewards.search(block):
-            errors.append(f"{contract['name']}: aggregate retains a vanilla reward or completionUnlock")
-    if len(matched_indexes) != len(_aggregate_suppression_contracts(registry)):
-        errors.append("Packaged aggregate suppression set is incomplete")
+
+    dummy_registry_owners = [
+        entry for entry in registry["mission_challenges"]
+        if entry["completion_owner"]["path"].removesuffix(".decl") == DHB_DUMMY_PATH
+        or entry["signal"].get("unlockable") == DHB_DUMMY_PATH
+    ]
+    if dummy_registry_owners:
+        errors.append("DHB dummy challenge acquired AP location ownership")
+    dhb_aggregate = next(
+        aggregate for aggregate in registry["all_mission_challenges"]
+        if aggregate["mission_key"] == "e1m4"
+    )
+    if tuple(dhb_aggregate["signal"]["children"]) != (7770172, 7770173, 7770174):
+        errors.append("DHB AP aggregate children include anything except three real challenges")
+
+    if re.search(
+        r"\bcompletionUnlock\b|warehouseofflinecontainer|CURRENCY_SENTINEL_BATTERY",
+        aggregate_source,
+    ):
+        errors.append("Aggregate main.decl contains a forbidden reward hack")
 
     protected_paths = (
         "propitem/propitem/batteries/sentinel_battery.decl",
@@ -337,31 +349,14 @@ def validate_vanilla_source_equivalence(
         / AGGREGATE_LIST_PATH
     )
     if aggregate_override_file.is_file():
-        aggregate_source = aggregate_source_file.read_text(encoding="utf-8").replace("\r\n", "\n")
-        expected_aggregate = aggregate_source
-        source_blocks = _level_blocks(aggregate_source)
-        for contract in _aggregate_suppression_contracts(registry):
-            expected_children = set(contract["unlockables"])
-            matches = [
-                block for _, _, _, block in source_blocks
-                if set(_challenge_paths(block)) == expected_children and "_dev_" not in block
-            ]
-            if len(matches) != 1:
-                errors.append(
-                    f"{contract['name']}: canonical patch2 source owner count is {len(matches)}"
-                )
-                continue
-            source_block = matches[0]
-            expected_aggregate = expected_aggregate.replace(
-                source_block,
-                _suppress_aggregate_reward(source_block),
-                1,
-            )
-        aggregate_override = aggregate_override_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+        expected_aggregate, _ = _dhb_dummy_override(registry)
+        aggregate_override = aggregate_override_file.read_text(
+            encoding="utf-8"
+        ).replace("\r\n", "\n")
         if aggregate_override != expected_aggregate:
             errors.append(
-                "Aggregate main.decl differs from canonical patch2 outside the three "
-                "approved challenges blocks"
+                "Aggregate main.decl differs from canonical patch2 outside the approved "
+                "DHB fourth-challenge registration"
             )
 
     return errors
