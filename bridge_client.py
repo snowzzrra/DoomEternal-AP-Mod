@@ -1418,9 +1418,8 @@ KNOWN_CATALOG_MAPS = {
 }
 
 MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
-    entry["signal"]["unlockable"]: canonical_map_name(entry.get("runtime_map"))
+    entry["signal"]["unlockable"]: canonical_map_name(entry["runtime_map"])
     for entry in MISSION_CHALLENGE_ENTRIES
-    if entry.get("runtime_map")
 }
 MISSION_CHALLENGE_RUNTIME_MAPS = frozenset(
     (set(MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.values()) | set(KNOWN_CATALOG_MAPS.values()))

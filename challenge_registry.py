@@ -13,6 +13,17 @@ from content_catalog import RUNTIME_STRATEGIES
 
 ROOT = Path(__file__).resolve().parent
 REGISTRY_PATH = ROOT / "data" / "challenge_location_registry.json"
+MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY = {
+    "e1m3": "game/sp/e1m3_cult/e1m3_cult",
+    "e1m4": "game/sp/e1m4_boss/e1m4_boss",
+    "e2m1": "game/sp/e2m1_nest/e2m1_nest",
+    "e2m2": "game/sp/e2m2_base/e2m2_base",
+    "e2m3": "game/sp/e2m3_core/e2m3_core",
+    "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
+    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
+    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
+    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
+}
 
 
 def canonical_map_name(name: str | None) -> str | None:
@@ -45,8 +56,10 @@ def challenge_registry_document(catalog=None) -> dict:
         if not item.category:
             raise ValueError(f"{item.name}: runtime location lacks category")
         data = _thaw(item.data)
-        if item.category == "mission_challenges" and item.mission_key in catalog.maps:
-            data.setdefault("runtime_map", catalog.maps[item.mission_key].runtime_map)
+        if item.category == "mission_challenges":
+            runtime_map = MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY.get(item.mission_key)
+            if runtime_map is not None:
+                data.setdefault("runtime_map", runtime_map)
         registry[item.category].append(data)
     return registry
 
@@ -130,6 +143,16 @@ def validate_challenge_registry(registry: dict) -> None:
         mission_key = _mission_key(entry)
         if not isinstance(unlockable, str) or not unlockable or not mission_key or unlockable in challenge_by_unlockable:
             raise ValueError(f"{entry['name']}: invalid or duplicate challenge unlockable")
+        runtime_map = entry.get("runtime_map")
+        expected_runtime_map = MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY.get(mission_key)
+        if not isinstance(runtime_map, str) or not runtime_map.strip():
+            raise ValueError(f"{entry['name']}: mission challenge runtime_map is required")
+        if canonical_map_name(runtime_map) != runtime_map:
+            raise ValueError(f"{entry['name']}: mission challenge runtime_map is not canonical")
+        if runtime_map not in set(MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY.values()):
+            raise ValueError(f"{entry['name']}: mission challenge runtime_map is unknown")
+        if expected_runtime_map is None or runtime_map != expected_runtime_map:
+            raise ValueError(f"{entry['name']}: mission challenge runtime_map does not match mission_key")
         challenge_by_unlockable[unlockable] = entry
         challenge_missions[unlockable] = mission_key
         sources = signal.get("physical_location_ids", [])

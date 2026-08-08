@@ -25,9 +25,59 @@ DHB_DUMMY_PATH = "mission_challenge/e6m3/challenge_3"
 DHB_DUMMY_DECL_PATH = "unlockable/mission_challenge/e6m3/challenge_3.decl"
 DHB_DUMMY_SHA256 = "7528ea87150ce66df800f420ea775f02f452b485b8f18a942438ea6c41a735d2"
 DHB_DUMMY_STAT = "STAT_PAIN_ELEMENTAL_GLORYKILL_STYLES"
+NEKRAVOL_DUMMY_PATH = "mission_challenge/e6m3/challenge_2"
+NEKRAVOL_DUMMY_DECL_PATH = "unlockable/mission_challenge/e6m3/challenge_2.decl"
+NEKRAVOL_DUMMY_SHA256 = "cae29c0689cae500f839825114eeb8c1927fca0aae2655a1ee409b8518c8599b"
+NEKRAVOL_DUMMY_STAT = "STAT_CHARGEBALL_MATCH_WON"
+PLAN_B_REGISTRATIONS = (
+    {
+        "mission_key": DHB_MISSION_KEY,
+        "label": "DHB",
+        "dummy_path": DHB_DUMMY_PATH,
+        "decl_path": DHB_DUMMY_DECL_PATH,
+        "sha256": DHB_DUMMY_SHA256,
+        "stat": DHB_DUMMY_STAT,
+        "count": 3,
+        "violence_event": None,
+        "required_monster": "AI_MONSTER_PAIN_ELEMENTAL",
+        "impossibility": "Pain Elementals are absent from vanilla Doom Hunter Base",
+    },
+    {
+        "mission_key": "e3m2_hell",
+        "label": "Nekravol",
+        "dummy_path": NEKRAVOL_DUMMY_PATH,
+        "decl_path": NEKRAVOL_DUMMY_DECL_PATH,
+        "sha256": NEKRAVOL_DUMMY_SHA256,
+        "stat": NEKRAVOL_DUMMY_STAT,
+        "count": 5,
+        "violence_event": "violenceevent/mission_challenge/angel_of_death",
+        "violence_event_decl_path": "violenceevent/violenceevent/mission_challenge/angel_of_death.decl",
+        "violence_event_sha256": "1354aaae8c0406097d703e8861dbb45480b64c46eeef8f807eb5209bf6bee2eb",
+        "required_monster": "AI_MONSTER_ZOMBIE_MAYKR",
+        "impossibility": "Maykr Drones are absent from vanilla Nekravol",
+    },
+    {
+        "mission_key": "e3m2_hell_b",
+        "label": "Nekravol II",
+        "dummy_path": NEKRAVOL_DUMMY_PATH,
+        "decl_path": NEKRAVOL_DUMMY_DECL_PATH,
+        "sha256": NEKRAVOL_DUMMY_SHA256,
+        "stat": NEKRAVOL_DUMMY_STAT,
+        "count": 5,
+        "violence_event": "violenceevent/mission_challenge/angel_of_death",
+        "violence_event_decl_path": "violenceevent/violenceevent/mission_challenge/angel_of_death.decl",
+        "violence_event_sha256": "1354aaae8c0406097d703e8861dbb45480b64c46eeef8f807eb5209bf6bee2eb",
+        "required_monster": "AI_MONSTER_ZOMBIE_MAYKR",
+        "impossibility": "Maykr Drones are absent from vanilla Nekravol Part II",
+    },
+)
 PATCH2_CORPUS_ARCHIVE = "gameresources_patch2_decl_analysis_20260710_210928.zip"
 PATCH2_CORPUS_PREFIX = (
     "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/"
+)
+BASE_CORPUS_ARCHIVE = "gameresources_decl_analysis_20260710_201519.zip"
+BASE_CORPUS_PREFIX = (
+    "gameresources_decl_analysis_20260710_201519/files/generated/decls/"
 )
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
@@ -60,6 +110,26 @@ def _patch2_corpus_source(path: str, expected_sha256: str) -> str:
     if actual != expected_sha256:
         raise ValueError(
             f"Mission Challenge patch2 corpus hash drift for {path}: {actual}"
+        )
+    return payload.decode("utf-8")
+
+
+def _base_corpus_source(path: str, expected_sha256: str) -> str:
+    archive = ROOT.parent / "Tools" / BASE_CORPUS_ARCHIVE
+    if not archive.is_file():
+        raise ValueError(f"Mission Challenge base corpus missing: {archive}")
+    member = BASE_CORPUS_PREFIX + path
+    with zipfile.ZipFile(archive) as corpus:
+        try:
+            payload = corpus.read(member)
+        except KeyError as error:
+            raise ValueError(
+                f"Mission Challenge base corpus path missing: {path}"
+            ) from error
+    actual = hashlib.sha256(payload).hexdigest()
+    if actual != expected_sha256:
+        raise ValueError(
+            f"Mission Challenge base corpus hash drift for {path}: {actual}"
         )
     return payload.decode("utf-8")
 
@@ -163,36 +233,57 @@ def _aggregate_contracts(registry: dict) -> list[dict]:
     return contracts
 
 
-def _dhb_registration_contract(registry: dict) -> dict:
-    matches = [
-        contract for contract in _aggregate_contracts(registry)
-        if contract["mission_key"] == DHB_MISSION_KEY
-    ]
-    if len(matches) != 1:
-        raise ValueError(
-            f"DHB Mission Challenge registration contract count is {len(matches)}"
-        )
-    contract = matches[0]
-    if len(contract["unlockables"]) != 3:
-        raise ValueError("DHB must retain exactly three real AP challenge children")
-    return contract
+def _plan_b_registration_contracts(registry: dict) -> tuple[dict, ...]:
+    contracts_by_mission = {
+        contract["mission_key"]: contract for contract in _aggregate_contracts(registry)
+    }
+    contracts = []
+    for plan in PLAN_B_REGISTRATIONS:
+        contract = contracts_by_mission.get(plan["mission_key"])
+        if contract is None:
+            raise ValueError(f"{plan['label']} Mission Challenge registration contract is missing")
+        if len(contract["unlockables"]) != 3:
+            raise ValueError(
+                f"{plan['label']} must retain exactly three real AP challenge children"
+            )
+        contracts.append({**contract, "plan": plan})
+    return tuple(contracts)
 
 
-def _assert_dhb_dummy_candidate() -> None:
+def _assert_dummy_candidate(plan: dict) -> None:
     candidate = _patch2_corpus_source(
-        DHB_DUMMY_DECL_PATH,
-        DHB_DUMMY_SHA256,
+        plan["decl_path"],
+        plan["sha256"],
     ).replace("\r\n", "\n")
     required = (
         'inherit = "mission_challenge/dlc1_challenge_base";',
         'unlockableFlags = "UNLOCKABLE_FLAG_HORDE_CHALLENGE";',
-        f'stat = "{DHB_DUMMY_STAT}";',
-        "count = 3;",
+        f'stat = "{plan["stat"]}";',
+        f'count = {plan["count"]};',
         'scoringItem = "horde/challenge_complete";',
     )
     for snippet in required:
         if candidate.count(snippet) != 1:
-            raise ValueError(f"DHB dummy candidate drift for {snippet!r}")
+            raise ValueError(f"{plan['label']} dummy candidate drift for {snippet!r}")
+    violence_event = plan.get("violence_event")
+    if violence_event and candidate.count(f'violenceEvent = "{violence_event}";') != 1:
+        raise ValueError(f"{plan['label']} dummy candidate violence event drift")
+    if violence_event:
+        event = _base_corpus_source(
+            plan["violence_event_decl_path"],
+            plan["violence_event_sha256"],
+        ).replace("\r\n", "\n")
+        event_required = (
+            f'requiredMonsterType = "{plan["required_monster"]}";',
+            f'stat = "{plan["stat"]}";',
+            'item[0] = "damage/firearm/heavy_cannon_bolt_action_cylindrical";',
+            "headShot = true;",
+        )
+        for snippet in event_required:
+            if event.count(snippet) != 1:
+                raise ValueError(
+                    f"{plan['label']} dummy violence event drift for {snippet!r}"
+                )
     forbidden = (
         "completionStat",
         "currencyToGive",
@@ -201,87 +292,113 @@ def _assert_dhb_dummy_candidate() -> None:
         "inventoryItemReward",
     )
     if any(token in candidate for token in forbidden):
-        raise ValueError("DHB dummy candidate unexpectedly owns persistence or reward")
+        raise ValueError(
+            f"{plan['label']} dummy candidate unexpectedly owns persistence or reward"
+        )
     base = _patch2_corpus_source(
         "unlockable/mission_challenge/dlc1_challenge_base.decl",
         "c1a96d4848f4a7b7a6e6e265e99a778a5ee82b636d006eed76e4ff6bd2149e99",
     ).replace("\r\n", "\n")
     if 'statDuration = "DUR_CUSTOM_LEVEL";' not in base:
-        raise ValueError("DHB dummy candidate base lost custom-level duration")
+        raise ValueError(f"{plan['label']} dummy candidate base lost custom-level duration")
     if any(token in base for token in forbidden):
-        raise ValueError("DHB dummy candidate base unexpectedly owns persistence or reward")
-
-
-def _dhb_dummy_override(registry: dict) -> tuple[str, dict]:
-    source = _source(
-        AGGREGATE_SOURCE_OWNER,
-        AGGREGATE_LIST_PATH,
-        AGGREGATE_LIST_SHA256,
-    ).replace("\r\n", "\n")
-    _assert_dhb_dummy_candidate()
-    contract = _dhb_registration_contract(registry)
-    expected = tuple(contract["unlockables"])
-    matches = [
-        (index, block)
-        for index, _, _, block in _level_blocks(source)
-        if _challenge_paths(block) == expected and "_dev_" not in block
-    ]
-    if len(matches) != 1:
         raise ValueError(
-            f"{contract['name']}: canonical DHB registration count is {len(matches)}"
+            f"{plan['label']} dummy candidate base unexpectedly owns persistence or reward"
         )
-    level_index, block = matches[0]
+
+
+def _append_dummy_to_registration(
+    block: str,
+    expected: tuple[str, ...],
+    dummy_path: str,
+    label: str,
+) -> str:
     challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
     if challenge_match is None:
-        raise ValueError("DHB canonical registration has no challenges block")
+        raise ValueError(f"{label} canonical registration has no challenges block")
     challenge_end = _block_end(block, challenge_match.start())
     challenge_block = block[challenge_match.start():challenge_end]
     if len(re.findall(r"\bnum\s*=\s*3\s*;", challenge_block)) != 1:
-        raise ValueError("DHB canonical challenge count is not exactly three")
+        raise ValueError(f"{label} canonical challenge count is not exactly three")
     item_matches = list(re.finditer(
         r'(?m)^(\s*)item\[(\d+)\]\s*=\s*"([^"]+)";',
         challenge_block,
     ))
     if [int(match.group(2)) for match in item_matches] != [0, 1, 2]:
-        raise ValueError("DHB canonical challenge indexes drifted")
+        raise ValueError(f"{label} canonical challenge indexes drifted")
     if tuple(match.group(3) for match in item_matches) != expected:
-        raise ValueError("DHB canonical real challenge order drifted")
+        raise ValueError(f"{label} canonical real challenge order drifted")
     item_indent = item_matches[-1].group(1)
     close_indent = re.search(r"(?m)^(\s*)\}\s*$", challenge_block)
     if close_indent is None:
-        raise ValueError("DHB canonical challenges block has no closing indentation")
+        raise ValueError(f"{label} canonical challenges block has no closing indentation")
     patched_challenges = re.sub(
         r"(\bnum\s*=\s*)3(\s*;)", r"\g<1>4\g<2>", challenge_block, count=1
     )
     close = patched_challenges.rfind("}")
     patched_challenges = (
         patched_challenges[:close].rstrip()
-        + f'\n{item_indent}item[3] = "{DHB_DUMMY_PATH}";\n'
+        + f'\n{item_indent}item[3] = "{dummy_path}";\n'
         + close_indent.group(1)
         + patched_challenges[close:]
     )
     replacement = block.replace(challenge_block, patched_challenges, 1)
-    override = source.replace(block, replacement, 1)
-    if _challenge_paths(replacement) != (*expected, DHB_DUMMY_PATH):
-        raise ValueError("DHB dummy registration patch failed")
-    return override, {
-        **contract,
-        "level_index": level_index,
-        "real_challenges": expected,
-        "dummy": {
-            "path": DHB_DUMMY_PATH,
-            "source_owner": DHB_DUMMY_SOURCE_OWNER,
-            "decl_path": DHB_DUMMY_DECL_PATH,
-            "sha256": DHB_DUMMY_SHA256,
-            "inherit": "mission_challenge/dlc1_challenge_base",
-            "stat": DHB_DUMMY_STAT,
-            "count": 3,
-            "duration": "DUR_CUSTOM_LEVEL",
-            "unlockable_flags": "UNLOCKABLE_FLAG_HORDE_CHALLENGE",
-            "reward": None,
-            "ap_location": None,
-        },
-    }
+    if _challenge_paths(replacement) != (*expected, dummy_path):
+        raise ValueError(f"{label} dummy registration patch failed")
+    return replacement
+
+
+def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]]:
+    source = _source(
+        AGGREGATE_SOURCE_OWNER,
+        AGGREGATE_LIST_PATH,
+        AGGREGATE_LIST_SHA256,
+    ).replace("\r\n", "\n")
+    contracts = _plan_b_registration_contracts(registry)
+    audited_contracts = []
+    for contract in contracts:
+        plan = contract["plan"]
+        _assert_dummy_candidate(plan)
+        expected = tuple(contract["unlockables"])
+        matches = [
+            (index, block)
+            for index, _, _, block in _level_blocks(source)
+            if _challenge_paths(block) == expected and "_dev_" not in block
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"{contract['name']}: canonical registration count is {len(matches)}"
+            )
+        level_index, block = matches[0]
+        replacement = _append_dummy_to_registration(
+            block, expected, plan["dummy_path"], plan["label"]
+        )
+        source = source.replace(block, replacement, 1)
+        audited_contracts.append({
+            **{key: value for key, value in contract.items() if key != "plan"},
+            "level_index": level_index,
+            "real_challenges": expected,
+            "dummy": {
+                "path": plan["dummy_path"],
+                "source_owner": DHB_DUMMY_SOURCE_OWNER,
+                "decl_path": plan["decl_path"],
+                "sha256": plan["sha256"],
+                "inherit": "mission_challenge/dlc1_challenge_base",
+                "stat": plan["stat"],
+                "count": plan["count"],
+                "duration": "DUR_CUSTOM_LEVEL",
+                "unlockable_flags": "UNLOCKABLE_FLAG_HORDE_CHALLENGE",
+                "violence_event": plan.get("violence_event"),
+                "violence_event_decl_path": plan.get("violence_event_decl_path"),
+                "violence_event_sha256": plan.get("violence_event_sha256"),
+                "required_monster": plan["required_monster"],
+                "impossibility": plan["impossibility"],
+                "existing_vanilla_reference": "Horde e6m3 registration",
+                "reward": None,
+                "ap_location": None,
+            },
+        })
+    return source, tuple(audited_contracts)
 
 
 def _reward_free_override(entry: dict) -> str:
@@ -328,7 +445,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         written_paths.append(target.as_posix())
     if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
         raise ValueError("Mission Challenge override set is incomplete or has duplicates")
-    aggregate_override, dhb_contract = _dhb_dummy_override(registry)
+    aggregate_override, plan_b_contracts = _plan_b_registration_override(registry)
     aggregate_target = (
         mod_root
         / AGGREGATE_TARGET_OWNER
@@ -345,12 +462,12 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
         "registration_experiment": {
-            "strategy": "append_existing_impossible_horde_challenge_to_dhb",
+            "strategy": "append_existing_mission_safe_impossible_horde_challenges",
             "source_owner": AGGREGATE_SOURCE_OWNER,
             "target_owner": AGGREGATE_TARGET_OWNER,
             "source_path": AGGREGATE_LIST_PATH,
-            "mission_count": 1,
-            "contract": dhb_contract,
+            "mission_count": len(plan_b_contracts),
+            "contracts": plan_b_contracts,
         },
         "written_paths": written_paths,
     }
