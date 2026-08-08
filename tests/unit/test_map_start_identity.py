@@ -167,7 +167,7 @@ def test_mission_challenge_overrides_winner_isolation_and_validator():
         assert audit["child_owner"] == "gameresources"
         assert audit["aggregate_owner"] == "gameresources_patch2"
         assert audit["challenge_count"] == 27
-        assert audit["registration_experiment"]["mission_count"] == 1
+        assert audit["registration_experiment"]["mission_count"] == 3
         
         for p in audit["written_paths"]:
             assert "gameresources_patch3" not in p

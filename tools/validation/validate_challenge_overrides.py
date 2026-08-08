@@ -23,9 +23,9 @@ from tools.decls.mission_challenge_decl_builder import (
     AGGREGATE_LIST_PATH,
     CHILD_SOURCE_OWNER,
     CHILD_TARGET_OWNER,
-    DHB_DUMMY_PATH,
+    PLAN_B_REGISTRATIONS,
     _challenge_paths,
-    _dhb_dummy_override,
+    _plan_b_registration_override,
     _level_blocks,
 )
 
@@ -196,11 +196,11 @@ def validate_overrides_from_mod_root(
         return errors
 
     aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    expected_aggregate, dhb_contract = _dhb_dummy_override(registry)
+    expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
     if aggregate_source != expected_aggregate:
         errors.append(
-            "Aggregate main.decl differs from canonical patch2 outside the approved "
-            "DHB fourth-challenge registration"
+            "Aggregate main.decl differs from canonical patch2 outside approved "
+            "Plan B fourth-challenge registrations"
         )
 
     blocks = [
@@ -208,34 +208,47 @@ def validate_overrides_from_mod_root(
         for index, _, _, block in _level_blocks(aggregate_source)
         if "_dev_" not in block
     ]
-    dhb_matches = [
-        (index, block)
-        for index, block in blocks
-        if index == dhb_contract["level_index"]
-    ]
-    if len(dhb_matches) != 1:
-        errors.append(f"DHB packaged registration count is {len(dhb_matches)}")
-    else:
-        registered = _challenge_paths(dhb_matches[0][1])
-        approved = (*dhb_contract["real_challenges"], DHB_DUMMY_PATH)
+    expected_plan_b_missions = tuple(
+        plan["mission_key"] for plan in PLAN_B_REGISTRATIONS
+    )
+    if tuple(contract["mission_key"] for contract in plan_b_contracts) != expected_plan_b_missions:
+        errors.append("Plan B registration scope is not exactly DHB, Nekravol, and Nekravol II")
+    dummy_paths = {contract["dummy"]["path"] for contract in plan_b_contracts}
+    for contract in plan_b_contracts:
+        label = contract["name"]
+        matches = [
+            (index, block)
+            for index, block in blocks
+            if index == contract["level_index"]
+        ]
+        if len(matches) != 1:
+            errors.append(f"{label} packaged registration count is {len(matches)}")
+            continue
+        registered = _challenge_paths(matches[0][1])
+        approved = (*contract["real_challenges"], contract["dummy"]["path"])
         if registered != approved:
-            errors.append(
-                f"DHB packaged registration is {registered}, expected {approved}"
-            )
+            errors.append(f"{label} packaged registration is {registered}, expected {approved}")
 
     dummy_registry_owners = [
         entry for entry in registry["mission_challenges"]
-        if entry["completion_owner"]["path"].removesuffix(".decl") == DHB_DUMMY_PATH
-        or entry["signal"].get("unlockable") == DHB_DUMMY_PATH
+        if entry["completion_owner"]["path"].removesuffix(".decl") in dummy_paths
+        or entry["signal"].get("unlockable") in dummy_paths
     ]
     if dummy_registry_owners:
-        errors.append("DHB dummy challenge acquired AP location ownership")
-    dhb_aggregate = next(
-        aggregate for aggregate in registry["all_mission_challenges"]
-        if aggregate["mission_key"] == "e1m4"
-    )
-    if tuple(dhb_aggregate["signal"]["children"]) != (7770172, 7770173, 7770174):
-        errors.append("DHB AP aggregate children include anything except three real challenges")
+        errors.append("Plan B dummy challenge acquired AP location ownership")
+    for contract in plan_b_contracts:
+        aggregate = next(
+            entry for entry in registry["all_mission_challenges"]
+            if entry["mission_key"] == contract["mission_key"]
+        )
+        real_ids = tuple(
+            entry["location_id"] for entry in registry["mission_challenges"]
+            if entry["mission_key"] == contract["mission_key"]
+        )
+        if tuple(aggregate["signal"]["children"]) != real_ids or len(real_ids) != 3:
+            errors.append(
+                f"{contract['name']} AP aggregate children include anything except three real challenges"
+            )
 
     if re.search(
         r"\bcompletionUnlock\b|warehouseofflinecontainer|CURRENCY_SENTINEL_BATTERY",
@@ -349,14 +362,14 @@ def validate_vanilla_source_equivalence(
         / AGGREGATE_LIST_PATH
     )
     if aggregate_override_file.is_file():
-        expected_aggregate, _ = _dhb_dummy_override(registry)
+        expected_aggregate, _ = _plan_b_registration_override(registry)
         aggregate_override = aggregate_override_file.read_text(
             encoding="utf-8"
         ).replace("\r\n", "\n")
         if aggregate_override != expected_aggregate:
             errors.append(
-                "Aggregate main.decl differs from canonical patch2 outside the approved "
-                "DHB fourth-challenge registration"
+                "Aggregate main.decl differs from canonical patch2 outside approved "
+                "Plan B fourth-challenge registrations"
             )
 
     return errors
