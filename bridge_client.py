@@ -2318,6 +2318,7 @@ class DoomEternalContext(CommonContext):
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
         self.cached_map_identity = None
+        self.pending_map_identity = None
         self.last_accepted_marker_mtime = None
         self.last_accepted_map_evidence_epoch = None
         self.session_map_completion_states = {}
@@ -2479,14 +2480,23 @@ class DoomEternalContext(CommonContext):
             else discover_active_map_markers()
         )
         if not markers:
-            return getattr(self, "cached_map_identity", None)
+            return (
+                getattr(self, "pending_map_identity", None)
+                or getattr(self, "cached_map_identity", None)
+            )
         newest_mtime, newest_path = markers[-1]
         current = getattr(lease, "gameplay_loaded_ns", None) if lease else None
         started = getattr(lease, "started_ns", None) if lease else None
         if started is not None and newest_mtime < started:
-            return getattr(self, "cached_map_identity", None)
+            return (
+                getattr(self, "pending_map_identity", None)
+                or getattr(self, "cached_map_identity", None)
+            )
         if current is not None and newest_mtime <= current:
-            return getattr(self, "cached_map_identity", None)
+            return (
+                getattr(self, "pending_map_identity", None)
+                or getattr(self, "cached_map_identity", None)
+            )
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
         self.invalidate_active_save_proof()
@@ -2494,12 +2504,12 @@ class DoomEternalContext(CommonContext):
         self.mission_select_observation_epoch = None
         self.current_map_name = None
         self.cached_map_identity = None
+        self.pending_map_identity = None
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
         if marker_data is None:
             return self.invalidate_map_identity("malformed_marker")
-        return self.accept_map_identity(
-            {**marker_data, "gameplay_epoch": newest_mtime},
-            evidence_epoch,
+        return self.store_pending_map_identity(
+            {**marker_data, "gameplay_epoch": newest_mtime}
         )
 
     def activate_save_selection(self, selected):
@@ -2557,22 +2567,42 @@ class DoomEternalContext(CommonContext):
             candidate_slot or "<none>",
         )
 
-    def invalidate_map_identity(self, reason):
+    def invalidate_map_identity(self, reason, *, clear_pending=True):
         if getattr(self, "last_marker_reject_reason", None) != reason:
             logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
             self.last_marker_reject_reason = reason
         self.current_map_name = None
         self.cached_map_identity = None
+        if clear_pending:
+            self.pending_map_identity = None
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
         return None
+
+    def store_pending_map_identity(self, marker_data):
+        self.pending_map_identity = {**marker_data, "evidence_epoch": None}
+        self.current_map_name = None
+        self.cached_map_identity = None
+        self.runtime_observers_frozen = True
+        if getattr(self, "last_pending_marker_mtime", None) != marker_data["mtime_ns"]:
+            self.last_pending_marker_mtime = marker_data["mtime_ns"]
+            logger.info(
+                "[MAP] MAP_IDENTITY_MARKER_PENDING map=%s runtime_map=%s "
+                "source=map_start_event epoch=%s",
+                marker_data["map_key"],
+                marker_data["runtime_map"],
+                marker_data["gameplay_epoch"],
+            )
+        return self.pending_map_identity
 
     def accept_map_identity(self, marker_data, evidence_epoch):
         marker_data = {
             **marker_data,
             "evidence_epoch": evidence_epoch,
         }
+        self.pending_map_identity = None
         self.cached_map_identity = marker_data
+        self.current_map_name = marker_data["runtime_map"]
         marker_mtime = marker_data["mtime_ns"]
         if self.last_accepted_marker_mtime != marker_mtime:
             self.last_accepted_marker_mtime = marker_mtime
@@ -2594,9 +2624,34 @@ class DoomEternalContext(CommonContext):
             self.invalidate_active_save_proof()
             return self.invalidate_map_identity("game_not_running")
 
-        if evidence is None or getattr(evidence, "state", None) != "gameplay":
-            reason = "menu" if (evidence and getattr(evidence, "state", None) == "menu") else "gameplay_not_loaded"
-            return self.invalidate_map_identity(reason)
+        pending = getattr(self, "pending_map_identity", None)
+        if evidence is None:
+            if pending is not None:
+                self.current_map_name = None
+                self.cached_map_identity = None
+                return None
+            cached = self.cached_map_identity
+            lease_epoch = (
+                lease.gameplay_loaded_ns
+                if lease is not None and lease.gameplay_loaded_ns
+                else None
+            )
+            if (
+                cached is not None
+                and (lease_epoch is None or cached.get("gameplay_epoch") == lease_epoch)
+            ):
+                return self.accept_map_identity(
+                    cached, cached.get("evidence_epoch")
+                )
+            return self.invalidate_map_identity("gameplay_not_loaded")
+
+        if getattr(evidence, "state", None) != "gameplay":
+            self.invalidate_active_save_proof()
+            if pending is not None:
+                self.current_map_name = None
+                self.cached_map_identity = None
+                return None
+            return self.invalidate_map_identity("menu")
 
         lease_epoch = (
             lease.gameplay_loaded_ns
@@ -2604,6 +2659,18 @@ class DoomEternalContext(CommonContext):
             else None
         )
         evidence_epoch = getattr(evidence, "epoch", None)
+
+        if pending is not None:
+            pending_mtime = pending.get("mtime_ns", 0)
+            if lease is not None and lease.started_ns and pending_mtime < lease.started_ns:
+                return self.invalidate_map_identity("stale_marker")
+            if (
+                lease_epoch is not None
+                and pending.get("gameplay_epoch") != lease_epoch
+            ):
+                return self.invalidate_map_identity("epoch_mismatch")
+            return self.accept_map_identity(pending, evidence_epoch)
+
         cached = self.cached_map_identity
         markers = discover_active_map_markers()
         if not markers:
@@ -2653,7 +2720,6 @@ class DoomEternalContext(CommonContext):
             **marker_data,
             "gameplay_epoch": lease_epoch or newest_mtime,
         }
-
         return self.accept_map_identity(marker_data, evidence_epoch)
 
     def log_save_proof_accepted(
@@ -2696,7 +2762,11 @@ class DoomEternalContext(CommonContext):
         lease = getattr(self, "runtime_observation_lease", None)
         lease_epoch = lease.gameplay_loaded_ns if (lease and getattr(lease, "gameplay_loaded_ns", None)) else None
 
-        proof_evidence_epoch = evidence_epoch
+        proof_evidence_epoch = (
+            evidence_epoch
+            if evidence_epoch is not None
+            else getattr(self, "active_save_proof_evidence_epoch", None)
+        )
         proof_load_epoch = lease_epoch
 
         newest = candidates[0] if candidates else None
@@ -2894,7 +2964,7 @@ class DoomEternalContext(CommonContext):
 
             self.active_save_proof_authoritative = True
             self.active_save_proof_slot = selected.slot_directory
-            self.active_save_proof_evidence_epoch = evidence_epoch
+            self.active_save_proof_evidence_epoch = proof_evidence_epoch
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
             return selected

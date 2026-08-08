@@ -89,6 +89,9 @@
     "wing_b_pickup_collectible_albums_album_03_1": {
       "native_entity_contract": {
         "original_targets": [],
+        "set_properties": {
+          "model": "art/pickups/codex.lwo"
+        },
         "required_snippets": [
           "inherit = \"pickup/collectible/albums/album_03\";",
           "triggerDef = \"trigger/props/progression_collectibles\";",

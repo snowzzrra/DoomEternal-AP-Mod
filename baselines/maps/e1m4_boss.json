@@ -19,14 +19,18 @@
     {
       "content_revision": "v0.3.9-alpha",
       "reason": "v0.3.9-alpha: per-map authoritative Mission Select identity marker"
+    },
+    {
+      "content_revision": "v0.3.9-alpha",
+      "reason": "v0.3.9 correction: Commander Keen native album model question_mark_a.lwo to codex.lwo only"
     }
   ],
   "asset_package_contract_sha256": "1301a39fcd94c697ef77009b823431bbb7eab9eaddf9db57e860d5a6071e367f",
-  "byte_sha256": "13a2a72eff3ef155c263bd41a1f817ca0ec6489ddf0043b498f7106f537a7b07",
+  "byte_sha256": "31e04aa08863f8039ee5167c3d848ba299cd1371a0c4b5ab12c2c40f5c926972",
   "content_revision": "v0.3.9-alpha",
   "generated_entity_metrics": {
     "bind_parents": 706,
-    "byte_size": 10659238,
+    "byte_size": 10659228,
     "classes": 9139,
     "entity_count": 9141,
     "layers": 2353,
@@ -62,6 +66,6 @@
     7770162
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "1312d7330ceff3e9cc34cb23eb5109807a5f2bc962e746ed6ed49ea96c77a1af",
-  "semantic_sha256": "d3724f1133350f078032f1ba3e9b3f3bab89780fc965203f69dae82e64a2c071"
+  "scripted_contract_sha256": "dc0c5401512c54369ec4de732d92a156a6882285453cef13a5660d31dc073273",
+  "semantic_sha256": "0448bca1870bd26582a6df0de60b7bd66b0619c3c472769adb2d34574e83d786"
 }

@@ -104,11 +104,11 @@ def test_marker_rejected_on_menu_loading_or_game_closed(monkeypatch):
     assert ctx.read_active_map_identity(evidence=menu_evidence) is None
     assert ctx.current_map_name is None
 
-    class MockLease:
-        def process_probe(self):
-            return False
-
-    ctx.runtime_observation_lease = MockLease()
+    from observer_lifecycle import RuntimeObservationLease
+    ctx.runtime_observation_lease = RuntimeObservationLease(
+        process_probe=lambda: False,
+        started_ns=time.time_ns(),
+    )
     ctx.current_map_name = "game/sp/e1m4_boss/e1m4_boss"
     ctx.mission_select_observation_map = "game/sp/e1m4_boss/e1m4_boss"
     ctx.mission_select_observation_epoch = 123
@@ -167,7 +167,7 @@ def test_mission_challenge_overrides_winner_isolation_and_validator():
         assert audit["child_owner"] == "gameresources"
         assert audit["aggregate_owner"] == "gameresources_patch2"
         assert audit["challenge_count"] == 27
-        assert audit["aggregate_reward_suppression"]["aggregate_count"] == 3
+        assert audit["registration_experiment"]["mission_count"] == 1
         
         for p in audit["written_paths"]:
             assert "gameresources_patch3" not in p
@@ -436,7 +436,7 @@ def test_tracker_ingests_marker_before_challenge_observation(monkeypatch):
         return None
     monkeypatch.setattr(asyncio, "sleep", no_sleep)
     asyncio.run(ctx.tracker_loop())
-    assert events == [("load", 123), ("challenge", True, True)]
+    assert events == [("load", 123), ("challenge", False, True)]
 
 
 def test_central_guard_revokes_unconsumed_new_load_and_malformed_load(monkeypatch):
@@ -483,6 +483,105 @@ def test_central_guard_does_not_rewind_valid_load(monkeypatch):
     assert ctx.ingest_visible_runtime_lifecycle() is None
     assert ctx.runtime_observation_lease.gameplay_loaded_ns == 200
     assert ctx.active_save_proof_authoritative is True
+
+
+def test_fresh_marker_survives_transient_menu_then_promotes_same_load(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(asyncio, "create_task", lambda *a, **kw: None)
+    import bridge_client
+    from bridge_client import DoomEternalContext, GameplaySaveEvidence
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setattr(bridge_client, "INV_DUMP_DIR", tmpdir)
+        ctx = DoomEternalContext("localhost:38281", "")
+        marker_path = os.path.join(tmpdir, "ap_active_map_e1m4_boss.txt")
+        with open(marker_path, "w", encoding="utf-8") as f:
+            f.write(
+                "AP_ACTIVE_MAP_V1 map_key=e1m4_boss "
+                "runtime_map=game/sp/e1m4_boss/e1m4_boss "
+                "marker=AP_MAP_START_E1M4_BOSS\n"
+            )
+        marker_epoch = os.stat(marker_path).st_mtime_ns
+
+        class Lease:
+            started_ns = marker_epoch - 1
+            gameplay_loaded_ns = None
+            def process_probe(self):
+                return True
+            def observe_gameplay_loaded(self, epoch):
+                self.gameplay_loaded_ns = epoch
+
+        ctx.runtime_observation_lease = Lease()
+        menu = GameplaySaveEvidence("menu", 100, "GAME-AUTOSAVE2", "game/hub/hub")
+        assert ctx.read_active_map_identity(menu) is None
+        assert ctx.pending_map_identity["map_key"] == "e1m4_boss"
+        assert ctx.cached_map_identity is None
+        assert ctx.current_map_name is None
+        assert ctx.runtime_observers_frozen is True
+
+        gameplay = GameplaySaveEvidence(
+            "gameplay", 101, "GAME-AUTOSAVE2", "game/sp/e1m4_boss/e1m4_boss"
+        )
+        promoted = ctx.read_active_map_identity(gameplay)
+        assert promoted["map_key"] == "e1m4_boss"
+        assert promoted["gameplay_epoch"] == marker_epoch
+        assert promoted["evidence_epoch"] == 101
+        assert ctx.pending_map_identity is None
+        assert ctx.current_map_name == "game/sp/e1m4_boss/e1m4_boss"
+        assert ctx.runtime_observers_frozen is True
+
+
+def test_newer_load_discards_old_pending_marker_and_process_exit_clears(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(asyncio, "create_task", lambda *a, **kw: None)
+    import bridge_client
+    from bridge_client import DoomEternalContext, GameplaySaveEvidence
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setattr(bridge_client, "INV_DUMP_DIR", tmpdir)
+        ctx = DoomEternalContext("localhost:38281", "")
+        mission_path = os.path.join(tmpdir, "ap_active_map_e1m4_boss.txt")
+        with open(mission_path, "w", encoding="utf-8") as f:
+            f.write(
+                "AP_ACTIVE_MAP_V1 map_key=e1m4_boss "
+                "runtime_map=game/sp/e1m4_boss/e1m4_boss "
+                "marker=AP_MAP_START_E1M4_BOSS\n"
+            )
+        first_epoch = os.stat(mission_path).st_mtime_ns
+
+        class Lease:
+            started_ns = first_epoch - 1
+            gameplay_loaded_ns = None
+            running = True
+            def process_probe(self):
+                return self.running
+            def observe_gameplay_loaded(self, epoch):
+                self.gameplay_loaded_ns = epoch
+
+        lease = Lease()
+        ctx.runtime_observation_lease = lease
+        menu = GameplaySaveEvidence("menu", 100, "GAME-AUTOSAVE2", "game/hub/hub")
+        assert ctx.read_active_map_identity(menu) is None
+        assert ctx.pending_map_identity["map_key"] == "e1m4_boss"
+
+        hub_path = os.path.join(tmpdir, "ap_active_map_hub.txt")
+        with open(hub_path, "w", encoding="utf-8") as f:
+            f.write(
+                "AP_ACTIVE_MAP_V1 map_key=hub runtime_map=game/hub/hub "
+                "marker=AP_MAP_START_HUB\n"
+            )
+        hub_epoch = max(time.time_ns(), first_epoch + 1_000_000)
+        os.utime(hub_path, ns=(hub_epoch, hub_epoch))
+        assert ctx.read_active_map_identity(menu) is None
+        assert ctx.pending_map_identity["map_key"] == "hub"
+        assert ctx.pending_map_identity["mtime_ns"] == os.stat(hub_path).st_mtime_ns
+        assert ctx.current_map_name is None
+
+        lease.running = False
+        assert ctx.read_active_map_identity(menu) is None
+        assert ctx.pending_map_identity is None
+        assert ctx.cached_map_identity is None
+        assert ctx.current_map_name is None
 
 
 def test_fresh_hub_marker_replaces_mission_identity(monkeypatch):

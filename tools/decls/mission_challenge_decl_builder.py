@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import zipfile
 from pathlib import Path
 
 from challenge_registry import load_challenge_registry
@@ -18,11 +19,16 @@ AGGREGATE_SOURCE_OWNER = "gameresources_patch2"
 AGGREGATE_TARGET_OWNER = "gameresources_patch2"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
 AGGREGATE_LIST_SHA256 = "e4528a4751e40f1237224989c0357df4bdd8d0f6d86fee8c502eeed5ff393ff4"
-AGGREGATE_SUPPRESSION_MISSION_KEYS = frozenset({
-    "e1m4",
-    "e3m2_hell",
-    "e3m2_hell_b",
-})
+DHB_MISSION_KEY = "e1m4"
+DHB_DUMMY_SOURCE_OWNER = "gameresources_patch2"
+DHB_DUMMY_PATH = "mission_challenge/e6m3/challenge_3"
+DHB_DUMMY_DECL_PATH = "unlockable/mission_challenge/e6m3/challenge_3.decl"
+DHB_DUMMY_SHA256 = "7528ea87150ce66df800f420ea775f02f452b485b8f18a942438ea6c41a735d2"
+DHB_DUMMY_STAT = "STAT_PAIN_ELEMENTAL_GLORYKILL_STYLES"
+PATCH2_CORPUS_ARCHIVE = "gameresources_patch2_decl_analysis_20260710_210928.zip"
+PATCH2_CORPUS_PREFIX = (
+    "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/"
+)
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
 \t\t}
@@ -35,6 +41,26 @@ def _source(owner: str, path: str, expected_sha256: str) -> str:
     actual = hashlib.sha256(payload).hexdigest()
     if actual != expected_sha256:
         raise ValueError(f"Mission Challenge vanilla owner hash drift for {path}: {actual}")
+    return payload.decode("utf-8")
+
+
+def _patch2_corpus_source(path: str, expected_sha256: str) -> str:
+    archive = ROOT.parent / "Tools" / PATCH2_CORPUS_ARCHIVE
+    if not archive.is_file():
+        raise ValueError(f"Mission Challenge patch2 corpus missing: {archive}")
+    member = PATCH2_CORPUS_PREFIX + path
+    with zipfile.ZipFile(archive) as corpus:
+        try:
+            payload = corpus.read(member)
+        except KeyError as error:
+            raise ValueError(
+                f"Mission Challenge patch2 corpus path missing: {path}"
+            ) from error
+    actual = hashlib.sha256(payload).hexdigest()
+    if actual != expected_sha256:
+        raise ValueError(
+            f"Mission Challenge patch2 corpus hash drift for {path}: {actual}"
+        )
     return payload.decode("utf-8")
 
 
@@ -137,85 +163,125 @@ def _aggregate_contracts(registry: dict) -> list[dict]:
     return contracts
 
 
-def _aggregate_suppression_contracts(registry: dict) -> list[dict]:
-    contracts = [
+def _dhb_registration_contract(registry: dict) -> dict:
+    matches = [
         contract for contract in _aggregate_contracts(registry)
-        if contract["mission_key"] in AGGREGATE_SUPPRESSION_MISSION_KEYS
+        if contract["mission_key"] == DHB_MISSION_KEY
     ]
-    found = {contract["mission_key"] for contract in contracts}
-    if found != AGGREGATE_SUPPRESSION_MISSION_KEYS:
+    if len(matches) != 1:
         raise ValueError(
-            "Mission Challenge native aggregate suppression scope drift: "
-            f"expected {sorted(AGGREGATE_SUPPRESSION_MISSION_KEYS)}, found {sorted(found)}"
+            f"DHB Mission Challenge registration contract count is {len(matches)}"
         )
-    return contracts
+    contract = matches[0]
+    if len(contract["unlockables"]) != 3:
+        raise ValueError("DHB must retain exactly three real AP challenge children")
+    return contract
 
 
-def _suppress_aggregate_reward(block: str) -> str:
-    """Remove native aggregate challenges block to suppress default Sentinel Battery reward."""
-    challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
-    if not challenge_match:
-        return block
-    start = challenge_match.start()
-    end = _block_end(block, start)
-    while end < len(block) and block[end] in " \t\r\n":
-        end += 1
-    return block[:start] + block[end:]
+def _assert_dhb_dummy_candidate() -> None:
+    candidate = _patch2_corpus_source(
+        DHB_DUMMY_DECL_PATH,
+        DHB_DUMMY_SHA256,
+    ).replace("\r\n", "\n")
+    required = (
+        'inherit = "mission_challenge/dlc1_challenge_base";',
+        'unlockableFlags = "UNLOCKABLE_FLAG_HORDE_CHALLENGE";',
+        f'stat = "{DHB_DUMMY_STAT}";',
+        "count = 3;",
+        'scoringItem = "horde/challenge_complete";',
+    )
+    for snippet in required:
+        if candidate.count(snippet) != 1:
+            raise ValueError(f"DHB dummy candidate drift for {snippet!r}")
+    forbidden = (
+        "completionStat",
+        "currencyToGive",
+        "currencyList",
+        "CURRENCY_",
+        "inventoryItemReward",
+    )
+    if any(token in candidate for token in forbidden):
+        raise ValueError("DHB dummy candidate unexpectedly owns persistence or reward")
+    base = _patch2_corpus_source(
+        "unlockable/mission_challenge/dlc1_challenge_base.decl",
+        "c1a96d4848f4a7b7a6e6e265e99a778a5ee82b636d006eed76e4ff6bd2149e99",
+    ).replace("\r\n", "\n")
+    if 'statDuration = "DUR_CUSTOM_LEVEL";' not in base:
+        raise ValueError("DHB dummy candidate base lost custom-level duration")
+    if any(token in base for token in forbidden):
+        raise ValueError("DHB dummy candidate base unexpectedly owns persistence or reward")
 
 
-def _aggregate_reward_free_override(registry: dict) -> tuple[str, list[dict]]:
+def _dhb_dummy_override(registry: dict) -> tuple[str, dict]:
     source = _source(
         AGGREGATE_SOURCE_OWNER,
         AGGREGATE_LIST_PATH,
         AGGREGATE_LIST_SHA256,
     ).replace("\r\n", "\n")
-    blocks = _level_blocks(source)
-    contracts = _aggregate_suppression_contracts(registry)
-    replacements: list[tuple[int, int, str]] = []
-    audit_contracts = []
-    used_indexes: set[int] = set()
-    for contract in contracts:
-        expected = set(contract["unlockables"])
-        matches = [
-            (index, start, end, block)
-            for index, start, end, block in blocks
-            if set(_challenge_paths(block)) == expected
-            and "_dev_" not in block
-        ]
-        if len(matches) != 1:
-            raise ValueError(
-                f"{contract['name']}: expected one vanilla aggregate owner, found {len(matches)}"
-            )
-        index, start, end, block = matches[0]
-        if index in used_indexes:
-            raise ValueError(f"{contract['name']}: aggregate owner reused")
-        used_indexes.add(index)
-        replacement = _suppress_aggregate_reward(block)
-        if _challenge_paths(replacement) != ():
-            raise ValueError(f"{contract['name']}: completion challenges block not removed")
-        for presentation in ("levelName",):
-            if len(re.findall(r"\b" + presentation + r"\b", replacement)) != len(re.findall(r"\b" + presentation + r"\b", block)):
-                raise ValueError(f"{contract['name']}: presentation changed")
-        if re.search(r"\bchallenges\s*=\s*\{", replacement):
-            raise ValueError(f"{contract['name']}: aggregate challenges block remains")
-        if re.search(r"CURRENCY_|inventoryItemReward|currencyToGive|gainedItems\s*=\s*\{\s*num\s*=\s*[1-9]", replacement):
-            raise ValueError(f"{contract['name']}: vanilla aggregate reward remains")
-        replacements.append((block, replacement))
-        audit_contracts.append({
-            **contract,
-            "level_index": index,
-            "challenges_suppressed": True,
-        })
-    override = source
-    for block, replacement in replacements:
-        override = override.replace(block, replacement, 1)
-    for _, _, _, block in _level_blocks(override):
-        if "_dev_" in block:
-            continue
-        for contract in contracts:
-            if set(_challenge_paths(block)) == set(contract["unlockables"]):
-                raise ValueError(f"{contract['name']}: aggregate challenges block remains")
-    return override, audit_contracts
+    _assert_dhb_dummy_candidate()
+    contract = _dhb_registration_contract(registry)
+    expected = tuple(contract["unlockables"])
+    matches = [
+        (index, block)
+        for index, _, _, block in _level_blocks(source)
+        if _challenge_paths(block) == expected and "_dev_" not in block
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"{contract['name']}: canonical DHB registration count is {len(matches)}"
+        )
+    level_index, block = matches[0]
+    challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
+    if challenge_match is None:
+        raise ValueError("DHB canonical registration has no challenges block")
+    challenge_end = _block_end(block, challenge_match.start())
+    challenge_block = block[challenge_match.start():challenge_end]
+    if len(re.findall(r"\bnum\s*=\s*3\s*;", challenge_block)) != 1:
+        raise ValueError("DHB canonical challenge count is not exactly three")
+    item_matches = list(re.finditer(
+        r'(?m)^(\s*)item\[(\d+)\]\s*=\s*"([^"]+)";',
+        challenge_block,
+    ))
+    if [int(match.group(2)) for match in item_matches] != [0, 1, 2]:
+        raise ValueError("DHB canonical challenge indexes drifted")
+    if tuple(match.group(3) for match in item_matches) != expected:
+        raise ValueError("DHB canonical real challenge order drifted")
+    item_indent = item_matches[-1].group(1)
+    close_indent = re.search(r"(?m)^(\s*)\}\s*$", challenge_block)
+    if close_indent is None:
+        raise ValueError("DHB canonical challenges block has no closing indentation")
+    patched_challenges = re.sub(
+        r"(\bnum\s*=\s*)3(\s*;)", r"\g<1>4\g<2>", challenge_block, count=1
+    )
+    close = patched_challenges.rfind("}")
+    patched_challenges = (
+        patched_challenges[:close].rstrip()
+        + f'\n{item_indent}item[3] = "{DHB_DUMMY_PATH}";\n'
+        + close_indent.group(1)
+        + patched_challenges[close:]
+    )
+    replacement = block.replace(challenge_block, patched_challenges, 1)
+    override = source.replace(block, replacement, 1)
+    if _challenge_paths(replacement) != (*expected, DHB_DUMMY_PATH):
+        raise ValueError("DHB dummy registration patch failed")
+    return override, {
+        **contract,
+        "level_index": level_index,
+        "real_challenges": expected,
+        "dummy": {
+            "path": DHB_DUMMY_PATH,
+            "source_owner": DHB_DUMMY_SOURCE_OWNER,
+            "decl_path": DHB_DUMMY_DECL_PATH,
+            "sha256": DHB_DUMMY_SHA256,
+            "inherit": "mission_challenge/dlc1_challenge_base",
+            "stat": DHB_DUMMY_STAT,
+            "count": 3,
+            "duration": "DUR_CUSTOM_LEVEL",
+            "unlockable_flags": "UNLOCKABLE_FLAG_HORDE_CHALLENGE",
+            "reward": None,
+            "ap_location": None,
+        },
+    }
 
 
 def _reward_free_override(entry: dict) -> str:
@@ -262,7 +328,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         written_paths.append(target.as_posix())
     if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
         raise ValueError("Mission Challenge override set is incomplete or has duplicates")
-    aggregate_override, aggregate_contracts = _aggregate_reward_free_override(registry)
+    aggregate_override, dhb_contract = _dhb_dummy_override(registry)
     aggregate_target = (
         mod_root
         / AGGREGATE_TARGET_OWNER
@@ -278,13 +344,13 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         "aggregate_owner": AGGREGATE_TARGET_OWNER,
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
-        "aggregate_reward_suppression": {
-            "strategy": "suppress_aggregate_challenges_in_main_decl",
+        "registration_experiment": {
+            "strategy": "append_existing_impossible_horde_challenge_to_dhb",
             "source_owner": AGGREGATE_SOURCE_OWNER,
             "target_owner": AGGREGATE_TARGET_OWNER,
             "source_path": AGGREGATE_LIST_PATH,
-            "aggregate_count": len(aggregate_contracts),
-            "contracts": aggregate_contracts,
+            "mission_count": 1,
+            "contract": dhb_contract,
         },
         "written_paths": written_paths,
     }

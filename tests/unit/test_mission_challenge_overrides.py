@@ -13,6 +13,7 @@ from tools.decls.mission_challenge_decl_builder import (
     AGGREGATE_TARGET_OWNER,
     CHILD_SOURCE_OWNER,
     CHILD_TARGET_OWNER,
+    DHB_DUMMY_PATH,
     build_mission_challenge_overrides,
 )
 from tools.validation.validate_challenge_overrides import (
@@ -56,7 +57,10 @@ def test_build_and_validate_mission_challenge_overrides(repo_root, temp_mod_root
     assert audit["aggregate_owner"] == "gameresources_patch2"
     assert audit["challenge_count"] == 27
     assert len(audit["written_paths"]) == 28  # 27 children + main.decl
-    assert audit["aggregate_reward_suppression"]["aggregate_count"] == 3
+    experiment = audit["registration_experiment"]
+    assert experiment["mission_count"] == 1
+    assert experiment["contract"]["dummy"]["path"] == DHB_DUMMY_PATH
+    assert experiment["contract"]["dummy"]["ap_location"] is None
 
     registry_path = repo_root / "data" / "challenge_location_registry.json"
 
@@ -77,9 +81,12 @@ def test_build_and_validate_mission_challenge_overrides(repo_root, temp_mod_root
     main_path = mod_dir / "gameresources_patch2" / "generated" / "decls" / "missionchallengelist" / "missionchallenge" / "main.decl"
     assert main_path.is_file()
     main_content = main_path.read_text(encoding="utf-8")
-    assert "mission_challenge/e1m4/challenge_1" not in main_content
-    assert "mission_challenge/e3m2/challenge_1" not in main_content
-    assert "mission_challenge/e3m2_b/challenge_1" not in main_content
+    assert main_content.count("mission_challenge/e1m4/challenge_1") == 1
+    assert main_content.count("mission_challenge/e1m4/challenge_2") == 1
+    assert main_content.count("mission_challenge/e1m4/challenge_3") == 1
+    assert main_content.count(DHB_DUMMY_PATH) == 2  # DHB experiment + vanilla Horde
+    assert main_content.count("mission_challenge/e3m2/challenge_1") == 1
+    assert main_content.count("mission_challenge/e3m2_b/challenge_1") == 1
     assert "mission_challenge/e1m3/challenge_1" in main_content
     assert "mission_challenge/e2m1/challenge_1" in main_content
     assert "mission_challenge/e3m1/challenge_1" in main_content
@@ -92,6 +99,34 @@ def test_build_and_validate_mission_challenge_overrides(repo_root, temp_mod_root
 
     container_path = mod_dir / "gameresources" / "generated" / "decls" / "warehouseofflinecontainer" / "campaign" / "e1m3_complete_challenges_reward_0.decl"
     assert not container_path.exists()
+
+
+def test_dhb_dummy_has_zero_ap_location_ownership(repo_root):
+    registry = json.loads(
+        (repo_root / "data" / "challenge_location_registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    dhb_children = [
+        entry for entry in registry["mission_challenges"]
+        if entry.get("mission_key") == "e1m4"
+    ]
+    assert [entry["location_id"] for entry in dhb_children] == [
+        7770172,
+        7770173,
+        7770174,
+    ]
+    assert [entry["signal"]["unlockable"] for entry in dhb_children] == [
+        "mission_challenge/e1m4/challenge_1",
+        "mission_challenge/e1m4/challenge_2",
+        "mission_challenge/e1m4/challenge_3",
+    ]
+    dhb_aggregate = next(
+        entry for entry in registry["all_mission_challenges"]
+        if entry["location_id"] == 7770175
+    )
+    assert dhb_aggregate["signal"]["children"] == [7770172, 7770173, 7770174]
+    assert DHB_DUMMY_PATH not in json.dumps(registry)
 
 
 def test_validator_rejects_invented_decl_path(repo_root, temp_mod_root):

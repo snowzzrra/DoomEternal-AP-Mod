@@ -539,6 +539,8 @@ entity {
                 ):
                     self.assertNotIn(forbidden, trigger)
 
+    
+
     def test_bound_pickup_triggers_keep_vanilla_local_coordinates_and_edit_siblings(self):
         cases = (
             (
