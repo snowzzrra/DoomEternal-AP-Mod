@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -67,10 +68,21 @@ CONFIG_FILE = Path(
 )
 BRIDGE_FILE = Path(__file__).resolve()
 BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
-BRIDGE_PROTOCOL = 3
+_CONTENT_IDENTITY = json.loads(
+    (Path(__file__).resolve().with_name("data") / "content_identity.json").read_text(encoding="utf-8")
+)
+BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
 BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
 TRANSITION_HANDLER = "unified"
-GAME_NAME = "DOOM Eternal"
+GAME_NAME = _CONTENT_IDENTITY["game"]
+DEATHLINK_RECEIVE_TIMEOUT = 20.0
+DEATHLINK_CONFIRM_TIMEOUT = 10.0
+DEATHLINK_MESSAGES = (
+    "{player} didn't rip and tear enough.",
+    "{player} was sent back to the Fortress.",
+    "{player} picked a fight with Hell and lost.",
+    "{player}'s ripping and tearing privileges were revoked.",
+)
 
 ENABLE_ITEM_NOTIFICATIONS = False
 try:
@@ -2340,8 +2352,11 @@ class DoomEternalContext(CommonContext):
         self.previous_died_last_game = None
         self.last_details_mtime = None
         self.last_details_path = None
-        self.deathlinked = False
-        self.last_deathlink_kill_attempt = 0.0
+        # Receive state is deliberately process-local. A restart drops pending
+        # DeathLink delivery instead of replaying an old lethal command.
+        self.received_deathlink_event = None
+        self.recent_deathlink_ids = {}
+        self.deathlink_echo_suppression_event_id = None
         self.last_goal_details_mtime = None
         self.final_sin_completion_candidate = None
         self.cultist_autosave_path = None
@@ -3057,7 +3072,6 @@ class DoomEternalContext(CommonContext):
                 "processed_items": 0,
                 "goal_sent": False,
                 "cultist_autosave_path": None,
-                "deathlinked": False,
                 "save_slot_observations": {},
             },
         )
@@ -3069,7 +3083,8 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = self.session_state.get(
             "cultist_autosave_path"
         )
-        self.deathlinked = bool(self.session_state.get("deathlinked", False))
+        # Never restore received DeathLink state across a process restart.
+        self.session_state.pop("deathlinked", None)
         raw_save_observations = self.session_state.get("save_slot_observations", {})
         if not isinstance(raw_save_observations, dict):
             raw_save_observations = {}
@@ -3106,7 +3121,7 @@ class DoomEternalContext(CommonContext):
             return
         self.session_state["processed_items"] = self.items_processed
         self.session_state["cultist_autosave_path"] = self.cultist_autosave_path
-        self.session_state["deathlinked"] = self.deathlinked
+        self.session_state.pop("deathlinked", None)
         self.session_state["save_slot_observations"] = self.save_slot_observations
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
@@ -3667,33 +3682,54 @@ class DoomEternalContext(CommonContext):
 
     def on_deathlink(self, data: dict):
         super().on_deathlink(data)
-        if self.death_link_enabled:
-            self.deathlinked = True
-            self.last_deathlink_kill_attempt = 0.0
-            self.persist_session_state()
-            logger.info(
-                "[DeathLink] Received. Will retry the in-game death until "
-                "the save confirms it."
-            )
+        if not self.death_link_enabled:
+            return
+        now = time.monotonic()
+        event_id = hashlib.sha256(
+            json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        self.recent_deathlink_ids = {
+            key: expiry for key, expiry in self.recent_deathlink_ids.items() if expiry > now
+        }
+        if event_id in self.recent_deathlink_ids:
+            logger.info("[DeathLink] Ignored duplicate received event %s.", event_id[:12])
+            return
+        self.recent_deathlink_ids[event_id] = now + DEATHLINK_RECEIVE_TIMEOUT + DEATHLINK_CONFIRM_TIMEOUT
+        self.received_deathlink_event = {
+            "id": event_id,
+            "state": "RECEIVED",
+            "deadline": now + DEATHLINK_RECEIVE_TIMEOUT,
+        }
+        logger.info("[DeathLink] Received %s; waiting for safe gameplay.", event_id[:12])
 
     def queue_received_deathlink(self):
-        if (
-            not self.death_link_enabled
-            or not self.deathlinked
-        ):
+        event = self.received_deathlink_event
+        if not self.death_link_enabled or event is None:
             return
-
         now = time.monotonic()
-        if now - self.last_deathlink_kill_attempt < DEATHLINK_KILL_INTERVAL:
+        if now >= event["deadline"]:
+            logger.warning("[DeathLink] %s expired in %s; no lethal retry will occur.", event["id"][:12], event["state"])
+            self.received_deathlink_event = None
             return
-        self.last_deathlink_kill_attempt = now
+        if event["state"] == "RECEIVED":
+            event["state"] = "WAITING_FOR_SAFE_GAMEPLAY"
+        if event["state"] == "WAITING_FOR_SAFE_GAMEPLAY":
+            if self.runtime_observers_frozen or not self.has_authoritative_save_proof():
+                return
+        elif event["state"] == "DISPATCHED_ONCE":
+            return
+        else:
+            logger.error("[DeathLink] Dropped invalid receive state %r.", event["state"])
+            self.received_deathlink_event = None
+            return
         if send_command(
             "ai_ScriptCmdEnt ap_deathlink activate",
             coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
         ):
-            logger.info(
-                "[DeathLink] Queued received death; awaiting save confirmation."
-            )
+            event["state"] = "DISPATCHED_ONCE"
+            event["deadline"] = now + DEATHLINK_CONFIRM_TIMEOUT
+            self.deathlink_echo_suppression_event_id = event["id"]
+            logger.info("[DeathLink] %s dispatched once; awaiting confirmation.", event["id"][:12])
 
     async def check_game_duration_death(self):
         selected = self.update_save_slot_lifecycle()
@@ -4149,14 +4185,15 @@ class DoomEternalContext(CommonContext):
     async def report_local_death(self):
         if not self.death_link_enabled:
             return
-        if self.deathlinked:
-            self.deathlinked = False
+        if self.deathlink_echo_suppression_event_id:
+            event_id = self.deathlink_echo_suppression_event_id
             discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
-            self.persist_session_state()
-            logger.info("[DeathLink] Suppressed echo from received DeathLink.")
+            self.deathlink_echo_suppression_event_id = None
+            self.received_deathlink_event = None
+            logger.info("[DeathLink] %s confirmed; suppressed linked echo.", event_id[:12])
             return
-
-        await self.send_death(f"{self.auth or 'The Doom Slayer'} was slain.")
+        player = self.auth or "The Doom Slayer"
+        await self.send_death(random.choice(DEATHLINK_MESSAGES).format(player=player))
 
     def record_publisher_ack(self, publisher_key, effect_index, effect):
         state = self.session_state.setdefault("publisher_acknowledgements", {})
