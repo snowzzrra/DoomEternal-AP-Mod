@@ -241,6 +241,36 @@ def test_old_save_becomes_new_session_baseline() -> None:
     assert observer["baseline_preexisting"] == ["old_complete"]
 
 
+def test_first_observation_of_new_key_is_baseline_then_false_to_true_is_edge() -> None:
+    state: dict = {}
+    store = SaveObserverBaselineStore(state)
+    store.observe(
+        binding_key=_binding(),
+        observer_key="mission_challenges",
+        records={"real_edge": False},
+        acknowledged_records=set(),
+    )
+
+    pending, created, new_edges = store.observe(
+        binding_key=_binding(),
+        observer_key="mission_challenges",
+        records={"real_edge": False, "late_complete": True},
+        acknowledged_records=set(),
+    )
+    assert not created
+    assert pending == set()
+    assert new_edges == set()
+
+    pending, _, new_edges = store.observe(
+        binding_key=_binding(),
+        observer_key="mission_challenges",
+        records={"real_edge": True, "late_complete": True},
+        acknowledged_records=set(),
+    )
+    assert pending == {"real_edge"}
+    assert new_edges == {"real_edge"}
+
+
 def test_reconnect_same_session_does_not_rebaseline_and_later_edge_is_pending() -> None:
     state: dict = {}
     store = SaveObserverBaselineStore(state)

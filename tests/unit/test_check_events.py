@@ -3271,6 +3271,174 @@ class CheckEventTests(unittest.TestCase):
                 bridge_client.DOOM_BASE_DIR = original_base_dir
                 bridge_client.INV_DUMP_DIR = original_dump_dir
 
+
+    def test_final_sin_mission_select_candidate_publishes_once_from_fresh_hub_details(self):
+        selected = types.SimpleNamespace(
+            slot_directory="GAME-AUTOSAVE1",
+            mtime_ns=100,
+        )
+        ctx = object.__new__(bridge_client.DoomEternalContext)
+        ctx.final_sin_completion_candidate = None
+        ctx.active_save_proof_authoritative = True
+        ctx.active_save_proof_slot = selected.slot_directory
+        ctx.runtime_observation_lease = None
+        bridge_client.DoomEternalContext.arm_final_sin_completion_candidate(
+            ctx,
+            selected,
+            {
+                "_path": "/save/GAME-AUTOSAVE1/game.details",
+                "_mtime_ns": 100,
+                "mapName": "game/hub/hub",
+                "completed": "0",
+            },
+            "game/sp/e3m4_boss/e3m4_boss",
+            77,
+        )
+        candidate = ctx.final_sin_completion_candidate
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        self.assertEqual(candidate["load_epoch"], 77)
+
+        executions = []
+
+        async def execute(_ctx, publisher, trigger_strategy, source_description):
+            executions.append((publisher, trigger_strategy, source_description))
+            return True
+
+        fresh_details = {
+            "_path": "/save/GAME-AUTOSAVE1/game.details",
+            "_mtime_ns": 101,
+            "mapName": "game/hub/hub",
+            "completed": "1",
+        }
+        with (
+            patch.object(bridge_client, "primary_save_for_slot", return_value=selected),
+            patch.object(
+                bridge_client,
+                "read_game_details_for_selection",
+                return_value=fresh_details,
+            ),
+            patch.object(
+                bridge_client.DoomEternalContext,
+                "execute_publisher",
+                new=execute,
+            ),
+        ):
+            self.assertTrue(asyncio.run(
+                bridge_client.DoomEternalContext.evaluate_final_sin_completion_candidate(ctx)
+            ))
+            self.assertFalse(asyncio.run(
+                bridge_client.DoomEternalContext.evaluate_final_sin_completion_candidate(ctx)
+            ))
+
+        self.assertIsNone(ctx.final_sin_completion_candidate)
+        self.assertEqual(len(executions), 1)
+        publisher, strategy, source = executions[0]
+        self.assertEqual(publisher.key, "final_sin_mission_complete")
+        self.assertEqual(strategy, "save_fallback")
+        self.assertEqual(source, "Final Sin Mission Select completed edge")
+        self.assertEqual(
+            tuple((effect["strategy"], effect.get("location_id")) for effect in publisher.effects),
+            (("location_check", 7770414), ("campaign_goal", None)),
+        )
+
+    def test_final_sin_mission_select_candidate_clears_on_fresh_abort(self):
+        selected = types.SimpleNamespace(slot_directory="GAME-AUTOSAVE1", mtime_ns=101)
+        ctx = object.__new__(bridge_client.DoomEternalContext)
+        ctx.final_sin_completion_candidate = {
+            "slot": selected.slot_directory,
+            "load_epoch": 77,
+            "details_path": "/save/GAME-AUTOSAVE1/game.details",
+            "details_token_at_arm": 100,
+            "completed_at_arm": "0",
+        }
+        ctx.active_save_proof_authoritative = False
+        ctx.active_save_proof_slot = None
+        ctx.runtime_observation_lease = None
+        details = {
+            "_path": ctx.final_sin_completion_candidate["details_path"],
+            "_mtime_ns": 101,
+            "mapName": "game/hub/hub",
+            "completed": "0",
+        }
+        with (
+            patch.object(bridge_client, "primary_save_for_slot", return_value=selected),
+            patch.object(
+                bridge_client,
+                "read_game_details_for_selection",
+                return_value=details,
+            ),
+            patch.object(
+                bridge_client.DoomEternalContext,
+                "execute_publisher",
+                side_effect=AssertionError("publisher must not execute"),
+            ),
+        ):
+            self.assertFalse(asyncio.run(
+                bridge_client.DoomEternalContext.evaluate_final_sin_completion_candidate(ctx)
+            ))
+        self.assertIsNone(ctx.final_sin_completion_candidate)
+
+    def test_final_sin_mission_select_candidate_waits_for_fresh_details(self):
+        selected = types.SimpleNamespace(slot_directory="GAME-AUTOSAVE1", mtime_ns=100)
+        candidate = {
+            "slot": selected.slot_directory,
+            "load_epoch": 77,
+            "details_path": "/save/GAME-AUTOSAVE1/game.details",
+            "details_token_at_arm": 100,
+            "completed_at_arm": "0",
+        }
+        ctx = object.__new__(bridge_client.DoomEternalContext)
+        ctx.final_sin_completion_candidate = dict(candidate)
+        ctx.active_save_proof_authoritative = False
+        ctx.active_save_proof_slot = None
+        ctx.runtime_observation_lease = None
+        details = {
+            "_path": candidate["details_path"],
+            "_mtime_ns": 100,
+            "mapName": "game/hub/hub",
+            "completed": "1",
+        }
+        with (
+            patch.object(bridge_client, "primary_save_for_slot", return_value=selected),
+            patch.object(
+                bridge_client,
+                "read_game_details_for_selection",
+                return_value=details,
+            ),
+            patch.object(
+                bridge_client.DoomEternalContext,
+                "execute_publisher",
+                side_effect=AssertionError("publisher must not execute"),
+            ),
+        ):
+            self.assertFalse(asyncio.run(
+                bridge_client.DoomEternalContext.evaluate_final_sin_completion_candidate(ctx)
+            ))
+        self.assertEqual(ctx.final_sin_completion_candidate, candidate)
+
+    def test_final_sin_mission_select_candidate_rejects_wrong_authoritative_slot(self):
+        ctx = object.__new__(bridge_client.DoomEternalContext)
+        ctx.final_sin_completion_candidate = {
+            "slot": "GAME-AUTOSAVE1",
+            "load_epoch": 77,
+            "details_path": "/save/GAME-AUTOSAVE1/game.details",
+            "details_token_at_arm": 100,
+            "completed_at_arm": "0",
+        }
+        ctx.active_save_proof_authoritative = True
+        ctx.active_save_proof_slot = "GAME-AUTOSAVE2"
+        ctx.runtime_observation_lease = None
+        with patch.object(
+            bridge_client.DoomEternalContext,
+            "execute_publisher",
+            side_effect=AssertionError("publisher must not execute"),
+        ):
+            self.assertFalse(asyncio.run(
+                bridge_client.DoomEternalContext.evaluate_final_sin_completion_candidate(ctx)
+            ))
+        self.assertIsNone(ctx.final_sin_completion_candidate)
+
     def test_goal_event_network_failure_preserves_file_for_retry(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             original_dump_dir = bridge_client.INV_DUMP_DIR
