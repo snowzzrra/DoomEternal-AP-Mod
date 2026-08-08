@@ -2343,6 +2343,7 @@ class DoomEternalContext(CommonContext):
         self.deathlinked = False
         self.last_deathlink_kill_attempt = 0.0
         self.last_goal_details_mtime = None
+        self.final_sin_completion_candidate = None
         self.cultist_autosave_path = None
         self.mission_locations_in_flight = set()
         self.mission_goal_in_flight = False
@@ -2943,6 +2944,9 @@ class DoomEternalContext(CommonContext):
             self.active_save_proof_evidence_epoch = proof_evidence_epoch
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
+            self.arm_final_sin_completion_candidate(
+                selected, details, expected_map, proof_load_epoch
+            )
             return selected
         else:
             if not self.mission_select_observation_map:
@@ -2966,6 +2970,9 @@ class DoomEternalContext(CommonContext):
             self.active_save_proof_evidence_epoch = proof_evidence_epoch
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
+            self.arm_final_sin_completion_candidate(
+                selected, details, expected_map, proof_load_epoch
+            )
             return selected
 
     def active_game_details(self):
@@ -4456,7 +4463,106 @@ class DoomEternalContext(CommonContext):
                     )
         return observed
 
+    def clear_final_sin_completion_candidate(self, reason):
+        candidate = getattr(self, "final_sin_completion_candidate", None)
+        if candidate is not None:
+            logger.info(
+                "[Goal] FINAL_SIN_COMPLETION_CANDIDATE_CLEARED slot=%s load_epoch=%s reason=%s",
+                candidate["slot"],
+                candidate["load_epoch"],
+                reason,
+            )
+        self.final_sin_completion_candidate = None
+
+    def arm_final_sin_completion_candidate(
+        self, selected, details, runtime_map, load_epoch
+    ):
+        if (
+            canonical_map_name(runtime_map)
+            != canonical_map_name(CAMPAIGN_GOAL_CONTRACT["runtime_map"])
+            or load_epoch is None
+        ):
+            return
+        details_path = details.get("_path")
+        details_token = details.get("_mtime_ns", selected.mtime_ns)
+        if not details_path or details_token is None:
+            return
+        existing = getattr(self, "final_sin_completion_candidate", None)
+        identity = (selected.slot_directory, load_epoch, str(details_path))
+        if existing is not None and identity == (
+            existing["slot"],
+            existing["load_epoch"],
+            existing["details_path"],
+        ):
+            return
+        self.final_sin_completion_candidate = {
+            "slot": selected.slot_directory,
+            "load_epoch": load_epoch,
+            "details_path": str(details_path),
+            "details_token_at_arm": int(details_token),
+            "completed_at_arm": str(details.get("completed", "0")),
+        }
+        logger.info(
+            "[Goal] FINAL_SIN_COMPLETION_CANDIDATE_ARMED slot=%s load_epoch=%s "
+            "details_token=%s completed=%s",
+            selected.slot_directory,
+            load_epoch,
+            details_token,
+            details.get("completed", "0"),
+        )
+
+    async def evaluate_final_sin_completion_candidate(self):
+        candidate = getattr(self, "final_sin_completion_candidate", None)
+        if candidate is None:
+            return False
+
+        if (
+            getattr(self, "active_save_proof_authoritative", False)
+            and getattr(self, "active_save_proof_slot", None)
+            and self.active_save_proof_slot != candidate["slot"]
+        ):
+            self.clear_final_sin_completion_candidate("different_authoritative_slot")
+            return False
+
+        selected = primary_save_for_slot(candidate["slot"])
+        details = read_game_details_for_selection(selected) if selected else None
+        if (
+            selected is not None
+            and details
+            and selected.slot_directory == candidate["slot"]
+        ):
+            details_path = details.get("_path")
+            details_token = details.get("_mtime_ns", selected.mtime_ns)
+            if (
+                str(details_path) == candidate["details_path"]
+                and details_token is not None
+                and int(details_token) > candidate["details_token_at_arm"]
+            ):
+                if details.get("completed") != "1":
+                    self.clear_final_sin_completion_candidate("fresh_incomplete_details")
+                    return False
+                publisher = next(
+                    item for item in PUBLISHERS
+                    if item.key == "final_sin_mission_complete"
+                )
+                published = await DoomEternalContext.execute_publisher(
+                    self,
+                    publisher,
+                    "save_fallback",
+                    "Final Sin Mission Select completed edge",
+                )
+                if published:
+                    self.clear_final_sin_completion_candidate("publisher_acknowledged")
+                return published
+
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None and not lease.process_probe():
+            self.clear_final_sin_completion_candidate("game_process_ended")
+        return False
+
     async def check_campaign_goal_save_fallback(self):
+        if await self.evaluate_final_sin_completion_candidate():
+            return
         details = self.active_game_details()
         if not details:
             return

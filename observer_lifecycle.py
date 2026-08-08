@@ -337,9 +337,13 @@ class SaveObserverBaselineStore:
         pending.difference_update(acknowledged_records)
         new_edges: set[str] = set()
         for key, complete in records.items():
-            if complete and not bool(previous.get(key, False)):
+            current = bool(complete)
+            if key not in previous:
+                previous[key] = current
+                continue
+            if current and not bool(previous[key]):
                 pending.add(key)
                 new_edges.add(key)
-            previous[key] = bool(complete)
+            previous[key] = current
         observer["pending_edges"] = sorted(pending)
         return pending, created, new_edges
