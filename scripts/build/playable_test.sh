@@ -413,6 +413,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
     "$REPO_ROOT/launcher_cli.py" "$REPO_ROOT/launcher_core.py" \
+    "$REPO_ROOT/launcher_integration.py" \
     "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
@@ -422,6 +423,8 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
+cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
+    "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
 cp "$REPO_ROOT/data/items.json" \
@@ -523,6 +526,7 @@ manifest = {
         "client/item_reconciliation.py",
         "client/launcher_cli.py",
         "client/launcher_core.py",
+        "client/launcher_integration.py",
         "client/launcher_platform.py",
         "client/launcher_supervisor.py",
         "client/map_registry.py",
@@ -532,6 +536,10 @@ manifest = {
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/run_bridge.sh",
+        "client/doom_logo.png",
+        "client/mod_templates/index.json",
+        "client/mod_templates/dash-off.zip",
+        "client/mod_templates/dash-on.zip",
         "client/runtime_install.sh",
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
@@ -664,10 +672,81 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps"
 
+DASH_OFF_MAP="$TEMP_DIR/e1m2_war-dash-off.entities"
+DASH_OFF_MOD="$TEMP_DIR/mod-dash-off"
+python3 - "$REPO_ROOT" "$DASH_OFF_MAP" <<'PY'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+output = Path(sys.argv[2])
+sys.path.insert(0, str(root))
+from launcher_core import ModCompiler, SeedManifest
+
+compiler = ModCompiler(root)
+manifest = SeedManifest.create(
+    seed_name="physical-template",
+    team=0,
+    slot=1,
+    options={"randomize_dash": False},
+    active_location_ids=compiler.active_location_ids(False),
+)
+compiler.compile_map(
+    manifest,
+    root / "vanillamaps/e1m2_war.map",
+    output,
+)
+PY
+grep -q 'entityDef capitol_progress_dash_1' "$DASH_OFF_MAP"
+if grep -q 'AP_CHECK_CAPITOL_PROGRESS_DASH_1\|ap_independent_capitol_progress_dash_1' "$DASH_OFF_MAP"; then
+    echo "Dash OFF physical template contains AP Dash transformation" >&2
+    exit 1
+fi
+grep -q 'entityDef AP_CHECK_CAPITOL_PROGRESS_DASH_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"
+grep -q 'entityDef ap_independent_capitol_progress_dash_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"
+grep -q 'thinkComponentDecl = "bob_rotate_fast"' "$GENERATED_MAPS_DIR/e1m2_war.entities"
+
+cp -a "$OUTPUT_DIR/mod" "$DASH_OFF_MOD"
+"$TOOLS_DIR/idFileDeCompressor" --compress \
+    "$DASH_OFF_MAP" \
+    "$DASH_OFF_MOD/e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
+mkdir -p "$OUTPUT_DIR/client/mod_templates"
 (
     cd "$OUTPUT_DIR/mod"
-    zip -q -r "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" .
+    zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-on.zip" .
 )
+(
+    cd "$DASH_OFF_MOD"
+    zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-off.zip" .
+)
+cp "$OUTPUT_DIR/client/mod_templates/dash-on.zip" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip"
+python3 - "$OUTPUT_DIR/client/mod_templates" <<'PY'
+import hashlib
+import json
+import sys
+import zipfile
+from pathlib import Path
+
+root = Path(sys.argv[1])
+member = "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
+variants = {}
+for key in ("dash_off", "dash_on"):
+    archive = root / f"{key.replace('_', '-')}.zip"
+    with zipfile.ZipFile(archive) as package:
+        physical = package.read(member)
+    variants[key] = {
+        "file": archive.name,
+        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+        "physical_e1m2_sha256": hashlib.sha256(physical).hexdigest(),
+    }
+if variants["dash_off"]["physical_e1m2_sha256"] == variants["dash_on"]["physical_e1m2_sha256"]:
+    raise SystemExit("Dash ON/OFF templates contain identical physical Exultia map")
+(root / "index.json").write_text(
+    json.dumps({"schema": 1, "variants": variants}, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
 
 (
     cd "$OUTPUT_DIR"

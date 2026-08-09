@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import shlex
 import tarfile
 import tempfile
 import unittest
@@ -104,6 +105,9 @@ class AdapterTests(unittest.TestCase):
             self.assertTrue((root / "game" / "Mods" / mod_zip.name).is_file())
 
 
+    
+
+
 class SteamLaunchOptionTests(unittest.TestCase):
     def test_current_launch_option_is_read_from_vdf(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -148,6 +152,29 @@ class SteamLaunchOptionTests(unittest.TestCase):
         self.assertIn("MANGOHUD=1", plan.proposed)
         self.assertTrue(plan.proposed.endswith("%command% -skipIntro +com_showFPS 1"))
         self.assertIn("--- current", plan.diff)
+
+
+    def test_literal_required_launch_option_is_byte_identical(self) -> None:
+        script = Path("/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/build/release/client/run_bridge.sh")
+        current = (
+            'WINEDLLOVERRIDES="XINPUT1_3=n,b" AP_CLIENT_DELAY=5 '
+            '"/run/media/system/Eris/DoomEAP/DoomEternal-AP-Mod/build/release/client/run_bridge.sh" %command%'
+        )
+        self.assertEqual(
+            SteamLaunchOptionsManager.compose_bridge(current, script, delay=5),
+            current,
+        )
+
+    def test_bridge_composition_preserves_arguments_and_quoting(self) -> None:
+        script = Path("/tmp/client with spaces/run_bridge.sh")
+        current = 'MANGOHUD=1 WINEDLLOVERRIDES="xaudio2_7=n" --before "two words" %command% --after custom'
+        proposed = SteamLaunchOptionsManager.compose_bridge(current, script, delay=5)
+        tokens = shlex.split(proposed)
+        self.assertEqual(tokens.count("WINEDLLOVERRIDES=xaudio2_7=n;XINPUT1_3=n,b"), 1)
+        self.assertEqual(tokens.count("AP_CLIENT_DELAY=5"), 1)
+        self.assertEqual(tokens.count(str(script)), 1)
+        self.assertEqual(tokens[tokens.index(str(script)) + 1 :], ["--before", "two words", "%command%", "--after", "custom"])
+        self.assertEqual(tokens[2], "MANGOHUD=1")
 
     def test_backup_and_restore_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_name:

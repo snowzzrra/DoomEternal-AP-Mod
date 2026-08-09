@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -216,6 +217,74 @@ def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
     return destination
 
 
+def stage_room_mod(
+    mod_zip: Path,
+    game_root: Path,
+    ownership_receipt: Path,
+    *,
+    trusted_template_hashes: set[str],
+    manifest_hash: str,
+) -> Path:
+    """Atomically stage one room mod without deleting unverified ZIPs."""
+    if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
+        raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
+    mods = game_root / "Mods"
+    mods.mkdir(parents=True, exist_ok=True)
+    destination = mods / mod_zip.name
+    previous: dict[str, object] = {}
+    if ownership_receipt.is_file():
+        try:
+            loaded = json.loads(ownership_receipt.read_text(encoding="utf-8"))
+            previous = loaded if isinstance(loaded, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            previous = {}
+
+    def digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    previous_path = Path(str(previous.get("staged_mod", ""))) if previous.get("staged_mod") else None
+    previous_sha = str(previous.get("staged_sha256", ""))
+    for candidate in sorted(mods.glob("DoomEternalArchipelago*.zip")):
+        if candidate == destination:
+            continue
+        candidate_sha = digest(candidate)
+        owned = (
+            previous_path is not None
+            and candidate.resolve() == previous_path.resolve()
+            and candidate_sha == previous_sha
+        )
+        if owned or candidate_sha in trusted_template_hashes:
+            candidate.unlink()
+            continue
+        raise RuntimeError(
+            f"unverified older DOOM Eternal Archipelago mod remains in Mods: {candidate}. "
+            "Remove it manually, then retry setup."
+        )
+    if destination.is_file():
+        destination_sha = digest(destination)
+        owned_destination = (
+            previous_path is not None
+            and destination.resolve() == previous_path.resolve()
+            and destination_sha == previous_sha
+        )
+        if not owned_destination and destination_sha not in trusted_template_hashes:
+            raise RuntimeError(
+                f"refusing to overwrite unverified mod ZIP: {destination}. Remove it manually, then retry setup."
+            )
+    staged = _stage_mod(mod_zip, game_root)
+    receipt = {
+        "schema": 1,
+        "manifest_hash": manifest_hash,
+        "staged_mod": str(staged.resolve()),
+        "staged_sha256": digest(staged),
+    }
+    ownership_receipt.parent.mkdir(parents=True, exist_ok=True)
+    temporary = ownership_receipt.with_suffix(f"{ownership_receipt.suffix}.tmp")
+    temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, ownership_receipt)
+    return staged
+
+
 class WindowsModManagerAdapter:
     """EternalModManager has no public CLI; stage mod and request smallest manual action."""
 
@@ -235,26 +304,50 @@ class WindowsModManagerAdapter:
 
 
 class LinuxModManagerAdapter:
-    """EternalModInjectorShell is interactive; run only with explicit session consent."""
+    """EternalModInjectorShell is interactive; prepare it, never fake unattended success."""
 
     def __init__(self, dependency: InstalledDependency):
         self.dependency = dependency
 
+    def _prepare_tools(self, game_root: Path) -> Path:
+        source_root = Path(self.dependency.root)
+        executable = Path(self.dependency.executable)
+        relative_executable = executable.relative_to(source_root)
+        for source in sorted(source_root.rglob("*")):
+            if not source.is_file() or source.name == DependencyManager.RECEIPT:
+                continue
+            relative = source.relative_to(source_root)
+            destination = game_root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.is_file():
+                if hashlib.sha256(destination.read_bytes()).digest() != hashlib.sha256(source.read_bytes()).digest():
+                    raise RuntimeError(f"refusing to overwrite different injector tool: {destination}")
+                continue
+            shutil.copy2(source, destination)
+        prepared = game_root / relative_executable
+        prepared.chmod(prepared.stat().st_mode | 0o100)
+        return prepared
+
     def prepare(self, game_root: Path, mod_zip: Path) -> AdapterResult:
         staged = _stage_mod(mod_zip, game_root)
-        command = (self.dependency.executable,)
+        executable = self._prepare_tools(game_root)
+        command = (str(executable),)
         return AdapterResult(
             state="manual_action_required",
-            message=f"Run EternalModInjectorShell after staging {staged.name}.",
+            message=(
+                f"Prepared {staged.name} and EternalModInjectorShell in the game directory. "
+                "Run the interactive injector, keep AUTO_LAUNCH_GAME disabled, then start DOOM Eternal through Steam."
+            ),
             command=command,
         )
 
     def activate_interactive(self, game_root: Path, mod_zip: Path) -> AdapterResult:
         _stage_mod(mod_zip, game_root)
+        executable = self._prepare_tools(game_root)
         environment = os.environ.copy()
         environment.update({"skip": "1", "skip_debug_check": "1"})
         completed = subprocess.run(
-            [self.dependency.executable],
+            [executable],
             cwd=game_root,
             env=environment,
             text=True,
@@ -265,7 +358,7 @@ class LinuxModManagerAdapter:
         return AdapterResult(
             state=state,
             message="EternalModInjectorShell finished." if state == "applied" else "EternalModInjectorShell failed.",
-            command=(self.dependency.executable,),
+            command=(str(executable),),
             stdout=completed.stdout,
             stderr=completed.stderr,
             returncode=completed.returncode,
@@ -436,6 +529,87 @@ class SteamLaunchOptionsManager:
         filtered.append(REQUIRED_DLL_OVERRIDE)
         override = f'WINEDLLOVERRIDES="{";".join(filtered)}"'
         return f"{override} {current}".strip()
+
+
+    @classmethod
+    def compose_bridge(cls, current: str, bridge_script: Path, *, delay: int = 5) -> str:
+        """Place Linux bridge wrapper before %command% while preserving command arguments."""
+        if delay < 0:
+            raise ValueError("AP client delay must be non-negative")
+        try:
+            tokens = shlex.split(current, posix=True)
+        except ValueError as error:
+            raise ValueError(f"Steam launch options have invalid quoting: {error}") from error
+        if tokens.count("%command%") != 1:
+            raise ValueError("Steam launch options must contain exactly one %command%")
+        script = str(bridge_script)
+        override_tokens = [token for token in tokens if token.startswith("WINEDLLOVERRIDES=")]
+        delay_tokens = [token for token in tokens if token.startswith("AP_CLIENT_DELAY=")]
+        script_tokens = [token for token in tokens if Path(token).name == "run_bridge.sh"]
+
+        def override_values() -> list[str]:
+            values: list[str] = []
+            for token in override_tokens:
+                values.extend(value for value in token.split("=", 1)[1].split(";") if value)
+            return values
+
+        existing_overrides = override_values()
+        required_present = any(
+            value.split("=", 1)[0].casefold() == "xinput1_3"
+            and value.split("=", 1)[1].casefold() == "n,b"
+            for value in existing_overrides
+            if "=" in value
+        )
+        if (
+            len(override_tokens) == 1
+            and len(delay_tokens) == 1
+            and delay_tokens[0] == f"AP_CLIENT_DELAY={delay}"
+            and script_tokens == [script]
+            and tokens.index(script) < tokens.index("%command%")
+            and required_present
+        ):
+            return current
+
+        filtered_overrides = [
+            value
+            for value in existing_overrides
+            if value.split("=", 1)[0].casefold() != "xinput1_3"
+        ]
+        filtered_overrides.append(REQUIRED_DLL_OVERRIDE)
+        remaining = [
+            token
+            for token in tokens
+            if not token.startswith(("WINEDLLOVERRIDES=", "AP_CLIENT_DELAY="))
+            and Path(token).name != "run_bridge.sh"
+        ]
+        command_index = remaining.index("%command%")
+        before_command = remaining[:command_index]
+        after_command = remaining[command_index:]
+        leading_environment: list[str] = []
+        while before_command and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", before_command[0]):
+            leading_environment.append(before_command.pop(0))
+        rendered = [
+            f'WINEDLLOVERRIDES="{";".join(filtered_overrides)}"',
+            f"AP_CLIENT_DELAY={delay}",
+            *(shlex.quote(token) for token in leading_environment),
+            shlex.quote(script),
+            *(shlex.quote(token) for token in before_command),
+            *(shlex.quote(token) for token in after_command),
+        ]
+        return " ".join(rendered)
+
+    @classmethod
+    def plan_bridge(cls, current: str, bridge_script: Path, *, delay: int = 5) -> LaunchOptionPlan:
+        proposed = cls.compose_bridge(current, bridge_script, delay=delay)
+        diff = "\n".join(
+            difflib.unified_diff(
+                [current + "\n"],
+                [proposed + "\n"],
+                fromfile="current",
+                tofile="proposed",
+            )
+        )
+        return LaunchOptionPlan(current, proposed, diff)
 
     @classmethod
     def plan(cls, current: str) -> LaunchOptionPlan:

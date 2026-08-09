@@ -6,10 +6,10 @@ import json
 import os
 import shutil
 import tempfile
+import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol
-
 
 ROOT = Path(__file__).resolve().parent
 DASH_LOCATION_ID = 7770083
@@ -38,7 +38,7 @@ class RoomSnapshot:
     checked_locations: tuple[int, ...]
 
     @classmethod
-    def from_packets(cls, room_info: dict[str, Any], connected: dict[str, Any]) -> "RoomSnapshot":
+    def from_packets(cls, room_info: dict[str, Any], connected: dict[str, Any]) -> RoomSnapshot:
         seed_name = room_info.get("seed_name")
         team = connected.get("team")
         slot = connected.get("slot")
@@ -72,7 +72,7 @@ class RoomSnapshot:
         )
 
     @classmethod
-    def from_event(cls, payload: dict[str, Any]) -> "RoomSnapshot":
+    def from_event(cls, payload: dict[str, Any]) -> RoomSnapshot:
         """Parse launcher event payload; intended for bridge/supervisor IPC."""
         return cls.from_packets(
             {"seed_name": payload.get("seed_name")},
@@ -106,7 +106,7 @@ class SeedManifest:
     manifest_hash: str
 
     @classmethod
-    def create(cls, *, seed_name: str, team: int, slot: int, options: dict[str, Any], active_location_ids: list[int]) -> "SeedManifest":
+    def create(cls, *, seed_name: str, team: int, slot: int, options: dict[str, Any], active_location_ids: list[int]) -> SeedManifest:
         identity = release_identity()
         normalized_options = {key: bool(value) for key, value in sorted(options.items())}
         payload = {
@@ -128,7 +128,7 @@ class SeedManifest:
         return asdict(self)
 
     @classmethod
-    def from_room(cls, snapshot: RoomSnapshot, known_location_ids: set[int]) -> "SeedManifest":
+    def from_room(cls, snapshot: RoomSnapshot, known_location_ids: set[int]) -> SeedManifest:
         identity = release_identity()
         slot_data = snapshot.slot_data
         compatibility = {
@@ -150,6 +150,68 @@ class SeedManifest:
             options={"randomize_dash": slot_data["randomize_dash"]},
             active_location_ids=list(snapshot.active_location_ids),
         )
+
+
+class RoomModPackageBuilder:
+    """Select a verified physical template, then bind it to one room manifest."""
+
+    INDEX_NAME = "index.json"
+
+    def __init__(self, templates_root: Path):
+        self.templates_root = templates_root
+
+    def _template(self, dash_enabled: bool) -> tuple[Path, dict[str, Any]]:
+        index_path = self.templates_root / self.INDEX_NAME
+        document = json.loads(index_path.read_text(encoding="utf-8"))
+        if document.get("schema") != 1 or not isinstance(document.get("variants"), dict):
+            raise ValueError("invalid physical template index")
+        key = "dash_on" if dash_enabled else "dash_off"
+        entry = document["variants"].get(key)
+        if not isinstance(entry, dict):
+            raise ValueError(f"missing physical template variant: {key}")
+        filename = entry.get("file")
+        if not isinstance(filename, str) or Path(filename).name != filename:
+            raise ValueError(f"unsafe physical template filename: {filename!r}")
+        template = self.templates_root / filename
+        if not template.is_file() or not zipfile.is_zipfile(template):
+            raise ValueError(f"physical template is not a ZIP: {template}")
+        expected = entry.get("sha256")
+        actual = _sha256(template)
+        if expected != actual:
+            raise ValueError(f"physical template SHA-256 mismatch: expected {expected}, got {actual}")
+        return template, entry
+
+    def build(self, manifest: SeedManifest, output_root: Path) -> Path:
+        dash_enabled = manifest.options.get("randomize_dash", False)
+        template, template_entry = self._template(dash_enabled)
+        output_root.mkdir(parents=True, exist_ok=True)
+        destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
+        temporary = destination.with_name(f".{destination.name}.incoming")
+        seed_document = manifest.document()
+        receipt = {
+            "schema": 1,
+            "manifest_hash": manifest.manifest_hash,
+            "randomize_dash": dash_enabled,
+            "template": template.name,
+            "template_sha256": template_entry["sha256"],
+            "physical_e1m2_sha256": template_entry.get("physical_e1m2_sha256"),
+        }
+        with zipfile.ZipFile(template) as source, zipfile.ZipFile(
+            temporary, "w", compression=zipfile.ZIP_DEFLATED
+        ) as output:
+            seen: set[str] = set()
+            for info in source.infolist():
+                path = Path(info.filename)
+                if path.is_absolute() or ".." in path.parts or info.filename in seen:
+                    raise ValueError(f"unsafe or duplicate template member: {info.filename}")
+                seen.add(info.filename)
+                if info.filename in {"seed_manifest.json", "seed_receipt.json"}:
+                    continue
+                output.writestr(info, source.read(info))
+            output.writestr("seed_manifest.json", json.dumps(seed_document, indent=2, sort_keys=True) + "\n")
+            output.writestr("seed_receipt.json", json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+        os.replace(temporary, destination)
+        return destination
 
 
 @dataclass

@@ -28,7 +28,7 @@ from challenge_registry import (
     canonical_map_name,
     load_challenge_registry,
 )
-from deathlink_receive import DeathLinkReceiver, ReceiveState
+from deathlink_receive import DeathLinkReceiver, ReceiveState, discard_unclaimed_command
 from foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
@@ -77,7 +77,10 @@ BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
 TRANSITION_HANDLER = "unified"
 GAME_NAME = _CONTENT_IDENTITY["game"]
 DEATHLINK_RECEIVE_TIMEOUT = 20.0
-DEATHLINK_CONFIRM_TIMEOUT = 10.0
+DEATHLINK_CONFIRM_TIMEOUT = 8.0
+DEATHLINK_TOTAL_TIMEOUT = 60.0
+DEATHLINK_LATE_SUPPRESSION_GRACE = 15.0
+DEATHLINK_MAX_ATTEMPTS = 3
 DEATHLINK_MESSAGES = (
     "{player} didn't rip and tear enough.",
     "{player} was sent back to the Fortress.",
@@ -88,10 +91,15 @@ LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
 
 
 def emit_launcher_event(event_type: str, **payload):
-    if not LAUNCHER_EVENTS_ENABLED:
-        return
     event = {"type": event_type, **payload}
-    print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
+    handler = globals().get("LAUNCHER_EVENT_HANDLER")
+    if callable(handler):
+        try:
+            handler(event)
+        except Exception:
+            logger.exception("[Launcher] Integrated event handler failed")
+    if LAUNCHER_EVENTS_ENABLED:
+        print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
 
 ENABLE_ITEM_NOTIFICATIONS = False
 try:
@@ -1941,12 +1949,8 @@ def request_telemetry_dump():
 
 
 def discard_queued_coalesced_command(coalesce_key):
-    """Cancel queued and imported forms of one coalesced command."""
-    for suffix in (".cmd", ".processing"):
-        try:
-            os.remove(os.path.join(QUEUE_DIR, f"{coalesce_key}{suffix}"))
-        except FileNotFoundError:
-            pass
+    """Cancel only an unclaimed command; consumer owns every .processing file."""
+    discard_unclaimed_command(Path(QUEUE_DIR), coalesce_key)
 
 
 def set_rpc_execution(enabled):
@@ -2361,11 +2365,16 @@ class DoomEternalContext(CommonContext):
         self.previous_died_last_game = None
         self.last_details_mtime = None
         self.last_details_path = None
-        # Receive state is deliberately process-local. A restart drops pending
-        # DeathLink delivery instead of replaying an old lethal command.
+        # Pending lethal commands stay process-local. Seen event identities persist per
+        # room so reconnect/transport replay cannot create a second logical event.
+        self.received_deathlink_event_ids: set[str] = set()
         self.deathlink_receiver = DeathLinkReceiver(
             wait_timeout=DEATHLINK_RECEIVE_TIMEOUT,
             confirm_timeout=DEATHLINK_CONFIRM_TIMEOUT,
+            retry_interval=DEATHLINK_KILL_INTERVAL,
+            total_timeout=DEATHLINK_TOTAL_TIMEOUT,
+            late_suppression_grace=DEATHLINK_LATE_SUPPRESSION_GRACE,
+            max_attempts=DEATHLINK_MAX_ATTEMPTS,
         )
         self.last_goal_details_mtime = None
         self.final_sin_completion_candidate = None
@@ -2414,7 +2423,16 @@ class DoomEternalContext(CommonContext):
         if cmd == "RoomInfo":
             self.room_seed_name = args.get("seed_name")
         elif cmd == "Connected":
+            previous_state_key = self.state_key
             self.initialize_item_state()
+            if previous_state_key and previous_state_key != self.state_key:
+                abandoned = self.deathlink_receiver.abandon(time.monotonic())
+                discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
+                if abandoned:
+                    logger.warning(
+                        "[DeathLink] Cleared room-bound receive events after slot change: %s.",
+                        ", ".join(event_id[:12] for event_id in abandoned),
+                    )
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
             self._death_link_task = asyncio.create_task(
                 self.update_death_link(self.death_link_enabled)
@@ -2425,6 +2443,7 @@ class DoomEternalContext(CommonContext):
             emit_launcher_event(
                 "connected",
                 seed_name=self.room_seed_name,
+                endpoint=str(getattr(self, "server_address", "") or ""),
                 team=args.get("team", self.team),
                 slot=args.get("slot", self.slot),
                 slot_data=args.get("slot_data", {}),
@@ -3108,8 +3127,19 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = self.session_state.get(
             "cultist_autosave_path"
         )
-        # Never restore received DeathLink state across a process restart.
+        # Never restore an in-flight lethal command across a process restart. Persist
+        # only bounded event identities, preventing old transport packets from
+        # killing the player again after reconnect.
         self.session_state.pop("deathlinked", None)
+        seen_deathlinks = self.session_state.get("received_deathlink_event_ids", [])
+        if not isinstance(seen_deathlinks, list):
+            seen_deathlinks = []
+        self.received_deathlink_event_ids = {
+            value for value in seen_deathlinks[-64:] if isinstance(value, str) and value
+        }
+        self.session_state["received_deathlink_event_ids"] = sorted(
+            self.received_deathlink_event_ids
+        )[-64:]
         raw_save_observations = self.session_state.get("save_slot_observations", {})
         if not isinstance(raw_save_observations, dict):
             raw_save_observations = {}
@@ -3147,6 +3177,9 @@ class DoomEternalContext(CommonContext):
         self.session_state["processed_items"] = self.items_processed
         self.session_state["cultist_autosave_path"] = self.cultist_autosave_path
         self.session_state.pop("deathlinked", None)
+        self.session_state["received_deathlink_event_ids"] = sorted(
+            self.received_deathlink_event_ids
+        )[-64:]
         self.session_state["save_slot_observations"] = self.save_slot_observations
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
@@ -3713,6 +3746,9 @@ class DoomEternalContext(CommonContext):
         event_id = hashlib.sha256(
             json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
+        if event_id in self.received_deathlink_event_ids:
+            logger.info("[DeathLink] Ignored persisted duplicate event %s.", event_id[:12])
+            return
         result = self.deathlink_receiver.receive(event_id, now)
         if result.detail == "duplicate":
             logger.info("[DeathLink] Ignored duplicate received event %s.", event_id[:12])
@@ -3720,7 +3756,9 @@ class DoomEternalContext(CommonContext):
         if result.state is ReceiveState.FAILED:
             logger.warning("[DeathLink] Rejected %s: bounded receive queue is full.", event_id[:12])
             return
-        logger.info("[DeathLink] Received %s; queued for safe gameplay.", event_id[:12])
+        self.received_deathlink_event_ids.add(event_id)
+        self.persist_session_state()
+        logger.info("[DeathLink] Received logical event %s; queued for safe gameplay.", event_id[:12])
 
     def queue_received_deathlink(self):
         if not self.death_link_enabled:
@@ -3735,12 +3773,38 @@ class DoomEternalContext(CommonContext):
                 "ai_ScriptCmdEnt ap_deathlink activate",
                 coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
             ),
+            command_in_flight=lambda: command_spool_exists(
+                DEATHLINK_KILL_COALESCE_KEY
+            ),
         )
-        if result.state is ReceiveState.DISPATCHED_ONCE and result.detail == "dispatched":
-            logger.info("[DeathLink] %s dispatched once; awaiting confirmation.", (result.event_id or "unknown")[:12])
+        event_id = (result.event_id or "unknown")[:12]
+        active = self.deathlink_receiver.active
+        if result.detail == "dispatched":
+            logger.info(
+                "[DeathLink] %s attempt %d queued; one command in flight.",
+                event_id,
+                active.attempts if active else 0,
+            )
+        elif result.detail == "delivered":
+            logger.info(
+                "[DeathLink] %s attempt %d delivered; awaiting death telemetry.",
+                event_id,
+                active.attempts if active else 0,
+            )
+        elif result.detail == "retry_scheduled":
+            logger.warning(
+                "[DeathLink] %s delivered command was not lethal; retry scheduled.",
+                event_id,
+            )
         elif result.state in {ReceiveState.EXPIRED, ReceiveState.FAILED}:
+            discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
             state_name = result.state.value.lower() if result.state else "unknown"
-            logger.warning("[DeathLink] %s %s (%s); receive state cleared.", (result.event_id or "unknown")[:12], state_name, result.detail)
+            logger.warning(
+                "[DeathLink] %s %s (%s); event cleared without claiming success.",
+                event_id,
+                state_name,
+                result.detail,
+            )
 
     async def check_game_duration_death(self):
         selected = self.update_save_slot_lifecycle()
@@ -4196,10 +4260,14 @@ class DoomEternalContext(CommonContext):
     async def report_local_death(self):
         if not self.death_link_enabled:
             return
-        receive_result = self.deathlink_receiver.confirm_local_death()
+        receive_result = self.deathlink_receiver.confirm_local_death(time.monotonic())
         if receive_result.state is ReceiveState.CONFIRMED:
             discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
-            logger.info("[DeathLink] %s confirmed; suppressed linked echo.", (receive_result.event_id or "unknown")[:12])
+            logger.info(
+                "[DeathLink] %s confirmed by death telemetry; linked echo suppressed (%s).",
+                (receive_result.event_id or "unknown")[:12],
+                receive_result.detail,
+            )
             return
         player = self.auth or "The Doom Slayer"
         await self.send_death(random.choice(DEATHLINK_MESSAGES).format(player=player))
@@ -5033,6 +5101,17 @@ class DoomEternalContext(CommonContext):
         class DoomEternalManager(GameManager):
             logging_pairs = (("Client", "Archipelago"),)
             base_title = "DOOM Eternal Archipelago Client"
+
+            def __init__(self, ctx):
+                super().__init__(ctx)
+                icon = Path(
+                    os.environ.get(
+                        "DOOM_AP_ICON",
+                        Path(__file__).with_name("doom_logo.png"),
+                    )
+                )
+                if icon.is_file():
+                    self.icon = str(icon)
 
         return DoomEternalManager
 
