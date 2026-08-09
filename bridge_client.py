@@ -64,10 +64,15 @@ try:
 except ImportError:
     from save_decrypt import decrypt, steam_id64
 
+APPLICATION_DIR = Path(
+    os.environ.get("DOOM_AP_APPLICATION_DIR", Path(__file__).resolve().parent)
+).resolve()
 CONFIG_FILE = Path(
-    os.environ.get("DOOM_AP_CONFIG_FILE", Path(__file__).with_name("ap_config.json"))
+    os.environ.get("DOOM_AP_CONFIG_FILE", APPLICATION_DIR / "ap_config.json")
 )
-BRIDGE_FILE = Path(__file__).resolve()
+BRIDGE_FILE = APPLICATION_DIR / "bridge_client.py"
+if not BRIDGE_FILE.is_file():
+    BRIDGE_FILE = Path(__file__).resolve()
 BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
 _CONTENT_IDENTITY = json.loads(
     (Path(__file__).resolve().with_name("data") / "content_identity.json").read_text(encoding="utf-8")
@@ -91,19 +96,14 @@ LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
 
 
 def emit_launcher_event(event_type: str, **payload):
+    if not LAUNCHER_EVENTS_ENABLED:
+        return
     event = {"type": event_type, **payload}
-    handler = globals().get("LAUNCHER_EVENT_HANDLER")
-    if callable(handler):
-        try:
-            handler(event)
-        except Exception:
-            logger.exception("[Launcher] Integrated event handler failed")
-    if LAUNCHER_EVENTS_ENABLED:
-        print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
+    print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
 
 ENABLE_ITEM_NOTIFICATIONS = False
 try:
-    _identity_path = Path(__file__).resolve().with_name("bridge_identity.json")
+    _identity_path = APPLICATION_DIR / "bridge_identity.json"
     if _identity_path.is_file():
         _identity = json.loads(_identity_path.read_text(encoding="utf-8"))
         if _identity.get("item_notifications", {}).get("enabled"):
@@ -903,8 +903,8 @@ else:
     )
 
 
-DEATH_PROBE = Path(__file__).with_name("save_death_probe.exe")
-DEATH_PROBE_RUNTIME = Path(__file__).parent / f".death-probe-{os.getpid()}"
+DEATH_PROBE = APPLICATION_DIR / "save_death_probe.exe"
+DEATH_PROBE_RUNTIME = APPLICATION_DIR / f".death-probe-{os.getpid()}"
 
 
 def discover_oodle_dll():
@@ -5095,25 +5095,7 @@ class DoomEternalContext(CommonContext):
                 await asyncio.sleep(self.tracker_backoff)
         self.tracker_alive = False
 
-    def make_gui(self):
-        from kvui import GameManager
-
-        class DoomEternalManager(GameManager):
-            logging_pairs = (("Client", "Archipelago"),)
-            base_title = "DOOM Eternal Archipelago Client"
-
-            def __init__(self, ctx):
-                super().__init__(ctx)
-                icon = Path(
-                    os.environ.get(
-                        "DOOM_AP_ICON",
-                        Path(__file__).with_name("doom_logo.png"),
-                    )
-                )
-                if icon.is_file():
-                    self.icon = str(icon)
-
-        return DoomEternalManager
+    
 
 async def amain(launch_args=None):
     start_bridge_logger()
@@ -5160,7 +5142,7 @@ async def amain(launch_args=None):
     ctx.server_task.add_done_callback(report_server_stop)
 
     if gui_enabled:
-        ctx.run_gui()
+        raise RuntimeError("DOOM Eternal bridge worker requires --nogui")
     ctx.run_cli()
 
     await ctx.exit_event.wait()

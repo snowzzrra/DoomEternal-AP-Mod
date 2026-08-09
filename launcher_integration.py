@@ -1,14 +1,11 @@
-"""Integrated room-bound setup used by real Archipelago Launcher entrypoint."""
+"""Room-bound setup services for standalone DOOM Eternal launcher."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-import runpy
-import sys
 import threading
-import traceback
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -20,10 +17,14 @@ from launcher_platform import (
     AdapterResult,
     DependencyManager,
     LinuxModManagerAdapter,
+    LaunchOptionPlan,
     SteamLaunchOptionsManager,
     WindowsModManagerAdapter,
     stage_room_mod,
 )
+
+EventSink = Callable[[str, dict[str, object]], None]
+ConsentCallback = Callable[[object], bool]
 
 
 @dataclass(frozen=True)
@@ -35,88 +36,39 @@ class IntegratedSetupRecord:
     staged_sha256: str
     adapter_state: str
     adapter_message: str
+    adapter_command: tuple[str, ...] = ()
     steam_launch_option: str = ""
     steam_launch_option_diff: str = ""
 
 
-def _message(title: str, text: str, *, error: bool = False, icon: Path | None = None) -> None:
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
-
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        if icon and icon.is_file():
-            image = tk.PhotoImage(file=str(icon))
-            root.iconphoto(True, image)
-            root._doom_icon = image  # type: ignore[attr-defined]
-        if error:
-            messagebox.showerror(title, text, parent=root)
-        else:
-            messagebox.showinfo(title, text, parent=root)
-        root.destroy()
-    except Exception:
-        print(f"{title}: {text}", file=sys.stderr if error else sys.stdout)
-
-
-def _consent(spec) -> bool:
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
-
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        accepted = messagebox.askyesno(
-            "DOOM Eternal dependency",
-            f"Download {spec.name} {spec.version} from its official GitHub release?\n\n"
-            "Archive will be verified by SHA-256 before extraction.",
-            parent=root,
-        )
-        root.destroy()
-        return bool(accepted)
-    except Exception:
-        return False
-
-
 class IntegratedLaunchWorkflow:
-    """Generate one room package, stage it, and prepare platform-specific tooling."""
+    """Generate, stage, and prepare platform tooling after authoritative Connected."""
 
     def __init__(
         self,
-        client_dir: Path,
+        application_dir: Path,
+        state_dir: Path,
+        config_path: Path,
         *,
         platform_name: str | None = None,
-        notify: Callable[[str, str], None] | None = None,
-        consent: Callable[[object], bool] | None = None,
-        icon: Path | None = None,
+        event_sink: EventSink | None = None,
+        consent: ConsentCallback | None = None,
     ):
         self.base_workflow = LaunchWorkflow()
-        self.client_dir = client_dir
+        self.application_dir = application_dir
+        self.state_dir = state_dir
+        self.config_path = config_path
         self.platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
-        self.icon = icon
-        self.notify = notify or (lambda title, text: _message(title, text, icon=self.icon))
-        self.consent = consent or _consent
+        self.event_sink = event_sink or (lambda _kind, _payload: None)
+        self.consent = consent or (lambda _spec: False)
 
-    def manifest_for(self, snapshot: RoomSnapshot):
-        return self.base_workflow.manifest_for(snapshot)
-
-    @staticmethod
-    def write_client_config(client_dir: Path, *, endpoint: str, manifest_hash: str) -> Path:
-        return LaunchWorkflow.write_client_config(
-            client_dir,
-            endpoint=endpoint,
-            manifest_hash=manifest_hash,
-        )
+    def _emit(self, kind: str, **payload: object) -> None:
+        self.event_sink(kind, payload)
 
     def _config(self) -> dict[str, object]:
-        path = self.client_dir / "ap_config.json"
-        if not path.is_file():
-            raise FileNotFoundError("ap_config.json was not created by DOOM Eternal Client configuration")
-        document = json.loads(path.read_text(encoding="utf-8"))
+        document = json.loads(self.config_path.read_text(encoding="utf-8"))
         if not isinstance(document, dict):
-            raise ValueError("ap_config.json must contain an object")
+            raise ValueError("launcher configuration must contain an object")
         return document
 
     @staticmethod
@@ -128,7 +80,9 @@ class IntegratedLaunchWorkflow:
         return root
 
     def _template_hashes(self) -> set[str]:
-        document = json.loads((self.client_dir / "mod_templates/index.json").read_text(encoding="utf-8"))
+        document = json.loads(
+            (self.application_dir / "mod_templates/index.json").read_text(encoding="utf-8")
+        )
         return {
             str(entry["sha256"])
             for entry in document.get("variants", {}).values()
@@ -145,17 +99,52 @@ class IntegratedLaunchWorkflow:
             except IndexError:
                 localconfig = Path()
             if localconfig.is_file():
-                current = SteamLaunchOptionsManager.detect(localconfig)
+                try:
+                    current = SteamLaunchOptionsManager.detect(localconfig)
+                except ValueError as error:
+                    message = str(error)
+                    self._emit(
+                        "warning",
+                        message=message,
+                        field="steam_launch_options",
+                        path=str(localconfig),
+                    )
+                    (self.state_dir / "steam_launch_option.txt").write_text("", encoding="utf-8")
+                    (self.state_dir / "steam_launch_option.diff").write_text(
+                        message + "\n", encoding="utf-8"
+                    )
+                    return type(
+                        SteamLaunchOptionsManager.plan_bridge(
+                            "%command%", self.application_dir / "run_bridge.sh"
+                        )
+                    )("", "", message)
         plan = SteamLaunchOptionsManager.plan_bridge(
             current,
-            self.client_dir / "run_bridge.sh",
+            self.application_dir / "run_bridge.sh",
             delay=5,
         )
-        instruction = self.client_dir / "steam_launch_option.txt"
-        instruction.write_text(plan.proposed + "\n", encoding="utf-8")
-        diff_path = self.client_dir / "steam_launch_option.diff"
-        diff_path.write_text((plan.diff or "No change required.\n") + ("\n" if plan.diff else ""), encoding="utf-8")
+        (self.state_dir / "steam_launch_option.txt").write_text(
+            plan.proposed + "\n", encoding="utf-8"
+        )
+        (self.state_dir / "steam_launch_option.diff").write_text(
+            (plan.diff or "No change required.\n") + ("\n" if plan.diff else ""),
+            encoding="utf-8",
+        )
         return plan
+
+    def _acquire(self, manager: DependencyManager, spec, local_artifact: Path | None):
+        installed = manager.acquire(
+            spec,
+            consent=self.consent,
+            local_artifact=local_artifact,
+        )
+        self._emit(
+            "dependency_ready",
+            name=installed.name,
+            version=installed.version,
+            executable=installed.executable,
+        )
+        return installed
 
     def _adapter(
         self,
@@ -163,22 +152,22 @@ class IntegratedLaunchWorkflow:
         game_root: Path,
         staged: Path,
     ) -> tuple[AdapterResult, str, str]:
-        dependency_manager = DependencyManager(self.client_dir / "dependencies")
-        local_key = "eternal_mod_manager_archive" if self.platform_name == "windows" else "eternal_basher_archive"
+        manager = DependencyManager(self.state_dir / "dependencies")
+        local_key = (
+            "eternal_mod_manager_archive"
+            if self.platform_name == "windows"
+            else "eternal_basher_archive"
+        )
         local_value = config.get(local_key)
         local_artifact = Path(str(local_value)).expanduser() if local_value else None
         if self.platform_name == "windows":
             try:
-                dependency = dependency_manager.acquire(
-                    WINDOWS_MOD_MANAGER,
-                    consent=self.consent,
-                    local_artifact=local_artifact,
-                )
+                dependency = self._acquire(manager, WINDOWS_MOD_MANAGER, local_artifact)
             except PermissionError:
                 return (
                     AdapterResult(
                         state="manual_action_required",
-                        message="Mod staged. Download/open EternalModManager 4.2.3, then run its injector.",
+                        message="The mod is ready. Approve the manager download, then try again.",
                     ),
                     "",
                     "",
@@ -187,48 +176,60 @@ class IntegratedLaunchWorkflow:
         if self.platform_name == "linux":
             plan = self._steam_plan(config)
             try:
-                dependency = dependency_manager.acquire(
-                    LINUX_MOD_INJECTOR,
-                    consent=self.consent,
-                    local_artifact=local_artifact,
-                )
+                dependency = self._acquire(manager, LINUX_MOD_INJECTOR, local_artifact)
             except PermissionError:
-                result = AdapterResult(
-                    state="manual_action_required",
-                    message=(
-                        "Mod staged. Obtain verified EternalModInjectorShell 6.66-rev3.12, run it interactively, "
-                        "then start DOOM Eternal through Steam."
+                return (
+                    AdapterResult(
+                        state="failed",
+                        message="Injector download was not approved. Try setup again when ready.",
                     ),
+                    plan.proposed,
+                    plan.diff,
                 )
-            else:
-                result = LinuxModManagerAdapter(dependency).prepare(game_root, staged)
+            self._emit("injector_started", command=[str(dependency.executable)])
+            result = LinuxModManagerAdapter(dependency).activate(game_root, staged)
+            self._emit(
+                "injector_finished",
+                state=result.state,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
             return result, plan.proposed, plan.diff
         raise RuntimeError(f"unsupported platform: {self.platform_name}")
 
-    def execute(self, snapshot: RoomSnapshot, install_root: Path, endpoint: str = "") -> IntegratedSetupRecord:
-        del install_root
-        print("[DOOM Setup] Connected; validating authoritative room options.", flush=True)
-        manifest = self.manifest_for(snapshot)
-        print(
-            f"[DOOM Setup] Building physical {'Dash ON' if manifest.options['randomize_dash'] else 'Dash OFF'} package.",
-            flush=True,
+    def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        manifest = self.base_workflow.manifest_for(snapshot)
+        self._emit(
+            "room_validated",
+            seed_name=manifest.seed_name,
+            team=manifest.team,
+            slot=manifest.slot,
+            randomize_dash=manifest.options["randomize_dash"],
+            manifest_hash=manifest.manifest_hash,
         )
-        generated = RoomModPackageBuilder(self.client_dir / "mod_templates").build(
+        self._emit(
+            "mod_building",
+            randomize_dash=manifest.options["randomize_dash"],
+        )
+        generated = RoomModPackageBuilder(self.application_dir / "mod_templates").build(
             manifest,
-            self.client_dir / "generated_mods",
+            self.state_dir / "generated_mods",
         )
-        print(f"[DOOM Setup] Generated {generated.name}; preparing installation.", flush=True)
         config = self._config()
         game_root = self._game_root(config)
-        receipt_path = self.client_dir / "launcher_setup.json"
+        receipt_path = self.state_dir / "launcher_setup.json"
         staged = stage_room_mod(
             generated,
             game_root,
             receipt_path,
             trusted_template_hashes=self._template_hashes(),
             manifest_hash=manifest.manifest_hash,
+            legacy_removal_sink=lambda path: self._emit(
+                "log", message=f"Removed legacy DOOM Eternal Archipelago mod: {path}"
+            ),
         )
-        print(f"[DOOM Setup] Staged {staged}; preparing platform adapter.", flush=True)
+        self._emit("mod_staged", path=str(staged), manifest_hash=manifest.manifest_hash)
         adapter, steam_option, steam_diff = self._adapter(config, game_root, staged)
         record = IntegratedSetupRecord(
             manifest_hash=manifest.manifest_hash,
@@ -238,93 +239,109 @@ class IntegratedLaunchWorkflow:
             staged_sha256=hashlib.sha256(staged.read_bytes()).hexdigest(),
             adapter_state=adapter.state,
             adapter_message=adapter.message,
+            adapter_command=adapter.command,
             steam_launch_option=steam_option,
             steam_launch_option_diff=steam_diff,
         )
-        payload = {**asdict(record), "endpoint": endpoint, "seed_name": manifest.seed_name, "team": manifest.team, "slot": manifest.slot}
+        payload = {
+            **asdict(record),
+            "endpoint": endpoint,
+            "seed_name": manifest.seed_name,
+            "team": manifest.team,
+            "slot": manifest.slot,
+        }
         temporary = receipt_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, receipt_path)
-        message = (
-            f"Room mod ready ({'Dash ON' if record.randomize_dash else 'Dash OFF'}).\n"
-            f"{adapter.message}"
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
-        if steam_option:
-            message += f"\n\nSteam Launch Options (not written automatically):\n{steam_option}"
-            if steam_diff:
-                message += f"\n\nProposed diff:\n{steam_diff}"
-        self.notify("DOOM Eternal room setup ready", message)
+        os.replace(temporary, receipt_path)
+        if adapter.state == "manual_action_required":
+            self._emit(
+                "manual_action_required",
+                message=adapter.message,
+                command=list(adapter.command),
+            )
         return record
 
 
-class IntegratedSetupCoordinator:
-    """Serialize room setup and make reconnect/retry idempotent."""
+class RoomSetupCoordinator:
+    """Serialize setup per room and expose explicit retry without duplicate reconnect work."""
 
-    def __init__(self, workflow: IntegratedLaunchWorkflow, client_dir: Path):
+    def __init__(
+        self,
+        workflow: IntegratedLaunchWorkflow,
+        event_sink: EventSink,
+        result_sink: Callable[[IntegratedSetupRecord], None],
+    ):
         self.workflow = workflow
-        self.client_dir = client_dir
+        self.event_sink = event_sink
+        self.result_sink = result_sink
         self._state_lock = threading.Lock()
         self._worker_lock = threading.Lock()
         self._active: set[tuple[object, ...]] = set()
         self._completed: set[tuple[object, ...]] = set()
+        self._last_event: dict[str, object] | None = None
 
-    def handle(self, event: dict[str, object]) -> None:
-        if event.get("type") != "connected":
-            return
-        key = (
+    @staticmethod
+    def _key(event: dict[str, object]) -> tuple[object, ...]:
+        return (
             event.get("seed_name"),
             event.get("team"),
             event.get("slot"),
             json.dumps(event.get("slot_data", {}), sort_keys=True),
         )
+
+    def submit(self, event: dict[str, object], *, force: bool = False) -> bool:
+        if event.get("type") != "connected":
+            return False
+        key = self._key(event)
         with self._state_lock:
-            if key in self._active or key in self._completed:
-                return
+            self._last_event = dict(event)
+            if key in self._active or (key in self._completed and not force):
+                return False
+            if force:
+                self._completed.discard(key)
             self._active.add(key)
+        self.event_sink("setup_started", {"seed_name": event.get("seed_name")})
 
         def worker() -> None:
             try:
                 with self._worker_lock:
                     snapshot = RoomSnapshot.from_event(event)
-                    endpoint = str(event.get("endpoint") or "")
-                    record = self.workflow.execute(snapshot, self.client_dir / "generated_mods", endpoint)
-                    self.workflow.write_client_config(
-                        self.client_dir,
-                        endpoint=endpoint,
-                        manifest_hash=record.manifest_hash,
+                    record = self.workflow.execute(
+                        snapshot,
+                        str(event.get("endpoint") or ""),
                     )
                 with self._state_lock:
                     self._completed.add(key)
+                self.result_sink(record)
+                self.event_sink(
+                    "setup_ready",
+                    {
+                        "manifest_hash": record.manifest_hash,
+                        "randomize_dash": record.randomize_dash,
+                        "adapter_state": record.adapter_state,
+                        "message": record.adapter_message,
+                        "steam_launch_option": record.steam_launch_option,
+                    },
+                )
             except Exception as error:
-                traceback.print_exc()
-                _message(
-                    "DOOM Eternal setup failed",
-                    f"{type(error).__name__}: {error}\n\nFix the problem and reconnect to retry safely.",
-                    error=True,
-                    icon=self.workflow.icon,
+                self.event_sink(
+                    "setup_failed",
+                    {
+                        "error_type": type(error).__name__,
+                        "message": str(error),
+                    },
                 )
             finally:
                 with self._state_lock:
                     self._active.discard(key)
 
-        threading.Thread(target=worker, name="DoomEternalRoomSetup", daemon=True).start()
+        threading.Thread(target=worker, name="DoomRoomSetup", daemon=True).start()
+        return True
 
-
-def launch_in_process(*launch_args: str, icon_path: str | None = None) -> None:
-    """Run bridge inside AP Launcher's child process; safe for frozen builds."""
-    client_dir = Path(__file__).resolve().parent
-    bridge = client_dir / "bridge_client.py"
-    icon = Path(icon_path).resolve() if icon_path else client_dir / "doom_logo.png"
-    os.environ["DOOM_AP_ICON"] = str(icon)
-    os.chdir(client_dir)
-    if str(client_dir) not in sys.path:
-        sys.path.insert(0, str(client_dir))
-    bridge_globals = runpy.run_path(str(bridge), run_name="doom_eternal_external_client")
-    workflow = IntegratedLaunchWorkflow(client_dir, icon=icon)
-    coordinator = IntegratedSetupCoordinator(workflow, client_dir)
-    bridge_globals["LAUNCHER_EVENT_HANDLER"] = coordinator.handle
-    bridge_globals["launch"](*launch_args)
-
-
-if __name__ == "__main__":
-    launch_in_process(*sys.argv[1:])
+    def retry(self) -> bool:
+        with self._state_lock:
+            event = dict(self._last_event) if self._last_event else None
+        return self.submit(event, force=True) if event else False

@@ -159,6 +159,7 @@ DoomEternalArchipelagoPlayableTest-0.4.0-beta.1.zip
 ├── DoomEternalArchipelagoBeta.zip
 ├── doometernal.apworld
 └── client/
+    ├── DoomEternalArchipelagoLauncher[.exe]
     ├── ap_client.exe
     ├── bridge_client.py
     ├── bridge_identity.json
@@ -166,8 +167,12 @@ DoomEternalArchipelagoPlayableTest-0.4.0-beta.1.zip
     ├── save_decrypt.py
     ├── run_bridge.sh
     ├── launcher_core.py
+    ├── launcher_controller.py
+    ├── launcher_integration.py
     ├── launcher_platform.py
     ├── launcher_supervisor.py
+    ├── launcher_ui.py
+    ├── licenses/
     ├── validate_runtime_install.sh
     ├── ap_config.example.json
     ├── data/

@@ -412,9 +412,10 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
-    "$REPO_ROOT/launcher_cli.py" "$REPO_ROOT/launcher_core.py" \
-    "$REPO_ROOT/launcher_integration.py" \
+    "$REPO_ROOT/launcher_app.py" "$REPO_ROOT/launcher_controller.py" \
+    "$REPO_ROOT/launcher_core.py" "$REPO_ROOT/launcher_integration.py" \
     "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
+    "$REPO_ROOT/launcher_ui.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
     "$REPO_ROOT/publisher_contracts.py" \
@@ -451,6 +452,11 @@ cp -R "$REPO_ROOT/player_templates" "$OUTPUT_DIR/client/"
 cp "$WORKSPACE/Archipelago/build/apworlds/doometernal.apworld" \
     "$OUTPUT_DIR/doometernal.apworld"
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
+
+LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-${ARCHIPELAGO_PYTHON:-python3}}"
+"$LAUNCHER_PYTHON" "$REPO_ROOT/tools/release/build_launcher.py" \
+    --output-dir "$OUTPUT_DIR/client" \
+    --archipelago-source "$WORKSPACE/Archipelago"
 
 cp "$REPO_ROOT/scripts/validate/runtime_install.sh" "$OUTPUT_DIR/client/validate_runtime_install.sh"
 chmod +x "$OUTPUT_DIR/client/validate_runtime_install.sh"
@@ -494,6 +500,19 @@ from map_registry import load_map_registry, release_plan
 map_manifest_files = [
     plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[5]), authorial=True))
 ]
+launcher_files = sorted(
+    path.relative_to(output_dir).as_posix()
+    for root in (
+        output_dir / "client" / "licenses",
+    )
+    for path in root.rglob("*")
+    if path.is_file()
+)
+launcher_executable = (
+    "client/DoomEternalArchipelagoLauncher.exe"
+    if (output_dir / "client/DoomEternalArchipelagoLauncher.exe").is_file()
+    else "client/DoomEternalArchipelagoLauncher"
+)
 
 bridge_path = output_dir / "client" / "bridge_client.py"
 client_path = output_dir / "client" / "ap_client.exe"
@@ -524,11 +543,13 @@ manifest = {
         "client/foundation.py",
         "client/item_classification.py",
         "client/item_reconciliation.py",
-        "client/launcher_cli.py",
+        "client/launcher_app.py",
+        "client/launcher_controller.py",
         "client/launcher_core.py",
         "client/launcher_integration.py",
         "client/launcher_platform.py",
         "client/launcher_supervisor.py",
+        "client/launcher_ui.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
         "client/publisher_contracts.py",
@@ -560,6 +581,8 @@ manifest = {
         *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
+        launcher_executable,
+        *launcher_files,
     ],
     "ap_client": {
         "sha256": client_sha256,

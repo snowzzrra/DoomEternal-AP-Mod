@@ -217,6 +217,29 @@ def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
     return destination
 
 
+LEGACY_DOOM_AP_MOD_NAMES = frozenset(
+    {
+        "ap_mod.zip",
+        "doometernalarchipelagoalpha.zip",
+        "doometernalarchipelagobeta.zip",
+        "doometernalarchipelagoprealpha.zip",
+    }
+)
+LEGACY_DOOM_AP_VERSIONED_MOD = re.compile(
+    r"doometernalarchipelago-(?:[0-9a-f]{16}|v[0-9][0-9a-z._-]*)\.zip",
+    re.IGNORECASE,
+)
+
+
+def is_legacy_doom_ap_mod(path: Path) -> bool:
+    """Recognize only historical or room-bound package names owned by this project."""
+    name = path.name
+    return (
+        name.casefold() in LEGACY_DOOM_AP_MOD_NAMES
+        or LEGACY_DOOM_AP_VERSIONED_MOD.fullmatch(name) is not None
+    )
+
+
 def stage_room_mod(
     mod_zip: Path,
     game_root: Path,
@@ -224,8 +247,9 @@ def stage_room_mod(
     *,
     trusted_template_hashes: set[str],
     manifest_hash: str,
+    legacy_removal_sink: Callable[[Path], None] | None = None,
 ) -> Path:
-    """Atomically stage one room mod without deleting unverified ZIPs."""
+    """Atomically replace only recognized DOOM Eternal Archipelago mod ZIPs."""
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
         raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
     mods = game_root / "Mods"
@@ -244,33 +268,29 @@ def stage_room_mod(
 
     previous_path = Path(str(previous.get("staged_mod", ""))) if previous.get("staged_mod") else None
     previous_sha = str(previous.get("staged_sha256", ""))
-    for candidate in sorted(mods.glob("DoomEternalArchipelago*.zip")):
-        if candidate == destination:
+    for candidate in sorted(mods.glob("*.zip")):
+        owned = False
+        if previous_path is not None and candidate.resolve() == previous_path.resolve():
+            owned = digest(candidate) == previous_sha
+        recognized = is_legacy_doom_ap_mod(candidate)
+        trusted = False
+        if (
+            not recognized
+            and not owned
+            and candidate.name.casefold().startswith("doometernalarchipelago")
+        ):
+            trusted = digest(candidate) in trusted_template_hashes
+        if not (recognized or owned or trusted):
             continue
-        candidate_sha = digest(candidate)
-        owned = (
-            previous_path is not None
-            and candidate.resolve() == previous_path.resolve()
-            and candidate_sha == previous_sha
-        )
-        if owned or candidate_sha in trusted_template_hashes:
+        try:
             candidate.unlink()
-            continue
-        raise RuntimeError(
-            f"unverified older DOOM Eternal Archipelago mod remains in Mods: {candidate}. "
-            "Remove it manually, then retry setup."
-        )
-    if destination.is_file():
-        destination_sha = digest(destination)
-        owned_destination = (
-            previous_path is not None
-            and destination.resolve() == previous_path.resolve()
-            and destination_sha == previous_sha
-        )
-        if not owned_destination and destination_sha not in trusted_template_hashes:
+        except OSError as error:
             raise RuntimeError(
-                f"refusing to overwrite unverified mod ZIP: {destination}. Remove it manually, then retry setup."
-            )
+                f"could not remove legacy DOOM Eternal Archipelago mod {candidate}: {error}"
+            ) from error
+        if legacy_removal_sink is not None:
+            legacy_removal_sink(candidate)
+
     staged = _stage_mod(mod_zip, game_root)
     receipt = {
         "schema": 1,
@@ -304,7 +324,9 @@ class WindowsModManagerAdapter:
 
 
 class LinuxModManagerAdapter:
-    """EternalModInjectorShell is interactive; prepare it, never fake unattended success."""
+    """Stage bundled InjectorShell tools and apply mods without launching Steam."""
+
+    TIMEOUT_SECONDS = 15 * 60
 
     def __init__(self, dependency: InstalledDependency):
         self.dependency = dependency
@@ -328,37 +350,67 @@ class LinuxModManagerAdapter:
         prepared.chmod(prepared.stat().st_mode | 0o100)
         return prepared
 
-    def prepare(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        staged = _stage_mod(mod_zip, game_root)
-        executable = self._prepare_tools(game_root)
-        command = (str(executable),)
-        return AdapterResult(
-            state="manual_action_required",
-            message=(
-                f"Prepared {staged.name} and EternalModInjectorShell in the game directory. "
-                "Run the interactive injector, keep AUTO_LAUNCH_GAME disabled, then start DOOM Eternal through Steam."
+    @staticmethod
+    def _configure_first_run(game_root: Path) -> None:
+        """Avoid InjectorShell first-run prompts; never enable game auto-launch."""
+        config = game_root / "EternalModInjector Settings.txt"
+        if config.is_file():
+            return
+        config.write_text(
+            "\n".join(
+                (
+                    ":ASSET_VERSION=2026-04-03",
+                    ":AUTO_LAUNCH_GAME=0",
+                    ":GAME_PARAMETERS=",
+                    ":HAS_CHECKED_RESOURCES=0",
+                    ":HAS_READ_FIRST_TIME=1",
+                    ":RESET_BACKUPS=0",
+                    ":AUTO_UPDATE=0",
+                    ":VERBOSE=0",
+                    ":SLOW=0",
+                    ":COMPRESS_TEXTURES=0",
+                    ":DISABLE_MULTITHREADING=0",
+                    ":ONLINE_SAFE=0",
+                    "",
+                )
             ),
-            command=command,
+            encoding="utf-8",
         )
 
-    def activate_interactive(self, game_root: Path, mod_zip: Path) -> AdapterResult:
+    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
         _stage_mod(mod_zip, game_root)
         executable = self._prepare_tools(game_root)
+        self._configure_first_run(game_root)
         environment = os.environ.copy()
         environment.update({"skip": "1", "skip_debug_check": "1"})
-        completed = subprocess.run(
-            [executable],
-            cwd=game_root,
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        command = (str(executable),)
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=game_root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=self.TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return AdapterResult(
+                state="timed_out",
+                message="Mod installation timed out. Review details and try again.",
+                command=command,
+                stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
+                stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
+            )
         state = "applied" if completed.returncode == 0 else "failed"
         return AdapterResult(
             state=state,
-            message="EternalModInjectorShell finished." if state == "applied" else "EternalModInjectorShell failed.",
-            command=(str(executable),),
+            message=(
+                "Mod installed successfully. Start DOOM Eternal through Steam."
+                if state == "applied"
+                else "Mod installation failed. Review details and try again."
+            ),
+            command=command,
             stdout=completed.stdout,
             stderr=completed.stderr,
             returncode=completed.returncode,
@@ -451,6 +503,8 @@ class ValveVdfParser:
         while position < len(text):
             match = cls.TOKEN.match(text, position)
             if match is None:
+                if not text[position:].strip():
+                    break
                 raise ValueError(f"invalid VDF at offset {position}")
             position = match.end()
             quoted, brace, bare = match.groups()
@@ -500,7 +554,11 @@ class SteamLaunchOptionsManager:
 
     @classmethod
     def detect(cls, localconfig: Path) -> str:
-        document = ValveVdfParser.parse(localconfig.read_text(encoding="utf-8", errors="strict"))
+        try:
+            text = localconfig.read_text(encoding="utf-8", errors="strict")
+            document = ValveVdfParser.parse(text)
+        except (OSError, UnicodeError, ValueError) as error:
+            raise ValueError(f"Failed to parse Steam VDF {localconfig}: {error}") from error
         current: object = document
         for key in ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps", DOOM_ETERNAL_APP_ID):
             if not isinstance(current, dict):
