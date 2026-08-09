@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import threading
+import zipfile
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -39,6 +40,15 @@ class IntegratedSetupRecord:
     adapter_command: tuple[str, ...] = ()
     steam_launch_option: str = ""
     steam_launch_option_diff: str = ""
+
+
+@dataclass(frozen=True)
+class InstallState:
+    state: str
+    manifest_hash: str
+    staged_mod: str = ""
+    steam_launch_option: str = ""
+    reason: str = ""
 
 
 class IntegratedLaunchWorkflow:
@@ -145,6 +155,52 @@ class IntegratedLaunchWorkflow:
             executable=installed.executable,
         )
         return installed
+
+    def install_state(self, snapshot: RoomSnapshot) -> InstallState:
+        """Resolve current room identity against verified launcher ownership."""
+        manifest = self.base_workflow.manifest_for(snapshot)
+        receipt_path = self.state_dir / "launcher_setup.json"
+        if not receipt_path.is_file():
+            return InstallState("install_needed", manifest.manifest_hash, reason="no launcher install record")
+        try:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            staged = Path(str(receipt["staged_mod"])).resolve()
+            expected_sha = str(receipt["staged_sha256"])
+            recorded_manifest = str(receipt["manifest_hash"])
+            adapter_state = str(receipt.get("adapter_state", ""))
+            windows_confirmed = bool(receipt.get("windows_installation_confirmed", False))
+            steam_option = str(receipt.get("steam_launch_option", ""))
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            return InstallState("install_needed", manifest.manifest_hash, reason=f"invalid install record: {error}")
+        if recorded_manifest != manifest.manifest_hash:
+            return InstallState("install_needed", manifest.manifest_hash, reason="installed manifest belongs to another room")
+        if not staged.is_file():
+            return InstallState("install_needed", manifest.manifest_hash, reason="recorded installed package is missing")
+        if hashlib.sha256(staged.read_bytes()).hexdigest() != expected_sha:
+            return InstallState("install_needed", manifest.manifest_hash, reason="installed package hash does not match record")
+        try:
+            with zipfile.ZipFile(staged) as package:
+                package_manifest = json.loads(package.read("seed_manifest.json"))
+            if package_manifest.get("manifest_hash") != manifest.manifest_hash:
+                raise ValueError("package manifest hash does not match current room")
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
+            return InstallState("install_needed", manifest.manifest_hash, reason=f"installed package validation failed: {error}")
+        if adapter_state != "applied" and not (adapter_state == "manual_action_required" and windows_confirmed):
+            return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
+        return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option)
+
+    def mark_windows_installation(self, succeeded: bool) -> None:
+        if not succeeded:
+            return
+        receipt_path = self.state_dir / "launcher_setup.json"
+        if not receipt_path.is_file():
+            return
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+        payload["adapter_state"] = "applied"
+        payload["windows_installation_confirmed"] = True
+        temporary = receipt_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temporary, receipt_path)
 
     def _adapter(
         self,
@@ -283,6 +339,13 @@ class RoomSetupCoordinator:
         self._completed: set[tuple[object, ...]] = set()
         self._last_event: dict[str, object] | None = None
 
+    def observe(self, event: dict[str, object]) -> bool:
+        if event.get("type") != "connected":
+            return False
+        with self._state_lock:
+            self._last_event = dict(event)
+        return True
+
     @staticmethod
     def _key(event: dict[str, object]) -> tuple[object, ...]:
         return (
@@ -340,6 +403,11 @@ class RoomSetupCoordinator:
 
         threading.Thread(target=worker, name="DoomRoomSetup", daemon=True).start()
         return True
+
+    def start(self, *, force: bool = False) -> bool:
+        with self._state_lock:
+            event = dict(self._last_event) if self._last_event else None
+        return self.submit(event, force=force) if event else False
 
     def retry(self) -> bool:
         with self._state_lock:

@@ -24,6 +24,8 @@ RUNTIME_DISTRIBUTIONS = (
     "typing_extensions",
     "platformdirs",
     "certifi",
+    "PySide6",
+    "shiboken6",
     "pyinstaller",
 )
 
@@ -69,7 +71,16 @@ def _copy_distribution_licenses(destination: Path) -> None:
             shutil.copy2(source, target / Path(str(entry)).name)
             copied += 1
         if not copied:
-            raise RuntimeError(f"license file not found for {name}")
+            license_text = distribution.metadata.get("License", "").strip()
+            if name in {"PySide6", "shiboken6"} and license_text:
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "LICENSE-SPDX.txt").write_text(
+                    f"{distribution.metadata['Name']} {distribution.version}: {license_text}\n",
+                    encoding="utf-8",
+                )
+                copied = 1
+            else:
+                raise RuntimeError(f"license file not found for {name}")
 
 
 def _copy_licenses(output_dir: Path, archipelago_source: Path) -> None:
@@ -93,10 +104,10 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         raise RuntimeError(
             "PyInstaller is missing; install requirements-launcher.txt in launcher build Python"
         )
-    try:
-        import tkinter  # noqa: F401
-    except ImportError as error:
-        raise RuntimeError("launcher build Python does not provide Tkinter") from error
+    if importlib.util.find_spec("PySide6") is None:
+        raise RuntimeError(
+            "PySide6 is missing; install requirements-launcher.txt in launcher build Python"
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     build_root = RELEASE_ROOT / "build/launcher"
@@ -143,21 +154,12 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "jinja2",
         "setuptools",
         "pip",
+        "tkinter",
+        "_tkinter",
     ):
         command[-1:-1] = ["--exclude-module", excluded_module]
     if os.name == "nt":
         command[-1:-1] = ["--hide-console", "hide-early"]
-    else:
-        runtime_libraries = (
-            Path(sys.base_prefix) / "lib/libtcl9.0.so",
-            Path(sys.base_prefix) / "lib/libtcl9tk9.0.so",
-        )
-        for runtime_library in runtime_libraries:
-            if runtime_library.is_file():
-                command[-1:-1] = [
-                    "--add-binary",
-                    f"{runtime_library}{data_separator}.",
-                ]
     subprocess.run(command, check=True, cwd=REPO_ROOT)
     executable = output_dir / (f"{name}.exe" if os.name == "nt" else name)
     if not executable.is_file():

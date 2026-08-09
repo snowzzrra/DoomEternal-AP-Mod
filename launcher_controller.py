@@ -222,7 +222,26 @@ class LauncherController:
 
     def process_event(self, event: dict[str, object]) -> None:
         if event.get("type") == "connected":
-            self.setup.submit(event)
+            self.setup.observe(event)
+            try:
+                from launcher_core import RoomSnapshot
+
+                snapshot = RoomSnapshot.from_event(event)
+                state = self.workflow.install_state(snapshot)
+                self.emit(
+                    "room_install_state",
+                    state=state.state,
+                    manifest_hash=state.manifest_hash,
+                    staged_mod=state.staged_mod,
+                    steam_launch_option=state.steam_launch_option,
+                    reason=state.reason,
+                )
+            except Exception as error:
+                self.emit(
+                    "room_install_state",
+                    state="install_needed",
+                    reason=f"could not verify installed room mod: {error}",
+                )
 
     def send_command(self, text: str) -> None:
         if not text.strip():
@@ -238,7 +257,13 @@ class LauncherController:
         self.emit("disconnected", intentional=True)
 
     def retry_setup(self) -> bool:
-        return self.setup.retry()
+        return self.setup.start(force=True)
+
+    def prepare_setup(self) -> bool:
+        return self.setup.start()
+
+    def reinstall_setup(self) -> bool:
+        return self.setup.start(force=True)
 
     def open_adapter(self) -> None:
         record = self.last_setup
@@ -266,6 +291,7 @@ class LauncherController:
         """Record user confirmation after EternalModManager completes its manual step."""
         if self.last_setup is None or self.last_setup.adapter_state != "manual_action_required":
             raise RuntimeError("there is no pending EternalModManager confirmation")
+        self.workflow.mark_windows_installation(succeeded)
         self.emit("windows_installation_confirmed", succeeded=succeeded)
 
     def close(self) -> None:
