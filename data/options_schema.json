@@ -1,0 +1,123 @@
+{
+  "excluded_options": [
+    {
+      "key": "local_items",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "LocalItems"
+    },
+    {
+      "key": "non_local_items",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "NonLocalItems"
+    },
+    {
+      "key": "start_inventory",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "StartInventory"
+    },
+    {
+      "key": "start_hints",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "StartHints"
+    },
+    {
+      "key": "start_location_hints",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "StartLocationHints"
+    },
+    {
+      "key": "exclude_locations",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "ExcludeLocations"
+    },
+    {
+      "key": "priority_locations",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "PriorityLocations"
+    },
+    {
+      "key": "item_links",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "ItemLinks"
+    },
+    {
+      "key": "plando_items",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "PlandoItems"
+    }
+  ],
+  "game": "DOOM Eternal",
+  "options": [
+    {
+      "default": 50,
+      "description": "A system that can move progression earlier, to try and prevent the player from getting stuck and bored early.\n\nA lower setting means more getting stuck. A higher setting means less getting stuck.",
+      "display_name": "Progression Balancing",
+      "group": "Game Options",
+      "key": "progression_balancing",
+      "maximum": 99,
+      "minimum": 0,
+      "source_class": "ProgressionBalancing",
+      "ui_type": "range"
+    },
+    {
+      "choices": [
+        {
+          "key": "full",
+          "label": "Full",
+          "value": 0
+        },
+        {
+          "key": "minimal",
+          "label": "Minimal",
+          "value": 2
+        }
+      ],
+      "default": "full",
+      "description": "Set rules for reachability of your items/locations.\n\n**Full:** ensure everything can be reached and acquired.\n\n**Minimal:** ensure what is needed to reach your goal can be acquired.",
+      "display_name": "Accessibility",
+      "group": "Game Options",
+      "key": "accessibility",
+      "source_class": "Accessibility",
+      "ui_type": "choice"
+    },
+    {
+      "default": false,
+      "description": "When you die, everyone who enabled death link dies. Of course, the reverse is true too.",
+      "display_name": "Death Link",
+      "group": "Game Options",
+      "key": "death_link",
+      "source_class": "DeathLink",
+      "ui_type": "toggle"
+    },
+    {
+      "default": false,
+      "description": "Randomize the Chainsaw. If false, the Chainsaw will always be found at its\nvanilla location in Hell on Earth.",
+      "display_name": "Randomize Chainsaw",
+      "group": "Game Options",
+      "key": "randomize_chainsaw",
+      "source_class": "RandomizeChainsaw",
+      "ui_type": "toggle"
+    },
+    {
+      "default": false,
+      "description": "Randomize the Dash pickup. Dash is not required by the current PTB logic\nbecause it is not technically mandatory until Khan Maykr, so enabling this\noption can place it anywhere allowed by that logic.",
+      "display_name": "Randomize Dash",
+      "group": "Game Options",
+      "key": "randomize_dash",
+      "source_class": "RandomizeDash",
+      "ui_type": "toggle"
+    },
+    {
+      "default": false,
+      "description": "When enabled, the mandatory first Sentinel Battery is shuffled into the\nitem pool instead of being locked to its Exultia pickup.",
+      "display_name": "Randomize First Sentinel Battery",
+      "group": "Game Options",
+      "key": "randomize_first_battery",
+      "source_class": "RandomizeFirstBattery",
+      "ui_type": "toggle"
+    }
+  ],
+  "schema_version": 1,
+  "source": "Archipelago/worlds/doometernal/options.py",
+  "source_sha256": "5f33b010189bf0754c5ac9886410fb86a7a5d5abd160ac119f315ab267778d6a"
+}

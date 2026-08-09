@@ -413,6 +413,12 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
         else:
             reconciliation["delivered"] = {}
         normalized["perk_reconciliation"] = reconciliation
+    rune_reconciliation = normalized.get("rune_reconciliation")
+    normalized["rune_reconciliation"] = (
+        copy.deepcopy(dict(rune_reconciliation))
+        if isinstance(rune_reconciliation, Mapping)
+        else {}
+    )
     groups = normalized.get("item_command_groups")
     if isinstance(groups, Mapping):
         safe_groups = {}

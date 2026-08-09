@@ -20,6 +20,7 @@ from launcher_integration import (
 )
 from launcher_platform import SteamInstallationLocator
 from launcher_supervisor import BridgeSupervisor
+from options_foundation import load_options_schema, save_player_yaml
 
 
 def application_directory() -> Path:
@@ -39,6 +40,10 @@ class LauncherController:
         self.config_path = self.state_dir / "launcher.json"
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.config = self._load_config()
+        self.options_schema = load_options_schema(
+            self.application_dir / "data" / "options_schema.json"
+        )
+        self.connected_room = False
         self.supervisor: BridgeSupervisor | None = None
         self.last_setup: IntegratedSetupRecord | None = None
         self._consent_lock = threading.Lock()
@@ -222,6 +227,7 @@ class LauncherController:
 
     def process_event(self, event: dict[str, object]) -> None:
         if event.get("type") == "connected":
+            self.connected_room = True
             self.setup.observe(event)
             try:
                 from launcher_core import RoomSnapshot
@@ -254,7 +260,24 @@ class LauncherController:
         if self.supervisor is not None:
             self.supervisor.stop()
             self.supervisor = None
+        self.connected_room = False
         self.emit("disconnected", intentional=True)
+
+    def save_player_options(
+        self,
+        destination: Path,
+        player_name: str,
+        values: dict[str, object],
+    ) -> Path:
+        """Save future-room generation input without touching connected room state."""
+        saved = save_player_yaml(
+            destination,
+            self.options_schema,
+            player_name,
+            values,
+        )
+        self.emit("player_yaml_saved", path=str(saved))
+        return saved
 
     def retry_setup(self) -> bool:
         return self.setup.start(force=True)

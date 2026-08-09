@@ -71,6 +71,13 @@ from publisher_runtime import (
     quarantine_malformed_event,
     read_map_event,
 )
+from rune_reconciliation import (
+    RUNE_WRITER_EVIDENCE,
+    RuneNativeState,
+    compile_rune_reconciliation_plan,
+    rune_item_perk_mapping,
+    rune_plan_already_recorded,
+)
 
 try:
     from .save_decrypt import decrypt, steam_id64
@@ -2090,6 +2097,19 @@ class DoomCommandProcessor(ClientCommandProcessor):
             f"skipped_never_replay={plan.skipped_never_replay} "
             f"skipped_unproven={plan.skipped_unproven}"
         )
+        rune_plan, rune_error = self.ctx.reconcile_owned_runes("manual", force=True)
+        if rune_error:
+            self.output(f"Rune reconcile: {rune_error}")
+        else:
+            self.output(
+                f"Rune reconcile: status={rune_plan.status} "
+                f"noop={len(rune_plan.noops)} candidates={len(rune_plan.repairs)}"
+            )
+
+    def _cmd_doom_rune_diag(self):
+        """Show AP Rune ownership and distinct native Rune state surfaces."""
+        for line in self.ctx.rune_diagnostic_lines():
+            self.output(line)
 
     def _cmd_doom_rpc_on(self):
         """Arm RPC commands; the native memory gate still enforces safe gameplay."""
@@ -2751,7 +2771,6 @@ class DoomEternalContext(CommonContext):
                 self.items_processed += 1
                 self.persist_session_state()
                 self.onboard_bootstrap("on_item_received")
-                self.reconcile_owned_perks("item_received")
 
                 batch_count += 1
                 if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
@@ -3543,6 +3562,7 @@ class DoomEternalContext(CommonContext):
             "owned_item_ids": [],
         }
         self.session_state["item_resync"] = {}
+        self.session_state["rune_reconciliation"] = {}
         self.reconnect_resync_attempted = False
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
@@ -3842,58 +3862,102 @@ class DoomEternalContext(CommonContext):
         self.persist_session_state()
         return state["epoch"]
 
-    def reconcile_owned_perks(self, trigger):
-        """Reapply desired Rune ownership once per connect/level epoch."""
-        if not self.item_state_ready or not self.current_map_name:
-            return False
-        supported = {
-            canonical_map_name(name)
-            for name in load_foundation_contracts()["active_maps"].values()
-        }
-        if canonical_map_name(self.current_map_name) not in supported:
-            return False
-        received_ids = self.received_item_ids(processed_only=True)
-        state = self.session_state.setdefault(
-            "perk_reconciliation", {"epoch": 1, "delivered": {}}
-        )
-        delivered = state.setdefault("delivered", {})
-        epoch = self.reconciliation_epoch()
-        candidates = [
-            *(('rune', item_id) for item_id in sorted(received_ids & REVISION_ONE_RUNE_IDS)),
-        ]
-        changed = False
-        for kind, item_id in candidates:
-            key = f"{kind}:{item_id}"
-            if int(delivered.get(key, -1)) >= epoch:
-                continue
-            commands, description = self.item_activation_commands(
-                item_id,
-                0,
-                intent=RECONCILIATION_REPAIR,
+    def rune_native_state(self):
+        """Read distinct Rune surfaces only from lifecycle-proven active save."""
+        if not self.has_authoritative_save_proof() or not self.active_save_slot:
+            return None, "authoritative active-save proof required"
+        lease = getattr(self, "runtime_observation_lease", None)
+        evidence_epoch = getattr(lease, "gameplay_loaded_ns", None)
+        if evidence_epoch is None:
+            evidence_epoch = self.active_native_evidence_epoch or "unknown"
+        return RuneNativeState.from_game_details(
+            self.active_game_details(),
+            save_slot=self.active_save_slot,
+            evidence_epoch=evidence_epoch,
+        ), None
+
+    def compile_owned_rune_plan(self):
+        if not self.item_state_ready:
+            return None, "item state is not ready"
+        native, error = self.rune_native_state()
+        if error:
+            return None, error
+        try:
+            mapping = rune_item_perk_mapping(ITEM_ID_TO_COMMAND, REVISION_ONE_RUNE_IDS)
+            plan = compile_rune_reconciliation_plan(
+                self.received_item_ids(processed_only=True),
+                native,
+                mapping,
+                expected_rune_item_ids=REVISION_ONE_RUNE_IDS,
             )
-            if commands is None:
-                logger.error("[Reconcile] Cannot compile %s %s: %s", kind, item_id, description)
-                continue
-            queued = True
-            for command_index, command in enumerate(commands):
-                # Native queue order is lexical; keep reconciliations after
-                # recv-* prerequisite jobs created in the same pass.
-                command_id = f"zz-reconcile-{kind}-{item_id}-e{epoch}-c{command_index}"
-                if not send_command(command, coalesce_key=command_id, already_queued_ok=True):
-                    queued = False
-                    break
-            if not queued:
-                continue
-            delivered[key] = epoch
-            changed = True
+        except ValueError as error:
+            return None, str(error)
+        return plan, None
+
+    def reconcile_owned_runes(self, trigger, *, force=False):
+        """Plan Rune repair once per native/AP fingerprint; never invent a writer."""
+        plan, error = self.compile_owned_rune_plan()
+        if error:
+            logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
+            return None, error
+        state = self.session_state.setdefault("rune_reconciliation", {})
+        if not force and rune_plan_already_recorded(state, plan):
             logger.info(
-                "[Reconcile] %s %s queued for epoch %s (%s): %s",
-                kind, item_id, epoch, trigger, description,
+                "RUNE_RECONCILE_NOOP trigger=%s detail=already_planned fingerprint=%s",
+                trigger,
+                plan.fingerprint,
             )
-        state["last_trigger"] = trigger
-        state["timestamp"] = time.time()
+            return plan, None
+        state.update(
+            fingerprint=plan.fingerprint,
+            status=plan.status,
+            trigger=trigger,
+            timestamp=time.time(),
+            repair_candidates=len(plan.repairs),
+        )
         self.persist_session_state()
-        return changed
+        if plan.repairs:
+            logger.warning(
+                "RUNE_RECONCILE_BLOCKED trigger=%s candidates=%s fingerprint=%s "
+                "writer=%s",
+                trigger,
+                len(plan.repairs),
+                plan.fingerprint,
+                RUNE_WRITER_EVIDENCE,
+            )
+        else:
+            logger.info(
+                "RUNE_RECONCILE_NOOP trigger=%s detail=native_state_coherent "
+                "owned=%s fingerprint=%s",
+                trigger,
+                len(plan.entries),
+                plan.fingerprint,
+            )
+        return plan, None
+
+    def rune_diagnostic_lines(self):
+        native, error = self.rune_native_state()
+        if error:
+            return [f"Rune diagnostic unavailable: {error}"]
+        plan, plan_error = self.compile_owned_rune_plan()
+        lines = [
+            f"Rune save slot: {native.save_slot}",
+            f"Available perks: {', '.join(sorted(native.available_perks)) or '-'}",
+            f"Active perks: {', '.join(sorted(native.active_perks)) or '-'}",
+            f"Registered Runes: {', '.join(sorted(native.registered_runes)) or '-'}",
+            "Equipped slots: " + ", ".join(value or "-" for value in native.equipped_slots),
+            f"Rune page observed: {native.page_unlocked if native.page_unlocked is not None else 'unknown'}",
+        ]
+        if plan_error:
+            lines.append(f"Plan: blocked ({plan_error})")
+        else:
+            lines.append(
+                f"Plan: {plan.status}; noops={len(plan.noops)} "
+                f"repair_candidates={len(plan.repairs)}"
+            )
+            if plan.repairs:
+                lines.append(f"Writer proof: {RUNE_WRITER_EVIDENCE}")
+        return lines
 
     def advance_automap_cleanup_epoch(self):
         """Open one idempotent cleanup pass after a level-ready marker."""
@@ -5460,7 +5524,6 @@ class DoomEternalContext(CommonContext):
                 try:
                     migrate_direct_item_command_jobs()
                     self.onboard_bootstrap("on_reconnect")
-                    self.reconcile_owned_perks("connect_or_reconnect")
                     self.reconcile_checked_automap_cleanup("connect_or_reconnect")
                     if not self.repair_item_mappings():
                         await asyncio.sleep(0.25)
@@ -5469,6 +5532,7 @@ class DoomEternalContext(CommonContext):
                         _, resync_error = self.automatic_reconcile_inventory("reconnect")
                         if resync_error is None:
                             self.reconnect_resync_attempted = True
+                            self.reconcile_owned_runes("reconnect")
                 except Exception as exc:
                     logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
 
@@ -5503,7 +5567,7 @@ class DoomEternalContext(CommonContext):
                                 os.path.basename(newest_path),
                                 epoch,
                             )
-                            self.reconcile_owned_perks("level_ready")
+                            self.reconcile_owned_runes("level_ready")
                             self.advance_automap_cleanup_epoch()
                             self.reconcile_checked_automap_cleanup("level_ready")
                             level_ready_resync = True
@@ -5523,11 +5587,6 @@ class DoomEternalContext(CommonContext):
                     self.automatic_reconcile_inventory("level_ready")
 
                 await self.process_pending_item_receipts("tracker")
-
-                try:
-                    self.reconcile_owned_perks("post_item_scan")
-                except Exception as exc:
-                    logger.warning("[Tracking] Error during post_item_scan perk reconciliation: %s", exc)
 
                 await self.flush_check_event_files()
 

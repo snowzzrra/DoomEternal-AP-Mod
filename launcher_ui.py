@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import queue
+from pathlib import Path
+from typing import cast
+
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
+    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -19,11 +24,14 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from launcher_controller import LauncherController
+from options_foundation import suggested_yaml_filename
 
 
 class LauncherUI(QMainWindow):
@@ -64,6 +72,8 @@ class LauncherUI(QMainWindow):
         self.next_action = "Connect to Archipelago"
         self.overall_state = QLabel("READY TO CONFIGURE")
         self.install_guidance = QLabel()
+        self.option_controls: dict[str, QWidget] = {}
+        self.option_defaults: dict[str, object] = {}
         self._build()
         self._discover()
         self._timer = QTimer(self)
@@ -89,6 +99,14 @@ class LauncherUI(QMainWindow):
             QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 15pt; font-weight: 700; }}
             QLineEdit {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
                 border-radius: 7px; padding: 7px 11px; min-height: 22px; }}
+            QComboBox, QSpinBox {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
+                border-radius: 7px; padding: 7px 11px; min-height: 22px; }}
+            QCheckBox {{ spacing: 8px; }}
+            QTabWidget::pane {{ border: 0; }}
+            QTabBar::tab {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['muted']};
+                border: 1px solid {self.COLORS['border']}; border-bottom: 0; padding: 10px 20px;
+                font-weight: 600; }}
+            QTabBar::tab:selected {{ background: {self.COLORS['surface']}; color: {self.COLORS['text']}; }}
             QPlainTextEdit {{ background: #0d1219; color: #d8e4ef; border: 1px solid {self.COLORS['border']};
                 border-radius: 7px; padding: 8px; }}
             QPushButton {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['text']};
@@ -121,6 +139,9 @@ class LauncherUI(QMainWindow):
         return frame
 
     def _build(self) -> None:
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -129,7 +150,7 @@ class LauncherUI(QMainWindow):
         outer.setContentsMargins(28, 24, 28, 28)
         outer.setSpacing(14)
         scroll.setWidget(body)
-        self.setCentralWidget(scroll)
+        self.tabs.addTab(scroll, "Setup")
 
         header = self._surface()
         header_layout = QHBoxLayout(header)
@@ -254,6 +275,142 @@ class LauncherUI(QMainWindow):
         outer.addWidget(launch)
 
         self._set_step(1)
+        self._build_options_tab()
+
+    def _build_options_tab(self) -> None:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(28, 24, 28, 28)
+        layout.setSpacing(14)
+        scroll.setWidget(body)
+        self.tabs.addTab(scroll, "Options")
+
+        header = self._surface()
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(24, 20, 24, 20)
+        header_layout.addWidget(self._label("Room Options", "title"))
+        header_layout.addWidget(self._label("Choose options for a player YAML file used when creating a future room.", "muted"))
+        self.connected_options_notice = self._label(
+            "Connected room settings come from the server. Changes here are for future room generation.", "muted"
+        )
+        self.connected_options_notice.setVisible(False)
+        header_layout.addWidget(self.connected_options_notice)
+        layout.addWidget(header)
+
+        player_card = self._surface()
+        player_layout = QVBoxLayout(player_card)
+        player_layout.setContentsMargins(22, 18, 22, 20)
+        player_layout.addWidget(self._label("Player Name", "section"))
+        player_layout.addWidget(self._label("Used for the suggested YAML filename.", "muted"))
+        self.player_name = QLineEdit("Player")
+        player_layout.addWidget(self.player_name)
+        layout.addWidget(player_card)
+
+        options = cast(list[dict[str, object]], self.controller.options_schema["options"])
+        groups: dict[str, list[dict[str, object]]] = {}
+        for option in options:
+            groups.setdefault(str(option.get("group") or "Options"), []).append(option)
+        for group, options in groups.items():
+            card = self._surface()
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(22, 18, 22, 20)
+            card_layout.setSpacing(10)
+            card_layout.addWidget(self._label(group, "section"))
+            for option in options:
+                card_layout.addWidget(self._option_widget(option))
+            layout.addWidget(card)
+
+        actions = QHBoxLayout()
+        reset = QPushButton("Reset to Defaults")
+        reset.clicked.connect(self._reset_options)
+        actions.addWidget(reset)
+        actions.addStretch(1)
+        save = QPushButton("Save Player YAML…")
+        save.setObjectName("primary")
+        save.clicked.connect(self._save_player_options)
+        actions.addWidget(save)
+        layout.addLayout(actions)
+        layout.addStretch(1)
+
+    def _option_widget(self, option: dict[str, object]) -> QWidget:
+        key = str(option["key"])
+        default = option.get("default")
+        self.option_defaults[key] = default
+        row = QWidget()
+        layout = QVBoxLayout(row)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(4)
+        layout.addWidget(self._label(str(option["display_name"])))
+        layout.addWidget(self._label(str(option["description"]), "muted"))
+        ui_type = str(option["ui_type"])
+        if ui_type == "toggle":
+            control: QWidget = QCheckBox("Enabled")
+            control.setChecked(bool(default))
+        elif ui_type == "choice":
+            control = QComboBox()
+            for choice in cast(list[object], option["choices"]):
+                if isinstance(choice, dict):
+                    choice_key = choice.get("key")
+                    choice_name = choice.get("label", choice_key)
+                else:
+                    choice_key = choice
+                    choice_name = choice
+                control.addItem(str(choice_name), choice_key)
+            index = control.findData(default)
+            control.setCurrentIndex(index if index >= 0 else 0)
+        else:
+            control = QSpinBox()
+            control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
+            control.setValue(cast(int, default))
+        self.option_controls[key] = control
+        layout.addWidget(control)
+        return row
+
+    def _reset_options(self) -> None:
+        for key, control in self.option_controls.items():
+            default = self.option_defaults[key]
+            if isinstance(control, QCheckBox):
+                control.setChecked(bool(default))
+            elif isinstance(control, QComboBox):
+                control.setCurrentIndex(max(0, control.findData(default)))
+            elif isinstance(control, QSpinBox):
+                control.setValue(cast(int, default))
+
+    def _save_player_options(self) -> None:
+        player_name = self.player_name.text()
+        try:
+            suggested = suggested_yaml_filename(player_name)
+        except ValueError as error:
+            self._append_log(f"Player YAML save error: {error}")
+            QMessageBox.critical(self, "Could not save Player YAML", str(error))
+            return
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Save Player YAML", suggested, "YAML files (*.yaml);;All files (*)"
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        if path.suffix.lower() not in {".yaml", ".yml"}:
+            path = path.with_suffix(".yaml")
+        values: dict[str, object] = {}
+        for key, control in self.option_controls.items():
+            if isinstance(control, QCheckBox):
+                values[key] = control.isChecked()
+            elif isinstance(control, QComboBox):
+                values[key] = control.currentData()
+            elif isinstance(control, QSpinBox):
+                values[key] = control.value()
+        try:
+            saved = self.controller.save_player_options(path, player_name, values)
+        except Exception as error:
+            self._append_log(f"Player YAML save error: {error}")
+            QMessageBox.critical(self, "Could not save Player YAML", str(error))
+            return
+        self._append_log(f"Player YAML saved: {saved}")
+        QMessageBox.information(self, "Player YAML saved", f"Saved player options to:\n{saved}")
 
     def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit) -> None:
         layout.addWidget(self._label(label), row, 0)
@@ -394,6 +551,7 @@ class LauncherUI(QMainWindow):
         elif kind in {"client_started", "connecting"}:
             self._set_state("Connecting to your Archipelago room…", "The launcher is waiting for room information.", action="Connecting…", step=2, complete=1, busy=True)
         elif kind == "connected":
+            self.connected_options_notice.setVisible(True)
             self._set_state("Connected. Checking installed mod.", "Verifying room identity and installed package before any setup.", action="Checking…", step=3, complete=2, busy=True)
         elif kind == "room_install_state":
             self.progress.setVisible(False)
@@ -409,8 +567,11 @@ class LauncherUI(QMainWindow):
                 self._set_state("Room connected. Mod needs installation.", f"Prepare the room-specific mod before starting DOOM Eternal. ({reason})", action="Prepare & install mod", step=3, complete=2, state="CONNECTED")
                 self._append_log("Connected room requires explicit Prepare & install.")
         elif kind == "disconnected":
+            self.connected_options_notice.setVisible(False)
             self.reinstall_button.setVisible(False)
             self._set_state("Connection stopped.", "You can update details and reconnect when ready.", action="Connect to Archipelago", step=2, complete=1, state="DISCONNECTED")
+        elif kind == "player_yaml_saved":
+            pass
         elif kind in {"setup_started", "mod_building"}:
             self.reinstall_button.setVisible(False)
             self._set_state("Preparing your mod…", "Creating the room-specific mod package.", action="Preparing…", step=3, complete=2, busy=True)

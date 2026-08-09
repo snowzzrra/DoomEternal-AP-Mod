@@ -51,6 +51,8 @@ CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
 PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
 mkdir -p "$TEMP_DIR"
+SKIP_REQUIREMENTS_UPDATE=1 "${ARCHIPELAGO_PYTHON:-$WORKSPACE/Archipelago/.venv/bin/python}" \
+    -m tools.content.compile_options_schema --check
 python3 - "$REPO_ROOT" "$TEMP_DIR" <<'PY'
 import json
 import sys
@@ -412,10 +414,11 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
     "$REPO_ROOT/item_reconciliation.py" \
+    "$REPO_ROOT/rune_reconciliation.py" \
     "$REPO_ROOT/launcher_app.py" "$REPO_ROOT/launcher_controller.py" \
     "$REPO_ROOT/launcher_core.py" "$REPO_ROOT/launcher_integration.py" \
     "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
-    "$REPO_ROOT/launcher_ui.py" \
+    "$REPO_ROOT/launcher_ui.py" "$REPO_ROOT/options_foundation.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
     "$REPO_ROOT/publisher_contracts.py" \
@@ -436,6 +439,7 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/runtime_locations.json" \
     "$REPO_ROOT/data/campaign_goal_contract.json" \
     "$REPO_ROOT/data/observer_contracts.json" \
+    "$REPO_ROOT/data/options_schema.json" \
     "$TEMP_DIR/publisher_contracts.json" \
     "$REPO_ROOT/data/content_identity.json" \
     "$OUTPUT_DIR/client/data/"
@@ -543,6 +547,7 @@ manifest = {
         "client/foundation.py",
         "client/item_classification.py",
         "client/item_reconciliation.py",
+        "client/rune_reconciliation.py",
         "client/launcher_app.py",
         "client/launcher_controller.py",
         "client/launcher_core.py",
@@ -550,6 +555,7 @@ manifest = {
         "client/launcher_platform.py",
         "client/launcher_supervisor.py",
         "client/launcher_ui.py",
+        "client/options_foundation.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
         "client/publisher_contracts.py",
@@ -576,6 +582,7 @@ manifest = {
         "client/data/generated_content.py",
         "client/data/campaign_goal_contract.json",
         "client/data/observer_contracts.json",
+        "client/data/options_schema.json",
         "client/data/publisher_contracts.json",
         "client/data/content_identity.json",
         *map_manifest_files,

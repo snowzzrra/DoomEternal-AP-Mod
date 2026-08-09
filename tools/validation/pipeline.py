@@ -275,6 +275,9 @@ class Pipeline:
                         "field=filename/marker value=shared campaign goal authority"
                     )
             compile_catalog(check=True)
+            from options_foundation import load_options_schema
+
+            load_options_schema(ROOT / "data" / "options_schema.json")
             identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
             generated: dict[str, object] = {}
             exec(
