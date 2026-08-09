@@ -84,15 +84,35 @@ def test_reconciliation_history_stops_at_processed_boundary():
     assert all(command.item_id < 10 for command in plan.commands)
 
 
-def test_duplicate_packet_does_not_create_second_new_receipt():
-    first = Receipt(77, 100, 1, 0)
-    duplicate = Receipt(77, 100, 1, 0)
+def test_byte_identical_receipts_at_distinct_indices_are_both_new():
+    first = Receipt(77, -2, 1, 0)
+    second = Receipt(77, -2, 1, 0)
 
-    observed = observe_received_items([Receipt(1, 1, 1, 0), first, duplicate], 1)
+    observed = observe_received_items([first, second], 0)
 
-    assert [receipt.index for receipt in observed.new] == [1]
+    assert [receipt.index for receipt in observed.new] == [0, 1]
+    assert observed.duplicates == ()
+    assert observed.authoritative_item_ids == (77, 77)
+
+
+def test_shifted_history_overlap_uses_occurrence_count_not_item_id():
+    old_first = Receipt(70, 100, 1, 0)
+    old_second = Receipt(71, 101, 1, 0)
+    inserted = Receipt(69, -2, 1, 0)
+    tail = Receipt(72, 102, 1, 0)
+    processed_counts = {
+        observe_received_items([old_first], 0).new[0].receipt_id: 1,
+        observe_received_items([old_second], 0).new[0].receipt_id: 1,
+    }
+
+    observed = observe_received_items(
+        [inserted, old_first, old_second, tail],
+        2,
+        cast(Any, processed_counts),
+    )
+
     assert [receipt.index for receipt in observed.duplicates] == [2]
-    assert observed.authoritative_item_ids == (1, 77)
+    assert [receipt.index for receipt in observed.new] == [3]
 
 
 def test_state_migration_preserves_history_and_safes_malformed_sessions():

@@ -52,7 +52,7 @@ def check_authorial() -> dict[str, int]:
 
     identity = read_json(ROOT / "data/content_identity.json")
     if set(identity) != set(IDENTITY_FIELDS):
-        raise ValueError("data/content_identity.json fields diverge from beta.1 contract")
+        raise ValueError("data/content_identity.json fields diverge from beta.2 contract")
     for field, expected_type in IDENTITY_FIELDS.items():
         value = identity[field]
         if not isinstance(value, expected_type) or isinstance(value, bool):
@@ -63,7 +63,7 @@ def check_authorial() -> dict[str, int]:
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
     if identity["content_revision"] != identity["release_version"]:
         raise ValueError("data/content_identity.json: content and release revisions diverge")
-    if identity["release_version"] != "0.4.0-beta.1":
+    if identity["release_version"] != "0.4.0-beta.2":
         raise ValueError("data/content_identity.json: invalid beta release revision")
 
     catalog = load_content_catalog(ROOT)

@@ -1,5 +1,6 @@
 import asyncio
 import atexit
+from collections import deque
 import glob
 import hashlib
 import json
@@ -114,6 +115,8 @@ def emit_launcher_event(event_type: str, **payload):
     print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
 
 ENABLE_ITEM_NOTIFICATIONS = False
+ITEM_DELIVERY_BATCH_SIZE = 16
+PACKET_TIMING_RANGE_LIMIT = 256
 try:
     _identity_path = APPLICATION_DIR / "bridge_identity.json"
     if _identity_path.is_file():
@@ -1513,7 +1516,14 @@ poll_counter = 0
 
 def log_delivery_event(event: str, **fields) -> None:
     """Emit bounded, correlation-friendly delivery diagnostics only."""
-    record = {"event": event, **{key: value for key, value in fields.items() if value is not None}}
+    wall_time_ns = fields.pop("wall_time_ns", None)
+    monotonic_ns = fields.pop("monotonic_ns", None)
+    record = {
+        "event": event,
+        "wall_time_ns": time.time_ns() if wall_time_ns is None else wall_time_ns,
+        "monotonic_ns": time.monotonic_ns() if monotonic_ns is None else monotonic_ns,
+        **{key: value for key, value in fields.items() if value is not None},
+    }
     logger.info("DELIVERY_EVENT %s", json.dumps(record, sort_keys=True, separators=(",", ":")))
 
 
@@ -1589,6 +1599,8 @@ def send_command(
                         reason="spool_exists",
                         **delivery_fields,
                     )
+                if already_queued_ok and arm_rpc:
+                    set_rpc_execution(True)
                 return already_queued_ok
 
         temporary_path = os.path.join(
@@ -1610,6 +1622,8 @@ def send_command(
                         reason="cmd_exists",
                         **delivery_fields,
                     )
+                if already_queued_ok and arm_rpc:
+                    set_rpc_execution(True)
                 return already_queued_ok
             finally:
                 try:
@@ -1629,6 +1643,8 @@ def send_command(
                         reason="processing_exists",
                         **delivery_fields,
                     )
+                if already_queued_ok and arm_rpc:
+                    set_rpc_execution(True)
                 return already_queued_ok
         else:
             os.replace(temporary_path, command_path)
@@ -2336,6 +2352,13 @@ class DoomEternalContext(CommonContext):
         self.dev_last_action = None
         self.dev_last_correlation = None
         self.tracking_task = None
+        self._item_delivery_lock = asyncio.Lock()
+        self._item_delivery_task = None
+        self._item_delivery_wakeup = False
+        self._item_delivery_waiting_for_state = False
+        # Process-local packet timing. Ranges keep ReceivedItems callback work O(1).
+        self._packet_received_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
+        self._item_session_generation = 0
         self.tracker_alive = False
         self.tracker_restart_count = 0
         self.last_tracker_error = None
@@ -2445,6 +2468,8 @@ class DoomEternalContext(CommonContext):
     def on_package(self, cmd: str, args: dict):
         if cmd == "RoomInfo":
             self.room_seed_name = args.get("seed_name")
+        elif cmd == "ReceivedItems":
+            self._on_received_items_packet(args)
         elif cmd == "Connected":
             previous_state_key = self.state_key
             self.initialize_item_state()
@@ -2463,6 +2488,8 @@ class DoomEternalContext(CommonContext):
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
             asyncio.create_task(self.check_mission_challenge_locations())
+            if self._item_delivery_wakeup:
+                self._schedule_item_delivery("connected")
             emit_launcher_event(
                 "connected",
                 seed_name=self.room_seed_name,
@@ -2490,6 +2517,262 @@ class DoomEternalContext(CommonContext):
             ):
                 logger.info("[DeathLink] Server received and echoed the death.")
                 self.confirmed_death_echo = data.get("time")
+
+    def _on_received_items_packet(self, args):
+        """Record packet metadata and wake delivery without doing delivery work."""
+        packet_received_ns = time.monotonic_ns()
+        packet_items = args.get("items", ()) if isinstance(args, dict) else ()
+        try:
+            packet_item_count = len(packet_items)
+        except TypeError:
+            packet_item_count = 0
+        authoritative_count = len(self.items_received)
+        packet_start_index = args.get("index") if isinstance(args, dict) else None
+        accepted_start_index = (
+            packet_start_index
+            if isinstance(packet_start_index, int)
+            and not isinstance(packet_start_index, bool)
+            and packet_start_index >= 0
+            else None
+        )
+        if accepted_start_index is None:
+            packet_start_index = max(0, authoritative_count - packet_item_count)
+        packet_accepted = (
+            accepted_start_index is not None
+            and accepted_start_index <= authoritative_count
+            and accepted_start_index + packet_item_count == authoritative_count
+        )
+        if packet_accepted and accepted_start_index == 0:
+            self._packet_received_ranges.clear()
+        if (
+            packet_accepted
+            and packet_item_count
+            and accepted_start_index is not None
+        ):
+            self._packet_received_ranges.append(
+                (
+                    accepted_start_index,
+                    accepted_start_index + packet_item_count,
+                    packet_received_ns,
+                )
+            )
+        log_delivery_event(
+            "ITEM_PACKET_RECEIVED",
+            packet_start_index=packet_start_index,
+            packet_count=packet_item_count,
+            authoritative_count=authoritative_count,
+            packet_received_monotonic_ns=packet_received_ns,
+        )
+        self._schedule_item_delivery("packet")
+
+    def _schedule_item_delivery(self, trigger):
+        """Coalesce packet wakeups into one event-loop delivery runner."""
+        exit_event = getattr(self, "exit_event", None)
+        if exit_event is not None and exit_event.is_set():
+            return
+        self._item_delivery_wakeup = True
+        task = getattr(self, "_item_delivery_task", None)
+        if task is None or task.done():
+            self._item_delivery_task = asyncio.get_running_loop().create_task(
+                self._run_scheduled_item_delivery()
+            )
+
+    async def _run_scheduled_item_delivery(self):
+        try:
+            while self._item_delivery_wakeup:
+                self._item_delivery_wakeup = False
+                await self.process_pending_item_receipts("packet")
+                if self._item_delivery_waiting_for_state:
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[Tracking] ITEM_DELIVERY_RUNNER_CRASH")
+
+    def _packet_received_timestamp(self, receipt_index):
+        for start, end, timestamp_ns in reversed(self._packet_received_ranges):
+            if start <= receipt_index < end:
+                return timestamp_ns
+        return None
+
+    async def process_pending_item_receipts(self, trigger):
+        """Consume authoritative receipts once, in increasing receive-index order."""
+        async with self._item_delivery_lock:
+            self._item_delivery_wakeup = False
+            if not self.item_state_ready:
+                self._item_delivery_waiting_for_state = True
+                self._item_delivery_wakeup = True
+                return False
+            self._item_delivery_waiting_for_state = False
+            captured_state_key = getattr(self, "state_key", "")
+            captured_generation = getattr(self, "_item_session_generation", 0)
+            try:
+                history_observation = self.observe_received_item_history()
+                duplicate_indices = {
+                    receipt.index for receipt in history_observation.duplicates
+                }
+            except ValueError as exc:
+                logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
+                return False
+
+            batch_count = 0
+            while len(self.items_received) > self.items_processed:
+                item_index = self.items_processed
+                network_item = self.items_received[item_index]
+                item_id = network_item.item
+                packet_received_ns = self._packet_received_timestamp(item_index)
+                duplicate = item_index in duplicate_indices
+                log_delivery_event(
+                    "RECEIPT_CLASSIFIED",
+                    receipt_index=item_index,
+                    item_id=item_id,
+                    trigger=trigger,
+                    classification="duplicate" if duplicate else "new",
+                    packet_received_monotonic_ns=packet_received_ns,
+                )
+                if duplicate:
+                    logger.info(
+                        "[To Game] Duplicate authoritative receipt acknowledged "
+                        "without replay: index=%s item_id=%s",
+                        item_index,
+                        item_id,
+                    )
+                    self.items_processed += 1
+                    self.persist_session_state()
+                    batch_count += 1
+                    if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
+                        batch_count = 0
+                        await asyncio.sleep(0)
+                        if (
+                            captured_state_key != getattr(self, "state_key", "")
+                            or captured_generation
+                            != getattr(self, "_item_session_generation", 0)
+                        ):
+                            return False
+                    continue
+
+                log_delivery_event(
+                    "ITEM_RECEIPT",
+                    receipt_index=item_index,
+                    item_id=item_id,
+                    item_name=self.delivery_item_name(item_id)
+                    if item_id in ITEM_CLASSIFICATION_IDENTITY else None,
+                    trigger=trigger,
+                    packet_received_monotonic_ns=packet_received_ns,
+                    active_map=self.current_map_name,
+                    slot=self.active_save_slot,
+                    bridge_revision=BRIDGE_REVISION,
+                    protocol_version=BRIDGE_PROTOCOL,
+                )
+                if item_id not in ITEM_ID_TO_COMMAND:
+                    logger.error(
+                        f"[To Game] No command mapping for item {item_id}; delivery paused. "
+                        "The seed/APWorld and bridge build are out of sync."
+                    )
+                    self.output(
+                        f"Missing item mapping for DOOM Eternal item {item_id}. "
+                        "Check the local bridge logs."
+                    )
+                    break
+
+                definition = ITEM_ID_TO_COMMAND[item_id]
+                if isinstance(definition, dict) and definition.get("type") == "no_op":
+                    logger.info(f"[To Game] Runtime-only item {item_id} acknowledged.")
+                    self._record_processed_receipt(network_item)
+                    self.items_processed += 1
+                    self.persist_session_state()
+                    batch_count += 1
+                    if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
+                        batch_count = 0
+                        await asyncio.sleep(0)
+                        if (
+                            captured_state_key != getattr(self, "state_key", "")
+                            or captured_generation
+                            != getattr(self, "_item_session_generation", 0)
+                        ):
+                            return False
+                    continue
+
+                try:
+                    classification = received_item_classification(
+                        item_id, getattr(network_item, "flags", None)
+                    )
+                    spooled, description = self.spool_item_commands(
+                        item_id,
+                        item_index,
+                        intent=NEW_RECEIPT,
+                        include_notification=ENABLE_ITEM_NOTIFICATIONS,
+                        classification=classification,
+                        packet_received_ns=packet_received_ns,
+                    )
+                    if not spooled:
+                        item_name = getattr(self, "item_names", {}).get(
+                            item_id, f"Item_{item_id}"
+                        )
+                        logger.error(
+                            "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d "
+                            "item_name=%s description=%s",
+                            item_index, item_id, item_name, description,
+                        )
+                        self.item_delivery_blocked = True
+                        self.item_delivery_blocked_info = {
+                            "index": item_index,
+                            "item_id": item_id,
+                            "item_name": item_name,
+                            "description": description,
+                        }
+                        break
+                except Exception as error:
+                    item_name = getattr(self, "item_names", {}).get(
+                        item_id, f"Item_{item_id}"
+                    )
+                    tb = traceback.format_exc()
+                    logger.error(
+                        "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d "
+                        "item_name=%s type=%s msg=%s\n%s",
+                        item_index, item_id, item_name, type(error).__name__, str(error), tb,
+                    )
+                    self.item_delivery_blocked = True
+                    self.item_delivery_blocked_info = {
+                        "index": item_index,
+                        "item_id": item_id,
+                        "item_name": item_name,
+                        "exception_type": type(error).__name__,
+                        "exception_message": str(error),
+                        "traceback": tb,
+                    }
+                    break
+                else:
+                    self.item_delivery_blocked = False
+                    self.item_delivery_blocked_info = None
+
+                logger.info(f"[To Game] Item received! {item_id} -> {description}")
+                self._record_processed_receipt(network_item)
+                self.items_processed += 1
+                self.persist_session_state()
+                self.onboard_bootstrap("on_item_received")
+                self.reconcile_owned_perks("item_received")
+
+                batch_count += 1
+                if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
+                    batch_count = 0
+                    await asyncio.sleep(0)
+                    if (
+                        captured_state_key != getattr(self, "state_key", "")
+                        or captured_generation
+                        != getattr(self, "_item_session_generation", 0)
+                    ):
+                        return False
+
+            self._packet_received_ranges = deque(
+                (
+                    timing_range
+                    for timing_range in self._packet_received_ranges
+                    if timing_range[1] > self.items_processed
+                ),
+                maxlen=PACKET_TIMING_RANGE_LIMIT,
+            )
+            return True
 
     def observation_slot_for_source(self, source):
         if isinstance(source, PrimarySaveSelection):
@@ -3107,6 +3390,8 @@ class DoomEternalContext(CommonContext):
             )
 
     def initialize_item_state(self):
+        previous_state_key = self.state_key
+        self._item_session_generation = getattr(self, "_item_session_generation", 0) + 1
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
         if (
@@ -3126,6 +3411,7 @@ class DoomEternalContext(CommonContext):
             self.session_state = default_session_state()
             self.items_processed = 0
             self.item_state_ready = False
+            self._packet_received_ranges.clear()
             return
         sessions = self.client_state["sessions"]
         self.state_key, migrated_from = migrate_legacy_session_key(
@@ -3134,6 +3420,8 @@ class DoomEternalContext(CommonContext):
             team=self.team,
             slot=self.slot,
         )
+        if previous_state_key != self.state_key:
+            self._packet_received_ranges.clear()
         if self.state_key is None:
             logger.warning(
                 "[State] Slot identity incomplete or unsafe; refusing session state reuse."
@@ -3142,6 +3430,7 @@ class DoomEternalContext(CommonContext):
             self.session_state = default_session_state()
             self.items_processed = 0
             self.item_state_ready = False
+            self._packet_received_ranges.clear()
             return
         if migrated_from is not None:
             logger.info(
@@ -3250,6 +3539,7 @@ class DoomEternalContext(CommonContext):
             "processed_boundary": 0,
             "highest_observed_index": -1,
             "receipt_ids": [],
+            "receipt_counts": {},
             "owned_item_ids": [],
         }
         self.session_state["item_resync"] = {}
@@ -3275,23 +3565,30 @@ class DoomEternalContext(CommonContext):
         if not isinstance(history, dict):
             history = {}
             self.session_state["receipt_history"] = history
-        receipt_ids = history.get("receipt_ids", [])
-        if not isinstance(receipt_ids, list):
-            receipt_ids = []
-            history["receipt_ids"] = receipt_ids
-        return {value for value in receipt_ids if isinstance(value, str) and value}
+        receipt_counts = history.get("receipt_counts", {})
+        if not isinstance(receipt_counts, dict):
+            receipt_counts = {}
+            history["receipt_counts"] = receipt_counts
+        return {
+            value: count
+            for value, count in receipt_counts.items()
+            if isinstance(value, str)
+            and value
+            and isinstance(count, int)
+            and not isinstance(count, bool)
+            and count > 0
+        }
 
     def _record_processed_receipt(self, network_item):
         receipt_id = receipt_identity(network_item)
         if receipt_id is None:
             return
         history = self.session_state.setdefault("receipt_history", {})
-        receipt_ids = history.setdefault("receipt_ids", [])
-        if not isinstance(receipt_ids, list):
-            receipt_ids = []
-            history["receipt_ids"] = receipt_ids
-        if receipt_id not in receipt_ids:
-            receipt_ids.append(receipt_id)
+        receipt_counts = history.setdefault("receipt_counts", {})
+        if not isinstance(receipt_counts, dict):
+            receipt_counts = {}
+            history["receipt_counts"] = receipt_counts
+        receipt_counts[receipt_id] = receipt_counts.get(receipt_id, 0) + 1
 
     def observe_received_item_history(self):
         """Record authoritative ownership summary without delivering effects."""
@@ -3942,6 +4239,7 @@ class DoomEternalContext(CommonContext):
         intent=HISTORICAL_OWNERSHIP,
         include_notification=None,
         classification=None,
+        packet_received_ns=None,
     ):
         commands, description = self.item_activation_commands(
             item_id,
@@ -3974,6 +4272,11 @@ class DoomEternalContext(CommonContext):
             command_id = self.item_command_id(
                 item_id, item_index, command_index, commands[command_index]
             )
+            packet_to_spool_ms = (
+                (time.monotonic_ns() - packet_received_ns) / 1_000_000
+                if packet_received_ns is not None
+                else None
+            )
             if not send_command(
                 commands[command_index],
                 coalesce_key=command_id,
@@ -3983,6 +4286,8 @@ class DoomEternalContext(CommonContext):
                     "item_id": item_id,
                     "item_name": self.delivery_item_name(item_id),
                     "command_ordinal": command_index,
+                    "packet_received_monotonic_ns": packet_received_ns,
+                    "packet_to_spool_ms": packet_to_spool_ms,
                     "source": "cmd",
                     "active_map": getattr(self, "current_map_name", None),
                     "slot": getattr(self, "active_save_slot", None),
@@ -5167,16 +5472,6 @@ class DoomEternalContext(CommonContext):
                 except Exception as exc:
                     logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
 
-                try:
-                    history_observation = self.observe_received_item_history()
-                    duplicate_indices = {
-                        receipt.index for receipt in history_observation.duplicates
-                    }
-                except ValueError as exc:
-                    logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
-                    await asyncio.sleep(0.25)
-                    continue
-
                 level_ready_resync = False
                 markers = discover_telemetry_markers()
                 if markers:
@@ -5227,114 +5522,7 @@ class DoomEternalContext(CommonContext):
                 if level_ready_resync:
                     self.automatic_reconcile_inventory("level_ready")
 
-                while (
-                    self.item_state_ready
-                    and len(self.items_received) > self.items_processed
-                ):
-                    item_index = self.items_processed
-                    network_item = self.items_received[item_index]
-                    if item_index in duplicate_indices:
-                        logger.info(
-                            "[To Game] Duplicate authoritative receipt acknowledged "
-                            "without replay: index=%s item_id=%s",
-                            item_index,
-                            network_item.item,
-                        )
-                        self._record_processed_receipt(network_item)
-                        self.items_processed += 1
-                        self.persist_session_state()
-                        continue
-                    item_id = network_item.item
-                    log_delivery_event(
-                        "ITEM_RECEIPT",
-                        receipt_index=item_index,
-                        item_id=item_id,
-                        item_name=self.delivery_item_name(item_id)
-                        if item_id in ITEM_CLASSIFICATION_IDENTITY else None,
-                        active_map=self.current_map_name,
-                        slot=self.active_save_slot,
-                        bridge_revision=BRIDGE_REVISION,
-                        protocol_version=BRIDGE_PROTOCOL,
-                    )
-                    if item_id not in ITEM_ID_TO_COMMAND:
-                        logger.error(
-                            f"[To Game] No command mapping for item {item_id}; "
-                            "delivery paused. The seed/APWorld and bridge build "
-                            "are out of sync."
-                        )
-                        self.output(
-                            f"Missing item mapping for DOOM Eternal item {item_id}. "
-                            "Check the local bridge logs."
-                        )
-                        break
-
-                    definition = ITEM_ID_TO_COMMAND[item_id]
-                    if (
-                        isinstance(definition, dict)
-                        and definition.get("type") == "no_op"
-                    ):
-                        logger.info(
-                            f"[To Game] Runtime-only item {item_id} acknowledged."
-                        )
-                        self._record_processed_receipt(network_item)
-                        self.items_processed += 1
-                        self.persist_session_state()
-                        continue
-
-                    try:
-                        classification = received_item_classification(
-                            item_id, getattr(network_item, "flags", None)
-                        )
-                        spooled, description = self.spool_item_commands(
-                            item_id,
-                            item_index,
-                            intent=NEW_RECEIPT,
-                            include_notification=ENABLE_ITEM_NOTIFICATIONS,
-                            classification=classification,
-                        )
-                        if not spooled:
-                            item_name = getattr(self, "item_names", {}).get(item_id, f"Item_{item_id}")
-                            logger.error(
-                                "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d item_name=%s description=%s",
-                                item_index, item_id, item_name, description
-                            )
-                            self.item_delivery_blocked = True
-                            self.item_delivery_blocked_info = {
-                                "index": item_index,
-                                "item_id": item_id,
-                                "item_name": item_name,
-                                "description": description,
-                            }
-                            break
-                    except Exception as error:
-                        item_name = getattr(self, "item_names", {}).get(item_id, f"Item_{item_id}")
-                        tb = traceback.format_exc()
-                        logger.error(
-                            "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d item_name=%s type=%s msg=%s\n%s",
-                            item_index, item_id, item_name, type(error).__name__, str(error), tb
-                        )
-                        self.item_delivery_blocked = True
-                        self.item_delivery_blocked_info = {
-                            "index": item_index,
-                            "item_id": item_id,
-                            "item_name": item_name,
-                            "exception_type": type(error).__name__,
-                            "exception_message": str(error),
-                            "traceback": tb,
-                        }
-                        break
-                    else:
-                        self.item_delivery_blocked = False
-                        self.item_delivery_blocked_info = None
-
-                    logger.info(
-                        f"[To Game] Item received! {item_id} -> {description}"
-                    )
-                    self._record_processed_receipt(network_item)
-                    self.items_processed += 1
-                    self.persist_session_state()
-                    self.onboard_bootstrap("on_item_received")
-                    self.reconcile_owned_perks("item_received")
+                await self.process_pending_item_receipts("tracker")
 
                 try:
                     self.reconcile_owned_perks("post_item_scan")
@@ -5455,6 +5643,10 @@ async def amain(launch_args=None):
 
     await ctx.exit_event.wait()
     emit_launcher_event("client_stopping")
+    item_delivery_task = getattr(ctx, "_item_delivery_task", None)
+    if item_delivery_task is not None and not item_delivery_task.done():
+        item_delivery_task.cancel()
+        await asyncio.gather(item_delivery_task, return_exceptions=True)
     await ctx.shutdown()
     await asyncio.gather(
         ctx.tracking_task,

@@ -904,7 +904,9 @@ if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q '(^|/)(playtests?|tests?|
     echo "Final ZIP contains a forbidden internal or development artifact" >&2
     exit 1
 fi
-if find "$OUTPUT_DIR/build" -type f -name '*.txt' -print -quit | grep -q .; then
+if find "$OUTPUT_DIR/build" \
+    -path "$OUTPUT_DIR/build/launcher/work" -prune -o \
+    -type f -name '*.txt' -print -quit | grep -q .; then
     echo "Runtime-test .txt files are forbidden in build/release/build" >&2
     exit 1
 fi

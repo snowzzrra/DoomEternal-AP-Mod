@@ -100,15 +100,7 @@ class ReceivedItemsObservation:
 
     @staticmethod
     def _deduplicated_item_ids(receipts: Iterable[ObservedReceipt]) -> tuple[int, ...]:
-        item_ids: list[int] = []
-        seen_ids: set[str] = set()
-        for receipt in receipts:
-            if receipt.receipt_id is not None:
-                if receipt.receipt_id in seen_ids:
-                    continue
-                seen_ids.add(receipt.receipt_id)
-            item_ids.append(receipt.item_id)
-        return tuple(item_ids)
+        return tuple(receipt.item_id for receipt in receipts)
 
     @property
     def authoritative_item_ids(self) -> tuple[int, ...]:
@@ -181,7 +173,7 @@ def receipt_identity(receipt: Any) -> str | None:
 def observe_received_items(
     received_items: Iterable[Any],
     processed_boundary: int,
-    processed_receipt_ids: Iterable[str] = (),
+    processed_receipt_ids: Iterable[str] | Mapping[str, int] = (),
 ) -> ReceivedItemsObservation:
     """Classify authoritative history without delivering or mutating state.
 
@@ -196,10 +188,23 @@ def observe_received_items(
         raise ValueError("processed boundary must be a non-negative integer")
 
     snapshot = tuple(received_items)
-    known_ids = {
-        value for value in processed_receipt_ids if isinstance(value, str) and value
-    }
-    seen_ids = set(known_ids)
+    if isinstance(processed_receipt_ids, Mapping):
+        known_occurrences = {
+            key: count
+            for key, count in processed_receipt_ids.items()
+            if isinstance(key, str)
+            and key
+            and isinstance(count, int)
+            and not isinstance(count, bool)
+            and count > 0
+        }
+    else:
+        known_occurrences = Counter(
+            value
+            for value in processed_receipt_ids
+            if isinstance(value, str) and value
+        )
+    snapshot_occurrences: Counter[str] = Counter()
     historical: list[ObservedReceipt] = []
     new: list[ObservedReceipt] = []
     duplicates: list[ObservedReceipt] = []
@@ -214,21 +219,20 @@ def observe_received_items(
         observed = ObservedReceipt(index, item_id, stable_id)
         all_item_ids.append(item_id)
         if stable_id is not None:
-            if stable_id not in receipt_ids:
-                receipt_ids.append(stable_id)
+            receipt_ids.append(stable_id)
+            snapshot_occurrences[stable_id] += 1
         if index < processed_boundary:
             historical.append(observed)
             historical_item_ids.append(item_id)
-            if stable_id is not None:
-                seen_ids.add(stable_id)
             continue
-        if stable_id is not None and stable_id in seen_ids:
+        if (
+            stable_id is not None
+            and snapshot_occurrences[stable_id] <= known_occurrences.get(stable_id, 0)
+        ):
             duplicates.append(observed)
             continue
         new.append(observed)
         new_item_ids.append(item_id)
-        if stable_id is not None:
-            seen_ids.add(stable_id)
 
     return ReceivedItemsObservation(
         tuple(historical),
@@ -249,13 +253,8 @@ classify_received_items = observe_received_items
 def receipt_history_fingerprint(received_items: Iterable[Any]) -> str:
     """Hash authoritative receipt order and stable packet identity."""
     records = []
-    seen_ids: set[str] = set()
     for receipt in received_items:
         stable_id = receipt_identity(receipt)
-        if stable_id is not None:
-            if stable_id in seen_ids:
-                continue
-            seen_ids.add(stable_id)
         records.append(
             {
                 "index": len(records),
@@ -281,6 +280,20 @@ def _safe_receipt_ids(value: Any) -> list[str]:
         if isinstance(entry, str) and entry and entry not in result:
             result.append(entry)
     return result
+
+
+def _safe_receipt_counts(value: Any) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        key: count
+        for key, count in value.items()
+        if isinstance(key, str)
+        and key
+        and isinstance(count, int)
+        and not isinstance(count, bool)
+        and count > 0
+    }
 
 
 def migrate_legacy_session_key(
@@ -329,7 +342,12 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     if isinstance(highest, bool) or not isinstance(highest, int) or highest < -1:
         highest = max(processed - 1, -1)
     history["highest_observed_index"] = highest
-    history["receipt_ids"] = _safe_receipt_ids(history.get("receipt_ids"))
+    legacy_receipt_ids = _safe_receipt_ids(history.get("receipt_ids"))
+    receipt_counts = _safe_receipt_counts(history.get("receipt_counts"))
+    if not receipt_counts:
+        receipt_counts = dict(Counter(legacy_receipt_ids))
+    history["receipt_counts"] = receipt_counts
+    history["receipt_ids"] = legacy_receipt_ids
     owned_ids = history.get("owned_item_ids")
     if not isinstance(owned_ids, list):
         owned_ids = []

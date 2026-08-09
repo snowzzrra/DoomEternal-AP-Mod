@@ -87,73 +87,14 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     return actual
 
 
-def assert_packaged_launcher(apworld_path: Path, client_dir: Path, bridge_sha256: str) -> None:
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        with zipfile.ZipFile(apworld_path) as archive:
-            archive.extractall(root)
-        client_path = root / "doometernal" / "client.py"
-        if not client_path.is_file():
-            raise AssertionError("unpacked APWorld lacks normal DOOM launcher")
-        settings = types.ModuleType("settings")
-        settings.get_settings = lambda: {
-            "doometernal_options": {"client_directory": str(client_dir)}
-        }
-        utils = types.ModuleType("Utils")
-        utils.messagebox = lambda *args, **kwargs: None
-        old_settings = sys.modules.get("settings")
-        old_utils = sys.modules.get("Utils")
-        sys.modules["settings"] = settings
-        sys.modules["Utils"] = utils
-        try:
-            spec = importlib.util.spec_from_file_location("packaged_launcher", client_path)
-            if spec is None or spec.loader is None:
-                raise AssertionError("unpacked normal launcher is not importable")
-            launcher = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(launcher)
-            resolved = launcher._client_directory().resolve()
-            actual_sha, revision = launcher._bridge_identity(resolved / "bridge_client.py")
-            identity_path = resolved / "bridge_identity.json"
-            original_identity = identity_path.read_text(encoding="utf-8")
-            bad_identity = json.loads(original_identity)
-            bad_identity["protocol"] = 999
-            identity_path.write_text(json.dumps(bad_identity), encoding="utf-8")
-            try:
-                launcher._bridge_identity(resolved / "bridge_client.py")
-            except RuntimeError as error:
-                if "incompatible" not in str(error):
-                    raise AssertionError("launcher protocol rejection is not clear") from error
-            else:
-                raise AssertionError("launcher accepted incompatible bridge protocol")
-            finally:
-                identity_path.write_text(original_identity, encoding="utf-8")
-            legacy_identity = json.loads(original_identity)
-            legacy_identity["game"] = "Doom Eternal"
-            identity_path.write_text(json.dumps(legacy_identity), encoding="utf-8")
-            try:
-                launcher._bridge_identity(resolved / "bridge_client.py")
-            except RuntimeError as error:
-                if "Old 'Doom Eternal' seeds require the prior client/APWorld" not in str(error):
-                    raise AssertionError("launcher game-identity rejection is not clear") from error
-            else:
-                raise AssertionError("launcher accepted a legacy bridge identity")
-            finally:
-                identity_path.write_text(original_identity, encoding="utf-8")
-        finally:
-            if old_settings is None:
-                sys.modules.pop("settings", None)
-            else:
-                sys.modules["settings"] = old_settings
-            if old_utils is None:
-                sys.modules.pop("Utils", None)
-            else:
-                sys.modules["Utils"] = old_utils
-        if resolved != client_dir.resolve() or resolved.parent != client_dir.resolve().parent:
-            raise AssertionError("normal launcher resolved a stale/global bridge path")
-        if not (resolved / "bridge_client.py").is_file():
-            raise AssertionError("normal launcher did not resolve an installed bridge")
-        if actual_sha != bridge_sha256 or revision != f"mission-unified-{bridge_sha256[:12]}":
-            raise AssertionError("normal launcher did not validate unpacked bridge identity")
+def assert_generation_only_apworld(apworld_path: Path) -> None:
+    """Keep launcher/runtime ownership out of generation-only APWorld package."""
+    with zipfile.ZipFile(apworld_path) as archive:
+        names = set(archive.namelist())
+    if "doometernal/__init__.py" not in names:
+        raise AssertionError("packaged APWorld lacks DOOM Eternal world module")
+    if "doometernal/client.py" in names:
+        raise AssertionError("packaged APWorld unexpectedly owns client startup")
 
 
 async def consume(
@@ -247,7 +188,7 @@ def main() -> int:
     manifest_path = Path(sys.argv[3]).resolve()
     apworld_path = Path(sys.argv[4]).resolve()
     bridge_sha256 = assert_packaged_manifest(client_dir, manifest_path)
-    assert_packaged_launcher(apworld_path, client_dir, bridge_sha256)
+    assert_generation_only_apworld(apworld_path)
     packaged_registry = client_dir / "data" / "challenge_location_registry.json"
     if (
         not packaged_registry.is_file()
