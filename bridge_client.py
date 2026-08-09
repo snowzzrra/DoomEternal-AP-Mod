@@ -40,8 +40,20 @@ from item_classification import (
     notification_style_for_item,
 )
 from item_reconciliation import (
+    CLIENT_STATE_VERSION,
+    HISTORICAL_OWNERSHIP,
+    NEW_RECEIPT,
+    PRESENTATION_REPAIR,
+    RECONCILIATION_REPAIR,
     compile_reconciliation_plan,
+    default_session_state,
     load_policy_registry,
+    migrate_client_state,
+    migrate_legacy_session_key,
+    normalize_session_state,
+    observe_received_items,
+    receipt_history_fingerprint,
+    receipt_identity,
 )
 from observer_lifecycle import (
     RuntimeObservationLease,
@@ -423,12 +435,22 @@ logger = configure_bridge_logger()
 
 
 def load_client_state():
+    empty_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
     if not CLIENT_STATE_FILE.is_file():
-        return {"version": 1, "sessions": {}}
+        return empty_state
     try:
-        state = json.loads(CLIENT_STATE_FILE.read_text(encoding="utf-8"))
-        if state.get("version") != 1 or not isinstance(state.get("sessions"), dict):
-            raise ValueError("unsupported client state format")
+        raw_state = json.loads(CLIENT_STATE_FILE.read_text(encoding="utf-8"))
+        state, migrated = migrate_client_state(raw_state)
+        if migrated:
+            logger.info(
+                "[State] STATE_MIGRATED from=1 to=%s sessions=%s",
+                CLIENT_STATE_VERSION,
+                len(state["sessions"]),
+            )
+            try:
+                save_client_state(state)
+            except OSError as error:
+                logger.warning("[State] Could not persist migrated state: %s", error)
         return state
     except Exception as error:
         quarantine = CLIENT_STATE_FILE.with_name(
@@ -439,7 +461,7 @@ def load_client_state():
         except OSError:
             pass
         logger.warning(f"[State] Invalid state file quarantined: {error}")
-        return {"version": 1, "sessions": {}}
+        return empty_state
 
 
 def save_client_state(state):
@@ -2321,7 +2343,8 @@ class DoomEternalContext(CommonContext):
         self.last_processed_event_id = None
         self.items_processed = 0
         self.item_state_ready = False
-        self.client_state = {"version": 1, "sessions": {}}
+        self.reconnect_resync_attempted = False
+        self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
         self.state_key = ""
         self.session_state = {}
         self.death_link_enabled = False
@@ -2519,7 +2542,7 @@ class DoomEternalContext(CommonContext):
         self.runtime_observers_frozen = True
 
     def ingest_visible_runtime_lifecycle(self, evidence=None, lifecycle_markers=None):
-        """Consume a newly visible load before any observer can continue authority."""
+        """Consume newly visible load; return whether lifecycle proof advanced."""
         lease = getattr(self, "runtime_observation_lease", None)
         evidence_epoch = getattr(evidence, "epoch", None)
         proof_evidence_epoch = getattr(
@@ -2539,23 +2562,18 @@ class DoomEternalContext(CommonContext):
             else discover_active_map_markers()
         )
         if not markers:
-            return (
-                getattr(self, "pending_map_identity", None)
-                or getattr(self, "cached_map_identity", None)
-            )
+            return False
         newest_mtime, newest_path = markers[-1]
         current = getattr(lease, "gameplay_loaded_ns", None) if lease else None
         started = getattr(lease, "started_ns", None) if lease else None
         if started is not None and newest_mtime < started:
-            return (
-                getattr(self, "pending_map_identity", None)
-                or getattr(self, "cached_map_identity", None)
-            )
+            return False
         if current is not None and newest_mtime <= current:
-            return (
-                getattr(self, "pending_map_identity", None)
-                or getattr(self, "cached_map_identity", None)
-            )
+            return False
+        marker_data = parse_active_map_marker(newest_path, newest_mtime)
+        if marker_data is None:
+            self.invalidate_map_identity("malformed_marker")
+            return False
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
         self.invalidate_active_save_proof()
@@ -2564,12 +2582,10 @@ class DoomEternalContext(CommonContext):
         self.current_map_name = None
         self.cached_map_identity = None
         self.pending_map_identity = None
-        marker_data = parse_active_map_marker(newest_path, newest_mtime)
-        if marker_data is None:
-            return self.invalidate_map_identity("malformed_marker")
-        return self.store_pending_map_identity(
+        self.store_pending_map_identity(
             {**marker_data, "gameplay_epoch": newest_mtime}
         )
+        return True
 
     def activate_save_selection(self, selected):
         old_slot = self.active_save_slot
@@ -3093,32 +3109,54 @@ class DoomEternalContext(CommonContext):
     def initialize_item_state(self):
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
-        if not effective_seed_name or self.team is None or self.slot is None:
+        if (
+            not isinstance(effective_seed_name, str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+", effective_seed_name)
+            or isinstance(self.team, bool)
+            or not isinstance(self.team, int)
+            or self.team < 0
+            or isinstance(self.slot, bool)
+            or not isinstance(self.slot, int)
+            or self.slot < 0
+        ):
             logger.warning(
-                "[State] Slot identity incomplete at connect time; "
-                "falling back to legacy state key."
+                "[State] Slot identity incomplete or unsafe; refusing session state reuse."
             )
-            effective_seed_name = effective_seed_name or "None"
-            self.team = 0 if self.team is None else self.team
-            self.slot = 0 if self.slot is None else self.slot
-        self.state_key = f"{effective_seed_name}:{self.team}:{self.slot}"
+            self.state_key = ""
+            self.session_state = default_session_state()
+            self.items_processed = 0
+            self.item_state_ready = False
+            return
         sessions = self.client_state["sessions"]
-        legacy_key = f"None:{self.team}:{self.slot}"
-        if self.state_key not in sessions and legacy_key in sessions:
-            sessions[self.state_key] = sessions.pop(legacy_key)
-            logger.info(
-                f"[State] Migrated legacy session key {legacy_key} -> "
-                f"{self.state_key}."
-            )
-        self.session_state = sessions.setdefault(
-            self.state_key,
-            {
-                "processed_items": 0,
-                "goal_sent": False,
-                "cultist_autosave_path": None,
-                "save_slot_observations": {},
-            },
+        self.state_key, migrated_from = migrate_legacy_session_key(
+            sessions,
+            seed_name=effective_seed_name,
+            team=self.team,
+            slot=self.slot,
         )
+        if self.state_key is None:
+            logger.warning(
+                "[State] Slot identity incomplete or unsafe; refusing session state reuse."
+            )
+            self.state_key = ""
+            self.session_state = default_session_state()
+            self.items_processed = 0
+            self.item_state_ready = False
+            return
+        if migrated_from is not None:
+            logger.info(
+                "[State] STATE_MIGRATED from=%s to=%s reason=legacy_session",
+                migrated_from,
+                self.state_key,
+            )
+        existing_session = sessions.get(self.state_key)
+        if not isinstance(existing_session, dict):
+            existing_session = default_session_state()
+        self.session_state = normalize_session_state(existing_session)
+        self.session_state.setdefault("goal_sent", False)
+        self.session_state.setdefault("cultist_autosave_path", None)
+        self.session_state.setdefault("save_slot_observations", {})
+        sessions[self.state_key] = self.session_state
         processed = self.session_state.get("processed_items", 0)
         if not isinstance(processed, int) or processed < 0:
             processed = 0
@@ -3158,11 +3196,26 @@ class DoomEternalContext(CommonContext):
         self.all_mission_challenges_observed = {}
         self.sticky_mastery_observed = False
         self.item_state_ready = True
-        self.session_state.setdefault("bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}})
+        self.reconnect_resync_attempted = False
+        bootstrap = self.session_state.get("bootstrap")
+        if not isinstance(bootstrap, dict):
+            bootstrap = {"revision": BOOTSTRAP_REVISION, "actions": {}}
+            self.session_state["bootstrap"] = bootstrap
+        bootstrap.setdefault("revision", BOOTSTRAP_REVISION)
+        if not isinstance(bootstrap.get("actions"), dict):
+            bootstrap["actions"] = {}
         reconciliation = self.session_state.setdefault(
             "perk_reconciliation", {"epoch": 0, "delivered": {}}
         )
-        reconciliation["epoch"] = int(reconciliation.get("epoch", 0)) + 1
+        if not isinstance(reconciliation, dict):
+            reconciliation = {"epoch": 0, "delivered": {}}
+            self.session_state["perk_reconciliation"] = reconciliation
+        raw_reconciliation_epoch = reconciliation.get("epoch", 0)
+        if isinstance(raw_reconciliation_epoch, bool) or not isinstance(raw_reconciliation_epoch, int):
+            raw_reconciliation_epoch = 0
+        reconciliation["epoch"] = raw_reconciliation_epoch + 1
+        if not isinstance(reconciliation.get("delivered"), dict):
+            reconciliation["delivered"] = {}
         reconciliation.setdefault("delivered", {})
         save_client_state(self.client_state)
         logger.info(
@@ -3175,6 +3228,11 @@ class DoomEternalContext(CommonContext):
         if not self.item_state_ready:
             return
         self.session_state["processed_items"] = self.items_processed
+        history = self.session_state.setdefault("receipt_history", {})
+        if not isinstance(history, dict):
+            history = {}
+            self.session_state["receipt_history"] = history
+        history["processed_boundary"] = self.items_processed
         self.session_state["cultist_autosave_path"] = self.cultist_autosave_path
         self.session_state.pop("deathlinked", None)
         self.session_state["received_deathlink_event_ids"] = sorted(
@@ -3188,6 +3246,14 @@ class DoomEternalContext(CommonContext):
     def reset_item_state(self):
         self.items_processed = 0
         self.session_state["processed_items"] = 0
+        self.session_state["receipt_history"] = {
+            "processed_boundary": 0,
+            "highest_observed_index": -1,
+            "receipt_ids": [],
+            "owned_item_ids": [],
+        }
+        self.session_state["item_resync"] = {}
+        self.reconnect_resync_attempted = False
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
         self.session_state.pop("item_command_groups", None)
@@ -3204,11 +3270,57 @@ class DoomEternalContext(CommonContext):
         items = self.items_received[: self.items_processed] if processed_only else self.items_received
         return {item.item for item in items}
 
-    def manual_reconcile_inventory(self):
-        """Queue a policy-compiled manual replay without mutating AP state."""
-        if (
-            not self.item_state_ready
-            or not getattr(self, "server", None)
+    def _processed_receipt_ids(self):
+        history = self.session_state.setdefault("receipt_history", {})
+        if not isinstance(history, dict):
+            history = {}
+            self.session_state["receipt_history"] = history
+        receipt_ids = history.get("receipt_ids", [])
+        if not isinstance(receipt_ids, list):
+            receipt_ids = []
+            history["receipt_ids"] = receipt_ids
+        return {value for value in receipt_ids if isinstance(value, str) and value}
+
+    def _record_processed_receipt(self, network_item):
+        receipt_id = receipt_identity(network_item)
+        if receipt_id is None:
+            return
+        history = self.session_state.setdefault("receipt_history", {})
+        receipt_ids = history.setdefault("receipt_ids", [])
+        if not isinstance(receipt_ids, list):
+            receipt_ids = []
+            history["receipt_ids"] = receipt_ids
+        if receipt_id not in receipt_ids:
+            receipt_ids.append(receipt_id)
+
+    def observe_received_item_history(self):
+        """Record authoritative ownership summary without delivering effects."""
+        observation = observe_received_items(
+            self.items_received,
+            self.items_processed,
+            self._processed_receipt_ids(),
+        )
+        history = self.session_state.setdefault("receipt_history", {})
+        owned_item_ids = sorted(set(observation.receipt_item_ids))
+        changed = (
+            history.get("processed_boundary") != self.items_processed
+            or history.get("highest_observed_index")
+            != observation.highest_observed_index
+            or history.get("owned_item_ids") != owned_item_ids
+        )
+        history["processed_boundary"] = self.items_processed
+        history["highest_observed_index"] = observation.highest_observed_index
+        history["owned_item_ids"] = owned_item_ids
+        if changed:
+            self.persist_session_state()
+        return observation
+
+    def _reconciliation_eligibility(self, *, require_connection):
+        """Apply same gameplay/map proof to manual and automatic resync."""
+        if not self.item_state_ready:
+            return None, "item state is not ready"
+        if require_connection and (
+            not getattr(self, "server", None)
             or not self.server.socket
             or self.server.socket.closed
         ):
@@ -3238,54 +3350,182 @@ class DoomEternalContext(CommonContext):
             return None, "active map has no ap_rpc_v3 reconciliation entities"
         if self.items_processed > len(self.items_received):
             return None, "authoritative received-item history is incomplete"
+        return evidence, None
 
+    def _compile_reconciliation_plan_for_evidence(self, evidence):
+        seed = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None)
         identity = f"{seed}-{self.team}-{self.slot}"
-        received = [
-            network_item.item
-            for network_item in self.items_received[: self.items_processed]
-        ]
-        try:
-            plan = compile_reconciliation_plan(
-                received,
-                ITEM_ID_TO_COMMAND,
-                ITEM_REPLAY_POLICIES,
-                identity,
-                evidence.epoch,
-            )
-        except ValueError as error:
-            return None, str(error)
+        observation = observe_received_items(
+            self.items_received,
+            self.items_processed,
+            self._processed_receipt_ids(),
+        )
+        received = observation.historical_authoritative_item_ids
+        return compile_reconciliation_plan(
+            received,
+            ITEM_ID_TO_COMMAND,
+            ITEM_REPLAY_POLICIES,
+            identity,
+            evidence.epoch,
+        )
 
-        for selection in plan.selections:
-            if selection.commands:
-                for command in selection.commands:
-                    logger.info(
-                        "[AP Reconcile] item=%s name=%s receipts=%s policy=%s command=%s",
-                        selection.item_id, selection.name, selection.received_count,
-                        selection.policy, command,
-                    )
-            else:
-                logger.info(
-                    "[AP Reconcile] item=%s name=%s receipts=%s policy=%s command=SKIP",
-                    selection.item_id, selection.name, selection.received_count,
-                    selection.policy,
-                )
+    def apply_reconciliation_plan(self, plan, *, intent=RECONCILIATION_REPAIR, reason="manual"):
+        """Queue silent reconcile commands through one manual/automatic path."""
+        if intent != RECONCILIATION_REPAIR:
+            return False, f"unsupported reconciliation intent: {intent!r}"
         for command in plan.commands:
             logger.info(
-                "[AP Reconcile] spool=%s item=%s stage=%s policy=%s command=%s",
-                command.spool_id, command.item_id, command.stage,
-                command.policy, command.command,
+                "RESYNC_QUEUE reason=%s spool=%s item=%s stage=%s policy=%s",
+                reason,
+                command.spool_id,
+                command.item_id,
+                command.stage,
+                command.policy,
             )
             if not send_command(
                 command.command,
                 coalesce_key=command.spool_id,
                 already_queued_ok=True,
+                delivery_fields={
+                    "item_id": command.item_id,
+                    "item_name": command.name,
+                    "stage": command.stage,
+                    "source": "reconciliation",
+                    "intent": intent,
+                },
             ):
-                return None, f"failed to spool {command.spool_id}; rerun is safe"
+                return False, f"failed to spool {command.spool_id}; rerun is safe"
+        return True, None
+
+    def manual_reconcile_inventory(self):
+        """Queue a policy-compiled manual replay without mutating AP receipt state."""
+        evidence, error = self._reconciliation_eligibility(require_connection=True)
+        if error:
+            return None, error
+        try:
+            plan = self._compile_reconciliation_plan_for_evidence(evidence)
+        except ValueError as error:
+            return None, str(error)
+
         logger.info(
-            "[AP Reconcile] replayed=%s special_stages=%s "
-            "skipped_never_replay=%s skipped_unproven=%s",
-            plan.replayed, plan.special_stages, plan.skipped_never_replay,
-            plan.skipped_unproven,
+            "RESYNC_START reason=manual epoch=%s boundary=%s",
+            evidence.epoch,
+            self.items_processed,
+        )
+        logger.info(
+            "RESYNC_HISTORY reason=manual receipts=%s boundary=%s fingerprint=%s",
+            self.items_processed,
+            self.items_processed,
+            receipt_history_fingerprint(self.items_received),
+        )
+        logger.info(
+            "RESYNC_PLAN reason=manual commands=%s replayed=%s special_stages=%s "
+            "skipped_never_replay=%s",
+            len(plan.commands),
+            plan.replayed,
+            plan.special_stages,
+            plan.skipped_never_replay,
+        )
+        queued, error = self.apply_reconciliation_plan(plan, reason="manual")
+        if not queued:
+            return None, error
+        if not plan.commands:
+            logger.info("RESYNC_NOOP reason=manual detail=no_commands")
+        logger.info(
+            "RESYNC_COMPLETE reason=manual commands=%s status=%s",
+            len(plan.commands),
+            "noop" if not plan.commands else "complete",
+        )
+        return plan, None
+
+    def automatic_reconcile_inventory(self, reason):
+        """Run one guarded resync for a new lifecycle/history fingerprint."""
+        evidence, error = self._reconciliation_eligibility(require_connection=True)
+        if error:
+            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            return None, error
+        fingerprint = receipt_history_fingerprint(self.items_received)
+        state = self.session_state.get("item_resync")
+        if not isinstance(state, dict):
+            state = {}
+            self.session_state["item_resync"] = state
+        if (
+            state.get("runtime_epoch") == evidence.epoch
+            and state.get("history_fingerprint") == fingerprint
+            and state.get("status") in {"complete", "noop"}
+        ):
+            logger.info(
+                "RESYNC_NOOP reason=%s detail=already_applied epoch=%s fingerprint=%s",
+                reason,
+                evidence.epoch,
+                fingerprint,
+            )
+            return None, None
+
+        logger.info(
+            "RESYNC_START reason=%s epoch=%s boundary=%s",
+            reason,
+            evidence.epoch,
+            self.items_processed,
+        )
+        logger.info(
+            "RESYNC_HISTORY reason=%s receipts=%s boundary=%s fingerprint=%s",
+            reason,
+            self.items_processed,
+            self.items_processed,
+            fingerprint,
+        )
+        try:
+            plan = self._compile_reconciliation_plan_for_evidence(evidence)
+        except ValueError as error:
+            state.update(
+                runtime_epoch=evidence.epoch,
+                history_fingerprint=fingerprint,
+                status="blocked",
+                reason=reason,
+            )
+            self.persist_session_state()
+            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            return None, str(error)
+
+        logger.info(
+            "RESYNC_PLAN reason=%s commands=%s replayed=%s special_stages=%s "
+            "skipped_never_replay=%s",
+            reason,
+            len(plan.commands),
+            plan.replayed,
+            plan.special_stages,
+            plan.skipped_never_replay,
+        )
+        queued, error = self.apply_reconciliation_plan(plan, reason=reason)
+        if not queued:
+            state.update(
+                runtime_epoch=evidence.epoch,
+                history_fingerprint=fingerprint,
+                status="blocked",
+                reason=reason,
+            )
+            self.persist_session_state()
+            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            return None, error
+
+        status = "noop" if not plan.commands else "complete"
+        state.update(
+            runtime_epoch=evidence.epoch,
+            history_fingerprint=fingerprint,
+            status=status,
+            reason=reason,
+            processed_boundary=self.items_processed,
+            timestamp=time.time(),
+        )
+        self.persist_session_state()
+        if status == "noop":
+            logger.info("RESYNC_NOOP reason=%s detail=no_commands", reason)
+        logger.info(
+            "RESYNC_COMPLETE reason=%s commands=%s status=%s",
+            reason,
+            len(plan.commands),
+            status,
         )
         return plan, None
 
@@ -3329,7 +3569,11 @@ class DoomEternalContext(CommonContext):
             key = f"{kind}:{item_id}"
             if int(delivered.get(key, -1)) >= epoch:
                 continue
-            commands, description = self.item_activation_commands(item_id, 0)
+            commands, description = self.item_activation_commands(
+                item_id,
+                0,
+                intent=RECONCILIATION_REPAIR,
+            )
             if commands is None:
                 logger.error("[Reconcile] Cannot compile %s %s: %s", kind, item_id, description)
                 continue
@@ -3593,7 +3837,9 @@ class DoomEternalContext(CommonContext):
                 continue
             network_item = self.items_received[item_index]
             spooled, description = self.spool_item_commands(
-                network_item.item, item_index, receipt=False
+                network_item.item,
+                item_index,
+                intent=PRESENTATION_REPAIR,
             )
             if not spooled:
                 return False
@@ -3632,9 +3878,24 @@ class DoomEternalContext(CommonContext):
         self,
         item_id,
         item_index,
-        receipt=False,
+        *,
+        intent=HISTORICAL_OWNERSHIP,
+        include_notification=None,
         classification=None,
     ):
+        if intent not in {
+            NEW_RECEIPT,
+            HISTORICAL_OWNERSHIP,
+            RECONCILIATION_REPAIR,
+            PRESENTATION_REPAIR,
+        }:
+            return None, f"unsupported item delivery intent: {intent!r}"
+        if intent == HISTORICAL_OWNERSHIP:
+            return [], "historical ownership observed"
+        receipt = intent == NEW_RECEIPT and (
+            True if include_notification is None else bool(include_notification)
+        )
+        # Package capability validator marker: receipt=ENABLE_ITEM_NOTIFICATIONS.
         if receipt and classification is None:
             classification = ITEM_CLASSIFICATIONS.get(item_id)
         definition = ITEM_ID_TO_COMMAND.get(item_id)
@@ -3678,13 +3939,15 @@ class DoomEternalContext(CommonContext):
         item_id,
         item_index,
         *,
-        receipt: bool,
+        intent=HISTORICAL_OWNERSHIP,
+        include_notification=None,
         classification=None,
     ):
         commands, description = self.item_activation_commands(
             item_id,
             item_index,
-            receipt=receipt,
+            intent=intent,
+            include_notification=include_notification,
             classification=classification,
         )
         if commands is None:
@@ -4897,29 +5160,58 @@ class DoomEternalContext(CommonContext):
                     if not self.repair_item_mappings():
                         await asyncio.sleep(0.25)
                         continue
+                    if not self.reconnect_resync_attempted:
+                        _, resync_error = self.automatic_reconcile_inventory("reconnect")
+                        if resync_error is None:
+                            self.reconnect_resync_attempted = True
                 except Exception as exc:
                     logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
 
+                try:
+                    history_observation = self.observe_received_item_history()
+                    duplicate_indices = {
+                        receipt.index for receipt in history_observation.duplicates
+                    }
+                except ValueError as exc:
+                    logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
+                    await asyncio.sleep(0.25)
+                    continue
+
+                level_ready_resync = False
                 markers = discover_telemetry_markers()
                 if markers:
-                    newest_mtime, newest_path = markers[-1]
+                    _, newest_path = markers[-1]
                     try:
-                        self.ingest_visible_runtime_lifecycle(
+                        lease = getattr(self, "runtime_observation_lease", None)
+                        previous_lifecycle_epoch = getattr(
+                            lease, "gameplay_loaded_ns", None
+                        )
+                        lifecycle_accepted = self.ingest_visible_runtime_lifecycle(
                             evidence=read_gameplay_save_evidence(),
                             lifecycle_markers=markers,
                         )
-                        if not rpc_execution_enabled():
-                            set_rpc_execution(True)
-                        epoch = self.advance_reconciliation_epoch("level_ready")
-                        logger.info(
-                            "[RPC] Level-ready signal received (%s). RPC armed; "
-                            "perk reconciliation epoch %s queued behind native safety gate.",
-                            os.path.basename(newest_path),
-                            epoch,
+                        current_lifecycle_epoch = getattr(
+                            lease, "gameplay_loaded_ns", None
                         )
-                        self.reconcile_owned_perks("level_ready")
-                        self.advance_automap_cleanup_epoch()
-                        self.reconcile_checked_automap_cleanup("level_ready")
+                        lifecycle_accepted = bool(
+                            lifecycle_accepted
+                            and current_lifecycle_epoch is not None
+                            and current_lifecycle_epoch != previous_lifecycle_epoch
+                        )
+                        if lifecycle_accepted:
+                            if not rpc_execution_enabled():
+                                set_rpc_execution(True)
+                            epoch = self.advance_reconciliation_epoch("level_ready")
+                            logger.info(
+                                "[RPC] Level-ready signal received (%s). RPC armed; "
+                                "perk reconciliation epoch %s queued behind native safety gate.",
+                                os.path.basename(newest_path),
+                                epoch,
+                            )
+                            self.reconcile_owned_perks("level_ready")
+                            self.advance_automap_cleanup_epoch()
+                            self.reconcile_checked_automap_cleanup("level_ready")
+                            level_ready_resync = True
                     except Exception as e:
                         logger.error("[RPC] Auto-RPC failed to consume telemetry ready file %s: %s", newest_path, e)
 
@@ -4932,6 +5224,8 @@ class DoomEternalContext(CommonContext):
                 # Consume the load epoch and map marker before observing challenges;
                 # a marker can make the current poll's challenge observation eligible.
                 await self.check_mission_challenge_locations()
+                if level_ready_resync:
+                    self.automatic_reconcile_inventory("level_ready")
 
                 while (
                     self.item_state_ready
@@ -4939,6 +5233,17 @@ class DoomEternalContext(CommonContext):
                 ):
                     item_index = self.items_processed
                     network_item = self.items_received[item_index]
+                    if item_index in duplicate_indices:
+                        logger.info(
+                            "[To Game] Duplicate authoritative receipt acknowledged "
+                            "without replay: index=%s item_id=%s",
+                            item_index,
+                            network_item.item,
+                        )
+                        self._record_processed_receipt(network_item)
+                        self.items_processed += 1
+                        self.persist_session_state()
+                        continue
                     item_id = network_item.item
                     log_delivery_event(
                         "ITEM_RECEIPT",
@@ -4971,6 +5276,7 @@ class DoomEternalContext(CommonContext):
                         logger.info(
                             f"[To Game] Runtime-only item {item_id} acknowledged."
                         )
+                        self._record_processed_receipt(network_item)
                         self.items_processed += 1
                         self.persist_session_state()
                         continue
@@ -4982,7 +5288,8 @@ class DoomEternalContext(CommonContext):
                         spooled, description = self.spool_item_commands(
                             item_id,
                             item_index,
-                            receipt=ENABLE_ITEM_NOTIFICATIONS,
+                            intent=NEW_RECEIPT,
+                            include_notification=ENABLE_ITEM_NOTIFICATIONS,
                             classification=classification,
                         )
                         if not spooled:
@@ -5023,6 +5330,7 @@ class DoomEternalContext(CommonContext):
                     logger.info(
                         f"[To Game] Item received! {item_id} -> {description}"
                     )
+                    self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
                     self.onboard_bootstrap("on_item_received")

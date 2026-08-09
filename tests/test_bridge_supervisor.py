@@ -1,7 +1,7 @@
 import textwrap
 import time
 
-from launcher_core import LaunchWorkflow, release_identity
+from launcher_core import release_identity
 from launcher_supervisor import BridgeState, BridgeSupervisor
 
 
@@ -32,20 +32,23 @@ def test_supervised_connected_event_installs_and_stop_redacts_password(tmp_path)
         while True:
             time.sleep(1)
     """))
+    events = []
+    log_lines = []
     supervisor = BridgeSupervisor(
-        client=bridge,
-        workflow=LaunchWorkflow(),
-        install_root=tmp_path / "installed",
+        entrypoint=bridge,
+        application_dir=tmp_path,
+        config_path=tmp_path / "config.yaml",
         profile_id="connected-test",
+        event_sink=events.append,
+        log_sink=log_lines.append,
     )
     supervisor.start(endpoint="localhost:38281", player="Doomguy", password="top-secret")
     _wait(supervisor, {BridgeState.CONNECTED})
-    assert supervisor.install_record is not None
-    assert supervisor.last_snapshot is not None
-    assert supervisor.install_record.state == "active"
-    assert supervisor.last_snapshot.seed_name == "supervised"
+    connected_events = [event for event in events if event["type"] == "connected"]
+    assert connected_events
+    assert connected_events[-1]["seed_name"] == "supervised"
     _wait(supervisor, {BridgeState.CONNECTED})
-    assert all("top-secret" not in line for line in supervisor.logs)
+    assert all("top-secret" not in line for line in log_lines)
     supervisor.stop()
     assert supervisor.state is BridgeState.STOPPED
 
@@ -53,11 +56,15 @@ def test_supervised_connected_event_installs_and_stop_redacts_password(tmp_path)
 def test_unexpected_bridge_exit_becomes_failed(tmp_path):
     bridge = tmp_path / "crash_bridge.py"
     bridge.write_text('print("AP_EVENT {\\"type\\":\\"client_started\\"}", flush=True)\nraise SystemExit(7)\n')
+    events = []
+    log_lines = []
     supervisor = BridgeSupervisor(
-        client=bridge,
-        workflow=LaunchWorkflow(),
-        install_root=tmp_path / "installed",
+        entrypoint=bridge,
+        application_dir=tmp_path,
+        config_path=tmp_path / "config.yaml",
         profile_id="crash-test",
+        event_sink=events.append,
+        log_sink=log_lines.append,
     )
     supervisor.start(endpoint="localhost:38281", player="Doomguy")
     _wait(supervisor, {BridgeState.FAILED})
