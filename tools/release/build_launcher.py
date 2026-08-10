@@ -170,7 +170,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=RELEASE_ROOT / "client")
+    parser.add_argument("--output-dir", type=Path, default=RELEASE_ROOT)
     parser.add_argument("--archipelago-source", type=Path, default=WORKSPACE / "Archipelago")
     parser.add_argument("--name", default="DoomEternalArchipelagoLauncher")
     arguments = parser.parse_args()

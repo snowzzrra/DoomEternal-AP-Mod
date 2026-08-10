@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import uuid
+from enum import Enum
 from pathlib import Path
 
 from launcher_integration import (
@@ -30,26 +31,39 @@ def application_directory() -> Path:
     return Path(__file__).resolve().parent
 
 
+class LauncherState(str, Enum):
+    IDLE = "IDLE"
+    CONNECTING = "CONNECTING"
+    CONNECTED = "CONNECTED"
+    FAILED = "FAILED"
+    DISCONNECTING = "DISCONNECTING"
+
+
 class LauncherController:
     """Own launcher state; UI consumes queued events on its main thread."""
 
     def __init__(self, application_dir: Path | None = None):
         self.application_dir = (application_dir or application_directory()).resolve()
+        packaged_client = self.application_dir / "client"
+        self.client_dir = packaged_client if packaged_client.is_dir() else self.application_dir
         self.state_dir = self.application_dir / "launcher-data"
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.state_dir / "launcher.json"
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.config = self._load_config()
         self.options_schema = load_options_schema(
-            self.application_dir / "data" / "options_schema.json"
+            self.client_dir / "data" / "options_schema.json"
         )
+        self.state = LauncherState.IDLE
         self.connected_room = False
         self.supervisor: BridgeSupervisor | None = None
+        self._lifecycle_lock = threading.Lock()
+        self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
         self._consent_lock = threading.Lock()
         self._consent_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
         self.workflow = IntegratedLaunchWorkflow(
-            self.application_dir,
+            self.client_dir,
             self.state_dir,
             self.config_path,
             event_sink=self._setup_event,
@@ -125,8 +139,61 @@ class LauncherController:
     def emit(self, kind: str, **payload: object) -> None:
         self.events.put({"type": kind, **payload})
 
-    def _worker_event(self, event: dict[str, object]) -> None:
-        self.events.put(event)
+    def _worker_event(
+        self, supervisor: BridgeSupervisor, event: dict[str, object]
+    ) -> None:
+        kind = str(event.get("type", ""))
+        stop_failed_worker = False
+        pending: dict[str, str] | None = None
+        emit_event = True
+        intentional_disconnect = False
+        with self._lifecycle_lock:
+            if supervisor is not self.supervisor:
+                return
+            if kind in {"client_started", "connecting"}:
+                if self.state is not LauncherState.DISCONNECTING:
+                    self.state = LauncherState.CONNECTING
+            elif kind == "connected":
+                if self.state is LauncherState.DISCONNECTING:
+                    emit_event = False
+                else:
+                    self.state = LauncherState.CONNECTED
+            elif kind in {"error", "setup_failed"}:
+                if (
+                    self.state is LauncherState.DISCONNECTING
+                    or self._pending_connect is not None
+                ):
+                    emit_event = False
+                else:
+                    self.state = LauncherState.FAILED
+                    self.connected_room = False
+                    stop_failed_worker = supervisor.running
+            elif kind in {"client_stopping", "disconnected"}:
+                if (
+                    self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING}
+                    or self._pending_connect is not None
+                ):
+                    emit_event = False
+            elif kind == "worker_stopped":
+                self.supervisor = None
+                emit_event = False
+                if self._pending_connect is not None:
+                    pending = self._pending_connect
+                    self._pending_connect = None
+                    self.state = LauncherState.CONNECTING
+                elif self.state is LauncherState.DISCONNECTING:
+                    self.state = LauncherState.IDLE
+                    intentional_disconnect = True
+                elif self.state is not LauncherState.FAILED:
+                    self.state = LauncherState.FAILED
+        if emit_event:
+            self.events.put(event)
+        if stop_failed_worker:
+            supervisor.stop(emit_disconnected=False)
+        if intentional_disconnect:
+            self.emit("disconnected", intentional=True)
+        if pending is not None:
+            self._start_supervisor(pending)
 
     def _worker_log(self, text: str) -> None:
         if text:
@@ -169,7 +236,7 @@ class LauncherController:
     def _entrypoint(self) -> Path:
         if getattr(sys, "frozen", False):
             return Path(sys.executable).resolve()
-        return self.application_dir / "launcher_app.py"
+        return self.client_dir / "launcher_app.py"
 
     def _archipelago_source(self) -> Path | None:
         if getattr(sys, "frozen", False):
@@ -177,6 +244,37 @@ class LauncherController:
         configured = os.environ.get("ARCHIPELAGO_SOURCE")
         candidate = Path(configured).expanduser() if configured else self.application_dir.parent / "Archipelago"
         return candidate.resolve() if (candidate / "CommonClient.py").is_file() else None
+
+    def _start_supervisor(self, connection: dict[str, str]) -> None:
+        profile = hashlib.sha256(
+            f"{connection['endpoint']}\0{connection['slot']}\0{self.state_dir}".encode()
+        ).hexdigest()
+        supervisor = BridgeSupervisor(
+            entrypoint=self._entrypoint(),
+            application_dir=self.client_dir,
+            config_path=self.config_path,
+            profile_id=profile,
+            event_sink=lambda event: self._worker_event(supervisor, event),
+            log_sink=self._worker_log,
+            archipelago_source=self._archipelago_source(),
+        )
+        with self._lifecycle_lock:
+            self.supervisor = supervisor
+            self.state = LauncherState.CONNECTING
+        try:
+            supervisor.start(
+                endpoint=connection["endpoint"],
+                player=connection["slot"],
+                password=connection["password"],
+            )
+        except Exception as error:
+            with self._lifecycle_lock:
+                if self.supervisor is supervisor:
+                    self.supervisor = None
+                    self.state = LauncherState.FAILED
+            self.emit("setup_failed", code="bridge_start_failed", message=str(error))
+            return
+        self.emit("connecting", endpoint=connection["endpoint"], slot=connection["slot"])
 
     def connect(
         self,
@@ -189,8 +287,6 @@ class LauncherController:
     ) -> None:
         if not endpoint.strip() or not slot.strip():
             raise ValueError("server address and slot are required")
-        if self.supervisor is not None and self.supervisor.running:
-            raise RuntimeError("disconnect the current bridge worker before connecting again")
         game = Path(game_root).expanduser().resolve()
         saves = Path(saves_root).expanduser().resolve()
         if not (game / "DOOMEternalx64vk.exe").is_file() or not (game / "base").is_dir():
@@ -206,24 +302,25 @@ class LauncherController:
                 "save_games_dir": str(saves),
             }
         )
-        profile = hashlib.sha256(
-            f"{endpoint.strip()}\0{slot.strip()}\0{self.state_dir}".encode()
-        ).hexdigest()
-        self.supervisor = BridgeSupervisor(
-            entrypoint=self._entrypoint(),
-            application_dir=self.application_dir,
-            config_path=self.config_path,
-            profile_id=profile,
-            event_sink=self._worker_event,
-            log_sink=self._worker_log,
-            archipelago_source=self._archipelago_source(),
-        )
-        self.supervisor.start(
-            endpoint=endpoint.strip(),
-            player=slot.strip(),
-            password=password,
-        )
-        self.emit("connecting", endpoint=endpoint.strip(), slot=slot.strip())
+        connection = {
+            "endpoint": endpoint.strip(),
+            "slot": slot.strip(),
+            "password": password,
+        }
+        stop_failed_worker: BridgeSupervisor | None = None
+        with self._lifecycle_lock:
+            if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
+                raise RuntimeError("disconnect the current bridge worker before connecting again")
+            if self.state is LauncherState.DISCONNECTING:
+                raise RuntimeError("bridge worker is still disconnecting")
+            if self.supervisor is not None:
+                self._pending_connect = connection
+                self.state = LauncherState.CONNECTING
+                stop_failed_worker = self.supervisor
+        if stop_failed_worker is not None:
+            stop_failed_worker.stop(emit_disconnected=False)
+            return
+        self._start_supervisor(connection)
 
     def process_event(self, event: dict[str, object]) -> None:
         if event.get("type") == "connected":
@@ -257,11 +354,21 @@ class LauncherController:
         self.supervisor.send_command(text)
 
     def disconnect(self) -> None:
-        if self.supervisor is not None:
-            self.supervisor.stop()
-            self.supervisor = None
-        self.connected_room = False
-        self.emit("disconnected", intentional=True)
+        supervisor: BridgeSupervisor | None
+        with self._lifecycle_lock:
+            if self.state is LauncherState.DISCONNECTING:
+                return
+            supervisor = self.supervisor
+            self._pending_connect = None
+            self.connected_room = False
+            if supervisor is None:
+                self.state = LauncherState.IDLE
+            else:
+                self.state = LauncherState.DISCONNECTING
+        if supervisor is None:
+            self.emit("disconnected", intentional=True)
+            return
+        supervisor.stop(emit_disconnected=False)
 
     def save_player_options(
         self,

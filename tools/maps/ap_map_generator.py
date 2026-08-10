@@ -18,6 +18,11 @@ from item_classification import (
     notification_entity_name,
     notification_style_for_item,
 )
+from item_reconciliation import (
+    AP_RECEIPT_FEEDBACK,
+    SUPPORTED_RECEIPT_FEEDBACK,
+    load_policy_registry,
+)
 from tools.maps.notification_formatting import notification_key
 
 AP_PICKUP_HITBOX_SIZE = 6
@@ -1323,6 +1328,7 @@ def generate_rpc_command_entities(
     items_dict,
     item_names=None,
     item_classifications=None,
+    receipt_feedback=None,
     enable_notifications=False,
 ):
     """Generate ap_rpc_v3_* effects and independent receipt notifications.
@@ -1331,6 +1337,14 @@ def generate_rpc_command_entities(
     When enable_notifications is True, also generates ap_notify_item_<id> entities.
     """
     validate_primitive_registry()
+    receipt_feedback = receipt_feedback or {}
+    unsupported_feedback = {
+        item_id: feedback
+        for item_id, feedback in receipt_feedback.items()
+        if feedback not in SUPPORTED_RECEIPT_FEEDBACK
+    }
+    if unsupported_feedback:
+        raise ValueError(f"unsupported item receipt feedback: {unsupported_feedback}")
     blocks = []
     required_entities = []
     for item_id, command_value in items_dict.items():
@@ -1408,6 +1422,11 @@ def generate_rpc_command_entities(
             if is_no_op:
                 continue
             item_id_int = int(item_id)
+            feedback = receipt_feedback.get(
+                item_id_int, receipt_feedback.get(str(item_id_int), AP_RECEIPT_FEEDBACK)
+            )
+            if feedback != AP_RECEIPT_FEEDBACK:
+                continue
             name = item_names.get(item_id_int)
             if not name:
                 raise ValueError(f"Item {item_id} has no name in item_names; notification requires it")
@@ -1487,13 +1506,28 @@ def generate_bootstrap_entities():
     """Historical stat-write bootstraps are intentionally absent from v0.2.2."""
     return ""
 
-def load_item_names(names_path="data/item_replay_policies.json"):
-    """Load item_id -> canonical name from replay policies."""
-    path = Path(__file__).resolve().parents[2] / names_path
-    with open(path, encoding="utf-8") as f:
-        policies = json.load(f)
-    items = policies.get("items", {})
-    return {int(k): v["name"] for k, v in items.items() if "name" in v}
+def load_item_notification_policies(
+    policy_path: str | Path = "data/item_replay_policies.json",
+):
+    """Load validated item names and receipt feedback from canonical policies."""
+    root = Path(__file__).resolve().parents[2]
+    path = Path(policy_path).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    definitions = json.loads(
+        (root / "data" / "items.json").read_text(encoding="utf-8")
+    )
+    policies = load_policy_registry(
+        path,
+        {int(item_id): definition for item_id, definition in definitions.items()},
+    )
+    return (
+        {item_id: policy.name for item_id, policy in policies.items()},
+        {
+            item_id: policy.receipt_feedback
+            for item_id, policy in policies.items()
+        },
+    )
 
 
 def load_explicit_location_feedback(
@@ -1527,6 +1561,7 @@ def generate_map(
     items_dict,
     item_names=None,
     item_classifications=None,
+    receipt_feedback=None,
     enable_notifications=True,
 ):
     with open(config_file, encoding="utf-8") as f:
@@ -1949,6 +1984,7 @@ def generate_map(
             items_dict,
             item_names=item_names,
             item_classifications=item_classifications,
+            receipt_feedback=receipt_feedback,
             enable_notifications=enable_notifications,
         )
         + generate_bootstrap_entities()
@@ -1990,10 +2026,11 @@ if __name__ == "__main__":
     with open(args.items, encoding="utf-8") as f:
         items_dict = json.load(f)
 
-    item_names = load_item_names(args.item_names) if os.path.exists(args.item_names) else None
+    item_names, receipt_feedback = load_item_notification_policies(args.item_names)
 
     generate_map(
         args.input, args.output, args.config, args.manifest, items_dict, 
         item_names=item_names,
+        receipt_feedback=receipt_feedback,
         enable_notifications=not args.disable_item_notifications,
     )

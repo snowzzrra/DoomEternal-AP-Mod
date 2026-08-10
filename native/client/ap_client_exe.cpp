@@ -30,9 +30,10 @@ static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "v0.3.9-alpha";
+static const char* kReleaseVersion = "0.4.0-beta.2";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
-static const int kItemMappingRevision = 7;
+static const int kRpcEntityContractRevision = 3;
+static const int kNativeCommandPolicyRevision = 7;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kQueueStateLogMs = 5000;
@@ -463,8 +464,10 @@ const char* ReceiptCommandKind(const std::string& commandId) {
 }
 
 std::string DeliveryContextFields() {
-    return " active_map=unavailable slot=unavailable bridge_revision=unavailable"
-        " protocol_version=3 helper_sha=unavailable injector_sha=unavailable";
+    return " active_map=unavailable slot=unavailable bridge_protocol_version=unavailable"
+        " rpc_entity_contract_revision=" + std::to_string(kRpcEntityContractRevision)
+        + " rpc_entity_prefix=" + kRpcEntityPrefix
+        + " helper_sha=unavailable injector_sha=unavailable";
 }
 
 std::string RpcGateReason(
@@ -629,8 +632,15 @@ void LogStartupHeader(
         + std::to_string(CountProcessesNamed("DOOMEternalx64vk.exe"))
     );
     LogDebug("Offset profile: steam-6.66-rev-3.1");
+    LogDebug(
+        "RPC_ENTITY_CONTRACT_REVISION: "
+        + std::to_string(kRpcEntityContractRevision)
+    );
     LogDebug(std::string("RPC_ENTITY_PREFIX: ") + kRpcEntityPrefix);
-    LogDebug("ITEM_MAPPING_REVISION: " + std::to_string(kItemMappingRevision));
+    LogDebug(
+        "NATIVE_COMMAND_POLICY_REVISION: "
+        + std::to_string(kNativeCommandPolicyRevision)
+    );
     LogDebug(
         std::string("Runtime mode: ")
         + (preflight.probableProton ? "Proton-compatible/client-local DLL allowed" : "Windows-native/game-root DLL required")

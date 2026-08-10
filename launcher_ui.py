@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import queue
+import html
+import re
 from pathlib import Path
 from typing import cast
 
@@ -38,15 +40,16 @@ class LauncherUI(QMainWindow):
     """Guided Qt shell; controller events are consumed on Qt main thread."""
 
     COLORS = {
-        "background": "#10151d",
-        "surface": "#18212c",
-        "surface_alt": "#202c3a",
-        "border": "#33475b",
-        "text": "#edf4fb",
-        "muted": "#a7b7c8",
-        "accent": "#e65b31",
-        "accent_active": "#ff7449",
-        "success": "#52c878",
+        "background": "#0b1016",
+        "surface": "#121b25",
+        "surface_alt": "#192735",
+        "border": "#2c4253",
+        "text": "#eef5fa",
+        "muted": "#9cabb9",
+        "accent": "#e86b35",
+        "accent_active": "#ff8750",
+        "success": "#78df8a",
+        "info": "#68d5e9",
         "warning": "#f0b24a",
         "danger": "#ed6d6d",
     }
@@ -71,6 +74,8 @@ class LauncherUI(QMainWindow):
         self.detail = QLabel("We will prepare the mod and never launch DOOM Eternal directly.")
         self.next_action = "Connect to Archipelago"
         self.overall_state = QLabel("READY TO CONFIGURE")
+        self._room_connected = False
+        self._connection_pending = False
         self.install_guidance = QLabel()
         self.option_controls: dict[str, QWidget] = {}
         self.option_defaults: dict[str, object] = {}
@@ -83,34 +88,39 @@ class LauncherUI(QMainWindow):
     def _configure_style(self) -> None:
         self.setStyleSheet(f"""
             QWidget {{ background: {self.COLORS['background']}; color: {self.COLORS['text']};
-                font-family: system-ui, 'Segoe UI', sans-serif; font-size: 13pt; }}
+                font-family: system-ui, 'Segoe UI', sans-serif; font-size: 11pt; }}
             QLabel {{ background: transparent; }}
             QMainWindow {{ background: {self.COLORS['background']}; }}
             QFrame#surface, QFrame#card {{ background: {self.COLORS['surface']};
-                border: 1px solid {self.COLORS['border']}; border-radius: 12px; }}
-            QFrame#card {{ background: {self.COLORS['surface_alt']}; border: 0; }}
-            QLabel#title {{ font-size: 25pt; font-weight: 700; }}
+                border: 1px solid {self.COLORS['border']}; border-radius: 5px; }}
+            QFrame#surface {{ border-left: 3px solid #35566a; }}
+            QFrame#card {{ background: {self.COLORS['surface_alt']}; border-color: #263b4b; }}
+            QFrame#optionCard {{ background: #101923; border: 1px solid #263f50; border-left: 3px solid #365c6d; border-radius: 4px; }}
+            QLabel#title {{ font-size: 24pt; font-weight: 700; letter-spacing: 1px; }}
             QLabel#subtitle, QLabel#muted {{ color: {self.COLORS['muted']}; }}
-            QLabel#section {{ font-size: 17pt; font-weight: 650; }}
-            QLabel#headline {{ font-size: 21pt; font-weight: 700; }}
-            QLabel#state {{ color: {self.COLORS['accent_active']}; font-size: 13pt; font-weight: 700; }}
-            QLabel#stepTitle {{ font-size: 12pt; font-weight: 650; }}
-            QLabel#stepState {{ color: {self.COLORS['muted']}; font-size: 11pt; }}
+            QLabel#section {{ font-size: 15pt; font-weight: 700; }}
+            QLabel#headline {{ font-size: 19pt; font-weight: 700; }}
+            QLabel#state {{ color: {self.COLORS['info']}; font-size: 11pt; font-weight: 700; }}
+            QLabel#stepTitle {{ font-size: 11pt; font-weight: 700; }}
+            QLabel#stepState {{ color: {self.COLORS['muted']}; font-size: 9pt; }}
             QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 15pt; font-weight: 700; }}
             QLineEdit {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
-                border-radius: 7px; padding: 7px 11px; min-height: 22px; }}
+                border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
             QComboBox, QSpinBox {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
-                border-radius: 7px; padding: 7px 11px; min-height: 22px; }}
-            QCheckBox {{ spacing: 8px; }}
+                border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{ border: 2px solid {self.COLORS['info']}; }}
+            QCheckBox {{ spacing: 9px; font-weight: 600; }}
+            QCheckBox::indicator {{ width: 21px; height: 21px; border: 1px solid #6d8391; background: #0d141c; border-radius: 3px; }}
+            QCheckBox::indicator:checked {{ background: {self.COLORS['success']}; border-color: {self.COLORS['success']}; }}
             QTabWidget::pane {{ border: 0; }}
             QTabBar::tab {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['muted']};
-                border: 1px solid {self.COLORS['border']}; border-bottom: 0; padding: 10px 20px;
+                border: 1px solid {self.COLORS['border']}; border-bottom: 0; padding: 9px 18px;
                 font-weight: 600; }}
             QTabBar::tab:selected {{ background: {self.COLORS['surface']}; color: {self.COLORS['text']}; }}
             QPlainTextEdit {{ background: #0d1219; color: #d8e4ef; border: 1px solid {self.COLORS['border']};
-                border-radius: 7px; padding: 8px; }}
+                border-radius: 4px; padding: 8px; }}
             QPushButton {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['text']};
-                border: 1px solid {self.COLORS['border']}; border-radius: 7px; padding: 10px 15px;
+                border: 1px solid {self.COLORS['border']}; border-radius: 4px; padding: 9px 13px;
                 font-weight: 600; }}
             QPushButton:hover {{ background: {self.COLORS['border']}; }}
             QPushButton#primary {{ background: {self.COLORS['accent']}; border-color: {self.COLORS['accent']}; color: white; }}
@@ -121,16 +131,33 @@ class LauncherUI(QMainWindow):
         """)
 
     def _load_icon(self) -> None:
-        icon = self.controller.application_dir / "doom_logo.png"
+        icon = self.controller.client_dir / "doom_logo.png"
         if icon.is_file():
             self.setWindowIcon(QIcon(str(icon)))
 
     @staticmethod
-    def _label(text: str, object_name: str = "") -> QLabel:
+    def _label(text: str, object_name: str = "", *, rich_text: bool = False) -> QLabel:
         label = QLabel(text)
         label.setObjectName(object_name)
         label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.RichText if rich_text else Qt.TextFormat.PlainText)
+        label.setOpenExternalLinks(False)
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         return label
+
+    @staticmethod
+    def _format_markdown(text: object) -> str:
+        """Small safe subset for APWorld option descriptions."""
+        escaped = html.escape(str(text), quote=False)
+        paragraphs = re.split(r"\n\s*\n", escaped)
+        formatted: list[str] = []
+        for paragraph in paragraphs:
+            paragraph = paragraph.replace("\n", "<br>")
+            paragraph = re.sub(r"(\*\*|__)(.+?)\1", r"<b>\2</b>", paragraph)
+            paragraph = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", paragraph)
+            paragraph = re.sub(r"(?<!_)_([^_\n]+)_(?!_)", r"<i>\1</i>", paragraph)
+            formatted.append(f"<p>{paragraph}</p>")
+        return "".join(formatted)
 
     @staticmethod
     def _surface() -> QFrame:
@@ -145,7 +172,9 @@ class LauncherUI(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         body = QWidget()
+        body.setMinimumWidth(0)
         outer = QVBoxLayout(body)
         outer.setContentsMargins(28, 24, 28, 28)
         outer.setSpacing(14)
@@ -160,27 +189,30 @@ class LauncherUI(QMainWindow):
         header_text.addWidget(self._label("Archipelago Launcher", "subtitle"))
         header_layout.addLayout(header_text, 1)
         self.overall_state.setObjectName("state")
+        self.overall_state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.overall_state.setMaximumWidth(210)
         header_layout.addWidget(self.overall_state, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
         outer.addWidget(header)
 
-        steps = QHBoxLayout()
-        steps.setSpacing(8)
+        steps = QGridLayout()
+        steps.setHorizontalSpacing(7)
+        steps.setVerticalSpacing(7)
         for index, (title, state) in enumerate((("Configure", "Game paths"), ("Connect", "Room details"),
                                                   ("Prepare", "Build mod"), ("Install", "Apply mod"),
                                                   ("Play", "Start via Steam")), start=1):
             card = QFrame()
             card.setObjectName("card")
-            layout = QHBoxLayout(card)
-            layout.setContentsMargins(12, 10, 12, 10)
+            layout = QVBoxLayout(card)
+            layout.setContentsMargins(10, 8, 10, 8)
+            layout.setSpacing(1)
             number = self._label(str(index), "stepNumber")
             title_label = self._label(title, "stepTitle")
             state_label = self._label(state, "stepState")
-            text = QVBoxLayout()
-            text.addWidget(title_label)
-            text.addWidget(state_label)
             layout.addWidget(number)
-            layout.addLayout(text)
-            steps.addWidget(card, 1)
+            layout.addWidget(title_label)
+            layout.addWidget(state_label)
+            steps.addWidget(card, 0, index - 1)
+            steps.setColumnStretch(index - 1, 1)
             self._step_widgets.append((card, number, state_label))
         outer.addLayout(steps)
 
@@ -192,7 +224,10 @@ class LauncherUI(QMainWindow):
         configure_layout.setContentsMargins(22, 20, 22, 22)
         configure_layout.setHorizontalSpacing(12)
         configure_layout.setVerticalSpacing(10)
+        configure_layout.setColumnMinimumWidth(0, 132)
         configure_layout.setColumnStretch(1, 1)
+        self.game_root.setMinimumWidth(180)
+        self.saves_root.setMinimumWidth(180)
         configure_layout.addWidget(self._label("1. Configure game", "section"), 0, 0, 1, 3)
         configure_layout.addWidget(self._label("Confirm detected folders, then enter room details.", "muted"), 1, 0, 1, 3)
         self._path_row(configure_layout, 2, "DOOM Eternal folder", self.game_root, self._browse_game)
@@ -207,6 +242,7 @@ class LauncherUI(QMainWindow):
         status = self._surface()
         status_layout = QVBoxLayout(status)
         status_layout.setContentsMargins(22, 20, 22, 22)
+        status_layout.setSpacing(10)
         self.headline.setObjectName("headline")
         status_layout.addWidget(self.headline)
         self.detail.setObjectName("muted")
@@ -221,6 +257,7 @@ class LauncherUI(QMainWindow):
         status_layout.addWidget(self.primary_button)
         self.stop_button = QPushButton("Stop connection")
         self.stop_button.clicked.connect(self._disconnect)
+        self.stop_button.setVisible(False)
         status_layout.addWidget(self.stop_button)
         self.reinstall_button = QPushButton("Reinstall mod")
         self.reinstall_button.clicked.connect(self._reinstall)
@@ -247,7 +284,7 @@ class LauncherUI(QMainWindow):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setFont(QFont("monospace", 11))
-        self.log.setMinimumHeight(150)
+        self.log.setMinimumHeight(120)
         status_layout.addWidget(self.log, 1)
         command = QHBoxLayout()
         self.command = QLineEdit()
@@ -259,6 +296,8 @@ class LauncherUI(QMainWindow):
         command.addWidget(send)
         status_layout.addLayout(command)
         content.addWidget(status, 2)
+        configure.setMinimumWidth(470)
+        status.setMinimumWidth(300)
 
         launch = self._surface()
         launch_layout = QGridLayout(launch)
@@ -281,7 +320,9 @@ class LauncherUI(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         body = QWidget()
+        body.setMinimumWidth(0)
         layout = QVBoxLayout(body)
         layout.setContentsMargins(28, 24, 28, 28)
         layout.setSpacing(14)
@@ -294,7 +335,7 @@ class LauncherUI(QMainWindow):
         header_layout.addWidget(self._label("Room Options", "title"))
         header_layout.addWidget(self._label("Choose options for a player YAML file used when creating a future room.", "muted"))
         self.connected_options_notice = self._label(
-            "Connected room settings come from the server. Changes here are for future room generation.", "muted"
+            "Connected room settings are server-authoritative. Local edits affect only a YAML file for future room generation.", "muted"
         )
         self.connected_options_notice.setVisible(False)
         header_layout.addWidget(self.connected_options_notice)
@@ -339,12 +380,19 @@ class LauncherUI(QMainWindow):
         key = str(option["key"])
         default = option.get("default")
         self.option_defaults[key] = default
-        row = QWidget()
-        layout = QVBoxLayout(row)
-        layout.setContentsMargins(0, 4, 0, 4)
-        layout.setSpacing(4)
-        layout.addWidget(self._label(str(option["display_name"])))
-        layout.addWidget(self._label(str(option["description"]), "muted"))
+        row = QFrame()
+        row.setObjectName("optionCard")
+        layout = QGridLayout(row)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setHorizontalSpacing(18)
+        layout.setVerticalSpacing(5)
+        layout.setColumnStretch(0, 1)
+        name = self._label(str(option["display_name"]))
+        name.setStyleSheet("font-weight: 700;")
+        layout.addWidget(name, 0, 0)
+        layout.addWidget(
+            self._label(self._format_markdown(option["description"]), "muted", rich_text=True), 1, 0
+        )
         ui_type = str(option["ui_type"])
         if ui_type == "toggle":
             control: QWidget = QCheckBox("Enabled")
@@ -366,7 +414,12 @@ class LauncherUI(QMainWindow):
             control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
             control.setValue(cast(int, default))
         self.option_controls[key] = control
-        layout.addWidget(control)
+        control.setMinimumWidth(170)
+        layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
+        default_text = "Enabled" if default is True else "Disabled" if default is False else str(default)
+        default_label = self._label(f"Default: {default_text}", "muted")
+        default_label.setStyleSheet("font-size: 9pt;")
+        layout.addWidget(default_label, 2, 0, 1, 2)
         return row
 
     def _reset_options(self) -> None:
@@ -448,6 +501,13 @@ class LauncherUI(QMainWindow):
         self.progress.setVisible(busy)
         self.primary_button.setEnabled(not busy)
 
+    def _set_connection_controls(self, editable: bool, stop_visible: bool, *, stop_enabled: bool = True) -> None:
+        """Keep room lifecycle visible without changing controller contracts."""
+        for field in (self.server, self.slot, self.password, self.game_root, self.saves_root):
+            field.setEnabled(editable)
+        self.stop_button.setVisible(stop_visible)
+        self.stop_button.setEnabled(stop_enabled)
+
     def _discover(self) -> None:
         found = self.controller.discover()
         if not self.game_root.text() and found.get("game_root"):
@@ -472,7 +532,9 @@ class LauncherUI(QMainWindow):
             self.saves_root.setText(selected)
 
     def _primary_action(self) -> None:
-        if "Try again" in self.next_action:
+        if "Retry connection" in self.next_action:
+            self._connect()
+        elif "Try again" in self.next_action:
             self._retry()
         elif "Prepare" in self.next_action:
             try:
@@ -488,12 +550,19 @@ class LauncherUI(QMainWindow):
     def _connect(self) -> None:
         try:
             self.controller.connect(endpoint=self.server.text(), slot=self.slot.text(), password=self.password.text(), game_root=self.game_root.text(), saves_root=self.saves_root.text())
+            self._connection_pending = True
+            self._set_connection_controls(False, True)
+            self._set_state("Connecting to your Archipelago room…", "The launcher is waiting for room information.", action="Connecting…", step=2, complete=1, busy=True, state="CONNECTING")
         except Exception as error:
-            self._set_state("Check your connection details.", str(error), action="Try again", step=2, complete=1, state="ACTION NEEDED")
+            self._connection_pending = False
+            self._set_connection_controls(True, False)
+            self._set_state("Check your connection details.", str(error), action="Retry connection", step=2, complete=1, state="CONNECTION FAILED")
             self._append_log(f"Connection error: {error}")
 
     def _disconnect(self) -> None:
         try:
+            self._set_connection_controls(False, True, stop_enabled=False)
+            self._set_state("Stopping connection…", "Waiting for the bridge worker to close.", action="Stopping…", step=2, complete=1, busy=True, state="DISCONNECTING")
             self.controller.disconnect()
         except Exception as error:
             self._append_log(f"Stop error: {error}")
@@ -549,10 +618,15 @@ class LauncherUI(QMainWindow):
             if event.get("field") == "steam_launch_options":
                 self.launch_option.setText("Unavailable — see log.")
         elif kind in {"client_started", "connecting"}:
-            self._set_state("Connecting to your Archipelago room…", "The launcher is waiting for room information.", action="Connecting…", step=2, complete=1, busy=True)
+            self._connection_pending = True
+            self._set_connection_controls(False, True)
+            self._set_state("Connecting to your Archipelago room…", "The launcher is waiting for room information.", action="Connecting…", step=2, complete=1, busy=True, state="CONNECTING")
         elif kind == "connected":
+            self._connection_pending = False
+            self._room_connected = True
+            self._set_connection_controls(False, True)
             self.connected_options_notice.setVisible(True)
-            self._set_state("Connected. Checking installed mod.", "Verifying room identity and installed package before any setup.", action="Checking…", step=3, complete=2, busy=True)
+            self._set_state("Connected. Checking installed mod.", "Verifying room identity and installed package before any setup.", action="Checking…", step=3, complete=2, busy=True, state="CONNECTED")
         elif kind == "room_install_state":
             self.progress.setVisible(False)
             if event.get("steam_launch_option"):
@@ -564,9 +638,12 @@ class LauncherUI(QMainWindow):
             else:
                 self.reinstall_button.setVisible(False)
                 reason = str(event.get("reason") or "no matching verified install was found")
-                self._set_state("Room connected. Mod needs installation.", f"Prepare the room-specific mod before starting DOOM Eternal. ({reason})", action="Prepare & install mod", step=3, complete=2, state="CONNECTED")
-                self._append_log("Connected room requires explicit Prepare & install.")
+                self._set_state("Room connected. Mod needs installation.", f"Prepare the room-specific mod before starting DOOM Eternal. ({reason})", action="Prepare and install mod", step=3, complete=2, state="CONNECTED")
+                self._append_log("Connected room requires explicit Prepare and install.")
         elif kind == "disconnected":
+            self._connection_pending = False
+            self._room_connected = False
+            self._set_connection_controls(True, False)
             self.connected_options_notice.setVisible(False)
             self.reinstall_button.setVisible(False)
             self._set_state("Connection stopped.", "You can update details and reconnect when ready.", action="Connect to Archipelago", step=2, complete=1, state="DISCONNECTED")
@@ -622,10 +699,26 @@ class LauncherUI(QMainWindow):
             elif state != "manual_action_required":
                 self._set_state("Setup needs your attention.", str(event.get("message", "")), action="Try again", step=4, complete=3, state="ACTION NEEDED")
         elif kind in {"setup_failed", "error"}:
-            self._set_state("Setup could not finish.", "Review details and try again after resolving the issue.", action="Try again", step=4, complete=3, state="ACTION NEEDED")
-            self._append_log(f"{kind}: {event.get('message', 'Unknown error')}")
+            message = str(event.get("message", "Unknown error"))
+            connection_failed = kind == "error" and event.get("code") == "connection_failed"
+            if connection_failed:
+                self._room_connected = False
+                self._connection_pending = False
+                self._set_connection_controls(True, False)
+                self.connected_options_notice.setVisible(False)
+                self.reinstall_button.setVisible(False)
+                self.guidance.setVisible(False)
+                self._set_state("Connection failed.", message, action="Retry connection", step=2, complete=1, state="CONNECTION FAILED")
+            elif not self._room_connected:
+                self._connection_pending = False
+                self._set_connection_controls(True, False)
+                self._set_state("Connection failed.", message, action="Retry connection", step=2, complete=1, state="CONNECTION FAILED")
+            else:
+                self._set_state("Setup could not finish.", "Review details and try again after resolving the issue.", action="Try again", step=4, complete=3, state="ACTION NEEDED")
+            self._append_log(f"{kind}: {message}")
         elif kind == "client_stopping":
-            self._set_state("Stopping connection…", "Waiting for the bridge worker to close.", action="Stopping…", step=2, complete=1, busy=True)
+            self._set_connection_controls(False, True, stop_enabled=False)
+            self._set_state("Stopping connection…", "Waiting for the bridge worker to close.", action="Stopping…", step=2, complete=1, busy=True, state="DISCONNECTING")
 
     def _append_log(self, text: str) -> None:
         if text:

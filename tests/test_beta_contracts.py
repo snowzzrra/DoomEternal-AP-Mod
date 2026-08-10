@@ -41,4 +41,4 @@ def test_release_identity_has_required_revisions():
     identity = release_identity()
     assert identity["game"] == "DOOM Eternal"
     assert identity["bridge_protocol_version"] == 4
-    assert identity["compiler_revision"] == 1
+    assert identity["compiler_revision"] == 2

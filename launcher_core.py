@@ -399,8 +399,17 @@ class ModCompiler:
 
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path) -> Path:
         """Compile physical Dash mutation. Caller supplies legal local vanilla dump."""
+        from item_classification import load_item_classifications
+        from item_reconciliation import load_policy_registry
         from tools.maps.ap_map_generator import generate_map
 
+        item_definitions = json.loads(
+            (self.root / "data/items.json").read_text(encoding="utf-8")
+        )
+        policies = load_policy_registry(
+            self.root / "data/item_replay_policies.json",
+            {int(item_id): definition for item_id, definition in item_definitions.items()},
+        )
         with tempfile.TemporaryDirectory() as temporary:
             staged = self.compile(manifest, Path(temporary))
             generate_map(
@@ -408,7 +417,15 @@ class ModCompiler:
                 output_entities,
                 staged / "e1m2_war.locations.json",
                 output_entities.with_suffix(".manifest.json"),
-                json.loads((self.root / "data/items.json").read_text(encoding="utf-8")),
+                item_definitions,
+                item_names={item_id: policy.name for item_id, policy in policies.items()},
+                item_classifications=load_item_classifications(
+                    self.root / "data/item_classifications.json"
+                ),
+                receipt_feedback={
+                    item_id: policy.receipt_feedback
+                    for item_id, policy in policies.items()
+                },
             )
         output_entities.with_suffix(".seed.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",

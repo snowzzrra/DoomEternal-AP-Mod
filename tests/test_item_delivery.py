@@ -91,6 +91,46 @@ def _spool(context, calls, result=True):
     context.spool_item_commands = spool
 
 
+def _receipt_commands(context, item_id, item_index):
+    commands, _description = context.item_activation_commands(
+        item_id,
+        item_index,
+        intent=bridge.NEW_RECEIPT,
+        include_notification=True,
+        classification=bridge.ITEM_CLASSIFICATIONS[item_id],
+    )
+    assert commands is not None
+    return commands
+
+
+def test_native_only_receipts_keep_effects_without_notification():
+    context = _context(
+        [NetworkItem(7770014, 1, 1, 1), NetworkItem(7770022, 2, 1, 0)]
+    )
+
+    for item_index, item_id in enumerate((7770014, 7770022)):
+        commands = _receipt_commands(context, item_id, item_index)
+        assert commands
+        assert any(f"ap_rpc_v3_{item_id}" in command for command in commands)
+        assert not any("ap_notify_item_" in command for command in commands)
+
+
+def test_ap_receipt_has_exactly_one_notification_and_repeats_at_new_index():
+    item_id = 7770001
+    context = _context(
+        [NetworkItem(item_id, 1, 1, 1), NetworkItem(item_id, 2, 1, 1)]
+    )
+
+    first = _receipt_commands(context, item_id, 0)
+    repeated = _receipt_commands(context, item_id, 1)
+
+    for commands in (first, repeated):
+        assert any(f"ap_rpc_v3_{item_id}" in command for command in commands)
+        assert sum("ap_notify_item_" in command for command in commands) == 1
+    assert any("ap_notify_item_major_7770001_a" in command for command in first)
+    assert any("ap_notify_item_major_7770001_b" in command for command in repeated)
+
+
 @_run_async
 async def test_packet_signal_schedules_immediate_processor_without_tracker():
     context = _context()

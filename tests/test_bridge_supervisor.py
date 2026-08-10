@@ -1,4 +1,5 @@
 import textwrap
+import threading
 import time
 
 from launcher_core import release_identity
@@ -49,8 +50,8 @@ def test_supervised_connected_event_installs_and_stop_redacts_password(tmp_path)
     assert connected_events[-1]["seed_name"] == "supervised"
     _wait(supervisor, {BridgeState.CONNECTED})
     assert all("top-secret" not in line for line in log_lines)
-    supervisor.stop()
-    assert supervisor.state is BridgeState.STOPPED
+    supervisor.stop(timeout=0.05)
+    _wait(supervisor, {BridgeState.STOPPED})
 
 
 def test_unexpected_bridge_exit_becomes_failed(tmp_path):
@@ -70,3 +71,63 @@ def test_unexpected_bridge_exit_becomes_failed(tmp_path):
     _wait(supervisor, {BridgeState.FAILED})
     assert supervisor.last_error is not None
     assert supervisor.last_error["code"] == "bridge_exited"
+
+
+def test_stop_returns_promptly_and_escalates_off_caller_thread(tmp_path, monkeypatch):
+    class Input:
+        def write(self, _text):
+            pass
+
+        def flush(self):
+            pass
+
+    class Process:
+        stdin = Input()
+        stdout = None
+        stderr = None
+
+        def __init__(self):
+            self.done = threading.Event()
+            self.returncode = None
+            self.terminated = False
+            self.killed = False
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self):
+            self.done.wait()
+            return self.returncode
+
+        def terminate(self):
+            self.terminated = True
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+            self.done.set()
+
+    process = Process()
+    monkeypatch.setattr("launcher_supervisor.subprocess.Popen", lambda *_args, **_kwargs: process)
+    events = []
+    supervisor = BridgeSupervisor(
+        entrypoint=tmp_path / "bridge.py",
+        application_dir=tmp_path,
+        config_path=tmp_path / "config.json",
+        profile_id="async-stop-test",
+        event_sink=events.append,
+        log_sink=lambda _line: None,
+    )
+    supervisor.start(endpoint="localhost:38281", player="Doomguy")
+
+    started = time.monotonic()
+    supervisor.stop(timeout=0.2)
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 0.05
+    assert supervisor.state is BridgeState.STOPPING
+    _wait(supervisor, {BridgeState.STOPPED})
+    assert process.terminated
+    assert process.killed
+    assert [event["type"] for event in events].count("disconnected") == 1
+    assert [event["type"] for event in events].count("worker_stopped") == 1

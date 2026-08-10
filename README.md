@@ -13,7 +13,7 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current beta gate is `0.4.0-beta.1`.
+Current beta gate is `0.4.0-beta.2`.
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -66,7 +66,7 @@ This repository:
 - contains the Python bridge and external C++ RPC client;
 - contains runtime manifests and item delivery data;
 - contains map generation and validation tools;
-- creates the final alpha release ZIP.
+- creates the final beta release ZIP.
 
 Sibling repository:
 
@@ -153,13 +153,13 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-0.4.0-beta.1.zip
+DoomEternalArchipelagoPlayableTest-0.4.0-beta.2.zip
 ├── README.md
+├── INSTALL.md
 ├── RELEASE_MANIFEST.json
-├── DoomEternalArchipelagoBeta.zip
+├── DoomEternalArchipelagoLauncher[.exe]
 ├── doometernal.apworld
 └── client/
-    ├── DoomEternalArchipelagoLauncher[.exe]
     ├── ap_client.exe
     ├── bridge_client.py
     ├── bridge_identity.json
@@ -172,7 +172,10 @@ DoomEternalArchipelagoPlayableTest-0.4.0-beta.1.zip
     ├── launcher_platform.py
     ├── launcher_supervisor.py
     ├── launcher_ui.py
-    ├── licenses/
+    ├── mod_templates/
+    │   ├── index.json
+    │   ├── dash-on.zip
+    │   └── dash-off.zip
     ├── validate_runtime_install.sh
     ├── ap_config.example.json
     ├── data/
@@ -208,7 +211,7 @@ configuration, seeds, logs, and local paths.
 
 ### Vanilla scripted weapon acquisitions
 
-These acquisitions remain fully vanilla in `0.4.0-beta.1`:
+These acquisitions remain fully vanilla in `0.4.0-beta.2`:
 
 - Super Shotgun — Cultist Base cutscene `5008`.
 - BFG-9000 — Mars Core cutscene `4701`.

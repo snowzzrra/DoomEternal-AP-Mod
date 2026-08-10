@@ -15,20 +15,24 @@
     {
       "content_revision": "v0.3.9-alpha",
       "reason": "v0.3.9-alpha: per-map authoritative Mission Select identity marker"
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "0.4.0-beta.2: suppress AP receipt popups for native-owned Blood Punch and Extra Life feedback"
     }
   ],
   "asset_package_contract_sha256": "39237e28326cdda5cc0b39b946495e49d28e08d7c1341ccee36d5e59784d53c8",
-  "byte_sha256": "3de3d76078098b4138ec1e6a002456a508f537ef2efe871444e4967d4d594490",
-  "content_revision": "v0.3.9-alpha",
+  "byte_sha256": "a8cf952b8d3d16817db4eb25e0f404601dba6b8f9be4b5dff2a14c46a31c9429",
+  "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 270,
-    "byte_size": 14408437,
-    "classes": 13345,
-    "entity_count": 13348,
+    "byte_size": 14405357,
+    "classes": 13341,
+    "entity_count": 13344,
     "layers": 2103,
     "targets": 8794,
     "transforms": 27375,
-    "unique_entity_names": 13346
+    "unique_entity_names": 13342
   },
   "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
   "map_key": "e2m1_nest",
@@ -68,5 +72,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "fe7a0de953a20078905b6a3f043a1603876ba1633b420c85447c7fd2717742e4",
-  "semantic_sha256": "dec9496f0dc24be4dcab3a69afeb91c6e0c44d49c3d718f81566b2c2738d9ff4"
+  "semantic_sha256": "da1ca8fd56e6ba414100c87200cc9fa27e9e1d9dea544116d384e22913bd5fdc"
 }

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -55,7 +55,8 @@
     },
     "7770014": {
       "name": "Blood Punch",
-      "policy": "replay_idempotent"
+      "policy": "replay_idempotent",
+      "receipt_feedback": "native_only"
     },
     "7770015": {
       "name": "Dash",
@@ -83,7 +84,8 @@
     },
     "7770022": {
       "name": "Extra Life",
-      "policy": "never_replay"
+      "policy": "never_replay",
+      "receipt_feedback": "native_only"
     },
     "7770023": {
       "name": "Extra Life Pack",

@@ -41,6 +41,7 @@ from item_classification import (
     notification_style_for_item,
 )
 from item_reconciliation import (
+    AP_RECEIPT_FEEDBACK,
     CLIENT_STATE_VERSION,
     HISTORICAL_OWNERSHIP,
     NEW_RECEIPT,
@@ -1461,22 +1462,32 @@ MISSION_CHALLENGE_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: entry
     for entry in MISSION_CHALLENGE_ENTRIES
 }
-KNOWN_CATALOG_MAPS = {
-    "e1m1_intro": "game/sp/e1m1_intro/e1m1_intro",
-    "e1m2_war": "game/sp/e1m2_war/e1m2_war",
-    "e1m3_cult": "game/sp/e1m3_cult/e1m3_cult",
-    "e1m4_boss": "game/sp/e1m4_boss/e1m4_boss",
-    "e2m1_nest": "game/sp/e2m1_nest/e2m1_nest",
-    "e2m2_base": "game/sp/e2m2_base/e2m2_base",
-    "e2m3_core": "game/sp/e2m3_core/e2m3_core",
-    "e2m4_boss": "game/sp/e2m4_boss/e2m4_boss",
-    "e3m1_slayer": "game/sp/e3m1_slayer/e3m1_slayer",
-    "e3m2_hell": "game/sp/e3m2_hell/e3m2_hell",
-    "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
-    "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
-    "e3m4_boss": "game/sp/e3m4_boss/e3m4_boss",
-    "hub": "game/hub/hub",
-}
+def _validated_catalog_maps(active_maps):
+    """Validate and canonicalize runtime map identity from packaged contracts."""
+    if not isinstance(active_maps, dict) or not active_maps:
+        raise ValueError("foundation active_maps must be a non-empty object")
+    validated = {}
+    seen_runtime_maps = set()
+    for raw_map_key, raw_runtime_map in active_maps.items():
+        if not isinstance(raw_map_key, str) or not raw_map_key.strip():
+            raise ValueError("foundation active_maps contains an invalid map key")
+        if raw_map_key != raw_map_key.strip():
+            raise ValueError(f"foundation active_maps map key is not canonical: {raw_map_key!r}")
+        if not isinstance(raw_runtime_map, str) or not raw_runtime_map.strip():
+            raise ValueError(f"foundation active_maps[{raw_map_key!r}] has an invalid runtime map")
+        runtime_map = canonical_map_name(raw_runtime_map)
+        if not runtime_map:
+            raise ValueError(f"foundation active_maps[{raw_map_key!r}] has an empty canonical runtime map")
+        if runtime_map in seen_runtime_maps:
+            raise ValueError(f"foundation active_maps contains duplicate runtime map: {runtime_map}")
+        validated[raw_map_key] = runtime_map
+        seen_runtime_maps.add(runtime_map)
+    return validated
+
+
+KNOWN_CATALOG_MAPS = _validated_catalog_maps(
+    load_foundation_contracts().get("active_maps")
+)
 
 MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: canonical_map_name(entry["runtime_map"])
@@ -2387,6 +2398,8 @@ class DoomEternalContext(CommonContext):
         self.items_processed = 0
         self.item_state_ready = False
         self.reconnect_resync_attempted = False
+        self._automatic_resync_noop_signature = None
+        self._automatic_resync_noop_logged_at = None
         self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
         self.state_key = ""
         self.session_state = {}
@@ -2454,6 +2467,40 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_epoch = 0
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
         self.automap_cleanup_delivered = {}
+        self._launcher_connection_failure_reported = False
+
+    def _report_launcher_connection_failure(self, message):
+        if (
+            not LAUNCHER_EVENTS_ENABLED
+            or self._launcher_connection_failure_reported
+        ):
+            return
+        self._launcher_connection_failure_reported = True
+        emit_launcher_event(
+            "error",
+            code="connection_failed",
+            message=message,
+        )
+        self.disconnected_intentionally = True
+        self.cancel_autoreconnect()
+        self.exit_event.set()
+
+    def handle_connection_loss(self, msg: str) -> None:
+        super().handle_connection_loss(msg)
+        self._report_launcher_connection_failure(msg)
+
+    async def connection_closed(self):
+        unexpected_launcher_close = (
+            LAUNCHER_EVENTS_ENABLED
+            and self.server is not None
+            and not self.disconnected_intentionally
+            and not self.exit_event.is_set()
+        )
+        await super().connection_closed()
+        if unexpected_launcher_close:
+            self._report_launcher_connection_failure(
+                "Disconnected from the Archipelago server"
+            )
 
     def queue_dev_commands(self, commands, action):
         """Spool isolated dev commands without touching receipt/bootstrap state."""
@@ -2521,10 +2568,8 @@ class DoomEternalContext(CommonContext):
                 checked_locations=sorted(args.get("checked_locations", [])),
             )
         elif cmd == "ConnectionRefused":
-            emit_launcher_event(
-                "error",
-                code="connection_refused",
-                message="Archipelago connection was refused",
+            self._report_launcher_connection_failure(
+                "Archipelago connection was refused"
             )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.reconcile_checked_automap_cleanup("server_checked_update")
@@ -3755,13 +3800,37 @@ class DoomEternalContext(CommonContext):
         )
         return plan, None
 
+    def log_automatic_resync_noop(self, reason, detail, epoch, history_fingerprint):
+        """Log changed automatic NOOPs immediately and unchanged ones periodically."""
+        signature = (reason, str(detail), epoch, history_fingerprint)
+        now = time.monotonic()
+        previous = getattr(self, "_automatic_resync_noop_signature", None)
+        logged_at = getattr(self, "_automatic_resync_noop_logged_at", None)
+        if previous == signature and logged_at is not None and now - logged_at < 300.0:
+            return False
+        self._automatic_resync_noop_signature = signature
+        self._automatic_resync_noop_logged_at = now
+        logger.info(
+            "RESYNC_NOOP reason=%s detail=%s epoch=%s fingerprint=%s",
+            reason,
+            detail,
+            epoch,
+            history_fingerprint,
+        )
+        return True
+
     def automatic_reconcile_inventory(self, reason):
         """Run one guarded resync for a new lifecycle/history fingerprint."""
+        fingerprint = receipt_history_fingerprint(self.items_received)
         evidence, error = self._reconciliation_eligibility(require_connection=True)
         if error:
-            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            self.log_automatic_resync_noop(
+                reason,
+                error,
+                getattr(self, "active_native_evidence_epoch", None),
+                fingerprint,
+            )
             return None, error
-        fingerprint = receipt_history_fingerprint(self.items_received)
         state = self.session_state.get("item_resync")
         if not isinstance(state, dict):
             state = {}
@@ -3771,9 +3840,9 @@ class DoomEternalContext(CommonContext):
             and state.get("history_fingerprint") == fingerprint
             and state.get("status") in {"complete", "noop"}
         ):
-            logger.info(
-                "RESYNC_NOOP reason=%s detail=already_applied epoch=%s fingerprint=%s",
+            self.log_automatic_resync_noop(
                 reason,
+                "already_applied",
                 evidence.epoch,
                 fingerprint,
             )
@@ -3802,7 +3871,7 @@ class DoomEternalContext(CommonContext):
                 reason=reason,
             )
             self.persist_session_state()
-            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            self.log_automatic_resync_noop(reason, error, evidence.epoch, fingerprint)
             return None, str(error)
 
         logger.info(
@@ -3823,7 +3892,7 @@ class DoomEternalContext(CommonContext):
                 reason=reason,
             )
             self.persist_session_state()
-            logger.info("RESYNC_NOOP reason=%s detail=%s", reason, error)
+            self.log_automatic_resync_noop(reason, error, evidence.epoch, fingerprint)
             return None, error
 
         status = "noop" if not plan.commands else "complete"
@@ -3837,7 +3906,9 @@ class DoomEternalContext(CommonContext):
         )
         self.persist_session_state()
         if status == "noop":
-            logger.info("RESYNC_NOOP reason=%s detail=no_commands", reason)
+            self.log_automatic_resync_noop(
+                reason, "no_commands", evidence.epoch, fingerprint
+            )
         logger.info(
             "RESYNC_COMPLETE reason=%s commands=%s status=%s",
             reason,
@@ -3940,13 +4011,21 @@ class DoomEternalContext(CommonContext):
         if error:
             return [f"Rune diagnostic unavailable: {error}"]
         plan, plan_error = self.compile_owned_rune_plan()
+        owned_perks = (
+            ", ".join(sorted(entry.perk for entry in plan.entries)) or "-"
+            if plan is not None
+            else f"unavailable ({plan_error})"
+        )
+        slots = tuple(native.equipped_slots) + (None, None, None)
         lines = [
-            f"Rune save slot: {native.save_slot}",
-            f"Available perks: {', '.join(sorted(native.available_perks)) or '-'}",
-            f"Active perks: {', '.join(sorted(native.active_perks)) or '-'}",
-            f"Registered Runes: {', '.join(sorted(native.registered_runes)) or '-'}",
-            "Equipped slots: " + ", ".join(value or "-" for value in native.equipped_slots),
-            f"Rune page observed: {native.page_unlocked if native.page_unlocked is not None else 'unknown'}",
+            f"AP-owned Rune perks: {owned_perks} | "
+            f"available: {', '.join(sorted(native.available_perks)) or '-'} | "
+            f"active: {', '.join(sorted(native.active_perks)) or '-'} | "
+            f"registered: {', '.join(sorted(native.registered_runes)) or '-'}",
+            f"Rune slots: 0={slots[0] or '-'} | 1={slots[1] or '-'} | "
+            f"2={slots[2] or '-'} | "
+            f"page={native.page_unlocked if native.page_unlocked is not None else 'unknown'} | "
+            f"active_save={native.save_slot} | epoch={native.evidence_epoch}",
         ]
         if plan_error:
             lines.append(f"Plan: blocked ({plan_error})")
@@ -4255,6 +4334,9 @@ class DoomEternalContext(CommonContext):
             return [], "historical ownership observed"
         receipt = intent == NEW_RECEIPT and (
             True if include_notification is None else bool(include_notification)
+        )
+        receipt = receipt and (
+            ITEM_REPLAY_POLICIES[item_id].receipt_feedback == AP_RECEIPT_FEEDBACK
         )
         # Package capability validator marker: receipt=ENABLE_ITEM_NOTIFICATIONS.
         if receipt and classification is None:

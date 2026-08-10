@@ -38,6 +38,7 @@ if [[ "$OUTPUT_DIR" != "$RELEASE_DIR" ]]; then
     exit 1
 fi
 TEMP_DIR="$OUTPUT_DIR/.staging"
+MOD_STAGING_DIR="$TEMP_DIR/mod"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$REPO_ROOT/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$REPO_ROOT/vanillamaps}"
 RELEASE_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["release_version"])' "$REPO_ROOT/data/content_identity.json")"
@@ -100,8 +101,7 @@ cleanup_build() {
     local status=$?
     rm -rf "$TEMP_DIR"
     if [[ "$status" -ne 0 ]]; then
-        rm -f "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
-            "$OUTPUT_DIR/$PTB_ZIP_NAME" "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp"
+        rm -f "$OUTPUT_DIR/$PTB_ZIP_NAME" "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp"
     fi
     return "$status"
 }
@@ -139,7 +139,7 @@ extract_and_build() {
     local source_map="$VANILLA_MAPS_DIR/$source_file"
     local generated_file="$GENERATED_MAPS_DIR/$generated_output"
     local generated_manifest="$GENERATED_MANIFESTS_DIR/$map_key.json"
-    local packaged_file="$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
+    local packaged_file="$MOD_STAGING_DIR/$resource_name/maps/$relative_entities_path"
     local source_hash_before
     local source_hash_after
     local generated_hash
@@ -235,16 +235,18 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 
 }
 
-rm -rf "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" \
+rm -rf "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/licenses" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" \
+    "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" \
     "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
-    "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" \
+    "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/INSTALL.md" \
     "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
     "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" \
     "$STALE_DEV_ZIP" \
     "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
     "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
 find "$OUTPUT_DIR/build" -mindepth 1 -maxdepth 1 ! -name build.log -exec rm -rf -- {} +
-mkdir -p "$OUTPUT_DIR/mod" "$OUTPUT_DIR/client" "$GENERATED_MAPS_DIR" "$TEMP_DIR"
+mkdir -p "$MOD_STAGING_DIR" "$OUTPUT_DIR/client" "$GENERATED_MAPS_DIR" "$TEMP_DIR"
 echo "Build log: $BUILD_LOG"
 if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
     echo "ITEM_NOTIFICATIONS=enabled"
@@ -261,7 +263,7 @@ if [[ -f "$SCRIPT_DIR/ap_client.exe" ]]; then
     exit 1
 fi
 
-cp -R "$REPO_ROOT/packaging/mod_assets/." "$OUTPUT_DIR/mod/"
+cp -R "$REPO_ROOT/packaging/mod_assets/." "$MOD_STAGING_DIR/"
 
 mapfile -t MAP_ROWS < <(
     python3 "$REPO_ROOT/map_registry.py" release-rows --authorial --registry "$MAP_SOURCES_FILE"
@@ -288,21 +290,21 @@ python3 "$REPO_ROOT/tools/release/build_string_table.py" \
     --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
     --location-names "$REPO_ROOT/data/location_names.json" \
     --maps-dir "$GENERATED_MAPS_DIR" \
-    --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/english.json"
+    --output "$MOD_STAGING_DIR/gameresources_patch1/EternalMod/strings/english.json"
 python3 "$REPO_ROOT/tools/release/build_string_table.py" \
     --items "$REPO_ROOT/data/items.json" \
     --item-replay-policies "$REPO_ROOT/data/item_replay_policies.json" \
     --location-names "$REPO_ROOT/data/location_names.json" \
     --maps-dir "$GENERATED_MAPS_DIR" \
-    --output "$OUTPUT_DIR/mod/gameresources_patch1/EternalMod/strings/portuguese.json"
+    --output "$MOD_STAGING_DIR/gameresources_patch1/EternalMod/strings/portuguese.json"
 
 if [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
-    cp -R "$AP_PIPELINE_ARTIFACT_ROOT/mod/." "$OUTPUT_DIR/mod/"
+    cp -R "$AP_PIPELINE_ARTIFACT_ROOT/mod/." "$MOD_STAGING_DIR/"
 else
 python3 "$REPO_ROOT/tools/maps/mission_complete_map_patcher.py" \
     --contracts "$REPO_ROOT/data/mission_complete_map_contracts.json" \
     "${MISSION_MAP_ARGS[@]}" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/mission-complete-map-patch.json"
 python3 - "$TEMP_DIR/mission-complete-map-patch.json" "$REPO_ROOT/data/campaign_goal_contract.json" <<'PY'
 import json
@@ -349,31 +351,31 @@ for map_row in "${MAP_ROWS[@]}"; do
     resource_name="$(basename "$resource_path" .resources)"
     "$TOOLS_DIR/idFileDeCompressor" --compress \
         "$GENERATED_MAPS_DIR/$generated_output" \
-        "$OUTPUT_DIR/mod/$resource_name/maps/$relative_entities_path"
+        "$MOD_STAGING_DIR/$resource_name/maps/$relative_entities_path"
 done
 
 python3 "$REPO_ROOT/tools/maps/automap_native_decl_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/automap-native-toy-override.json"
 python3 "$REPO_ROOT/tools/decls/rune_decl_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/rune-menu-override.json"
 python3 "$REPO_ROOT/tools/decls/rune_slot_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/rune-slot-override.json"
 python3 "$REPO_ROOT/tools/decls/mastery_decl_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/base-mastery-overrides.json"
 python3 "$REPO_ROOT/tools/decls/mission_challenge_decl_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/mission-challenge-overrides.json"
 python3 "$REPO_ROOT/tools/decls/devinv_builder.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --map-registry "$MAP_SOURCES_FILE" \
     --audit-output "$TEMP_DIR/devinv-override.json"
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
     --registry "$TEMP_DIR/challenge_location_registry.json" \
-    --mod-root "$OUTPUT_DIR/mod"
+    --mod-root "$MOD_STAGING_DIR"
 
 python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
     --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
@@ -388,7 +390,7 @@ ICE_DECL_RELATIVE="generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_
 python3 "$REPO_ROOT/tools/maps/logic_decl_patcher.py" \
     --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
     --location 7770074 \
-    --output "$OUTPUT_DIR/mod/hub_patch2/$ICE_DECL_RELATIVE" \
+    --output "$MOD_STAGING_DIR/hub_patch2/$ICE_DECL_RELATIVE" \
     --snapshot "$TEMP_DIR/ice_logic_decl_patch.json"
 python3 - "$REPO_ROOT/data/snapshots/ice_logic_decl_patch.json" "$TEMP_DIR/ice_logic_decl_patch.json" <<'PY'
 import json
@@ -402,8 +404,9 @@ if actual != expected:
     raise SystemExit(f"Ice logic DECL structural snapshot drift: {actual!r}")
 PY
 
-cp "$REPO_ROOT/packaging/EternalMod.json" "$OUTPUT_DIR/mod/EternalMod.json"
+cp "$REPO_ROOT/packaging/EternalMod.json" "$MOD_STAGING_DIR/EternalMod.json"
 cp "$REPO_ROOT/README.md" "$OUTPUT_DIR/README.md"
+cp "$REPO_ROOT/docs/INSTALL.md" "$OUTPUT_DIR/INSTALL.md"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
     "$REPO_ROOT/deathlink_receive.py" \
@@ -459,7 +462,7 @@ chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 
 LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-${ARCHIPELAGO_PYTHON:-python3}}"
 "$LAUNCHER_PYTHON" "$REPO_ROOT/tools/release/build_launcher.py" \
-    --output-dir "$OUTPUT_DIR/client" \
+    --output-dir "$OUTPUT_DIR" \
     --archipelago-source "$WORKSPACE/Archipelago"
 
 cp "$REPO_ROOT/scripts/validate/runtime_install.sh" "$OUTPUT_DIR/client/validate_runtime_install.sh"
@@ -480,7 +483,7 @@ identity = {
     "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest(),
     "item_notifications": {
         "enabled": sys.argv[3] == "1",
-        "revision": 1,
+        "revision": 2,
         "experimental": False,
     },
 }
@@ -507,15 +510,15 @@ map_manifest_files = [
 launcher_files = sorted(
     path.relative_to(output_dir).as_posix()
     for root in (
-        output_dir / "client" / "licenses",
+        output_dir / "licenses",
     )
     for path in root.rglob("*")
     if path.is_file()
 )
 launcher_executable = (
-    "client/DoomEternalArchipelagoLauncher.exe"
-    if (output_dir / "client/DoomEternalArchipelagoLauncher.exe").is_file()
-    else "client/DoomEternalArchipelagoLauncher"
+    "DoomEternalArchipelagoLauncher.exe"
+    if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
+    else "DoomEternalArchipelagoLauncher"
 )
 
 bridge_path = output_dir / "client" / "bridge_client.py"
@@ -532,8 +535,8 @@ manifest = {
     "version": release_version,
     "files": [
         "README.md",
+        "INSTALL.md",
         "RELEASE_MANIFEST.json",
-        "DoomEternalArchipelagoBeta.zip",
         "doometernal.apworld",
         "client/ap_client.exe",
         "client/bridge_client.py",
@@ -612,7 +615,7 @@ manifest = {
     "content_identity": content_identity,
     "item_notifications": {
         "enabled": item_notifications_enabled,
-        "revision": 1,
+        "revision": 2,
         "experimental": False,
     },
 }
@@ -635,7 +638,7 @@ if grep -q 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.
     exit 1
 fi
 if grep -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
-    "$OUTPUT_DIR/mod" "$GENERATED_MAPS_DIR" "$OUTPUT_DIR/client/data/items.json"; then
+    "$MOD_STAGING_DIR" "$GENERATED_MAPS_DIR" "$OUTPUT_DIR/client/data/items.json"; then
     echo "Rejected Armor Drain or watcher architecture entered build" >&2
     exit 1
 fi
@@ -643,11 +646,17 @@ if grep -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridg
     echo "Old goal-only transition handler entered build" >&2
     exit 1
 fi
-if strings "$CLIENT_BUILD_DIR/ap_client.exe" | grep -q 'v0\.3\.8-alpha'; then
-    echo "Active v0.3.8-alpha version string found in ap_client.exe" >&2
+CLIENT_STRINGS_FILE="$TEMP_DIR/ap-client.strings"
+strings "$CLIENT_BUILD_DIR/ap_client.exe" > "$CLIENT_STRINGS_FILE"
+if grep -qE 'v0\.3\.(8|9)-alpha' "$CLIENT_STRINGS_FILE"; then
+    echo "Stale alpha product label found in ap_client.exe" >&2
     exit 1
 fi
-mapfile -t MASTERY_OVERRIDE_FILES < <(find "$OUTPUT_DIR/mod" -type f \( \
+if ! grep -Fq "$RELEASE_VERSION" "$CLIENT_STRINGS_FILE"; then
+    echo "Current $RELEASE_VERSION product label missing from ap_client.exe" >&2
+    exit 1
+fi
+mapfile -t MASTERY_OVERRIDE_FILES < <(find "$MOD_STAGING_DIR" -type f \( \
     -path '*/generated/decls/unlockable/weapon_mastery/*' -o \
     -path '*/generated/decls/perks/perk/player/weapons/*' \
 \) | LC_ALL=C sort)
@@ -657,33 +666,33 @@ if grep -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "
     exit 1
 fi
 if ! grep -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
-    "$OUTPUT_DIR/mod/gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl"; then
+    "$MOD_STAGING_DIR/gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl"; then
     echo "Sticky AP gameplay upgrade missing" >&2
     exit 1
 fi
 python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
     --registry "$TEMP_DIR/challenge_location_registry.json" \
-    --mod-root "$OUTPUT_DIR/mod"
+    --mod-root "$MOD_STAGING_DIR"
 python3 "$REPO_ROOT/tools/validation/validate_devinvloadout_package.py" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --map-registry "$MAP_SOURCES_FILE" \
     --generated-map "$GENERATED_MAPS_DIR/e1m1_intro.entities"
 python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
     --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
     --maps-dir "$GENERATED_MAPS_DIR" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --client-dir "$OUTPUT_DIR/client" \
     --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json"
 python3 "$REPO_ROOT/tools/validation/audit_item_notification_release.py" \
     --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
     --generated-maps "$GENERATED_MAPS_DIR" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --client-dir "$OUTPUT_DIR/client" \
     --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json" \
     --map-registry "$MAP_SOURCES_FILE" \
     --decompressor "$TOOLS_DIR/idFileDeCompressor" \
     --update-manifest
-if find "$OUTPUT_DIR/mod" \( \
+if find "$MOD_STAGING_DIR" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \
 \) -print -quit | grep -q .; then
@@ -698,7 +707,7 @@ FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print
 
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
-    --mod-root "$OUTPUT_DIR/mod" \
+    --mod-root "$MOD_STAGING_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps"
 
@@ -736,21 +745,19 @@ grep -q 'entityDef AP_CHECK_CAPITOL_PROGRESS_DASH_1' "$GENERATED_MAPS_DIR/e1m2_w
 grep -q 'entityDef ap_independent_capitol_progress_dash_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"
 grep -q 'thinkComponentDecl = "bob_rotate_fast"' "$GENERATED_MAPS_DIR/e1m2_war.entities"
 
-cp -a "$OUTPUT_DIR/mod" "$DASH_OFF_MOD"
+cp -a "$MOD_STAGING_DIR" "$DASH_OFF_MOD"
 "$TOOLS_DIR/idFileDeCompressor" --compress \
     "$DASH_OFF_MAP" \
     "$DASH_OFF_MOD/e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
 mkdir -p "$OUTPUT_DIR/client/mod_templates"
 (
-    cd "$OUTPUT_DIR/mod"
+    cd "$MOD_STAGING_DIR"
     zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-on.zip" .
 )
 (
     cd "$DASH_OFF_MOD"
     zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-off.zip" .
 )
-cp "$OUTPUT_DIR/client/mod_templates/dash-on.zip" \
-    "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip"
 python3 - "$OUTPUT_DIR/client/mod_templates" <<'PY'
 import hashlib
 import json
@@ -778,19 +785,35 @@ if variants["dash_off"]["physical_e1m2_sha256"] == variants["dash_on"]["physical
 )
 PY
 
+if [[ -e "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" ]]; then
+    echo "Obsolete universal mod ZIP exists in public release root" >&2
+    exit 1
+fi
+if [[ -e "$OUTPUT_DIR/client/DoomEternalArchipelagoLauncher" || \
+      -e "$OUTPUT_DIR/client/DoomEternalArchipelagoLauncher.exe" ]]; then
+    echo "Launcher must not be packaged under client/" >&2
+    exit 1
+fi
+if [[ ! -f "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" && \
+      ! -f "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" ]]; then
+    echo "Public root launcher is missing" >&2
+    exit 1
+fi
+
 (
     cd "$OUTPUT_DIR"
     zip -q -r "${PTB_ZIP_NAME}.tmp" \
-        README.md RELEASE_MANIFEST.json client doometernal.apworld \
-        DoomEternalArchipelagoBeta.zip
+        README.md INSTALL.md RELEASE_MANIFEST.json client doometernal.apworld \
+        DoomEternalArchipelagoLauncher* licenses
 )
 mv "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" "${OUTPUT_DIR}/${PTB_ZIP_NAME}"
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
-    rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" "$OUTPUT_DIR/mod" \
+    rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" \
         "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/doometernal.apworld" \
-        "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
-        "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
+        "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" \
+        "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" "$OUTPUT_DIR/licenses" \
+        "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/INSTALL.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
     echo "Automap prototype ZIP created at: $OUTPUT_DIR/$PTB_ZIP_NAME"
     exit 0
 fi
@@ -820,13 +843,13 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoBeta.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/client/mod_templates/dash-on.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$EXTRACTED_AUDIT_DIR/DoomEternalArchipelagoBeta.zip"
+    --zip "$EXTRACTED_AUDIT_DIR/client/mod_templates/dash-on.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
@@ -927,6 +950,6 @@ if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"
-echo "Installable mod: $OUTPUT_DIR/DoomEternalArchipelagoBeta.zip"
+echo "Room mod templates: $OUTPUT_DIR/client/mod_templates"
 echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"

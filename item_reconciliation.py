@@ -15,6 +15,8 @@ from foundation import compile_item_delivery_plan
 REPLAY_IDEMPOTENT = "replay_idempotent"
 SPECIAL_PROGRESSIVE = "special_progressive"
 NEVER_REPLAY = "never_replay"
+AP_RECEIPT_FEEDBACK = "ap"
+NATIVE_ONLY_RECEIPT_FEEDBACK = "native_only"
 NEW_RECEIPT = "new_receipt"
 HISTORICAL_OWNERSHIP = "historical_ownership"
 RECONCILIATION_REPAIR = "reconciliation_repair"
@@ -31,6 +33,9 @@ CLIENT_STATE_VERSION = 2
 SUPPORTED_POLICIES = frozenset(
     {REPLAY_IDEMPOTENT, SPECIAL_PROGRESSIVE, NEVER_REPLAY}
 )
+SUPPORTED_RECEIPT_FEEDBACK = frozenset(
+    {AP_RECEIPT_FEEDBACK, NATIVE_ONLY_RECEIPT_FEEDBACK}
+)
 
 
 @dataclass(frozen=True)
@@ -38,6 +43,7 @@ class ReplayPolicy:
     item_id: int
     name: str
     policy: str
+    receipt_feedback: str = AP_RECEIPT_FEEDBACK
 
 
 @dataclass(frozen=True)
@@ -523,9 +529,11 @@ def load_policy_registry(
             raise ValueError(f"item policy ID is not canonical decimal: {raw_id!r}")
         if not isinstance(entry, dict):
             raise ValueError(f"item policy {item_id} must be an object")
-        if set(entry) != {"name", "policy"}:
+        if not {"name", "policy"} <= set(entry) or set(entry) - {
+            "name", "policy", "receipt_feedback"
+        }:
             raise ValueError(
-                f"item policy {item_id} must contain exactly name and policy"
+                f"item policy {item_id} must contain name, policy, and optional receipt_feedback"
             )
         name = entry["name"]
         policy = entry["policy"]
@@ -533,7 +541,12 @@ def load_policy_registry(
             raise ValueError(f"item policy {item_id} has invalid name")
         if policy not in SUPPORTED_POLICIES:
             raise ValueError(f"unsupported policy for item {item_id}: {policy!r}")
-        parsed[item_id] = ReplayPolicy(item_id, name, policy)
+        receipt_feedback = entry.get("receipt_feedback", AP_RECEIPT_FEEDBACK)
+        if receipt_feedback not in SUPPORTED_RECEIPT_FEEDBACK:
+            raise ValueError(
+                f"unsupported receipt feedback for item {item_id}: {receipt_feedback!r}"
+            )
+        parsed[item_id] = ReplayPolicy(item_id, name, policy, receipt_feedback)
 
     missing = sorted(set(definitions) - set(parsed))
     extra = sorted(set(parsed) - set(definitions))

@@ -68,6 +68,8 @@ def audit_mod_payload(
     mod_root: Path,
     map_registry: Path,
     decompressor: Path | None,
+    *,
+    require_generated_identity: bool = True,
 ) -> dict[str, dict[str, int | str]]:
     """Compare every release map against its unpacked, compressed mod payload."""
     records: dict[str, dict[str, int | str]] = {}
@@ -86,12 +88,12 @@ def audit_mod_payload(
             packaged_locations = set(
                 LOCATION_NOTIFICATION_RE.findall(packaged.decode("utf-8"))
             )
-            if generated != packaged:
+            if require_generated_identity and generated != packaged:
                 raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
             if enabled:
                 if not packaged_notifications:
                     raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
-                if generated_notifications != packaged_notifications:
+                if require_generated_identity and generated_notifications != packaged_notifications:
                     raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
                 _assert_notifications(packaged.decode("utf-8"), plan.map_key)
             elif "entityDef ap_rpc_item_" in packaged.decode("utf-8") or packaged_notifications:
@@ -166,16 +168,52 @@ def audit_release(
     return records
 
 
-def _extract_playable_zip(playable_zip: Path, destination: Path) -> tuple[Path, Path, Path]:
+def _extract_playable_zip(
+    playable_zip: Path,
+    destination: Path,
+) -> tuple[dict[str, Path], Path, Path]:
     with zipfile.ZipFile(playable_zip) as archive:
+        files = {info.filename for info in archive.infolist() if not info.is_dir()}
+        if "DoomEternalArchipelagoBeta.zip" in files:
+            raise AssertionError("playable ZIP contains obsolete universal mod ZIP")
+        launchers = files & {
+            "DoomEternalArchipelagoLauncher",
+            "DoomEternalArchipelagoLauncher.exe",
+        }
+        if len(launchers) != 1:
+            raise AssertionError("playable ZIP must contain exactly one root launcher")
+        if any(name.startswith("client/DoomEternalArchipelagoLauncher") for name in files):
+            raise AssertionError("playable ZIP contains launcher under client")
+        required = {
+            "README.md",
+            "INSTALL.md",
+            "RELEASE_MANIFEST.json",
+            "doometernal.apworld",
+            "client/mod_templates/index.json",
+            "client/mod_templates/dash-on.zip",
+            "client/mod_templates/dash-off.zip",
+        }
+        missing = required - files
+        if missing:
+            raise AssertionError(f"playable ZIP lacks public layout files: {sorted(missing)}")
+        if not any(name.startswith("licenses/") for name in files):
+            raise AssertionError("playable ZIP lacks root runtime licenses")
+        nested_candidates = {
+            name for name in files
+            if name.lower().endswith(".zip")
+            and "DoomEternalArchipelagoPlayableTest-" in Path(name).name
+        }
+        if nested_candidates:
+            raise AssertionError(f"playable ZIP contains prior candidate: {sorted(nested_candidates)}")
         archive.extractall(destination)
-    mod_zip = destination / "DoomEternalArchipelagoBeta.zip"
-    if not mod_zip.is_file():
-        raise AssertionError("playable ZIP lacks its injector mod ZIP")
-    mod_root = destination / "mod"
-    with zipfile.ZipFile(mod_zip) as archive:
-        archive.extractall(mod_root)
-    return mod_root, destination / "client", destination / "RELEASE_MANIFEST.json"
+    mod_roots = {}
+    for variant in ("dash-on", "dash-off"):
+        mod_zip = destination / "client" / "mod_templates" / f"{variant}.zip"
+        mod_root = destination / f"mod-{variant}"
+        with zipfile.ZipFile(mod_zip) as archive:
+            archive.extractall(mod_root)
+        mod_roots[variant] = mod_root
+    return mod_roots, destination / "client", destination / "RELEASE_MANIFEST.json"
 
 
 def main() -> int:
@@ -194,9 +232,28 @@ def main() -> int:
         if any((args.mod_root, args.client_dir, args.release_manifest, args.update_manifest)):
             parser.error("--playable-zip cannot be combined with local payload arguments")
         with tempfile.TemporaryDirectory() as directory:
-            mod_root, client_dir, manifest = _extract_playable_zip(args.playable_zip, Path(directory))
-            audit_release(args.enabled == "1", args.generated_maps, mod_root, client_dir,
-                          manifest, args.map_registry, args.decompressor)
+            mod_roots, client_dir, manifest = _extract_playable_zip(
+                args.playable_zip, Path(directory)
+            )
+            dash_on = audit_release(
+                args.enabled == "1", args.generated_maps, mod_roots["dash-on"],
+                client_dir, manifest, args.map_registry, args.decompressor,
+            )
+            _audit_locales(args.enabled == "1", mod_roots["dash-off"])
+            dash_off = audit_mod_payload(
+                args.enabled == "1", args.generated_maps, mod_roots["dash-off"],
+                args.map_registry, args.decompressor,
+                require_generated_identity=False,
+            )
+            count_fields = (
+                "major_notification_count",
+                "filler_notification_count",
+            )
+            for map_key in dash_on:
+                if any(dash_on[map_key][field] != dash_off[map_key][field] for field in count_fields):
+                    raise AssertionError(
+                        f"dash template notification payloads diverge: {map_key}"
+                    )
         return 0
     if not all((args.mod_root, args.client_dir, args.release_manifest)):
         parser.error("local audit requires --mod-root, --client-dir, and --release-manifest")

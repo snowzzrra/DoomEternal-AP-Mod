@@ -61,7 +61,11 @@ class BridgeSupervisor:
         self._process: subprocess.Popen[str] | None = None
         self._password = ""
         self._intentional_stop = False
+        self._emit_disconnected = True
+        self._failure_emitted = False
         self._write_lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
+        self._stopped = threading.Event()
 
     @property
     def running(self) -> bool:
@@ -89,6 +93,9 @@ class BridgeSupervisor:
             self._profiles.add(self.profile_id)
         self._password = password
         self._intentional_stop = False
+        self._emit_disconnected = True
+        self._failure_emitted = False
+        self._stopped.clear()
         self.state = BridgeState.STARTING
         environment = os.environ.copy()
         environment.update(
@@ -153,6 +160,7 @@ class BridgeSupervisor:
                         "message": self._redact(str(error)),
                     }
                     self.state = BridgeState.FAILED
+                    self._failure_emitted = True
                     self.event_sink({"type": "setup_failed", **self.last_error})
                 continue
             redacted = self._redact(line)
@@ -171,6 +179,7 @@ class BridgeSupervisor:
             self.state = BridgeState.DISCONNECTED
         elif event_type == "error":
             self.state = BridgeState.FAILED
+            self._failure_emitted = True
             self.last_error = {
                 "code": str(event.get("code", "bridge_error")),
                 "message": self._redact(str(event.get("message", "bridge error"))),
@@ -195,35 +204,64 @@ class BridgeSupervisor:
         return_code = process.wait()
         with self._profiles_lock:
             self._profiles.discard(self.profile_id)
-        if self._intentional_stop:
+        with self._lifecycle_lock:
+            intentional_stop = self._intentional_stop
+            emit_disconnected = self._emit_disconnected
+        if intentional_stop:
             self.state = BridgeState.STOPPED
-            self.event_sink({"type": "disconnected", "intentional": True})
+            if emit_disconnected:
+                self.event_sink({"type": "disconnected", "intentional": True})
         else:
-            self.state = BridgeState.FAILED
             self.last_error = {
                 "code": "bridge_exited",
                 "message": f"bridge worker exited with code {return_code}",
             }
-            self.event_sink({"type": "setup_failed", **self.last_error})
+            self.state = BridgeState.FAILED
+            if not self._failure_emitted:
+                self._failure_emitted = True
+                self.event_sink({"type": "setup_failed", **self.last_error})
+        self._stopped.set()
+        self.event_sink(
+            {
+                "type": "worker_stopped",
+                "intentional": intentional_stop,
+                "returncode": return_code,
+            }
+        )
 
-    def stop(self, timeout: float = 5.0) -> None:
+    def stop(self, timeout: float = 5.0, *, emit_disconnected: bool = True) -> None:
+        """Request shutdown and return without waiting for worker process."""
         process = self._process
         if process is None or process.poll() is not None:
-            self.state = BridgeState.STOPPED
             return
-        self._intentional_stop = True
-        self.state = BridgeState.STOPPING
+        with self._lifecycle_lock:
+            if self._intentional_stop:
+                return
+            self._intentional_stop = True
+            self._emit_disconnected = emit_disconnected
+            self.state = BridgeState.STOPPING
+        threading.Thread(
+            target=self._stop_process,
+            args=(process, timeout),
+            name="DoomBridgeStop",
+            daemon=True,
+        ).start()
+
+    def _stop_process(self, process: subprocess.Popen[str], timeout: float) -> None:
         try:
             self.send_command("/exit")
-            process.wait(timeout=timeout)
-        except (BrokenPipeError, RuntimeError, subprocess.TimeoutExpired):
+        except (BrokenPipeError, RuntimeError):
+            pass
+        if self._stopped.wait(timeout):
+            return
+        try:
             process.terminate()
-            try:
-                process.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
+        except OSError:
+            pass
+        if self._stopped.wait(timeout):
+            return
+        try:
+            if process.poll() is None:
                 process.kill()
-                process.wait(timeout=timeout)
-        finally:
-            with self._profiles_lock:
-                self._profiles.discard(self.profile_id)
-            self.state = BridgeState.STOPPED
+        except OSError:
+            pass

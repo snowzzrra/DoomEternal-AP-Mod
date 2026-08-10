@@ -11,9 +11,8 @@ from typing import Any, Mapping
 
 from content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from map_registry import load_map_registry, release_plan
-from tools.maps.ap_map_generator import generate_map
+from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINES_DIR = ROOT / "baselines" / "maps"
@@ -366,6 +365,7 @@ def generate_frozen_outputs(
     mod_root = temp_root / "mod"
     results: dict[str, tuple[Path, Path, Path]] = {}
     items = json.loads((ROOT / "data" / "items.json").read_text(encoding="utf-8"))
+    item_names, receipt_feedback = load_item_notification_policies()
     for plan in release_plan(registry):
         output = generated / plan.generated_output
         manifest = generated / f"{plan.map_key}.json"
@@ -373,6 +373,8 @@ def generate_frozen_outputs(
         generate_map(
             ROOT / "vanillamaps" / plan.source_file, output, config, manifest,
             items,
+            item_names=item_names,
+            receipt_feedback=receipt_feedback,
         )
         results[plan.map_key] = (output, manifest, config)
     patch_mission_complete_maps(

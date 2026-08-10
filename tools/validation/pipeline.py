@@ -18,7 +18,7 @@ from typing import Iterable, Sequence
 
 from content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from tools.content.compile_content_catalog import compile_catalog
-from tools.maps.ap_map_generator import generate_map, load_item_names
+from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
 from tools.maps.map_semantic_baseline import (
     BaselineDrift,
     assert_map_baseline,
@@ -27,7 +27,6 @@ from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 from tools.validation.audit_resource_packages import (
     audit_source_asset_dependencies,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent
@@ -425,7 +424,7 @@ class Pipeline:
                 items = json.loads(
                     (ROOT / "data" / "items.json").read_text(encoding="utf-8")
                 )
-                item_names = load_item_names(
+                item_names, receipt_feedback = load_item_notification_policies(
                     ROOT / "data" / "item_replay_policies.json"
                 )
                 generate_map(
@@ -435,6 +434,7 @@ class Pipeline:
                     generated_manifest,
                     items,
                     item_names=item_names,
+                    receipt_feedback=receipt_feedback,
                     enable_notifications=True,
                 )
                 final = temporary / spec.data["generated_output"]
@@ -754,12 +754,35 @@ class Pipeline:
                     "RELEASE_ARTIFACT_NOT_PUBLISHED"
                 )
             with zipfile.ZipFile(zip_path) as outer:
-                inner = outer.read("DoomEternalArchipelagoBeta.zip")
-            with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
-                handle.write(inner)
-                handle.flush()
-                if not zipfile.is_zipfile(handle.name):
-                    raise ValueError("internal ZIP audit failed")
+                files = {info.filename for info in outer.infolist() if not info.is_dir()}
+                if "DoomEternalArchipelagoBeta.zip" in files:
+                    raise ValueError("obsolete universal mod ZIP entered release")
+                launchers = files & {
+                    "DoomEternalArchipelagoLauncher",
+                    "DoomEternalArchipelagoLauncher.exe",
+                }
+                if len(launchers) != 1 or any(
+                    name.startswith("client/DoomEternalArchipelagoLauncher")
+                    for name in files
+                ):
+                    raise ValueError("public launcher layout is invalid")
+                template_names = (
+                    "client/mod_templates/dash-on.zip",
+                    "client/mod_templates/dash-off.zip",
+                )
+                template_payloads = [outer.read(name) for name in template_names]
+                if any(
+                    "DoomEternalArchipelagoPlayableTest-" in Path(name).name
+                    for name in files
+                    if name.lower().endswith(".zip")
+                ):
+                    raise ValueError("prior release candidate entered public ZIP")
+            for payload in template_payloads:
+                with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    if not zipfile.is_zipfile(handle.name):
+                        raise ValueError("mod template ZIP audit failed")
             print(f"ARTIFACT {zip_path}")
             print(f"SHA256 {_sha256(zip_path)}")
             print(f"CONTENT_REVISION {identity['content_revision']}")

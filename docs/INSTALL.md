@@ -1,13 +1,13 @@
 # Installation
 
-DOOM Eternal Archipelago 0.4.0-beta.1 requires a legally obtained, player-supplied DOOM Eternal installation. Game
+DOOM Eternal Archipelago 0.4.0-beta.2 requires a legally obtained, player-supplied DOOM Eternal installation. Game
 files and external modding tools are not distributed in project releases.
 
 ## Required files
 
 - `doometernal.apworld`;
-- `DoomEternalArchipelagoBeta.zip`;
-- matching `client/` directory;
+- root `DoomEternalArchipelagoLauncher` on Linux or `DoomEternalArchipelagoLauncher.exe` on Windows;
+- sibling `client/` support-runtime directory, including verified `mod_templates/`;
 - [EternalModManager](https://github.com/brunoanc/EternalModManager) 4.2.3 on Windows;
 - [EternalModInjectorShell](https://github.com/leveste/EternalBasher) 6.66-rev3.12 on Linux.
 
@@ -17,12 +17,13 @@ Never run an artifact after verification failure.
 ## Install APWorld and connect
 
 1. Open `doometernal.apworld` with Archipelago Launcher and restart launcher.
-2. Select **DOOM Eternal Client**.
-3. Point `doom_eternal_options.client_directory` to extracted matching `client/` directory.
+2. Keep root launcher and sibling `client/` directory together.
+3. Start root `DoomEternalArchipelagoLauncher[.exe]`.
 4. Enter room address, slot name, and password when requested.
-5. Wait for RoomSnapshot processing, manifest generation, compilation, and mod staging.
+5. Connection loads `RoomSnapshot`, derives `SeedManifest`, and reports whether matching room package is installed.
+6. Use explicit setup action to generate room-specific package, stage it, and open/run platform injector workflow.
 
-Launcher supervises native bridge. It never starts DOOM Eternal and exposes no game-launch button. Open DOOM Eternal
+Connect does not install or inject. Launcher supervises native bridge. It never starts DOOM Eternal and exposes no game-launch button. Open DOOM Eternal
 yourself through Steam whenever ready.
 
 ## Windows
@@ -71,7 +72,8 @@ for same profile.
 
 ## Troubleshooting
 
-- **Client files not found:** select extracted matching `client/`, not game directory.
+- **Client files not found:** preserve sibling `client/` beside root launcher; do not move launcher into `client/`.
+- **Room ZIP mismatch:** rerun explicit setup for current room; never reuse package generated for another manifest.
 - **Hash mismatch:** discard artifact; retry official pinned URL or select official local copy.
 - **Manager says manual action required:** complete injector action in official manager.
 - **Bridge cannot reach game:** verify mod injection, one bridge instance, and required Proton DLL override.

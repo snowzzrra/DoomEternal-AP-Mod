@@ -110,6 +110,15 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         **{int(item_id): int(value) for item_id, value in compatibility.items()},
         **classifications,
     }
+    policies = json.loads(
+        (client_dir / "data" / "item_replay_policies.json").read_text(
+            encoding="utf-8"
+        )
+    ).get("items", {})
+    compatibility_commands = json.loads(
+        GENERATOR_ITEM_COMPATIBILITY.read_text(encoding="utf-8")
+    )
+    all_commands = {**compatibility_commands.get("items", {}), **commands}
     if {int(item_id) for item_id in commands} != set(classifications):
         raise AssertionError(
             "packaged item classifications do not cover item mapping"
@@ -134,6 +143,45 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
 
     if enabled and not notifications:
         raise AssertionError("enabled notifier build lacks notification entities")
+    expected_notifications = set()
+    native_only_item_ids = set()
+    for raw_item_id, definition in all_commands.items():
+        if isinstance(definition, dict) and definition.get("type") == "no_op":
+            continue
+        item_id = int(raw_item_id)
+        feedback = policies.get(str(item_id), {}).get("receipt_feedback", "ap")
+        if feedback == "native_only":
+            native_only_item_ids.add(item_id)
+            continue
+        if feedback != "ap":
+            raise AssertionError(
+                f"unsupported packaged receipt feedback for item {item_id}: {feedback!r}"
+            )
+        classification = notification_classifications[item_id]
+        if isinstance(classification, dict):
+            classification = classification["classification"]
+        style = notification_style_for_item(item_id, classification)
+        stages = range(len(definition["perks"])) if (
+            isinstance(definition, dict)
+            and definition.get("type") == "progressive_perk"
+        ) else (None,)
+        for stage in stages:
+            stage_suffix = f"_{stage}" if stage is not None else ""
+            expected_notifications.update(
+                f"{style}_{item_id}{stage_suffix}_{slot}" for slot in ("a", "b")
+            )
+    if enabled and notifications != expected_notifications:
+        missing = sorted(expected_notifications - notifications)
+        unexpected = sorted(notifications - expected_notifications)
+        raise AssertionError(
+            f"notification entities diverge from receipt feedback policy; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    if any(
+        int(suffix.split("_", 2)[1]) in native_only_item_ids
+        for suffix in notifications
+    ):
+        raise AssertionError("native-only item has notification entities")
     expected_headers = {
         f"#str_ap_notify_item_{suffix.split('_', 1)[1].rsplit('_', 1)[0]}"
         for suffix in notifications
