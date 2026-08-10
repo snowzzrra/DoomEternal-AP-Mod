@@ -309,6 +309,30 @@
       "vanilla_automap": false,
       "vanilla_exploration": false
     },
+    "mastery_tokens": {
+      "match": {
+        "location_ids": [
+          7770338,
+          7770339,
+          7770345,
+          7770350,
+          7770369,
+          7770388,
+          7770391
+        ]
+      },
+      "vanilla_class": "idProp2",
+      "automap_marker_source": "original entity automapPropertiesDecl",
+      "automap_properties": [
+        "mastery_token_weapon"
+      ],
+      "dossier_total_owner": null,
+      "collected_state_writer": "native mastery-token useable transaction",
+      "reward_edge": "useableComponentDecl=propitem/mastery_token/weapon",
+      "safe_cut": "retain AP trigger and audited functional targets only",
+      "vanilla_automap": true,
+      "vanilla_exploration": false
+    },
     "independent_ice_trigger": {
       "match": {
         "location_ids": [

@@ -2,7 +2,7 @@
     "schema_version": 1,
     "item_mapping_revision": 5,
     "source": "Archipelago/worlds/doometernal/items.py",
-    "source_sha256": "2f1fce1174ba24369550652a8b08c67fe9ecbed83a8b1ba23b9fb16f1550e3dd",
+    "source_sha256": "ab953d69da50c285a8c1f1b10e4ffce7d94dca745d5cb4c1633965b99c87255e",
     "items": {
         "7770000": {
             "name": "Heavy Cannon",
@@ -30,6 +30,10 @@
         },
         "7770006": {
             "name": "BFG-9000",
+            "classification": 1
+        },
+        "7770900": {
+            "name": "Combat Shotgun",
             "classification": 1
         },
         "7770008": {

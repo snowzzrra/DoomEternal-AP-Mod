@@ -109,8 +109,21 @@ class LauncherUI(QMainWindow):
             QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 15pt; font-weight: 700; }}
             QLineEdit {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
                 border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
-            QComboBox, QSpinBox {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
+            QSpinBox {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
                 border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
+            QComboBox {{ background: #101923; color: {self.COLORS['text']}; border: 1px solid #4d697d;
+                border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
+            QComboBox::drop-down {{ width: 30px; border: 0; border-left: 1px solid #4d697d; }}
+            QComboBox:hover {{ background: #192735; border-color: {self.COLORS['info']}; }}
+            QComboBox:disabled {{ background: #18232d; color: #8796a3; border-color: #3c4b58; }}
+            QComboBox QAbstractItemView {{ background: #101923; color: {self.COLORS['text']};
+                border: 1px solid #4d697d; outline: 0; selection-background-color: {self.COLORS['accent']};
+                selection-color: #ffffff; }}
+            QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 4px 9px; color: {self.COLORS['text']};
+                background: #101923; }}
+            QComboBox QAbstractItemView::item:hover {{ background: #244052; color: #ffffff; }}
+            QComboBox QAbstractItemView::item:selected {{ background: {self.COLORS['accent']}; color: #ffffff; }}
+            QComboBox QAbstractItemView::item:disabled {{ background: #18232d; color: #7f8d99; }}
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{ border: 2px solid {self.COLORS['info']}; }}
             QCheckBox {{ spacing: 9px; font-weight: 600; }}
             QCheckBox::indicator {{ width: 21px; height: 21px; border: 1px solid #6d8391; background: #0d141c; border-radius: 3px; }}

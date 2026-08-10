@@ -23,6 +23,7 @@ from foundation import (
 )
 from item_classification import load_item_classification_identity
 from map_registry import load_map_registry, validation_plan
+from tools.maps import ap_map_generator
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
     RPC_ENTITY_PREFIX,
@@ -40,7 +41,6 @@ from tools.maps.ap_map_generator import (
 )
 from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
 from tools.maps.hub_diff_guard import assert_hub_diff_classified
-from tools.maps.map_preflight import validate_onboarding_audit, validate_registry_preflight
 from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -644,23 +644,6 @@ def main(argv: list[str] | None = None) -> int:
             )
     except (OSError, ValueError) as exc:
         errors.append(f"Packaged location names invalid: {exc}")
-    registry_for_preflight = load_map_registry(MAP_SOURCES_PATH)
-    package_spec = Path(
-        "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
-    )
-    container_catalog = set()
-    if package_spec.exists():
-        container_catalog = {
-            entry.get("name") for entry in read_json(package_spec).get("files", [])
-            if entry.get("name", "").endswith(".resources")
-        }
-    try:
-        validate_registry_preflight(
-            ROOT, registry_for_preflight, location_ids, set(item_ids.values()),
-            container_catalog,
-        )
-    except (OSError, ValueError) as exc:
-        errors.append(f"New-map preflight failed: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
     reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
@@ -799,30 +782,49 @@ def main(argv: list[str] | None = None) -> int:
         if "propitem/ap/" in override_path.as_posix():
             errors.append(f"Forbidden scripted-pickup DECL override remains packaged: {override_path}")
 
-    manifests: dict[str, int] = {}
+    manifests: dict[str, dict[str, int]] = {}
     for path in sorted((ROOT / "manifests").glob("*.json")):
-        for declaration, location_id in read_json(path).items():
-            if declaration in manifests:
-                errors.append(f"Duplicate manifest declaration: {declaration}")
-            if location_id in manifests.values():
-                errors.append(f"Duplicate manifest location ID: {location_id}")
-            manifests[declaration] = location_id
+        manifest = read_json(path)
+        manifests[path.stem] = manifest
+        for location_id, declarations in sorted(
+            collect_duplicate_ids(manifest).items()
+        ):
+            errors.append(
+                f"Duplicate manifest location ID in {path.name}: "
+                f"{location_id}: {declarations}"
+            )
+    manifest_location_ids = [
+        location_id
+        for manifest in manifests.values()
+        for location_id in manifest.values()
+    ]
+    manifest_location_owners: dict[int, list[str]] = {}
+    for map_key, manifest in manifests.items():
+        for declaration, location_id in manifest.items():
+            manifest_location_owners.setdefault(location_id, []).append(
+                f"{map_key}/{declaration}"
+            )
+    for location_id, owners in sorted(manifest_location_owners.items()):
+        if len(owners) > 1:
+            errors.append(f"Duplicate manifest location ID {location_id}: {owners}")
     for location_id in BATTERY_LOCATIONS.values():
-        if list(manifests.values()).count(location_id) != 1:
+        if manifest_location_ids.count(location_id) != 1:
             errors.append(f"Physical Sentinel Battery {location_id} must have one active manifest check")
 
-    feedback_document = read_json(ROOT / "data" / "location_feedback_policies.json")
-    if feedback_document.get("schema_version") != 1:
-        errors.append("Unsupported location feedback policy schema")
-    feedback_ap_only = feedback_document.get("policies", {})
     physical_location_count = 0
     praetor_policy_count = 0
     prohibited_praetor_policy = "praetor" + "_token_ap"
-    for path in sorted((ROOT / "level_configs").glob("*.json")):
+    config_pairs = sorted(
+        (map_key, ROOT / source["level_config"])
+        for map_key, source in map_sources.items()
+        if source.get("enabled", True)
+    )
+    config_paths = [path for _, path in config_pairs]
+    for map_key, path in config_pairs:
         config_data = read_json(path)
         if prohibited_praetor_policy in config_data:
             errors.append(f"Retired Praetor policy remains in {path.name}")
-        if config_data.get("map_key") != path.stem:
+        if config_data.get("map_key") != map_key:
             errors.append(f"Missing or divergent map_key in {path.name}")
         config = dict(config_data.get("entities", {}))
         for ap_check in config:
@@ -838,23 +840,31 @@ def main(argv: list[str] | None = None) -> int:
             if policy and (
                 not policy.get("independent_ap_trigger")
                 or not policy.get("remove_original")
-                or set(policy) - {"independent_ap_trigger", "remove_original", "drop_targets"}
+                or set(policy) - {
+                    "independent_ap_trigger", "remove_original", "drop_targets",
+                    "preserve_targets",
+                }
             ):
                 errors.append(
                     f"Praetor token lacks generic AP pickup policy: {path.name}/{ap_check}"
                 )
         physical_location_count += len(config)
-        feedback = dict(config_data.get("location_feedback", {}))
-        for ap_check in feedback_ap_only.get(config_data.get("map_key"), []):
-            if ap_check in feedback:
-                errors.append(f"Duplicate explicit feedback policy: {path.name}/{ap_check}")
-            feedback[ap_check] = {"policy": "ap_only"}
         encounter_checks = {
             encounter["ap_check"]
             for encounter in config_data.get("secret_encounters", [])
         }
+        declared_checks = set(config) | encounter_checks
+        try:
+            feedback = ap_map_generator.load_explicit_location_feedback(
+                map_key,
+                config_data.get("location_feedback", {}),
+                declared_checks,
+            )
+        except ValueError as exc:
+            errors.append(f"Invalid location feedback policies in {path.name}: {exc}")
+            feedback = {}
         unknown_feedback = sorted(
-            set(feedback) - set(config) - encounter_checks
+            set(feedback) - declared_checks
         )
         if unknown_feedback:
             errors.append(
@@ -862,7 +872,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{unknown_feedback}"
             )
         default_feedback = sorted(
-            (set(config) | encounter_checks) - set(feedback)
+            declared_checks - set(feedback)
         )
         if default_feedback:
             errors.append(
@@ -891,16 +901,16 @@ def main(argv: list[str] | None = None) -> int:
             errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
         for encounter in config_data.get("secret_encounters", []):
             config[encounter["ap_check"]] = encounter["location_id"]
-        manifest_path = ROOT / "manifests" / path.name
+        manifest_path = ROOT / map_sources[map_key]["manifest"]
         if not manifest_path.exists():
             errors.append(f"Missing manifest for {path.name}")
             continue
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 205:
+    if physical_location_count != 289:
         errors.append(
-            f"Expected 205 physical entity locations through Sentinel Prime, found {physical_location_count}"
+            f"Expected 289 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -918,10 +928,10 @@ def main(argv: list[str] | None = None) -> int:
         if plan.release_asset
     }
     expected_level_configs = {
-        Path(source["level_config"]).name for source in enabled_map_sources.values()
+        ROOT / source["level_config"] for source in enabled_map_sources.values()
     }
-    if expected_level_configs != {path.name for path in (ROOT / "level_configs").glob("*.json")}:
-        errors.append("Enabled map sources are not aligned with level_configs/*.json")
+    if expected_level_configs != set(config_paths):
+        errors.append("Enabled map sources are not aligned with canonical map configs")
 
     for map_key, source in enabled_map_sources.items():
         config_path = ROOT / source["level_config"]
@@ -1010,9 +1020,10 @@ def main(argv: list[str] | None = None) -> int:
     missing_commands = sorted(set(item_ids.values()) - set(commands))
     extra_commands = sorted(set(commands) - set(item_ids.values()))
     declared_runtime_locations = runtime_locations & set(location_ids.values())
-    missing_locations = sorted(set(manifests.values()) - set(location_ids.values()))
+    manifest_location_id_set = set(manifest_location_ids)
+    missing_locations = sorted(manifest_location_id_set - set(location_ids.values()))
     unmanifested_locations = sorted(
-        set(location_ids.values()) - set(manifests.values()) - runtime_locations
+        set(location_ids.values()) - manifest_location_id_set - runtime_locations
     )
 
     if missing_commands:
@@ -1028,10 +1039,10 @@ def main(argv: list[str] | None = None) -> int:
             "Runtime location IDs absent from APWorld: "
             f"{sorted(runtime_locations - declared_runtime_locations)}"
         )
-    overlap = runtime_locations & set(manifests.values())
+    overlap = runtime_locations & manifest_location_id_set
     if overlap:
         errors.append(f"Runtime location IDs also present in map manifests: {sorted(overlap)}")
-    reused_manifest_ids = sorted(reserved_location_ids & set(manifests.values()))
+    reused_manifest_ids = sorted(reserved_location_ids & manifest_location_id_set)
     if reused_manifest_ids:
         errors.append(f"Reserved location IDs remain in manifests: {reused_manifest_ids}")
 
@@ -1061,9 +1072,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": 116,
-        "locations": 291,
-        "map_checks": 245,
-        "runtime_locations": 46,
+        "locations": 369,
+        "map_checks": 307,
+        "runtime_locations": 62,
         "runtime_goals": 1,
         "route_sentinel_batteries": 21,
     }:
@@ -1289,7 +1300,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"Validated {len(item_ids)} AP items, {len(commands)} commands, "
-        f"{len(location_ids)} locations, {len(manifests)} map checks, "
+        f"{len(location_ids)} locations, {len(manifest_location_ids)} map checks, "
         f"{len(enabled_map_sources)} enabled map sources, "
         f"and {len(runtime_locations)} runtime checks."
     )

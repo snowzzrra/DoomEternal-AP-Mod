@@ -61,6 +61,7 @@ def test_supported_current_options_map_to_expected_ui_types(schema):
         "randomize_chainsaw": "toggle",
         "randomize_dash": "toggle",
         "randomize_first_battery": "toggle",
+        "starting_weapon": "choice",
     }
     assert "start_inventory" in {entry["key"] for entry in schema["excluded_options"]}
 
@@ -96,7 +97,7 @@ def test_randomize_dash_yaml_uses_canonical_boolean(schema, dash):
     assert document["game"] == "DOOM Eternal"
     assert document["DOOM Eternal"]["randomize_dash"] is dash
     assert "starting_inventory" not in text
-    assert "starting_weapon" not in text
+    assert document["DOOM Eternal"]["starting_weapon"] == "combat_shotgun"
 
 
 @pytest.mark.parametrize("dash", [False, True])

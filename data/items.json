@@ -9,6 +9,7 @@
         "give weapon/player/bfg",
         "give ammo/sharedammopool/bfg 30"
     ],
+    "7770900": "give weapon/player/shotgun",
     "7770008": "give weapon/player/unmaykr",
     "7770009": "give weapon/player/hammer",
     "7770010": "give weapon/player/chainsaw",

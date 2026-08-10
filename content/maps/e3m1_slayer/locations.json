@@ -106,7 +106,14 @@
       ]
     }
   },
-  "remove_entities": [],
+  "target_removals": {
+    "game_target_relay_getcrucible": [
+      "game_target_give_item_1"
+    ]
+  },
+  "remove_entities": [
+    "game_target_give_item_1"
+  ],
   "secret_encounters": [
     {
       "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E3M1_1",

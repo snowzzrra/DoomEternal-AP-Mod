@@ -117,16 +117,53 @@
       "ui_type": "toggle"
     },
     {
-      "default": false,
-      "description": "Start with one seed-selected supported weapon instead of vanilla Combat Shotgun only.",
-      "display_name": "Randomize Starting Weapon",
+      "choices": [
+        {
+          "key": "random_weapon",
+          "label": "Random",
+          "value": 0
+        },
+        {
+          "key": "heavy_cannon",
+          "label": "Heavy Cannon",
+          "value": 1
+        },
+        {
+          "key": "plasma_rifle",
+          "label": "Plasma Rifle",
+          "value": 2
+        },
+        {
+          "key": "rocket_launcher",
+          "label": "Rocket Launcher",
+          "value": 3
+        },
+        {
+          "key": "ballista",
+          "label": "Ballista",
+          "value": 4
+        },
+        {
+          "key": "chaingun",
+          "label": "Chaingun",
+          "value": 5
+        },
+        {
+          "key": "combat_shotgun",
+          "label": "Combat Shotgun",
+          "value": 6
+        }
+      ],
+      "default": "combat_shotgun",
+      "description": "Choose the weapon you start with. Random selects one eligible weapon when the seed is generated. The selected weapon is removed from the item pool.",
+      "display_name": "Starting Weapon",
       "group": "Game Options",
-      "key": "randomize_starting_weapon",
-      "source_class": "RandomizeStartingWeapon",
-      "ui_type": "toggle"
+      "key": "starting_weapon",
+      "source_class": "StartingWeapon",
+      "ui_type": "choice"
     }
   ],
   "schema_version": 1,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "a837541da9a4e38d17cdcbb6baed1ca238a02e519234057000c7c5485a2f646d"
+  "source_sha256": "6e62353510fabe795650d28e1c6edd8d6a46828f129189f9dd47c7e2a614e914"
 }

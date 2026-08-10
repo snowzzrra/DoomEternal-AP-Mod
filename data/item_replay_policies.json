@@ -29,6 +29,10 @@
       "name": "BFG-9000",
       "policy": "never_replay"
     },
+    "7770900": {
+      "name": "Combat Shotgun",
+      "policy": "replay_idempotent"
+    },
     "7770008": {
       "name": "The Unmaykr",
       "policy": "replay_idempotent"

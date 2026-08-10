@@ -16,7 +16,10 @@ from tools.maps.ap_map_generator import (
 ROOT = Path(__file__).resolve().parent.parent.parent
 OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088}
 NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172)) | {7770253, 7770254, 7770255}
-EXPECTED_CHANGED_OR_REMOVED = {
+EXPECTED_CHANGED = {
+    "target_relay_pickup_ballista",
+}
+EXPECTED_REMOVED = {
     "sentinel_battery_room_progress_praetor_token_1",
     "sentinel_battery_room_progress_praetor_token_2",
     "sentinel_battery_room_progress_mod_bot_3",
@@ -26,11 +29,7 @@ EXPECTED_CHANGED_OR_REMOVED = {
     "progress_cheats_all_mastered_runes_1",
     "pickup_weapon_gauss_rifle_hub_1",
     "progress_cheats_fully_upgraded_progression_wheel_final",
-    "target_relay_pickup_ballista",
     "target_give_item_ballista",
-    "interact_hub_2_battery_station_1",
-    "interact_hub_2_battery_station_2",
-    "sentinel_battery_room_interact_hub_2_battery_station_1",
 }
 
 
@@ -57,7 +56,7 @@ def _blocks(text: str) -> dict[str, str]:
 
 
 def assert_hub_diff_classified() -> dict:
-    config_path = ROOT / "level_configs/hub.json"
+    config_path = ROOT / "content/maps/hub/locations.json"
     current = json.loads(config_path.read_text(encoding="utf-8"))
     old = copy.deepcopy(current)
     old["entities"] = {
@@ -73,8 +72,14 @@ def assert_hub_diff_classified() -> dict:
 
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
-        old_config = temporary / "hub-v030.json"
+        old_config = temporary / "locations.json"
         old_config.write_text(json.dumps(old), encoding="utf-8")
+        for companion_name in ("assets.json", "descriptor.json"):
+            companion = config_path.with_name(companion_name)
+            if companion.is_file():
+                (temporary / companion_name).write_text(
+                    companion.read_text(encoding="utf-8"), encoding="utf-8"
+                )
         old_map = temporary / "hub-v030.entities"
         new_map = temporary / "hub-v031.entities"
         items = json.loads((ROOT / "data/items.json").read_text(encoding="utf-8"))
@@ -106,7 +111,7 @@ def assert_hub_diff_classified() -> dict:
     changed = {name for name in before.keys() & after if before[name] != after[name]}
     removed = set(before) - set(after)
     added = set(after) - set(before)
-    if changed | removed != EXPECTED_CHANGED_OR_REMOVED:
+    if changed != EXPECTED_CHANGED or removed != EXPECTED_REMOVED:
         raise ValueError(
             f"Unclassified Hub original-entity diff: changed={sorted(changed)}, "
             f"removed={sorted(removed)}"

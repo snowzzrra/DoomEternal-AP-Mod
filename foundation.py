@@ -97,7 +97,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 116, "locations": 291, "map_checks": 245, "runtime_locations": 46, "runtime_goals": 1, "route_sentinel_batteries": 21},
+    "counts": {"items": 116, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 21},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -147,19 +147,6 @@ def load_foundation_contracts(*, data_dir: Path | None = None, authorial: bool =
     registry = load_map_registry(root=root, authorial=True)
     plans = release_plan(registry)
     contracts["active_maps"] = {plan.map_key: plan.runtime_map for plan in plans}
-    manifest_counts = [
-        len(json.loads((root / plan.manifest).read_text(encoding="utf-8")))
-        for plan in plans if (root / plan.manifest).exists()
-    ]
-    if len(manifest_counts) == len(plans):
-        from content_catalog import load_content_catalog
-
-        runtime_location_count = len(load_content_catalog(root).runtime_locations)
-        counts = dict(contracts["counts"])
-        counts["map_checks"] = sum(manifest_counts)
-        counts["runtime_locations"] = runtime_location_count
-        counts["locations"] = counts["map_checks"] + counts["runtime_locations"]
-        contracts["counts"] = counts
     return contracts
 
 

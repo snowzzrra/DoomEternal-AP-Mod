@@ -23,20 +23,24 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "0.4.0-beta.2: suppress AP receipt popups for native-owned Blood Punch and Extra Life feedback"
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Combat Shotgun canonical item mapping adds its global runtime target."
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "cc1f74616822498242a058f3fdc45152f66cdd2f481d0c6845bdaccc529cbbba",
+  "byte_sha256": "3ef22db997fd94d03a0e7a9aebc5131891d374ab7000407f0129cd4c5fd231da",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17062644,
-    "classes": 13741,
-    "entity_count": 13779,
+    "byte_size": 17064460,
+    "classes": 13744,
+    "entity_count": 13782,
     "layers": 6997,
     "targets": 11442,
     "transforms": 30258,
-    "unique_entity_names": 13742
+    "unique_entity_names": 13745
   },
   "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
   "map_key": "e2m3_core",
@@ -74,5 +78,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "e4dd607788016a934e1c20ce3a142e5076398a000d58a73df561c97fd1c1b346",
-  "semantic_sha256": "f0d9af187dd478bddee74da6058de737626e5f001f8f15fb41218ee25a0deade"
+  "semantic_sha256": "01c309cd7a7c6c00219660fe549787dacf08393e0c83567894a75dfed9a4cc0f"
 }

@@ -31,20 +31,28 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "0.4.0-beta.2: suppress AP receipt popups for native-owned Blood Punch and Extra Life feedback"
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Enforce Crucible ownership by removing only relay-to-grant edge and orphaned grant entity while preserving objective and cutscene flow."
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Combat Shotgun canonical item mapping adds its global runtime target."
     }
   ],
   "asset_package_contract_sha256": "1f1478e688520d20aa566cb3cf90b28faa19c3504d9f583caf4e89e41bd2940c",
-  "byte_sha256": "7af6fd42ed6140b3c800bfc1f501c906285a0be2911504696555b7b713ed484c",
+  "byte_sha256": "cb430c643c464170709e7d505b67429b4ffa4e06520b9a67340fbd15a80b46f9",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11977512,
-    "classes": 12159,
-    "entity_count": 12161,
+    "byte_size": 11978725,
+    "classes": 12161,
+    "entity_count": 12163,
     "layers": 1662,
-    "targets": 7631,
-    "transforms": 23374,
-    "unique_entity_names": 12160
+    "targets": 7630,
+    "transforms": 23373,
+    "unique_entity_names": 12162
   },
   "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
   "map_key": "e3m1_slayer",
@@ -89,6 +97,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "5557d0e7416c5d3a1e67f456edae8a19446b5e1a145166d97f0b37dc68bf6f87",
-  "semantic_sha256": "9659fb35e5d97bff9ee362b920a559e2bda9667f446026c887a4bdf58950b0ba"
+  "scripted_contract_sha256": "0fc4c3cea35b716569e076a14f862eedcba37cb96bc7ccbfbe7605089fe16fd7",
+  "semantic_sha256": "ea14cdd13aaf603e815592fc81a399c9bb79709d15bb41a2ede8a76ce201e636"
 }

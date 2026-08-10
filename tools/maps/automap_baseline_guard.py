@@ -99,7 +99,13 @@ def assert_separate_automap_helper_guard() -> int:
                         raise ValueError(f"Automap helper retains {forbidden}: {map_key}/{location_id}")
                 if _scalar(helper, "automapPropertiesDecl") != _expected_decl(source_block):
                     raise ValueError(f"Automap helper decl drift: {map_key}/{location_id}")
-                _assert_close(_position(helper), _position(source_block), f"{map_key}/{location_id}")
+                target_policy = config.get("target_policies", {}).get(entity_name, {})
+                expected_position = target_policy.get(
+                    "independent_position", _position(source_block)
+                )
+                _assert_close(
+                    _position(helper), expected_position, f"{map_key}/{location_id}"
+                )
 
                 generated_bounds = find_entity_block_bounds(generated, entity_name)
                 if generated_bounds is not None:
