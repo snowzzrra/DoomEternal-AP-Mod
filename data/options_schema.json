@@ -115,9 +115,18 @@
       "key": "randomize_first_battery",
       "source_class": "RandomizeFirstBattery",
       "ui_type": "toggle"
+    },
+    {
+      "default": false,
+      "description": "Start with one seed-selected supported weapon instead of vanilla Combat Shotgun only.",
+      "display_name": "Randomize Starting Weapon",
+      "group": "Game Options",
+      "key": "randomize_starting_weapon",
+      "source_class": "RandomizeStartingWeapon",
+      "ui_type": "toggle"
     }
   ],
   "schema_version": 1,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "5f33b010189bf0754c5ac9886410fb86a7a5d5abd160ac119f315ab267778d6a"
+  "source_sha256": "a837541da9a4e38d17cdcbb6baed1ca238a02e519234057000c7c5485a2f646d"
 }

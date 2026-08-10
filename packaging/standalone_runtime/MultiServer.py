@@ -104,7 +104,7 @@ class CommandProcessor(metaclass=CommandMeta):
 
     def _cmd_license(self) -> None:
         """Returns licensing information."""
-        self.output("See the licenses directory distributed with this launcher.")
+        self.output("See upstream project distributions for dependency license terms.")
 
     def default(self, raw: str) -> None:
         self.output("Echo: " + raw)

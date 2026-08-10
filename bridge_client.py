@@ -1,6 +1,6 @@
 import asyncio
 import atexit
-from collections import deque
+from collections import Counter, deque
 import glob
 import hashlib
 import json
@@ -1551,6 +1551,52 @@ def command_spool_exists(command_id):
     return os.path.exists(queued_path) or os.path.exists(processing_path)
 
 
+def queue_session_namespace(state_key):
+    """Opaque durable queue namespace; never includes connection credentials."""
+    if not isinstance(state_key, str) or not state_key:
+        return None
+    return hashlib.sha256(state_key.encode("utf-8")).hexdigest()[:16]
+
+
+def quarantine_incompatible_receipt_jobs(state_key):
+    """Hold bridge-owned queued receipts not belonging to active AP identity.
+
+    `.processing` is native-owned and deliberately untouched. Native recovery is
+    the only owner of that suffix.
+    """
+    namespace = queue_session_namespace(state_key)
+    if namespace is None:
+        return
+    os.makedirs(QUEUE_DIR, exist_ok=True)
+    expected = re.compile(rf"^recv-{re.escape(namespace)}-.*\.cmd$")
+    for source in sorted(Path(QUEUE_DIR).glob("recv-*.cmd")):
+        if expected.fullmatch(source.name):
+            continue
+        target = source.with_suffix(".held")
+        if target.exists():
+            target = source.with_name(f"{source.name}.held")
+        try:
+            os.replace(source, target)
+            logger.warning("[Queue] Held foreign or legacy receipt job: %s", source.name)
+        except OSError as error:
+            logger.error("[Queue] Could not hold receipt job %s: %s", source, error)
+
+
+def publish_queue_session_namespace(state_key):
+    """Publish active room identity for native-owned `.processing` recovery."""
+    namespace = queue_session_namespace(state_key)
+    if namespace is None:
+        return
+    os.makedirs(QUEUE_DIR, exist_ok=True)
+    marker = Path(QUEUE_DIR) / "active_session_namespace"
+    temporary = Path(QUEUE_DIR) / f".active_session_namespace-{uuid.uuid4().hex}.tmp"
+    with temporary.open("x", encoding="ascii", newline="\n") as file:
+        file.write(namespace + "\n")
+        file.flush()
+        os.fsync(file.fileno())
+    os.replace(temporary, marker)
+
+
 def hold_orphaned_dev_jobs():
     """On bridge restart, keep dev jobs visible but require explicit resume."""
     os.makedirs(QUEUE_DIR, exist_ok=True)
@@ -1697,7 +1743,7 @@ def expected_item_job_activation(item_id, command_index):
         return None, str(error)
 
 
-def migrate_direct_item_command_jobs():
+def migrate_direct_item_command_jobs(state_key):
     """Rewrite old queued item jobs to map-side RPC activations.
 
     Only .cmd belongs to the bridge. A .processing file is owned by the native
@@ -1710,7 +1756,10 @@ def migrate_direct_item_command_jobs():
         logger.error(f"[Queue] Could not create queue directory for migration: {error}")
         return
 
-    for pattern in ("*.cmd",):
+    namespace = queue_session_namespace(state_key)
+    if namespace is None:
+        return
+    for pattern in (f"recv-{namespace}-*.cmd",):
         for source_path in sorted(glob.glob(os.path.join(QUEUE_DIR, pattern))):
             path = Path(source_path)
             try:
@@ -1719,7 +1768,7 @@ def migrate_direct_item_command_jobs():
                 logger.error(f"[Queue] Could not read queued job for migration: {path}: {error}")
                 continue
             match = re.match(
-                r"recv-(\d+)-item-(\d+)-cmd-(\d+)\.(cmd|processing)$",
+                rf"recv-{re.escape(namespace)}-(\d+)-item-(\d+)-cmd-(\d+)\.(cmd|processing)$",
                 path.name,
             )
             if not match:
@@ -1753,9 +1802,7 @@ def migrate_direct_item_command_jobs():
             if command == replacement:
                 continue
 
-            command_id = (
-                f"recv-{receive_index:06d}-item-{item_id}-cmd-{command_index:02d}"
-            )
+            command_id = f"recv-{namespace}-{receive_index:06d}-item-{item_id}-cmd-{command_index:02d}"
             target_path = Path(QUEUE_DIR) / f"{command_id}.cmd"
             temporary_path = Path(QUEUE_DIR) / f".{command_id}-{uuid.uuid4().hex}.tmp"
             try:
@@ -2549,6 +2596,25 @@ class DoomEternalContext(CommonContext):
                         ", ".join(event_id[:12] for event_id in abandoned),
                     )
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
+            slot_data = args.get("slot_data", {})
+            bootstrap = Counter()
+            configured = slot_data.get("starting_inventory", {})
+            if isinstance(configured, dict):
+                by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
+                for name, quantity in configured.items():
+                    if name in by_name and isinstance(quantity, int) and quantity > 0:
+                        bootstrap[by_name[name]] += quantity
+            weapon = slot_data.get("starting_weapon")
+            if isinstance(weapon, str):
+                by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
+                if weapon in by_name:
+                    bootstrap[by_name[weapon]] += 1
+            processed_receipt_count = min(self.items_processed, len(self.items_received))
+            for receipt in self.items_received[:processed_receipt_count]:
+                item_id = receipt.item
+                if bootstrap.get(item_id, 0) > 0:
+                    bootstrap[item_id] -= 1
+            self.starting_inventory_pending = bootstrap
             self._death_link_task = asyncio.create_task(
                 self.update_death_link(self.death_link_enabled)
             )
@@ -2762,11 +2828,15 @@ class DoomEternalContext(CommonContext):
                     classification = received_item_classification(
                         item_id, getattr(network_item, "flags", None)
                     )
+                    bootstrap_pending = getattr(self, "starting_inventory_pending", Counter())
+                    bootstrap_item = bootstrap_pending.get(item_id, 0) > 0
+                    if bootstrap_item:
+                        bootstrap_pending[item_id] -= 1
                     spooled, description = self.spool_item_commands(
                         item_id,
                         item_index,
-                        intent=NEW_RECEIPT,
-                        include_notification=ENABLE_ITEM_NOTIFICATIONS,
+                        intent=RECONCILIATION_REPAIR if bootstrap_item else NEW_RECEIPT,
+                        include_notification=False if bootstrap_item else ENABLE_ITEM_NOTIFICATIONS,
                         classification=classification,
                         packet_received_ns=packet_received_ns,
                     )
@@ -3575,6 +3645,8 @@ class DoomEternalContext(CommonContext):
             f"[State] Loaded {self.items_processed} processed items for "
             f"{self.state_key}."
         )
+        publish_queue_session_namespace(self.state_key)
+        quarantine_incompatible_receipt_jobs(self.state_key)
         self.check_and_update_event_session()
 
     def persist_session_state(self):
@@ -4008,8 +4080,20 @@ class DoomEternalContext(CommonContext):
 
     def rune_diagnostic_lines(self):
         native, error = self.rune_native_state()
+        authority = "authoritative"
         if error:
-            return [f"Rune diagnostic unavailable: {error}"]
+            candidate = self.active_game_details()
+            if not isinstance(candidate, dict):
+                return [
+                    "Rune diagnostic unavailable: "
+                    f"authority=observational repair_allowed=no reason={error}"
+                ]
+            native = RuneNativeState.from_game_details(
+                candidate,
+                save_slot=self.active_save_slot or getattr(self, "selected_observation_slot", None) or "candidate",
+                evidence_epoch=getattr(self, "active_native_evidence_epoch", None) or "unknown",
+            )
+            authority = "observational"
         plan, plan_error = self.compile_owned_rune_plan()
         owned_perks = (
             ", ".join(sorted(entry.perk for entry in plan.entries)) or "-"
@@ -4018,6 +4102,9 @@ class DoomEternalContext(CommonContext):
         )
         slots = tuple(native.equipped_slots) + (None, None, None)
         lines = [
+            f"Rune authority={authority} repair_allowed={'yes' if authority == 'authoritative' else 'no'} "
+            f"reason={plan_error or error or 'active-save proof'} slot={native.save_slot} "
+            f"epoch={native.evidence_epoch} map={self.current_map_name or '-'}",
             f"AP-owned Rune perks: {owned_perks} | "
             f"available: {', '.join(sorted(native.available_perks)) or '-'} | "
             f"active: {', '.join(sorted(native.active_perks)) or '-'} | "
@@ -4369,7 +4456,10 @@ class DoomEternalContext(CommonContext):
             suffix = "notify"
         else:
             suffix = f"effect-{command_index:02d}"
-        return f"recv-{item_index:06d}-item-{item_id}-{suffix}"
+        namespace = queue_session_namespace(self.state_key)
+        if namespace is None:
+            raise RuntimeError("cannot create receipt command without active AP identity")
+        return f"recv-{namespace}-{item_index:06d}-item-{item_id}-{suffix}"
 
     def delivery_item_name(self, item_id):
         identity = ITEM_CLASSIFICATION_IDENTITY.get(item_id)
@@ -5604,7 +5694,7 @@ class DoomEternalContext(CommonContext):
 
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
-                    migrate_direct_item_command_jobs()
+                    migrate_direct_item_command_jobs(self.state_key)
                     self.onboard_bootstrap("on_reconnect")
                     self.reconcile_checked_automap_cleanup("connect_or_reconnect")
                     if not self.repair_item_mappings():

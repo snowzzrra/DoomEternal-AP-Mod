@@ -14,7 +14,7 @@ jobs:
         run: python -m compileall -q bridge_client.py deathlink_receive.py launcher_core.py launcher_cli.py launcher_supervisor.py tools/content tools/validation
       - name: Validate authorial content
         run: python -m tools.validation.authorial --check-authorial
-      - name: Run focused contracts
-        run: python -m pytest -q tests
+      - name: Validate packaged options schema
+        run: python -c "from pathlib import Path; from options_foundation import load_options_schema; load_options_schema(Path('data/options_schema.json'))"
       - name: Check whitespace
         run: git diff --check

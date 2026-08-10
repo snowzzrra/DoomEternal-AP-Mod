@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -14,6 +15,15 @@ from typing import Any, Protocol
 ROOT = Path(__file__).resolve().parent
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
+MANIFEST_SCHEMA_VERSION = 2
+MOD_CONTRACT_REVISION = 1
+SUPPORTED_CAPABILITIES = frozenset({
+    "room_mod_v1",
+    "randomize_dash_v1",
+    "starting_inventory_v1",
+    "starting_weapon_v1",
+    "scripted_weapon_stripping_v1",
+})
 
 
 def _canonical(value: Any) -> bytes:
@@ -101,16 +111,28 @@ class SeedManifest:
     apworld_revision: str
     content_revision: str
     compiler_revision: int
-    options: dict[str, bool]
+    manifest_schema_version: int
+    mod_contract_revision: int
+    required_capabilities: tuple[str, ...]
+    options: dict[str, Any]
     active_location_ids: tuple[int, ...]
     manifest_hash: str
 
     @classmethod
     def create(cls, *, seed_name: str, team: int, slot: int, options: dict[str, Any], active_location_ids: list[int]) -> SeedManifest:
         identity = release_identity()
-        normalized_options = {key: bool(value) for key, value in sorted(options.items())}
+        normalized_options = {key: options[key] for key in sorted(options)}
+        required_capabilities = {"room_mod_v1"}
+        if normalized_options.get("randomize_dash"):
+            required_capabilities.add("randomize_dash_v1")
+        if normalized_options.get("starting_inventory"):
+            required_capabilities.add("starting_inventory_v1")
+        if normalized_options.get("starting_weapon"):
+            required_capabilities.add("starting_weapon_v1")
+        if normalized_options.get("scripted_weapon_stripping"):
+            required_capabilities.add("scripted_weapon_stripping_v1")
         payload = {
-            "schema": 1,
+            "schema": MANIFEST_SCHEMA_VERSION,
             "game": identity["game"],
             "seed_name": seed_name,
             "team": int(team),
@@ -119,6 +141,9 @@ class SeedManifest:
             "apworld_revision": identity["apworld_revision"],
             "content_revision": identity["content_revision"],
             "compiler_revision": identity["compiler_revision"],
+            "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
+            "mod_contract_revision": MOD_CONTRACT_REVISION,
+            "required_capabilities": sorted(required_capabilities),
             "options": normalized_options,
             "active_location_ids": sorted(active_location_ids),
         }
@@ -131,15 +156,30 @@ class SeedManifest:
     def from_room(cls, snapshot: RoomSnapshot, known_location_ids: set[int]) -> SeedManifest:
         identity = release_identity()
         slot_data = snapshot.slot_data
-        compatibility = {
-            "bridge_protocol": ("bridge_protocol", identity["bridge_protocol_version"]),
-            "content_revision": ("content_revision", identity["content_revision"]),
-            "apworld_revision": ("apworld_revision", identity["apworld_revision"]),
-            "compiler_revision": ("compiler_revision", identity["compiler_revision"]),
-        }
-        for label, (field, expected) in compatibility.items():
-            if field in slot_data and slot_data[field] != expected:
-                raise ValueError(f"session {label} is incompatible: {slot_data[field]!r} != {expected!r}")
+        if "bridge_protocol" in slot_data and slot_data["bridge_protocol"] != identity["bridge_protocol_version"]:
+            raise ValueError(f"session bridge_protocol is incompatible: {slot_data['bridge_protocol']!r} != {identity['bridge_protocol_version']!r}")
+        schema = slot_data.get("manifest_schema_version", 1)
+        contract = slot_data.get("mod_contract_revision", 1)
+        if not isinstance(schema, int) or schema < 1 or schema > MANIFEST_SCHEMA_VERSION:
+            raise ValueError(f"session manifest schema is unsupported: {schema!r}")
+        if not isinstance(contract, int) or contract < 1 or contract > MOD_CONTRACT_REVISION:
+            raise ValueError(f"session mod contract is unsupported: {contract!r}")
+        required = slot_data.get("required_capabilities")
+        if required is None:
+            required_capabilities = {"room_mod_v1"}
+            if slot_data.get("randomize_dash"):
+                required_capabilities.add("randomize_dash_v1")
+        elif isinstance(required, list) and all(isinstance(value, str) for value in required):
+            required_capabilities = set(required)
+        else:
+            raise ValueError("session required_capabilities must be a list of strings")
+        unsupported = sorted(required_capabilities - SUPPORTED_CAPABILITIES)
+        if unsupported:
+            raise ValueError(f"session requires unsupported capabilities: {unsupported}")
+        if "compiler_revision" in slot_data and slot_data["compiler_revision"] != identity["compiler_revision"]:
+            # Implementation metadata only. Compatibility is decided above.
+            import logging
+            logging.getLogger(__name__).info("session compiler_revision differs: room=%r local=%r", slot_data["compiler_revision"], identity["compiler_revision"])
         unknown = sorted(set(snapshot.active_location_ids) - known_location_ids)
         if unknown:
             raise ValueError(f"session contains unknown DOOM Eternal location IDs: {unknown}")
@@ -147,7 +187,12 @@ class SeedManifest:
             seed_name=snapshot.seed_name,
             team=snapshot.team,
             slot=snapshot.slot,
-            options={"randomize_dash": slot_data["randomize_dash"]},
+            options={
+                "randomize_dash": slot_data["randomize_dash"],
+                **({"starting_inventory": slot_data["starting_inventory"]} if "starting_inventory" in slot_data else {}),
+                **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
+                **({"scripted_weapon_stripping": slot_data["scripted_weapon_stripping"]} if "scripted_weapon_stripping" in slot_data else {}),
+            },
             active_location_ids=list(snapshot.active_location_ids),
         )
 
@@ -160,9 +205,23 @@ class RoomModPackageBuilder:
     def __init__(self, templates_root: Path):
         self.templates_root = templates_root
 
-    def _template(self, dash_enabled: bool) -> tuple[Path, dict[str, Any]]:
-        index_path = self.templates_root / self.INDEX_NAME
-        document = json.loads(index_path.read_text(encoding="utf-8"))
+    def _template(self, dash_enabled: bool) -> tuple[bytes, str, dict[str, Any]]:
+        if self.templates_root.is_file():
+            with zipfile.ZipFile(self.templates_root) as archive:
+                document = json.loads(archive.read(self.INDEX_NAME))
+                template_reader = archive.read
+                source_name = self.templates_root.name
+                return self._select_template(document, template_reader, source_name, dash_enabled)
+        document = json.loads((self.templates_root / self.INDEX_NAME).read_text(encoding="utf-8"))
+        return self._select_template(
+            document,
+            lambda name: (self.templates_root / name).read_bytes(),
+            str(self.templates_root),
+            dash_enabled,
+        )
+
+    @staticmethod
+    def _select_template(document, read_member, source_name, dash_enabled):
         if document.get("schema") != 1 or not isinstance(document.get("variants"), dict):
             raise ValueError("invalid physical template index")
         key = "dash_on" if dash_enabled else "dash_off"
@@ -172,18 +231,21 @@ class RoomModPackageBuilder:
         filename = entry.get("file")
         if not isinstance(filename, str) or Path(filename).name != filename:
             raise ValueError(f"unsafe physical template filename: {filename!r}")
-        template = self.templates_root / filename
-        if not template.is_file() or not zipfile.is_zipfile(template):
-            raise ValueError(f"physical template is not a ZIP: {template}")
+        try:
+            payload = read_member(filename)
+        except (KeyError, OSError) as error:
+            raise ValueError(f"physical template is missing: {filename} in {source_name}") from error
+        if not zipfile.is_zipfile(io.BytesIO(payload)):
+            raise ValueError(f"physical template is not a ZIP: {filename}")
         expected = entry.get("sha256")
-        actual = _sha256(template)
+        actual = hashlib.sha256(payload).hexdigest()
         if expected != actual:
             raise ValueError(f"physical template SHA-256 mismatch: expected {expected}, got {actual}")
-        return template, entry
+        return payload, filename, entry
 
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
         dash_enabled = manifest.options.get("randomize_dash", False)
-        template, template_entry = self._template(dash_enabled)
+        template_payload, template_name, template_entry = self._template(dash_enabled)
         output_root.mkdir(parents=True, exist_ok=True)
         destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
         temporary = destination.with_name(f".{destination.name}.incoming")
@@ -192,11 +254,11 @@ class RoomModPackageBuilder:
             "schema": 1,
             "manifest_hash": manifest.manifest_hash,
             "randomize_dash": dash_enabled,
-            "template": template.name,
+            "template": template_name,
             "template_sha256": template_entry["sha256"],
             "physical_e1m2_sha256": template_entry.get("physical_e1m2_sha256"),
         }
-        with zipfile.ZipFile(template) as source, zipfile.ZipFile(
+        with zipfile.ZipFile(io.BytesIO(template_payload)) as source, zipfile.ZipFile(
             temporary, "w", compression=zipfile.ZIP_DEFLATED
         ) as output:
             seen: set[str] = set()

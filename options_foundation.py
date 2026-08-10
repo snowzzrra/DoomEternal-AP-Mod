@@ -15,6 +15,8 @@ import yaml
 OPTIONS_SCHEMA_VERSION = 1
 SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "range"})
 GAME_NAME = "DOOM Eternal"
+START_INVENTORY_KEY = "start_inventory"
+START_INVENTORY_SAFE_CLASSIFICATIONS = 0b0011
 
 
 def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -113,21 +115,82 @@ def load_options_schema(path: Path) -> dict[str, Any]:
 
 def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
     validated = validate_options_schema(schema)
-    return {option["key"]: option["default"] for option in validated["options"]}
+    return {
+        **{option["key"]: option["default"] for option in validated["options"]},
+        START_INVENTORY_KEY: {},
+    }
+
+
+def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
+    """Load start-safe item names from canonical generated item metadata.
+
+    Explicit eligibility wins when supplied. Older projections safely fall back
+    to AP's progression/useful classification rule.
+    """
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"could not load item catalog: {error}") from error
+    if not isinstance(document, Mapping) or document.get("schema_version") != 1:
+        raise ValueError("unsupported item catalog schema")
+    raw_items = document.get("items")
+    if not isinstance(raw_items, Mapping):
+        raise ValueError("item catalog lacks items")
+
+    entries: list[tuple[str, Mapping[str, Any]]] = []
+    explicit_eligibility = False
+    for raw in raw_items.values():
+        if not isinstance(raw, Mapping):
+            raise ValueError("item catalog contains malformed item")
+        name = raw.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("item catalog contains item without name")
+        eligible = raw.get("start_inventory_eligible")
+        if eligible is not None and not isinstance(eligible, bool):
+            raise ValueError("item catalog start inventory eligibility must be boolean")
+        explicit_eligibility = explicit_eligibility or eligible is not None
+        entries.append((name, raw))
+
+    catalog: list[dict[str, str]] = []
+    for name, item in entries:
+        if explicit_eligibility:
+            if item.get("start_inventory_eligible") is not True:
+                continue
+        else:
+            classification = item.get("classification")
+            if isinstance(classification, bool) or not isinstance(classification, int):
+                raise ValueError("item catalog classification must be an integer")
+            if not classification & START_INVENTORY_SAFE_CLASSIFICATIONS:
+                continue
+        catalog.append({"name": name, "label": name})
+    return sorted(catalog, key=lambda item: item["label"].casefold())
+
+
+def validate_start_inventory(value: Any) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        raise ValueError("start_inventory must be an item-to-quantity map")
+    result: dict[str, int] = {}
+    for name, quantity in value.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("start_inventory item names must be text")
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError("start_inventory quantities must be positive integers")
+        result[name] = quantity
+    return result
 
 
 def validate_option_values(
     schema: Mapping[str, Any], values: Mapping[str, Any]
-) -> dict[str, bool | int | str]:
+) -> dict[str, bool | int | str | dict[str, int]]:
     validated = validate_options_schema(schema)
     if not isinstance(values, Mapping):
         raise ValueError("option values must be an object")
-    expected = {option["key"] for option in validated["options"]}
+    expected = {option["key"] for option in validated["options"]} | {START_INVENTORY_KEY}
     if set(values) != expected:
         missing = sorted(expected - set(values))
         extra = sorted(set(values) - expected)
         raise ValueError(f"option value keys mismatch; missing={missing} extra={extra}")
-    result: dict[str, bool | int | str] = {}
+    result: dict[str, bool | int | str | dict[str, int]] = {}
     for option in validated["options"]:
         key = option["key"]
         value = values[key]
@@ -146,6 +209,7 @@ def validate_option_values(
                     f"{key} must be between {option['minimum']} and {option['maximum']}"
                 )
         result[key] = value
+    result[START_INVENTORY_KEY] = validate_start_inventory(values[START_INVENTORY_KEY])
     return result
 
 

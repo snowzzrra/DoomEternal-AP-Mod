@@ -28,12 +28,14 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSpinBox,
     QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from launcher_controller import LauncherController
-from options_foundation import suggested_yaml_filename
+from options_foundation import load_start_inventory_catalog, suggested_yaml_filename
 
 
 class LauncherUI(QMainWindow):
@@ -79,6 +81,7 @@ class LauncherUI(QMainWindow):
         self.install_guidance = QLabel()
         self.option_controls: dict[str, QWidget] = {}
         self.option_defaults: dict[str, object] = {}
+        self.start_inventory_catalog: list[dict[str, str]] = []
         self._build()
         self._discover()
         self._timer = QTimer(self)
@@ -119,6 +122,10 @@ class LauncherUI(QMainWindow):
             QTabBar::tab:selected {{ background: {self.COLORS['surface']}; color: {self.COLORS['text']}; }}
             QPlainTextEdit {{ background: #0d1219; color: #d8e4ef; border: 1px solid {self.COLORS['border']};
                 border-radius: 4px; padding: 8px; }}
+            QTableWidget {{ background: #0d141c; alternate-background-color: #121d28; border: 1px solid #263f50;
+                border-radius: 4px; gridline-color: #263f50; }}
+            QHeaderView::section {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['muted']};
+                border: 0; border-bottom: 1px solid {self.COLORS['border']}; padding: 7px; font-weight: 700; }}
             QPushButton {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['text']};
                 border: 1px solid {self.COLORS['border']}; border-radius: 4px; padding: 9px 13px;
                 font-weight: 600; }}
@@ -189,9 +196,9 @@ class LauncherUI(QMainWindow):
         header_text.addWidget(self._label("Archipelago Launcher", "subtitle"))
         header_layout.addLayout(header_text, 1)
         self.overall_state.setObjectName("state")
-        self.overall_state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.overall_state.setMaximumWidth(210)
-        header_layout.addWidget(self.overall_state, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        self.overall_state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        self.overall_state.setMinimumWidth(0)
+        header_layout.addWidget(self.overall_state, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
         outer.addWidget(header)
 
         steps = QGridLayout()
@@ -295,9 +302,9 @@ class LauncherUI(QMainWindow):
         send.clicked.connect(self._send_command)
         command.addWidget(send)
         status_layout.addLayout(command)
-        content.addWidget(status, 2)
+        content.addWidget(status, 3)
         configure.setMinimumWidth(470)
-        status.setMinimumWidth(300)
+        status.setMinimumWidth(0)
 
         launch = self._surface()
         launch_layout = QGridLayout(launch)
@@ -350,6 +357,8 @@ class LauncherUI(QMainWindow):
         player_layout.addWidget(self.player_name)
         layout.addWidget(player_card)
 
+        layout.addWidget(self._start_inventory_widget())
+
         options = cast(list[dict[str, object]], self.controller.options_schema["options"])
         groups: dict[str, list[dict[str, object]]] = {}
         for option in options:
@@ -375,6 +384,103 @@ class LauncherUI(QMainWindow):
         actions.addWidget(save)
         layout.addLayout(actions)
         layout.addStretch(1)
+
+    def _start_inventory_widget(self) -> QWidget:
+        card = self._surface()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(22, 18, 22, 20)
+        card_layout.setSpacing(10)
+        card_layout.addWidget(self._label("Starting Inventory", "section"))
+        card_layout.addWidget(self._label(
+            "Add persistent progression or useful items. Quantities are written as the common Archipelago start_inventory map.",
+            "muted",
+        ))
+        try:
+            self.start_inventory_catalog = load_start_inventory_catalog(
+                self.controller.client_dir / "data" / "item_classifications.json"
+            )
+        except ValueError as error:
+            self._append_log(f"Starting inventory catalog unavailable: {error}")
+            self.start_inventory_catalog = []
+
+        controls = QHBoxLayout()
+        self.start_inventory_selector = QComboBox()
+        for item in self.start_inventory_catalog:
+            self.start_inventory_selector.addItem(item["label"], item["name"])
+        self.start_inventory_selector.setMinimumWidth(250)
+        self.start_inventory_quantity = QSpinBox()
+        self.start_inventory_quantity.setRange(1, 9999)
+        self.start_inventory_quantity.setValue(1)
+        self.start_inventory_quantity.setPrefix("Qty: ")
+        add = QPushButton("Add item")
+        add.setObjectName("primary")
+        add.clicked.connect(self._add_start_inventory_item)
+        enabled = bool(self.start_inventory_catalog)
+        self.start_inventory_selector.setEnabled(enabled)
+        self.start_inventory_quantity.setEnabled(enabled)
+        add.setEnabled(enabled)
+        controls.addWidget(self.start_inventory_selector, 1)
+        controls.addWidget(self.start_inventory_quantity)
+        controls.addWidget(add)
+        card_layout.addLayout(controls)
+
+        if not enabled:
+            card_layout.addWidget(self._label(
+                "No safe item catalog is available. Starting inventory stays empty rather than offering unverified items.",
+                "muted",
+            ))
+
+        self.start_inventory_table = QTableWidget(0, 2)
+        self.start_inventory_table.setHorizontalHeaderLabels(["Item", "Quantity"])
+        self.start_inventory_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.start_inventory_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.start_inventory_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.start_inventory_table.setAlternatingRowColors(True)
+        self.start_inventory_table.verticalHeader().setVisible(False)
+        self.start_inventory_table.horizontalHeader().setStretchLastSection(False)
+        self.start_inventory_table.horizontalHeader().setStretchLastSection(False)
+        self.start_inventory_table.setColumnWidth(1, 105)
+        self.start_inventory_table.setMinimumHeight(126)
+        card_layout.addWidget(self.start_inventory_table)
+        remove = QPushButton("Remove selected")
+        remove.clicked.connect(self._remove_start_inventory_item)
+        card_layout.addWidget(remove, alignment=Qt.AlignmentFlag.AlignRight)
+        return card
+
+    def _add_start_inventory_item(self) -> None:
+        name = self.start_inventory_selector.currentData()
+        if not isinstance(name, str) or not name:
+            return
+        quantity = self.start_inventory_quantity.value()
+        for row in range(self.start_inventory_table.rowCount()):
+            item = self.start_inventory_table.item(row, 0)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == name:
+                existing = self.start_inventory_table.item(row, 1)
+                current = int(existing.text()) if existing is not None else 0
+                self.start_inventory_table.setItem(row, 1, QTableWidgetItem(str(current + quantity)))
+                self.start_inventory_table.selectRow(row)
+                return
+        row = self.start_inventory_table.rowCount()
+        self.start_inventory_table.insertRow(row)
+        item = QTableWidgetItem(name)
+        item.setData(Qt.ItemDataRole.UserRole, name)
+        self.start_inventory_table.setItem(row, 0, item)
+        self.start_inventory_table.setItem(row, 1, QTableWidgetItem(str(quantity)))
+        self.start_inventory_table.selectRow(row)
+
+    def _remove_start_inventory_item(self) -> None:
+        row = self.start_inventory_table.currentRow()
+        if row >= 0:
+            self.start_inventory_table.removeRow(row)
+
+    def _start_inventory_values(self) -> dict[str, int]:
+        values: dict[str, int] = {}
+        for row in range(self.start_inventory_table.rowCount()):
+            item = self.start_inventory_table.item(row, 0)
+            quantity = self.start_inventory_table.item(row, 1)
+            if item is not None and quantity is not None:
+                values[str(item.data(Qt.ItemDataRole.UserRole))] = int(quantity.text())
+        return values
 
     def _option_widget(self, option: dict[str, object]) -> QWidget:
         key = str(option["key"])
@@ -431,6 +537,7 @@ class LauncherUI(QMainWindow):
                 control.setCurrentIndex(max(0, control.findData(default)))
             elif isinstance(control, QSpinBox):
                 control.setValue(cast(int, default))
+        self.start_inventory_table.setRowCount(0)
 
     def _save_player_options(self) -> None:
         player_name = self.player_name.text()
@@ -456,6 +563,7 @@ class LauncherUI(QMainWindow):
                 values[key] = control.currentData()
             elif isinstance(control, QSpinBox):
                 values[key] = control.value()
+        values["start_inventory"] = self._start_inventory_values()
         try:
             saved = self.controller.save_player_options(path, player_name, values)
         except Exception as error:

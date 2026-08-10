@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -766,11 +767,39 @@ class Pipeline:
                     for name in files
                 ):
                     raise ValueError("public launcher layout is invalid")
-                template_names = (
-                    "client/mod_templates/dash-on.zip",
-                    "client/mod_templates/dash-off.zip",
-                )
-                template_payloads = [outer.read(name) for name in template_names]
+                expected_roots = {
+                    *launchers,
+                    "client",
+                    "doometernal.apworld",
+                    "README.md",
+                    "INSTALL.md",
+                    "RELEASE_MANIFEST.json",
+                }
+                roots = {name.split("/", 1)[0] for name in files}
+                if roots != expected_roots:
+                    raise ValueError(
+                        f"public ZIP root layout is not exact: {sorted(roots)}"
+                    )
+                if "client/resources/mod_templates.zip" not in files:
+                    raise ValueError("internal room template resource is missing")
+                with zipfile.ZipFile(io.BytesIO(outer.read("client/resources/mod_templates.zip"))) as resources:
+                    resource_files = {
+                        info.filename for info in resources.infolist() if not info.is_dir()
+                    }
+                    expected_resources = {"index.json", "dash-on.zip", "dash-off.zip"}
+                    if resource_files != expected_resources:
+                        raise ValueError("internal room template resource layout is invalid")
+                    template_payloads = [
+                        resources.read("dash-on.zip"),
+                        resources.read("dash-off.zip"),
+                    ]
+                if any(
+                    "mod_templates" in Path(name).parts or "licenses" in Path(name).parts
+                    for name in files
+                ):
+                    raise ValueError("public ZIP exposes internal room resources")
+                if any(Path(name).name == "DoomEternalArchipelagoBeta.zip" for name in files):
+                    raise ValueError("fixed mod ZIP entered public release")
                 if any(
                     "DoomEternalArchipelagoPlayableTest-" in Path(name).name
                     for name in files

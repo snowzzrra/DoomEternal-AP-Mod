@@ -90,9 +90,9 @@ class IntegratedLaunchWorkflow:
         return root
 
     def _template_hashes(self) -> set[str]:
-        document = json.loads(
-            (self.application_dir / "mod_templates/index.json").read_text(encoding="utf-8")
-        )
+        resource = self.application_dir / "resources" / "mod_templates.zip"
+        with zipfile.ZipFile(resource) as archive:
+            document = json.loads(archive.read("index.json"))
         return {
             str(entry["sha256"])
             for entry in document.get("variants", {}).values()
@@ -268,7 +268,9 @@ class IntegratedLaunchWorkflow:
             "mod_building",
             randomize_dash=manifest.options["randomize_dash"],
         )
-        generated = RoomModPackageBuilder(self.application_dir / "mod_templates").build(
+        generated = RoomModPackageBuilder(
+            self.application_dir / "resources" / "mod_templates.zip"
+        ).build(
             manifest,
             self.state_dir / "generated_mods",
         )

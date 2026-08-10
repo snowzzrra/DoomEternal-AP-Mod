@@ -174,7 +174,7 @@ def _extract_playable_zip(
 ) -> tuple[dict[str, Path], Path, Path]:
     with zipfile.ZipFile(playable_zip) as archive:
         files = {info.filename for info in archive.infolist() if not info.is_dir()}
-        if "DoomEternalArchipelagoBeta.zip" in files:
+        if any(Path(name).name == "DoomEternalArchipelagoBeta.zip" for name in files):
             raise AssertionError("playable ZIP contains obsolete universal mod ZIP")
         launchers = files & {
             "DoomEternalArchipelagoLauncher",
@@ -184,20 +184,32 @@ def _extract_playable_zip(
             raise AssertionError("playable ZIP must contain exactly one root launcher")
         if any(name.startswith("client/DoomEternalArchipelagoLauncher") for name in files):
             raise AssertionError("playable ZIP contains launcher under client")
+        expected_roots = {
+            *launchers,
+            "client",
+            "doometernal.apworld",
+            "README.md",
+            "INSTALL.md",
+            "RELEASE_MANIFEST.json",
+        }
+        roots = {name.split("/", 1)[0] for name in files}
+        if roots != expected_roots:
+            raise AssertionError(f"playable ZIP root layout is not exact: {sorted(roots)}")
         required = {
             "README.md",
             "INSTALL.md",
             "RELEASE_MANIFEST.json",
             "doometernal.apworld",
-            "client/mod_templates/index.json",
-            "client/mod_templates/dash-on.zip",
-            "client/mod_templates/dash-off.zip",
+            "client/resources/mod_templates.zip",
         }
         missing = required - files
         if missing:
             raise AssertionError(f"playable ZIP lacks public layout files: {sorted(missing)}")
-        if not any(name.startswith("licenses/") for name in files):
-            raise AssertionError("playable ZIP lacks root runtime licenses")
+        if any(
+            "licenses" in Path(name).parts or "mod_templates" in Path(name).parts
+            for name in files
+        ):
+            raise AssertionError("playable ZIP exposes internal resources")
         nested_candidates = {
             name for name in files
             if name.lower().endswith(".zip")
@@ -207,8 +219,16 @@ def _extract_playable_zip(
             raise AssertionError(f"playable ZIP contains prior candidate: {sorted(nested_candidates)}")
         archive.extractall(destination)
     mod_roots = {}
+    with zipfile.ZipFile(destination / "client" / "resources" / "mod_templates.zip") as resources:
+        resource_files = {
+            info.filename for info in resources.infolist() if not info.is_dir()
+        }
+        expected_resources = {"index.json", "dash-on.zip", "dash-off.zip"}
+        if resource_files != expected_resources:
+            raise AssertionError("internal room template resource layout is invalid")
+        resources.extractall(destination / "template-resources")
     for variant in ("dash-on", "dash-off"):
-        mod_zip = destination / "client" / "mod_templates" / f"{variant}.zip"
+        mod_zip = destination / "template-resources" / f"{variant}.zip"
         mod_root = destination / f"mod-{variant}"
         with zipfile.ZipFile(mod_zip) as archive:
             archive.extractall(mod_root)

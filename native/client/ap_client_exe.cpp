@@ -27,6 +27,7 @@
 MeathookInterface* g_MhInterface = nullptr;
 
 static const char* kQueueDirectory = "base\\ap_queue";
+static const char* kQueueSessionNamespacePath = "base\\ap_queue\\active_session_namespace";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
@@ -1408,7 +1409,28 @@ std::optional<std::string> MigratedDirectItemCommand(
         + "_" + std::to_string(std::stoi(commandIndex)) + " activate";
 }
 
-void EnsureQueueDirectory(CommandSourceMap& recoveredSources) {
+std::optional<std::string> ActiveQueueSessionNamespace() {
+    std::ifstream input(kQueueSessionNamespacePath);
+    std::string value;
+    if (!std::getline(input, value)) return std::nullopt;
+    static const std::regex valid(R"(^[0-9a-f]{16}$)");
+    if (!std::regex_match(value, valid)) return std::nullopt;
+    return value;
+}
+
+std::optional<std::string> ReceiptCommandNamespace(const std::string& filename) {
+    static const std::regex namespaced(R"(^recv-([0-9a-f]{16})-.*\.(cmd|processing)$)");
+    std::smatch match;
+    if (std::regex_match(filename, match, namespaced)) return match[1].str();
+    if (StartsWith(filename, "recv-")) return std::string(); // legacy/unrecognized receipt
+    return std::nullopt; // generic command
+}
+
+void EnsureQueueDirectory(
+    CommandSourceMap& recoveredSources,
+    std::unordered_set<std::string>& heldReceiptLogs,
+    const std::optional<std::string>& activeNamespace
+) {
     CreateDirectoryA(kQueueDirectory, nullptr);
     // Telemetry is a disposable poll, not a gameplay command. Never recover a
     // stale condump across a pause, loading screen, crash, or new game session.
@@ -1421,7 +1443,21 @@ void EnsureQueueDirectory(CommandSourceMap& recoveredSources) {
     if (find == INVALID_HANDLE_VALUE) return;
     do {
         if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-            const std::string processingPath = std::string(kQueueDirectory) + "\\" + data.cFileName;
+            const std::string filename = data.cFileName;
+            const std::string processingPath = std::string(kQueueDirectory) + "\\" + filename;
+            const auto receiptNamespace = ReceiptCommandNamespace(filename);
+            if (receiptNamespace.has_value()) {
+                if (!activeNamespace.has_value() || receiptNamespace.value() != activeNamespace.value()) {
+                    if (heldReceiptLogs.insert(filename).second) {
+                        const std::string reason = receiptNamespace->empty()
+                            ? "legacy_unnamespaced"
+                            : (!activeNamespace.has_value() ? "session_unavailable" : "foreign_session");
+                        LogDebug("QUEUE_SESSION_HOLD command_id=" + CommandIdFromPath(processingPath)
+                            + " reason=" + reason);
+                    }
+                    continue;
+                }
+            }
             const std::string queuedPath =
                 processingPath.substr(0, processingPath.size() - std::string(".processing").size()) + ".cmd";
             std::string command;
@@ -1451,7 +1487,7 @@ void EnsureQueueDirectory(CommandSourceMap& recoveredSources) {
                 const std::string commandId = CommandIdFromPath(processingPath);
                 recoveredSources[commandId] = "recovered_processing";
                 LogDebug(
-                    "QUEUE_RECOVER command_id=" + commandId
+                    "QUEUE_SESSION_RECOVER command_id=" + commandId
                     + " source=recovered_processing"
                     + DeliveryContextFields()
                 );
@@ -1481,10 +1517,26 @@ std::vector<std::string> FindQueuedFiles() {
 void ImportSpoolFiles(
     std::deque<CommandJob>& queue,
     std::unordered_set<std::string>& knownCommandIds,
-    CommandSourceMap& recoveredSources
+    CommandSourceMap& recoveredSources,
+    std::unordered_set<std::string>& heldReceiptLogs,
+    const std::optional<std::string>& activeNamespace
 ) {
     size_t duplicateCount = 0;
     for (const std::string& queuedPath : FindQueuedFiles()) {
+        const std::string filename = std::filesystem::path(queuedPath).filename().string();
+        const auto receiptNamespace = ReceiptCommandNamespace(filename);
+        if (receiptNamespace.has_value()
+                && (!activeNamespace.has_value()
+                    || receiptNamespace.value() != activeNamespace.value())) {
+            if (heldReceiptLogs.insert(filename).second) {
+                const std::string reason = receiptNamespace->empty()
+                    ? "legacy_unnamespaced"
+                    : (!activeNamespace.has_value() ? "session_unavailable" : "foreign_session");
+                LogDebug("QUEUE_SESSION_HOLD command_id=" + CommandIdFromPath(queuedPath)
+                    + " reason=" + reason);
+            }
+            continue;
+        }
         const std::string processingPath = queuedPath.substr(0, queuedPath.size() - 4) + ".processing";
         if (!MoveFileExA(queuedPath.c_str(), processingPath.c_str(), MOVEFILE_WRITE_THROUGH)) {
             continue;
@@ -1682,7 +1734,21 @@ int main(int argc, char** argv) {
     }
 
     CommandSourceMap recoveredSources;
-    EnsureQueueDirectory(recoveredSources);
+    // A previous bridge process may have left its room marker behind. Do not
+    // trust it for startup recovery; current bridge publishes only after
+    // authoritative Connected identity.
+    bool startupNamespaceCleared = DeleteFileA(kQueueSessionNamespacePath) != FALSE;
+    if (!startupNamespaceCleared) {
+        const DWORD error = GetLastError();
+        startupNamespaceCleared = error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+        if (!startupNamespaceCleared) {
+            LogDebug(
+                "QUEUE_SESSION_MARKER_CLEAR_RETRY error=" + std::to_string(error)
+            );
+        }
+    }
+    std::unordered_set<std::string> heldReceiptLogs;
+    EnsureQueueDirectory(recoveredSources, heldReceiptLogs, std::nullopt);
     DeleteFileA(kRpcGatePath);
     const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
     const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
@@ -1739,7 +1805,25 @@ int main(int argc, char** argv) {
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading()
         );
-        ImportSpoolFiles(queue, knownCommandIds, recoveredSources);
+        std::optional<std::string> activeNamespace;
+        if (startupNamespaceCleared) {
+            activeNamespace = ActiveQueueSessionNamespace();
+        } else if (DeleteFileA(kQueueSessionNamespacePath)) {
+            startupNamespaceCleared = true;
+        } else {
+            const DWORD error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) {
+                startupNamespaceCleared = true;
+            }
+        }
+        EnsureQueueDirectory(recoveredSources, heldReceiptLogs, activeNamespace);
+        ImportSpoolFiles(
+            queue,
+            knownCommandIds,
+            recoveredSources,
+            heldReceiptLogs,
+            activeNamespace
+        );
 
         const DWORD now = GetTickCount();
         bool rpcArmed = IsRpcExecutionEnabled();

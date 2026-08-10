@@ -9,6 +9,11 @@ fi
 export PYTHONPATH="$REPO_ROOT"
 WORKSPACE="$(cd "$REPO_ROOT/.." && pwd)"
 TOOLS_DIR="$WORKSPACE/Tools"
+ARCHIPELAGO_PYTHON="${ARCHIPELAGO_PYTHON:-$WORKSPACE/Archipelago/.venv/bin/python}"
+if [[ ! -x "$ARCHIPELAGO_PYTHON" ]]; then
+    echo "Archipelago Python is not executable: $ARCHIPELAGO_PYTHON" >&2
+    exit 1
+fi
 OUTPUT_DIR=""
 ENABLE_ITEM_NOTIFICATIONS=1
 
@@ -52,7 +57,7 @@ CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
 PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
 mkdir -p "$TEMP_DIR"
-SKIP_REQUIREMENTS_UPDATE=1 "${ARCHIPELAGO_PYTHON:-$WORKSPACE/Archipelago/.venv/bin/python}" \
+SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \
     -m tools.content.compile_options_schema --check
 python3 - "$REPO_ROOT" "$TEMP_DIR" <<'PY'
 import json
@@ -453,14 +458,14 @@ done
 cp -R "$REPO_ROOT/player_templates" "$OUTPUT_DIR/client/"
 (
     cd "$WORKSPACE/Archipelago"
-    SKIP_REQUIREMENTS_UPDATE=1 "${ARCHIPELAGO_PYTHON:-python3}" \
+    SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \
         Launcher.py "Build APWorlds" -- "DOOM Eternal" --skip_open_folder
 )
 cp "$WORKSPACE/Archipelago/build/apworlds/doometernal.apworld" \
     "$OUTPUT_DIR/doometernal.apworld"
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 
-LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-${ARCHIPELAGO_PYTHON:-python3}}"
+LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-$ARCHIPELAGO_PYTHON}"
 "$LAUNCHER_PYTHON" "$REPO_ROOT/tools/release/build_launcher.py" \
     --output-dir "$OUTPUT_DIR" \
     --archipelago-source "$WORKSPACE/Archipelago"
@@ -507,14 +512,6 @@ from map_registry import load_map_registry, release_plan
 map_manifest_files = [
     plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[5]), authorial=True))
 ]
-launcher_files = sorted(
-    path.relative_to(output_dir).as_posix()
-    for root in (
-        output_dir / "licenses",
-    )
-    for path in root.rglob("*")
-    if path.is_file()
-)
 launcher_executable = (
     "DoomEternalArchipelagoLauncher.exe"
     if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
@@ -567,9 +564,7 @@ manifest = {
         "client/save_decrypt.py",
         "client/run_bridge.sh",
         "client/doom_logo.png",
-        "client/mod_templates/index.json",
-        "client/mod_templates/dash-off.zip",
-        "client/mod_templates/dash-on.zip",
+        "client/resources/mod_templates.zip",
         "client/runtime_install.sh",
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
@@ -592,7 +587,6 @@ manifest = {
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
         launcher_executable,
-        *launcher_files,
     ],
     "ap_client": {
         "sha256": client_sha256,
@@ -749,16 +743,18 @@ cp -a "$MOD_STAGING_DIR" "$DASH_OFF_MOD"
 "$TOOLS_DIR/idFileDeCompressor" --compress \
     "$DASH_OFF_MAP" \
     "$DASH_OFF_MOD/e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
-mkdir -p "$OUTPUT_DIR/client/mod_templates"
+mkdir -p "$OUTPUT_DIR/client/resources"
+TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
+mkdir -p "$TEMPLATE_STAGE"
 (
     cd "$MOD_STAGING_DIR"
-    zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-on.zip" .
+    zip -q -r "$TEMPLATE_STAGE/dash-on.zip" .
 )
 (
     cd "$DASH_OFF_MOD"
-    zip -q -r "$OUTPUT_DIR/client/mod_templates/dash-off.zip" .
+    zip -q -r "$TEMPLATE_STAGE/dash-off.zip" .
 )
-python3 - "$OUTPUT_DIR/client/mod_templates" <<'PY'
+python3 - "$TEMPLATE_STAGE" "$OUTPUT_DIR/client/resources/mod_templates.zip" <<'PY'
 import hashlib
 import json
 import sys
@@ -766,6 +762,7 @@ import zipfile
 from pathlib import Path
 
 root = Path(sys.argv[1])
+destination = Path(sys.argv[2])
 member = "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
 variants = {}
 for key in ("dash_off", "dash_on"):
@@ -783,6 +780,9 @@ if variants["dash_off"]["physical_e1m2_sha256"] == variants["dash_on"]["physical
     json.dumps({"schema": 1, "variants": variants}, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
+with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
+    for path in sorted(root.iterdir()):
+        output.write(path, path.name)
 PY
 
 if [[ -e "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" ]]; then
@@ -799,12 +799,17 @@ if [[ ! -f "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" && \
     echo "Public root launcher is missing" >&2
     exit 1
 fi
+if [[ -f "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" ]]; then
+    LAUNCHER_EXECUTABLE="DoomEternalArchipelagoLauncher.exe"
+else
+    LAUNCHER_EXECUTABLE="DoomEternalArchipelagoLauncher"
+fi
 
 (
     cd "$OUTPUT_DIR"
     zip -q -r "${PTB_ZIP_NAME}.tmp" \
         README.md INSTALL.md RELEASE_MANIFEST.json client doometernal.apworld \
-        DoomEternalArchipelagoLauncher* licenses
+        "$LAUNCHER_EXECUTABLE"
 )
 mv "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" "${OUTPUT_DIR}/${PTB_ZIP_NAME}"
 
@@ -812,7 +817,7 @@ if [[ "$AUTOMAP_PROTOTYPE_ONLY" == "1" ]]; then
     rm -rf "$OUTPUT_DIR/build" "$OUTPUT_DIR/client" \
         "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/doometernal.apworld" \
         "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" \
-        "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" "$OUTPUT_DIR/licenses" \
+        "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" \
         "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/INSTALL.md" "$OUTPUT_DIR/RELEASE_MANIFEST.json"
     echo "Automap prototype ZIP created at: $OUTPUT_DIR/$PTB_ZIP_NAME"
     exit 0
@@ -843,13 +848,14 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/client/mod_templates/dash-on.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" dash-on.zip -d "$TEMP_DIR/template-resource"
+unzip -q "$TEMP_DIR/template-resource/dash-on.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$EXTRACTED_AUDIT_DIR/client/mod_templates/dash-on.zip"
+    --zip "$TEMP_DIR/template-resource/dash-on.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
@@ -911,6 +917,22 @@ python3 "$REPO_ROOT/tools/validation/audit_packaged_transition_bridge.py" \
     "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
     "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
 mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | grep -v '/$' | LC_ALL=C sort)
+PACKAGE_ROOTS=()
+for package_file in "${PACKAGE_FILES[@]}"; do
+    package_root="${package_file%%/*}"
+    if [[ ! " ${PACKAGE_ROOTS[*]} " =~ " ${package_root} " ]]; then
+        PACKAGE_ROOTS+=("$package_root")
+    fi
+done
+mapfile -t PACKAGE_ROOTS < <(printf '%s\n' "${PACKAGE_ROOTS[@]}" | LC_ALL=C sort)
+mapfile -t EXPECTED_ROOTS < <(printf '%s\n' \
+    "$LAUNCHER_EXECUTABLE" client doometernal.apworld README.md INSTALL.md \
+    RELEASE_MANIFEST.json | LC_ALL=C sort)
+if [[ "${PACKAGE_ROOTS[*]}" != "${EXPECTED_ROOTS[*]}" ]]; then
+    echo "Final ZIP root layout is not exact" >&2
+    printf 'actual:\n%s\nexpected:\n%s\n' "${PACKAGE_ROOTS[*]}" "${EXPECTED_ROOTS[*]}" >&2
+    exit 1
+fi
 if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q \
     '(^|/)(XINPUT1_3\.dll|EternalModManager[^/]*|EternalModInjectorShell[^/]*|Meathook[^/]*)(/|$)'; then
     echo "Final ZIP contains a prohibited external dependency" >&2
@@ -950,6 +972,6 @@ if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"
-echo "Room mod templates: $OUTPUT_DIR/client/mod_templates"
+echo "Room mod template resource: $OUTPUT_DIR/client/resources/mod_templates.zip"
 echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"
