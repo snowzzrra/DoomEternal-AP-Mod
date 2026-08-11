@@ -39,19 +39,23 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Combat Shotgun canonical item mapping adds its global runtime target."
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Permanent no-option BFG stripping: neutralize canonical _pickup_weapon_bfg_1 writer while preserving entity flow; retain existing Crucible relay enforcement."
     }
   ],
   "asset_package_contract_sha256": "1f1478e688520d20aa566cb3cf90b28faa19c3504d9f583caf4e89e41bd2940c",
-  "byte_sha256": "cb430c643c464170709e7d505b67429b4ffa4e06520b9a67340fbd15a80b46f9",
+  "byte_sha256": "53f4c58da837151bba45eccd12bd1b0c6a7e8a1ad2340ff8b1301a76d21fbd9d",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11978725,
+    "byte_size": 11978178,
     "classes": 12161,
     "entity_count": 12163,
     "layers": 1662,
     "targets": 7630,
-    "transforms": 23373,
+    "transforms": 23371,
     "unique_entity_names": 12162
   },
   "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
@@ -97,6 +101,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "0fc4c3cea35b716569e076a14f862eedcba37cb96bc7ccbfbe7605089fe16fd7",
-  "semantic_sha256": "ea14cdd13aaf603e815592fc81a399c9bb79709d15bb41a2ede8a76ce201e636"
+  "scripted_contract_sha256": "0457232e4969841ba4c8ba9b399abc90d7a8af909bb184770c1d780b4923d510",
+  "semantic_sha256": "b8787d5b5b35e7e6f8248894d92bb150ef22d40a57ae21e13d684ae719b5f037"
 }

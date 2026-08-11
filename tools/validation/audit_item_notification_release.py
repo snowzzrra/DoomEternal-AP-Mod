@@ -223,16 +223,23 @@ def _extract_playable_zip(
         resource_files = {
             info.filename for info in resources.infolist() if not info.is_dir()
         }
-        expected_resources = {"index.json", "dash-on.zip", "dash-off.zip"}
-        if resource_files != expected_resources:
+        document = json.loads(resources.read("index.json"))
+        variants = document.get("variants")
+        if document.get("schema") != 2 or not isinstance(variants, dict) or len(variants) != 8:
             raise AssertionError("internal room template resource layout is invalid")
+        expected_resources = {"index.json"} | {
+            entry.get("file") for entry in variants.values()
+            if isinstance(entry, dict) and isinstance(entry.get("file"), str)
+        }
+        if resource_files != expected_resources:
+            raise AssertionError("internal room template resource files are invalid")
         resources.extractall(destination / "template-resources")
-    for variant in ("dash-on", "dash-off"):
-        mod_zip = destination / "template-resources" / f"{variant}.zip"
-        mod_root = destination / f"mod-{variant}"
+    for signature, entry in variants.items():
+        mod_zip = destination / "template-resources" / entry["file"]
+        mod_root = destination / f"mod-{signature}"
         with zipfile.ZipFile(mod_zip) as archive:
             archive.extractall(mod_root)
-        mod_roots[variant] = mod_root
+        mod_roots[signature] = mod_root
     return mod_roots, destination / "client", destination / "RELEASE_MANIFEST.json"
 
 
@@ -255,25 +262,23 @@ def main() -> int:
             mod_roots, client_dir, manifest = _extract_playable_zip(
                 args.playable_zip, Path(directory)
             )
-            dash_on = audit_release(
-                args.enabled == "1", args.generated_maps, mod_roots["dash-on"],
+            first_signature = "111"
+            physical_on = audit_release(
+                args.enabled == "1", args.generated_maps, mod_roots[first_signature],
                 client_dir, manifest, args.map_registry, args.decompressor,
             )
-            _audit_locales(args.enabled == "1", mod_roots["dash-off"])
-            dash_off = audit_mod_payload(
-                args.enabled == "1", args.generated_maps, mod_roots["dash-off"],
+            for mod_root in mod_roots.values():
+                _audit_locales(args.enabled == "1", mod_root)
+            for signature, mod_root in mod_roots.items():
+                audit = audit_mod_payload(
+                args.enabled == "1", args.generated_maps, mod_root,
                 args.map_registry, args.decompressor,
                 require_generated_identity=False,
-            )
-            count_fields = (
-                "major_notification_count",
-                "filler_notification_count",
-            )
-            for map_key in dash_on:
-                if any(dash_on[map_key][field] != dash_off[map_key][field] for field in count_fields):
-                    raise AssertionError(
-                        f"dash template notification payloads diverge: {map_key}"
-                    )
+                )
+                for map_key in physical_on:
+                    for field in ("major_notification_count", "filler_notification_count"):
+                        if physical_on[map_key][field] != audit[map_key][field]:
+                            raise AssertionError(f"physical template notification payloads diverge: {signature}/{map_key}")
         return 0
     if not all((args.mod_root, args.client_dir, args.release_manifest)):
         parser.error("local audit requires --mod-root, --client-dir, and --release-manifest")

@@ -90,16 +90,23 @@ def test_room_package_builder_binds_seed_manifest_without_fixed_fallback(
 ) -> None:
     templates = tmp_path / "templates"
     templates.mkdir()
-    template = templates / "dash-off.zip"
+    template = templates / "physical-000.zip"
     template.write_bytes(_template_bytes())
     template_sha = hashlib.sha256(template.read_bytes()).hexdigest()
     (templates / "index.json").write_text(
         json.dumps(
             {
-                "schema": 1,
+                "schema": 2,
+                "physical_options": [
+                    "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
+                ],
                 "variants": {
-                    "dash_off": {"file": template.name, "sha256": template_sha},
-                    "dash_on": {"file": template.name, "sha256": template_sha},
+                    **{
+                        f"{chainsaw}{dash}{battery}": {
+                            "file": template.name, "sha256": template_sha
+                        }
+                        for chainsaw in "01" for dash in "01" for battery in "01"
+                    },
                 },
             }
         ),
@@ -109,7 +116,11 @@ def test_room_package_builder_binds_seed_manifest_without_fixed_fallback(
         seed_name="room-package-test",
         team=1,
         slot=2,
-        options={"randomize_dash": False},
+        options={
+            "randomize_chainsaw": False,
+            "randomize_dash": False,
+            "randomize_first_battery": False,
+        },
         active_location_ids=[],
     )
 

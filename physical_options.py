@@ -1,0 +1,81 @@
+"""Authoritative projection for room-selected physical pickup options."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from typing import Any, Mapping
+
+
+PHYSICAL_OPTION_KEYS = (
+    "randomize_chainsaw",
+    "randomize_dash",
+    "randomize_first_battery",
+)
+
+PHYSICAL_OPTIONS = {
+    "randomize_chainsaw": {
+        "map_key": "e1m1_intro",
+        "location_id": 7770001,
+        "entity": "AP_CHECK_BARGE_PICKUP_WEAPON_CHAINSAW_1",
+    },
+    "randomize_dash": {
+        "map_key": "e1m2_war",
+        "location_id": 7770083,
+        "entity": "AP_CHECK_CAPITOL_PROGRESS_DASH_1",
+    },
+    "randomize_first_battery": {
+        "map_key": "e1m2_war",
+        "location_id": 7770084,
+        "entity": "AP_CHECK_CAPITOL_PROGRESS_SENTINEL_BATTERY_1_E1M2",
+    },
+}
+
+
+def normalize_physical_options(options: Mapping[str, Any], *, require_all: bool = False) -> dict[str, bool]:
+    """Return physical flags without inventing values for real room data."""
+    result: dict[str, bool] = {}
+    for key in PHYSICAL_OPTION_KEYS:
+        if key not in options:
+            if require_all:
+                raise ValueError(f"missing physical option: {key}")
+            result[key] = False
+            continue
+        value = options[key]
+        if not isinstance(value, bool):
+            raise ValueError(f"physical option {key} must be boolean")
+        result[key] = value
+    return result
+
+
+def physical_signature(options: Mapping[str, Any]) -> str:
+    values = normalize_physical_options(options)
+    return "".join("1" if values[key] else "0" for key in PHYSICAL_OPTION_KEYS)
+
+
+def physical_location_ids(options: Mapping[str, Any]) -> set[int]:
+    values = normalize_physical_options(options)
+    return {
+        int(spec["location_id"])
+        for key, spec in PHYSICAL_OPTIONS.items()
+        if values[key]
+    }
+
+
+def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) -> dict[str, Any]:
+    """Remove only false physical-option AP entries from map projection.
+
+    Permanent map controls (including ``remove_entities`` and neutralization
+    fields) are intentionally untouched.
+    """
+    result = deepcopy(dict(config))
+    map_key = result.get("map_key")
+    values = normalize_physical_options(options)
+    for key, spec in PHYSICAL_OPTIONS.items():
+        if values[key] or spec["map_key"] != map_key:
+            continue
+        entity = str(spec["entity"])
+        result.get("entities", {}).pop(entity, None)
+        result.get("names", {}).pop(str(spec["location_id"]), None)
+        result.get("location_feedback", {}).pop(entity, None)
+        result.get("target_policies", {}).pop(entity.removeprefix("AP_CHECK_").lower(), None)
+    return result

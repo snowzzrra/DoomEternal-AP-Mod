@@ -68,6 +68,9 @@
   "location_feedback": {
     "default_policy": "ap_only"
   },
+  "neutralize_pickups": [
+    "_pickup_weapon_bfg_1"
+  ],
   "target_policies": {
     "game_progress_argent_cell_1_498834914": {
       "independent_ap_trigger": true,

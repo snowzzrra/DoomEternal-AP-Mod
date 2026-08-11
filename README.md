@@ -209,18 +209,6 @@ configuration, seeds, logs, and local paths.
 - Received progression/useful/trap items use the Current major card; filler
   uses the lateral Codex card. Location feedback uses the Codex presentation.
 
-### Vanilla scripted weapon acquisitions
-
-These acquisitions remain fully vanilla in `0.4.0-beta.2`:
-
-- Super Shotgun — Cultist Base cutscene `5008`.
-- BFG-9000 — Mars Core cutscene `4701`.
-- Crucible — Taras Nabad cutscene `4137`.
-
-The cutscene IDs are recorded for future inventory-grant stripping. That work
-must remove only the weapon inventory grant while preserving each cutscene,
-animation, progression edge, script, and owning mission; it is not implemented
-in this release.
 
 ## Known probable issues
 

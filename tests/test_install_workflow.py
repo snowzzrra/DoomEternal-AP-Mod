@@ -14,7 +14,9 @@ def _snapshot() -> RoomSnapshot:
             "team": 1,
             "slot": 2,
             "slot_data": {
+                "randomize_chainsaw": False,
                 "randomize_dash": False,
+                "randomize_first_battery": False,
                 "bridge_protocol": 4,
                 "content_revision": identity["content_revision"],
             },
@@ -30,7 +32,9 @@ def test_room_snapshot_drives_successful_install(tmp_path):
     assert record.state == "active"
     assert persisted["manifest_hash"] == record.manifest_hash
     assert persisted["content_revision"] == release_identity()["content_revision"]
-    assert set(record.installed_files) == {"e1m2_war.locations.json", "seed_manifest.json"}
+    assert set(record.installed_files) == {
+        "e1m1_intro.locations.json", "e1m2_war.locations.json", "seed_manifest.json"
+    }
 
 
 def test_install_rolls_back_reverse_order_after_intermediate_failure(tmp_path):

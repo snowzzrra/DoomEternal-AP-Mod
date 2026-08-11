@@ -12,6 +12,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from physical_options import (
+    PHYSICAL_OPTION_KEYS,
+    physical_location_ids,
+    physical_signature,
+    project_map_config,
+)
+from tools.decls.devinv_builder import build_devinv_loadout, output_path_for_map
+
 ROOT = Path(__file__).resolve().parent
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
@@ -22,7 +30,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "randomize_dash_v1",
     "starting_inventory_v1",
     "starting_weapon_v1",
-    "scripted_weapon_stripping_v1",
+    "physical_options_v1",
 })
 
 
@@ -63,6 +71,9 @@ class RoomSnapshot:
             raise ValueError("Connected.slot_data must be an object")
         if not isinstance(slot_data.get("randomize_dash"), bool):
             raise ValueError("Connected.slot_data.randomize_dash must be boolean")
+        for key in PHYSICAL_OPTION_KEYS:
+            if not isinstance(slot_data.get(key), bool):
+                raise ValueError(f"Connected.slot_data.{key} must be boolean")
 
         def locations(field: str) -> tuple[int, ...]:
             values = connected.get(field)
@@ -121,16 +132,31 @@ class SeedManifest:
     @classmethod
     def create(cls, *, seed_name: str, team: int, slot: int, options: dict[str, Any], active_location_ids: list[int]) -> SeedManifest:
         identity = release_identity()
-        normalized_options = {key: options[key] for key in sorted(options)}
+        normalized_options = {
+            key: options[key]
+            for key in sorted(options)
+        }
+        for key in PHYSICAL_OPTION_KEYS:
+            normalized_options.setdefault(key, False)
+            if not isinstance(normalized_options[key], bool):
+                raise ValueError(f"manifest option {key} must be boolean")
+        if "starting_inventory" in normalized_options:
+            inventory = normalized_options["starting_inventory"]
+            if not isinstance(inventory, dict):
+                raise ValueError("manifest starting_inventory must be an object")
+            for name, quantity in inventory.items():
+                if not isinstance(name, str) or not isinstance(quantity, int) or isinstance(quantity, bool) or quantity < 1:
+                    raise ValueError("manifest starting_inventory has invalid name or quantity")
+        if "starting_weapon" in normalized_options and normalized_options["starting_weapon"] is not None and not isinstance(normalized_options["starting_weapon"], str):
+            raise ValueError("manifest starting_weapon must be string or null")
         required_capabilities = {"room_mod_v1"}
+        required_capabilities.add("physical_options_v1")
         if normalized_options.get("randomize_dash"):
             required_capabilities.add("randomize_dash_v1")
         if normalized_options.get("starting_inventory"):
             required_capabilities.add("starting_inventory_v1")
         if normalized_options.get("starting_weapon"):
             required_capabilities.add("starting_weapon_v1")
-        if normalized_options.get("scripted_weapon_stripping"):
-            required_capabilities.add("scripted_weapon_stripping_v1")
         payload = {
             "schema": MANIFEST_SCHEMA_VERSION,
             "game": identity["game"],
@@ -189,9 +215,9 @@ class SeedManifest:
             slot=snapshot.slot,
             options={
                 "randomize_dash": slot_data["randomize_dash"],
+                **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
                 **({"starting_inventory": slot_data["starting_inventory"]} if "starting_inventory" in slot_data else {}),
                 **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
-                **({"scripted_weapon_stripping": slot_data["scripted_weapon_stripping"]} if "scripted_weapon_stripping" in slot_data else {}),
             },
             active_location_ids=list(snapshot.active_location_ids),
         )
@@ -201,30 +227,32 @@ class RoomModPackageBuilder:
     """Select a verified physical template, then bind it to one room manifest."""
 
     INDEX_NAME = "index.json"
+    DEVINV_MAP_KEY = "e1m1_intro"
 
     def __init__(self, templates_root: Path):
         self.templates_root = templates_root
 
-    def _template(self, dash_enabled: bool) -> tuple[bytes, str, dict[str, Any]]:
+    def _template(self, options: dict[str, Any]) -> tuple[bytes, str, dict[str, Any]]:
         if self.templates_root.is_file():
             with zipfile.ZipFile(self.templates_root) as archive:
                 document = json.loads(archive.read(self.INDEX_NAME))
                 template_reader = archive.read
                 source_name = self.templates_root.name
-                return self._select_template(document, template_reader, source_name, dash_enabled)
+                return self._select_template(document, template_reader, source_name, options)
         document = json.loads((self.templates_root / self.INDEX_NAME).read_text(encoding="utf-8"))
         return self._select_template(
             document,
             lambda name: (self.templates_root / name).read_bytes(),
-            str(self.templates_root),
-            dash_enabled,
+            str(self.templates_root), options,
         )
 
     @staticmethod
-    def _select_template(document, read_member, source_name, dash_enabled):
-        if document.get("schema") != 1 or not isinstance(document.get("variants"), dict):
+    def _select_template(document, read_member, source_name, options):
+        if document.get("schema") != 2 or not isinstance(document.get("variants"), dict):
             raise ValueError("invalid physical template index")
-        key = "dash_on" if dash_enabled else "dash_off"
+        if document.get("physical_options") != list(PHYSICAL_OPTION_KEYS):
+            raise ValueError("physical template option contract mismatch")
+        key = physical_signature(options)
         entry = document["variants"].get(key)
         if not isinstance(entry, dict):
             raise ValueError(f"missing physical template variant: {key}")
@@ -244,8 +272,8 @@ class RoomModPackageBuilder:
         return payload, filename, entry
 
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
-        dash_enabled = manifest.options.get("randomize_dash", False)
-        template_payload, template_name, template_entry = self._template(dash_enabled)
+        physical_options = {key: manifest.options[key] for key in PHYSICAL_OPTION_KEYS}
+        template_payload, template_name, template_entry = self._template(manifest.options)
         output_root.mkdir(parents=True, exist_ok=True)
         destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
         temporary = destination.with_name(f".{destination.name}.incoming")
@@ -253,11 +281,20 @@ class RoomModPackageBuilder:
         receipt = {
             "schema": 1,
             "manifest_hash": manifest.manifest_hash,
-            "randomize_dash": dash_enabled,
+            "physical_options": physical_options,
+            "physical_signature": physical_signature(physical_options),
             "template": template_name,
             "template_sha256": template_entry["sha256"],
-            "physical_e1m2_sha256": template_entry.get("physical_e1m2_sha256"),
+            "starting_inventory": manifest.options.get("starting_inventory", {}),
+            "starting_weapon": manifest.options.get("starting_weapon"),
         }
+        devinv_path = output_path_for_map(
+            Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY
+        ).as_posix()
+        devinv_source = build_devinv_loadout(
+            manifest.options.get("starting_inventory", {}),
+            manifest.options.get("starting_weapon"),
+        )
         with zipfile.ZipFile(io.BytesIO(template_payload)) as source, zipfile.ZipFile(
             temporary, "w", compression=zipfile.ZIP_DEFLATED
         ) as output:
@@ -267,9 +304,10 @@ class RoomModPackageBuilder:
                 if path.is_absolute() or ".." in path.parts or info.filename in seen:
                     raise ValueError(f"unsafe or duplicate template member: {info.filename}")
                 seen.add(info.filename)
-                if info.filename in {"seed_manifest.json", "seed_receipt.json"}:
+                if info.filename in {"seed_manifest.json", "seed_receipt.json", devinv_path}:
                     continue
                 output.writestr(info, source.read(info))
+            output.writestr(devinv_path, devinv_source)
             output.writestr("seed_manifest.json", json.dumps(seed_document, indent=2, sort_keys=True) + "\n")
             output.writestr("seed_receipt.json", json.dumps(receipt, indent=2, sort_keys=True) + "\n")
         os.replace(temporary, destination)
@@ -402,65 +440,51 @@ class ModCompiler:
     def __init__(self, root: Path = ROOT):
         self.root = root
 
-    def active_location_ids(self, randomize_dash: bool) -> list[int]:
+    def active_location_ids(self, options: dict[str, Any] | bool) -> list[int]:
         names = json.loads((self.root / "data" / "location_names.json").read_text(encoding="utf-8"))["locations"]
         ids = sorted(int(location_id) for location_id in names)
-        return ids if randomize_dash else [location_id for location_id in ids if location_id != DASH_LOCATION_ID]
+        if isinstance(options, bool):
+            options = {
+                "randomize_chainsaw": False,
+                "randomize_dash": options,
+                "randomize_first_battery": False,
+            }
+        return [location_id for location_id in ids if location_id not in (
+            set(site_id for site_id in (7770001, DASH_LOCATION_ID, 7770084))
+            - physical_location_ids(options)
+        )]
 
     def known_location_ids(self) -> set[int]:
-        return set(self.active_location_ids(True))
+        return set(self.active_location_ids({key: True for key in PHYSICAL_OPTION_KEYS}))
 
     def compile(self, manifest: SeedManifest, output_root: Path) -> Path:
         output_root.mkdir(parents=True, exist_ok=True)
         (output_root / "seed_manifest.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        dash_enabled = manifest.options.get("randomize_dash", False)
-        e1m2 = json.loads((self.root / "content/maps/e1m2_war/locations.json").read_text(encoding="utf-8"))
-        active_ids = set(manifest.active_location_ids)
-        e1m2["entities"] = {
-            check: location_id for check, location_id in e1m2["entities"].items()
-            if location_id in active_ids
-        }
-        e1m2["names"] = {
-            location_id: name for location_id, name in e1m2["names"].items()
-            if int(location_id) in active_ids
-        }
-        e1m2["secret_encounters"] = [
-            encounter for encounter in e1m2.get("secret_encounters", [])
-            if encounter["location_id"] in active_ids
-        ]
-        active_checks = set(e1m2["entities"]) | {
-            encounter["ap_check"] for encounter in e1m2["secret_encounters"]
-        }
-        e1m2["location_feedback"] = {
-            check: policy for check, policy in e1m2.get("location_feedback", {}).items()
-            if check in active_checks
-        }
-        active_entity_names = {
-            check.removeprefix("AP_CHECK_").lower() for check in e1m2["entities"]
-        }
-        e1m2["target_policies"] = {
-            name: policy for name, policy in e1m2.get("target_policies", {}).items()
-            if name in active_entity_names
-        }
-        # Minimal per-seed overlays must not mutate unrelated vanilla owners.
-        if not (active_ids - {DASH_LOCATION_ID}):
-            for key in (
-                "inline_currency_removals", "neutralize_pickups", "target_removals",
-                "remove_entities", "neutralize_entity_references",
-            ):
-                e1m2[key] = [] if key != "target_removals" else {}
-        if not dash_enabled:
-            e1m2["entities"].pop(DASH_ENTITY, None)
-            e1m2["names"].pop(str(DASH_LOCATION_ID), None)
-        (output_root / "e1m2_war.locations.json").write_text(
-            json.dumps(e1m2, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        for map_key in ("e1m1_intro", "e1m2_war"):
+            package = self.root / f"content/maps/{map_key}"
+            config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
+            descriptor = json.loads((package / "descriptor.json").read_text(encoding="utf-8"))
+            config.setdefault("map_key", descriptor["key"])
+            config.setdefault("runtime_map", descriptor["runtime_map"])
+            assets_path = package / "assets.json"
+            if assets_path.is_file():
+                assets = json.loads(assets_path.read_text(encoding="utf-8"))
+                config = {
+                    **config,
+                    "assets": assets.get("assets", []),
+                    "default_visual_asset": assets.get("default_visual_asset"),
+                }
+            projected = project_map_config(config, manifest.options)
+            (output_root / f"{map_key}.locations.json").write_text(
+                json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
         return output_root
 
-    def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path) -> Path:
-        """Compile physical Dash mutation. Caller supplies legal local vanilla dump."""
+    def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,
+                    map_key: str = "e1m2_war") -> Path:
+        """Compile one physical-option map. Caller supplies legal local vanilla dump."""
         from item_classification import load_item_classifications
         from item_reconciliation import load_policy_registry
         from tools.maps.ap_map_generator import generate_map
@@ -477,7 +501,7 @@ class ModCompiler:
             generate_map(
                 vanilla_entities,
                 output_entities,
-                staged / "e1m2_war.locations.json",
+                staged / f"{map_key}.locations.json",
                 output_entities.with_suffix(".manifest.json"),
                 item_definitions,
                 item_names={item_id: policy.name for item_id, policy in policies.items()},
@@ -562,12 +586,22 @@ class LaunchWorkflow:
         """Offline simulation adapter. Production Join consumes RoomSnapshot."""
         options = room.get("options", {})
         dash = bool(options.get("randomize_dash", False))
-        active = self.compiler.active_location_ids(dash)
+        physical_options = {
+            "randomize_chainsaw": bool(options.get("randomize_chainsaw", False)),
+            "randomize_dash": dash,
+            "randomize_first_battery": bool(options.get("randomize_first_battery", False)),
+        }
+        active = self.compiler.active_location_ids(physical_options)
+        slot_data = {
+            **physical_options,
+            **({"starting_inventory": options["starting_inventory"]} if "starting_inventory" in options else {}),
+            **({"starting_weapon": options["starting_weapon"]} if "starting_weapon" in options else {}),
+        }
         snapshot = RoomSnapshot.from_packets(
             {"seed_name": room["seed_name"]},
             {
                 "team": room["team"], "slot": room["slot"],
-                "slot_data": {"randomize_dash": dash},
+                "slot_data": slot_data,
                 "missing_locations": active, "checked_locations": [],
             },
         )

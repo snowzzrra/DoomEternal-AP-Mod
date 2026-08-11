@@ -32,7 +32,9 @@
   },
   "location_feedback": {},
   "neutralize_pickups": [
-    "phobos_pickup_weapon_chaingun_1_e2m3"
+    "phobos_pickup_weapon_chaingun_1_e2m3",
+    "phobos_pickup_weapon_bfg_1",
+    "phobos_pickup_weapon_bfg_2"
   ],
   "target_policies": {
     "slayer_arena_pickup_keycard_slayer_key_1": {

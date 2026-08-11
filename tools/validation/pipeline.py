@@ -786,13 +786,24 @@ class Pipeline:
                     resource_files = {
                         info.filename for info in resources.infolist() if not info.is_dir()
                     }
-                    expected_resources = {"index.json", "dash-on.zip", "dash-off.zip"}
-                    if resource_files != expected_resources:
+                    document = json.loads(resources.read("index.json"))
+                    variants = document.get("variants")
+                    if (
+                        document.get("schema") != 2
+                        or document.get("physical_options") != [
+                            "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
+                        ]
+                        or not isinstance(variants, dict)
+                        or set(variants) != {f"{chainsaw}{dash}{battery}" for chainsaw in "01" for dash in "01" for battery in "01"}
+                    ):
                         raise ValueError("internal room template resource layout is invalid")
-                    template_payloads = [
-                        resources.read("dash-on.zip"),
-                        resources.read("dash-off.zip"),
-                    ]
+                    template_names = {"index.json"} | {
+                        entry.get("file") for entry in variants.values()
+                        if isinstance(entry, dict) and isinstance(entry.get("file"), str)
+                    }
+                    if resource_files != template_names:
+                        raise ValueError("internal room template resource files are invalid")
+                    template_payloads = [resources.read(entry["file"]) for entry in variants.values()]
                 if any(
                     "mod_templates" in Path(name).parts or "licenses" in Path(name).parts
                     for name in files

@@ -33,7 +33,11 @@ def test_join_uses_room_options_and_writes_config(tmp_path):
         {"seed_name": "beta", "team": 0, "slot": 1, "options": {"randomize_dash": True}},
         tmp_path, "archipelago.example:38281",
     )
-    assert manifest.options == {"randomize_dash": True}
+    assert manifest.options == {
+        "randomize_chainsaw": False,
+        "randomize_dash": True,
+        "randomize_first_battery": False,
+    }
     assert json.loads((tmp_path / "ap_config.json").read_text())["seed_manifest_hash"] == manifest.manifest_hash
 
 

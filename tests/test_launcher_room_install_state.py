@@ -9,7 +9,8 @@ from launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
 
 
 def _snapshot(seed_name: str = "room-seed", dash: bool = False) -> RoomSnapshot:
-    ids = ModCompiler().active_location_ids(dash)
+    options = {"randomize_chainsaw": False, "randomize_dash": dash, "randomize_first_battery": False}
+    ids = ModCompiler().active_location_ids(options)
     identity = release_identity()
     return RoomSnapshot.from_packets(
         {"seed_name": seed_name},
@@ -17,7 +18,9 @@ def _snapshot(seed_name: str = "room-seed", dash: bool = False) -> RoomSnapshot:
             "team": 1,
             "slot": 2,
             "slot_data": {
+                "randomize_chainsaw": False,
                 "randomize_dash": dash,
+                "randomize_first_battery": False,
                 "bridge_protocol": identity["bridge_protocol_version"],
                 "content_revision": identity["content_revision"],
             },
@@ -89,7 +92,11 @@ def test_connect_observation_does_not_start_setup():
         "seed_name": "room-seed",
         "team": 1,
         "slot": 2,
-        "slot_data": {"randomize_dash": False},
+        "slot_data": {
+            "randomize_chainsaw": False,
+            "randomize_dash": False,
+            "randomize_first_battery": False,
+        },
     }
 
     assert coordinator.observe(event)

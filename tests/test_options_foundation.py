@@ -134,7 +134,11 @@ def test_saving_future_yaml_does_not_mutate_connected_room_authority(schema, tmp
         {
             "team": 1,
             "slot": 2,
-            "slot_data": {"randomize_dash": False},
+            "slot_data": {
+                "randomize_chainsaw": False,
+                "randomize_dash": False,
+                "randomize_first_battery": False,
+            },
             "missing_locations": [],
             "checked_locations": [],
         },
@@ -143,7 +147,11 @@ def test_saving_future_yaml_does_not_mutate_connected_room_authority(schema, tmp
         seed_name="current-room",
         team=1,
         slot=2,
-        options={"randomize_dash": False},
+        options={
+            "randomize_chainsaw": False,
+            "randomize_dash": False,
+            "randomize_first_battery": False,
+        },
         active_location_ids=[],
     )
     original_slot_data = dict(snapshot.slot_data)

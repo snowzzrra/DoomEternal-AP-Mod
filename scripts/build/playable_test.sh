@@ -374,6 +374,9 @@ python3 "$REPO_ROOT/tools/decls/mastery_decl_builder.py" \
 python3 "$REPO_ROOT/tools/decls/mission_challenge_decl_builder.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/mission-challenge-overrides.json"
+python3 "$REPO_ROOT/tools/decls/weapon_stripping_builder.py" \
+    --mod-root "$MOD_STAGING_DIR" \
+    --audit-output "$TEMP_DIR/weapon-stripping-overrides.json"
 python3 "$REPO_ROOT/tools/decls/devinv_builder.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --map-registry "$MAP_SOURCES_FILE" \
@@ -705,84 +708,89 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps"
 
-DASH_OFF_MAP="$TEMP_DIR/e1m2_war-dash-off.entities"
-DASH_OFF_MOD="$TEMP_DIR/mod-dash-off"
-python3 - "$REPO_ROOT" "$DASH_OFF_MAP" <<'PY'
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-output = Path(sys.argv[2])
-sys.path.insert(0, str(root))
-from launcher_core import ModCompiler, SeedManifest
-
-compiler = ModCompiler(root)
-manifest = SeedManifest.create(
-    seed_name="physical-template",
-    team=0,
-    slot=1,
-    options={"randomize_dash": False},
-    active_location_ids=compiler.active_location_ids(False),
-)
-compiler.compile_map(
-    manifest,
-    root / "vanillamaps/e1m2_war.map",
-    output,
-)
-PY
-grep -q 'entityDef capitol_progress_dash_1' "$DASH_OFF_MAP"
-if grep -q 'AP_CHECK_CAPITOL_PROGRESS_DASH_1\|ap_independent_capitol_progress_dash_1' "$DASH_OFF_MAP"; then
-    echo "Dash OFF physical template contains AP Dash transformation" >&2
-    exit 1
-fi
-grep -q 'entityDef AP_CHECK_CAPITOL_PROGRESS_DASH_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"
-grep -q 'entityDef ap_independent_capitol_progress_dash_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"
-grep -q 'thinkComponentDecl = "bob_rotate_fast"' "$GENERATED_MAPS_DIR/e1m2_war.entities"
-
-cp -a "$MOD_STAGING_DIR" "$DASH_OFF_MOD"
-"$TOOLS_DIR/idFileDeCompressor" --compress \
-    "$DASH_OFF_MAP" \
-    "$DASH_OFF_MOD/e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
 mkdir -p "$OUTPUT_DIR/client/resources"
 TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
 mkdir -p "$TEMPLATE_STAGE"
-(
-    cd "$MOD_STAGING_DIR"
-    zip -q -r "$TEMPLATE_STAGE/dash-on.zip" .
-)
-(
-    cd "$DASH_OFF_MOD"
-    zip -q -r "$TEMPLATE_STAGE/dash-off.zip" .
-)
-python3 - "$TEMPLATE_STAGE" "$OUTPUT_DIR/client/resources/mod_templates.zip" <<'PY'
+python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" <<'PY'
 import hashlib
 import json
+import shutil
+import subprocess
 import sys
 import zipfile
+from itertools import product
 from pathlib import Path
 
-root = Path(sys.argv[1])
-destination = Path(sys.argv[2])
-member = "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
+root, staged, template_root, compressor = map(Path, sys.argv[1:])
+sys.path.insert(0, str(root))
+from launcher_core import ModCompiler, SeedManifest
+from physical_options import PHYSICAL_OPTION_KEYS
+from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+
+compiler = ModCompiler(root)
+maps = {
+    "e1m1_intro": ("e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities", root / "vanillamaps/e1m1_intro.map"),
+    "e1m2_war": ("e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities", root / "vanillamaps/e1m2_war.map"),
+}
+variant_maps = {}
+for bits in product((False, True), repeat=3):
+    options = dict(zip(PHYSICAL_OPTION_KEYS, bits))
+    signature = "".join("1" if value else "0" for value in bits)
+    manifest = SeedManifest.create(
+        seed_name="physical-template", team=0, slot=1, options=options,
+        active_location_ids=compiler.active_location_ids(options),
+    )
+    variant_maps[signature] = {}
+    for map_key, (member, vanilla) in maps.items():
+        entities = template_root / f"{signature}-{map_key}.entities"
+        compiler.compile_map(manifest, vanilla, entities, map_key)
+        packed = template_root / f"{signature}-{map_key}.packed"
+        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+        variant_maps[signature][map_key] = packed
+    patch_mission_complete_maps(
+        root / "data/mission_complete_map_contracts.json",
+        {
+            map_key: template_root / f"{signature}-{map_key}.entities"
+            for map_key in maps
+        },
+        staged,
+    )
+    for map_key in maps:
+        entities = template_root / f"{signature}-{map_key}.entities"
+        packed = template_root / f"{signature}-{map_key}.packed"
+        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+
 variants = {}
-for key in ("dash_off", "dash_on"):
-    archive = root / f"{key.replace('_', '-')}.zip"
-    with zipfile.ZipFile(archive) as package:
-        physical = package.read(member)
-    variants[key] = {
-        "file": archive.name,
-        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-        "physical_e1m2_sha256": hashlib.sha256(physical).hexdigest(),
+for signature, members in variant_maps.items():
+    destination = template_root / f"physical-{signature}.zip"
+    mod = template_root / f"mod-{signature}"
+    shutil.copytree(staged, mod)
+    for map_key, packed in members.items():
+        relative, _ = maps[map_key]
+        target = mod / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(packed, target)
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
+        for path in sorted(mod.rglob("*")):
+            if path.is_file():
+                output.write(path, path.relative_to(mod).as_posix())
+    variants[signature] = {
+        "file": destination.name,
+        "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
+        "maps": {
+            key: hashlib.sha256(value.read_bytes()).hexdigest()
+            for key, value in members.items()
+        },
     }
-if variants["dash_off"]["physical_e1m2_sha256"] == variants["dash_on"]["physical_e1m2_sha256"]:
-    raise SystemExit("Dash ON/OFF templates contain identical physical Exultia map")
-(root / "index.json").write_text(
-    json.dumps({"schema": 1, "variants": variants}, indent=2, sort_keys=True) + "\n",
-    encoding="utf-8",
-)
-with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
-    for path in sorted(root.iterdir()):
-        output.write(path, path.name)
+(template_root / "index.json").write_text(json.dumps({
+    "schema": 2,
+    "physical_options": list(PHYSICAL_OPTION_KEYS),
+    "variants": variants,
+}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+with zipfile.ZipFile(root / "build/release/client/resources/mod_templates.zip", "w", zipfile.ZIP_DEFLATED) as output:
+    output.write(template_root / "index.json", "index.json")
+    for entry in variants.values():
+        output.write(template_root / entry["file"], entry["file"])
 PY
 
 if [[ -e "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" ]]; then
@@ -848,14 +856,14 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" dash-on.zip -d "$TEMP_DIR/template-resource"
-unzip -q "$TEMP_DIR/template-resource/dash-on.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json physical-111.zip -d "$TEMP_DIR/template-resource"
+unzip -q "$TEMP_DIR/template-resource/physical-111.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$TEMP_DIR/template-resource/dash-on.zip"
+    --zip "$TEMP_DIR/template-resource/physical-111.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \

@@ -26,7 +26,9 @@ def test_supervised_connected_event_installs_and_stop_redacts_password(tmp_path)
         event("connecting")
         print("secret=" + os.environ.get("DOOM_AP_PASSWORD", ""), flush=True)
         event("connected", seed_name="supervised", team=0, slot=1,
-              slot_data={{"randomize_dash": False,
+              slot_data={{"randomize_chainsaw": False,
+                         "randomize_dash": False,
+                         "randomize_first_battery": False,
                          "bridge_protocol": {identity['bridge_protocol_version']!r},
                          "content_revision": {identity['content_revision']!r}}},
               missing_locations=[], checked_locations=[])

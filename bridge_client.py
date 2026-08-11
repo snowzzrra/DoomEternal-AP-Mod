@@ -1,6 +1,6 @@
 import asyncio
 import atexit
-from collections import Counter, deque
+from collections import deque
 import glob
 import hashlib
 import json
@@ -2597,24 +2597,25 @@ class DoomEternalContext(CommonContext):
                     )
             self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
             slot_data = args.get("slot_data", {})
-            bootstrap = Counter()
+            materialized = {}
             configured = slot_data.get("starting_inventory", {})
             if isinstance(configured, dict):
                 by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
                 for name, quantity in configured.items():
                     if name in by_name and isinstance(quantity, int) and quantity > 0:
-                        bootstrap[by_name[name]] += quantity
+                        materialized[by_name[name]] = materialized.get(by_name[name], 0) + quantity
             weapon = slot_data.get("starting_weapon")
             if isinstance(weapon, str):
                 by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
                 if weapon in by_name:
-                    bootstrap[by_name[weapon]] += 1
+                    item_id = by_name[weapon]
+                    materialized[item_id] = materialized.get(item_id, 0) + 1
             processed_receipt_count = min(self.items_processed, len(self.items_received))
             for receipt in self.items_received[:processed_receipt_count]:
                 item_id = receipt.item
-                if bootstrap.get(item_id, 0) > 0:
-                    bootstrap[item_id] -= 1
-            self.starting_inventory_pending = bootstrap
+                if materialized.get(item_id, 0) > 0:
+                    materialized[item_id] -= 1
+            self._materialized_receipt_counts = materialized
             self._death_link_task = asyncio.create_task(
                 self.update_death_link(self.death_link_enabled)
             )
@@ -2782,6 +2783,30 @@ class DoomEternalContext(CommonContext):
                             return False
                     continue
 
+                materialized = getattr(self, "_materialized_receipt_counts", {})
+                if materialized.get(item_id, 0) > 0:
+                    materialized[item_id] -= 1
+                    logger.info(
+                        "[To Game] Materialized starting receipt acknowledged without replay: "
+                        "index=%s item_id=%s",
+                        item_index,
+                        item_id,
+                    )
+                    self._record_processed_receipt(network_item)
+                    self.items_processed += 1
+                    self.persist_session_state()
+                    batch_count += 1
+                    if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
+                        batch_count = 0
+                        await asyncio.sleep(0)
+                        if (
+                            captured_state_key != getattr(self, "state_key", "")
+                            or captured_generation
+                            != getattr(self, "_item_session_generation", 0)
+                        ):
+                            return False
+                    continue
+
                 log_delivery_event(
                     "ITEM_RECEIPT",
                     receipt_index=item_index,
@@ -2828,15 +2853,11 @@ class DoomEternalContext(CommonContext):
                     classification = received_item_classification(
                         item_id, getattr(network_item, "flags", None)
                     )
-                    bootstrap_pending = getattr(self, "starting_inventory_pending", Counter())
-                    bootstrap_item = bootstrap_pending.get(item_id, 0) > 0
-                    if bootstrap_item:
-                        bootstrap_pending[item_id] -= 1
                     spooled, description = self.spool_item_commands(
                         item_id,
                         item_index,
-                        intent=RECONCILIATION_REPAIR if bootstrap_item else NEW_RECEIPT,
-                        include_notification=False if bootstrap_item else ENABLE_ITEM_NOTIFICATIONS,
+                        intent=NEW_RECEIPT,
+                        include_notification=ENABLE_ITEM_NOTIFICATIONS,
                         classification=classification,
                         packet_received_ns=packet_received_ns,
                     )

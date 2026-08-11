@@ -13,7 +13,11 @@ def _manifest(enabled: bool) -> SeedManifest:
         seed_name="dash-physical",
         team=0,
         slot=1,
-        options={"randomize_dash": enabled},
+        options={
+            "randomize_chainsaw": False,
+            "randomize_dash": enabled,
+            "randomize_first_battery": False,
+        },
         active_location_ids=[DASH_LOCATION_ID] if enabled else [],
     )
 
@@ -27,7 +31,7 @@ def test_dash_false_preserves_vanilla_physical_pickup(tmp_path):
     assert content.count("entityDef capitol_progress_dash_1") == 1
     assert "ap_independent_capitol_progress_dash_1" not in content
     assert "AP_CHECK_CAPITOL_PROGRESS_DASH_1" not in content
-    assert checks == {}
+    assert "AP_CHECK_CAPITOL_PROGRESS_DASH_1" not in checks
     assert seed["options"]["randomize_dash"] is False
     assert DASH_LOCATION_ID not in seed["active_location_ids"]
 
@@ -63,6 +67,6 @@ def test_dash_true_emits_exactly_one_physical_ap_transformation(tmp_path):
     assert "entityDef capitol_progress_dash_1" not in content
     assert content.count("entityDef ap_independent_capitol_progress_dash_1") == 1
     assert content.count("entityDef AP_CHECK_CAPITOL_PROGRESS_DASH_1") == 1
-    assert checks == {"AP_CHECK_CAPITOL_PROGRESS_DASH_1": DASH_LOCATION_ID}
+    assert checks["AP_CHECK_CAPITOL_PROGRESS_DASH_1"] == DASH_LOCATION_ID
     assert seed["options"]["randomize_dash"] is True
     assert seed["active_location_ids"] == [DASH_LOCATION_ID]

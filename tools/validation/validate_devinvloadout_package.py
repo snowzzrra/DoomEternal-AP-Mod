@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import re
+import json
 from pathlib import Path
 
 from map_registry import load_map_registry
+from tools.decls.devinv_builder import validate_devinv_source
 
 
 DECL_PREFIX = Path("generated/decls/devinvloadout")
@@ -24,7 +26,12 @@ def expected_decl_path(mod_root: Path, registry_path: Path, generated_map: Path)
     return mod_root / Path(resource_path).stem / DECL_PREFIX / f"{logical_decl}.decl"
 
 
-def validate(mod_root: Path, registry_path: Path, generated_map: Path) -> None:
+def validate(
+    mod_root: Path,
+    registry_path: Path,
+    generated_map: Path,
+    manifest_path: Path | None = None,
+) -> None:
     expected = expected_decl_path(mod_root, registry_path, generated_map)
     logical_suffix = expected.relative_to(mod_root).parts[1:]
     candidates = [
@@ -50,6 +57,21 @@ def validate(mod_root: Path, registry_path: Path, generated_map: Path) -> None:
             raise AssertionError(f"DevInvLoadout lost required marker: {marker}")
     if 'STAT_CHALLENGE_PAGE_UNLOCKED' in text:
         raise AssertionError("DevInvLoadout unexpectedly unlocks Challenge Page")
+    options = {}
+    manifest_path = manifest_path or mod_root / "seed_manifest.json"
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        options = manifest.get("options", {})
+        if not isinstance(options, dict):
+            raise AssertionError("seed manifest options must be an object")
+    try:
+        validate_devinv_source(
+            text,
+            options.get("starting_inventory", {}),
+            options.get("starting_weapon"),
+        )
+    except ValueError as error:
+        raise AssertionError(str(error)) from error
 
 
 def main() -> None:
@@ -57,8 +79,9 @@ def main() -> None:
     parser.add_argument("--mod-root", required=True, type=Path)
     parser.add_argument("--map-registry", required=True, type=Path)
     parser.add_argument("--generated-map", required=True, type=Path)
+    parser.add_argument("--manifest", type=Path)
     args = parser.parse_args()
-    validate(args.mod_root, args.map_registry, args.generated_map)
+    validate(args.mod_root, args.map_registry, args.generated_map, args.manifest)
 
 
 if __name__ == "__main__":
