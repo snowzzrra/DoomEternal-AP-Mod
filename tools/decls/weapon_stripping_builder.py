@@ -37,6 +37,15 @@ OWNERS = (
         "inventory_item": "weapon/player/bfg",
         "desired_count": "1",
     },
+    {
+        "name": "crucible_cinematic",
+        "container": "e3m1_slayer_patch2",
+        "source": WORKSPACE / "sp_hub_decl_analysis_20260719_140903" / "decls" / "game" / "sp" / "e3m1_slayer" / "e3m1_slayer_patch2" / "generated" / "decls" / "logicentity" / "maps" / "game" / "sp" / "e3m1_slayer" / "e3m1_slayer_cinematic_crucible" / "cinematic_crucible_info_logic.decl",
+        "path": "logicentity/maps/game/sp/e3m1_slayer/e3m1_slayer_cinematic_crucible/cinematic_crucible_info_logic.decl",
+        "sha256": "71693874af8425a398615587c82fa253175766315a16c571ae23d04a7a4b51e2",
+        "inventory_item": "weapon/player/crucible",
+        "desired_count": "1",
+    },
 )
 
 PAYLOAD_RE = re.compile(
