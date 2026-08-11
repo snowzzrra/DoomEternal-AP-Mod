@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSlider,
     QSpinBox,
     QTabWidget,
     QTableWidget,
@@ -37,6 +38,57 @@ from PySide6.QtWidgets import (
 
 from launcher_controller import LauncherController
 from options_foundation import load_start_inventory_catalog, suggested_yaml_filename
+
+
+class NamedRangeControl(QWidget):
+    """Numeric named-range input with visible special-value selection."""
+
+    def __init__(self, option: dict[str, object]):
+        super().__init__()
+        self._special_values = cast(list[dict[str, object]], option["special_values"])
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.special = QComboBox()
+        self.special.addItem("Set exact amount", None)
+        for special in self._special_values:
+            self.special.addItem(str(special["label"]), special["key"])
+        layout.addWidget(self.special)
+        numeric = QHBoxLayout()
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.spin = QSpinBox()
+        minimum = cast(int, option["minimum"])
+        maximum = cast(int, option["maximum"])
+        self.slider.setRange(minimum, maximum)
+        self.spin.setRange(minimum, maximum)
+        numeric.addWidget(self.slider, 1)
+        numeric.addWidget(self.spin)
+        layout.addLayout(numeric)
+        maximum_label = option.get("maximum_label")
+        if isinstance(maximum_label, str):
+            layout.addWidget(QLabel(f"{maximum_label} = {maximum}"))
+        self.slider.valueChanged.connect(self.spin.setValue)
+        self.spin.valueChanged.connect(self.slider.setValue)
+        self.special.currentIndexChanged.connect(self._set_special)
+        self.setValue(option["default"])
+
+    def _set_special(self, _index: int) -> None:
+        explicit = self.special.currentData() is None
+        self.slider.setEnabled(explicit)
+        self.spin.setEnabled(explicit)
+
+    def value(self) -> int | str:
+        special = self.special.currentData()
+        if isinstance(special, str):
+            return special
+        return self.spin.value()
+
+    def setValue(self, value: object) -> None:
+        if isinstance(value, str):
+            self.special.setCurrentIndex(max(0, self.special.findData(value)))
+            return
+        self.special.setCurrentIndex(0)
+        self.spin.setValue(cast(int, value))
 
 
 class LauncherUI(QMainWindow):
@@ -413,7 +465,7 @@ class LauncherUI(QMainWindow):
         card_layout.setSpacing(10)
         card_layout.addWidget(self._label("Starting Inventory", "section"))
         card_layout.addWidget(self._label(
-            "Add persistent progression or useful items. Quantities are written as the common Archipelago start_inventory map.",
+            "Add supported items. Quantities are written as the common Archipelago start_inventory map.",
             "muted",
         ))
         try:
@@ -447,7 +499,7 @@ class LauncherUI(QMainWindow):
 
         if not enabled:
             card_layout.addWidget(self._label(
-                "No safe item catalog is available. Starting inventory stays empty rather than offering unverified items.",
+                "No supported start-inventory items are available.",
                 "muted",
             ))
 
@@ -537,10 +589,12 @@ class LauncherUI(QMainWindow):
                 control.addItem(str(choice_name), choice_key)
             index = control.findData(default)
             control.setCurrentIndex(index if index >= 0 else 0)
-        else:
+        elif ui_type == "range":
             control = QSpinBox()
             control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
             control.setValue(cast(int, default))
+        else:
+            control = NamedRangeControl(option)
         self.option_controls[key] = control
         control.setMinimumWidth(170)
         layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
@@ -559,6 +613,8 @@ class LauncherUI(QMainWindow):
                 control.setCurrentIndex(max(0, control.findData(default)))
             elif isinstance(control, QSpinBox):
                 control.setValue(cast(int, default))
+            elif isinstance(control, NamedRangeControl):
+                control.setValue(default)
         self.start_inventory_table.setRowCount(0)
 
     def _save_player_options(self) -> None:
@@ -584,6 +640,8 @@ class LauncherUI(QMainWindow):
             elif isinstance(control, QComboBox):
                 values[key] = control.currentData()
             elif isinstance(control, QSpinBox):
+                values[key] = control.value()
+            elif isinstance(control, NamedRangeControl):
                 values[key] = control.value()
         values["start_inventory"] = self._start_inventory_values()
         try:

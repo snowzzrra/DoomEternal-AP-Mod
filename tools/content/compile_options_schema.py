@@ -24,18 +24,18 @@ def _load_apworld(ap_root: Path):
     os.environ.setdefault("SKIP_REQUIREMENTS_UPDATE", "1")
     sys.path.insert(0, str(ap_root))
     try:
-        from Options import Choice, Range, Toggle  # type: ignore[import-not-found]
+        from Options import Choice, NamedRange, Range, Toggle  # type: ignore[import-not-found]
         from worlds.doometernal import DoomEternalWorld  # type: ignore[import-not-found]
     finally:
         try:
             sys.path.remove(str(ap_root))
         except ValueError:
             pass
-    return DoomEternalWorld, Toggle, Choice, Range
+    return DoomEternalWorld, Toggle, Choice, Range, NamedRange
 
 
 def compile_schema(ap_root: Path) -> dict[str, Any]:
-    world, toggle_type, choice_type, range_type = _load_apworld(ap_root)
+    world, toggle_type, choice_type, range_type, named_range_type = _load_apworld(ap_root)
     options = []
     excluded = []
     for key, option_type in world.options_dataclass.type_hints.items():
@@ -67,6 +67,35 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                 }
             )
             continue
+        if issubclass(option_type, named_range_type):
+            special_names = getattr(option_type, "special_range_names", {})
+            if not isinstance(special_names, dict):
+                raise ValueError(f"invalid named range values for {key}")
+            special_values = [
+                {"key": name, "label": name.replace("_", " ").title()}
+                for name in sorted(special_names)
+            ]
+            default = int(option_type.default)
+            default = next(
+                (
+                    special["key"]
+                    for special in special_values
+                    if special_names[special["key"]] == default
+                ),
+                default,
+            )
+            named_range = {
+                **base,
+                "ui_type": "named_range",
+                "default": default,
+                "minimum": int(option_type.range_start),
+                "maximum": int(option_type.range_end),
+                "special_values": special_values,
+            }
+            if key == "praetor_suit_upgrades_in_pool":
+                named_range["maximum_label"] = "All"
+            options.append(named_range)
+            continue
         if issubclass(option_type, range_type):
             options.append(
                 {
@@ -92,7 +121,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
 
     source = ap_root / "worlds/doometernal/options.py"
     document = {
-        "schema_version": 1,
+        "schema_version": 2,
         "game": world.game,
         "source": "Archipelago/worlds/doometernal/options.py",
         "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),

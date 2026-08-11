@@ -31,14 +31,18 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Permanent no-option BFG stripping: neutralize canonical phobos pickup writers while preserving entity flow."
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Canonical region topology assigns public locations and audited campaign graph."
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "0695d313e35cbaaf359db847b62c08c6cb906b5b5355dff1152e70f78c5369d1",
+  "byte_sha256": "b647b299ef19a0ca5d5e06c5269d9485364ae39b67da25bbd8bf3b38f554249f",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17063314,
+    "byte_size": 17063484,
     "classes": 13744,
     "entity_count": 13782,
     "layers": 6997,
@@ -82,5 +86,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "7c3bb29edc581611a4394c772a073d776d56251e82b42be1dda92e9830f26824",
-  "semantic_sha256": "9d39cb962f7074dd2bfa38bc9c3b457bfa76851aeceba11b4dd2ff2728490031"
+  "semantic_sha256": "e5e97f73e0aef7601af560fd109005450cb3006e2e7aa8d1bc0498fbc5715dff"
 }

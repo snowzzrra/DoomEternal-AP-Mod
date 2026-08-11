@@ -12,11 +12,10 @@ from typing import Any, Mapping, cast
 import yaml
 
 
-OPTIONS_SCHEMA_VERSION = 1
-SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "range"})
+OPTIONS_SCHEMA_VERSION = 2
+SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "range", "named_range"})
 GAME_NAME = "DOOM Eternal"
 START_INVENTORY_KEY = "start_inventory"
-START_INVENTORY_SAFE_CLASSIFICATIONS = 0b0011
 
 
 def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -72,23 +71,57 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"choice {key} contains duplicate keys")
             if option.get("default") not in choice_keys:
                 raise ValueError(f"choice {key} default is not canonical")
-        else:
+        elif ui_type in {"range", "named_range"}:
             minimum = option.get("minimum")
             maximum = option.get("maximum")
             default = option.get("default")
             if any(
                 isinstance(value, bool) or not isinstance(value, int)
-                for value in (minimum, maximum, default)
+                for value in (minimum, maximum)
             ):
-                raise ValueError(f"range {key} bounds/default must be integers")
+                raise ValueError(f"range {key} bounds must be integers")
             minimum = cast(int, minimum)
             maximum = cast(int, maximum)
-            default = cast(int, default)
-            if minimum > maximum or not minimum <= default <= maximum:
+            if minimum > maximum:
+                raise ValueError(f"range {key} bounds are invalid")
+            if ui_type == "named_range":
+                special_values = option.get("special_values")
+                if not isinstance(special_values, list):
+                    raise ValueError(f"named range {key} lacks special values")
+                special_keys: list[str] = []
+                for special in special_values:
+                    if not isinstance(special, Mapping):
+                        raise ValueError(f"named range {key} contains malformed special value")
+                    special_key = special.get("key")
+                    if (
+                        not isinstance(special_key, str)
+                        or re.fullmatch(r"[a-z][a-z0-9_]*", special_key) is None
+                        or not isinstance(special.get("label"), str)
+                        or not special["label"].strip()
+                    ):
+                        raise ValueError(f"named range {key} contains invalid special value")
+                    special_keys.append(special_key)
+                if len(special_keys) != len(set(special_keys)):
+                    raise ValueError(f"named range {key} contains duplicate special values")
+                maximum_label = option.get("maximum_label")
+                if maximum_label is not None and (
+                    not isinstance(maximum_label, str) or not maximum_label.strip()
+                ):
+                    raise ValueError(f"named range {key} maximum label is invalid")
+                if default not in special_keys and (
+                    isinstance(default, bool)
+                    or not isinstance(default, int)
+                    or not minimum <= default <= maximum
+                ):
+                    raise ValueError(f"named range {key} default is invalid")
+            elif (
+                isinstance(default, bool)
+                or not isinstance(default, int)
+                or not minimum <= default <= maximum
+            ):
                 raise ValueError(f"range {key} default is outside bounds")
             option["minimum"] = minimum
             option["maximum"] = maximum
-            option["default"] = default
         options.append(option)
 
     excluded = document.get("excluded_options", [])
@@ -122,11 +155,7 @@ def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
-    """Load start-safe item names from canonical generated item metadata.
-
-    Explicit eligibility wins when supplied. Older projections safely fall back
-    to AP's progression/useful classification rule.
-    """
+    """Load explicitly supported start-inventory items from item metadata."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -137,8 +166,7 @@ def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
     if not isinstance(raw_items, Mapping):
         raise ValueError("item catalog lacks items")
 
-    entries: list[tuple[str, Mapping[str, Any]]] = []
-    explicit_eligibility = False
+    entries: list[tuple[str, bool | None]] = []
     for raw in raw_items.values():
         if not isinstance(raw, Mapping):
             raise ValueError("item catalog contains malformed item")
@@ -148,20 +176,12 @@ def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
         eligible = raw.get("start_inventory_eligible")
         if eligible is not None and not isinstance(eligible, bool):
             raise ValueError("item catalog start inventory eligibility must be boolean")
-        explicit_eligibility = explicit_eligibility or eligible is not None
-        entries.append((name, raw))
+        entries.append((name, eligible))
 
     catalog: list[dict[str, str]] = []
-    for name, item in entries:
-        if explicit_eligibility:
-            if item.get("start_inventory_eligible") is not True:
-                continue
-        else:
-            classification = item.get("classification")
-            if isinstance(classification, bool) or not isinstance(classification, int):
-                raise ValueError("item catalog classification must be an integer")
-            if not classification & START_INVENTORY_SAFE_CLASSIFICATIONS:
-                continue
+    for name, eligible in entries:
+        if eligible is not True:
+            continue
         catalog.append({"name": name, "label": name})
     return sorted(catalog, key=lambda item: item["label"].casefold())
 
@@ -201,12 +221,25 @@ def validate_option_values(
             choices = {choice["key"] for choice in option["choices"]}
             if not isinstance(value, str) or value not in choices:
                 raise ValueError(f"{key} must be one of {sorted(choices)}")
-        else:
+        elif option["ui_type"] == "range":
             if isinstance(value, bool) or not isinstance(value, int):
                 raise ValueError(f"{key} must be an integer")
             if not option["minimum"] <= value <= option["maximum"]:
                 raise ValueError(
                     f"{key} must be between {option['minimum']} and {option['maximum']}"
+                )
+        else:
+            special_keys = {special["key"] for special in option["special_values"]}
+            if isinstance(value, str):
+                if value not in special_keys:
+                    raise ValueError(f"{key} must be an explicit value or named range")
+            elif (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not option["minimum"] <= value <= option["maximum"]
+            ):
+                raise ValueError(
+                    f"{key} must be between {option['minimum']} and {option['maximum']} or a named range"
                 )
         result[key] = value
     result[START_INVENTORY_KEY] = validate_start_inventory(values[START_INVENTORY_KEY])

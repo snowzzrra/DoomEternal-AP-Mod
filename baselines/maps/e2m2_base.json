@@ -27,14 +27,18 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Combat Shotgun canonical item mapping adds its global runtime target."
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Canonical region topology assigns public locations and audited campaign graph."
     }
   ],
   "asset_package_contract_sha256": "229e53dac6f890364c30fc312a58965140c19453e8b7f6108a25a15bbcc50fef",
-  "byte_sha256": "9983f63bce614dd82cd32a2884c94171462f7468f3c0c3343f43405b20e840dd",
+  "byte_sha256": "4cf1cfc41ed7c721dd61cae0fc37cb1a2f8341af281988cc72261fb7b76e8158",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 126,
-    "byte_size": 28807552,
+    "byte_size": 28807720,
     "classes": 19130,
     "entity_count": 19134,
     "layers": 3691,
@@ -84,5 +88,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "165409c4b1f6e8b6cb6055d4aca5b97b24dd835fe15fbbe1cd1d92aa4bd98360",
-  "semantic_sha256": "4c6517968196b5095b102c1d7cafd1caf710acd1fea32e43e9b940996864a6c0"
+  "semantic_sha256": "f7d5bdd2ae5e77e39f6adc63bdfd82fd72d6edb2cf5be7f5268b410c274a5a01"
 }

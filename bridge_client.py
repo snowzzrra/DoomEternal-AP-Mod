@@ -1,6 +1,5 @@
 import asyncio
 import atexit
-from collections import deque
 import glob
 import hashlib
 import json
@@ -14,6 +13,7 @@ import sys
 import time
 import traceback
 import uuid
+from collections import deque
 from pathlib import Path
 from typing import NamedTuple
 
@@ -40,6 +40,7 @@ from item_classification import (
     normalize_network_classification,
     notification_style_for_item,
 )
+from item_contracts import start_inventory_eligible, validate_death_link_mode
 from item_reconciliation import (
     AP_RECEIPT_FEEDBACK,
     CLIENT_STATE_VERSION,
@@ -2497,6 +2498,7 @@ class DoomEternalContext(CommonContext):
         self.state_key = ""
         self.session_state = {}
         self.death_link_enabled = False
+        self.death_link_mode = "hardcore"
         self.previous_checkpoint_death = None
         self.checkpoint_death_by_save_slot = {}
         self.last_duration_cache_key = None
@@ -2650,21 +2652,40 @@ class DoomEternalContext(CommonContext):
                         "[DeathLink] Cleared room-bound receive events after slot change: %s.",
                         ", ".join(event_id[:12] for event_id in abandoned),
                     )
-            self.death_link_enabled = bool(args.get("slot_data", {}).get("death_link", False))
             slot_data = args.get("slot_data", {})
+            configured_mode = slot_data.get("death_link_mode")
+            if configured_mode is None:
+                self.death_link_mode = "hardcore"
+                self.death_link_enabled = bool(slot_data.get("death_link", False))
+            else:
+                try:
+                    self.death_link_enabled, blocker = validate_death_link_mode(configured_mode)
+                    self.death_link_mode = configured_mode
+                    if blocker:
+                        logger.error("[DeathLink] %s", blocker)
+                except ValueError as error:
+                    self.death_link_mode = "hardcore"
+                    self.death_link_enabled = False
+                    logger.error("[DeathLink] Disabled invalid slot mode: %s", error)
             materialized = {}
             configured = slot_data.get("starting_inventory", {})
             if isinstance(configured, dict):
                 by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
                 for name, quantity in configured.items():
-                    if name in by_name and isinstance(quantity, int) and quantity > 0:
+                    if (
+                        name in by_name
+                        and start_inventory_eligible(by_name[name])
+                        and isinstance(quantity, int)
+                        and quantity > 0
+                    ):
                         materialized[by_name[name]] = materialized.get(by_name[name], 0) + quantity
             weapon = slot_data.get("starting_weapon")
             if isinstance(weapon, str):
                 by_name = {entry["name"]: item_id for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()}
                 if weapon in by_name:
                     item_id = by_name[weapon]
-                    materialized[item_id] = materialized.get(item_id, 0) + 1
+                    if start_inventory_eligible(item_id):
+                        materialized[item_id] = materialized.get(item_id, 0) + 1
             processed_receipt_count = min(self.items_processed, len(self.items_received))
             for receipt in self.items_received[:processed_receipt_count]:
                 item_id = receipt.item

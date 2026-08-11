@@ -1,5 +1,15 @@
 import json
+from pathlib import Path
 
+from item_classification import load_item_classification_identity
+from item_contracts import (
+    UNSUPPORTED_EXTRA_LIVES_BLOCKER,
+    UNSUPPORTED_POWERUP_BLOCKER,
+    start_inventory_eligible,
+    validate_beta3_item_contracts,
+    validate_death_link_mode,
+)
+from item_reconciliation import load_policy_registry
 from launcher_core import DASH_ENTITY, DASH_LOCATION_ID, LaunchWorkflow, ModCompiler, SeedManifest, release_identity
 
 
@@ -90,3 +100,36 @@ def test_release_identity_has_required_revisions():
     assert identity["game"] == "DOOM Eternal"
     assert identity["bridge_protocol_version"] == 4
     assert identity["compiler_revision"] == 2
+
+
+def test_beta3_consumable_contracts_are_runtime_complete_and_non_startable():
+    root = Path(__file__).resolve().parents[1]
+    definitions = {
+        int(item_id): definition
+        for item_id, definition in json.loads(
+            (root / "data/items.json").read_text(encoding="utf-8")
+        ).items()
+    }
+    identity = load_item_classification_identity(root / "data/item_classifications.json")
+    classifications = {item_id: entry["classification"] for item_id, entry in identity.items()}
+    policies = load_policy_registry(root / "data/item_replay_policies.json", definitions)
+    validate_beta3_item_contracts(definitions, classifications, policies)
+    for item_id in (7770025, 7770026, 7770029, 7770030):
+        assert not start_inventory_eligible(item_id)
+
+
+def test_extra_lives_deathlink_mode_fails_closed_with_probe_blocker():
+    supported, blocker = validate_death_link_mode("extra_lives")
+    assert not supported
+    assert blocker == UNSUPPORTED_EXTRA_LIVES_BLOCKER
+    assert validate_death_link_mode("hardcore") == (True, None)
+
+
+def test_haste_massacre_contracts_fail_closed_with_runtime_proof_blocker():
+    assert UNSUPPORTED_POWERUP_BLOCKER == (
+        "Haste/Massacre runtime primitive proof blocker: local source proves "
+        "chrispy pickup/powerup/berserk and declares pickup/powerup/overdrive with "
+        "idStatusEffect_Haste, but proves no exact Haste activation command and no "
+        "Massacre entity or command; do not allocate APWorld or mod contract entries "
+        "until both engine primitives are proven"
+    )

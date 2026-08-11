@@ -16,15 +16,6 @@ MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
 
 
-def _runtime_region(catalog: ContentCatalog, name: str) -> str:
-    if "Weapon Mastery Challenge" in name:
-        return "Weapon Masteries"
-    for spec in catalog.maps.values():
-        if name.startswith(f"{spec.display_name} -"):
-            return spec.display_name
-    raise ValueError(f"runtime location has no map/region owner: {name}")
-
-
 def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     physical = [item for item in catalog.physical_locations if selected_map in (None, item.map_key)]
     if selected_map is not None and selected_map not in catalog.maps:
@@ -33,9 +24,11 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     # selector for catalog discovery, not a partial generated module.
     if selected_map is not None:
         physical = list(catalog.physical_locations)
-    rows = [(item.name, item.location_id, item.region) for item in physical]
+    rows: list[tuple[str, int | None, str]] = [
+        (item.name, item.location_id, item.region) for item in physical
+    ]
     rows.extend(
-        (item.name, item.location_id, _runtime_region(catalog, item.name)) for item in catalog.runtime_locations
+        (item.name, item.location_id, item.region) for item in catalog.runtime_locations
     )
     route = catalog.route
     rows.extend((item["name"], None, item["region"]) for item in route.get("virtual_locations", []))
@@ -112,8 +105,10 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
             "CAMPAIGN_CONNECTIONS = (",
         ]
     )
-    for source, destination, entrance in route["connections"]:
-        lines.append(f"    ({string(source)}, {string(destination)}, {string(entrance)}),")
+    for source, destination, entrance, condition in route["connections"]:
+        lines.append(
+            f"    ({string(source)}, {string(destination)}, {string(entrance)}, {dict(condition)!r}),"
+        )
     lines.extend(
         [
             ")",
@@ -132,6 +127,7 @@ def compile_catalog(
     output_root: Path | None = None,
     check: bool = False,
     map_key: str | None = None,
+    source_only: bool = False,
 ) -> bool:
     catalog = load_content_catalog()
     rendered = render(catalog, map_key)
@@ -163,6 +159,9 @@ def compile_catalog(
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(rendered, encoding="utf-8", newline="\n")
             changed = True
+
+    if source_only:
+        return changed
 
     if output_root is None:
         output_root = MOD_ROOT / "build" / "staging" / "runtime_catalog"
@@ -261,12 +260,14 @@ def main() -> int:
     parser.add_argument("--map", dest="map_key")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--output-root", type=Path, default=None)
+    parser.add_argument("--source-only", action="store_true")
     args = parser.parse_args()
     changed = compile_catalog(
         args.output,
         output_root=args.output_root,
         check=args.check,
         map_key=args.map_key,
+        source_only=args.source_only,
     )
     print("updated" if changed else "up-to-date")
     return 0

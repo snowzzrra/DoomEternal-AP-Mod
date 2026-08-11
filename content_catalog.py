@@ -97,6 +97,7 @@ class RuntimeLocationSpec:
     signal: Mapping[str, Any]
     data: Mapping[str, Any]
     category: str = ""
+    region: str = ""
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,12 @@ class ContentCatalog:
         default_factory=lambda: MappingProxyType({})
     )
     reserved_location_ids: Mapping[int, Mapping[str, Any]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    region_metadata: Mapping[str, Mapping[str, Any]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    region_assignments: Mapping[int, str] = field(
         default_factory=lambda: MappingProxyType({})
     )
 
@@ -228,36 +235,65 @@ def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
     return tuple(sorted(packages, key=lambda item: item["descriptor"]["order"]))
 
 
-def _normalized_route(packages: tuple[dict[str, Any], ...]) -> Mapping[str, Any]:
-    regions: list[tuple[int, str]] = []
-    connections: list[tuple[int, list[str]]] = []
-    virtual: list[tuple[int, dict[str, Any]]] = []
-    for package in packages:
-        raw = package["descriptor"]["route"]
-        if not isinstance(raw, Mapping):
-            raise ValueError(f"{package['descriptor']['key']}: route must be an object")
-        for row in raw.get("regions", []):
-            if not isinstance(row, Mapping) or set(row) != {"name", "order"}:
-                raise ValueError(f"{package['descriptor']['key']}: invalid route region")
-            regions.append((row["order"], row["name"]))
-        for row in raw.get("connections", []):
-            if not isinstance(row, Mapping) or set(row) != {"from", "to", "rule", "order"}:
-                raise ValueError(f"{package['descriptor']['key']}: invalid route connection")
-            connections.append((row["order"], [row["from"], row["to"], row["rule"]]))
-        for row in raw.get("virtual_locations", []):
-            if not isinstance(row, Mapping) or "order" not in row:
-                raise ValueError(f"{package['descriptor']['key']}: invalid route virtual location")
-            virtual.append((row["order"], {key: value for key, value in row.items() if key != "order"}))
-    def ordered(values):
-        if len({order for order, _ in values}) != len(values):
-            raise ValueError("route order values must be unique")
-        return [value for _, value in sorted(values)]
-    normalized_regions, normalized_connections, normalized_virtual = map(ordered, (regions, connections, virtual))
-    known = set(normalized_regions)
-    if len(known) != len(normalized_regions) or any(a not in known or b not in known for a, b, _ in normalized_connections):
-        raise ValueError("route has duplicate or undeclared regions")
-    return _freeze({"schema_version": 1, "regions": normalized_regions,
-                    "connections": normalized_connections, "virtual_locations": normalized_virtual})
+def _load_region_topology(root: Path) -> tuple[Mapping[str, Any], Mapping[int, str]]:
+    path = root / "content" / "catalog" / "region_topology.json"
+    topology = _json(path)
+    if topology.get("schema_version") != 1:
+        raise ValueError("region topology schema_version must be 1")
+    regions = topology.get("regions", [])
+    assignments = topology.get("assignments", {})
+    if not isinstance(regions, list) or not isinstance(assignments, Mapping):
+        raise ValueError("region topology regions/assignments are invalid")
+    names = [entry.get("name") for entry in regions]
+    if any(not isinstance(entry, Mapping) or not entry.get("name") for entry in regions):
+        raise ValueError("region topology contains an invalid region")
+    if len(names) != len(set(names)):
+        raise ValueError("region topology contains duplicate regions")
+    if set(assignments) - set(names):
+        raise ValueError("region topology assigns locations to undeclared regions")
+    flattened = [location_id for values in assignments.values() for location_id in values]
+    if len(flattened) != len(set(flattened)):
+        raise ValueError("region topology assigns a location more than once")
+    location_regions = {
+        int(location_id): region
+        for region, values in assignments.items()
+        for location_id in values
+    }
+    raw_connections = topology.get("connections", [])
+    raw_conditions = topology.get("connection_conditions", {})
+    if not isinstance(raw_connections, list) or not isinstance(raw_conditions, Mapping):
+        raise ValueError("region topology connections/connection_conditions are invalid")
+    connection_keys = set()
+    connections = []
+    for row in raw_connections:
+        if not isinstance(row, list) or len(row) != 3 or any(not isinstance(value, str) for value in row):
+            raise ValueError("region topology contains an invalid connection")
+        source, destination, entrance = row
+        key = f"{source} -> {destination}"
+        if key in connection_keys:
+            raise ValueError("region topology contains duplicate connection pairs")
+        connection_keys.add(key)
+        condition = raw_conditions.get(key, {})
+        if not isinstance(condition, Mapping):
+            raise ValueError(f"{key}: connection condition must be an object")
+        unknown = set(condition) - {"soft_capabilities"}
+        if unknown:
+            raise ValueError(f"{key}: unknown connection condition fields: {sorted(unknown)}")
+        capabilities = condition.get("soft_capabilities", [])
+        if not isinstance(capabilities, list) or any(not isinstance(value, str) or not value for value in capabilities):
+            raise ValueError(f"{key}: soft_capabilities must be a list of non-empty strings")
+        connections.append([source, destination, entrance, _freeze(dict(condition))])
+    undeclared_conditions = set(raw_conditions) - connection_keys
+    if undeclared_conditions:
+        raise ValueError(f"region topology declares conditions for unknown connections: {sorted(undeclared_conditions)}")
+    route = {
+        "schema_version": 1,
+        "regions": [entry["name"] for entry in sorted(regions, key=lambda entry: entry["order"])],
+        "connections": connections,
+        "virtual_locations": [],
+    }
+    metadata = {entry["name"]: entry for entry in regions}
+    return _freeze({"topology": topology, "route": route, "metadata": metadata}), MappingProxyType(location_regions)
 
 
 def _asset(raw_asset: Mapping[str, Any], spec: MapSpec) -> AssetSpec:
@@ -272,6 +308,7 @@ def _asset(raw_asset: Mapping[str, Any], spec: MapSpec) -> AssetSpec:
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
     canonical_visual = load_ap_visual_contract(root)
     packages = _map_content_packages(root)
+    topology_data, region_assignments = _load_region_topology(root)
     maps: dict[str, MapSpec] = {}
     physical: list[PhysicalLocationSpec] = []
     runtime: list[RuntimeLocationSpec] = []
@@ -296,8 +333,7 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
         )
         maps[key] = spec
         config = package["locations"]
-        policies, regions = config.get("target_policies", {}), config.get("region_overrides", {})
-        default_region = config.get("region", spec.display_name)
+        policies = config.get("target_policies", {})
         package_ids = set(config.get("entities", {}).values()) | {item["location_id"] for item in config.get("secret_encounters", [])}
         package_names = {int(location_id): name for location_id, name in config.get("names", {}).items()}
         if set(package_names) != package_ids:
@@ -307,11 +343,11 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             entity = ap_check.removeprefix("AP_CHECK_").lower()
             policy = _freeze(policies.get(entity, {}))
             physical.append(PhysicalLocationSpec("", location_id, key, ap_check,
-                regions.get(str(location_id), default_region), _strategy_for_policy(policy, ap_check), policy))
+                region_assignments[location_id], _strategy_for_policy(policy, ap_check), policy))
         for encounter in config.get("secret_encounters", []):
             location_id = encounter["location_id"]
             physical.append(PhysicalLocationSpec("", location_id, key,
-                encounter.get("ap_check", f"AP_CHECK_SECRET_{location_id}"), default_region,
+                encounter.get("ap_check", f"AP_CHECK_SECRET_{location_id}"), region_assignments[location_id],
                 "secret_encounter", _freeze(encounter)))
         assets.extend(_asset(asset, spec) for asset in package["assets"].get("assets", []))
         if spec.enabled:
@@ -324,7 +360,7 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
                 visual_presentation_policy=_freeze(canonical_visual["visual_presentation_policy"])))
         for entry in package["runtime"].get("locations", []):
             signal, category = _freeze(entry.get("signal", {})), entry.get("category", "")
-            item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category)
+            item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category, region_assignments[entry["location_id"]])
             runtime.append(item)
             if category != "mission_complete":
                 challenges.append(ChallengeSpec(item.name, item.location_id, item.mission_key, item.strategy, signal))
@@ -340,7 +376,7 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             goal = _freeze(package["onboarding"]["campaign_goal"])
     for entry in _json(root / "content" / "global_runtime.json").get("locations", []):
         signal, category = _freeze(entry.get("signal", {})), entry.get("category", "")
-        item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category)
+        item = RuntimeLocationSpec(entry["name"], entry["location_id"], entry.get("strategy", signal.get("kind", "")), entry.get("mission_key"), signal, _freeze(entry), category, region_assignments[entry["location_id"]])
         runtime.append(item)
         if category != "mission_complete":
             challenges.append(ChallengeSpec(item.name, item.location_id, item.mission_key, item.strategy, signal))
@@ -351,7 +387,8 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
         item.map_key, item.ap_check, item.region, item.strategy, item.policy) for item in physical]
     catalog = ContentCatalog(root, MappingProxyType(maps), tuple(physical), tuple(runtime),
         tuple(challenges), tuple(publishers), tuple(assets), MappingProxyType(names), goal,
-        _normalized_route(packages), MappingProxyType(reserved))
+        topology_data["route"], MappingProxyType(reserved),
+        MappingProxyType(topology_data["metadata"]), region_assignments)
     validate_content_catalog(catalog)
     return catalog
 
@@ -368,7 +405,55 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             f"reserved location IDs are public: {sorted(collisions)}"
         )
     known_ids = set(ids)
+    region_names = set(catalog.route.get("regions", ()))
+    metadata_names = set(catalog.region_metadata)
+    if region_names != metadata_names or set(catalog.region_assignments) != known_ids:
+        raise ValueError("region topology must declare and assign every public location")
+    if any(region not in region_names for region in catalog.region_assignments.values()):
+        raise ValueError("region topology assigns a location to an unknown region")
+    connections = catalog.route.get("connections", ())
+    if any(len(row) != 4 or row[0] not in region_names or row[1] not in region_names or row[0] == row[1] for row in connections):
+        raise ValueError("region topology contains an illegal connection")
+    pairs = {(row[0], row[1]) for row in connections}
+    if len(pairs) != len(connections):
+        raise ValueError("region topology contains duplicate connections")
+    if any(set(row[3]) - {"soft_capabilities"} for row in connections):
+        raise ValueError("region topology contains an unknown connection condition field")
+    reachable = {"Menu"}
+    while True:
+        expanded = reachable | {row[1] for row in connections if row[0] in reachable}
+        if expanded == reachable:
+            break
+        reachable = expanded
+    if reachable != region_names:
+        raise ValueError("region topology contains unreachable regions")
+    mission_regions: dict[str, list[str]] = {}
+    terminal_regions: dict[str, list[str]] = {}
+    for region, metadata in catalog.region_metadata.items():
+        mission_key = metadata.get("mission_key")
+        if mission_key:
+            mission_regions.setdefault(mission_key, []).append(region)
+            if metadata.get("terminal"):
+                terminal_regions.setdefault(mission_key, []).append(region)
+    if any(not 2 <= len(regions) <= 4 for regions in mission_regions.values()):
+        raise ValueError("each base mission must have two to four regions")
+    if any(len(regions) != 1 for regions in terminal_regions.values()) or set(terminal_regions) != set(mission_regions):
+        raise ValueError("each base mission must have exactly one terminal region")
+    for item in (*catalog.physical_locations, *catalog.runtime_locations):
+        if catalog.region_assignments.get(item.location_id) != item.region:
+            raise ValueError(f"{item.name}: region assignment is not canonical")
+    for item in catalog.physical_locations:
+        region_mission = catalog.region_metadata[item.region].get("mission_key")
+        if item.map_key != "hub" and region_mission != item.map_key:
+            raise ValueError(f"{item.name}: physical location is outside its mission topology")
     for item in catalog.runtime_locations:
+        metadata = catalog.region_metadata[item.region]
+        if item.category == "mission_complete":
+            if not metadata.get("terminal") or not metadata.get("mission_key"):
+                raise ValueError(f"{item.name}: mission complete is outside terminal mission region")
+        elif item.category in {"mission_challenges", "all_mission_challenges"}:
+            if not metadata.get("mission_key"):
+                raise ValueError(f"{item.name}: challenge is outside its mission topology")
         if item.strategy not in RUNTIME_STRATEGIES:
             raise ValueError(f"{item.name}: unknown runtime strategy {item.strategy}")
         sources = item.signal.get("physical_location_ids", ())

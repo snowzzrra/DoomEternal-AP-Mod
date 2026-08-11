@@ -101,11 +101,13 @@
     },
     "7770025": {
       "name": "Full Heal",
-      "policy": "never_replay"
+      "policy": "never_replay",
+      "receipt_feedback": "ap"
     },
     "7770026": {
       "name": "Full Armor",
-      "policy": "never_replay"
+      "policy": "never_replay",
+      "receipt_feedback": "ap"
     },
     "7770027": {
       "name": "Fuel",
@@ -117,11 +119,13 @@
     },
     "7770029": {
       "name": "Soulsphere",
-      "policy": "never_replay"
+      "policy": "never_replay",
+      "receipt_feedback": "ap"
     },
     "7770030": {
       "name": "Berserk",
-      "policy": "never_replay"
+      "policy": "never_replay",
+      "receipt_feedback": "ap"
     },
     "7770031": {
       "name": "Small Health",

@@ -1,0 +1,45 @@
+{
+    "schema_version": 1,
+    "contract_revision": 3,
+    "items": {
+        "7770025": {
+            "name": "Full Heal",
+            "runtime_family": "resource",
+            "runtime_primitive": "target_command",
+            "runtime_effect": "give health",
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770026": {
+            "name": "Full Armor",
+            "runtime_family": "resource",
+            "runtime_primitive": "target_command",
+            "runtime_effect": "give armor",
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770029": {
+            "name": "Soulsphere",
+            "runtime_family": "multi_command",
+            "runtime_primitive": "target_command",
+            "runtime_effect": [
+                "give health 200",
+                "give armor 200"
+            ],
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770030": {
+            "name": "Berserk",
+            "runtime_family": "trap_spawn",
+            "runtime_primitive": "target_command",
+            "runtime_effect": "chrispy pickup/powerup/berserk",
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        }
+    }
+}

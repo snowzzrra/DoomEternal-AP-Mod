@@ -49,7 +49,7 @@
   "game": "DOOM Eternal",
   "options": [
     {
-      "default": 50,
+      "default": "normal",
       "description": "A system that can move progression earlier, to try and prevent the player from getting stuck and bored early.\n\nA lower setting means more getting stuck. A higher setting means less getting stuck.",
       "display_name": "Progression Balancing",
       "group": "Game Options",
@@ -57,7 +57,21 @@
       "maximum": 99,
       "minimum": 0,
       "source_class": "ProgressionBalancing",
-      "ui_type": "range"
+      "special_values": [
+        {
+          "key": "disabled",
+          "label": "Disabled"
+        },
+        {
+          "key": "extreme",
+          "label": "Extreme"
+        },
+        {
+          "key": "normal",
+          "label": "Normal"
+        }
+      ],
+      "ui_type": "named_range"
     },
     {
       "choices": [
@@ -166,9 +180,48 @@
       "key": "starting_weapon",
       "source_class": "StartingWeapon",
       "ui_type": "choice"
+    },
+    {
+      "default": 6,
+      "description": "Number of individual Praetor Suit upgrades placed in the item pool.\n\n``Random`` is resolved from the seeded world RNG. Its bounded, middle-biased\nrange avoids both empty and nearly-complete upgrade sets while explicit\nvalues remain available across the full catalog range.",
+      "display_name": "Praetor Suit Upgrades in Pool",
+      "group": "Game Options",
+      "key": "praetor_suit_upgrades_in_pool",
+      "maximum": 21,
+      "maximum_label": "All",
+      "minimum": 0,
+      "source_class": "PraetorSuitUpgradesInPool",
+      "special_values": [
+        {
+          "key": "random",
+          "label": "Random"
+        }
+      ],
+      "ui_type": "named_range"
+    },
+    {
+      "choices": [
+        {
+          "key": "hardcore",
+          "label": "Hardcore",
+          "value": 0
+        },
+        {
+          "key": "extra_lives",
+          "label": "Extra Lives",
+          "value": 1
+        }
+      ],
+      "default": "hardcore",
+      "description": "DeathLink gameplay mode sent to the runtime DeathLink lane.\n\nHardcore applies incoming deaths directly. Extra Lives requires verified\nruntime outcome telemetry; unsupported runtimes reject this mode.",
+      "display_name": "DeathLink Mode",
+      "group": "Game Options",
+      "key": "death_link_mode",
+      "source_class": "DeathLinkMode",
+      "ui_type": "choice"
     }
   ],
-  "schema_version": 1,
+  "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "77948547a337eb586063782b9f4a3fb8e8e07f2e247b75d0c2764ba87ff9fc70"
+  "source_sha256": "18b3fa09ac502415a61ab95c94cc49efd95e1d14790cfca61296462d37dabb3f"
 }

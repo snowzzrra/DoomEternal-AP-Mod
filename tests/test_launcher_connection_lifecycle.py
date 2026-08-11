@@ -125,7 +125,7 @@ def test_connection_failure_after_connected_restores_retry_ready_ui(monkeypatch)
     for name in (
         "QApplication", "QCheckBox", "QComboBox", "QFileDialog", "QFrame", "QGridLayout", "QHeaderView",
         "QHBoxLayout", "QLabel", "QLineEdit", "QMainWindow", "QMessageBox", "QPlainTextEdit",
-        "QProgressBar", "QPushButton", "QScrollArea", "QSizePolicy", "QSpinBox", "QTabWidget", "QTableWidget",
+        "QProgressBar", "QPushButton", "QScrollArea", "QSizePolicy", "QSlider", "QSpinBox", "QTabWidget", "QTableWidget",
         "QTableWidgetItem", "QVBoxLayout", "QWidget",
     ):
         setattr(qtwidgets, name, object)

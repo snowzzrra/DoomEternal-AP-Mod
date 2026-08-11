@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "regions": [
+    {"name": "Menu", "mission_key": null, "order": 0},
+    {"name": "Weapon Masteries", "mission_key": null, "order": 1},
+    {"name": "Hell on Earth - Barges/Approach", "mission_key": "e1m1_intro", "order": 2},
+    {"name": "Hell on Earth - Council/Downtown", "mission_key": "e1m1_intro", "order": 3, "terminal": true},
+    {"name": "Fortress of Doom - First Visit", "mission_key": null, "order": 4},
+    {"name": "Exultia - Exultia", "mission_key": "e1m2_war", "order": 5},
+    {"name": "Exultia - Hell", "mission_key": "e1m2_war", "order": 6},
+    {"name": "Exultia - Betrayer/Exit", "mission_key": "e1m2_war", "order": 7, "terminal": true},
+    {"name": "Fortress of Doom - Second Visit", "mission_key": null, "order": 8},
+    {"name": "Cultist Base - Outer/Key", "mission_key": "e1m3_cult", "order": 9},
+    {"name": "Cultist Base - Inner/Revenant", "mission_key": "e1m3_cult", "order": 10},
+    {"name": "Cultist Base - Prison/Train", "mission_key": "e1m3_cult", "order": 11, "terminal": true},
+    {"name": "Doom Hunter Base - Approach", "mission_key": "e1m4_boss", "order": 12},
+    {"name": "Doom Hunter Base - Inner Base", "mission_key": "e1m4_boss", "order": 13},
+    {"name": "Doom Hunter Base - Arena", "mission_key": "e1m4_boss", "order": 14, "terminal": true},
+    {"name": "Fortress of Doom - Third Visit", "mission_key": null, "order": 15},
+    {"name": "Super Gore Nest - Yellow", "mission_key": "e2m1_nest", "order": 16},
+    {"name": "Super Gore Nest - Red", "mission_key": "e2m1_nest", "order": 17},
+    {"name": "Super Gore Nest - Blue", "mission_key": "e2m1_nest", "order": 18},
+    {"name": "Super Gore Nest - Heart/Escape", "mission_key": "e2m1_nest", "order": 19, "terminal": true},
+    {"name": "Fortress of Doom - Fourth Visit", "mission_key": null, "order": 20},
+    {"name": "ARC Complex - Approach/City", "mission_key": "e2m2_base", "order": 21},
+    {"name": "ARC Complex - Turrets/Sewers", "mission_key": "e2m2_base", "order": 22},
+    {"name": "ARC Complex - HQ/Marauder", "mission_key": "e2m2_base", "order": 23, "terminal": true},
+    {"name": "Fortress of Doom - Fifth Visit", "mission_key": null, "order": 24},
+    {"name": "Mars Core - Phobos/BFG", "mission_key": "e2m3_core", "order": 25},
+    {"name": "Mars Core - Transit", "mission_key": "e2m3_core", "order": 26},
+    {"name": "Mars Core - Surface/Portal", "mission_key": "e2m3_core", "order": 27, "terminal": true},
+    {"name": "Sentinel Prime - City/Procession", "mission_key": "e2m4_boss", "order": 28},
+    {"name": "Sentinel Prime - Gladiator", "mission_key": "e2m4_boss", "order": 29, "terminal": true},
+    {"name": "Fortress of Doom - Sixth Visit", "mission_key": null, "order": 30},
+    {"name": "Taras Nabad - City/Titan", "mission_key": "e3m1_slayer", "order": 31},
+    {"name": "Taras Nabad - Throne/Catacombs", "mission_key": "e3m1_slayer", "order": 32},
+    {"name": "Taras Nabad - Power Core/Forge", "mission_key": "e3m1_slayer", "order": 33, "terminal": true},
+    {"name": "Fortress of Doom - Seventh Visit", "mission_key": null, "order": 34},
+    {"name": "Nekravol - Entrance", "mission_key": "e3m2_hell", "order": 35},
+    {"name": "Nekravol - Kalibas", "mission_key": "e3m2_hell", "order": 36},
+    {"name": "Nekravol - Upper Factory/Exit", "mission_key": "e3m2_hell", "order": 37, "terminal": true},
+    {"name": "Nekravol Part II - Soul Forge", "mission_key": "e3m2_hell_b", "order": 38},
+    {"name": "Nekravol Part II - Tower", "mission_key": "e3m2_hell_b", "order": 39},
+    {"name": "Nekravol Part II - Top/Portal", "mission_key": "e3m2_hell_b", "order": 40, "terminal": true},
+    {"name": "Urdak - Approach", "mission_key": "e3m3_maykr", "order": 41},
+    {"name": "Urdak - Portal Reconfiguration", "mission_key": "e3m3_maykr", "order": 42},
+    {"name": "Urdak - Khan", "mission_key": "e3m3_maykr", "order": 43, "terminal": true},
+    {"name": "Final Sin - Lower City", "mission_key": "e3m4_boss", "order": 44},
+    {"name": "Final Sin - Upper Towers", "mission_key": "e3m4_boss", "order": 45},
+    {"name": "Final Sin - Icon", "mission_key": "e3m4_boss", "order": 46, "terminal": true}
+  ],
+  "connections": [
+    ["Menu", "Hell on Earth - Barges/Approach", ""],
+    ["Menu", "Weapon Masteries", ""],
+    ["Hell on Earth - Barges/Approach", "Hell on Earth - Council/Downtown", ""],
+    ["Hell on Earth - Council/Downtown", "Fortress of Doom - First Visit", "Return to Fortress after Hell on Earth"],
+    ["Fortress of Doom - First Visit", "Exultia - Exultia", "Portal to Exultia"],
+    ["Exultia - Exultia", "Exultia - Hell", ""],
+    ["Exultia - Hell", "Exultia - Betrayer/Exit", ""],
+    ["Exultia - Betrayer/Exit", "Fortress of Doom - Second Visit", "Return to Fortress after Exultia"],
+    ["Fortress of Doom - Second Visit", "Cultist Base - Outer/Key", "Portal to Cultist Base"],
+    ["Cultist Base - Outer/Key", "Cultist Base - Inner/Revenant", ""],
+    ["Cultist Base - Inner/Revenant", "Cultist Base - Prison/Train", ""],
+    ["Cultist Base - Prison/Train", "Doom Hunter Base - Approach", "Portal to Doom Hunter Base"],
+    ["Doom Hunter Base - Approach", "Doom Hunter Base - Inner Base", ""],
+    ["Doom Hunter Base - Inner Base", "Doom Hunter Base - Arena", ""],
+    ["Doom Hunter Base - Arena", "Fortress of Doom - Third Visit", "Return to Fortress after Doom Hunter Base"],
+    ["Fortress of Doom - Third Visit", "Super Gore Nest - Yellow", "Portal to Super Gore Nest"],
+    ["Super Gore Nest - Yellow", "Super Gore Nest - Red", ""],
+    ["Super Gore Nest - Red", "Super Gore Nest - Blue", ""],
+    ["Super Gore Nest - Blue", "Super Gore Nest - Heart/Escape", ""],
+    ["Super Gore Nest - Heart/Escape", "Fortress of Doom - Fourth Visit", "Return to Fortress after Super Gore Nest"],
+    ["Fortress of Doom - Fourth Visit", "ARC Complex - Approach/City", "Portal to ARC Complex"],
+    ["ARC Complex - Approach/City", "ARC Complex - Turrets/Sewers", ""],
+    ["ARC Complex - Turrets/Sewers", "ARC Complex - HQ/Marauder", ""],
+    ["ARC Complex - HQ/Marauder", "Fortress of Doom - Fifth Visit", "Return to Fortress after ARC Complex"],
+    ["Fortress of Doom - Fifth Visit", "Mars Core - Phobos/BFG", "Portal to Mars Core"],
+    ["Mars Core - Phobos/BFG", "Mars Core - Transit", ""],
+    ["Mars Core - Transit", "Mars Core - Surface/Portal", ""],
+    ["Mars Core - Surface/Portal", "Sentinel Prime - City/Procession", "Portal to Sentinel Prime"],
+    ["Sentinel Prime - City/Procession", "Sentinel Prime - Gladiator", ""],
+    ["Sentinel Prime - Gladiator", "Fortress of Doom - Sixth Visit", "Return to Fortress after Sentinel Prime"],
+    ["Fortress of Doom - Sixth Visit", "Taras Nabad - City/Titan", "Portal to Taras Nabad"],
+    ["Taras Nabad - City/Titan", "Taras Nabad - Throne/Catacombs", ""],
+    ["Taras Nabad - Throne/Catacombs", "Taras Nabad - Power Core/Forge", ""],
+    ["Taras Nabad - Power Core/Forge", "Fortress of Doom - Seventh Visit", "Return to Fortress after Taras Nabad"],
+    ["Fortress of Doom - Seventh Visit", "Nekravol - Entrance", "Portal to Nekravol"],
+    ["Nekravol - Entrance", "Nekravol - Kalibas", ""],
+    ["Nekravol - Kalibas", "Nekravol - Upper Factory/Exit", ""],
+    ["Nekravol - Upper Factory/Exit", "Nekravol Part II - Soul Forge", "Continue to Nekravol Part II"],
+    ["Nekravol Part II - Soul Forge", "Nekravol Part II - Tower", ""],
+    ["Nekravol Part II - Tower", "Nekravol Part II - Top/Portal", ""],
+    ["Nekravol Part II - Top/Portal", "Urdak - Approach", "Continue to Urdak"],
+    ["Urdak - Approach", "Urdak - Portal Reconfiguration", ""],
+    ["Urdak - Portal Reconfiguration", "Urdak - Khan", ""],
+    ["Urdak - Khan", "Final Sin - Lower City", "Continue to Final Sin"],
+    ["Final Sin - Lower City", "Final Sin - Upper Towers", ""],
+    ["Final Sin - Upper Towers", "Final Sin - Icon", ""]
+  ],
+  "connection_conditions": {
+    "Exultia - Hell -> Exultia - Betrayer/Exit": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Cultist Base - Inner/Revenant -> Cultist Base - Prison/Train": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Doom Hunter Base - Inner Base -> Doom Hunter Base - Arena": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Super Gore Nest - Red -> Super Gore Nest - Blue": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Super Gore Nest - Blue -> Super Gore Nest - Heart/Escape": {
+      "soft_capabilities": ["weapon_coverage_3"]
+    },
+    "ARC Complex - Approach/City -> ARC Complex - Turrets/Sewers": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "ARC Complex - Turrets/Sewers -> ARC Complex - HQ/Marauder": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Mars Core - Phobos/BFG -> Mars Core - Transit": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Mars Core - Transit -> Mars Core - Surface/Portal": {
+      "soft_capabilities": ["weapon_coverage_3"]
+    },
+    "Sentinel Prime - City/Procession -> Sentinel Prime - Gladiator": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Taras Nabad - Throne/Catacombs -> Taras Nabad - Power Core/Forge": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Nekravol - Kalibas -> Nekravol - Upper Factory/Exit": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Nekravol Part II - Tower -> Nekravol Part II - Top/Portal": {
+      "soft_capabilities": ["weapon_coverage_3"]
+    },
+    "Urdak - Portal Reconfiguration -> Urdak - Khan": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Final Sin - Lower City -> Final Sin - Upper Towers": {
+      "soft_capabilities": ["weapon_coverage_2"]
+    },
+    "Final Sin - Upper Towers -> Final Sin - Icon": {
+      "soft_capabilities": ["weapon_coverage_3"]
+    }
+  },
+  "assignments": {
+    "Hell on Earth - Barges/Approach": [7770001, 7770002, 7770003, 7770008, 7770014],
+    "Hell on Earth - Council/Downtown": [7770004, 7770005, 7770006, 7770007, 7770009, 7770010, 7770011, 7770012, 7770013, 7770015, 7770016, 7770017, 7770018, 7770019, 7770020, 7770122],
+    "Exultia - Exultia": [7770021, 7770025, 7770026, 7770027, 7770028, 7770029, 7770030, 7770031, 7770032, 7770034, 7770035, 7770036, 7770037, 7770038, 7770039, 7770040, 7770041, 7770043, 7770044, 7770083, 7770084],
+    "Exultia - Hell": [7770024, 7770045, 7770089, 7770090],
+    "Exultia - Betrayer/Exit": [7770023, 7770042, 7770123],
+    "Fortress of Doom - First Visit": [7770073, 7770086],
+    "Fortress of Doom - Second Visit": [7770072, 7770074, 7770081, 7770087, 7770088, 7770163, 7770164, 7770165, 7770166, 7770167, 7770168, 7770169, 7770171, 7770253, 7770254, 7770255],
+    "Fortress of Doom - Third Visit": [7770170],
+    "Cultist Base - Outer/Key": [7770046, 7770047, 7770048, 7770049, 7770050, 7770051, 7770052, 7770053, 7770054, 7770056, 7770057, 7770058, 7770059, 7770060, 7770061, 7770062, 7770063, 7770064, 7770065, 7770066, 7770067, 7770071],
+    "Cultist Base - Inner/Revenant": [7770091, 7770092, 7770138, 7770139, 7770140, 7770141],
+    "Cultist Base - Prison/Train": [7770069, 7770070, 7770124],
+    "Doom Hunter Base - Approach": [7770143, 7770144, 7770145, 7770146, 7770147, 7770148, 7770149, 7770161],
+    "Doom Hunter Base - Inner Base": [7770150, 7770151, 7770152, 7770153, 7770154, 7770155],
+    "Doom Hunter Base - Arena": [7770156, 7770157, 7770158, 7770159, 7770160, 7770162, 7770172, 7770173, 7770174, 7770175],
+    "Super Gore Nest - Yellow": [7770176, 7770177, 7770181, 7770183, 7770185, 7770188, 7770190, 7770194, 7770196, 7770197, 7770202, 7770204, 7770206, 7770207, 7770208, 7770209],
+    "Super Gore Nest - Red": [7770178, 7770182, 7770191, 7770195, 7770198, 7770203],
+    "Super Gore Nest - Blue": [7770179, 7770184, 7770192, 7770199, 7770205],
+    "Super Gore Nest - Heart/Escape": [7770180, 7770186, 7770187, 7770189, 7770193, 7770200, 7770201, 7770210],
+    "ARC Complex - Approach/City": [7770211, 7770212, 7770213, 7770214, 7770215, 7770216, 7770217, 7770223, 7770224, 7770225, 7770226, 7770227, 7770228, 7770229, 7770230, 7770231, 7770232, 7770233],
+    "ARC Complex - Turrets/Sewers": [7770218, 7770219, 7770220, 7770221, 7770222, 7770240, 7770242, 7770243, 7770249, 7770250, 7770251, 7770252],
+    "ARC Complex - HQ/Marauder": [7770234, 7770235, 7770236, 7770237, 7770244, 7770245, 7770246, 7770247, 7770248],
+    "Mars Core - Phobos/BFG": [7770256, 7770257, 7770258, 7770259, 7770260, 7770261, 7770262, 7770263, 7770264, 7770266, 7770267, 7770268, 7770269, 7770270, 7770271, 7770272, 7770273, 7770274, 7770275, 7770276, 7770277, 7770278, 7770279, 7770280, 7770281, 7770283],
+    "Mars Core - Transit": [7770265],
+    "Mars Core - Surface/Portal": [7770284, 7770285, 7770286, 7770287, 7770288, 7770289],
+    "Sentinel Prime - City/Procession": [7770291, 7770292, 7770293, 7770294, 7770295, 7770296, 7770297, 7770298],
+    "Sentinel Prime - Gladiator": [7770290, 7770299, 7770300, 7770301, 7770302],
+    "Taras Nabad - City/Titan": [7770303, 7770306, 7770307, 7770308, 7770311, 7770313, 7770314, 7770315, 7770316, 7770317, 7770319, 7770320, 7770321, 7770322, 7770323, 7770324, 7770325, 7770326, 7770327, 7770328, 7770329, 7770330],
+    "Taras Nabad - Throne/Catacombs": [7770309, 7770310, 7770318, 7770331, 7770332],
+    "Taras Nabad - Power Core/Forge": [7770312, 7770333, 7770334, 7770335, 7770336, 7770337, 7770338, 7770339],
+    "Nekravol - Entrance": [7770340, 7770341, 7770355],
+    "Nekravol - Kalibas": [7770342, 7770343, 7770350, 7770356, 7770357],
+    "Nekravol - Upper Factory/Exit": [7770344, 7770345, 7770346, 7770347, 7770348, 7770349, 7770351, 7770352, 7770353, 7770354, 7770358, 7770359, 7770360, 7770361, 7770362],
+    "Nekravol Part II - Soul Forge": [7770363, 7770364, 7770365, 7770366, 7770367, 7770368, 7770369, 7770370, 7770381],
+    "Nekravol Part II - Tower": [7770371, 7770372, 7770373, 7770374, 7770375, 7770376, 7770377],
+    "Nekravol Part II - Top/Portal": [7770378, 7770379, 7770380, 7770382, 7770383, 7770384, 7770385, 7770386, 7770387],
+    "Urdak - Approach": [7770388, 7770389, 7770390, 7770391, 7770394, 7770396, 7770397],
+    "Urdak - Portal Reconfiguration": [7770393, 7770395, 7770398, 7770399, 7770400, 7770401, 7770402, 7770403, 7770404, 7770405, 7770406, 7770407, 7770408, 7770409, 7770410],
+    "Urdak - Khan": [7770392, 7770411],
+    "Final Sin - Lower City": [7770412],
+    "Final Sin - Upper Towers": [7770413, 7770415, 7770416, 7770417],
+    "Final Sin - Icon": [7770414],
+    "Weapon Masteries": [7770125, 7770126, 7770127, 7770128, 7770129, 7770130, 7770131, 7770132, 7770133, 7770134, 7770135, 7770136, 7770137]
+  }
+}
