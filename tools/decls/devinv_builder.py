@@ -109,7 +109,7 @@ SAFE_REPRESENTATIONS = {
 }
 
 STARTING_WEAPON_NAMES = frozenset({
-    "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Ballista", "Chaingun", "Combat Shotgun",
+    "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Super Shotgun", "Ballista", "Chaingun", "Combat Shotgun",
 })
 
 # Expected vanilla markers that must exist before patching
@@ -138,18 +138,23 @@ _ITEM_BLOCK_RE = re.compile(
 _ITEM_PATH_RE = re.compile(r'\bitem = "(?P<path>[^"]+)";')
 
 
-def _rewrite_base_combat_shotgun(source: str, equipped: bool) -> str:
-    """Keep vanilla shotgun ownership while selecting its equip state."""
+def _remove_base_combat_shotgun(source: str) -> str:
+    """Remove vanilla shotgun ownership and compact fixed inventory indices."""
     old = (
         '\t\t\titem[5] = {\n'
         f'\t\t\t\titem = "{COMBAT_SHOTGUN_PATH}";\n'
         '\t\t\t\tequip = true;\n'
         '\t\t\t}'
     )
-    new = old if equipped else old.replace('\n\t\t\t\tequip = true;', '')
     if source.count(old) != 1:
         raise ValueError("canonical DevInv base Combat Shotgun entry is missing or ambiguous")
-    return source.replace(old, new, 1)
+    source = source.replace(old + "\n", "", 1)
+    for old_index, new_index in ((6, 5), (7, 6)):
+        marker = f"\t\t\titem[{old_index}] = {{"
+        if source.count(marker) != 1:
+            raise ValueError("canonical DevInv fixed inventory entry is missing or ambiguous")
+        source = source.replace(marker, f"\t\t\titem[{new_index}] = {{", 1)
+    return source
 
 
 def canonical_base() -> str:
@@ -226,8 +231,13 @@ def build_devinv_loadout(
     ):
         raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
 
+    source = canonical_base()
+    keep_vanilla_shotgun = starting_weapon in (None, "Combat Shotgun")
+    if not keep_vanilla_shotgun:
+        source = _remove_base_combat_shotgun(source)
+
     entries: list[str] = []
-    index = 8
+    index = 8 if keep_vanilla_shotgun else 7
     for name in sorted(starting_inventory):
         quantity = starting_inventory[name]
         if name not in SAFE_REPRESENTATIONS:
@@ -240,20 +250,18 @@ def build_devinv_loadout(
             for _ in range(quantity):
                 entries.append(_decl_item(field, path, flags, index))
                 index += 1
-    if starting_weapon is not None:
+    if starting_weapon is not None and starting_weapon != "Combat Shotgun":
         field, path, _ = SAFE_REPRESENTATIONS[starting_weapon][0]
         entries.append(_decl_item(field, path, ("equip",), index))
+        index += 1
 
-    source = canonical_base()
-    if starting_weapon is not None and starting_weapon != "Combat Shotgun":
-        source = _rewrite_base_combat_shotgun(source, equipped=False)
     if entries:
         marker = "\t\t}\n\t\tcurrencyToGive = {"
         if source.count(marker) != 1:
             raise ValueError("canonical DevInv startingInventory block is missing or ambiguous")
         block = "\n".join(entries) + "\n"
         source = source.replace(marker, block + "\t\t}\n\t\tcurrencyToGive = {", 1)
-        source = source.replace("\t\t\tnum = 8;", f"\t\t\tnum = {index};", 1)
+    source = source.replace("\t\t\tnum = 8;", f"\t\t\tnum = {index};", 1)
     validate_devinv_source(source, starting_inventory, starting_weapon)
     return source
 
@@ -282,35 +290,66 @@ def validate_devinv_source(
         raise ValueError("starting_inventory must be an object")
     if starting_weapon is not None and starting_weapon not in STARTING_WEAPON_NAMES:
         raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
+    match = _STARTING_INVENTORY_RE.search(source)
+    if match is None:
+        raise ValueError("DevInvLoadout startingInventory block is missing or ambiguous")
+    num_match = re.search(r"\t\t\tnum = (?P<num>\d+);", match.group("body"))
+    item_matches = list(_ITEM_BLOCK_RE.finditer(match.group("body")))
+    if num_match is None:
+        raise ValueError("DevInvLoadout startingInventory num is missing")
+    declared_num = int(num_match.group("num"))
+    indices = [int(item_match.group("index")) for item_match in item_matches]
+    if indices != list(range(declared_num)):
+        raise ValueError("DevInvLoadout startingInventory indices are not contiguous or num is untruthful")
+    item_blocks = {
+        int(item_match.group("index")): item_match.group("body")
+        for item_match in item_matches
+    }
+
+    weapon_paths = {
+        SAFE_REPRESENTATIONS[name][0][1]
+        for name in STARTING_WEAPON_NAMES
+    }
+    weapon_entries = []
+    for index, body in item_blocks.items():
+        path_match = _ITEM_PATH_RE.search(body)
+        if path_match is not None and path_match.group("path") in weapon_paths:
+            weapon_entries.append((index, body, path_match.group("path")))
+
+    shotgun_entries = [entry for entry in weapon_entries if entry[2] == COMBAT_SHOTGUN_PATH]
+    if starting_weapon in (None, "Combat Shotgun"):
+        vanilla_shotguns = [entry for entry in shotgun_entries if entry[0] < 8]
+        if (
+            len(vanilla_shotguns) != 1
+            or vanilla_shotguns[0][0] != 5
+            or "equip = true;" not in vanilla_shotguns[0][1]
+        ):
+            raise ValueError("DevInvLoadout vanilla Combat Shotgun must be exactly one equipped entry")
+        if starting_weapon == "Combat Shotgun" and len(shotgun_entries) != 1:
+            raise ValueError("DevInvLoadout Combat Shotgun must use vanilla entry without dynamic duplicate")
+    elif any(index < 7 for index, _, _ in shotgun_entries):
+        raise ValueError("DevInvLoadout non-shotgun starting weapon retained vanilla Combat Shotgun")
+
+    dynamic_start = 8 if starting_weapon in (None, "Combat Shotgun") else 7
+    dynamic_blocks = [body for index, body in item_blocks.items() if index >= dynamic_start]
+
     if starting_inventory is not None:
         for name, quantity in starting_inventory.items():
             representation = SAFE_REPRESENTATIONS.get(name)
             if representation is None:
                 raise ValueError(f"unsupported starting_inventory item: {name!r}")
-            expected = sum(source.count(f'{field} = "{path}";') for field, path, _ in representation)
-            if expected < quantity:
-                raise ValueError(f"DevInvLoadout did not materialize {name!r} quantity {quantity}")
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+                raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
+            if starting_weapon == name:
+                raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
+            for field, path, _ in representation:
+                expected = sum(
+                    body.count(f'{field} = "{path}";')
+                    for body in dynamic_blocks
+                )
+                if expected != quantity:
+                    raise ValueError(f"DevInvLoadout did not materialize {name!r} quantity {quantity}")
 
-    match = _STARTING_INVENTORY_RE.search(source)
-    if match is None:
-        raise ValueError("DevInvLoadout startingInventory block is missing or ambiguous")
-    item_blocks = {
-        int(item_match.group("index")): item_match.group("body")
-        for item_match in _ITEM_BLOCK_RE.finditer(match.group("body"))
-    }
-    base_shotgun = item_blocks.get(5)
-    base_path_match = _ITEM_PATH_RE.search(base_shotgun or "")
-    if base_shotgun is None or base_path_match is None or base_path_match.group("path") != COMBAT_SHOTGUN_PATH:
-        raise ValueError("DevInvLoadout base Combat Shotgun entry is missing or malformed")
-    base_shotgun_equipped = "equip = true;" in base_shotgun
-    if base_shotgun_equipped != (starting_weapon in (None, "Combat Shotgun")):
-        raise ValueError("DevInvLoadout base Combat Shotgun equip state is incorrect")
-
-    dynamic_blocks = [body for index, body in item_blocks.items() if index >= 8]
-    weapon_paths = {
-        SAFE_REPRESENTATIONS[name][0][1]
-        for name in STARTING_WEAPON_NAMES
-    }
     selected_path = (
         SAFE_REPRESENTATIONS[starting_weapon][0][1]
         if starting_weapon is not None
@@ -323,19 +362,14 @@ def validate_devinv_source(
         path = path_match.group("path")
         if path in weapon_paths and "equip = true;" in body and path != selected_path:
             raise ValueError("DevInvLoadout starting_inventory weapon must not be equipped")
+    equipped_weapons = [body for _, body, _ in weapon_entries if "equip = true;" in body]
+    if len(equipped_weapons) != 1:
+        raise ValueError("DevInvLoadout must contain exactly one equipped weapon")
     if starting_weapon is not None:
-        selected_entries = [
-            body for body in dynamic_blocks
-            if (path_match := _ITEM_PATH_RE.search(body)) is not None
-            and path_match.group("path") == selected_path
-        ]
-        equipped_selected = sum("equip = true;" in body for body in selected_entries)
-        if equipped_selected != 1:
-            raise ValueError("DevInvLoadout resolved starting_weapon must have exactly one equip=true entry")
-    if starting_weapon is not None:
-        field, path, _ = SAFE_REPRESENTATIONS[starting_weapon][0]
-        if source.count(f'{field} = "{path}";') < 1:
-            raise ValueError(f"DevInvLoadout did not materialize starting weapon: {starting_weapon!r}")
+        selected_entries = [entry for entry in weapon_entries if entry[2] == selected_path]
+        equipped_selected = sum("equip = true;" in entry[1] for entry in selected_entries)
+        if len(selected_entries) != 1 or equipped_selected != 1:
+            raise ValueError("DevInvLoadout resolved starting_weapon must have exactly one equipped ownership entry")
 
 
 def output_path_for_map(mod_root: Path, registry_path: Path, map_key: str) -> Path:
