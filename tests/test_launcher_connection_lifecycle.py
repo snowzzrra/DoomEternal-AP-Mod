@@ -123,9 +123,10 @@ def test_connection_failure_after_connected_restores_retry_ready_ui(monkeypatch)
     setattr(qtgui, "QIcon", object)
     qtwidgets = ModuleType("PySide6.QtWidgets")
     for name in (
-        "QApplication", "QCheckBox", "QComboBox", "QFileDialog", "QFrame", "QGridLayout",
+        "QApplication", "QCheckBox", "QComboBox", "QFileDialog", "QFrame", "QGridLayout", "QHeaderView",
         "QHBoxLayout", "QLabel", "QLineEdit", "QMainWindow", "QMessageBox", "QPlainTextEdit",
-        "QProgressBar", "QPushButton", "QScrollArea", "QSpinBox", "QTabWidget", "QVBoxLayout", "QWidget",
+        "QProgressBar", "QPushButton", "QScrollArea", "QSizePolicy", "QSpinBox", "QTabWidget", "QTableWidget",
+        "QTableWidgetItem", "QVBoxLayout", "QWidget",
     ):
         setattr(qtwidgets, name, object)
     monkeypatch.setitem(sys.modules, "PySide6", pyside)
@@ -138,12 +139,16 @@ def test_connection_failure_after_connected_restores_retry_ready_ui(monkeypatch)
         def __init__(self):
             self.enabled = True
             self.visible = False
+            self.text = ""
 
         def setEnabled(self, enabled):
             self.enabled = enabled
 
         def setVisible(self, visible):
             self.visible = visible
+
+        def setText(self, text):
+            self.text = text
 
     class FakeLauncherUI:
         def __init__(self):
@@ -158,6 +163,7 @@ def test_connection_failure_after_connected_restores_retry_ready_ui(monkeypatch)
             self.connected_options_notice = FakeWidget()
             self.reinstall_button = FakeWidget()
             self.guidance = FakeWidget()
+            self.warning = FakeWidget()
             self.state = None
             self.logs = []
 
@@ -194,6 +200,12 @@ def test_connection_failure_after_connected_restores_retry_ready_ui(monkeypatch)
         "room connection lost",
         {"action": "Retry connection", "step": 2, "complete": 1, "state": "CONNECTION FAILED"},
     )
+
+    LauncherUI._handle_event(ui, {"type": "warning", "message": "Steam option is unavailable"})
+
+    assert ui.warning.visible
+    assert ui.warning.text == "Warning: Steam option is unavailable"
+    assert ui.logs[-1] == "Warning: Steam option is unavailable"
 
 
 def test_root_launcher_resolves_sibling_client_resources(tmp_path, monkeypatch):

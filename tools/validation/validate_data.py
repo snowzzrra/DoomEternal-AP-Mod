@@ -23,6 +23,7 @@ from foundation import (
 )
 from item_classification import load_item_classification_identity
 from map_registry import load_map_registry, validation_plan
+from tools.decls.devinv_builder import load_devinv_mapping
 from tools.maps import ap_map_generator
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
@@ -77,7 +78,7 @@ def extract_namedtuple_table(path: Path, variable: str) -> dict[str, int]:
         ):
             return {
                 ast.literal_eval(key): ast.literal_eval(value.args[0])
-                for key, value in zip(node.value.keys, node.value.values)
+                for key, value in zip(node.value.keys, node.value.values, strict=True)
                 if ast.literal_eval(value.args[0]) is not None
             }
     if variable == "location_data_table":
@@ -106,6 +107,44 @@ def extract_frozenset_constant(path: Path, variable: str) -> set[int]:
         ):
             return set(ast.literal_eval(node.value.args[0]))
     raise RuntimeError(f"Could not find {variable} in {path}")
+
+
+def extract_string_set_constant(path: Path, variable: str) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == variable for target in node.targets)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "frozenset"
+        ):
+            return set(ast.literal_eval(node.value.args[0]))
+    raise RuntimeError(f"Could not find {variable} in {path}")
+
+
+def validate_devinv_mapping(item_ids: dict[str, int], commands: dict[int, object]) -> list[str]:
+    errors: list[str] = []
+    try:
+        mapping = load_devinv_mapping()
+        legal_names = extract_string_set_constant(APWORLD / "items.py", "DEVINV_START_INVENTORY_ITEM_NAMES")
+    except (OSError, ValueError, SyntaxError, TypeError, RuntimeError, AttributeError) as exc:
+        return [f"DevInv start mapping invalid: {exc}"]
+    mapped_names = {entry["name"] for entry in mapping.values()}
+    if mapped_names != legal_names:
+        errors.append(
+            "DevInv start mapping coverage drift: "
+            f"missing={sorted(legal_names - mapped_names)}, extra={sorted(mapped_names - legal_names)}"
+        )
+    for item_id, entry in mapping.items():
+        if item_id not in commands:
+            errors.append(f"DevInv mapping ID {item_id} missing from data/items.json")
+        if item_ids.get(entry["name"]) != item_id:
+            errors.append(
+                f"DevInv mapping identity drift for {entry['name']}: "
+                f"mapping={item_id}, APWorld={item_ids.get(entry['name'])}"
+            )
+    return errors
 
 
 def collect_duplicate_ids(values: dict[str, int]) -> dict[int, list[str]]:
@@ -650,6 +689,7 @@ def main(argv: list[str] | None = None) -> int:
     if reused_location_ids:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
+    errors.extend(validate_devinv_mapping(item_ids, commands))
     if {name: location_ids.get(name) for name in BATTERY_LOCATIONS} != BATTERY_LOCATIONS:
         errors.append("Six physical Sentinel Battery AP locations must remain active")
     if item_ids.get("Sentinel Battery") != 7770016:
@@ -713,7 +753,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{runtime_item_collisions}"
         )
     all_map_check_ids = set()
-    for map_key, source in load_map_registry(MAP_SOURCES_PATH)["maps"].items():
+    for _map_key, source in load_map_registry(MAP_SOURCES_PATH)["maps"].items():
         if not source.get("enabled", True):
             continue
         cfg = read_json(ROOT / source["level_config"])

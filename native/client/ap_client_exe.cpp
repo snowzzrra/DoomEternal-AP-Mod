@@ -61,6 +61,7 @@ struct CommandJob {
     DWORD nextAttemptTick = 0;
     std::string source = "cmd";
     DWORD importedTick = 0;
+    std::optional<std::string> receiptNamespace;
 };
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;
@@ -1560,7 +1561,15 @@ void ImportSpoolFiles(
             if (recovered != recoveredSources.end()) {
                 recoveredSources.erase(recovered);
             }
-            queue.push_back({processingPath, command, 0, 0, source, GetTickCount()});
+            queue.push_back({
+                processingPath,
+                command,
+                0,
+                0,
+                source,
+                GetTickCount(),
+                receiptNamespace,
+            });
             LogDebug(
                 "QUEUE_IMPORT command_id=" + commandId
                 + " source=" + source
@@ -1906,6 +1915,24 @@ int main(int argc, char** argv) {
                 knownCommandIds.erase(commandId);
                 queue.pop_front();
                 continue;
+            }
+            if (job.receiptNamespace.has_value()) {
+                const std::optional<std::string> dispatchNamespace =
+                    startupNamespaceCleared ? ActiveQueueSessionNamespace() : std::nullopt;
+                if (!dispatchNamespace.has_value()
+                        || dispatchNamespace.value() != job.receiptNamespace.value()) {
+                    const std::string reason = !dispatchNamespace.has_value()
+                        ? "session_unavailable" : "foreign_session";
+                    LogDebug(
+                        "QUEUE_SESSION_HOLD command_id=" + commandId
+                        + " reason=" + reason
+                    );
+                    // Leave .processing in place. EnsureQueueDirectory owns recovery;
+                    // bridge owns only .cmd and may quarantine foreign receipts.
+                    knownCommandIds.erase(commandId);
+                    queue.pop_front();
+                    continue;
+                }
             }
             const DWORD dispatchTick = GetTickCount();
             if (normalReceipt) {

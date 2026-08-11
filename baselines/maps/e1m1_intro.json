@@ -23,20 +23,24 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Combat Shotgun canonical item mapping adds its global runtime target."
+    },
+    {
+      "content_revision": "0.4.0-beta.2",
+      "reason": "Add AP location-send feedback for native toy category while preserving source toy feedback"
     }
   ],
   "asset_package_contract_sha256": "5a150841d01b6714748a785e83921beae8c74894cceb1c0e01bc5b61e6474722",
-  "byte_sha256": "2a7a2130eb01675d85779fb559621c1ee7cbe49f650d58ec13f0c129b4077ba0",
+  "byte_sha256": "edbd24a1425e6b3070a7c51801f4cb4efef6e719e6c27a41f1e0ddf379fb2c89",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 40,
-    "byte_size": 11965990,
-    "classes": 10412,
-    "entity_count": 10414,
+    "byte_size": 11968642,
+    "classes": 10415,
+    "entity_count": 10417,
     "layers": 5406,
-    "targets": 18767,
+    "targets": 18770,
     "transforms": 22241,
-    "unique_entity_names": 10413
+    "unique_entity_names": 10416
   },
   "manifest_sha256": "13eeb48eb9c1f6246400296e59dea33faa79bf50dfc0866e2e966459517282b0",
   "map_key": "e1m1_intro",
@@ -67,6 +71,6 @@
     7770122
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "c3d9283ab4d88a2c0c92e4ec0838fbe04c34d4bb410acb705295ca548842b517",
-  "semantic_sha256": "49dfcad20ee59eaa8ab02cf18b15285d967d7649cba4231ad6295f9071876684"
+  "scripted_contract_sha256": "aa10ef45e3d0f3d4cb3b9859afacad3139fe29d8eec6787c4cbb383900e946da",
+  "semantic_sha256": "20dfe2ade6080ab1ad515ac75a8338848d2ed02abb791f2ebf0698ac2ba6b3ad"
 }

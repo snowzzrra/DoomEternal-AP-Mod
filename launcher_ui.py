@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -72,13 +73,14 @@ class LauncherUI(QMainWindow):
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.game_root = QLineEdit(str(controller.config.get("game_root", "")))
         self.saves_root = QLineEdit(str(controller.config.get("save_games_dir", "")))
-        self.headline = QLabel("Configure your game and connect to your room.")
-        self.detail = QLabel("We will prepare the mod and never launch DOOM Eternal directly.")
+        self.headline = self._label("Configure your game and connect to your room.")
+        self.detail = self._label("We will prepare the mod and never launch DOOM Eternal directly.")
         self.next_action = "Connect to Archipelago"
-        self.overall_state = QLabel("READY TO CONFIGURE")
+        self.overall_state = self._label("READY TO CONFIGURE")
         self._room_connected = False
         self._connection_pending = False
-        self.install_guidance = QLabel()
+        self.install_guidance = self._label("")
+        self.warning = self._label("")
         self.option_controls: dict[str, QWidget] = {}
         self.option_defaults: dict[str, object] = {}
         self.start_inventory_catalog: list[dict[str, str]] = []
@@ -104,6 +106,9 @@ class LauncherUI(QMainWindow):
             QLabel#section {{ font-size: 15pt; font-weight: 700; }}
             QLabel#headline {{ font-size: 19pt; font-weight: 700; }}
             QLabel#state {{ color: {self.COLORS['info']}; font-size: 11pt; font-weight: 700; }}
+            QLabel#warning {{ color: {self.COLORS['warning']}; background: #2a2115;
+                border: 1px solid #76511e; border-left: 3px solid {self.COLORS['warning']};
+                border-radius: 4px; padding: 8px 10px; font-weight: 600; }}
             QLabel#stepTitle {{ font-size: 11pt; font-weight: 700; }}
             QLabel#stepState {{ color: {self.COLORS['muted']}; font-size: 9pt; }}
             QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 15pt; font-weight: 700; }}
@@ -267,6 +272,9 @@ class LauncherUI(QMainWindow):
         status_layout.addWidget(self.headline)
         self.detail.setObjectName("muted")
         status_layout.addWidget(self.detail)
+        self.warning.setObjectName("warning")
+        self.warning.setVisible(False)
+        status_layout.addWidget(self.warning)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
@@ -451,7 +459,8 @@ class LauncherUI(QMainWindow):
         self.start_inventory_table.setAlternatingRowColors(True)
         self.start_inventory_table.verticalHeader().setVisible(False)
         self.start_inventory_table.horizontalHeader().setStretchLastSection(False)
-        self.start_inventory_table.horizontalHeader().setStretchLastSection(False)
+        self.start_inventory_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.start_inventory_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.start_inventory_table.setColumnWidth(1, 105)
         self.start_inventory_table.setMinimumHeight(126)
         card_layout.addWidget(self.start_inventory_table)
@@ -735,7 +744,10 @@ class LauncherUI(QMainWindow):
         if kind == "log":
             self._append_log(str(event.get("message", "")))
         elif kind == "warning":
-            self._append_log(f"Warning: {event.get('message', '')}")
+            message = str(event.get("message", ""))
+            self.warning.setText(f"Warning: {message}")
+            self.warning.setVisible(bool(message))
+            self._append_log(f"Warning: {message}")
             if event.get("field") == "steam_launch_options":
                 self.launch_option.setText("Unavailable — see log.")
         elif kind in {"client_started", "connecting"}:
@@ -835,7 +847,7 @@ class LauncherUI(QMainWindow):
                 self._set_connection_controls(True, False)
                 self._set_state("Connection failed.", message, action="Retry connection", step=2, complete=1, state="CONNECTION FAILED")
             else:
-                self._set_state("Setup could not finish.", "Review details and try again after resolving the issue.", action="Try again", step=4, complete=3, state="ACTION NEEDED")
+                self._set_state("Setup could not finish.", message, action="Try again", step=4, complete=3, state="ACTION NEEDED")
             self._append_log(f"{kind}: {message}")
         elif kind == "client_stopping":
             self._set_connection_controls(False, True, stop_enabled=False)

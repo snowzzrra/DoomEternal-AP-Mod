@@ -1582,19 +1582,63 @@ def quarantine_incompatible_receipt_jobs(state_key):
             logger.error("[Queue] Could not hold receipt job %s: %s", source, error)
 
 
-def publish_queue_session_namespace(state_key):
-    """Publish active room identity for native-owned `.processing` recovery."""
+def ensure_queue_session_namespace(state_key):
+    """Keep active room identity available for native-owned queue recovery."""
     namespace = queue_session_namespace(state_key)
     if namespace is None:
-        return
-    os.makedirs(QUEUE_DIR, exist_ok=True)
+        return False
     marker = Path(QUEUE_DIR) / "active_session_namespace"
+    try:
+        current = marker.read_text(encoding="ascii")
+    except FileNotFoundError:
+        current = None
+    except (OSError, UnicodeError) as error:
+        logger.warning("[Queue] Could not read session namespace marker: %s", error)
+        current = None
+
+    if current is not None and current.strip() == namespace:
+        return True
+
+    try:
+        os.makedirs(QUEUE_DIR, exist_ok=True)
+    except OSError as error:
+        logger.error("[Queue] Could not create queue directory for session namespace: %s", error)
+        return False
+
     temporary = Path(QUEUE_DIR) / f".active_session_namespace-{uuid.uuid4().hex}.tmp"
-    with temporary.open("x", encoding="ascii", newline="\n") as file:
-        file.write(namespace + "\n")
-        file.flush()
-        os.fsync(file.fileno())
-    os.replace(temporary, marker)
+    try:
+        with temporary.open("x", encoding="ascii", newline="\n") as file:
+            file.write(namespace + "\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, marker)
+        logger.info("[Queue] Refreshed active session namespace: %s", namespace)
+        return True
+    except OSError as error:
+        logger.error("[Queue] Could not publish session namespace marker: %s", error)
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+        return False
+
+
+def invalidate_queue_session_namespace(reason="authority_reset"):
+    """Remove durable queue authority until a connected identity is proven."""
+    marker = Path(QUEUE_DIR) / "active_session_namespace"
+    try:
+        marker.unlink()
+        logger.info("[Queue] Invalidated active session namespace: %s", reason)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        logger.error(
+            "[Queue] Could not invalidate session namespace marker (%s): %s",
+            reason,
+            error,
+        )
 
 
 def hold_orphaned_dev_jobs():
@@ -2434,6 +2478,8 @@ class DoomEternalContext(CommonContext):
         self._item_delivery_task = None
         self._item_delivery_wakeup = False
         self._item_delivery_waiting_for_state = False
+        self._queue_session_authoritative = False
+        invalidate_queue_session_namespace("bridge_start")
         # Process-local packet timing. Ranges keep ReceivedItems callback work O(1).
         self._packet_received_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
         self._item_session_generation = 0
@@ -2516,6 +2562,10 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_delivered = {}
         self._launcher_connection_failure_reported = False
 
+    def reset_queue_session_authority(self, reason):
+        self._queue_session_authoritative = False
+        invalidate_queue_session_namespace(reason)
+
     def _report_launcher_connection_failure(self, message):
         if (
             not LAUNCHER_EVENTS_ENABLED
@@ -2533,10 +2583,12 @@ class DoomEternalContext(CommonContext):
         self.exit_event.set()
 
     def handle_connection_loss(self, msg: str) -> None:
+        self.reset_queue_session_authority("connection_loss")
         super().handle_connection_loss(msg)
         self._report_launcher_connection_failure(msg)
 
     async def connection_closed(self):
+        self.reset_queue_session_authority("connection_closed")
         unexpected_launcher_close = (
             LAUNCHER_EVENTS_ENABLED
             and self.server is not None
@@ -2581,6 +2633,9 @@ class DoomEternalContext(CommonContext):
 
     def on_package(self, cmd: str, args: dict):
         if cmd == "RoomInfo":
+            # Durable item state cannot authorize queue work until matching
+            # Connected rebinds state_key to this room.
+            self.reset_queue_session_authority("room_info")
             self.room_seed_name = args.get("seed_name")
         elif cmd == "ReceivedItems":
             self._on_received_items_packet(args)
@@ -2635,6 +2690,7 @@ class DoomEternalContext(CommonContext):
                 checked_locations=sorted(args.get("checked_locations", [])),
             )
         elif cmd == "ConnectionRefused":
+            self.reset_queue_session_authority("connection_refused")
             self._report_launcher_connection_failure(
                 "Archipelago connection was refused"
             )
@@ -3545,6 +3601,7 @@ class DoomEternalContext(CommonContext):
             )
 
     def initialize_item_state(self):
+        self.reset_queue_session_authority("initialize_item_state")
         previous_state_key = self.state_key
         self._item_session_generation = getattr(self, "_item_session_generation", 0) + 1
         self.client_state = load_client_state()
@@ -3666,8 +3723,13 @@ class DoomEternalContext(CommonContext):
             f"[State] Loaded {self.items_processed} processed items for "
             f"{self.state_key}."
         )
-        publish_queue_session_namespace(self.state_key)
+        if not ensure_queue_session_namespace(self.state_key):
+            logger.error(
+                "[Queue] Refusing queue authority because session namespace publish failed."
+            )
+            return
         quarantine_incompatible_receipt_jobs(self.state_key)
+        self._queue_session_authoritative = True
         self.check_and_update_event_session()
 
     def persist_session_state(self):
@@ -4498,6 +4560,12 @@ class DoomEternalContext(CommonContext):
         classification=None,
         packet_received_ns=None,
     ):
+        if getattr(self, "_queue_session_authoritative", self.item_state_ready) is False:
+            return False, "queue session is not bound to current connection"
+        if not ensure_queue_session_namespace(self.state_key):
+            self.reset_queue_session_authority("namespace_publish_failed")
+            return False, "active queue session namespace unavailable"
+
         commands, description = self.item_activation_commands(
             item_id,
             item_index,
@@ -5715,7 +5783,11 @@ class DoomEternalContext(CommonContext):
 
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
-                    migrate_direct_item_command_jobs(self.state_key)
+                    if getattr(self, "_queue_session_authoritative", False):
+                        if not ensure_queue_session_namespace(self.state_key):
+                            self.reset_queue_session_authority("namespace_publish_failed")
+                        else:
+                            migrate_direct_item_command_jobs(self.state_key)
                     self.onboard_bootstrap("on_reconnect")
                     self.reconcile_checked_automap_cleanup("connect_or_reconnect")
                     if not self.repair_item_mappings():
@@ -5874,7 +5946,9 @@ async def amain(launch_args=None):
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
     def report_server_stop(task):
         if ctx.exit_event.is_set():
+            ctx.reset_queue_session_authority("server_loop_stopped")
             return
+        ctx.reset_queue_session_authority("server_loop_stopped")
         try:
             error = task.exception()
         except asyncio.CancelledError:

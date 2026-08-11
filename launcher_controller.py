@@ -14,6 +14,7 @@ import uuid
 from enum import Enum
 from pathlib import Path
 
+from launcher_core import LaunchWorkflow
 from launcher_integration import (
     IntegratedLaunchWorkflow,
     IntegratedSetupRecord,
@@ -94,6 +95,10 @@ class LauncherController:
             encoding="utf-8",
         )
         os.replace(temporary, self.config_path)
+        LaunchWorkflow.write_client_config(
+            self.client_dir,
+            runtime_config=self.config,
+        )
 
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
@@ -131,9 +136,14 @@ class LauncherController:
         unique_remote = sorted({candidate.resolve() for candidate in remote_candidates})
         if len(unique_remote) == 1:
             found["steam_remote_dir"] = str(unique_remote[0])
+            found["steam_id3"] = LaunchWorkflow._steam_id3(found["steam_remote_dir"])
         elif len(unique_remote) > 1:
             found["ambiguous_steam_remote_dirs"] = [str(path) for path in unique_remote]
-        self.config = {**found, **self.config}
+        self.config = {**self.config, **found}
+        LaunchWorkflow.write_client_config(
+            self.client_dir,
+            runtime_config=self.config,
+        )
         return found
 
     def emit(self, kind: str, **payload: object) -> None:

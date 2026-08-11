@@ -18,7 +18,6 @@ from launcher_platform import (
     AdapterResult,
     DependencyManager,
     LinuxModManagerAdapter,
-    LaunchOptionPlan,
     SteamLaunchOptionsManager,
     WindowsModManagerAdapter,
     stage_room_mod,
@@ -276,6 +275,13 @@ class IntegratedLaunchWorkflow:
         )
         config = self._config()
         game_root = self._game_root(config)
+        runtime_config = self.base_workflow.write_client_config(
+            self.application_dir,
+            endpoint=endpoint or str(config.get("server_address") or ""),
+            manifest_hash=manifest.manifest_hash,
+            runtime_config=config,
+        )
+        self._emit("runtime_config_ready", path=str(runtime_config))
         receipt_path = self.state_dir / "launcher_setup.json"
         staged = stage_room_mod(
             generated,

@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 import zipfile
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -31,6 +32,14 @@ SUPPORTED_CAPABILITIES = frozenset({
     "starting_inventory_v1",
     "starting_weapon_v1",
     "physical_options_v1",
+})
+CLIENT_CONFIG_FIELDS = frozenset({
+    "steam_remote_dir",
+    "steam_id3",
+    "doom_base_dir",
+    "save_games_dir",
+    "server_address",
+    "seed_manifest_hash",
 })
 
 
@@ -572,14 +581,97 @@ class LaunchWorkflow:
             return installed
 
     @staticmethod
-    def write_client_config(client_dir: Path, *, endpoint: str, manifest_hash: str) -> Path:
-        client_dir.mkdir(parents=True, exist_ok=True)
-        path = client_dir / "ap_config.json"
+    def client_config_path(client_dir: Path) -> Path:
+        """Resolve config beside native ap_client, never inside launcher-data."""
+        candidate = Path(client_dir)
+        if candidate.is_file() or candidate.name.casefold() in {"ap_client", "ap_client.exe"}:
+            candidate = candidate.parent
+        return candidate / "ap_config.json"
+
+    @staticmethod
+    def _steam_id3(steam_remote_dir: object, configured: object = None) -> int:
+        remote = Path(str(steam_remote_dir)).expanduser()
+        if (
+            remote.name.casefold() != "remote"
+            or remote.parent.name != "782330"
+            or remote.parent.parent.parent.name.casefold() != "userdata"
+        ):
+            raise ValueError(
+                "steam_remote_dir must end with userdata/<STEAM_ID3>/782330/remote"
+            )
+        account = remote.parent.parent.name
+        if not account.isascii() or not account.isdigit() or int(account) <= 0:
+            raise ValueError(
+                "steam_remote_dir must contain numeric userdata/<STEAM_ID3>"
+            )
+        inferred = int(account)
+        if configured is not None:
+            if isinstance(configured, bool) or not isinstance(configured, (int, str)):
+                raise ValueError("steam_id3 must be a positive integer")
+            try:
+                configured_id = int(configured)
+            except ValueError as error:
+                raise ValueError("steam_id3 must be a positive integer") from error
+            if configured_id <= 0 or configured_id != inferred:
+                raise ValueError(
+                    "steam_id3 does not match userdata directory in steam_remote_dir"
+                )
+        return inferred
+
+    @staticmethod
+    def write_client_config(
+        client_dir: Path,
+        *,
+        endpoint: str | None = None,
+        manifest_hash: str | None = None,
+        runtime_config: Mapping[str, object] | None = None,
+    ) -> Path:
+        """Atomically materialize native runtime config from nonsecret launcher state."""
+        path = LaunchWorkflow.client_config_path(client_dir)
+        path.parent.mkdir(parents=True, exist_ok=True)
         config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        config.update({"server_address": endpoint, "seed_manifest_hash": manifest_hash})
-        temporary = client_dir / ".ap_config.json.tmp"
-        temporary.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, path)
+        if not isinstance(config, dict):
+            raise ValueError("native client configuration must contain an object")
+
+        source = dict(runtime_config or {})
+        for key in CLIENT_CONFIG_FIELDS - {"steam_id3", "steam_remote_dir"}:
+            value = source.get(key)
+            if key == "server_address" and endpoint is not None:
+                value = endpoint
+            elif key == "seed_manifest_hash" and manifest_hash is not None:
+                value = manifest_hash
+            if value is not None:
+                config[key] = value
+
+        remote = source.get("steam_remote_dir") or config.get("steam_remote_dir")
+        configured_id = source.get("steam_id3")
+        if configured_id is None and not source.get("steam_remote_dir"):
+            configured_id = config.get("steam_id3")
+        if remote:
+            config["steam_remote_dir"] = str(Path(str(remote)).expanduser())
+            config["steam_id3"] = LaunchWorkflow._steam_id3(
+                config["steam_remote_dir"], configured_id
+            )
+        config.pop("password", None)
+
+        temporary_name: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_name = temporary.name
+                temporary.write(json.dumps(config, indent=2, sort_keys=True) + "\n")
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_name, path)
+        finally:
+            if temporary_name is not None:
+                Path(temporary_name).unlink(missing_ok=True)
         return path
 
     def join(self, room: dict[str, Any], client_dir: Path, endpoint: str) -> SeedManifest:

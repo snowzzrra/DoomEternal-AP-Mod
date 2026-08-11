@@ -9,6 +9,7 @@ import json
 import re
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from map_registry import load_map_registry
 
@@ -76,37 +77,14 @@ CANONICAL_BASE = """{
 }
 """.rstrip("\n")
 
-# Only representations exercised by canonical campaign DECLs are accepted.
-# Values are (field, path, flags), where flags are emitted as DECL booleans.
-SAFE_REPRESENTATIONS = {
-    "Heavy Cannon": (("item", "weapon/player/heavy_cannon", ()),),
-    "Plasma Rifle": (("item", "weapon/player/plasma_rifle", ()),),
-    "Rocket Launcher": (("item", "weapon/player/rocket_launcher", ()),),
-    "Super Shotgun": (("item", "weapon/player/double_barrel", ()),),
-    "Ballista": (("item", "weapon/player/gauss_rifle", ()),),
-    "Chaingun": (("item", "weapon/player/chaingun", ()),),
-    "BFG-9000": (("item", "weapon/player/bfg", ()),),
-    "Combat Shotgun": (("item", "weapon/player/shotgun", ()),),
-    "The Unmaykr": (("item", "weapon/player/unmaykr", ()),),
-    "Sentinel Hammer": (("item", "weapon/player/hammer", ()),),
-    "Chainsaw": (("item", "weapon/player/chainsaw", ()),),
-    "Dash": (("item", "ability_dash", ()),),
-    "Blood Punch": (("perk", "perk/player/blood_punch/base", ("equip",)),),
-    "Empyrean Key": (("item", "inventory/key", ()),),
-    "Rune": (("item", "inventory/rune", ()),),
-    "Frag Grenade": (
-        ("item", "equipmentlauncher/equipmentlauncherleft", ()),
-        ("item", "throwable/player/frag_grenade", ("forceStat", "equip")),
-    ),
-    "Flame Belch": (
-        ("item", "equipmentlauncher/equipmentlauncherleft", ()),
-        ("item", "weapon/player/equipment_flame_belch", ("equip",)),
-    ),
-    "Ice Bomb": (
-        ("item", "equipmentlauncher/equipmentlauncherleft", ()),
-        ("item", "throwable/player/ice_bomb", ("forceStat",)),
-    ),
-}
+DEVINV_MAPPING_PATH = Path(__file__).resolve().parents[2] / "data" / "devinv_start_mapping.json"
+DEVINV_MAPPING_SCHEMA_VERSION = 1
+DEVINV_ALLOWED_KINDS = frozenset({
+    "ability", "currency", "equipment", "key", "mastery", "progressive",
+    "rune", "suit_perk", "weapon", "weapon_mod",
+})
+DEVINV_ALLOWED_FIELDS = frozenset({"item", "perk"})
+DEVINV_ALLOWED_FLAGS = frozenset({"applyAfterLoadout", "equip", "forceStat", "isRune"})
 
 STARTING_WEAPON_NAMES = frozenset({
     "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Super Shotgun", "Ballista", "Chaingun", "Combat Shotgun",
@@ -136,6 +114,125 @@ _ITEM_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 _ITEM_PATH_RE = re.compile(r'\bitem = "(?P<path>[^"]+)";')
+_PERK_PATH_RE = re.compile(r'\bperk = "(?P<path>[^"]+)";')
+_CURRENCY_BLOCK_RE = re.compile(
+    r"\t\tcurrencyToGive = \{\n(?P<body>.*?)\n\t\t\}\n\t\tclearAllBeforeApply",
+    re.DOTALL,
+)
+
+
+def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str, Any]]:
+    """Load declarative public-ID -> DevInv representations."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"could not load DevInv start mapping: {error}") from error
+    if (
+        not isinstance(document, dict)
+        or document.get("schema_version") != DEVINV_MAPPING_SCHEMA_VERSION
+        or document.get("mapping_revision") != 1
+        or not isinstance(document.get("source"), str)
+    ):
+        raise ValueError("unsupported DevInv start mapping schema")
+    raw_items = document.get("items")
+    if not isinstance(raw_items, dict) or not raw_items:
+        raise ValueError("DevInv start mapping lacks items")
+    result: dict[int, dict[str, Any]] = {}
+    names: set[str] = set()
+    for raw_id, raw_entry in raw_items.items():
+        try:
+            item_id = int(raw_id)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"invalid DevInv mapping item ID: {raw_id!r}") from error
+        if str(item_id) != raw_id or item_id in result:
+            raise ValueError(f"non-canonical or duplicate DevInv mapping ID: {raw_id!r}")
+        if not isinstance(raw_entry, dict):
+            raise ValueError(f"DevInv mapping item {item_id} is not an object")
+        entry = dict(raw_entry)
+        name = entry.get("name")
+        kind = entry.get("kind")
+        if not isinstance(name, str) or not name.strip() or name in names:
+            raise ValueError(f"DevInv mapping item {item_id} has duplicate or invalid name")
+        if kind not in DEVINV_ALLOWED_KINDS:
+            raise ValueError(f"DevInv mapping item {item_id} has invalid kind: {kind!r}")
+        names.add(name)
+        if kind == "currency":
+            if set(entry) != {"name", "kind", "currency", "countPerItem"}:
+                raise ValueError(f"DevInv currency mapping {item_id} has invalid fields")
+            if not isinstance(entry["currency"], str) or not entry["currency"].startswith("CURRENCY_"):
+                raise ValueError(f"DevInv currency mapping {item_id} has invalid currency")
+            if isinstance(entry["countPerItem"], bool) or not isinstance(entry["countPerItem"], int) or entry["countPerItem"] < 1:
+                raise ValueError(f"DevInv currency mapping {item_id} has invalid countPerItem")
+        elif kind == "progressive":
+            tiers = entry.get("tiers")
+            if set(entry) != {"name", "kind", "field", "tiers"} or entry.get("field") not in DEVINV_ALLOWED_FIELDS:
+                raise ValueError(f"DevInv progressive mapping {item_id} has invalid fields")
+            if (
+                not isinstance(tiers, list)
+                or not tiers
+                or any(not isinstance(path, str) or not path for path in tiers)
+                or len(tiers) != len(set(tiers))
+            ):
+                raise ValueError(f"DevInv progressive mapping {item_id} has invalid ordered tiers")
+        else:
+            representations = entry.get("representations")
+            if set(entry) != {"name", "kind", "representations"} or not isinstance(representations, list) or not representations:
+                raise ValueError(f"DevInv mapping item {item_id} has invalid representations")
+            for representation in representations:
+                if not isinstance(representation, dict):
+                    raise ValueError(f"DevInv mapping item {item_id} has malformed representation")
+                allowed = {"field", "path", "flags", "dedupe"}
+                if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation fields")
+                if not isinstance(representation.get("path"), str) or not representation["path"]:
+                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation path")
+                flags = representation.get("flags", [])
+                if (
+                    not isinstance(flags, list)
+                    or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
+                    or len(flags) != len(set(flags))
+                ):
+                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation flags")
+                if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
+                    raise ValueError(f"DevInv mapping item {item_id} has invalid dedupe key")
+        result[item_id] = entry
+    return result
+
+
+def _mapping_by_name(mapping: Mapping[int, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {entry["name"]: entry for entry in mapping.values()}
+
+
+def _entry_for_name(name: str, mapping: Mapping[int, dict[str, Any]]) -> dict[str, Any]:
+    try:
+        return _mapping_by_name(mapping)[name]
+    except KeyError as error:
+        raise ValueError(f"unsupported starting_inventory item: {name!r}") from error
+
+
+def _materialized_representations(
+    name: str, quantity: int, mapping: Mapping[int, dict[str, Any]], seen_dedupe: set[str],
+) -> list[tuple[str, str, tuple[str, ...]]]:
+    entry = _entry_for_name(name, mapping)
+    if entry["kind"] == "currency":
+        return []
+    if entry["kind"] == "progressive":
+        tiers = entry["tiers"]
+        if quantity > len(tiers):
+            raise ValueError(f"starting_inventory quantity for {name!r} exceeds {len(tiers)} progressive tiers")
+        return [(entry["field"], path, ()) for path in tiers[:quantity]]
+    materialized = []
+    for raw in entry["representations"]:
+        dedupe = raw.get("dedupe")
+        if dedupe is not None and dedupe in seen_dedupe:
+            continue
+        if dedupe is not None:
+            seen_dedupe.add(dedupe)
+        materialized.append((raw["field"], raw["path"], tuple(sorted(raw.get("flags", ())))) )
+    return materialized * quantity if not any(raw.get("dedupe") for raw in entry["representations"]) else materialized + [
+        (raw["field"], raw["path"], tuple(sorted(raw.get("flags", ()))))
+        for raw in entry["representations"] if raw.get("dedupe") is None
+    ] * (quantity - 1)
 
 
 def _remove_base_combat_shotgun(source: str) -> str:
@@ -210,6 +307,71 @@ def _decl_item(field: str, path: str, flags: tuple[str, ...], index: int, count:
     return "\n".join(lines)
 
 
+def _add_currency_totals(source: str, totals: Mapping[str, int]) -> str:
+    match = _CURRENCY_BLOCK_RE.search(source)
+    if match is None:
+        raise ValueError("canonical DevInv currencyToGive block is missing or ambiguous")
+    body = match.group("body")
+    blocks = list(_ITEM_BLOCK_RE.finditer(body))
+    existing: dict[str, int] = {}
+    for item_match in blocks:
+        item_body = item_match.group("body")
+        currency_match = re.search(r'currencyType = "([^"]+)";', item_body)
+        if currency_match:
+            count_match = re.search(r"count = (\d+);", item_body)
+            if count_match is None:
+                raise ValueError("DevInv currency entry has no count")
+            existing[currency_match.group(1)] = existing.get(currency_match.group(1), 0) + int(count_match.group(1))
+    for currency, amount in totals.items():
+        if currency in existing:
+            pattern = re.compile(
+                rf'(currencyType = "{re.escape(currency)}";(?:(?!\n\t\t\t\}}).)*?\n\t\t\t\tcount = )\d+(;)',
+                re.DOTALL,
+            )
+            if not pattern.search(body):
+                raise ValueError(f"DevInv currency entry {currency} cannot be updated")
+            body = pattern.sub(
+                lambda m, currency=currency, amount=amount: f"{m.group(1)}{existing[currency] + amount}{m.group(2)}",
+                body,
+                count=1,
+            )
+            existing[currency] += amount
+            continue
+        next_index = max((int(item.group("index")) for item in blocks), default=-1) + 1
+        body += "\n" + _decl_currency(currency, amount, next_index)
+        blocks = list(_ITEM_BLOCK_RE.finditer(body))
+    num = len(list(_ITEM_BLOCK_RE.finditer(body)))
+    replacement = f"\t\tcurrencyToGive = {{\n\t\t\tnum = {num};\n{body}\n\t\t}}\n\t\tclearAllBeforeApply"
+    return source[:match.start()] + replacement + source[match.end():]
+
+
+def _decl_currency(currency: str, count: int, index: int) -> str:
+    return "\n".join((
+        f"\t\t\titem[{index}] = {{",
+        f'\t\t\t\tcurrencyType = "{currency}";',
+        f"\t\t\t\tcount = {count};",
+        "\t\t\t}",
+    ))
+
+
+def _currency_totals(source: str) -> dict[str, int]:
+    match = _CURRENCY_BLOCK_RE.search(source)
+    if match is None:
+        raise ValueError("DevInvLoadout currencyToGive block is missing or ambiguous")
+    totals: dict[str, int] = {}
+    for item_match in _ITEM_BLOCK_RE.finditer(match.group("body")):
+        body = item_match.group("body")
+        currency_match = re.search(r'currencyType = "([^"]+)";', body)
+        if currency_match is None:
+            continue
+        count_match = re.search(r"count = (\d+);", body)
+        if count_match is None:
+            raise ValueError("DevInvLoadout currency entry has no count")
+        currency = currency_match.group(1)
+        totals[currency] = totals.get(currency, 0) + int(count_match.group(1))
+    return totals
+
+
 def build_devinv_loadout(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
@@ -231,6 +393,14 @@ def build_devinv_loadout(
     ):
         raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
 
+    mapping = load_devinv_mapping()
+    by_name = _mapping_by_name(mapping)
+    for name, quantity in starting_inventory.items():
+        _entry_for_name(name, mapping)
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
+        if starting_weapon == name:
+            raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
     source = canonical_base()
     keep_vanilla_shotgun = starting_weapon in (None, "Combat Shotgun")
     if not keep_vanilla_shotgun:
@@ -238,20 +408,23 @@ def build_devinv_loadout(
 
     entries: list[str] = []
     index = 8 if keep_vanilla_shotgun else 7
+    seen_dedupe: set[str] = set()
+    currency_totals: dict[str, int] = {}
     for name in sorted(starting_inventory):
         quantity = starting_inventory[name]
-        if name not in SAFE_REPRESENTATIONS:
-            raise ValueError(f"unsupported starting_inventory item: {name!r}")
-        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
-            raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
-        if starting_weapon == name:
-            raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
-        for field, path, flags in SAFE_REPRESENTATIONS[name]:
-            for _ in range(quantity):
-                entries.append(_decl_item(field, path, flags, index))
-                index += 1
+        entry = by_name[name]
+        if entry["kind"] == "currency":
+            currency_totals[entry["currency"]] = currency_totals.get(entry["currency"], 0) + quantity * entry["countPerItem"]
+            continue
+        for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe):
+            entries.append(_decl_item(field, path, flags, index))
+            index += 1
     if starting_weapon is not None and starting_weapon != "Combat Shotgun":
-        field, path, _ = SAFE_REPRESENTATIONS[starting_weapon][0]
+        weapon_entry = by_name.get(starting_weapon)
+        if weapon_entry is None or weapon_entry["kind"] != "weapon":
+            raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
+        representation = weapon_entry["representations"][0]
+        field, path = representation["field"], representation["path"]
         entries.append(_decl_item(field, path, ("equip",), index))
         index += 1
 
@@ -262,6 +435,8 @@ def build_devinv_loadout(
         block = "\n".join(entries) + "\n"
         source = source.replace(marker, block + "\t\t}\n\t\tcurrencyToGive = {", 1)
     source = source.replace("\t\t\tnum = 8;", f"\t\t\tnum = {index};", 1)
+    if currency_totals:
+        source = _add_currency_totals(source, currency_totals)
     validate_devinv_source(source, starting_inventory, starting_weapon)
     return source
 
@@ -306,8 +481,22 @@ def validate_devinv_source(
         for item_match in item_matches
     }
 
+    mapping = load_devinv_mapping()
+    by_name = _mapping_by_name(mapping)
+    if starting_inventory is not None:
+        baseline_currency = _currency_totals(canonical_base())
+        actual_currency = _currency_totals(source)
+        expected_currency: dict[str, int] = {}
+        for name, quantity in starting_inventory.items():
+            entry = _entry_for_name(name, mapping)
+            if entry["kind"] == "currency":
+                currency = entry["currency"]
+                expected_currency[currency] = expected_currency.get(currency, 0) + quantity * entry["countPerItem"]
+        for currency, amount in expected_currency.items():
+            if actual_currency.get(currency, 0) - baseline_currency.get(currency, 0) != amount:
+                raise ValueError(f"DevInvLoadout did not aggregate currency {currency} by {amount}")
     weapon_paths = {
-        SAFE_REPRESENTATIONS[name][0][1]
+        by_name[name]["representations"][0]["path"]
         for name in STARTING_WEAPON_NAMES
     }
     weapon_entries = []
@@ -334,24 +523,39 @@ def validate_devinv_source(
     dynamic_blocks = [body for index, body in item_blocks.items() if index >= dynamic_start]
 
     if starting_inventory is not None:
+        expected: dict[tuple[str, str, tuple[str, ...]], int] = {}
+        seen_dedupe: set[str] = set()
         for name, quantity in starting_inventory.items():
-            representation = SAFE_REPRESENTATIONS.get(name)
-            if representation is None:
-                raise ValueError(f"unsupported starting_inventory item: {name!r}")
+            entry = _entry_for_name(name, mapping)
             if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
                 raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
             if starting_weapon == name:
                 raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
-            for field, path, _ in representation:
-                expected = sum(
-                    body.count(f'{field} = "{path}";')
-                    for body in dynamic_blocks
-                )
-                if expected != quantity:
-                    raise ValueError(f"DevInvLoadout did not materialize {name!r} quantity {quantity}")
+            for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe):
+                expected[(field, path, flags)] = expected.get((field, path, flags), 0) + 1
+        actual: dict[tuple[str, str, tuple[str, ...]], int] = {}
+        for body in dynamic_blocks:
+            field_match = re.search(r"\b(item|perk) = \"([^\"]+)\";", body)
+            if field_match is None:
+                raise ValueError("DevInvLoadout dynamic entry has no item or perk")
+            flags = tuple(sorted(flag for flag in DEVINV_ALLOWED_FLAGS if f"{flag} = true;" in body))
+            key = (field_match.group(1), field_match.group(2), flags)
+            actual[key] = actual.get(key, 0) + 1
+        for key, count in expected.items():
+            if actual.get(key, 0) != count:
+                raise ValueError(f"DevInvLoadout did not materialize representation {key!r} count {count}")
+        if starting_weapon is not None and starting_weapon != "Combat Shotgun":
+            weapon_representation = by_name[starting_weapon]["representations"][0]
+            key = (weapon_representation["field"], weapon_representation["path"], ("equip",))
+            expected[key] = expected.get(key, 0) + 1
+            if actual.get(key, 0) != expected[key]:
+                raise ValueError("DevInvLoadout resolved starting weapon was not materialized")
+        unexpected = {key: count for key, count in actual.items() if count != expected.get(key, 0)}
+        if unexpected:
+            raise ValueError(f"DevInvLoadout contains unexpected dynamic representations: {unexpected!r}")
 
     selected_path = (
-        SAFE_REPRESENTATIONS[starting_weapon][0][1]
+        by_name[starting_weapon]["representations"][0]["path"]
         if starting_weapon is not None
         else None
     )
