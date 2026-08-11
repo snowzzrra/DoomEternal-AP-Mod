@@ -152,6 +152,11 @@
           "key": "combat_shotgun",
           "label": "Combat Shotgun",
           "value": 6
+        },
+        {
+          "key": "super_shotgun",
+          "label": "Super Shotgun",
+          "value": 7
         }
       ],
       "default": "combat_shotgun",
@@ -165,5 +170,5 @@
   ],
   "schema_version": 1,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "6e62353510fabe795650d28e1c6edd8d6a46828f129189f9dd47c7e2a614e914"
+  "source_sha256": "77948547a337eb586063782b9f4a3fb8e8e07f2e247b75d0c2764ba87ff9fc70"
 }
