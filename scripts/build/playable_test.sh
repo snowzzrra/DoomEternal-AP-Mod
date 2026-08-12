@@ -424,6 +424,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/ap_visual_contract.py" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
+    "$REPO_ROOT/item_contracts.py" \
     "$REPO_ROOT/item_reconciliation.py" \
     "$REPO_ROOT/rune_reconciliation.py" \
     "$REPO_ROOT/launcher_app.py" "$REPO_ROOT/launcher_controller.py" \
@@ -444,6 +445,7 @@ mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
 cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/item_classifications.json" \
+    "$REPO_ROOT/data/item_runtime_contracts.json" \
     "$REPO_ROOT/data/item_replay_policies.json" \
     "$REPO_ROOT/data/location_names.json" \
     "$TEMP_DIR/challenge_location_registry.json" \
@@ -549,6 +551,7 @@ manifest = {
         "client/ap_visual_contract.py",
         "client/foundation.py",
         "client/item_classification.py",
+        "client/item_contracts.py",
         "client/item_reconciliation.py",
         "client/rune_reconciliation.py",
         "client/launcher_app.py",
@@ -573,6 +576,7 @@ manifest = {
         "client/ap_config.example.json",
         "client/data/items.json",
         "client/data/item_classifications.json",
+        "client/data/item_runtime_contracts.json",
         "client/data/item_replay_policies.json",
         "client/data/location_names.json",
         "client/data/challenge_location_registry.json",
