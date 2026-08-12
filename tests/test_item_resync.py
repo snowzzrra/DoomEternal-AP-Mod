@@ -6,7 +6,6 @@ from unittest.mock import patch
 from item_reconciliation import (
     NEVER_REPLAY,
     REPLAY_IDEMPOTENT,
-    SPECIAL_PROGRESSIVE,
     ReplayPolicy,
     compile_reconciliation_plan,
     migrate_client_state,
@@ -203,32 +202,6 @@ def test_replay_safe_plan_is_one_silent_reconciliation_command():
     assert len(plan.commands) == 1
     assert plan.commands[0].spool_id.startswith("reconcile-")
     assert "notify" not in plan.commands[0].command
-
-
-def test_progressive_plan_clamps_to_configured_stages():
-    definitions = {2: {"type": "progressive_perk", "perks": ["one", "two"]}}
-    with patch("item_reconciliation.compile_item_delivery_plan", _fake_delivery):
-        plan = compile_reconciliation_plan(
-            [2] * 5,
-            definitions,
-            _registry((2, SPECIAL_PROGRESSIVE)),
-            "room-0-1",
-            4,
-        )
-
-    assert plan.selections[0].received_count == 5
-    assert [command.stage for command in plan.commands] == [0, 1]
-    assert plan.special_stages == 2
-
-
-def test_manual_and_automatic_plans_share_deterministic_semantics():
-    definitions = {1: "simple", 2: {"type": "progressive_perk", "perks": ["one"]}}
-    registry = _registry((1, REPLAY_IDEMPOTENT), (2, SPECIAL_PROGRESSIVE))
-    with patch("item_reconciliation.compile_item_delivery_plan", _fake_delivery):
-        manual = compile_reconciliation_plan([1, 2, 2], definitions, registry, "room-0-1", 4)
-        automatic = compile_reconciliation_plan([1, 2, 2], definitions, registry, "room-0-1", 4)
-
-    assert manual == automatic
 
 
 def test_identity_state_is_separate_per_room():

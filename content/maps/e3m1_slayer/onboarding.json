@@ -32,18 +32,15 @@
     },
     {
       "id": 7770305,
-      "status": "deferred_vanilla_progression",
+      "status": "excluded_vanilla_progression",
       "content": "Crucible acquisition",
       "public": false,
       "generated": false,
       "reusable": false,
-      "requires": "complete cutscene stripping and runtime validation"
+      "reason": "Crucible acquisition is excluded from AP physical locations"
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "crucible"
-    ],
     "required_source_edge": {
       "from": "game_target_relay_getcrucible",
       "to": "game_target_give_item_1"
@@ -68,7 +65,7 @@
     "source hash locked",
     "owner is a static patch2 candidate",
     "native question-mark asset ID locked",
-    "Crucible grant edge preserved",
+    "Crucible grant edge removed from generated output",
     "Automap remains vanilla",
     "package-scoped cache input verified"
   ]

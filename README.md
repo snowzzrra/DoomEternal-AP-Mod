@@ -13,7 +13,7 @@ into `doometernal.apworld` during release builds.
 
 ## Project status
 
-Current beta gate is `0.4.0-beta.2`.
+Current beta gate is `0.4.0-beta.3`.
 
 - Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
   visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
@@ -153,7 +153,7 @@ scripts/pipeline.sh release --build
 The release gate uses a content-addressed receipt and builds:
 
 ```text
-DoomEternalArchipelagoPlayableTest-0.4.0-beta.2.zip
+DoomEternalArchipelagoPlayableTest-0.4.0-beta.3.zip
 ├── README.md
 ├── INSTALL.md
 ├── RELEASE_MANIFEST.json

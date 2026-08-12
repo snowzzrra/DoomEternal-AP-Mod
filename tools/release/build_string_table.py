@@ -58,23 +58,6 @@ def build_string_table(
 ) -> None:
     items = json.loads(items_path.read_text(encoding="utf-8"))
     policies = json.loads(policies_path.read_text(encoding="utf-8"))
-    compatibility_path = (
-        Path(__file__).resolve().parents[2]
-        / "data"
-        / "generator_item_compatibility.json"
-    )
-    if compatibility_path.is_file():
-        compatibility = json.loads(
-            compatibility_path.read_text(encoding="utf-8")
-        )
-        items = {**compatibility.get("items", {}), **items}
-        policy_items = dict(policies.get("items", {}))
-        for item_id, name in compatibility.get("names", {}).items():
-            policy_items.setdefault(item_id, {
-                "name": name,
-                "policy": "never_replay",
-            })
-        policies = {**policies, "items": policy_items}
     item_names = {
         int(item_id): entry["name"]
         for item_id, entry in policies.get("items", {}).items()

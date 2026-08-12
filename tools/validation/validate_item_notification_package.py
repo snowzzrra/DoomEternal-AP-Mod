@@ -30,11 +30,6 @@ STRING_TABLES = (
     Path("gameresources_patch1/EternalMod/strings/portuguese.json"),
 )
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
-GENERATOR_ITEM_COMPATIBILITY = (
-    Path(__file__).resolve().parents[2]
-    / "data"
-    / "generator_item_compatibility.json"
-)
 def entity_block(content: str, entity_name: str) -> str:
     marker = f"entityDef {entity_name} {{"
     start = content.find(marker)
@@ -103,22 +98,13 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     classifications = load_item_classification_identity(
         client_dir / "data" / "item_classifications.json"
     )
-    compatibility = json.loads(
-        GENERATOR_ITEM_COMPATIBILITY.read_text(encoding="utf-8")
-    ).get("classifications", {})
-    notification_classifications = {
-        **{int(item_id): int(value) for item_id, value in compatibility.items()},
-        **classifications,
-    }
+    notification_classifications = classifications
     policies = json.loads(
         (client_dir / "data" / "item_replay_policies.json").read_text(
             encoding="utf-8"
         )
     ).get("items", {})
-    compatibility_commands = json.loads(
-        GENERATOR_ITEM_COMPATIBILITY.read_text(encoding="utf-8")
-    )
-    all_commands = {**compatibility_commands.get("items", {}), **commands}
+    all_commands = commands
     if {int(item_id) for item_id in commands} != set(classifications):
         raise AssertionError(
             "packaged item classifications do not cover item mapping"

@@ -50,17 +50,17 @@
     }
   ],
   "asset_package_contract_sha256": "1f1478e688520d20aa566cb3cf90b28faa19c3504d9f583caf4e89e41bd2940c",
-  "byte_sha256": "18aa40918fd5989015d70f1b532e1c1fa1d01acd61f39a3cf5065d672e44b433",
+  "byte_sha256": "b2aa7c850dcd01ac6c57e98aa8637a8c3fe0f21494077287a5bedd199510cea0",
   "content_revision": "0.4.0-beta.2",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 11978346,
-    "classes": 12161,
-    "entity_count": 12163,
+    "byte_size": 11980735,
+    "classes": 12166,
+    "entity_count": 12168,
     "layers": 1662,
-    "targets": 7630,
+    "targets": 7632,
     "transforms": 23371,
-    "unique_entity_names": 12162
+    "unique_entity_names": 12167
   },
   "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
   "map_key": "e3m1_slayer",
@@ -106,5 +106,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "0457232e4969841ba4c8ba9b399abc90d7a8af909bb184770c1d780b4923d510",
-  "semantic_sha256": "620e500c367774c453e4f508817e0fad0b0fcf465d4d9df83a4be4d5b4ed6e30"
+  "semantic_sha256": "c1e31faa34ef394107b270260700f5d86044f81b17a3574f870e67460bb3da5d"
 }

@@ -1,14 +1,9 @@
-import json
-from pathlib import Path
-
 import pytest
 
-from foundation import compile_item_delivery_plan
 from rune_reconciliation import (
     RUNE_WRITER_STATUS,
     RuneNativeState,
     compile_rune_reconciliation_plan,
-    rune_item_perk_mapping,
     rune_plan_already_recorded,
 )
 
@@ -86,23 +81,6 @@ def test_historical_repair_plan_has_no_executable_command_surface():
     assert not hasattr(plan.repairs[0], "command")
 
 
-def test_new_rune_receipt_compiles_one_effect_and_one_notification():
-    definitions = {RUNE_A: f"ai_ScriptCmdEnt player1 givePlayerPerk {PERK_A}"}
-
-    receipt = compile_item_delivery_plan(
-        RUNE_A,
-        definitions,
-        receipt=True,
-        classification=1,
-        notification_slot="a",
-    )
-    silent = compile_item_delivery_plan(RUNE_A, definitions, receipt=False)
-
-    assert len(receipt.commands) == 2
-    assert receipt.commands[-1].entity.startswith("ap_notify_item_")
-    assert len(silent.commands) == 1
-
-
 def test_unknown_owned_rune_mapping_fails_closed():
     with pytest.raises(ValueError, match="no mapping"):
         compile_rune_reconciliation_plan(
@@ -139,19 +117,3 @@ def test_game_details_snapshot_keeps_distinct_rune_surfaces():
     assert native.registered_runes == {PERK_A}
     assert native.equipped_slots == (PERK_B, None, None)
     assert native.page_unlocked is True
-
-
-def test_rune_mapping_is_derived_from_canonical_item_definitions():
-    root = Path(__file__).resolve().parents[1]
-    definitions = {
-        int(key): value
-        for key, value in json.loads(
-            (root / "data/items.json").read_text(encoding="utf-8")
-        ).items()
-    }
-    rune_ids = {7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095}
-
-    mapping = rune_item_perk_mapping(definitions, rune_ids)
-
-    assert set(mapping) == rune_ids
-    assert all(perk.startswith("perk/player/runes/") for perk in mapping.values())

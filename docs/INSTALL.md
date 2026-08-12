@@ -1,6 +1,6 @@
 # Installation
 
-DOOM Eternal Archipelago 0.4.0-beta.2 requires a legally obtained, player-supplied DOOM Eternal installation. Game
+DOOM Eternal Archipelago 0.4.0-beta.3 requires a legally obtained, player-supplied DOOM Eternal installation. Game
 files and external modding tools are not distributed in project releases.
 
 ## Required files

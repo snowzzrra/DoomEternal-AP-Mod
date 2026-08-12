@@ -29,6 +29,10 @@
       "name": "BFG-9000",
       "policy": "never_replay"
     },
+    "7770007": {
+      "name": "The Crucible",
+      "policy": "never_replay"
+    },
     "7770900": {
       "name": "Combat Shotgun",
       "policy": "replay_idempotent"

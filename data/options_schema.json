@@ -114,7 +114,7 @@
     },
     {
       "default": false,
-      "description": "Randomize the Dash pickup. Dash is not required by the current PTB logic\nbecause it is not technically mandatory until Khan Maykr, so enabling this\noption can place it anywhere allowed by that logic.",
+      "description": "Shuffle the Dash pickup into the item pool.",
       "display_name": "Randomize Dash",
       "group": "Game Options",
       "key": "randomize_dash",
@@ -205,15 +205,10 @@
           "key": "hardcore",
           "label": "Hardcore",
           "value": 0
-        },
-        {
-          "key": "extra_lives",
-          "label": "Extra Lives",
-          "value": 1
         }
       ],
       "default": "hardcore",
-      "description": "DeathLink gameplay mode sent to the runtime DeathLink lane.\n\nHardcore applies incoming deaths directly. Extra Lives requires verified\nruntime outcome telemetry; unsupported runtimes reject this mode.",
+      "description": "DeathLink gameplay mode sent to runtime DeathLink lane.",
       "display_name": "DeathLink Mode",
       "group": "Game Options",
       "key": "death_link_mode",
@@ -223,5 +218,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "18b3fa09ac502415a61ab95c94cc49efd95e1d14790cfca61296462d37dabb3f"
+  "source_sha256": "8da8b45f8c96b4daaeb7474d65b3d62d657d476e128e65022ad5f52bd365a0c4"
 }

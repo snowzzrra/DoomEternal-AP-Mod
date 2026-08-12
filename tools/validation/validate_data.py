@@ -1111,7 +1111,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
-        "items": 116,
+        "items": 117,
         "locations": 369,
         "map_checks": 307,
         "runtime_locations": 62,
@@ -1124,8 +1124,8 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Item delivery plan compilation failed: {exc}")
         plans = []
-    if len(plans) != 116:
-        errors.append(f"Expected 116 compiled item plans, found {len(plans)}")
+    if len(plans) != 117:
+        errors.append(f"Expected 117 compiled item plans, found {len(plans)}")
 
     generated_bootstrap = generate_bootstrap_entities()
     if generated_bootstrap or any(prefix in generated_bootstrap for prefix in BOOTSTRAP_ENTITY_PREFIXES):

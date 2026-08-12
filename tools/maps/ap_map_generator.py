@@ -988,10 +988,9 @@ def build_universal_physical_policy(
 ):
     """Generate an independent trigger and visual for any generic physical location.
 
-    Preserves the original vanilla relay targets so that doors, gates, and other
-    world events that the pickup used to trigger still fire correctly. The independent
-    AP trigger becomes the sole fire-point: vanilla relays first, then AP_CHECK, then
-    visual cleanup.
+    Preserves original vanilla relay targets for doors, gates, and other world
+    events. Independent AP trigger fires vanilla relays, AP_CHECK, then visual
+    cleanup in sequence.
     """
     visual_name = f"ap_location_visual_{location_id}"
     cleanup_name = f"ap_remove_location_visual_{location_id}"
@@ -1580,50 +1579,12 @@ def generate_map(
             "assets": asset_document.get("assets", []),
             "default_visual_asset": asset_document.get("default_visual_asset"),
         }
-    legacy_compatibility = {}
-    if level_config.get("generator_compatibility") == "crucible_item":
-        compatibility_path = (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "generator_item_compatibility.json"
-        )
-        legacy_compatibility = json.loads(
-            compatibility_path.read_text(encoding="utf-8")
-        )
-        merged_items = {}
-        compatibility_items = legacy_compatibility.get("items", {})
-        insert_after = legacy_compatibility.get("insert_after")
-        for item_id, command in items_dict.items():
-            merged_items[item_id] = command
-            if item_id == insert_after:
-                merged_items.update(compatibility_items)
-        if not set(compatibility_items) <= set(merged_items):
-            raise ValueError("legacy compatibility item insertion point is missing")
-        items_dict = merged_items
-        if item_names is not None:
-            item_names = {
-                **{
-                    int(key): value
-                    for key, value in legacy_compatibility.get("names", {}).items()
-                },
-                **item_names,
-            }
     if item_classifications is None:
         item_classifications = load_item_classifications(
             Path(__file__).resolve().parents[2]
             / "data"
             / "item_classifications.json"
         )
-    item_classifications = {
-        **{
-            int(key): value
-            for key, value in legacy_compatibility.get(
-                "classifications", {}
-            ).items()
-        },
-        **item_classifications,
-    }
-
     map_key = level_config.get("map_key")
     canonical_visual = canonical_ap_visual_for_map(map_key)
     config_entities = level_config.get("entities", {})

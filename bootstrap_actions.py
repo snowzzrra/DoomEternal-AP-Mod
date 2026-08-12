@@ -55,8 +55,7 @@ SUIT_PAGE_UNLOCKING_ITEM_IDS = frozenset({
     7770106, 7770107, 7770108, 7770109, 7770110, 7770111, 7770112, 7770113,
     7770114, 7770115, 7770116, 7770117, 7770118,
 })
-# Compatibility name for local callers; the page predicate is no longer
-# limited to independent perks.
+# Suit-page unlock IDs include parent-tab unlockers and independent perks.
 SUIT_UPGRADE_ITEM_IDS = SUIT_PAGE_UNLOCKING_ITEM_IDS
 
 BOOTSTRAP_STAT_ALLOWLIST = {

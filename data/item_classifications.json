@@ -2,7 +2,7 @@
     "schema_version": 1,
     "item_mapping_revision": 5,
     "source": "Archipelago/worlds/doometernal/items.py",
-    "source_sha256": "ab953d69da50c285a8c1f1b10e4ffce7d94dca745d5cb4c1633965b99c87255e",
+    "source_sha256": "1525358757e34e85652cd3ce6bf1c52dc706354488cec75fe84c66a14e0b460f",
     "items": {
         "7770000": {
             "name": "Heavy Cannon",
@@ -30,6 +30,10 @@
         },
         "7770006": {
             "name": "BFG-9000",
+            "classification": 1
+        },
+        "7770007": {
+            "name": "The Crucible",
             "classification": 1
         },
         "7770900": {

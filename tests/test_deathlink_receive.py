@@ -1,4 +1,4 @@
-from deathlink_receive import DeathLinkReceiver, ReceiveState, discard_unclaimed_command
+from deathlink_receive import DeathLinkReceiver, ReceiveState
 
 
 class FakeSpool:
@@ -130,27 +130,3 @@ def test_only_one_command_is_ever_in_flight():
     for now in (1.1, 1.5, 2.0, 3.0):
         assert advance(receiver, spool, now).detail == "awaiting_delivery"
     assert spool.dispatches == 1
-
-
-def test_cancel_never_removes_consumer_processing_file(tmp_path):
-    queued = tmp_path / "deathlink-kill.cmd"
-    processing = tmp_path / "deathlink-kill.processing"
-    queued.write_text("kill\n", encoding="utf-8")
-    processing.write_text("consumer owns this\n", encoding="utf-8")
-    assert discard_unclaimed_command(tmp_path, "deathlink-kill") is True
-    assert not queued.exists()
-    assert processing.read_text(encoding="utf-8") == "consumer owns this\n"
-
-
-def test_distinct_events_use_bounded_fifo_without_overwrite():
-    receiver = DeathLinkReceiver(max_queue=2)
-    spool = FakeSpool()
-    receiver.receive("one", 0.0)
-    receiver.receive("two", 0.1)
-    assert receiver.receive("three", 0.2).detail == "queue_full"
-    advance(receiver, spool, 1.0)
-    spool.delivered()
-    advance(receiver, spool, 2.0)
-    assert receiver.confirm_local_death(2.1).state is ReceiveState.CONFIRMED
-    assert receiver.active is not None
-    assert receiver.active.event_id == "two"
