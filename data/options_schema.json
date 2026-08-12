@@ -198,25 +198,9 @@
         }
       ],
       "ui_type": "named_range"
-    },
-    {
-      "choices": [
-        {
-          "key": "hardcore",
-          "label": "Hardcore",
-          "value": 0
-        }
-      ],
-      "default": "hardcore",
-      "description": "DeathLink gameplay mode sent to runtime DeathLink lane.",
-      "display_name": "DeathLink Mode",
-      "group": "Game Options",
-      "key": "death_link_mode",
-      "source_class": "DeathLinkMode",
-      "ui_type": "choice"
     }
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "8da8b45f8c96b4daaeb7474d65b3d62d657d476e128e65022ad5f52bd365a0c4"
+  "source_sha256": "1c042fb7b667adbd2a35af8d23992b0993aa35da089e6bfd442afc7c36e05805"
 }

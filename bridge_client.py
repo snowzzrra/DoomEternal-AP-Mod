@@ -40,7 +40,7 @@ from item_classification import (
     normalize_network_classification,
     notification_style_for_item,
 )
-from item_contracts import start_inventory_eligible, validate_death_link_mode
+from item_contracts import DEFAULT_DEATH_LINK_MODE, start_inventory_eligible
 from item_reconciliation import (
     AP_RECEIPT_FEEDBACK,
     CLIENT_STATE_VERSION,
@@ -2498,7 +2498,7 @@ class DoomEternalContext(CommonContext):
         self.state_key = ""
         self.session_state = {}
         self.death_link_enabled = False
-        self.death_link_mode = "hardcore"
+        self.death_link_mode = DEFAULT_DEATH_LINK_MODE
         self.previous_checkpoint_death = None
         self.checkpoint_death_by_save_slot = {}
         self.last_duration_cache_key = None
@@ -2653,20 +2653,10 @@ class DoomEternalContext(CommonContext):
                         ", ".join(event_id[:12] for event_id in abandoned),
                     )
             slot_data = args.get("slot_data", {})
-            configured_mode = slot_data.get("death_link_mode")
-            if configured_mode is None:
-                self.death_link_mode = "hardcore"
-                self.death_link_enabled = bool(slot_data.get("death_link", False))
-            else:
-                try:
-                    self.death_link_enabled, blocker = validate_death_link_mode(configured_mode)
-                    self.death_link_mode = configured_mode
-                    if blocker:
-                        logger.error("[DeathLink] %s", blocker)
-                except ValueError as error:
-                    self.death_link_mode = "hardcore"
-                    self.death_link_enabled = False
-                    logger.error("[DeathLink] Disabled invalid slot mode: %s", error)
+            self.death_link_mode = DEFAULT_DEATH_LINK_MODE
+            self.death_link_enabled = bool(slot_data.get("death_link", False))
+            if "death_link_mode" in slot_data:
+                logger.debug("[DeathLink] Ignoring legacy death_link_mode slot data")
             materialized = {}
             configured = slot_data.get("starting_inventory", {})
             if isinstance(configured, dict):

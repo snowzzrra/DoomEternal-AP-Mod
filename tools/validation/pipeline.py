@@ -575,12 +575,11 @@ class Pipeline:
         env["SKIP_REQUIREMENTS_UPDATE"] = "1"
         _run([
             sys.executable, "-m", "pytest",
-            "tests/test_beta_contracts.py",
-            "tests/test_bridge_supervisor.py",
-            "tests/test_dash_physical.py",
+            "tests/test_item_delivery.py",
+            "tests/test_item_resync.py",
+            "tests/test_rune_reconciliation.py",
             "tests/test_deathlink_receive.py",
             "tests/test_install_workflow.py",
-            "tests/test_platform_adapters.py",
             "-q", "--maxfail=1",
         ], env=env)
         if full:
@@ -695,11 +694,13 @@ class Pipeline:
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
         env["AP_TEST_WORLDS"] = "doometernal"
-        _run([
-            str(python), "-m", "pytest", "-c", str(ARCHIPELAGO / "pytest.ini"),
-            str(ARCHIPELAGO / "worlds" / "doometernal" / "test"),
-            "-q", "--maxfail=1",
-        ], cwd=WORKSPACE, env=env)
+        test_root = ARCHIPELAGO / "worlds" / "doometernal" / "test"
+        if any(path.name not in {"__init__.py", "bases.py"} for path in test_root.glob("test_*.py")):
+            _run([
+                str(python), "-m", "pytest", "-c", str(ARCHIPELAGO / "pytest.ini"),
+                str(test_root),
+                "-q", "--maxfail=1",
+            ], cwd=WORKSPACE, env=env)
         smoke_root = CACHE_ROOT / "seed-smoke"
         smoke_root.mkdir(parents=True, exist_ok=True)
         env["SKIP_REQUIREMENTS_UPDATE"] = "1"

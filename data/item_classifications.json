@@ -2,7 +2,7 @@
     "schema_version": 1,
     "item_mapping_revision": 5,
     "source": "Archipelago/worlds/doometernal/items.py",
-    "source_sha256": "1525358757e34e85652cd3ce6bf1c52dc706354488cec75fe84c66a14e0b460f",
+    "source_sha256": "ccc4f7ba10b7eaf20266d4aebe476b5c8d4a2e1982d0b5a0441145c707b0fdc6",
     "items": {
         "7770000": {
             "name": "Heavy Cannon",
@@ -78,7 +78,7 @@
         },
         "7770017": {
             "name": "Progressive Health Upgrade",
-            "classification": 1
+            "classification": 2
         },
         "7770018": {
             "name": "Empyrean Key",
@@ -254,7 +254,7 @@
         },
         "7770063": {
             "name": "Heat Blast Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770064": {
             "name": "Microwave Beam",
@@ -262,23 +262,23 @@
         },
         "7770065": {
             "name": "Microwave Beam Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770067": {
             "name": "Precision Bolt Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770068": {
             "name": "Micro Missiles Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770069": {
             "name": "Full Auto Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770070": {
             "name": "Sticky Bombs Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770071": {
             "name": "Remote Detonate",
@@ -286,7 +286,7 @@
         },
         "7770072": {
             "name": "Remote Detonate Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770073": {
             "name": "Lock-on Burst",
@@ -294,7 +294,7 @@
         },
         "7770074": {
             "name": "Lock-on Burst Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770075": {
             "name": "Arbalest",
@@ -302,7 +302,7 @@
         },
         "7770076": {
             "name": "Arbalest Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770077": {
             "name": "Destroyer Blade",
@@ -310,7 +310,7 @@
         },
         "7770078": {
             "name": "Destroyer Blade Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770079": {
             "name": "Energy Shield",
@@ -318,7 +318,7 @@
         },
         "7770080": {
             "name": "Energy Shield Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770081": {
             "name": "Mobile Turret",
@@ -326,7 +326,7 @@
         },
         "7770082": {
             "name": "Mobile Turret Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770083": {
             "name": "Meat Hook",
@@ -334,7 +334,7 @@
         },
         "7770084": {
             "name": "Meat Hook Mastery",
-            "classification": 1
+            "classification": 2
         },
         "7770085": {
             "name": "Savagery",
@@ -350,7 +350,7 @@
         },
         "7770088": {
             "name": "Progressive Armor Upgrade",
-            "classification": 1
+            "classification": 2
         },
         "7770089": {
             "name": "Air Control",
@@ -366,7 +366,7 @@
         },
         "7770092": {
             "name": "Progressive Ammo Upgrade",
-            "classification": 1
+            "classification": 2
         },
         "7770093": {
             "name": "Chrono Strike",

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 ITEM_RUNTIME_CONTRACTS_FILE = Path(__file__).with_name("data") / "item_runtime_contracts.json"
-DEATH_LINK_MODES = frozenset({"hardcore"})
+DEFAULT_DEATH_LINK_MODE = "hardcore"
 
 
 def load_item_runtime_contracts(
@@ -71,9 +71,3 @@ def validate_item_contracts(
 def start_inventory_eligible(item_id: int) -> bool:
     contract = load_item_runtime_contracts().get(item_id)
     return contract is None or bool(contract["start_inventory_eligible"])
-
-
-def validate_death_link_mode(mode: str) -> tuple[bool, str | None]:
-    if mode not in DEATH_LINK_MODES:
-        raise ValueError(f"unsupported death_link_mode: {mode!r}")
-    return True, None

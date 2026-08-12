@@ -1502,7 +1502,7 @@ entity {{
 
 
 def generate_bootstrap_entities():
-    """Historical stat-write bootstraps are intentionally absent from v0.2.2."""
+    """Return map bootstrap entities."""
     return ""
 
 def load_item_notification_policies(

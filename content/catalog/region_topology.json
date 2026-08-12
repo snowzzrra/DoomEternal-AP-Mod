@@ -12,251 +12,515 @@
       "order": 1
     },
     {
-      "name": "Hell on Earth - Hell Priest Barge",
+      "name": "Hell on Earth - Barge - Hell Priest Barge",
       "mission_key": "e1m1_intro",
       "order": 2
     },
     {
-      "name": "Hell on Earth - Downtown",
+      "name": "Hell on Earth - City - Midtown",
       "mission_key": "e1m1_intro",
       "order": 3
     },
     {
-      "name": "Hell on Earth - Citadel of Hell",
+      "name": "Hell on Earth - City - Ravaged Cathedral",
       "mission_key": "e1m1_intro",
-      "order": 4,
+      "order": 4
+    },
+    {
+      "name": "Hell on Earth - City - Downtown",
+      "mission_key": "e1m1_intro",
+      "order": 5
+    },
+    {
+      "name": "Hell on Earth - City - Metro Station",
+      "mission_key": "e1m1_intro",
+      "order": 6
+    },
+    {
+      "name": "Hell on Earth - Citadel - Citadel of Hell",
+      "mission_key": "e1m1_intro",
+      "order": 7,
       "terminal": true
     },
     {
       "name": "Fortress of Doom - First Visit",
       "mission_key": null,
-      "order": 5
+      "order": 8
     },
     {
-      "name": "Exultia - Mourning Spire",
+      "name": "Exultia - Exultia - Mourning Spire",
       "mission_key": "e1m2_war",
-      "order": 6
+      "order": 9
     },
     {
-      "name": "Exultia - Ichor Expanse",
+      "name": "Exultia - Exultia - Central Rotunda",
       "mission_key": "e1m2_war",
-      "order": 7
+      "order": 10
     },
     {
-      "name": "Exultia - Isle of Torment",
+      "name": "Exultia - Exultia - Belphegor's Gate",
       "mission_key": "e1m2_war",
-      "order": 8,
+      "order": 11
+    },
+    {
+      "name": "Exultia - Exultia - Dour Slough",
+      "mission_key": "e1m2_war",
+      "order": 12
+    },
+    {
+      "name": "Exultia - Hell - Precipice of Recompense",
+      "mission_key": "e1m2_war",
+      "order": 13
+    },
+    {
+      "name": "Exultia - Hell - Ichor Expanse",
+      "mission_key": "e1m2_war",
+      "order": 14
+    },
+    {
+      "name": "Exultia - Hell - Isle of Torment",
+      "mission_key": "e1m2_war",
+      "order": 15,
       "terminal": true
     },
     {
       "name": "Fortress of Doom - Second Visit",
       "mission_key": null,
-      "order": 9
+      "order": 16
     },
     {
       "name": "Cultist Base - Grotto of Penance",
       "mission_key": "e1m3_cult",
-      "order": 10
+      "order": 17
+    },
+    {
+      "name": "Cultist Base - Station of Inquisition",
+      "mission_key": "e1m3_cult",
+      "order": 18
+    },
+    {
+      "name": "Cultist Base - Basilica of Adjuration",
+      "mission_key": "e1m3_cult",
+      "order": 19
+    },
+    {
+      "name": "Cultist Base - Forge of Transfiguration",
+      "mission_key": "e1m3_cult",
+      "order": 20
     },
     {
       "name": "Cultist Base - Promenade of Culling",
       "mission_key": "e1m3_cult",
-      "order": 11
+      "order": 21
     },
     {
       "name": "Cultist Base - Station of Anointment",
       "mission_key": "e1m3_cult",
-      "order": 12,
+      "order": 22,
       "terminal": true
+    },
+    {
+      "name": "Cultist Base - Challenges - Mission Challenges",
+      "mission_key": "e1m3_cult",
+      "order": 23,
+      "challenge_meta": true
     },
     {
       "name": "Doom Hunter Base - Station of Redemption",
       "mission_key": "e1m4_boss",
-      "order": 13
+      "order": 24
     },
     {
       "name": "Doom Hunter Base - Lazarus Generators",
       "mission_key": "e1m4_boss",
-      "order": 14
+      "order": 25
+    },
+    {
+      "name": "Doom Hunter Base - Tower of Baphomet",
+      "mission_key": "e1m4_boss",
+      "order": 26
+    },
+    {
+      "name": "Doom Hunter Base - Skies of Stigmata",
+      "mission_key": "e1m4_boss",
+      "order": 27
     },
     {
       "name": "Doom Hunter Base - Chamber of Penance",
       "mission_key": "e1m4_boss",
-      "order": 15,
+      "order": 28,
       "terminal": true
+    },
+    {
+      "name": "Doom Hunter Base - Challenges - Mission Challenges",
+      "mission_key": "e1m4_boss",
+      "order": 29,
+      "challenge_meta": true
     },
     {
       "name": "Fortress of Doom - Third Visit",
       "mission_key": null,
-      "order": 16
+      "order": 30
     },
     {
-      "name": "Super Gore Nest - Mixom Square",
+      "name": "Super Gore Nest - Upper Area - Mixom Square",
       "mission_key": "e2m1_nest",
-      "order": 17
+      "order": 31
     },
     {
-      "name": "Super Gore Nest - Vermilion Canal",
+      "name": "Super Gore Nest - Upper Area - Star Mall",
       "mission_key": "e2m1_nest",
-      "order": 18
+      "order": 32
     },
     {
-      "name": "Super Gore Nest - Argent Energy Station",
+      "name": "Super Gore Nest - Upper Area - Vermilion Canal",
       "mission_key": "e2m1_nest",
-      "order": 19,
+      "order": 33
+    },
+    {
+      "name": "Super Gore Nest - Upper Area - Vorus Medical Plaza",
+      "mission_key": "e2m1_nest",
+      "order": 34
+    },
+    {
+      "name": "Super Gore Nest - Lower Area - Pumping Station C",
+      "mission_key": "e2m1_nest",
+      "order": 35
+    },
+    {
+      "name": "Super Gore Nest - Lower Area - Toxin Refinery",
+      "mission_key": "e2m1_nest",
+      "order": 36
+    },
+    {
+      "name": "Super Gore Nest - Lower Area - Argent Energy Station",
+      "mission_key": "e2m1_nest",
+      "order": 37,
       "terminal": true
+    },
+    {
+      "name": "Super Gore Nest - Challenges - Mission Challenges",
+      "mission_key": "e2m1_nest",
+      "order": 38,
+      "challenge_meta": true
     },
     {
       "name": "Fortress of Doom - Fourth Visit",
       "mission_key": null,
-      "order": 20
+      "order": 39
     },
     {
-      "name": "ARC Complex - Moring Aeronautics",
+      "name": "ARC Complex - Emerson Hotel",
       "mission_key": "e2m2_base",
-      "order": 21
+      "order": 40
+    },
+    {
+      "name": "ARC Complex - Mario's Restaurant",
+      "mission_key": "e2m2_base",
+      "order": 41
+    },
+    {
+      "name": "ARC Complex - ARC Turret",
+      "mission_key": "e2m2_base",
+      "order": 42
+    },
+    {
+      "name": "ARC Complex - The Waste Tunnels",
+      "mission_key": "e2m2_base",
+      "order": 43
     },
     {
       "name": "ARC Complex - Vargo Convention Center",
       "mission_key": "e2m2_base",
-      "order": 22
+      "order": 44
+    },
+    {
+      "name": "ARC Complex - Atrium Offices",
+      "mission_key": "e2m2_base",
+      "order": 45
+    },
+    {
+      "name": "ARC Complex - Moring Aeronautics",
+      "mission_key": "e2m2_base",
+      "order": 46
     },
     {
       "name": "ARC Complex - Convention Parking",
       "mission_key": "e2m2_base",
-      "order": 23,
+      "order": 47,
       "terminal": true
+    },
+    {
+      "name": "ARC Complex - Challenges - Mission Challenges",
+      "mission_key": "e2m2_base",
+      "order": 48,
+      "challenge_meta": true
     },
     {
       "name": "Fortress of Doom - Fifth Visit",
       "mission_key": null,
-      "order": 24
+      "order": 49
     },
     {
-      "name": "Mars Core - Phobos Teleport Station",
+      "name": "Mars Core - Phobos - Phobos Teleport Station",
       "mission_key": "e2m3_core",
-      "order": 25
+      "order": 50
     },
     {
-      "name": "Mars Core - BFG-10000 Ventilation",
+      "name": "Mars Core - Phobos - BFG-10000 Gun Deck",
       "mission_key": "e2m3_core",
-      "order": 26
+      "order": 51
     },
     {
-      "name": "Mars Core - Temple of Sin",
+      "name": "Mars Core - UAC - BFG-10000 Ventilation",
       "mission_key": "e2m3_core",
-      "order": 27,
+      "order": 52
+    },
+    {
+      "name": "Mars Core - UAC - UAC Outpost LD",
+      "mission_key": "e2m3_core",
+      "order": 53
+    },
+    {
+      "name": "Mars Core - UAC - Alpha Labs",
+      "mission_key": "e2m3_core",
+      "order": 54
+    },
+    {
+      "name": "Mars Core - Meteor - Martian Chunks",
+      "mission_key": "e2m3_core",
+      "order": 55
+    },
+    {
+      "name": "Mars Core - Meteor - UAC Transmission Tower",
+      "mission_key": "e2m3_core",
+      "order": 56
+    },
+    {
+      "name": "Mars Core - Meteor - Delta Labs",
+      "mission_key": "e2m3_core",
+      "order": 57
+    },
+    {
+      "name": "Mars Core - Hell - Temple of Sin",
+      "mission_key": "e2m3_core",
+      "order": 58,
       "terminal": true
+    },
+    {
+      "name": "Mars Core - Challenges - Mission Challenges",
+      "mission_key": "e2m3_core",
+      "order": 59,
+      "challenge_meta": true
     },
     {
       "name": "Sentinel Prime - Holy Pathway",
       "mission_key": "e2m4_boss",
-      "order": 28
+      "order": 60
+    },
+    {
+      "name": "Sentinel Prime - Altar",
+      "mission_key": "e2m4_boss",
+      "order": 61
+    },
+    {
+      "name": "Sentinel Prime - Training Hall",
+      "mission_key": "e2m4_boss",
+      "order": 62
     },
     {
       "name": "Sentinel Prime - Dungeons",
       "mission_key": "e2m4_boss",
-      "order": 29,
+      "order": 63,
       "terminal": true
     },
     {
       "name": "Fortress of Doom - Sixth Visit",
       "mission_key": null,
-      "order": 30
+      "order": 64
     },
     {
       "name": "Taras Nabad - City Outskirts",
       "mission_key": "e3m1_slayer",
-      "order": 31
+      "order": 65
+    },
+    {
+      "name": "Taras Nabad - Atrium Plaza",
+      "mission_key": "e3m1_slayer",
+      "order": 66
+    },
+    {
+      "name": "Taras Nabad - Slayer Creation Chamber",
+      "mission_key": "e3m1_slayer",
+      "order": 67
     },
     {
       "name": "Taras Nabad - Catacombs",
       "mission_key": "e3m1_slayer",
-      "order": 32
+      "order": 68
+    },
+    {
+      "name": "Taras Nabad - Fallen Titan",
+      "mission_key": "e3m1_slayer",
+      "order": 69
+    },
+    {
+      "name": "Taras Nabad - Skyline",
+      "mission_key": "e3m1_slayer",
+      "order": 70
+    },
+    {
+      "name": "Taras Nabad - Throne Room",
+      "mission_key": "e3m1_slayer",
+      "order": 71
     },
     {
       "name": "Taras Nabad - Central Power Core",
       "mission_key": "e3m1_slayer",
-      "order": 33,
+      "order": 72,
       "terminal": true
+    },
+    {
+      "name": "Taras Nabad - Challenges - Mission Challenges",
+      "mission_key": "e3m1_slayer",
+      "order": 73,
+      "challenge_meta": true
     },
     {
       "name": "Fortress of Doom - Seventh Visit",
       "mission_key": null,
-      "order": 34
+      "order": 74
     },
     {
       "name": "Nekravol - Pain's Basin",
       "mission_key": "e3m2_hell",
-      "order": 35
+      "order": 75
     },
     {
       "name": "Nekravol - The Mill",
       "mission_key": "e3m2_hell",
-      "order": 36
+      "order": 76
     },
     {
       "name": "Nekravol - Passage of the Damned",
       "mission_key": "e3m2_hell",
-      "order": 37
+      "order": 77
     },
     {
       "name": "Nekravol - Halls of Torment",
       "mission_key": "e3m2_hell",
-      "order": 38,
+      "order": 78,
       "terminal": true
+    },
+    {
+      "name": "Nekravol - Challenges - Mission Challenges",
+      "mission_key": "e3m2_hell",
+      "order": 79,
+      "challenge_meta": true
     },
     {
       "name": "Nekravol Part II - Corpse Conveyor",
       "mission_key": "e3m2_hell_b",
-      "order": 39
+      "order": 80
     },
     {
       "name": "Nekravol Part II - Soul Extraction",
       "mission_key": "e3m2_hell_b",
-      "order": 40
+      "order": 81
+    },
+    {
+      "name": "Nekravol Part II - Demon Foundry",
+      "mission_key": "e3m2_hell_b",
+      "order": 82
     },
     {
       "name": "Nekravol Part II - Soul Ascent",
       "mission_key": "e3m2_hell_b",
-      "order": 41
+      "order": 83
+    },
+    {
+      "name": "Nekravol Part II - Soul Converter",
+      "mission_key": "e3m2_hell_b",
+      "order": 84
     },
     {
       "name": "Nekravol Part II - Argent Transmitter",
       "mission_key": "e3m2_hell_b",
-      "order": 42,
+      "order": 85,
       "terminal": true
+    },
+    {
+      "name": "Nekravol Part II - Challenges - Mission Challenges",
+      "mission_key": "e3m2_hell_b",
+      "order": 86,
+      "challenge_meta": true
     },
     {
       "name": "Urdak - Infernal Demodulator",
       "mission_key": "e3m3_maykr",
-      "order": 43
+      "order": 87
+    },
+    {
+      "name": "Urdak - The Sanctuary",
+      "mission_key": "e3m3_maykr",
+      "order": 88
+    },
+    {
+      "name": "Urdak - Guardians of Sanctuary",
+      "mission_key": "e3m3_maykr",
+      "order": 89
+    },
+    {
+      "name": "Urdak - Abyss of Sanctuary",
+      "mission_key": "e3m3_maykr",
+      "order": 90
+    },
+    {
+      "name": "Urdak - Dimensional Lacerator",
+      "mission_key": "e3m3_maykr",
+      "order": 91
     },
     {
       "name": "Urdak - Perse Harmonizer",
       "mission_key": "e3m3_maykr",
-      "order": 44
+      "order": 92
     },
     {
       "name": "Urdak - Xanthous Harmonizer",
       "mission_key": "e3m3_maykr",
-      "order": 45,
+      "order": 93,
       "terminal": true
+    },
+    {
+      "name": "Urdak - Challenges - Mission Challenges",
+      "mission_key": "e3m3_maykr",
+      "order": 94,
+      "challenge_meta": true
     },
     {
       "name": "Final Sin - Starstruct Industries",
       "mission_key": "e3m4_boss",
-      "order": 46
+      "order": 95
     },
     {
       "name": "Final Sin - Viris West",
       "mission_key": "e3m4_boss",
-      "order": 47
+      "order": 96
+    },
+    {
+      "name": "Final Sin - Oriiion, Inc.",
+      "mission_key": "e3m4_boss",
+      "order": 97
+    },
+    {
+      "name": "Final Sin - Mall Hotel",
+      "mission_key": "e3m4_boss",
+      "order": 98
     },
     {
       "name": "Final Sin - South Station",
       "mission_key": "e3m4_boss",
-      "order": 48,
+      "order": 99,
       "terminal": true
     }
   ],
@@ -268,41 +532,76 @@
     ],
     [
       "Menu",
-      "Hell on Earth - Hell Priest Barge",
+      "Hell on Earth - Barge - Hell Priest Barge",
       "Portal to Hell on Earth"
     ],
     [
-      "Hell on Earth - Hell Priest Barge",
-      "Hell on Earth - Downtown",
+      "Hell on Earth - Barge - Hell Priest Barge",
+      "Hell on Earth - City - Midtown",
       ""
     ],
     [
-      "Hell on Earth - Downtown",
-      "Hell on Earth - Citadel of Hell",
+      "Hell on Earth - City - Midtown",
+      "Hell on Earth - City - Ravaged Cathedral",
       ""
     ],
     [
-      "Hell on Earth - Citadel of Hell",
+      "Hell on Earth - City - Ravaged Cathedral",
+      "Hell on Earth - City - Downtown",
+      ""
+    ],
+    [
+      "Hell on Earth - City - Downtown",
+      "Hell on Earth - City - Metro Station",
+      ""
+    ],
+    [
+      "Hell on Earth - City - Metro Station",
+      "Hell on Earth - Citadel - Citadel of Hell",
+      ""
+    ],
+    [
+      "Hell on Earth - Citadel - Citadel of Hell",
       "Fortress of Doom - First Visit",
       "Return to Fortress after Hell on Earth"
     ],
     [
       "Fortress of Doom - First Visit",
-      "Exultia - Mourning Spire",
+      "Exultia - Exultia - Mourning Spire",
       "Portal to Exultia"
     ],
     [
-      "Exultia - Mourning Spire",
-      "Exultia - Ichor Expanse",
+      "Exultia - Exultia - Mourning Spire",
+      "Exultia - Exultia - Central Rotunda",
       ""
     ],
     [
-      "Exultia - Ichor Expanse",
-      "Exultia - Isle of Torment",
+      "Exultia - Exultia - Central Rotunda",
+      "Exultia - Exultia - Belphegor's Gate",
       ""
     ],
     [
-      "Exultia - Isle of Torment",
+      "Exultia - Exultia - Belphegor's Gate",
+      "Exultia - Exultia - Dour Slough",
+      ""
+    ],
+    [
+      "Exultia - Exultia - Dour Slough",
+      "Exultia - Hell - Precipice of Recompense",
+      ""
+    ],
+    [
+      "Exultia - Hell - Precipice of Recompense",
+      "Exultia - Hell - Ichor Expanse",
+      ""
+    ],
+    [
+      "Exultia - Hell - Ichor Expanse",
+      "Exultia - Hell - Isle of Torment",
+      ""
+    ],
+    [
+      "Exultia - Hell - Isle of Torment",
       "Fortress of Doom - Second Visit",
       "Return to Fortress after Exultia"
     ],
@@ -313,6 +612,21 @@
     ],
     [
       "Cultist Base - Grotto of Penance",
+      "Cultist Base - Station of Inquisition",
+      ""
+    ],
+    [
+      "Cultist Base - Station of Inquisition",
+      "Cultist Base - Basilica of Adjuration",
+      ""
+    ],
+    [
+      "Cultist Base - Basilica of Adjuration",
+      "Cultist Base - Forge of Transfiguration",
+      ""
+    ],
+    [
+      "Cultist Base - Forge of Transfiguration",
       "Cultist Base - Promenade of Culling",
       ""
     ],
@@ -327,14 +641,34 @@
       "Portal to Doom Hunter Base"
     ],
     [
+      "Cultist Base - Station of Anointment",
+      "Cultist Base - Challenges - Mission Challenges",
+      "Cultist Base Mission Challenges"
+    ],
+    [
       "Doom Hunter Base - Station of Redemption",
       "Doom Hunter Base - Lazarus Generators",
       ""
     ],
     [
       "Doom Hunter Base - Lazarus Generators",
+      "Doom Hunter Base - Tower of Baphomet",
+      ""
+    ],
+    [
+      "Doom Hunter Base - Tower of Baphomet",
+      "Doom Hunter Base - Skies of Stigmata",
+      ""
+    ],
+    [
+      "Doom Hunter Base - Skies of Stigmata",
       "Doom Hunter Base - Chamber of Penance",
       ""
+    ],
+    [
+      "Doom Hunter Base - Chamber of Penance",
+      "Doom Hunter Base - Challenges - Mission Challenges",
+      "Doom Hunter Base Mission Challenges"
     ],
     [
       "Doom Hunter Base - Chamber of Penance",
@@ -343,36 +677,86 @@
     ],
     [
       "Fortress of Doom - Third Visit",
-      "Super Gore Nest - Mixom Square",
+      "Super Gore Nest - Upper Area - Mixom Square",
       "Portal to Super Gore Nest"
     ],
     [
-      "Super Gore Nest - Mixom Square",
-      "Super Gore Nest - Vermilion Canal",
+      "Super Gore Nest - Upper Area - Mixom Square",
+      "Super Gore Nest - Upper Area - Star Mall",
       ""
     ],
     [
-      "Super Gore Nest - Vermilion Canal",
-      "Super Gore Nest - Argent Energy Station",
+      "Super Gore Nest - Upper Area - Star Mall",
+      "Super Gore Nest - Upper Area - Vermilion Canal",
       ""
     ],
     [
-      "Super Gore Nest - Argent Energy Station",
+      "Super Gore Nest - Upper Area - Vermilion Canal",
+      "Super Gore Nest - Upper Area - Vorus Medical Plaza",
+      ""
+    ],
+    [
+      "Super Gore Nest - Upper Area - Vorus Medical Plaza",
+      "Super Gore Nest - Lower Area - Pumping Station C",
+      ""
+    ],
+    [
+      "Super Gore Nest - Lower Area - Pumping Station C",
+      "Super Gore Nest - Lower Area - Toxin Refinery",
+      ""
+    ],
+    [
+      "Super Gore Nest - Lower Area - Toxin Refinery",
+      "Super Gore Nest - Lower Area - Argent Energy Station",
+      ""
+    ],
+    [
+      "Super Gore Nest - Lower Area - Argent Energy Station",
       "Fortress of Doom - Fourth Visit",
       "Return to Fortress after Super Gore Nest"
     ],
     [
+      "Super Gore Nest - Lower Area - Argent Energy Station",
+      "Super Gore Nest - Challenges - Mission Challenges",
+      "Super Gore Nest Mission Challenges"
+    ],
+    [
       "Fortress of Doom - Fourth Visit",
-      "ARC Complex - Moring Aeronautics",
+      "ARC Complex - Emerson Hotel",
       "Portal to ARC Complex"
     ],
     [
-      "ARC Complex - Moring Aeronautics",
+      "ARC Complex - Emerson Hotel",
+      "ARC Complex - Mario's Restaurant",
+      ""
+    ],
+    [
+      "ARC Complex - Mario's Restaurant",
+      "ARC Complex - ARC Turret",
+      ""
+    ],
+    [
+      "ARC Complex - ARC Turret",
+      "ARC Complex - The Waste Tunnels",
+      ""
+    ],
+    [
+      "ARC Complex - The Waste Tunnels",
       "ARC Complex - Vargo Convention Center",
       ""
     ],
     [
       "ARC Complex - Vargo Convention Center",
+      "ARC Complex - Atrium Offices",
+      ""
+    ],
+    [
+      "ARC Complex - Atrium Offices",
+      "ARC Complex - Moring Aeronautics",
+      ""
+    ],
+    [
+      "ARC Complex - Moring Aeronautics",
       "ARC Complex - Convention Parking",
       ""
     ],
@@ -382,27 +766,77 @@
       "Return to Fortress after ARC Complex"
     ],
     [
+      "ARC Complex - Convention Parking",
+      "ARC Complex - Challenges - Mission Challenges",
+      "ARC Complex Mission Challenges"
+    ],
+    [
       "Fortress of Doom - Fifth Visit",
-      "Mars Core - Phobos Teleport Station",
+      "Mars Core - Phobos - Phobos Teleport Station",
       "Portal to Mars Core"
     ],
     [
-      "Mars Core - Phobos Teleport Station",
-      "Mars Core - BFG-10000 Ventilation",
+      "Mars Core - Phobos - Phobos Teleport Station",
+      "Mars Core - Phobos - BFG-10000 Gun Deck",
       ""
     ],
     [
-      "Mars Core - BFG-10000 Ventilation",
-      "Mars Core - Temple of Sin",
+      "Mars Core - Phobos - BFG-10000 Gun Deck",
+      "Mars Core - UAC - BFG-10000 Ventilation",
       ""
     ],
     [
-      "Mars Core - Temple of Sin",
+      "Mars Core - UAC - BFG-10000 Ventilation",
+      "Mars Core - UAC - UAC Outpost LD",
+      ""
+    ],
+    [
+      "Mars Core - UAC - UAC Outpost LD",
+      "Mars Core - UAC - Alpha Labs",
+      ""
+    ],
+    [
+      "Mars Core - UAC - Alpha Labs",
+      "Mars Core - Meteor - Martian Chunks",
+      ""
+    ],
+    [
+      "Mars Core - Meteor - Martian Chunks",
+      "Mars Core - Meteor - UAC Transmission Tower",
+      ""
+    ],
+    [
+      "Mars Core - Meteor - UAC Transmission Tower",
+      "Mars Core - Meteor - Delta Labs",
+      ""
+    ],
+    [
+      "Mars Core - Meteor - Delta Labs",
+      "Mars Core - Hell - Temple of Sin",
+      ""
+    ],
+    [
+      "Mars Core - Hell - Temple of Sin",
       "Sentinel Prime - Holy Pathway",
       "Portal to Sentinel Prime"
     ],
     [
+      "Mars Core - Hell - Temple of Sin",
+      "Mars Core - Challenges - Mission Challenges",
+      "Mars Core Mission Challenges"
+    ],
+    [
       "Sentinel Prime - Holy Pathway",
+      "Sentinel Prime - Altar",
+      ""
+    ],
+    [
+      "Sentinel Prime - Altar",
+      "Sentinel Prime - Training Hall",
+      ""
+    ],
+    [
+      "Sentinel Prime - Training Hall",
       "Sentinel Prime - Dungeons",
       ""
     ],
@@ -418,11 +852,36 @@
     ],
     [
       "Taras Nabad - City Outskirts",
+      "Taras Nabad - Atrium Plaza",
+      ""
+    ],
+    [
+      "Taras Nabad - Atrium Plaza",
+      "Taras Nabad - Slayer Creation Chamber",
+      ""
+    ],
+    [
+      "Taras Nabad - Slayer Creation Chamber",
       "Taras Nabad - Catacombs",
       ""
     ],
     [
       "Taras Nabad - Catacombs",
+      "Taras Nabad - Fallen Titan",
+      ""
+    ],
+    [
+      "Taras Nabad - Fallen Titan",
+      "Taras Nabad - Skyline",
+      ""
+    ],
+    [
+      "Taras Nabad - Skyline",
+      "Taras Nabad - Throne Room",
+      ""
+    ],
+    [
+      "Taras Nabad - Throne Room",
       "Taras Nabad - Central Power Core",
       ""
     ],
@@ -430,6 +889,11 @@
       "Taras Nabad - Central Power Core",
       "Fortress of Doom - Seventh Visit",
       "Return to Fortress after Taras Nabad"
+    ],
+    [
+      "Taras Nabad - Central Power Core",
+      "Taras Nabad - Challenges - Mission Challenges",
+      "Taras Nabad Mission Challenges"
     ],
     [
       "Fortress of Doom - Seventh Visit",
@@ -457,19 +921,39 @@
       "Portal to Nekravol Part II"
     ],
     [
+      "Nekravol - Halls of Torment",
+      "Nekravol - Challenges - Mission Challenges",
+      "Nekravol Mission Challenges"
+    ],
+    [
       "Nekravol Part II - Corpse Conveyor",
       "Nekravol Part II - Soul Extraction",
       ""
     ],
     [
       "Nekravol Part II - Soul Extraction",
+      "Nekravol Part II - Demon Foundry",
+      ""
+    ],
+    [
+      "Nekravol Part II - Demon Foundry",
       "Nekravol Part II - Soul Ascent",
       ""
     ],
     [
       "Nekravol Part II - Soul Ascent",
+      "Nekravol Part II - Soul Converter",
+      ""
+    ],
+    [
+      "Nekravol Part II - Soul Converter",
       "Nekravol Part II - Argent Transmitter",
       ""
+    ],
+    [
+      "Nekravol Part II - Argent Transmitter",
+      "Nekravol Part II - Challenges - Mission Challenges",
+      "Nekravol Part II Mission Challenges"
     ],
     [
       "Nekravol Part II - Argent Transmitter",
@@ -478,6 +962,26 @@
     ],
     [
       "Urdak - Infernal Demodulator",
+      "Urdak - The Sanctuary",
+      ""
+    ],
+    [
+      "Urdak - The Sanctuary",
+      "Urdak - Guardians of Sanctuary",
+      ""
+    ],
+    [
+      "Urdak - Guardians of Sanctuary",
+      "Urdak - Abyss of Sanctuary",
+      ""
+    ],
+    [
+      "Urdak - Abyss of Sanctuary",
+      "Urdak - Dimensional Lacerator",
+      ""
+    ],
+    [
+      "Urdak - Dimensional Lacerator",
       "Urdak - Perse Harmonizer",
       ""
     ],
@@ -485,6 +989,11 @@
       "Urdak - Perse Harmonizer",
       "Urdak - Xanthous Harmonizer",
       ""
+    ],
+    [
+      "Urdak - Xanthous Harmonizer",
+      "Urdak - Challenges - Mission Challenges",
+      "Urdak Mission Challenges"
     ],
     [
       "Urdak - Xanthous Harmonizer",
@@ -498,93 +1007,160 @@
     ],
     [
       "Final Sin - Viris West",
+      "Final Sin - Oriiion, Inc.",
+      ""
+    ],
+    [
+      "Final Sin - Oriiion, Inc.",
+      "Final Sin - Mall Hotel",
+      ""
+    ],
+    [
+      "Final Sin - Mall Hotel",
       "Final Sin - South Station",
       ""
     ]
   ],
   "assignments": {
-    "Hell on Earth - Hell Priest Barge": [
+    "Menu": [],
+    "Weapon Masteries": [
+      7770125,
+      7770126,
+      7770127,
+      7770128,
+      7770129,
+      7770130,
+      7770131,
+      7770132,
+      7770133,
+      7770134,
+      7770135,
+      7770136,
+      7770137
+    ],
+    "Hell on Earth - Barge - Hell Priest Barge": [
       7770001,
       7770008,
       7770014,
       7770017
     ],
-    "Hell on Earth - Downtown": [
+    "Hell on Earth - City - Midtown": [
+      7770005,
+      7770009,
+      7770015,
+      7770018
+    ],
+    "Hell on Earth - City - Ravaged Cathedral": [
+      7770002
+    ],
+    "Hell on Earth - City - Downtown": [
+      7770004,
       7770006,
       7770007,
-      7770009,
       7770010,
-      7770015,
-      7770018,
-      7770019,
-      7770002,
-      7770004,
-      7770005,
-      7770003,
-      7770016
+      7770019
     ],
-    "Hell on Earth - Citadel of Hell": [
+    "Hell on Earth - City - Metro Station": [
+      7770003,
       7770011,
+      7770016,
+      7770020
+    ],
+    "Hell on Earth - Citadel - Citadel of Hell": [
       7770012,
       7770013,
-      7770020,
       7770122
     ],
-    "Exultia - Mourning Spire": [
-      7770021,
-      7770025,
-      7770026,
-      7770027,
-      7770030,
+    "Fortress of Doom - First Visit": [
+      7770073,
+      7770086
+    ],
+    "Exultia - Exultia - Mourning Spire": [
+      7770044,
       7770031,
       7770032,
-      7770044,
+      7770030,
       7770034,
-      7770035,
-      7770043,
-      7770028,
-      7770029,
       7770036,
       7770037,
       7770038,
       7770039,
       7770040,
-      7770041,
+      7770041
+    ],
+    "Exultia - Exultia - Central Rotunda": [
+      7770021,
+      7770023,
       7770083,
       7770084
     ],
-    "Exultia - Ichor Expanse": [
+    "Exultia - Exultia - Belphegor's Gate": [
       7770024,
+      7770043
+    ],
+    "Exultia - Exultia - Dour Slough": [
+      7770025,
+      7770026,
+      7770027,
+      7770028,
+      7770029,
+      7770035
+    ],
+    "Exultia - Hell - Precipice of Recompense": [],
+    "Exultia - Hell - Ichor Expanse": [
       7770045,
       7770089,
       7770090
     ],
-    "Exultia - Isle of Torment": [
-      7770023,
+    "Exultia - Hell - Isle of Torment": [
       7770042,
       7770123
     ],
+    "Fortress of Doom - Second Visit": [
+      7770072,
+      7770074,
+      7770087,
+      7770088,
+      7770081,
+      7770163,
+      7770164,
+      7770165,
+      7770166,
+      7770167,
+      7770168,
+      7770169,
+      7770171,
+      7770253,
+      7770254,
+      7770255
+    ],
     "Cultist Base - Grotto of Penance": [
-      7770046,
-      7770047,
-      7770048,
-      7770049,
-      7770050,
-      7770051,
+      7770058,
+      7770056,
       7770052,
       7770053,
       7770054,
-      7770056,
-      7770057,
-      7770058,
-      7770059,
-      7770060,
-      7770061,
       7770062,
+      7770049,
+      7770051,
+      7770057,
+      7770060,
+      7770046,
+      7770048,
+      7770047,
+      7770050,
+      7770059
+    ],
+    "Cultist Base - Station of Inquisition": [
+      7770061,
+      7770066
+    ],
+    "Cultist Base - Basilica of Adjuration": [
       7770063,
       7770064,
-      7770065,
-      7770066,
+      7770065
+    ],
+    "Cultist Base - Forge of Transfiguration": [
       7770067
     ],
     "Cultist Base - Promenade of Culling": [
@@ -595,7 +1171,9 @@
     "Cultist Base - Station of Anointment": [
       7770069,
       7770070,
-      7770124,
+      7770124
+    ],
+    "Cultist Base - Challenges - Mission Challenges": [
       7770138,
       7770139,
       7770140,
@@ -608,70 +1186,113 @@
       7770146,
       7770147,
       7770148,
-      7770149,
-      7770161
+      7770149
     ],
     "Doom Hunter Base - Lazarus Generators": [
       7770150,
       7770151,
       7770152,
       7770153,
-      7770154,
+      7770154
+    ],
+    "Doom Hunter Base - Tower of Baphomet": [
       7770155,
-      7770156,
-      7770157
+      7770156
+    ],
+    "Doom Hunter Base - Skies of Stigmata": [
+      7770157,
+      7770158,
+      7770159
     ],
     "Doom Hunter Base - Chamber of Penance": [
-      7770158,
-      7770159,
       7770160,
       7770162,
+      7770161
+    ],
+    "Doom Hunter Base - Challenges - Mission Challenges": [
       7770172,
       7770173,
       7770174,
       7770175
     ],
-    "Super Gore Nest - Mixom Square": [
+    "Fortress of Doom - Third Visit": [
+      7770170
+    ],
+    "Super Gore Nest - Upper Area - Mixom Square": [
       7770176,
       7770177,
+      7770181,
       7770183,
+      7770185,
+      7770188,
       7770190,
       7770194,
       7770196,
-      7770202,
       7770204,
-      7770181,
-      7770185,
-      7770188,
+      7770202
+    ],
+    "Super Gore Nest - Upper Area - Star Mall": [],
+    "Super Gore Nest - Upper Area - Vermilion Canal": [
+      7770178,
+      7770179,
+      7770180,
+      7770182,
+      7770184,
+      7770186,
+      7770187,
+      7770189,
+      7770191,
+      7770192,
+      7770193,
+      7770195,
+      7770197,
+      7770198,
+      7770199,
+      7770200,
+      7770201,
+      7770205,
+      7770203
+    ],
+    "Super Gore Nest - Upper Area - Vorus Medical Plaza": [],
+    "Super Gore Nest - Lower Area - Pumping Station C": [],
+    "Super Gore Nest - Lower Area - Toxin Refinery": [],
+    "Super Gore Nest - Lower Area - Argent Energy Station": [
+      7770210
+    ],
+    "Super Gore Nest - Challenges - Mission Challenges": [
       7770206,
       7770207,
       7770208,
       7770209
     ],
-    "Super Gore Nest - Vermilion Canal": [
-      7770178,
-      7770182,
-      7770191,
-      7770195,
-      7770203,
-      7770179,
-      7770180,
-      7770184,
-      7770186,
-      7770187,
-      7770189,
-      7770192,
-      7770193,
-      7770199,
-      7770200,
-      7770201,
-      7770205,
-      7770198,
-      7770197
+    "Fortress of Doom - Fourth Visit": [],
+    "ARC Complex - Emerson Hotel": [],
+    "ARC Complex - Mario's Restaurant": [],
+    "ARC Complex - ARC Turret": [],
+    "ARC Complex - The Waste Tunnels": [],
+    "ARC Complex - Vargo Convention Center": [
+      7770220,
+      7770221,
+      7770222,
+      7770223,
+      7770224,
+      7770225,
+      7770226,
+      7770227,
+      7770228,
+      7770229,
+      7770230,
+      7770231,
+      7770232,
+      7770233,
+      7770234,
+      7770235,
+      7770236,
+      7770240,
+      7770242,
+      7770243
     ],
-    "Super Gore Nest - Argent Energy Station": [
-      7770210
-    ],
+    "ARC Complex - Atrium Offices": [],
     "ARC Complex - Moring Aeronautics": [
       7770211,
       7770212,
@@ -687,74 +1308,65 @@
       7770251,
       7770252
     ],
-    "ARC Complex - Vargo Convention Center": [
-      7770220,
-      7770221,
-      7770222,
-      7770240,
-      7770242,
-      7770243,
-      7770223,
-      7770224,
-      7770225,
-      7770226,
-      7770227,
-      7770228,
-      7770229,
-      7770230,
-      7770231,
-      7770232,
-      7770233,
-      7770234,
-      7770235,
-      7770236
-    ],
     "ARC Complex - Convention Parking": [
       7770237,
+      7770248
+    ],
+    "ARC Complex - Challenges - Mission Challenges": [
       7770244,
       7770245,
       7770246,
-      7770247,
-      7770248
+      7770247
     ],
-    "Mars Core - Phobos Teleport Station": [
-      7770256,
+    "Fortress of Doom - Fifth Visit": [],
+    "Mars Core - Phobos - Phobos Teleport Station": [],
+    "Mars Core - Phobos - BFG-10000 Gun Deck": [
+      7770256
+    ],
+    "Mars Core - UAC - BFG-10000 Ventilation": [
+      7770265
+    ],
+    "Mars Core - UAC - UAC Outpost LD": [
       7770257,
       7770258,
-      7770259,
-      7770264,
-      7770260,
       7770261,
       7770262,
       7770263,
+      7770264,
       7770266,
       7770267,
       7770268,
       7770269,
-      7770270,
       7770271,
       7770272,
-      7770273,
-      7770274,
+      7770273
+    ],
+    "Mars Core - UAC - Alpha Labs": [],
+    "Mars Core - Meteor - Martian Chunks": [
+      7770259,
+      7770260,
       7770275,
+      7770277
+    ],
+    "Mars Core - Meteor - UAC Transmission Tower": [],
+    "Mars Core - Meteor - Delta Labs": [],
+    "Mars Core - Hell - Temple of Sin": [
+      7770281,
+      7770283,
+      7770284,
+      7770289,
+      7770270,
+      7770274,
       7770276,
-      7770277,
       7770278,
       7770279,
       7770280
     ],
-    "Mars Core - BFG-10000 Ventilation": [
-      7770265
-    ],
-    "Mars Core - Temple of Sin": [
-      7770281,
-      7770283,
-      7770284,
+    "Mars Core - Challenges - Mission Challenges": [
       7770285,
       7770286,
       7770287,
-      7770288,
-      7770289
+      7770288
     ],
     "Sentinel Prime - Holy Pathway": [
       7770291,
@@ -767,12 +1379,15 @@
       7770298,
       7770299
     ],
+    "Sentinel Prime - Altar": [],
+    "Sentinel Prime - Training Hall": [],
     "Sentinel Prime - Dungeons": [
-      7770290,
       7770300,
       7770301,
-      7770302
+      7770302,
+      7770290
     ],
+    "Fortress of Doom - Sixth Visit": [],
     "Taras Nabad - City Outskirts": [
       7770303,
       7770306,
@@ -800,20 +1415,28 @@
       7770329,
       7770330
     ],
+    "Taras Nabad - Atrium Plaza": [],
+    "Taras Nabad - Slayer Creation Chamber": [],
     "Taras Nabad - Catacombs": [
       7770318,
       7770331,
       7770332
     ],
+    "Taras Nabad - Fallen Titan": [],
+    "Taras Nabad - Skyline": [],
+    "Taras Nabad - Throne Room": [],
     "Taras Nabad - Central Power Core": [
+      7770338,
+      7770339,
+      7770337
+    ],
+    "Taras Nabad - Challenges - Mission Challenges": [
       7770333,
       7770334,
       7770335,
-      7770336,
-      7770337,
-      7770338,
-      7770339
+      7770336
     ],
+    "Fortress of Doom - Seventh Visit": [],
     "Nekravol - Pain's Basin": [
       7770340,
       7770341
@@ -839,11 +1462,13 @@
       7770355,
       7770356,
       7770357,
+      7770362
+    ],
+    "Nekravol - Challenges - Mission Challenges": [
       7770358,
       7770359,
       7770360,
-      7770361,
-      7770362
+      7770361
     ],
     "Nekravol Part II - Corpse Conveyor": [
       7770363,
@@ -864,35 +1489,43 @@
       7770376,
       7770377
     ],
+    "Nekravol Part II - Demon Foundry": [],
     "Nekravol Part II - Soul Ascent": [
       7770378,
       7770379,
       7770380,
       7770381,
-      7770382,
-      7770383,
-      7770384
+      7770382
     ],
+    "Nekravol Part II - Soul Converter": [],
     "Nekravol Part II - Argent Transmitter": [
-      7770385,
-      7770386,
       7770387
+    ],
+    "Nekravol Part II - Challenges - Mission Challenges": [
+      7770383,
+      7770384,
+      7770385,
+      7770386
     ],
     "Urdak - Infernal Demodulator": [
       7770388,
       7770389,
       7770390,
       7770391,
-      7770394,
-      7770396,
       7770392,
       7770393,
+      7770394,
       7770395,
+      7770396,
       7770397,
       7770398,
       7770399,
       7770400
     ],
+    "Urdak - The Sanctuary": [],
+    "Urdak - Guardians of Sanctuary": [],
+    "Urdak - Abyss of Sanctuary": [],
+    "Urdak - Dimensional Lacerator": [],
     "Urdak - Perse Harmonizer": [
       7770401,
       7770402,
@@ -902,11 +1535,13 @@
     "Urdak - Xanthous Harmonizer": [
       7770405,
       7770406,
+      7770411
+    ],
+    "Urdak - Challenges - Mission Challenges": [
       7770407,
       7770408,
       7770409,
-      7770410,
-      7770411
+      7770410
     ],
     "Final Sin - Starstruct Industries": [
       7770412
@@ -917,52 +1552,10 @@
       7770416,
       7770417
     ],
+    "Final Sin - Oriiion, Inc.": [],
+    "Final Sin - Mall Hotel": [],
     "Final Sin - South Station": [
       7770414
-    ],
-    "Weapon Masteries": [
-      7770125,
-      7770126,
-      7770127,
-      7770128,
-      7770129,
-      7770130,
-      7770131,
-      7770132,
-      7770133,
-      7770134,
-      7770135,
-      7770136,
-      7770137
-    ],
-    "Fortress of Doom - First Visit": [
-      7770073,
-      7770086
-    ],
-    "Fortress of Doom - Second Visit": [
-      7770072,
-      7770074,
-      7770081,
-      7770087,
-      7770088,
-      7770163,
-      7770164,
-      7770165,
-      7770166,
-      7770167,
-      7770168,
-      7770169,
-      7770171,
-      7770253,
-      7770254,
-      7770255
-    ],
-    "Fortress of Doom - Third Visit": [
-      7770170
-    ],
-    "Fortress of Doom - Fourth Visit": [],
-    "Fortress of Doom - Fifth Visit": [],
-    "Fortress of Doom - Sixth Visit": [],
-    "Fortress of Doom - Seventh Visit": []
+    ]
   }
 }

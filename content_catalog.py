@@ -433,10 +433,10 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
         mission_key = metadata.get("mission_key")
         if mission_key:
             mission_regions.setdefault(mission_key, []).append(region)
-            if metadata.get("terminal"):
+            if metadata.get("terminal") and not metadata.get("challenge_meta"):
                 terminal_regions.setdefault(mission_key, []).append(region)
-    if any(not 2 <= len(regions) <= 4 for regions in mission_regions.values()):
-        raise ValueError("each base mission must have two to four regions")
+            if metadata.get("challenge_meta") and not region.endswith(" - Challenges - Mission Challenges"):
+                raise ValueError(f"{region}: challenge meta region has non-canonical name")
     if any(len(regions) != 1 for regions in terminal_regions.values()) or set(terminal_regions) != set(mission_regions):
         raise ValueError("each base mission must have exactly one terminal region")
     for item in (*catalog.physical_locations, *catalog.runtime_locations):
