@@ -60,15 +60,18 @@
       "special_values": [
         {
           "key": "disabled",
-          "label": "Disabled"
+          "label": "Disabled",
+          "value": 0
         },
         {
           "key": "extreme",
-          "label": "Extreme"
+          "label": "Extreme",
+          "value": 99
         },
         {
           "key": "normal",
-          "label": "Normal"
+          "label": "Normal",
+          "value": 50
         }
       ],
       "ui_type": "named_range"
@@ -224,7 +227,8 @@
       "special_values": [
         {
           "key": "random",
-          "label": "Random"
+          "label": "Random",
+          "value": -1
         }
       ],
       "ui_type": "named_range"

@@ -53,13 +53,13 @@ Select **Resume** to return to launcher session state. Reconnect to the room if
 requested; passwords are entered again. Launcher verifies room identity and
 package state before setup.
 
-## Session and Doctor
+## Session and Help
 
 **Session** shows room, mod, game, and RPC status, room-authoritative options,
 activity, logs, setup actions, and Steam launch. Keep the launcher open while
-playing. Use **Doctor** for bounded installation, bridge, and handshake
-diagnostics; its repair and support-bundle actions are separate from session
-controls.
+playing. Open **Help** for launcher guidance. Run **Setup check** for bounded
+installation, bridge, and handshake diagnostics; use **Repair/Fix** for supported
+repairs and **Support report** for sanitized troubleshooting data.
 
 ## Create YAML
 
@@ -160,13 +160,13 @@ When enabled, choose one room mode:
 - **Hardcore:** the same received death remains pending until
   death is detected.
 
-## Diagnostics and support
+## Setup checks and support
 
-When available in launcher, run **Doctor** for bounded checks covering platform,
-game installation, processes, and launcher configuration. **Repair** applies
-only explicit, supported repairs. **Create support bundle** exports sanitized
+When available in launcher, run **Setup check** for bounded checks covering
+platform, game installation, processes, and launcher configuration. **Repair/Fix**
+applies only explicit, supported repairs. **Support report** exports sanitized
 diagnostics and bounded logs for troubleshooting.
-Save contents are excluded and secrets are redacted. Review bundle contents
+Save contents are excluded and secrets are redacted. Review report contents
 before sharing.
 
 ## Troubleshooting

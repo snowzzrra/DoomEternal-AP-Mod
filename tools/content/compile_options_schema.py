@@ -100,8 +100,12 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
             if not isinstance(special_names, dict):
                 raise ValueError(f"invalid named range values for {key}")
             special_values = [
-                {"key": name, "label": name.replace("_", " ").title()}
-                for name in sorted(special_names)
+                {
+                    "key": name,
+                    "label": name.replace("_", " ").title(),
+                    "value": value,
+                }
+                for name, value in sorted(special_names.items())
             ]
             default = int(option_type.default)
             default = next(

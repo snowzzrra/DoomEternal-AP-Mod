@@ -18,6 +18,9 @@ from launcher_platform import (
 )
 
 
+SUPPORT_LOG_TAIL_BYTES = 256 * 1024
+
+
 @dataclass(frozen=True)
 class Diagnostic:
     key: str
@@ -79,7 +82,155 @@ def sanitize_support_bundle(document: Mapping[str, object]) -> dict[str, object]
     return sanitize_support_value(dict(document))  # type: ignore[return-value]
 
 
-def write_support_bundle(destination: Path, report: DoctorReport, *, logs: Sequence[str] = ()) -> Path:
+def _configured_paths(value: object) -> tuple[Path, ...]:
+    if isinstance(value, (str, Path)):
+        values = (value,)
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        values = tuple(value)
+    else:
+        return ()
+    paths: list[Path] = []
+    for item in values:
+        try:
+            paths.append(Path(str(item)).expanduser())
+        except (OSError, TypeError, ValueError):
+            continue
+    return tuple(paths)
+
+
+def _bridge_log_candidates(
+    config: Mapping[str, object] | None,
+    paths: object | None,
+    application_dir: Path | None = None,
+) -> tuple[Path, ...]:
+    config = config or {}
+    candidates: list[Path] = []
+    for key in ("bridge_log_path", "bridge_log_file"):
+        for path in _configured_paths(config.get(key)):
+            candidates.extend((path, path.with_name("bridge.previous.log")))
+
+    directories: list[Path] = []
+    directories.extend(_configured_paths(config.get("bridge_log_dir")))
+    for name in ("config_dir", "state_dir", "data_dir"):
+        value = getattr(paths, name, None)
+        for root in _configured_paths(value):
+            directories.extend((root, root / "logs"))
+    if application_dir is not None:
+        directories.append(application_dir / "logs")
+
+    if os.name == "nt":
+        user_root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    else:
+        user_root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    directories.extend((user_root / "doom-eternal-ap" / "logs", user_root / "doom-eternal-archipelago" / "logs"))
+    for directory in directories:
+        candidates.extend((directory / "bridge.log", directory / "bridge.previous.log"))
+    return tuple(dict.fromkeys(candidates))
+
+
+def _native_log_candidates(config: Mapping[str, object] | None) -> tuple[Path, ...]:
+    config = config or {}
+    configured = config.get("game_root") or config.get("doom_base_dir")
+    if not configured:
+        return ()
+    try:
+        root = Path(str(configured)).expanduser()
+        if root.name.casefold() == "base":
+            root = root.parent
+    except (OSError, TypeError, ValueError):
+        return ()
+    base = root / "base"
+    return (base / "ap_client.log", base / "ap_client.previous.log")
+
+
+def _read_log_tail(path: Path, limit: int = SUPPORT_LOG_TAIL_BYTES) -> str | None:
+    try:
+        with path.open("rb") as source:
+            source.seek(0, os.SEEK_END)
+            size = source.tell()
+            if size <= 0:
+                return None
+            start = max(0, size - limit)
+            source.seek(start)
+            payload = source.read(limit)
+        if start:
+            line_start = payload.find(b"\n")
+            if line_start < 0:
+                return None
+            payload = payload[line_start + 1 :]
+        text = redact_secrets(_safe_path(payload.decode("utf-8", errors="replace")))
+        encoded = text.encode("utf-8")
+        if len(encoded) > limit:
+            encoded = encoded[-limit:]
+            line_start = encoded.find(b"\n")
+            if line_start < 0:
+                return None
+            text = encoded[line_start + 1 :].decode("utf-8", errors="replace")
+        return text
+    except (OSError, UnicodeError):
+        return None
+
+
+def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
+    useful: list[tuple[int, int, Path]] = []
+    for index in range(0, len(candidates), 2):
+        current = candidates[index]
+        previous = candidates[index + 1] if index + 1 < len(candidates) else None
+        current_stat = None
+        previous_stat = None
+        try:
+            stat = current.stat()
+            if current.is_file() and stat.st_size > 0:
+                current_stat = stat
+        except OSError:
+            pass
+        if previous is not None:
+            try:
+                stat = previous.stat()
+                if previous.is_file() and stat.st_size > 0:
+                    previous_stat = stat
+            except OSError:
+                pass
+        if current_stat is not None and (
+            previous_stat is None or current_stat.st_mtime_ns >= previous_stat.st_mtime_ns
+        ):
+            useful.append((current_stat.st_mtime_ns, 1, current))
+        elif previous_stat is not None and previous is not None:
+            useful.append((previous_stat.st_mtime_ns, 0, previous))
+    if not useful:
+        return None
+    useful.sort(reverse=True)
+    return useful[0][2]
+
+
+def _support_log_tails(
+    config: Mapping[str, object] | None,
+    paths: object | None,
+    application_dir: Path | None = None,
+) -> dict[str, str]:
+    tails: dict[str, str] = {}
+    for archive_name, candidates in (
+        ("bridge.log", _bridge_log_candidates(config, paths, application_dir)),
+        ("ap_client.log", _native_log_candidates(config)),
+    ):
+        selected = _most_recent_log(candidates)
+        if selected is None:
+            continue
+        tail = _read_log_tail(selected)
+        if tail is not None:
+            tails[archive_name] = tail
+    return tails
+
+
+def write_support_bundle(
+    destination: Path,
+    report: DoctorReport,
+    *,
+    logs: Sequence[str] = (),
+    config: Mapping[str, object] | None = None,
+    paths: object | None = None,
+    application_dir: Path | None = None,
+) -> Path:
     """Write bounded diagnostics and redacted logs."""
     destination = destination.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -89,6 +240,8 @@ def write_support_bundle(destination: Path, report: DoctorReport, *, logs: Seque
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
         archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
+        for name, tail in _support_log_tails(config, paths, application_dir).items():
+            archive.writestr(name, tail)
     os.replace(temporary, destination)
     return destination
 

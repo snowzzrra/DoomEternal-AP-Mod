@@ -32,33 +32,49 @@ class NamedRangeControl(QWidget):
         layout.setSpacing(5)
         self.special = QComboBox()
         self.special.addItem("Exact value", None)
+        self.special_values: dict[str, object] = {}
         for special in cast(list[dict[str, object]], option["special_values"]):
-            self.special.addItem(str(special["label"]), special["key"])
+            key = str(special["key"])
+            self.special_values[key] = special.get("value")
+            self.special.addItem(str(special["label"]), key)
         layout.addWidget(self.special)
-        row = QHBoxLayout()
+        self.numeric_row = QWidget()
+        row = QHBoxLayout(self.numeric_row)
+        row.setContentsMargins(0, 0, 0, 0)
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.spin = QSpinBox()
         self.slider.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
         self.spin.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
         row.addWidget(self.slider, 1)
         row.addWidget(self.spin)
-        layout.addLayout(row)
+        layout.addWidget(self.numeric_row)
         self.slider.valueChanged.connect(self.spin.setValue)
         self.spin.valueChanged.connect(self.slider.setValue)
         self.special.currentIndexChanged.connect(self._special_changed)
         self.setValue(option["default"])
 
     def _special_changed(self, _index: int) -> None:
-        exact = self.special.currentData() is None
-        self.slider.setEnabled(exact)
-        self.spin.setEnabled(exact)
+        key = self.special.currentData()
+        if key is None:
+            self.numeric_row.show()
+            self.slider.setEnabled(True)
+            self.spin.setEnabled(True)
+            return
+        value = self.special_values.get(str(key))
+        displayable = isinstance(value, int) and not isinstance(value, bool) and self.slider.minimum() <= value <= self.slider.maximum()
+        self.numeric_row.setVisible(displayable)
+        if displayable:
+            self.spin.setValue(cast(int, value))
+        self.slider.setEnabled(False)
+        self.spin.setEnabled(False)
 
     def value(self) -> int | str:
         return self.spin.value() if self.special.currentData() is None else str(self.special.currentData())
 
     def setValue(self, value: object) -> None:
         if isinstance(value, str):
-            self.special.setCurrentIndex(max(0, self.special.findData(value)))
+            index = self.special.findData(value)
+            self.special.setCurrentIndex(index if index >= 0 else 0)
         else:
             self.special.setCurrentIndex(0)
             self.spin.setValue(cast(int, value))
@@ -149,14 +165,19 @@ class LauncherUI(QMainWindow):
             QFrame#topbar {{ background:#0d151a; border-bottom:1px solid {self.COLORS['line']}; }}
             QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16242b,stop:.55 #111b21,stop:1 #0d151a); border:1px solid #45606b; border-left:4px solid {self.COLORS['doom']}; }}
             QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; }}
-            QFrame#status {{ background:#101a20; border:1px solid #38505b; border-left:3px solid #64737a; }}
+            QWidget#statusItem {{ background:transparent; border:0; }}
+            QLabel#statusIndicator {{ color:#64737a; font-size:12pt; }}
+            QWidget#statusItem[statusTone="good"] QLabel#statusIndicator {{ color:{self.COLORS['good']}; }}
+            QWidget#statusItem[statusTone="active"] QLabel#statusIndicator {{ color:{self.COLORS['ap']}; }}
+            QWidget#statusItem[statusTone="warn"] QLabel#statusIndicator {{ color:{self.COLORS['warn']}; }}
+            QWidget#statusItem[statusTone="bad"] QLabel#statusIndicator {{ color:{self.COLORS['bad']}; }}
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
             QLabel#eyebrow {{ color:{self.COLORS['ap']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
             QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:23pt; font-weight:800; }}
             QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; }}
             QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
-            QLabel#stateName {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:10pt; font-weight:800; }}
+            QLabel#stateName {{ color:{self.COLORS['muted']}; font-size:9pt; font-weight:800; }}
             QLabel#warning {{ color:{self.COLORS['warn']}; background:#292419; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
             QLineEdit,QSpinBox {{ background:#0c1419; color:{self.COLORS['text']}; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
             QComboBox {{ background:#0c1419; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
@@ -214,8 +235,7 @@ class LauncherUI(QMainWindow):
         nav = QVBoxLayout(shell)
         nav.setContentsMargins(12, 18, 12, 16)
         nav.setSpacing(5)
-        nav.addWidget(self._label("DOOM Eternal", "brand"))
-        nav.addWidget(self._label("ARCHIPELAGO", "eyebrow"))
+        nav.addWidget(self._label("DOOM Eternal\nArchipelago", "brand"))
         nav.addSpacing(22)
         self.nav_buttons: list[QPushButton] = []
         for label, page in (("HOME", 0), ("JOIN ROOM", 1), ("SESSION", 2), ("CREATE PLAYER", 3), ("HELP", 4)):
@@ -235,7 +255,8 @@ class LauncherUI(QMainWindow):
         top = QHBoxLayout(topbar)
         top.setContentsMargins(24, 10, 24, 10)
         self.top_state = self._label("READY TO JOIN", "state")
-        top.addWidget(self._label("DOOM ETERNAL ARCHIPELAGO", "eyebrow"))
+        self.top_context = self._label("HOME", "eyebrow")
+        top.addWidget(self.top_context)
         top.addStretch(1)
         top.addWidget(self.top_state)
         stage_layout.addWidget(topbar)
@@ -258,10 +279,9 @@ class LauncherUI(QMainWindow):
         hero_layout = QHBoxLayout(hero)
         hero_layout.setContentsMargins(24, 20, 24, 20)
         copy = QVBoxLayout()
-        copy.addWidget(self._label("DOOM ETERNAL ARCHIPELAGO", "eyebrow"))
-        self.hero_title = self._label("JOIN YOUR ROOM", "title")
+        self.hero_title = self._label("JOIN A ROOM", "title")
         copy.addWidget(self.hero_title)
-        self.hero_detail = self._label("Connect to your Archipelago room, then play DOOM Eternal.", "muted")
+        self.hero_detail = self._label("Connect to your Archipelago room and start playing.", "muted")
         self.hero_detail.setWordWrap(True)
         copy.addWidget(self.hero_detail)
         hero_layout.addLayout(copy, 1)
@@ -277,6 +297,10 @@ class LauncherUI(QMainWindow):
         create_copy.addWidget(self._label("NEW PLAYER FILE", "section"))
         create_copy.addWidget(self._label("Choose your game settings and save a Player YAML for your next room.", "muted"))
         create_layout.addLayout(create_copy, 1)
+        self.join_another_button = QPushButton("JOIN ANOTHER ROOM")
+        self.join_another_button.clicked.connect(self._focus_join)
+        self.join_another_button.hide()
+        create_layout.addWidget(self.join_another_button)
         create_button = QPushButton("CREATE PLAYER YAML")
         create_button.clicked.connect(lambda: self._show_page(3))
         create_layout.addWidget(create_button)
@@ -286,22 +310,44 @@ class LauncherUI(QMainWindow):
 
     def _status_strip(self) -> QWidget:
         strip = QWidget()
-        layout = QGridLayout(strip)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setHorizontalSpacing(8)
-        self.statuses: dict[str, tuple[QFrame, QLabel, QLabel]] = {}
+        self.status_layout = QGridLayout(strip)
+        self.status_layout.setContentsMargins(0, 0, 0, 0)
+        self.status_layout.setHorizontalSpacing(8)
+        self.status_layout.setVerticalSpacing(8)
+        self.status_strip = strip
+        self.status_items: list[QWidget] = []
+        self.statuses: dict[str, tuple[QWidget, QLabel, QLabel, QLabel]] = {}
         for index, (key, title) in enumerate((("room", "CONNECTION"), ("mod", "MOD"), ("game", "GAME"), ("rpc", "GAME LINK"))):
-            card = self._card("status")
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 9, 12, 9)
+            item = QWidget()
+            item.setObjectName("statusItem")
+            item.setProperty("statusTone", "muted")
+            item_layout = QHBoxLayout(item)
+            item_layout.setContentsMargins(4, 2, 4, 2)
+            item_layout.setSpacing(6)
+            indicator = self._label("○", "statusIndicator")
             name = self._label(title, "stateName")
             detail = self._label("WAITING", "stateDetail")
-            card_layout.addWidget(name)
-            card_layout.addWidget(detail)
-            layout.addWidget(card, 0, index)
-            layout.setColumnStretch(index, 1)
-            self.statuses[key] = (card, name, detail)
+            item_layout.addWidget(indicator)
+            item_layout.addWidget(name)
+            item_layout.addWidget(self._label("·", "muted"))
+            item_layout.addWidget(detail)
+            item_layout.addStretch(1)
+            self.status_items.append(item)
+            self.statuses[key] = (item, indicator, name, detail)
+        QTimer.singleShot(0, self._arrange_status_strip)
         return strip
+
+    def _arrange_status_strip(self) -> None:
+        columns = 2 if self.status_strip.width() < 700 else 4
+        for index, item in enumerate(self.status_items):
+            self.status_layout.addWidget(item, index // columns, index % columns)
+        for column in range(4):
+            self.status_layout.setColumnStretch(column, 1 if column < columns else 0)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "status_strip"):
+            self._arrange_status_strip()
 
     def _join_page(self) -> QScrollArea:
         body = QWidget()
@@ -547,15 +593,22 @@ class LauncherUI(QMainWindow):
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)
+        self.top_context.setText(("HOME", "JOIN ROOM", "SESSION", "CREATE PLAYER", "HELP")[index])
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == index)
 
     def _set_status(self, key: str, detail: str, color: str) -> None:
-        card, name, label = self.statuses[key]
-        card.setStyleSheet(f"border-top:3px solid {color};")
-        name.setStyleSheet(f"color:{color};")
+        item, indicator, _name, label = self.statuses[key]
+        tone = {
+            self.COLORS["good"]: "good", self.COLORS["ap"]: "active",
+            self.COLORS["warn"]: "warn", self.COLORS["bad"]: "bad",
+        }.get(color, "muted")
+        item.setProperty("statusTone", tone)
+        item.style().unpolish(item)
+        item.style().polish(item)
         icon = "●" if color == self.COLORS["good"] else "◆" if color == self.COLORS["ap"] else "!" if color in (self.COLORS["warn"], self.COLORS["bad"]) else "○"
-        label.setText(f"{icon} {detail.upper()}")
+        indicator.setText(icon)
+        label.setText(detail.upper())
 
     def _set_home(self, title: str, detail: str, action: str, state: str, *, enabled: bool = True) -> None:
         self.hero_title.setText(title)
@@ -563,6 +616,9 @@ class LauncherUI(QMainWindow):
         self.hero_action.setText(action)
         self.hero_action.setEnabled(enabled)
         self.top_state.setText(state)
+
+    def _set_home_secondary_actions(self, resumable: bool) -> None:
+        self.join_another_button.setVisible(resumable)
 
     def _set_connection_controls(self, editable: bool) -> None:
         for field in (self.game_root, self.saves_root, self.server, self.slot, self.password, self.join_button):
@@ -575,18 +631,24 @@ class LauncherUI(QMainWindow):
             self.game_root.setText(str(found["game_root"]))
         if not self.saves_root.text() and found.get("save_games_dir"):
             self.saves_root.setText(str(found["save_games_dir"]))
+        has_session = bool(self.controller.config.get("server_address") and self.controller.config.get("slot"))
+        self._set_home_secondary_actions(has_session)
         if self.game_root.text() and self.saves_root.text():
             self.detected_paths.setText("DOOM Eternal found")
-            has_session = bool(self.controller.config.get("server_address") and self.controller.config.get("slot"))
             self._set_home(
-                "WELCOME BACK" if has_session else "JOIN YOUR ROOM",
-                "Reconnect to your saved room and continue playing." if has_session else "Connect to your Archipelago room, then play DOOM Eternal.",
+                "WELCOME BACK" if has_session else "JOIN A ROOM",
+                "Reconnect to your saved room and continue playing." if has_session else "Connect to your Archipelago room and start playing.",
                 "RESUME" if has_session else "JOIN A ROOM",
                 "READY",
             )
         else:
             self.detected_paths.setText("DOOM Eternal needs a game folder")
-            self._set_home("FIND DOOM ETERNAL", "Choose your game folder before joining a room.", "JOIN A ROOM", "ACTION NEEDED")
+            self._set_home(
+                "WELCOME BACK" if has_session else "JOIN A ROOM",
+                "Reconnect to your saved room and continue playing." if has_session else "Connect to your Archipelago room and start playing.",
+                "RESUME" if has_session else "JOIN A ROOM",
+                "ACTION NEEDED",
+            )
         for key in self.statuses:
             self._set_status(key, "waiting", self.COLORS["muted"])
         if not self.start_inventory_catalog:
@@ -927,7 +989,7 @@ class LauncherUI(QMainWindow):
     def _save_support_bundle(self) -> None:
         try:
             path = self.controller.create_support_bundle(Path.home() / "DOOM-Eternal-Archipelago-support.zip", logs=self.log.toPlainText().splitlines())
-            self.doctor_action.setText(f"Support bundle saved: {path}")
+            self.doctor_action.setText(f"Support report saved: {path}")
         except Exception as error: self._append_log(f"Support bundle error: {error}")
 
     def _preview_repairs(self) -> None:

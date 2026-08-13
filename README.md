@@ -43,8 +43,8 @@ installation guidance, session activity, logs, diagnostics, repair, and explicit
 Steam launch. Each generated room carries its own options and identity, so the
 game, client, save, and installed map package operate as one consistent session.
 From Home, use Join for a room or Resume for saved room identity; Session shows
-connected-room state and setup actions, while Doctor provides diagnostics. Create
-YAML is for generating a future room and does not replace connected-room options.
+connected-room state and setup actions, while Help provides setup checks and
+troubleshooting actions. Create YAML is for generating a future room.
 
 ## 2. Installation
 
@@ -200,8 +200,8 @@ locations. Reconnect compares local state with the server and resumes pending
 work from that shared history.
 
 Room identity also protects generated content. The launcher, installed package,
-bridge, APWorld, slot data, and save association are checked together. Doctor
-reports identity or installation drift. Repair presents a concrete plan, backs
+bridge, APWorld, slot data, and save association are checked together. Setup check
+reports identity or installation drift. Repair/Fix presents a concrete plan, backs
 up owned content, applies confirmed actions, and validates installed files.
 
 ### Campaign systems
@@ -245,8 +245,8 @@ The active runtime has three cooperating layers:
 
 The launcher surrounds those layers. It reads the room schema, creates player
 YAML, discovers supported installations, prepares the room package, supervises
-the bridge, opens DOOM Eternal through Steam, and provides Doctor, Repair, and a
-sanitized support bundle.
+the bridge, opens DOOM Eternal through Steam, and provides Help, setup check,
+Repair/Fix, and a sanitized support report.
 
 ## 4. Roadmap
 
@@ -280,7 +280,7 @@ sanitized support bundle.
 - Hard, Soft, and Combat logic profiles.
 - Physical Chainsaw, Dash, and first Sentinel Battery options.
 - Start With Automap, mission replay Fast Travel, and Soft/Hardcore DeathLink.
-- Doctor, Repair, support bundles, resync, and room identity checks.
+- Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
 ### 0.4.0-beta.5 — Meathook-AP integration
 

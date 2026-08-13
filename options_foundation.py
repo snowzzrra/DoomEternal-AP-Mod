@@ -121,6 +121,8 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
                         or re.fullmatch(r"[a-z][a-z0-9_]*", special_key) is None
                         or not isinstance(special.get("label"), str)
                         or not special["label"].strip()
+                        or isinstance(special.get("value"), bool)
+                        or not isinstance(special.get("value"), int)
                     ):
                         raise ValueError(f"named range {key} contains invalid special value")
                     special_keys.append(special_key)

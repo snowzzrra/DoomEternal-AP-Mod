@@ -216,7 +216,14 @@ class LauncherController:
         raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
-        bundle = write_support_bundle(destination, self.run_doctor(), logs=logs or [])
+        bundle = write_support_bundle(
+            destination,
+            self.run_doctor(),
+            logs=logs or [],
+            config=self.config,
+            paths=self.user_paths,
+            application_dir=self.client_dir,
+        )
         self.emit("support_bundle_ready", path=str(bundle))
         return bundle
 
