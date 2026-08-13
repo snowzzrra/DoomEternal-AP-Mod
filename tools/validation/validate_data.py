@@ -1116,7 +1116,7 @@ def main(argv: list[str] | None = None) -> int:
         "map_checks": 307,
         "runtime_locations": 62,
         "runtime_goals": 1,
-        "route_sentinel_batteries": 21,
+        "route_sentinel_batteries": 18,
     }:
         errors.append("Foundation frozen counts changed")
     try:

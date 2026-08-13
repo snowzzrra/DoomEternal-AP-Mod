@@ -1021,6 +1021,11 @@
       ""
     ]
   ],
+  "connection_conditions": {
+    "Fortress of Doom - Second Visit -> Cultist Base - Grotto of Penance": {
+      "soft_capabilities": ["requires_first_battery"]
+    }
+  },
   "assignments": {
     "Menu": [],
     "Weapon Masteries": [

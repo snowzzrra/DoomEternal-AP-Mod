@@ -1,16 +1,9 @@
 {
   "schema_version": 1,
-  "format": "doom_wiki_fast_travel_anchors",
-  "source_note": {
-    "title": "DOOM Wiki Fast Travel",
-    "url": "https://doomwiki.org/wiki/Fast_Travel",
-    "mirror_url": "https://breezewiki.com/doom/wiki/Fast_Travel"
-  },
   "missions": [
     {
       "mission_key": "e1m1_intro",
       "display_name": "Hell on Earth",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Hell on Earth - Barge - Hell Priest Barge",
@@ -36,17 +29,11 @@
           "name": "Hell on Earth - Citadel - Citadel of Hell",
           "map_group": "Citadel"
         }
-      ],
-      "materialized_anchors": [
-        "Hell on Earth - Barge - Hell Priest Barge",
-        "Hell on Earth - City - Downtown",
-        "Hell on Earth - Citadel - Citadel of Hell"
       ]
     },
     {
       "mission_key": "e1m2_war",
       "display_name": "Exultia",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Exultia - Exultia - Mourning Spire",
@@ -76,17 +63,11 @@
           "name": "Exultia - Hell - Isle of Torment",
           "map_group": "Hell"
         }
-      ],
-      "materialized_anchors": [
-        "Exultia - Exultia - Mourning Spire",
-        "Exultia - Hell - Ichor Expanse",
-        "Exultia - Hell - Isle of Torment"
       ]
     },
     {
       "mission_key": "e1m3_cult",
       "display_name": "Cultist Base",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Cultist Base - Grotto of Penance",
@@ -112,17 +93,11 @@
           "name": "Cultist Base - Station of Anointment",
           "map_group": "Cultist Base"
         }
-      ],
-      "materialized_anchors": [
-        "Cultist Base - Grotto of Penance",
-        "Cultist Base - Promenade of Culling",
-        "Cultist Base - Station of Anointment"
       ]
     },
     {
       "mission_key": "e1m4_boss",
       "display_name": "Doom Hunter Base",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Doom Hunter Base - Station of Redemption",
@@ -144,17 +119,11 @@
           "name": "Doom Hunter Base - Chamber of Penance",
           "map_group": "Doom Hunter Base"
         }
-      ],
-      "materialized_anchors": [
-        "Doom Hunter Base - Station of Redemption",
-        "Doom Hunter Base - Lazarus Generators",
-        "Doom Hunter Base - Chamber of Penance"
       ]
     },
     {
       "mission_key": "e2m1_nest",
       "display_name": "Super Gore Nest",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Super Gore Nest - Upper Area - Mixom Square",
@@ -184,17 +153,11 @@
           "name": "Super Gore Nest - Lower Area - Argent Energy Station",
           "map_group": "Lower Area"
         }
-      ],
-      "materialized_anchors": [
-        "Super Gore Nest - Upper Area - Mixom Square",
-        "Super Gore Nest - Upper Area - Vermilion Canal",
-        "Super Gore Nest - Lower Area - Argent Energy Station"
       ]
     },
     {
       "mission_key": "e2m2_base",
       "display_name": "ARC Complex",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "ARC Complex - Emerson Hotel",
@@ -228,17 +191,11 @@
           "name": "ARC Complex - Convention Parking",
           "map_group": "ARC Complex"
         }
-      ],
-      "materialized_anchors": [
-        "ARC Complex - Moring Aeronautics",
-        "ARC Complex - Vargo Convention Center",
-        "ARC Complex - Convention Parking"
       ]
     },
     {
       "mission_key": "e2m3_core",
       "display_name": "Mars Core",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Mars Core - Phobos - Phobos Teleport Station",
@@ -276,17 +233,11 @@
           "name": "Mars Core - Hell - Temple of Sin",
           "map_group": "Hell"
         }
-      ],
-      "materialized_anchors": [
-        "Mars Core - Phobos - Phobos Teleport Station",
-        "Mars Core - UAC - BFG-10000 Ventilation",
-        "Mars Core - Hell - Temple of Sin"
       ]
     },
     {
       "mission_key": "e2m4_boss",
       "display_name": "Sentinel Prime",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Sentinel Prime - Holy Pathway",
@@ -304,16 +255,11 @@
           "name": "Sentinel Prime - Dungeons",
           "map_group": "Sentinel Prime"
         }
-      ],
-      "materialized_anchors": [
-        "Sentinel Prime - Holy Pathway",
-        "Sentinel Prime - Dungeons"
       ]
     },
     {
       "mission_key": "e3m1_slayer",
       "display_name": "Taras Nabad",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Taras Nabad - City Outskirts",
@@ -347,17 +293,11 @@
           "name": "Taras Nabad - Central Power Core",
           "map_group": "Central Power Core"
         }
-      ],
-      "materialized_anchors": [
-        "Taras Nabad - City Outskirts",
-        "Taras Nabad - Catacombs",
-        "Taras Nabad - Central Power Core"
       ]
     },
     {
       "mission_key": "e3m2_hell",
       "display_name": "Nekravol",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Nekravol - Pain's Basin",
@@ -375,18 +315,11 @@
           "name": "Nekravol - Halls of Torment",
           "map_group": "Nekravol"
         }
-      ],
-      "materialized_anchors": [
-        "Nekravol - Pain's Basin",
-        "Nekravol - The Mill",
-        "Nekravol - Passage of the Damned",
-        "Nekravol - Halls of Torment"
       ]
     },
     {
       "mission_key": "e3m2_hell_b",
       "display_name": "Nekravol Part II",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Nekravol Part II - Corpse Conveyor",
@@ -412,18 +345,11 @@
           "name": "Nekravol Part II - Argent Transmitter",
           "map_group": "Nekravol Part II"
         }
-      ],
-      "materialized_anchors": [
-        "Nekravol Part II - Corpse Conveyor",
-        "Nekravol Part II - Soul Extraction",
-        "Nekravol Part II - Soul Ascent",
-        "Nekravol Part II - Argent Transmitter"
       ]
     },
     {
       "mission_key": "e3m3_maykr",
       "display_name": "Urdak",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Urdak - Infernal Demodulator",
@@ -453,17 +379,11 @@
           "name": "Urdak - Xanthous Harmonizer",
           "map_group": "Urdak"
         }
-      ],
-      "materialized_anchors": [
-        "Urdak - Infernal Demodulator",
-        "Urdak - Perse Harmonizer",
-        "Urdak - Xanthous Harmonizer"
       ]
     },
     {
       "mission_key": "e3m4_boss",
       "display_name": "Final Sin",
-      "source_note": "DOOM Wiki Fast Travel: https://doomwiki.org/wiki/Fast_Travel (BreezeWiki: https://breezewiki.com/doom/wiki/Fast_Travel)",
       "anchors": [
         {
           "name": "Final Sin - Starstruct Industries",
@@ -485,58 +405,7 @@
           "name": "Final Sin - South Station",
           "map_group": "Final Sin"
         }
-      ],
-      "materialized_anchors": [
-        "Final Sin - Starstruct Industries",
-        "Final Sin - Viris West",
-        "Final Sin - South Station"
       ]
-    }
-  ],
-  "ambiguities": [
-    {
-      "location_ids": [
-        7770011,
-        7770020
-      ],
-      "issue": "Hell on Earth basement records identify UAC basement content but do not expose an anchor name.",
-      "assignment": "Hell on Earth - Citadel - Citadel of Hell"
-    },
-    {
-      "location_ids": [
-        7770023,
-        7770042,
-        7770123
-      ],
-      "issue": "Exultia throne and mission-terminal records identify the final area without a unique anchor field.",
-      "assignment": "Exultia - Hell - Isle of Torment"
-    },
-    {
-      "location_ids": [
-        7770197,
-        7770198
-      ],
-      "issue": "Super Gore Nest radioactive and post-fire-trap records do not distinguish Pumping Station C from Toxin Refinery in source location names.",
-      "assignment": "Super Gore Nest - Lower Area - Toxin Refinery; Super Gore Nest - Lower Area - Pumping Station C"
-    },
-    {
-      "location_ids": [
-        7770122,
-        7770123,
-        7770124,
-        7770162,
-        7770210,
-        7770248,
-        7770289,
-        7770290,
-        7770337,
-        7770362,
-        7770387,
-        7770411,
-        7770414
-      ],
-      "issue": "Mission-complete runtime records expose map terminals, not fast-travel anchor coordinates.",
-      "assignment": "Mission terminal anchor for each mission."
     }
   ]
 }
