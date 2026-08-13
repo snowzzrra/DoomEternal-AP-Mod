@@ -23,7 +23,9 @@ class ReceiveState(str, Enum):
     COMMAND_IN_FLIGHT = "COMMAND_IN_FLIGHT"
     AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
     WAITING_FOR_RETRY = "WAITING_FOR_RETRY"
-    CONFIRMED = "CONFIRMED"
+    APPLIED = "APPLIED"
+    RESOLVED = "RESOLVED"
+    CONFIRMED = "RESOLVED"
     EXPIRED = "EXPIRED"
     FAILED = "FAILED"
 
@@ -195,7 +197,7 @@ class DeathLinkReceiver:
         event = self.active
         if event is None:
             return self._result(None, None, "idle", now)
-        if self.mode == "soft" and now >= event.total_deadline:
+        if now >= event.total_deadline:
             return self._finish(ReceiveState.EXPIRED, "total_timeout", now=now, allow_late_suppression=True)
         if event.state is ReceiveState.RECEIVED:
             event.state = ReceiveState.WAITING_FOR_SAFE_GAMEPLAY
@@ -206,6 +208,13 @@ class DeathLinkReceiver:
             if in_flight:
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
             event.deliveries += 1
+            if self.mode == "soft":
+                return self._finish(
+                    ReceiveState.APPLIED,
+                    "accepted",
+                    now=now,
+                    allow_late_suppression=True,
+                )
             event.state = ReceiveState.AWAITING_CONFIRMATION
             event.confirmation_deadline = now + self.confirm_timeout
             self._suppression_event_id = event.event_id
@@ -214,9 +223,7 @@ class DeathLinkReceiver:
         if event.state is ReceiveState.AWAITING_CONFIRMATION:
             if event.confirmation_deadline is not None and now < event.confirmation_deadline:
                 return self._result(event.event_id, event.state, "awaiting_confirmation", now)
-            if self.mode == "soft" or (
-                self.max_attempts is not None and event.attempts >= self.max_attempts
-            ):
+            if self.max_attempts is not None and event.attempts >= self.max_attempts:
                 return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
             event.state = ReceiveState.WAITING_FOR_RETRY
             event.next_attempt_at = now + self.retry_interval
@@ -255,7 +262,7 @@ class DeathLinkReceiver:
     def confirm_local_death(self, now: float) -> ReceiveResult:
         event = self.active
         if event is not None and self._suppression_event_id == event.event_id and event.attempts:
-            return self._finish(ReceiveState.CONFIRMED, "echo_suppressed", now=now)
+            return self._finish(ReceiveState.RESOLVED, "echo_suppressed", now=now)
         if self._late_suppression is not None:
             event_id, deadline = self._late_suppression
             self._late_suppression = None
@@ -263,7 +270,7 @@ class DeathLinkReceiver:
                 # Timeout policy: suppress one death arriving shortly after a delivered
                 # kill. This can suppress a coincidental local death during the bounded
                 # grace window, but prevents a late DeathLink kill from echoing.
-                return self._result(event_id, ReceiveState.CONFIRMED, "late_echo_suppressed", now)
+                return self._result(event_id, ReceiveState.APPLIED, "late_echo_suppressed", now)
         return self._result(None, None, "not_linked", now)
 
     def abandon(self, now: float, reason: str = "room_changed") -> tuple[str, ...]:
@@ -305,7 +312,7 @@ class DeathLinkReceiver:
                 dispatches=event.attempts,
                 safe_pauses=event.safe_pauses,
                 unsafe_pauses=event.unsafe_pauses,
-                death_confirmation=state is ReceiveState.CONFIRMED,
+                death_confirmation=state is ReceiveState.RESOLVED,
                 cancel_reason=detail if detail in {"disconnect", "room_changed", "safe_action"} else None,
             )
         )

@@ -78,6 +78,17 @@ def _validate_native_automap_station(text: str) -> None:
     return None
 
 
+def _remove_native_automap_station(text: str) -> str:
+    match = re.search(r'class\s*=\s*"idInteractable_Automap";', text)
+    if match is None:
+        raise ValueError("native Automap station missing")
+    start = text.rfind("entity {", 0, match.start())
+    if start < 0:
+        raise ValueError("native Automap station wrapper missing")
+    end = _matching_brace(text, text.find("{", start))
+    return text[:start] + text[end:]
+
+
 def _append_target(block: str, target: str) -> str:
     targets = re.search(
         r"targets\s*=\s*\{\s*num\s*=\s*(\d+);(?P<body>.*?)\s*\}",
@@ -147,6 +158,7 @@ def project_start_with_automap(content: str, map_key: str, enabled: bool) -> str
 	}}
 }}'''
     projected, _ = _attach_to_player_starts(content, entity_name)
+    projected = _remove_native_automap_station(projected)
     return projected + "\n" + writer
 
 
@@ -166,3 +178,5 @@ def validate_start_with_automap_projection(content: str, map_key: str) -> None:
             raise ValueError(f"Start With Automap entity contract drift: {required}")
     if re.search(r"\btargets\s*=\s*\{", block):
         raise ValueError("Start With Automap writer owns an unexpected target chain")
+    if re.search(r'class\s*=\s*"idInteractable_Automap";', content):
+        raise ValueError("Start With Automap projection retained native station")

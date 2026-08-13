@@ -651,6 +651,32 @@ def neutralize_conditional_pickup_block(block, preserve_original_visual=False):
     return replace_targets_block(block, [])
 
 
+def is_sentinel_crystal_source(block):
+    return all(
+        marker in block
+        for marker in (
+            'inherit = "progress/argent_cell";',
+            'class = "idInteractable_WorldCache";',
+            'automapPropertiesDecl = "argent_cell";',
+        )
+    )
+
+
+def remove_sentinel_crystal_head(block):
+    for property_name in (
+        "renderModelInfo",
+        "automapPropertiesDecl",
+        "fxDecl",
+    ):
+        block = remove_property_blocks(block, property_name)
+        block = re.sub(
+            rf'\s*{re.escape(property_name)}\s*=\s*(?:"[^"]*"|[^;]+);',
+            "",
+            block,
+        )
+    return block
+
+
 def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
     """Create an AP trigger independent from an ownership-hidden pickup."""
     policy = policy or {}
@@ -965,8 +991,6 @@ def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
     target_names.append(ap_check_id)
     block = replace_targets_block(block, target_names)
     if target_policy.get("gate_relay"):
-        # First Fortress Crystal must remain inert until vanilla Flame Belch
-        # chain activates target_relay_argent_cell_useable.
         if not re.search(r'flags\s*=\s*\{\s*hide\s*=\s*true;', block):
             block = block.replace("edit = {", "edit = {\n\t\t\tflags = { hide = true; }", 1)
     return block
@@ -1073,11 +1097,16 @@ def generate_automap_location_helper(source_block, location_id, policy=None):
         position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', source_block)
         if not position_block:
             raise ValueError(f"Automap helper source position is missing for {location_id}")
-        coordinates = {
-            axis: (re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)).group(1)
-                   if re.search(rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)) else "0")
+        position_values = {
+            axis: re.search(
+                rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)
+            )
             for axis in ("x", "y", "z")
         }
+        coordinates = {}
+        for axis in ("x", "y", "z"):
+            match = position_values[axis]
+            coordinates[axis] = match.group(1) if match is not None else "0"
     marker = re.search(
         r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
     )
@@ -1840,6 +1869,10 @@ def generate_map(
                                     ),
                                 )
                             )
+                    elif is_sentinel_crystal_source(block):
+                        new_blocks.append(
+                            "entity {" + remove_sentinel_crystal_head(block)
+                        )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )

@@ -116,6 +116,7 @@ def assert_separate_automap_helper_guard() -> int:
                         visual_name = config.get("target_policies", {}).get(
                             entity_name, {}
                         ).get("independent_visual", {}).get("entity_name")
+                        visual_name = visual_name or f"ap_location_visual_{location_id}"
                         visual_bounds = (
                             find_entity_block_bounds(generated, visual_name)
                             if visual_name else None

@@ -31,13 +31,17 @@ artifact after verification failure.
 2. Restart Archipelago Launcher.
 3. Keep the release launcher and its bundled client runtime together.
 
-## Join without YAML
+## Launcher flow
 
-1. Start the DOOM Eternal Archipelago launcher.
-2. Confirm or select the DOOM Eternal installation and save folder.
-3. Enter room address, slot name, and optional password.
-4. Select **Join** or **Connect to Archipelago**.
-5. Wait for room data and package identity check.
+The launcher opens on **Home**. Use **Resume** to reconnect with saved room
+identity, or open **Join** to enter a server, slot, and optional password.
+
+### Join
+
+1. Confirm or select the DOOM Eternal installation and save folder.
+2. Enter room address, slot name, and optional password.
+3. Select **Join** or **Connect to Archipelago**.
+4. Wait for room data and package identity check.
 
 YAML is not required for joining. Connected-room options are server-authoritative.
 
@@ -48,6 +52,14 @@ Join connects the prepared room and starts the bridge.
 Select **Resume** to return to launcher session state. Reconnect to the room if
 requested; passwords are entered again. Launcher verifies room identity and
 package state before setup.
+
+## Session and Doctor
+
+**Session** shows room, mod, game, and RPC status, room-authoritative options,
+activity, logs, setup actions, and Steam launch. Keep the launcher open while
+playing. Use **Doctor** for bounded installation, bridge, and handshake
+diagnostics; its repair and support-bundle actions are separate from session
+controls.
 
 ## Create YAML
 
@@ -125,20 +137,28 @@ consumers.
 
 ### Start With Automap
 
-**Start With Automap** reveals progression-item markers only.
+**Start With Automap** grants Automap at mission start and reveals progression-item
+markers. Automap stations are absent when the option is enabled.
+
+### Traps
+
+- **Trap Percentage** replaces that percentage of filler padding with traps. It
+  does not replace progression items or other pool items.
+- **Enabled Traps** selects trap types eligible for those filler slots. If no
+  trap types are enabled, no traps are placed.
 
 ### Fast Travel
 
-Fast Travel uses native replay only for missions already completed by the
-player.
+Fast Travel means that whenever the player has completed a level, it will always have Fast Travel enabled in posterior playthroughs, as in Mission Select replays.
 
 ### DeathLink
 
 When enabled, choose one room mode:
 
 - **Soft:** one received death applies to its target; normal respawn/checkpoint
-  flow continues.
-- **Hardcore:** received death ignores player extra lives.
+  flow continues. The event is dispatched once.
+- **Hardcore:** the same received death remains pending until
+  death is detected.
 
 ## Diagnostics and support
 

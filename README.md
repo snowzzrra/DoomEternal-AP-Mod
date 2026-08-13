@@ -34,13 +34,17 @@ Current campaign coverage includes:
 - 369 locations in total;
 - 117 item types;
 - randomized starting weapons and starting inventory;
-- configurable Chainsaw, Dash, first Sentinel Battery, Automap, and DeathLink;
+- configurable Chainsaw, Dash, first Sentinel Battery, Automap, traps, and
+  DeathLink;
 - room-specific map packages for Windows and Linux/Proton.
 
 The launcher handles room connection, YAML creation, room package preparation,
 installation guidance, session activity, logs, diagnostics, repair, and explicit
 Steam launch. Each generated room carries its own options and identity, so the
 game, client, save, and installed map package operate as one consistent session.
+From Home, use Join for a room or Resume for saved room identity; Session shows
+connected-room state and setup actions, while Doctor provides diagnostics. Create
+YAML is for generating a future room and does not replace connected-room options.
 
 ## 2. Installation
 
@@ -208,12 +212,16 @@ up owned content, applies confirmed actions, and validates installed files.
   and thirteen bundles worth two each. The thirteen Fortress consumers each
   require a balance of two.
 - **Start With Automap** grants native Automap ownership in all 13 missions and
-  starts the player with `Reveal Automap Progression Items`.
+  reveals progression-item markers. Automap stations are absent when this option
+  is enabled.
+- **Trap Percentage** replaces that percentage of filler padding with traps. It
+  does not replace progression items or other pool items. **Enabled Traps** selects
+  trap types eligible for those filler slots; with no enabled types, no traps are
+  placed.
 - **Fast Travel** activates the mission's native Fast Travel unlock during a
   replay whose Mission Complete state was already checked at load start.
-- **DeathLink Soft** dispatches one received death event once. **Hardcore**
-  keeps the same event pending during unsafe gameplay states and dispatches in
-  safe gameplay until death telemetry confirms completion.
+- **DeathLink Soft** dispatches each received death event once, then normal
+  respawn/checkpoint flow continues. **Hardcore** keeps the same event pending until death is detected.
 - **Marker cleanup** reconciles server-confirmed locations with their map and
   Automap presentation across reloads and revisits.
 
@@ -318,7 +326,7 @@ sanitized support bundle.
 - The Archipelago project and contributors for the multiworld framework,
   protocol, server, and `CommonClient`.
 - tastyfresh (from the Doom 2016+ Modding Discord server) for the original 
-  large check list used to bootstrap the project.
+  large check list for project setup.
 - Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct 
   technical guidance and map/runtime research.
 - alby (from the Doom 2016+ Modding Discord server) for technical help, runtime

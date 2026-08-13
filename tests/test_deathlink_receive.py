@@ -28,30 +28,29 @@ def advance(receiver, spool, now, *, safe=True):
     )
 
 
-def test_command_delivery_is_not_death_confirmation():
+def test_soft_command_delivery_is_terminal_application():
     receiver = DeathLinkReceiver()
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     assert advance(receiver, spool, 1.0).state is ReceiveState.COMMAND_IN_FLIGHT
     spool.delivered()
     result = advance(receiver, spool, 2.0)
-    assert result.state is ReceiveState.AWAITING_CONFIRMATION
-    assert result.detail == "delivered"
-    assert receiver.active is not None
+    assert result.state is ReceiveState.APPLIED
+    assert result.detail == "accepted"
+    assert receiver.active is None
 
 
-def test_default_soft_mode_dispatches_once_then_fails_without_confirmation():
+def test_default_soft_mode_dispatches_once_without_death_telemetry():
     receiver = DeathLinkReceiver(confirm_timeout=1.0, retry_interval=1.0)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
 
     assert advance(receiver, spool, 1.0).detail == "dispatched"
     spool.delivered()
-    assert advance(receiver, spool, 2.0).detail == "delivered"
-    result = advance(receiver, spool, 3.0)
+    result = advance(receiver, spool, 2.0)
 
-    assert result.state is ReceiveState.FAILED
-    assert result.detail == "attempt_limit"
+    assert result.state is ReceiveState.APPLIED
+    assert result.detail == "accepted"
     assert spool.dispatches == 1
 
 
@@ -71,7 +70,7 @@ def test_first_attempt_can_fail_then_retry_confirms_exactly_once():
     assert advance(receiver, spool, 7.0).detail == "dispatched"
     spool.delivered()
     assert advance(receiver, spool, 8.0).detail == "delivered"
-    assert receiver.confirm_local_death(8.5).state is ReceiveState.CONFIRMED
+    assert receiver.confirm_local_death(8.5).state is ReceiveState.RESOLVED
     assert receiver.confirm_local_death(8.6).detail == "not_linked"
     assert spool.dispatches == 2
 
@@ -95,7 +94,6 @@ def test_local_death_after_confirmation_is_not_suppressed():
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
     spool.delivered()
-    advance(receiver, spool, 2.0)
     assert receiver.confirm_local_death(2.1).detail == "echo_suppressed"
     assert receiver.confirm_local_death(3.0).detail == "not_linked"
 
@@ -110,10 +108,9 @@ def test_timeout_is_bounded_and_allows_future_event():
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
     spool.delivered()
-    advance(receiver, spool, 2.0)
-    result = advance(receiver, spool, 4.0)
-    assert result.state is ReceiveState.FAILED
-    assert result.detail == "attempt_limit"
+    result = advance(receiver, spool, 2.0)
+    assert result.state is ReceiveState.APPLIED
+    assert result.detail == "accepted"
     assert receiver.active is None
     assert receiver.receive("two", 8.0).detail == "queued"
 
@@ -130,14 +127,13 @@ def test_late_death_after_timeout_is_suppressed_once_within_grace():
     receiver.receive("one", 0.0)
     advance(receiver, spool, 0.5)
     spool.delivered()
-    advance(receiver, spool, 1.0)
-    assert advance(receiver, spool, 2.0).state is ReceiveState.FAILED
+    assert advance(receiver, spool, 1.0).state is ReceiveState.APPLIED
     assert receiver.confirm_local_death(3.0).detail == "late_echo_suppressed"
     assert receiver.confirm_local_death(3.1).detail == "not_linked"
 
 
 def test_only_one_command_is_ever_in_flight():
-    receiver = DeathLinkReceiver(confirm_timeout=2.0, retry_interval=1.0)
+    receiver = DeathLinkReceiver(confirm_timeout=2.0, retry_interval=1.0, mode="hardcore")
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)

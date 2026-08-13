@@ -13,7 +13,7 @@ import yaml
 
 
 OPTIONS_SCHEMA_VERSION = 2
-SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "range", "named_range"})
+SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "option_set", "range", "named_range"})
 GAME_NAME = "DOOM Eternal"
 START_INVENTORY_KEY = "start_inventory"
 
@@ -71,6 +71,29 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"choice {key} contains duplicate keys")
             if option.get("default") not in choice_keys:
                 raise ValueError(f"choice {key} default is not canonical")
+        elif ui_type == "option_set":
+            choices = option.get("choices")
+            default = option.get("default")
+            if not isinstance(choices, list) or not choices:
+                raise ValueError(f"option set {key} lacks choices")
+            if not isinstance(default, list):
+                raise ValueError(f"option set {key} default must be a list")
+            choice_keys: list[str] = []
+            for choice in choices:
+                if not isinstance(choice, Mapping):
+                    raise ValueError(f"option set {key} contains malformed entry")
+                choice_key = choice.get("key")
+                if not isinstance(choice_key, str) or not choice_key:
+                    raise ValueError(f"option set {key} contains invalid key")
+                if not isinstance(choice.get("label"), str) or not choice["label"]:
+                    raise ValueError(f"option set {key} contains invalid label")
+                choice_keys.append(choice_key)
+            if len(choice_keys) != len(set(choice_keys)):
+                raise ValueError(f"option set {key} contains duplicate keys")
+            if any(not isinstance(value, str) or value not in choice_keys for value in default):
+                raise ValueError(f"option set {key} default contains unknown values")
+            if len(default) != len(set(default)):
+                raise ValueError(f"option set {key} default contains duplicate values")
         elif ui_type in {"range", "named_range"}:
             minimum = option.get("minimum")
             maximum = option.get("maximum")
@@ -201,7 +224,7 @@ def validate_start_inventory(value: Any) -> dict[str, int]:
 
 def validate_option_values(
     schema: Mapping[str, Any], values: Mapping[str, Any]
-) -> dict[str, bool | int | str | dict[str, int]]:
+) -> dict[str, bool | int | str | list[str] | dict[str, int]]:
     validated = validate_options_schema(schema)
     if not isinstance(values, Mapping):
         raise ValueError("option values must be an object")
@@ -210,7 +233,7 @@ def validate_option_values(
         missing = sorted(expected - set(values))
         extra = sorted(set(values) - expected)
         raise ValueError(f"option value keys mismatch; missing={missing} extra={extra}")
-    result: dict[str, bool | int | str | dict[str, int]] = {}
+    result: dict[str, bool | int | str | list[str] | dict[str, int]] = {}
     for option in validated["options"]:
         key = option["key"]
         value = values[key]
@@ -221,6 +244,15 @@ def validate_option_values(
             choices = {choice["key"] for choice in option["choices"]}
             if not isinstance(value, str) or value not in choices:
                 raise ValueError(f"{key} must be one of {sorted(choices)}")
+        elif option["ui_type"] == "option_set":
+            choices = {choice["key"] for choice in option["choices"]}
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or item not in choices for item in value
+            ):
+                raise ValueError(f"{key} must be a list of allowed values")
+            if len(value) != len(set(value)):
+                raise ValueError(f"{key} must not contain duplicate values")
+            value = sorted(value)
         elif option["ui_type"] == "range":
             if isinstance(value, bool) or not isinstance(value, int):
                 raise ValueError(f"{key} must be an integer")

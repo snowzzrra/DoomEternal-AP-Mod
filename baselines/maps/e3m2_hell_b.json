@@ -27,20 +27,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "0.4.0-beta.4: add native Fast Travel unlock entity at supported map activation position."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "0.4.0-beta.4: intentional Sentinel Crystal and AP pickup presentation delta preserves functional owners, triggers, publishers, and progression."
     }
   ],
   "asset_package_contract_sha256": "a43cba94a0a9b3b1bc5111140501dea4833642da8d09b1ca4cab8da6f40c4c08",
-  "byte_sha256": "2d630bb6a0771ba4e89812a6264cb4fe42921f9f87e1284d5eba62f52a4eac4b",
+  "byte_sha256": "da9eeff2dd057aeb16fbfe8c1905b0eb6bb529fa9ac9c2d5548cd7206b80e200",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 387,
-    "byte_size": 6850105,
-    "classes": 7325,
-    "entity_count": 7325,
+    "byte_size": 6853884,
+    "classes": 7326,
+    "entity_count": 7326,
     "layers": 432,
-    "targets": 3974,
-    "transforms": 14986,
-    "unique_entity_names": 7325
+    "targets": 3979,
+    "transforms": 14989,
+    "unique_entity_names": 7326
   },
   "manifest_sha256": "f05560ddbc41d3d605ff9757be1575757b86cd945874238523be0001b1f9c6c1",
   "map_key": "e3m2_hell_b",
@@ -76,5 +80,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "ff71930583525a3af2dc7fa6a2a2e527c70866162a3a12c84e004a340bd89654",
-  "semantic_sha256": "734283b94c30f27856373970e384d48c78bb1799dea190f8505418331faba5ee"
+  "semantic_sha256": "72053a8c57ed326698d136823f6d6b2530189f740331ddc387c786b0062b91b4"
 }

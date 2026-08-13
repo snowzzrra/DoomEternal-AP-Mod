@@ -228,9 +228,102 @@
         }
       ],
       "ui_type": "named_range"
+    },
+    {
+      "default": 10,
+      "description": "Percentage of filler padding replaced by enabled traps.",
+      "display_name": "Trap Percentage",
+      "group": "Game Options",
+      "key": "trap_percentage",
+      "maximum": 100,
+      "minimum": 0,
+      "source_class": "TrapPercentage",
+      "ui_type": "range"
+    },
+    {
+      "choices": [
+        {
+          "key": "Ammo Drain Trap",
+          "label": "Ammo Drain Trap"
+        },
+        {
+          "key": "Arachnotron Trap",
+          "label": "Arachnotron Trap"
+        },
+        {
+          "key": "Archvile Trap",
+          "label": "Archvile Trap"
+        },
+        {
+          "key": "BFG Drain Trap",
+          "label": "BFG Drain Trap"
+        },
+        {
+          "key": "Baron Trap",
+          "label": "Baron Trap"
+        },
+        {
+          "key": "Carcass Trap",
+          "label": "Carcass Trap"
+        },
+        {
+          "key": "Cueball Trap",
+          "label": "Cueball Trap"
+        },
+        {
+          "key": "Dread Knight Trap",
+          "label": "Dread Knight Trap"
+        },
+        {
+          "key": "Fuel Drain Trap",
+          "label": "Fuel Drain Trap"
+        },
+        {
+          "key": "Hell Knight Trap",
+          "label": "Hell Knight Trap"
+        },
+        {
+          "key": "Imp Trap",
+          "label": "Imp Trap"
+        },
+        {
+          "key": "Marauder Trap",
+          "label": "Marauder Trap"
+        },
+        {
+          "key": "Revenant Trap",
+          "label": "Revenant Trap"
+        },
+        {
+          "key": "Tyrant Trap",
+          "label": "Tyrant Trap"
+        }
+      ],
+      "default": [
+        "Ammo Drain Trap",
+        "Arachnotron Trap",
+        "Archvile Trap",
+        "BFG Drain Trap",
+        "Baron Trap",
+        "Carcass Trap",
+        "Cueball Trap",
+        "Dread Knight Trap",
+        "Fuel Drain Trap",
+        "Hell Knight Trap",
+        "Imp Trap",
+        "Marauder Trap",
+        "Revenant Trap",
+        "Tyrant Trap"
+      ],
+      "description": "Trap types eligible for filler-padding replacement.",
+      "display_name": "Enabled Traps",
+      "group": "Game Options",
+      "key": "enabled_traps",
+      "source_class": "EnabledTraps",
+      "ui_type": "option_set"
     }
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "b74ebae585b0fb6ad485f01ad9d04055ffd8e203746c6d1dc4c17de33c4a493c"
+  "source_sha256": "177641bb90b552d3315cf30b43e928a1bc897cf1ae10971931bc423bce1b2cab"
 }

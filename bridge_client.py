@@ -5327,7 +5327,7 @@ class DoomEternalContext(CommonContext):
         if not self.death_link_enabled:
             return
         receive_result = self.deathlink_receiver.confirm_local_death(time.monotonic())
-        if receive_result.state is ReceiveState.CONFIRMED:
+        if receive_result.detail in {"echo_suppressed", "late_echo_suppressed"}:
             discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
             logger.info(
                 "[DeathLink] %s confirmed by death telemetry; linked echo suppressed (%s).",

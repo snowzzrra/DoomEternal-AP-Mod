@@ -24,18 +24,18 @@ def _load_apworld(ap_root: Path):
     os.environ.setdefault("SKIP_REQUIREMENTS_UPDATE", "1")
     sys.path.insert(0, str(ap_root))
     try:
-        from Options import Choice, NamedRange, Range, Toggle  # type: ignore[import-not-found]
+        from Options import Choice, NamedRange, OptionSet, Range, Toggle  # type: ignore[import-not-found]
         from worlds.doometernal import DoomEternalWorld  # type: ignore[import-not-found]
     finally:
         try:
             sys.path.remove(str(ap_root))
         except ValueError:
             pass
-    return DoomEternalWorld, Toggle, Choice, Range, NamedRange
+    return DoomEternalWorld, Toggle, Choice, OptionSet, Range, NamedRange
 
 
 def compile_schema(ap_root: Path) -> dict[str, Any]:
-    world, toggle_type, choice_type, range_type, named_range_type = _load_apworld(ap_root)
+    world, toggle_type, choice_type, option_set_type, range_type, named_range_type = _load_apworld(ap_root)
     options = []
     excluded = []
     for key, option_type in world.options_dataclass.type_hints.items():
@@ -64,6 +64,34 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                     "ui_type": "choice",
                     "default": option_type.name_lookup[option_type.default],
                     "choices": choices,
+                }
+            )
+            continue
+        if issubclass(option_type, option_set_type) and option_type.__module__ != "Options":
+            valid_keys = getattr(option_type, "valid_keys", None)
+            if isinstance(valid_keys, (str, bytes)) or valid_keys is None:
+                raise ValueError(f"invalid option set values for {key}")
+            try:
+                choice_keys = sorted(valid_keys)
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"invalid option set values for {key}") from error
+            if any(not isinstance(choice_key, str) or not choice_key for choice_key in choice_keys):
+                raise ValueError(f"option set {key} values must be non-empty strings")
+            default = getattr(option_type, "default", ())
+            if isinstance(default, (str, bytes)):
+                raise ValueError(f"invalid option set default for {key}")
+            try:
+                default_values = sorted(default)
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"invalid option set default for {key}") from error
+            if any(value not in choice_keys for value in default_values):
+                raise ValueError(f"option set {key} default contains unknown values")
+            options.append(
+                {
+                    **base,
+                    "ui_type": "option_set",
+                    "default": default_values,
+                    "choices": [{"key": choice_key, "label": choice_key} for choice_key in choice_keys],
                 }
             )
             continue
