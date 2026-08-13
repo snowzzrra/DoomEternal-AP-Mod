@@ -65,24 +65,41 @@ class NamedRangeControl(QWidget):
 
 
 class OptionSetControl(QWidget):
-    """Schema-driven set chooser for a future OptionSet UI type."""
+    """Schema-driven compact chooser for OptionSet values."""
 
     def __init__(self, option: dict[str, object]):
         super().__init__()
         self.checks: list[tuple[object, QCheckBox]] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
+        actions = QHBoxLayout()
+        select_all = QPushButton("SELECT ALL")
+        select_all.clicked.connect(lambda: self._set_all(True))
+        clear = QPushButton("CLEAR")
+        clear.clicked.connect(lambda: self._set_all(False))
+        actions.addWidget(select_all)
+        actions.addWidget(clear)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(5)
         default = option.get("default", [])
         selected = set(default) if isinstance(default, list) else set()
-        for choice in cast(list[object], option.get("choices", [])):
+        for index, choice in enumerate(cast(list[object], option.get("choices", []))):
             if not isinstance(choice, dict):
                 continue
             key = choice.get("key")
             check = QCheckBox(str(choice.get("label", key)))
             check.setChecked(key in selected)
-            layout.addWidget(check)
+            grid.addWidget(check, index // 2, index % 2)
             self.checks.append((key, check))
+        layout.addLayout(grid)
+
+    def _set_all(self, checked: bool) -> None:
+        for _, check in self.checks:
+            check.setChecked(checked)
 
     def value(self) -> list[object]:
         return [key for key, check in self.checks if check.isChecked()]
@@ -97,16 +114,16 @@ class LauncherUI(QMainWindow):
     """Controller-backed, keyboard-first launcher shell."""
 
     COLORS = {
-        "ink": "#090b0d", "panel": "#12161a", "panel2": "#1a2025",
-        "line": "#344049", "text": "#eff3f2", "muted": "#98a5a7",
-        "doom": "#e94920", "doom_hot": "#ff7043", "ap": "#39c6cf",
-        "good": "#8bd66b", "warn": "#f3b64c", "bad": "#f05c5c",
+        "ink": "#0a1014", "panel": "#111a20", "panel2": "#18252d",
+        "line": "#38505b", "text": "#eef4f3", "muted": "#9cacb1",
+        "doom": "#e8782f", "doom_hot": "#ff9c4a", "ap": "#42c7c8",
+        "good": "#9acd63", "warn": "#f0bd58", "bad": "#ef6262",
     }
 
     def __init__(self, controller: LauncherController):
         super().__init__()
         self.controller = controller
-        self.setWindowTitle("DOOM Eternal // Archipelago")
+        self.setWindowTitle("DOOM Eternal Archipelago")
         self.resize(1200, 800)
         self.setMinimumSize(760, 600)
         self.option_controls: dict[str, QWidget] = {}
@@ -126,36 +143,38 @@ class LauncherUI(QMainWindow):
 
     def _configure_style(self) -> None:
         self.setStyleSheet(f"""
-            QWidget {{ background:{self.COLORS['ink']}; color:{self.COLORS['text']}; font-family:'Agency FB','Bahnschrift Condensed','Noto Sans'; font-size:11pt; }}
+            QWidget {{ background:{self.COLORS['ink']}; color:{self.COLORS['text']}; font-family:'Segoe UI','Aptos','Noto Sans',sans-serif; font-size:10.5pt; }}
             QLabel {{ background:transparent; }} QMainWindow {{ background:{self.COLORS['ink']}; }}
-            QFrame#shell {{ background:{self.COLORS['panel']}; border-right:1px solid {self.COLORS['line']}; }}
-            QFrame#topbar {{ background:#0d1114; border-bottom:1px solid {self.COLORS['line']}; }}
-            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #261713,stop:.48 #171c20,stop:1 #101518); border:1px solid #633227; border-left:6px solid {self.COLORS['doom']}; }}
-            QFrame#card, QFrame#status {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; }}
-            QFrame#status {{ border-top:3px solid #4a555a; }}
-            QLabel#brand {{ font-size:24pt; font-weight:900; letter-spacing:2px; }}
-            QLabel#eyebrow {{ color:{self.COLORS['doom_hot']}; font-size:9pt; font-weight:800; letter-spacing:2px; }}
-            QLabel#title {{ font-size:21pt; font-weight:900; letter-spacing:1px; }}
-            QLabel#section {{ font-size:14pt; font-weight:800; letter-spacing:1px; }}
-            QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; letter-spacing:1px; }}
+            QFrame#shell {{ background:#0d151a; border-right:1px solid {self.COLORS['line']}; }}
+            QFrame#topbar {{ background:#0d151a; border-bottom:1px solid {self.COLORS['line']}; }}
+            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16242b,stop:.55 #111b21,stop:1 #0d151a); border:1px solid #45606b; border-left:4px solid {self.COLORS['doom']}; }}
+            QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; }}
+            QFrame#status {{ background:#101a20; border:1px solid #38505b; border-left:3px solid #64737a; }}
+            QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
+            QLabel#eyebrow {{ color:{self.COLORS['ap']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
+            QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:23pt; font-weight:800; }}
+            QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; }}
+            QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
-            QLabel#stateName {{ font-size:10pt; font-weight:900; letter-spacing:1px; }}
-            QLabel#warning {{ color:{self.COLORS['warn']}; background:#30230f; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
-            QLineEdit,QSpinBox {{ background:#10161a; color:{self.COLORS['text']}; border:1px solid #53636b; padding:7px 9px; min-height:20px; }}
-            QComboBox {{ background:#161c20; border:1px solid #53636b; padding:7px 9px; min-height:20px; }}
-            QComboBox QAbstractItemView {{ background:#161c20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
+            QLabel#stateName {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:10pt; font-weight:800; }}
+            QLabel#warning {{ color:{self.COLORS['warn']}; background:#292419; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
+            QLineEdit,QSpinBox {{ background:#0c1419; color:{self.COLORS['text']}; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
+            QComboBox {{ background:#0c1419; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
+            QComboBox QAbstractItemView {{ background:#101a20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
             QLineEdit:focus,QSpinBox:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['ap']}; }}
-            QPushButton {{ background:#20282d; border:1px solid #47565e; padding:9px 13px; font-weight:800; letter-spacing:.5px; }}
-            QPushButton:hover {{ background:#303c43; border-color:{self.COLORS['ap']}; }}
-            QPushButton#primary {{ background:{self.COLORS['doom']}; border-color:{self.COLORS['doom']}; color:white; }}
-            QPushButton#primary:hover {{ background:{self.COLORS['doom_hot']}; }}
-            QPushButton#nav {{ text-align:left; background:transparent; border:0; color:{self.COLORS['muted']}; padding:12px 14px; }}
-            QPushButton#nav:checked,QPushButton#nav:hover {{ background:#20282d; color:white; border-left:3px solid {self.COLORS['doom']}; }}
-            QPushButton:disabled {{ color:#708087; background:#192025; border-color:#2e383e; }}
-            QPlainTextEdit,QTableWidget {{ background:#0c1013; color:{self.COLORS['text']}; border:1px solid {self.COLORS['line']}; }}
-            QTableWidget {{ gridline-color:#273138; alternate-background-color:#11171b; }}
-            QHeaderView::section {{ background:#1b2328; color:{self.COLORS['muted']}; border:0; padding:6px; font-weight:800; }}
-            QCheckBox {{ spacing:8px; }} QCheckBox::indicator {{ width:18px; height:18px; border:1px solid #64747c; background:#0d1215; }}
+            QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:9px 13px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
+            QPushButton:hover {{ background:#243740; border-color:{self.COLORS['ap']}; }}
+            QPushButton#primary {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; color:#102012; }}
+            QPushButton#primary:hover {{ background:#b2e77a; }}
+            QPushButton#nav {{ text-align:left; background:transparent; border:0; border-left:3px solid transparent; color:{self.COLORS['muted']}; padding:10px 10px; }}
+            QPushButton#nav:checked,QPushButton#nav:hover {{ background:#17242b; color:{self.COLORS['text']}; border-left-color:{self.COLORS['doom']}; }}
+            QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:6px 10px; color:{self.COLORS['muted']}; }}
+            QPushButton#sessionNav:checked,QPushButton#sessionNav:hover {{ color:{self.COLORS['text']}; border-color:{self.COLORS['doom']}; background:#1d2d34; }}
+            QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
+            QPlainTextEdit,QTableWidget {{ background:#0b1217; color:{self.COLORS['text']}; border:1px solid {self.COLORS['line']}; }}
+            QTableWidget {{ gridline-color:#25363e; alternate-background-color:#111c22; }}
+            QHeaderView::section {{ background:#16242b; color:{self.COLORS['muted']}; border:0; padding:6px; font-weight:800; }}
+            QCheckBox {{ spacing:8px; }} QCheckBox::indicator {{ width:17px; height:17px; border:1px solid #6b7f86; background:#0c1419; }}
             QCheckBox::indicator:checked {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; }}
         """)
 
@@ -190,16 +209,16 @@ class LauncherUI(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         shell = self._card("shell")
-        shell.setMaximumWidth(164)
-        shell.setMinimumWidth(118)
+        shell.setMinimumWidth(152)
+        shell.setMaximumWidth(196)
         nav = QVBoxLayout(shell)
         nav.setContentsMargins(12, 18, 12, 16)
         nav.setSpacing(5)
-        nav.addWidget(self._label("DOOM // AP", "brand"))
-        nav.addWidget(self._label("ROOM LAUNCHER", "eyebrow"))
-        nav.addSpacing(28)
+        nav.addWidget(self._label("DOOM Eternal", "brand"))
+        nav.addWidget(self._label("ARCHIPELAGO", "eyebrow"))
+        nav.addSpacing(22)
         self.nav_buttons: list[QPushButton] = []
-        for label, page in (("HOME", 0), ("JOIN", 1), ("SESSION", 2), ("CREATE YAML", 3), ("DOCTOR", 4)):
+        for label, page in (("HOME", 0), ("JOIN ROOM", 1), ("SESSION", 2), ("CREATE PLAYER", 3), ("HELP", 4)):
             button = QPushButton(label)
             button.setObjectName("nav")
             button.setCheckable(True)
@@ -207,7 +226,6 @@ class LauncherUI(QMainWindow):
             nav.addWidget(button)
             self.nav_buttons.append(button)
         nav.addStretch(1)
-        nav.addWidget(self._label("ALT+H HOME\nALT+J JOIN\nCTRL+ENTER PRIMARY", "muted"))
         layout.addWidget(shell)
         stage = QWidget()
         stage_layout = QVBoxLayout(stage)
@@ -216,8 +234,8 @@ class LauncherUI(QMainWindow):
         topbar = self._card("topbar")
         top = QHBoxLayout(topbar)
         top.setContentsMargins(24, 10, 24, 10)
-        self.top_state = self._label("OFFLINE", "state")
-        top.addWidget(self._label("DOOM ETERNAL  /  ARCHIPELAGO", "eyebrow"))
+        self.top_state = self._label("READY TO JOIN", "state")
+        top.addWidget(self._label("DOOM ETERNAL ARCHIPELAGO", "eyebrow"))
         top.addStretch(1)
         top.addWidget(self.top_state)
         stage_layout.addWidget(topbar)
@@ -240,28 +258,29 @@ class LauncherUI(QMainWindow):
         hero_layout = QHBoxLayout(hero)
         hero_layout.setContentsMargins(24, 20, 24, 20)
         copy = QVBoxLayout()
-        copy.addWidget(self._label("SESSION-FIRST CONTROL", "eyebrow"))
-        self.hero_title = self._label("MOD READY WHEN YOUR ROOM IS READY", "title")
+        copy.addWidget(self._label("DOOM ETERNAL ARCHIPELAGO", "eyebrow"))
+        self.hero_title = self._label("JOIN YOUR ROOM", "title")
         copy.addWidget(self.hero_title)
-        self.hero_detail = self._label("Join a room. Launcher verifies its room mod before DOOM starts.", "muted")
+        self.hero_detail = self._label("Connect to your Archipelago room, then play DOOM Eternal.", "muted")
+        self.hero_detail.setWordWrap(True)
         copy.addWidget(self.hero_detail)
         hero_layout.addLayout(copy, 1)
-        self.hero_action = QPushButton("JOIN ROOM")
+        self.hero_action = QPushButton("JOIN A ROOM")
         self.hero_action.setObjectName("primary")
         self.hero_action.clicked.connect(self._primary_action)
         hero_layout.addWidget(self.hero_action, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         outer.addWidget(hero)
-        routes = QHBoxLayout()
-        self.resume = QPushButton("RESUME SESSION")
-        self.resume.setObjectName("primary")
-        self.resume.clicked.connect(self._resume)
-        join = QPushButton("JOIN ROOM")
-        join.setObjectName("primary")
-        join.clicked.connect(lambda: self._show_page(1))
-        routes.addWidget(self.resume)
-        routes.addWidget(join)
-        routes.addStretch(1)
-        outer.addLayout(routes)
+        create = self._card()
+        create_layout = QHBoxLayout(create)
+        create_layout.setContentsMargins(20, 16, 20, 16)
+        create_copy = QVBoxLayout()
+        create_copy.addWidget(self._label("NEW PLAYER FILE", "section"))
+        create_copy.addWidget(self._label("Choose your game settings and save a Player YAML for your next room.", "muted"))
+        create_layout.addLayout(create_copy, 1)
+        create_button = QPushButton("CREATE PLAYER YAML")
+        create_button.clicked.connect(lambda: self._show_page(3))
+        create_layout.addWidget(create_button)
+        outer.addWidget(create)
         outer.addStretch(1)
         return self._scroll(body)
 
@@ -271,12 +290,12 @@ class LauncherUI(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setHorizontalSpacing(8)
         self.statuses: dict[str, tuple[QFrame, QLabel, QLabel]] = {}
-        for index, (key, title) in enumerate((("room", "ROOM"), ("mod", "MOD"), ("game", "GAME"), ("rpc", "RPC"))):
+        for index, (key, title) in enumerate((("room", "CONNECTION"), ("mod", "MOD"), ("game", "GAME"), ("rpc", "GAME LINK"))):
             card = self._card("status")
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(12, 9, 12, 9)
             name = self._label(title, "stateName")
-            detail = self._label("○ WAITING", "stateDetail")
+            detail = self._label("WAITING", "stateDetail")
             card_layout.addWidget(name)
             card_layout.addWidget(detail)
             layout.addWidget(card, 0, index)
@@ -292,8 +311,8 @@ class LauncherUI(QMainWindow):
         hero = self._card("hero")
         hero_layout = QVBoxLayout(hero)
         hero_layout.setContentsMargins(24, 20, 24, 20)
-        hero_layout.addWidget(self._label("JOIN ROOM", "title"))
-        hero_layout.addWidget(self._label("Connect identity first. Launcher uses detected DOOM and save folders unless you change them.", "muted"))
+        hero_layout.addWidget(self._label("JOIN A ROOM", "title"))
+        hero_layout.addWidget(self._label("Enter room details. DOOM Eternal location is checked automatically.", "muted"))
         outer.addWidget(hero)
         outer.addWidget(self._join_card())
         outer.addStretch(1)
@@ -305,30 +324,30 @@ class LauncherUI(QMainWindow):
         layout.setContentsMargins(20, 18, 20, 20)
         layout.setVerticalSpacing(9)
         layout.setColumnStretch(1, 1)
-        layout.addWidget(self._label("ROOM IDENTITY", "section"), 0, 0, 1, 3)
-        layout.addWidget(self._label("Server, player slot, and optional password.", "muted"), 1, 0, 1, 3)
+        layout.addWidget(self._label("ROOM DETAILS", "section"), 0, 0, 1, 3)
+        layout.addWidget(self._label("Server, player name, and optional password.", "muted"), 1, 0, 1, 3)
         self.game_root = QLineEdit(str(self.controller.config.get("game_root", "")))
         self.saves_root = QLineEdit(str(self.controller.config.get("save_games_dir", "")))
         self.server = QLineEdit(str(self.controller.config.get("server_address", "")))
         self.slot = QLineEdit(str(self.controller.config.get("slot", "")))
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.detected_paths = self._label("Checking detected DOOM folders…", "muted")
+        self.detected_paths = self._label("Checking for DOOM Eternal…", "muted")
         layout.addWidget(self.detected_paths, 2, 0, 1, 3)
-        self.change_paths = QPushButton("CHANGE FOLDERS")
+        self.change_paths = QPushButton("CHOOSE GAME FOLDER")
         self.change_paths.clicked.connect(self._toggle_paths)
         layout.addWidget(self.change_paths, 3, 0, 1, 3, Qt.AlignmentFlag.AlignLeft)
-        self.game_path_label = self._label("GAME", "eyebrow")
-        self.save_path_label = self._label("SAVES", "eyebrow")
+        self.game_path_label = self._label("GAME FOLDER", "eyebrow")
+        self.save_path_label = self._label("SAVE FOLDER", "eyebrow")
         layout.addWidget(self.game_path_label, 4, 0); layout.addWidget(self.game_root, 4, 1)
         layout.addWidget(self.save_path_label, 5, 0); layout.addWidget(self.saves_root, 5, 1)
         self.game_browse = QPushButton("BROWSE"); self.game_browse.clicked.connect(self._browse_game)
         self.save_browse = QPushButton("BROWSE"); self.save_browse.clicked.connect(self._browse_saves)
         layout.addWidget(self.game_browse, 4, 2); layout.addWidget(self.save_browse, 5, 2)
         self._entry_row(layout, 6, "SERVER", self.server)
-        self._entry_row(layout, 7, "SLOT", self.slot)
+        self._entry_row(layout, 7, "PLAYER", self.slot)
         self._entry_row(layout, 8, "PASSWORD", self.password)
-        self.join_button = QPushButton("CONNECT TO ROOM")
+        self.join_button = QPushButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
         layout.addWidget(self.join_button, 9, 1, 1, 2)
@@ -340,12 +359,14 @@ class LauncherUI(QMainWindow):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
         layout.setSpacing(9)
-        layout.addWidget(self._label("ROOM SUMMARY", "section"))
+        layout.addWidget(self._label("ROOM", "section"))
         self.room_summary = self._label("No room connected.", "muted")
+        self.room_summary.setWordWrap(True)
         layout.addWidget(self.room_summary)
-        self.room_options = self._label("Authoritative slot settings appear after connection.", "muted")
+        self.room_options = self._label("Room settings appear after connection.", "muted")
+        self.room_options.setWordWrap(True)
         layout.addWidget(self.room_options)
-        view_options = QPushButton("VIEW ROOM OPTIONS")
+        view_options = QPushButton("VIEW ALL SETTINGS")
         view_options.clicked.connect(self._view_room_options)
         layout.addWidget(view_options, alignment=Qt.AlignmentFlag.AlignLeft)
         self.drift = self._label("")
@@ -360,10 +381,10 @@ class LauncherUI(QMainWindow):
         copy.clicked.connect(self._copy_launch_option)
         layout.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
         controls = QHBoxLayout()
-        self.stop_button = QPushButton("STOP")
+        self.stop_button = QPushButton("DISCONNECT")
         self.stop_button.clicked.connect(self._disconnect)
         self.stop_button.setEnabled(False)
-        self.reinstall_button = QPushButton("REINSTALL MOD")
+        self.reinstall_button = QPushButton("UPDATE MOD")
         self.reinstall_button.clicked.connect(self._reinstall)
         self.reinstall_button.setEnabled(False)
         controls.addWidget(self.stop_button)
@@ -381,8 +402,11 @@ class LauncherUI(QMainWindow):
         header = QHBoxLayout()
         header.addWidget(self._label("SESSION", "title"))
         header.addStretch(1)
-        for text, page in (("ACTIVITY", 0), ("LOG", 1), ("ROOM", 2), ("DOCTOR", 3)):
+        for text, page in (("ACTIVITY", 0), ("LOG", 1), ("ROOM", 2)):
             button = QPushButton(text)
+            button.setObjectName("sessionNav")
+            button.setCheckable(True)
+            button.setChecked(page == 0)
             button.clicked.connect(lambda checked=False, target=page: self.session_stack.setCurrentIndex(target))
             header.addWidget(button)
         outer.addLayout(header)
@@ -390,25 +414,7 @@ class LauncherUI(QMainWindow):
         self.session_stack.addWidget(self._activity_card())
         self.session_stack.addWidget(self._session_log_page())
         self.session_stack.addWidget(self._session_card())
-        doctor_link = self._card()
-        doctor_layout = QVBoxLayout(doctor_link)
-        doctor_layout.addWidget(self._label("DOCTOR", "section"))
-        doctor_layout.addWidget(self._label("Installation and handshake diagnostics stay separate from session controls.", "muted"))
-        doctor_button = QPushButton("OPEN DOCTOR")
-        doctor_button.clicked.connect(lambda: self._show_page(4))
-        doctor_layout.addWidget(doctor_button, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.session_stack.addWidget(doctor_link)
         outer.addWidget(self.session_stack, 1)
-        command = QHBoxLayout()
-        self.command_input = QLineEdit()
-        self.command_input.setPlaceholderText("Archipelago command")
-        self.command_input.returnPressed.connect(self._send_command)
-        send = QPushButton("SEND")
-        send.setObjectName("primary")
-        send.clicked.connect(self._send_command)
-        command.addWidget(self.command_input, 1)
-        command.addWidget(send)
-        outer.addLayout(command)
         return body
 
     def _session_log_page(self) -> QFrame:
@@ -427,9 +433,9 @@ class LauncherUI(QMainWindow):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
         layout.addWidget(self._label("ACTIVITY", "section"))
-        layout.addWidget(self._label("Structured launcher and bridge events. Most recent first.", "muted"))
+        layout.addWidget(self._label("Items, checks, DeathLink, and connection updates. Most recent first.", "muted"))
         self.activity = QTableWidget(0, 3)
-        self.activity.setHorizontalHeaderLabels(["TIME", "SIGNAL", "CONTEXT"])
+        self.activity.setHorizontalHeaderLabels(["TIME", "UPDATE", "DETAILS"])
         self.activity.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.activity.setAlternatingRowColors(True)
@@ -450,7 +456,7 @@ class LauncherUI(QMainWindow):
         head = QVBoxLayout(header)
         head.setContentsMargins(24, 20, 24, 20)
         head.addWidget(self._label("CREATE PLAYER YAML", "title"))
-        head.addWidget(self._label("Future-room settings only. Connected room settings remain server-authoritative.", "muted"))
+        head.addWidget(self._label("Choose your DOOM Eternal settings, Starting Inventory, and save your player file.", "muted"))
         layout.addWidget(header)
         player = self._card()
         player_layout = QVBoxLayout(player)
@@ -494,22 +500,23 @@ class LauncherUI(QMainWindow):
         header = self._card("hero")
         head = QVBoxLayout(header)
         head.setContentsMargins(24, 20, 24, 20)
-        head.addWidget(self._label("DOCTOR", "title"))
-        head.addWidget(self._label("Secondary diagnostics for installation, bridge, and gameplay handshake.", "muted"))
+        head.addWidget(self._label("HELP", "title"))
+        head.addWidget(self._label("Check your setup, fix common problems, or create a support report.", "muted"))
         layout.addWidget(header)
         card = self._card()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(20, 18, 20, 20)
-        self.doctor_status = self._label("NO REPORT", "state")
-        self.doctor_evidence = self._label("Run Doctor when room setup needs diagnosis.", "muted")
+        self.doctor_status = self._label("SETUP NOT CHECKED", "state")
+        self.doctor_evidence = self._label("Check setup when you need help joining or playing.", "muted")
+        self.doctor_evidence.setWordWrap(True)
         self.doctor_action = self._label("", "muted")
         card_layout.addWidget(self.doctor_status)
         card_layout.addWidget(self.doctor_evidence)
         card_layout.addWidget(self.doctor_action)
         buttons = QHBoxLayout()
         for text, callback, primary in (
-            ("RUN DOCTOR", self._run_doctor, True), ("PROBE HANDSHAKE", self._probe_handshake, False),
-            ("LAUNCH VIA STEAM", self._launch_game, False), ("SAVE SUPPORT BUNDLE", self._save_support_bundle, False),
+            ("CHECK SETUP", self._run_doctor, True), ("FIX SETUP", self._preview_repairs, False),
+            ("SAVE SUPPORT REPORT", self._save_support_bundle, False),
         ):
             button = QPushButton(text)
             if primary:
@@ -518,15 +525,17 @@ class LauncherUI(QMainWindow):
             buttons.addWidget(button)
         buttons.addStretch(1)
         card_layout.addLayout(buttons)
-        repair = QPushButton("PREVIEW REPAIRS")
-        repair.clicked.connect(self._preview_repairs)
-        card_layout.addWidget(repair, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(card)
+        details = self._card()
+        details_layout = QVBoxLayout(details)
+        details_layout.setContentsMargins(20, 18, 20, 20)
+        details_layout.addWidget(self._label("TECHNICAL DETAILS", "section"))
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setFont(QFont("monospace", 10))
-        self.log.setPlaceholderText("Diagnostic output")
-        layout.addWidget(self.log, 1)
+        self.log.setPlaceholderText("Setup details appear here when needed.")
+        details_layout.addWidget(self.log, 1)
+        layout.addWidget(details, 1)
         return self._scroll(body)
 
     def _install_shortcuts(self) -> None:
@@ -567,16 +576,21 @@ class LauncherUI(QMainWindow):
         if not self.saves_root.text() and found.get("save_games_dir"):
             self.saves_root.setText(str(found["save_games_dir"]))
         if self.game_root.text() and self.saves_root.text():
-            self.detected_paths.setText("DOOM detected. Game and save folders are ready.")
+            self.detected_paths.setText("DOOM Eternal found")
             has_session = bool(self.controller.config.get("server_address") and self.controller.config.get("slot"))
-            self.resume.setVisible(has_session)
-            self._set_home("RESUME YOUR RUN" if has_session else "JOIN YOUR ROOM", "Reconnect with saved room identity." if has_session else "Connect to a room to prepare its bound mod.", "RESUME SESSION" if has_session else "JOIN ROOM", "READY")
+            self._set_home(
+                "WELCOME BACK" if has_session else "JOIN YOUR ROOM",
+                "Reconnect to your saved room and continue playing." if has_session else "Connect to your Archipelago room, then play DOOM Eternal.",
+                "RESUME" if has_session else "JOIN A ROOM",
+                "READY",
+            )
         else:
-            self.detected_paths.setText("DOOM folders need attention before connection.")
-            self.resume.setVisible(False)
-            self._set_home("LOCATE DOOM ETERNAL", "Select game and save folders before joining a room.", "JOIN ROOM", "ACTION NEEDED")
+            self.detected_paths.setText("DOOM Eternal needs a game folder")
+            self._set_home("FIND DOOM ETERNAL", "Choose your game folder before joining a room.", "JOIN A ROOM", "ACTION NEEDED")
         for key in self.statuses:
             self._set_status(key, "waiting", self.COLORS["muted"])
+        if not self.start_inventory_catalog:
+            self._append_log("Starting Inventory choices unavailable. Open Help and run Check Setup.")
 
     def _focus_join(self) -> None:
         self._show_page(1)
@@ -598,13 +612,13 @@ class LauncherUI(QMainWindow):
 
     def _primary_action(self) -> None:
         text = self.hero_action.text()
-        if "JOIN" in text:
+        if "JOIN" in text or "RETRY" in text:
             self._focus_join()
         elif "RESUME" in text:
             self._resume()
-        elif "PREPARE" in text or "REINSTALL" in text or "TRY AGAIN" in text:
-            self._prepare(force="REINSTALL" in text or "TRY AGAIN" in text)
-        elif "STEAM" in text:
+        elif "UPDATE" in text or "PREPARE" in text or "TRY AGAIN" in text:
+            self._prepare(force="UPDATE" in text or "TRY AGAIN" in text)
+        elif "PLAY" in text:
             self._launch_game()
 
     def _connect(self) -> None:
@@ -624,7 +638,7 @@ class LauncherUI(QMainWindow):
         show = force if force is not None else not self.game_root.isVisible()
         for widget in (self.game_root, self.saves_root, self.game_path_label, self.save_path_label, self.game_browse, self.save_browse):
             widget.setVisible(show)
-        self.change_paths.setText("HIDE FOLDER CONTROLS" if show else "CHANGE FOLDERS")
+        self.change_paths.setText("HIDE FOLDERS" if show else "CHOOSE GAME FOLDER")
 
     def _disconnect(self) -> None:
         try:
@@ -681,34 +695,34 @@ class LauncherUI(QMainWindow):
         seed = str(event.get("seed_name", "Unknown seed"))
         team, slot = event.get("team", "?"), event.get("slot", "?")
         endpoint = str(event.get("endpoint") or self.controller.config.get("server_address", "Unknown server"))
-        identity = str(event.get("slot_name") or self.controller.config.get("slot", slot))
-        self.room_summary.setText(f"SERVER  {endpoint}\nIDENTITY  {identity}\nSEED  {seed}  //  TEAM {team}  SLOT {slot}")
+        player = str(event.get("slot_name") or self.controller.config.get("slot", slot))
+        self.room_summary.setText(f"Server: {endpoint}\nPlayer: {player}\nSeed: {seed} | Team {team}, Slot {slot}")
         slot_data = event.get("slot_data")
         if not isinstance(slot_data, dict):
-            self.room_options.setText("Room did not provide slot settings.")
+            self.room_options.setText("This room did not send a settings summary.")
             return
         traps = [(key, value) for key, value in sorted(slot_data.items()) if "trap" in str(key).casefold()]
         core = [(key, value) for key, value in sorted(slot_data.items()) if key in {"randomize_dash", "death_link", "death_link_mode", "start_with_automap"}]
         lines = [f"{str(key).replace('_', ' ').title()}: {value}" for key, value in core]
         if traps:
-            lines.append("Trap settings: " + ", ".join(f"{key}={value}" for key, value in traps))
+            lines.append("Traps: " + ", ".join(f"{str(key).replace('_', ' ').title()} {value}%" if isinstance(value, int) and "percentage" in str(key) else f"{str(key).replace('_', ' ').title()}: {value}" for key, value in traps))
         else:
-            lines.append("Trap settings: not supplied by this room")
-        self.room_options.setText("\n".join(lines))
+            lines.append("Traps: not set for this room")
+        self.room_options.setText(" | ".join(lines))
 
     def _view_room_options(self) -> None:
         dialog = QDialog(self)
-        dialog.setWindowTitle("Room options")
+        dialog.setWindowTitle("Room settings")
         dialog.resize(640, 480)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(self._label("AUTHORITATIVE ROOM OPTIONS", "section"))
+        layout.addWidget(self._label("ROOM SETTINGS", "section"))
         options = QPlainTextEdit()
         options.setReadOnly(True)
         slot_data = self.room_event.get("slot_data", {})
         if isinstance(slot_data, dict):
-            options.setPlainText("\n".join(f"{key}: {value}" for key, value in sorted(slot_data.items())) or "No slot settings supplied.")
+            options.setPlainText("\n".join(f"{str(key).replace('_', ' ').title()}: {value}" for key, value in sorted(slot_data.items())) or "No settings supplied.")
         else:
-            options.setPlainText("No slot settings supplied.")
+            options.setPlainText("No settings supplied.")
         layout.addWidget(options)
         close = QPushButton("CLOSE")
         close.clicked.connect(dialog.accept)
@@ -769,18 +783,21 @@ class LauncherUI(QMainWindow):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
         layout.addWidget(self._label("STARTING INVENTORY", "section"))
+        layout.addWidget(self._label("Choose supported items to begin with. Quantities are saved in your Player YAML.", "muted"))
         try:
-            self.start_inventory_catalog = load_start_inventory_catalog(self.controller.client_dir / "data" / "item_classifications.json")
+            self.start_inventory_catalog = load_start_inventory_catalog(self.controller.client_dir / "data" / "start_inventory_catalog.json")
         except ValueError as error:
             self.start_inventory_catalog = []
-            self._append_log(f"Starting inventory catalog unavailable: {error}")
+            self._append_log(f"Starting Inventory choices could not load: {error}. Check Help for details.")
         controls = QHBoxLayout()
         self.inventory_picker = QComboBox()
+        self.inventory_picker.setMinimumContentsLength(24)
         for item in self.start_inventory_catalog:
             self.inventory_picker.addItem(item["label"], item["name"])
         self.inventory_quantity = QSpinBox()
         self.inventory_quantity.setRange(1, 9999)
-        add = QPushButton("ADD ITEM")
+        add = QPushButton("ADD")
+        add.setObjectName("primary")
         add.clicked.connect(self._add_inventory)
         enabled = bool(self.start_inventory_catalog)
         self.inventory_picker.setEnabled(enabled)
@@ -796,7 +813,7 @@ class LauncherUI(QMainWindow):
         self.inventory.verticalHeader().hide()
         self.inventory.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.inventory.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.inventory.setMinimumHeight(120)
+        self.inventory.setMinimumHeight(150)
         layout.addWidget(self.inventory)
         remove = QPushButton("REMOVE SELECTED")
         remove.clicked.connect(lambda: self.inventory.removeRow(self.inventory.currentRow()) if self.inventory.currentRow() >= 0 else None)
@@ -871,35 +888,41 @@ class LauncherUI(QMainWindow):
         try:
             self._render_doctor_report(self.controller.run_doctor().document())
         except Exception as error:
-            self.doctor_status.setText("DOCTOR COULD NOT RUN")
+            self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
             self.doctor_evidence.setText(str(error))
 
     def _render_doctor_report(self, report: object) -> None:
-        if not isinstance(report, dict): return
+        if not isinstance(report, dict):
+            return
         healthy = bool(report.get("ok"))
         diagnostics = report.get("diagnostics", [])
         lines = []
         if isinstance(diagnostics, list):
             for item in diagnostics:
-                if isinstance(item, dict): lines.append(f"{item.get('key', 'check')}: {item.get('status', 'unknown')} — {item.get('message', '')}")
-        self.doctor_status.setText("DOCTOR CLEAR" if healthy else "DOCTOR NEEDS ATTENTION")
+                if isinstance(item, dict):
+                    lines.append(f"{item.get('key', 'check')}: {item.get('status', 'unknown')} - {item.get('message', '')}")
+        self.doctor_status.setText("SETUP READY" if healthy else "SETUP NEEDS ATTENTION")
         self.doctor_status.setStyleSheet(f"color:{self.COLORS['good' if healthy else 'warn']};")
-        self.doctor_evidence.setText("\n".join(lines) or "No diagnostic evidence returned.")
-        self.doctor_action.setText("Probe handshake after DOOM reaches gameplay." if healthy else "Review failed checks, then retry.")
+        self.doctor_evidence.setText("\n".join(lines) or "No setup details returned.")
+        self.doctor_action.setText("You are ready to play." if healthy else "Review failed checks, then use Fix Setup or try again.")
 
     def _probe_handshake(self) -> None:
         try:
             result = self.controller.probe_handshake()
-            self.doctor_status.setText(f"HANDSHAKE {str(result.get('status', 'unavailable')).upper()}")
-            self.doctor_evidence.setText(", ".join(f"{key}={value}" for key, value in result.items()))
-        except Exception as error: self._append_log(f"Handshake probe error: {error}")
+            status = str(result.get("status", "unavailable")).replace("_", " ").upper()
+            self.doctor_status.setText(f"GAME CONNECTION {status}")
+            self.doctor_evidence.setText("Game connection check completed. Technical details are available below.")
+            self._append_log(", ".join(f"{key}={value}" for key, value in result.items()))
+        except Exception as error:
+            self._append_log(f"Game connection check error: {error}")
 
     def _launch_game(self) -> None:
         try:
             self.controller.launch_game()
             self._set_status("game", "launch requested", self.COLORS["good"])
-            self._append_log("Steam launch requested.")
-        except Exception as error: self._append_log(f"Steam launch error: {error}")
+            self._append_log("DOOM Eternal launch requested.")
+        except Exception as error:
+            self._append_log(f"DOOM Eternal launch error: {error}")
 
     def _save_support_bundle(self) -> None:
         try:
@@ -932,86 +955,95 @@ class LauncherUI(QMainWindow):
     def _activity_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
         semantic = {
-            "connected": ("LINK", self.COLORS["good"]), "disconnected": ("LINK", self.COLORS["muted"]),
-            "error": ("FAULT", self.COLORS["bad"]), "setup_failed": ("FAULT", self.COLORS["bad"]),
-            "warning": ("CAUTION", self.COLORS["warn"]), "room_install_state": ("MOD", self.COLORS["ap"]),
-            "setup_ready": ("MOD", self.COLORS["good"]), "command_sent": ("COMMAND", self.COLORS["ap"]),
+            "connected": ("CONNECTED", self.COLORS["good"]), "disconnected": ("DISCONNECTED", self.COLORS["muted"]),
+            "error": ("NEEDS ATTENTION", self.COLORS["bad"]), "setup_failed": ("NEEDS ATTENTION", self.COLORS["bad"]),
+            "warning": ("NOTICE", self.COLORS["warn"]), "room_install_state": ("MOD", self.COLORS["ap"]),
+            "setup_ready": ("READY", self.COLORS["good"]), "command_sent": ("MESSAGE SENT", self.COLORS["ap"]),
+            "item": ("ITEM RECEIVED", self.COLORS["good"]), "location": ("CHECK COMPLETE", self.COLORS["ap"]),
+            "deathlink": ("DEATHLINK", self.COLORS["warn"]),
         }
         segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
-        fields = (("SERVER", "endpoint"), ("SEED", "seed_name"), ("STATE", "state"), ("REASON", "reason"), ("MESSAGE", "message"), ("CODE", "code"), ("PATH", "path"))
-        detail = "  ·  ".join(f"{label}: {event[key]}" for label, key in fields if event.get(key) not in (None, ""))
+        fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Status", "state"), ("Reason", "reason"), ("Message", "message"))
+        detail = " | ".join(f"{label}: {event[key]}" for label, key in fields if event.get(key) not in (None, ""))
         row = 0
         self.activity.insertRow(row)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
         signal = QTableWidgetItem(segment)
         signal.setForeground(color)
         self.activity.setItem(row, 1, signal)
-        self.activity.setItem(row, 2, QTableWidgetItem(detail or "Structured event received"))
-        while self.activity.rowCount() > 100: self.activity.removeRow(self.activity.rowCount() - 1)
+        self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
+        while self.activity.rowCount() > 100:
+            self.activity.removeRow(self.activity.rowCount() - 1)
 
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
-        if kind == "log": self._append_log(str(event.get("message", ""))); return
+        if kind == "log":
+            self._append_log(str(event.get("message", "")))
+            return
         if kind == "connected":
             self._connection_pending = False; self._room_connected = True
             self._set_connection_controls(False); self._render_room(event)
             self._set_status("room", "connected", self.COLORS["good"])
             self._set_status("mod", "checking", self.COLORS["ap"])
-            self._set_home("ROOM CONNECTED", "Checking room identity against installed mod.", "CHECKING…", "CONNECTED", enabled=False)
+            self._set_home("ROOM CONNECTED", "Checking your room before play.", "CHECKING...", "CONNECTED", enabled=False)
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True; self._set_connection_controls(False)
             self._set_status("room", "connecting", self.COLORS["ap"])
         elif kind == "room_install_state":
             option = str(event.get("steam_launch_option", ""))
-            if option: self.launch_option.setText(option); self._set_status("game", "option ready", self.COLORS["good"])
+            if option:
+                self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             state, reason = str(event.get("state", "")), str(event.get("reason", ""))
             if state == "already_installed":
                 self.drift.hide(); self.reinstall_button.setEnabled(True)
-                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "standing by", self.COLORS["ap"])
+                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("MOD READY", "Verified for this room. Start DOOM through Steam and keep launcher open.", "START VIA STEAM", "MOD READY")
+                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
             else:
                 drift = state == "update_required" or "another room" in reason
-                self.drift.setText("ROOM DRIFT — " + (reason or "installed mod does not match connected room")); self.drift.setVisible(drift)
+                self.drift.setText("ROOM UPDATE - " + (reason or "This room needs its matching mod.")); self.drift.setVisible(drift)
                 self.reinstall_button.setEnabled(False)
-                self._set_status("mod", "install needed", self.COLORS["warn"]); self._set_status("game", "blocked", self.COLORS["warn"])
-                self._set_home("ROOM MOD REQUIRED", reason or "Prepare mod bound to current room before play.", "PREPARE MOD", "ACTION NEEDED")
+                self._set_status("mod", "update needed", self.COLORS["warn"]); self._set_status("game", "waiting", self.COLORS["warn"])
+                self._set_home("UPDATE MOD", reason or "Prepare this room before play.", "UPDATE MOD", "ACTION NEEDED")
         elif kind in {"setup_started", "mod_building", "runtime_config_ready", "mod_staged", "injector_started"}:
-            self.reinstall_button.setEnabled(False); self._set_status("mod", "preparing", self.COLORS["ap"])
-            self._set_home("PREPARING ROOM MOD", "Building, staging, and installing room-specific package.", "PREPARING…", "WORKING", enabled=False)
+            self.reinstall_button.setEnabled(False); self._set_status("mod", "updating", self.COLORS["ap"])
+            self._set_home("UPDATING MOD", "Preparing your room for play.", "UPDATING...", "WORKING", enabled=False)
         elif kind == "setup_ready":
             option = str(event.get("steam_launch_option", "")); state = str(event.get("adapter_state", ""))
-            if option: self.launch_option.setText(option); self._set_status("game", "option ready", self.COLORS["good"])
+            if option:
+                self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
-                self.reinstall_button.setEnabled(True); self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "standing by", self.COLORS["ap"])
+                self.reinstall_button.setEnabled(True); self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("MOD READY", "Installed for this room. Start DOOM through Steam.", "START VIA STEAM", "MOD READY")
+                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
             elif state == "manual_action_required":
-                self._set_home("FINISH INSTALLATION", str(event.get("message", "Complete manager step, then retry.")), "TRY AGAIN", "ACTION NEEDED")
-            else: self._set_home("SETUP NEEDS ATTENTION", str(event.get("message", "Retry room setup.")), "TRY AGAIN", "ACTION NEEDED")
+                self._set_home("FINISH SETUP", str(event.get("message", "Finish the game manager step, then try again.")), "TRY AGAIN", "ACTION NEEDED")
+            else:
+                self._set_home("SETUP NEEDS ATTENTION", str(event.get("message", "Try setup again.")), "TRY AGAIN", "ACTION NEEDED")
         elif kind == "manual_action_required":
-            message = str(event.get("message", "Complete manager step."))
-            self._set_home("FINISH INSTALLATION", message, "WAITING FOR MANAGER", "ACTION NEEDED", enabled=False)
+            message = str(event.get("message", "Finish the game manager step."))
+            self._set_home("FINISH SETUP", message, "WAITING", "ACTION NEEDED", enabled=False)
             complete = QMessageBox.question(
                 self,
                 "Confirm mod installation",
-                f"{message}\n\nDid EternalModManager finish installing room mod?",
+                f"{message}\n\nDid EternalModManager finish installing this room mod?",
             ) == QMessageBox.StandardButton.Yes
             self._confirm_windows(complete)
         elif kind == "windows_installation_confirmed":
             if bool(event.get("succeeded")):
                 self.reinstall_button.setEnabled(True)
                 self._set_status("mod", "ready", self.COLORS["good"])
-                self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "standing by", self.COLORS["ap"])
+                self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("MOD READY", "Installed for this room. Start DOOM through Steam.", "START VIA STEAM", "MOD READY")
+                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
             else:
-                self._set_home("INSTALLATION NEEDS RETRY", "Complete manager installation, then reinstall this room mod.", "TRY AGAIN", "ACTION NEEDED")
+                self._set_home("SETUP NEEDS RETRY", "Finish installation, then update this room mod.", "TRY AGAIN", "ACTION NEEDED")
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
-            self.reinstall_button.setEnabled(False); self.drift.hide(); self.room_summary.setText("No room connected. Join a room to bind this launcher session.")
-            for key in self.statuses: self._set_status(key, "waiting", self.COLORS["muted"])
-            self._set_home("SESSION STOPPED", "Update room details or join again.", "JOIN ROOM", "OFFLINE")
+            self.reinstall_button.setEnabled(False); self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
+            for key in self.statuses:
+                self._set_status(key, "waiting", self.COLORS["muted"])
+            self._set_home("SESSION ENDED", "Update room details or reconnect.", "JOIN A ROOM", "OFFLINE")
         elif kind in {"setup_failed", "error"}:
             message = str(event.get("message", "Unknown error"))
             if not self._room_connected:
@@ -1019,7 +1051,8 @@ class LauncherUI(QMainWindow):
                 self._set_home("CONNECTION FAILED", message, "RETRY JOIN", "CONNECTION FAILED")
             else:
                 self._set_status("mod", "failed", self.COLORS["bad"]); self._set_home("SETUP FAILED", message, "TRY AGAIN", "ACTION NEEDED")
-        elif kind == "warning": self._append_log("Warning: " + str(event.get("message", "")))
+        elif kind == "warning":
+            self._append_log("Warning: " + str(event.get("message", "")))
 
     def _append_log(self, text: str) -> None:
         if not text:

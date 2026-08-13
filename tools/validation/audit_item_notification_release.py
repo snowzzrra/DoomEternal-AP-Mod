@@ -21,6 +21,7 @@ from tools.validation.validate_item_notification_package import (
     entity_block,
     string_table_names,
 )
+from tools.validation.release_layout import expected_release_roots
 
 
 def _normalized(content: bytes) -> bytes:
@@ -168,15 +169,7 @@ def _extract_playable_zip(
             raise AssertionError("playable ZIP must contain exactly one root launcher")
         if any(name.startswith("client/DoomEternalArchipelagoLauncher") for name in files):
             raise AssertionError("playable ZIP contains launcher under client")
-        expected_roots = {
-            *launchers,
-            "client",
-            "doometernal.apworld",
-            "README.md",
-            "INSTALL.md",
-            "LICENSE",
-            "RELEASE_MANIFEST.json",
-        }
+        expected_roots = expected_release_roots(next(iter(launchers)))
         roots = {name.split("/", 1)[0] for name in files}
         if roots != expected_roots:
             raise AssertionError(f"playable ZIP root layout is not exact: {sorted(roots)}")

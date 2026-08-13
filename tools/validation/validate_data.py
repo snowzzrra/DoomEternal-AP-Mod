@@ -24,6 +24,7 @@ from foundation import (
 from item_classification import load_item_classification_identity
 from map_registry import load_map_registry, validation_plan
 from tools.decls.devinv_builder import load_devinv_mapping
+from tools.content.compile_start_inventory_catalog import compile_catalog
 from tools.maps import ap_map_generator
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
@@ -145,6 +146,17 @@ def validate_devinv_mapping(item_ids: dict[str, int], commands: dict[int, object
                 f"mapping={item_id}, APWorld={item_ids.get(entry['name'])}"
             )
     return errors
+
+
+def validate_start_inventory_catalog() -> list[str]:
+    try:
+        expected = compile_catalog()
+        actual = read_json(ROOT / "data" / "start_inventory_catalog.json")
+    except (OSError, ValueError, SyntaxError, TypeError, RuntimeError, AttributeError) as exc:
+        return [f"Starting Inventory catalog invalid: {exc}"]
+    if actual != expected:
+        return ["Starting Inventory catalog diverges from canonical DevInv legality"]
+    return []
 
 
 def collect_duplicate_ids(values: dict[str, int]) -> dict[int, list[str]]:
@@ -692,6 +704,7 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
     errors.extend(validate_devinv_mapping(item_ids, commands))
+    errors.extend(validate_start_inventory_catalog())
     if {name: location_ids.get(name) for name in BATTERY_LOCATIONS} != BATTERY_LOCATIONS:
         errors.append("Six physical Sentinel Battery AP locations must remain active")
     if item_ids.get("Sentinel Battery") != 7770016:

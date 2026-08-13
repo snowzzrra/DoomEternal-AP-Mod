@@ -28,6 +28,7 @@ from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 from tools.validation.audit_resource_packages import (
     audit_source_asset_dependencies,
 )
+from tools.validation.release_layout import expected_release_roots
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent
@@ -767,14 +768,7 @@ class Pipeline:
                     for name in files
                 ):
                     raise ValueError("public launcher layout is invalid")
-                expected_roots = {
-                    *launchers,
-                    "client",
-                    "doometernal.apworld",
-                    "README.md",
-                    "INSTALL.md",
-                    "RELEASE_MANIFEST.json",
-                }
+                expected_roots = expected_release_roots(next(iter(launchers)))
                 roots = {name.split("/", 1)[0] for name in files}
                 if roots != expected_roots:
                     raise ValueError(

@@ -178,7 +178,7 @@ def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
-    """Load explicitly supported start-inventory items from item metadata."""
+    """Load generated DevInv-supported Starting Inventory choices."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -186,26 +186,22 @@ def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
     if not isinstance(document, Mapping) or document.get("schema_version") != 1:
         raise ValueError("unsupported item catalog schema")
     raw_items = document.get("items")
-    if not isinstance(raw_items, Mapping):
+    if not isinstance(raw_items, list):
         raise ValueError("item catalog lacks items")
 
-    entries: list[tuple[str, bool | None]] = []
-    for raw in raw_items.values():
+    catalog: list[dict[str, str]] = []
+    names: set[str] = set()
+    for raw in raw_items:
         if not isinstance(raw, Mapping):
             raise ValueError("item catalog contains malformed item")
         name = raw.get("name")
         if not isinstance(name, str) or not name.strip():
             raise ValueError("item catalog contains item without name")
-        eligible = raw.get("start_inventory_eligible")
-        if eligible is not None and not isinstance(eligible, bool):
-            raise ValueError("item catalog start inventory eligibility must be boolean")
-        entries.append((name, eligible))
-
-    catalog: list[dict[str, str]] = []
-    for name, eligible in entries:
-        if eligible is not True:
-            continue
-        catalog.append({"name": name, "label": name})
+        label = raw.get("label", name)
+        if not isinstance(label, str) or not label.strip() or name in names:
+            raise ValueError("item catalog contains invalid item label")
+        names.add(name)
+        catalog.append({"name": name, "label": label})
     return sorted(catalog, key=lambda item: item["label"].casefold())
 
 

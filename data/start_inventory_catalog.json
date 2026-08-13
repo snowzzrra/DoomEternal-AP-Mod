@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "source": "Archipelago/worlds/doometernal/items.py + data/devinv_start_mapping.json",
+  "items": [
+    {
+      "name": "Air Control",
+      "label": "Air Control"
+    },
+    {
+      "name": "Ammo from Barrels",
+      "label": "Ammo from Barrels"
+    },
+    {
+      "name": "Arbalest",
+      "label": "Arbalest"
+    },
+    {
+      "name": "Arbalest Mastery",
+      "label": "Arbalest Mastery"
+    },
+    {
+      "name": "Ballista",
+      "label": "Ballista"
+    },
+    {
+      "name": "Blood Fueled",
+      "label": "Blood Fueled"
+    },
+    {
+      "name": "Blood Punch",
+      "label": "Blood Punch"
+    },
+    {
+      "name": "Chaingun",
+      "label": "Chaingun"
+    },
+    {
+      "name": "Chainsaw",
+      "label": "Chainsaw"
+    },
+    {
+      "name": "Chrono Strike",
+      "label": "Chrono Strike"
+    },
+    {
+      "name": "Combat Shotgun",
+      "label": "Combat Shotgun"
+    },
+    {
+      "name": "Dash",
+      "label": "Dash"
+    },
+    {
+      "name": "Dash Refill on Glory Kill",
+      "label": "Dash Refill on Glory Kill"
+    },
+    {
+      "name": "Dazed and Confused",
+      "label": "Dazed and Confused"
+    },
+    {
+      "name": "Destroyer Blade",
+      "label": "Destroyer Blade"
+    },
+    {
+      "name": "Destroyer Blade Mastery",
+      "label": "Destroyer Blade Mastery"
+    },
+    {
+      "name": "Energy Shield",
+      "label": "Energy Shield"
+    },
+    {
+      "name": "Energy Shield Mastery",
+      "label": "Energy Shield Mastery"
+    },
+    {
+      "name": "Equipment Fiend",
+      "label": "Equipment Fiend"
+    },
+    {
+      "name": "Extended Ice Bomb Duration",
+      "label": "Extended Ice Bomb Duration"
+    },
+    {
+      "name": "Faster Dash Recharge",
+      "label": "Faster Dash Recharge"
+    },
+    {
+      "name": "Faster Ledge Grab",
+      "label": "Faster Ledge Grab"
+    },
+    {
+      "name": "Faster Weapon Swap",
+      "label": "Faster Weapon Swap"
+    },
+    {
+      "name": "Flame Belch",
+      "label": "Flame Belch"
+    },
+    {
+      "name": "Frag Grenade",
+      "label": "Frag Grenade"
+    },
+    {
+      "name": "Frag Grenade Cluster Bombs",
+      "label": "Frag Grenade Cluster Bombs"
+    },
+    {
+      "name": "Frag Grenade Concussive Blast",
+      "label": "Frag Grenade Concussive Blast"
+    },
+    {
+      "name": "Frag Grenade Cooldown",
+      "label": "Frag Grenade Cooldown"
+    },
+    {
+      "name": "Frozen Melee Shatter",
+      "label": "Frozen Melee Shatter"
+    },
+    {
+      "name": "Full Auto",
+      "label": "Full Auto"
+    },
+    {
+      "name": "Full Auto Mastery",
+      "label": "Full Auto Mastery"
+    },
+    {
+      "name": "Health from Frozen Demons",
+      "label": "Health from Frozen Demons"
+    },
+    {
+      "name": "Heat Blast",
+      "label": "Heat Blast"
+    },
+    {
+      "name": "Heat Blast Mastery",
+      "label": "Heat Blast Mastery"
+    },
+    {
+      "name": "Heavy Cannon",
+      "label": "Heavy Cannon"
+    },
+    {
+      "name": "Ice Bomb",
+      "label": "Ice Bomb"
+    },
+    {
+      "name": "Ice Bomb Cooldown",
+      "label": "Ice Bomb Cooldown"
+    },
+    {
+      "name": "Larger Automap Reveal",
+      "label": "Larger Automap Reveal"
+    },
+    {
+      "name": "Lock-on Burst",
+      "label": "Lock-on Burst"
+    },
+    {
+      "name": "Lock-on Burst Mastery",
+      "label": "Lock-on Burst Mastery"
+    },
+    {
+      "name": "Meat Hook",
+      "label": "Meat Hook"
+    },
+    {
+      "name": "Meat Hook Mastery",
+      "label": "Meat Hook Mastery"
+    },
+    {
+      "name": "Micro Missiles",
+      "label": "Micro Missiles"
+    },
+    {
+      "name": "Micro Missiles Mastery",
+      "label": "Micro Missiles Mastery"
+    },
+    {
+      "name": "Microwave Beam",
+      "label": "Microwave Beam"
+    },
+    {
+      "name": "Microwave Beam Mastery",
+      "label": "Microwave Beam Mastery"
+    },
+    {
+      "name": "Mobile Turret",
+      "label": "Mobile Turret"
+    },
+    {
+      "name": "Mobile Turret Mastery",
+      "label": "Mobile Turret Mastery"
+    },
+    {
+      "name": "Plasma Rifle",
+      "label": "Plasma Rifle"
+    },
+    {
+      "name": "Powerup Extender",
+      "label": "Powerup Extender"
+    },
+    {
+      "name": "Precision Bolt",
+      "label": "Precision Bolt"
+    },
+    {
+      "name": "Precision Bolt Mastery",
+      "label": "Precision Bolt Mastery"
+    },
+    {
+      "name": "Progressive Ammo Upgrade",
+      "label": "Progressive Ammo Upgrade"
+    },
+    {
+      "name": "Progressive Armor Upgrade",
+      "label": "Progressive Armor Upgrade"
+    },
+    {
+      "name": "Progressive Health Upgrade",
+      "label": "Progressive Health Upgrade"
+    },
+    {
+      "name": "Punch and Reave",
+      "label": "Punch and Reave"
+    },
+    {
+      "name": "Reduced Hazard Damage",
+      "label": "Reduced Hazard Damage"
+    },
+    {
+      "name": "Reduced Self Damage",
+      "label": "Reduced Self Damage"
+    },
+    {
+      "name": "Remote Detonate",
+      "label": "Remote Detonate"
+    },
+    {
+      "name": "Remote Detonate Mastery",
+      "label": "Remote Detonate Mastery"
+    },
+    {
+      "name": "Respawning Barrels",
+      "label": "Respawning Barrels"
+    },
+    {
+      "name": "Reveal Automap Progression Items",
+      "label": "Reveal Automap Progression Items"
+    },
+    {
+      "name": "Reveal Automap Stations",
+      "label": "Reveal Automap Stations"
+    },
+    {
+      "name": "Reveal Dossier Progression Items",
+      "label": "Reveal Dossier Progression Items"
+    },
+    {
+      "name": "Rocket Launcher",
+      "label": "Rocket Launcher"
+    },
+    {
+      "name": "Savagery",
+      "label": "Savagery"
+    },
+    {
+      "name": "Saving Throw",
+      "label": "Saving Throw"
+    },
+    {
+      "name": "Second Frag Grenade",
+      "label": "Second Frag Grenade"
+    },
+    {
+      "name": "Seek and Destroy",
+      "label": "Seek and Destroy"
+    },
+    {
+      "name": "Sentinel Battery",
+      "label": "Sentinel Battery"
+    },
+    {
+      "name": "Sentinel Battery Bundle",
+      "label": "Sentinel Battery Bundle"
+    },
+    {
+      "name": "Sticky Bombs",
+      "label": "Sticky Bombs"
+    },
+    {
+      "name": "Sticky Bombs Mastery",
+      "label": "Sticky Bombs Mastery"
+    },
+    {
+      "name": "Super Shotgun",
+      "label": "Super Shotgun"
+    }
+  ]
+}

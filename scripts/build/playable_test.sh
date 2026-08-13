@@ -444,8 +444,10 @@ cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
     "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
+python3 -m tools.content.compile_start_inventory_catalog --check
 cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/item_classifications.json" \
+    "$REPO_ROOT/data/start_inventory_catalog.json" \
     "$REPO_ROOT/data/item_runtime_contracts.json" \
     "$REPO_ROOT/data/item_replay_policies.json" \
     "$REPO_ROOT/data/location_names.json" \
@@ -511,6 +513,7 @@ output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
 sys.path.insert(0, sys.argv[3])
 from map_registry import load_map_registry, release_plan
+from tools.validation.release_layout import expected_release_roots
 map_manifest_files = [
     plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
 ]
@@ -521,11 +524,7 @@ launcher_executable = (
 )
 
 public_files = [
-        "README.md",
-        "INSTALL.md",
-        "LICENSE",
-        "RELEASE_MANIFEST.json",
-        "doometernal.apworld",
+        *sorted(expected_release_roots(launcher_executable) - {"client", launcher_executable}),
         "client/ap_client.exe",
         "client/bridge_client.py",
         "client/bridge_identity.json",
@@ -562,6 +561,7 @@ public_files = [
         "client/ap_config.example.json",
         "client/data/items.json",
         "client/data/item_classifications.json",
+        "client/data/start_inventory_catalog.json",
         "client/data/item_runtime_contracts.json",
         "client/data/item_replay_policies.json",
         "client/data/location_names.json",
@@ -899,9 +899,13 @@ for package_file in "${PACKAGE_FILES[@]}"; do
     fi
 done
 mapfile -t PACKAGE_ROOTS < <(printf '%s\n' "${PACKAGE_ROOTS[@]}" | LC_ALL=C sort)
-mapfile -t EXPECTED_ROOTS < <(printf '%s\n' \
-    "$LAUNCHER_EXECUTABLE" client doometernal.apworld README.md INSTALL.md LICENSE \
-    RELEASE_MANIFEST.json | LC_ALL=C sort)
+mapfile -t EXPECTED_ROOTS < <(PYTHONPATH="$REPO_ROOT" python3 - "$LAUNCHER_EXECUTABLE" <<'PY'
+import sys
+from tools.validation.release_layout import expected_release_roots
+
+print("\n".join(sorted(expected_release_roots(sys.argv[1]))))
+PY
+)
 if [[ "${PACKAGE_ROOTS[*]}" != "${EXPECTED_ROOTS[*]}" ]]; then
     echo "Final ZIP root layout is not exact" >&2
     printf 'actual:\n%s\nexpected:\n%s\n' "${PACKAGE_ROOTS[*]}" "${EXPECTED_ROOTS[*]}" >&2
