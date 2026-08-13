@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 ITEM_RUNTIME_CONTRACTS_FILE = Path(__file__).with_name("data") / "item_runtime_contracts.json"
-DEFAULT_DEATH_LINK_MODE = "hardcore"
+DEFAULT_DEATH_LINK_MODE = "soft"
 
 
 def load_item_runtime_contracts(

@@ -12,6 +12,13 @@ PHYSICAL_OPTION_KEYS = (
     "randomize_first_battery",
 )
 
+ROOM_OPTION_KEYS = (
+    "death_link",
+    "death_link_mode",
+    "start_with_automap",
+)
+DEATH_LINK_MODES = frozenset({"soft", "hardcore"})
+
 PHYSICAL_OPTIONS = {
     "randomize_chainsaw": {
         "map_key": "e1m1_intro",
@@ -45,6 +52,36 @@ def normalize_physical_options(options: Mapping[str, Any], *, require_all: bool 
             raise ValueError(f"physical option {key} must be boolean")
         result[key] = value
     return result
+
+
+def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
+    """Project room-wide options without synthesizing native game writers."""
+    death_link = options.get("death_link", False)
+    if not isinstance(death_link, bool):
+        raise ValueError("room option death_link must be boolean")
+
+    death_link_mode = options.get("death_link_mode", "soft")
+    if not isinstance(death_link_mode, str) or death_link_mode not in DEATH_LINK_MODES:
+        raise ValueError(
+            "room option death_link_mode must be one of "
+            + ", ".join(sorted(DEATH_LINK_MODES))
+        )
+
+    start_with_automap = options.get("start_with_automap", False)
+    if not isinstance(start_with_automap, bool):
+        raise ValueError("room option start_with_automap must be boolean")
+    if start_with_automap:
+        raise ValueError(
+            "start_with_automap=true cannot be compiled: verified native Automap "
+            "writer proof is missing"
+        )
+
+    return {
+        "schema_version": 1,
+        "death_link": death_link,
+        "death_link_mode": death_link_mode,
+        "start_with_automap": False,
+    }
 
 
 def physical_signature(options: Mapping[str, Any]) -> str:

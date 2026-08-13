@@ -1,79 +1,152 @@
-# Installation
+# Install DOOM Eternal Archipelago beta.4
 
-DOOM Eternal Archipelago 0.4.0-beta.3 requires a legally obtained, player-supplied DOOM Eternal installation. Game
-files and external modding tools are not distributed in project releases.
+DOOM Eternal Archipelago **0.4.0-beta.4** requires a legally obtained,
+player-supplied DOOM Eternal installation. Releases do not include game files
+or external modding tools.
 
-## Required files
+## Requirements
+
+Release package must contain:
 
 - `doometernal.apworld`;
-- root `DoomEternalArchipelagoLauncher` on Linux or `DoomEternalArchipelagoLauncher.exe` on Windows;
-- sibling `client/` support-runtime directory, including verified `mod_templates/`;
-- [EternalModManager](https://github.com/brunoanc/EternalModManager) 4.2.3 on Windows;
-- [EternalModInjectorShell](https://github.com/leveste/EternalBasher) 6.66-rev3.12 on Linux.
+- `DoomEternalArchipelagoLauncher` on Linux or
+  `DoomEternalArchipelagoLauncher.exe` on Windows;
+- the bundled `client/` support runtime and verified mod templates.
 
-Launcher asks before acquiring pinned dependencies, verifies SHA-256, and can use a local official artifact instead.
-Never run an artifact after verification failure.
+Use one supported external installer:
 
-## Install APWorld and connect
+- **Windows:** [EternalModManager](https://github.com/brunoanc/EternalModManager)
+  4.2.3;
+- **Linux/Proton:**
+  [EternalModInjectorShell](https://github.com/leveste/EternalBasher)
+  6.66-rev3.12.
 
-1. Open `doometernal.apworld` with Archipelago Launcher and restart launcher.
-2. Keep root launcher and sibling `client/` directory together.
-3. Start root `DoomEternalArchipelagoLauncher[.exe]`.
-4. Enter room address, slot name, and password when requested.
-5. Connection loads `RoomSnapshot`, derives `SeedManifest`, and reports whether matching room package is installed.
-6. Use explicit setup action to generate room-specific package, stage it, and open/run platform injector workflow.
+Launcher requests consent before acquiring pinned dependencies and verifies
+SHA-256. An official verified artifact may be supplied instead. Do not run an
+artifact after verification failure.
 
-Connect does not install or inject. Launcher supervises native bridge. It never starts DOOM Eternal and exposes no game-launch button. Open DOOM Eternal
-yourself through Steam whenever ready.
+## Install APWorld
 
-## Windows
+1. Open `doometernal.apworld` with Archipelago Launcher.
+2. Restart Archipelago Launcher.
+3. Keep the release launcher and its bundled client runtime together.
 
-1. Select game directory containing `DOOMEternalx64vk.exe`.
-2. Consent to verified EternalModManager acquisition, or select verified local 4.2.3 ZIP.
-3. Launcher places generated mod ZIP in `DOOMEternal/Mods` and opens manager.
-4. Select generated mod and press **Run Injector**.
-5. Wait for manager to finish, then open DOOM Eternal yourself through Steam.
+## Join without YAML
 
-EternalModManager 4.2.3 has no stable public command-line injector. Passing game directory opens GUI; passing mod ZIP
-does not import or inject it. Launcher therefore reports `manual_action_required` and never claims application merely
-because manager opened.
+1. Start the DOOM Eternal Archipelago launcher.
+2. Confirm or select the DOOM Eternal installation and save folder.
+3. Enter room address, slot name, and optional password.
+4. Select **Join** or **Connect to Archipelago**.
+5. Wait for room data and package identity check.
 
-## Linux / Steam / Proton
+YAML is not required for joining. Connected-room options are server-authoritative.
 
-Launcher and bridge remain native Linux processes. DOOM Eternal remains Steam-managed inside player's configured Proton
-prefix. Do not start `DOOMEternalx64vk.exe` directly through Wine.
+Join only connects the bridge. It does not prepare a package, install or inject
+the mod, or start DOOM Eternal.
 
-1. Select Steam library containing App ID `782330` if discovery is ambiguous.
-2. Consent to verified EternalModInjectorShell acquisition, or select verified local 6.66-rev3.12 archive.
-3. Launcher places generated mod ZIP in `DOOMEternal/Mods`.
-4. Run EternalModInjectorShell from game directory and confirm successful exit.
-5. Open DOOM Eternal yourself through Steam when ready.
+## Resume
 
-EternalModInjectorShell is an interactive script without positional or unattended CLI. Launcher must not fabricate
-flags. Interactive execution uses official script and reports its exit code, stdout, and stderr.
+Select **Resume** to return to launcher session state. Reconnect to the room if
+requested; passwords are entered again. Launcher verifies room identity and
+package state before setup.
+
+## Create YAML
+
+Use **Create YAML** or the **Options** tab for a future room:
+
+1. Set player name, starting inventory, and supported room options.
+2. Select **Save Player YAML**.
+3. Use saved YAML with Archipelago generation.
+
+Create YAML does not connect to a room or alter an active room. It cannot enable
+features blocked by current runtime capability checks.
+
+## Prepare and Install
+
+After room connection reports that setup is required, select the explicit
+**Prepare and install** action. Launcher then:
+
+1. validates room identity and options;
+2. builds the room-specific mod package;
+3. stages the package in DOOM Eternal's mod directory;
+4. invokes the platform external tool;
+5. reports installation state and any manual action required.
+
+Do not start DOOM Eternal until installation reports success. Launcher never
+starts the game directly; open it through Steam.
+
+### Windows
+
+1. Approve verified EternalModManager 4.2.3 acquisition or provide an official
+   verified local artifact.
+2. Launcher stages the generated mod and opens EternalModManager.
+3. In EternalModManager, select the generated DOOM Eternal Archipelago mod.
+4. Press **Run Injector**.
+5. Return to launcher and confirm whether installation succeeded.
+6. Start DOOM Eternal through Steam.
+
+EternalModManager has no stable public command-line injector. Launcher cannot
+claim installation merely because its window opened.
+
+### Linux / Steam / Proton
+
+Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
+by Steam inside the configured Proton prefix. Do not launch the Windows game
+executable directly through Wine.
+
+1. Approve verified EternalModInjectorShell 6.66-rev3.12 acquisition or provide
+   an official verified local artifact.
+2. Launcher stages the generated mod.
+3. Launcher opens the interactive EternalModInjectorShell workflow.
+4. Complete its prompts and confirm successful exit.
+5. Start DOOM Eternal through Steam.
+
 
 ## Steam launch option
 
-Meathook under Proton requires:
+Meathook under Proton requires this Steam launch option:
 
 ```text
 WINEDLLOVERRIDES="XINPUT1_3=n,b" %command%
 ```
 
-Launch-option preparation preserves existing custom arguments, merges existing `WINEDLLOVERRIDES`, keeps one
-`%command%`, and preserves arguments after it. Review proposed diff before consent. Previous value is backed up and can
-be restored. Current beta does not rewrite Steam VDF directly; copy proposed instruction into
-**DOOM Eternal → Properties → Launch Options** while Steam is closed.
+Launcher preserves existing custom arguments and existing
+`WINEDLLOVERRIDES`, keeps one `%command%`, and shows the proposed result. Copy
+the option into DOOM Eternal's Steam **Properties → Launch Options**. Launcher
+does not edit Steam settings directly.
 
-## Stop session
+## Stop and resume safely
 
-Close DOOM Eternal normally. Stop **DOOM Eternal Client** to terminate supervised bridge. Do not run two bridge clients
-for same profile.
+Close DOOM Eternal normally. Stop **DOOM Eternal Client** to terminate the
+supervised bridge. Do not run two bridge clients for one profile.
+
+## Feature limits
+
+### DeathLink
+
+When enabled, choose one room mode:
+
+- **Soft:** one received death dispatch; no repeat after the attempt.
+- **Hardcore:** retry received death until confirmed or bounded timeout.
+
+## Diagnostics and support
+
+When available in launcher, run **Doctor** for bounded checks covering platform,
+game installation, processes, and launcher configuration. **Create support
+bundle** exports sanitized diagnostics and bounded logs for troubleshooting.
+Save contents are excluded and secrets are redacted. Review bundle contents
+before sharing.
 
 ## Troubleshooting
 
-- **Client files not found:** preserve sibling `client/` beside root launcher; do not move launcher into `client/`.
-- **Room ZIP mismatch:** rerun explicit setup for current room; never reuse package generated for another manifest.
-- **Hash mismatch:** discard artifact; retry official pinned URL or select official local copy.
-- **Manager says manual action required:** complete injector action in official manager.
-- **Bridge cannot reach game:** verify mod injection, one bridge instance, and required Proton DLL override.
+- **Client runtime not found:** keep bundled client files with release launcher.
+- **Room package mismatch:** run explicit Prepare and install for current room;
+  do not reuse another room's package.
+- **Hash mismatch:** discard artifact and retry verified acquisition or provide a
+  verified official artifact.
+- **Windows manual action required:** finish **Run Injector** in
+  EternalModManager, then confirm result in launcher.
+- **Linux injector failure:** review interactive tool output and exit status,
+  then retry setup.
+- **Bridge cannot reach game:** verify mod installation, one bridge instance,
+  Meathook availability, and the Proton DLL override.

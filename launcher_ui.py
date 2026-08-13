@@ -113,8 +113,8 @@ class LauncherUI(QMainWindow):
         super().__init__()
         self.controller = controller
         self.setWindowTitle("DOOM Eternal Archipelago")
-        self.resize(1180, 820)
-        self.setMinimumSize(900, 680)
+        self.resize(1120, 780)
+        self.setMinimumSize(700, 560)
         self._step_widgets: list[tuple[QFrame, QLabel, QLabel]] = []
         self._configure_style()
         self._load_icon()
@@ -136,6 +136,9 @@ class LauncherUI(QMainWindow):
         self.option_controls: dict[str, QWidget] = {}
         self.option_defaults: dict[str, object] = {}
         self.start_inventory_catalog: list[dict[str, str]] = []
+        self.doctor_status = self._label("Run Doctor to check game, launcher, and live bridge evidence.", "muted")
+        self.doctor_evidence = self._label("No diagnostic report collected yet.", "muted")
+        self.doctor_action = self._label("Action: Run Doctor before requesting support.", "muted")
         self._build()
         self._discover()
         self._timer = QTimer(self)
@@ -145,15 +148,21 @@ class LauncherUI(QMainWindow):
     def _configure_style(self) -> None:
         self.setStyleSheet(f"""
             QWidget {{ background: {self.COLORS['background']}; color: {self.COLORS['text']};
-                font-family: system-ui, 'Segoe UI', sans-serif; font-size: 11pt; }}
+                font-family: 'Bahnschrift', 'Aptos', sans-serif; font-size: 11pt; }}
             QLabel {{ background: transparent; }}
             QMainWindow {{ background: {self.COLORS['background']}; }}
             QFrame#surface, QFrame#card {{ background: {self.COLORS['surface']};
-                border: 1px solid {self.COLORS['border']}; border-radius: 5px; }}
-            QFrame#surface {{ border-left: 3px solid #35566a; }}
+                border: 1px solid {self.COLORS['border']}; border-radius: 8px; }}
+            QFrame#surface {{ border-top: 2px solid #35566a; }}
             QFrame#card {{ background: {self.COLORS['surface_alt']}; border-color: #263b4b; }}
+            QFrame#hero {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #172735, stop:.58 #111b25, stop:1 #0b1016);
+                border: 1px solid #375064; border-left: 5px solid {self.COLORS['accent']}; border-radius: 10px; }}
+            QFrame#stateCard {{ background: #101923; border: 1px solid #294151;
+                border-radius: 6px; }}
             QFrame#optionCard {{ background: #101923; border: 1px solid #263f50; border-left: 3px solid #365c6d; border-radius: 4px; }}
-            QLabel#title {{ font-size: 24pt; font-weight: 700; letter-spacing: 1px; }}
+            QLabel#title {{ font-family: 'Bahnschrift SemiCondensed', 'Bahnschrift', sans-serif;
+                font-size: 25pt; font-weight: 800; letter-spacing: 2px; }}
             QLabel#subtitle, QLabel#muted {{ color: {self.COLORS['muted']}; }}
             QLabel#section {{ font-size: 15pt; font-weight: 700; }}
             QLabel#headline {{ font-size: 19pt; font-weight: 700; }}
@@ -161,9 +170,9 @@ class LauncherUI(QMainWindow):
             QLabel#warning {{ color: {self.COLORS['warning']}; background: #2a2115;
                 border: 1px solid #76511e; border-left: 3px solid {self.COLORS['warning']};
                 border-radius: 4px; padding: 8px 10px; font-weight: 600; }}
-            QLabel#stepTitle {{ font-size: 11pt; font-weight: 700; }}
+            QLabel#stepTitle {{ font-size: 10pt; font-weight: 700; }}
             QLabel#stepState {{ color: {self.COLORS['muted']}; font-size: 9pt; }}
-            QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 15pt; font-weight: 700; }}
+            QLabel#stepNumber {{ color: {self.COLORS['muted']}; font-size: 14pt; font-weight: 800; }}
             QLineEdit {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
                 border-radius: 4px; padding: 6px 9px; min-height: 22px; }}
             QSpinBox {{ background: #f2f5f8; color: #17212b; border: 1px solid #91a0ae;
@@ -187,7 +196,7 @@ class LauncherUI(QMainWindow):
             QCheckBox::indicator:checked {{ background: {self.COLORS['success']}; border-color: {self.COLORS['success']}; }}
             QTabWidget::pane {{ border: 0; }}
             QTabBar::tab {{ background: {self.COLORS['surface_alt']}; color: {self.COLORS['muted']};
-                border: 1px solid {self.COLORS['border']}; border-bottom: 0; padding: 9px 18px;
+                border: 1px solid {self.COLORS['border']}; border-bottom: 0; padding: 9px 14px;
                 font-weight: 600; }}
             QTabBar::tab:selected {{ background: {self.COLORS['surface']}; color: {self.COLORS['text']}; }}
             QPlainTextEdit {{ background: #0d1219; color: #d8e4ef; border: 1px solid {self.COLORS['border']};
@@ -202,6 +211,8 @@ class LauncherUI(QMainWindow):
             QPushButton:hover {{ background: {self.COLORS['border']}; }}
             QPushButton#primary {{ background: {self.COLORS['accent']}; border-color: {self.COLORS['accent']}; color: white; }}
             QPushButton#primary:hover {{ background: {self.COLORS['accent_active']}; }}
+            QPushButton#nav {{ border: 0; background: transparent; color: {self.COLORS['muted']}; }}
+            QPushButton#nav:hover, QPushButton#nav:checked {{ color: white; background: #203442; }}
             QPushButton:disabled {{ color: #8190a0; background: #293544; }}
             QProgressBar {{ border: 0; background: {self.COLORS['surface_alt']}; border-radius: 4px; height: 8px; }}
             QProgressBar::chunk {{ background: {self.COLORS['accent']}; border-radius: 4px; }}
@@ -256,14 +267,15 @@ class LauncherUI(QMainWindow):
         outer.setContentsMargins(28, 24, 28, 28)
         outer.setSpacing(14)
         scroll.setWidget(body)
-        self.tabs.addTab(scroll, "Setup")
+        self.tabs.addTab(scroll, "Home")
 
         header = self._surface()
+        header.setObjectName("hero")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(24, 20, 24, 20)
         header_text = QVBoxLayout()
-        header_text.addWidget(self._label("DOOM Eternal", "title"))
-        header_text.addWidget(self._label("Archipelago Launcher", "subtitle"))
+        header_text.addWidget(self._label("DOOM ETERNAL", "title"))
+        header_text.addWidget(self._label("ARCHIPELAGO // BETA.4", "subtitle"))
         header_layout.addLayout(header_text, 1)
         self.overall_state.setObjectName("state")
         self.overall_state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
@@ -291,10 +303,38 @@ class LauncherUI(QMainWindow):
             steps.addWidget(card, 0, index - 1)
             steps.setColumnStretch(index - 1, 1)
             self._step_widgets.append((card, number, state_label))
+            if index > 4:
+                card.hide()
         outer.addLayout(steps)
 
-        content = QHBoxLayout()
-        content.setSpacing(14)
+        routes = QGridLayout()
+        self.routes_layout = routes
+        self.route_cards: list[QWidget] = []
+        routes.setHorizontalSpacing(10)
+        for column, (title, detail, action) in enumerate((
+            ("RESUME", "Return to active room session.", self._open_session),
+            ("JOIN", "Connect game, save path, and room.", self._focus_connection),
+            ("CREATE YAML", "Build player settings for future room.", self._open_options),
+            ("DOCTOR", "Check installation and live game bridge.", self._open_doctor),
+        )):
+            card = QFrame()
+            card.setObjectName("stateCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(14, 12, 14, 12)
+            card_layout.addWidget(self._label(title, "stepTitle"))
+            card_layout.addWidget(self._label(detail, "muted"))
+            button = QPushButton("Open")
+            button.clicked.connect(action)
+            card_layout.addWidget(button, alignment=Qt.AlignmentFlag.AlignLeft)
+            routes.addWidget(card, 0, column)
+            self.route_cards.append(card)
+            routes.setColumnStretch(column, 1)
+        outer.addLayout(routes)
+
+        content = QGridLayout()
+        self.content_layout = content
+        content.setHorizontalSpacing(14)
+        content.setVerticalSpacing(14)
         outer.addLayout(content)
         configure = self._surface()
         configure_layout = QGridLayout(configure)
@@ -314,7 +354,8 @@ class LauncherUI(QMainWindow):
         self._entry_row(configure_layout, 7, "Server address", self.server)
         self._entry_row(configure_layout, 8, "Slot name", self.slot)
         self._entry_row(configure_layout, 9, "Password", self.password)
-        content.addWidget(configure, 3)
+        content.addWidget(configure, 0, 0)
+        self.configure_panel = configure
 
         status = self._surface()
         status_layout = QVBoxLayout(status)
@@ -360,24 +401,97 @@ class LauncherUI(QMainWindow):
         guidance_layout.addLayout(actions)
         self.guidance.setVisible(False)
         status_layout.addWidget(self.guidance)
-        status_layout.addWidget(self._label("Launcher log", "section"))
+        status_layout.addWidget(self._label("SESSION", "section"))
+        self.session_tabs = QTabWidget()
+        activity = QWidget()
+        activity_layout = QVBoxLayout(activity)
+        activity_layout.setContentsMargins(10, 10, 10, 10)
+        activity_layout.addWidget(self._label(
+            "Current connection, installation, and launch status appear above.", "muted"
+        ))
+        activity_layout.addStretch(1)
+        self.session_tabs.addTab(activity, "Activity")
+
+        log_page = QWidget()
+        log_layout = QVBoxLayout(log_page)
+        log_layout.setContentsMargins(6, 6, 6, 6)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setFont(QFont("monospace", 11))
-        self.log.setMinimumHeight(120)
-        status_layout.addWidget(self.log, 1)
+        self.log.setMinimumHeight(150)
+        log_layout.addWidget(self.log, 1)
         command = QHBoxLayout()
         self.command = QLineEdit()
-        self.command.setPlaceholderText("Send chat command")
+        self.command.setPlaceholderText("Send room command")
         self.command.returnPressed.connect(self._send_command)
         command.addWidget(self.command, 1)
-        send = QPushButton("Send chat")
+        send = QPushButton("Send")
         send.clicked.connect(self._send_command)
         command.addWidget(send)
-        status_layout.addLayout(command)
-        content.addWidget(status, 3)
-        configure.setMinimumWidth(470)
+        log_layout.addLayout(command)
+        self.session_tabs.addTab(log_page, "Log")
+
+        room = QWidget()
+        room_layout = QVBoxLayout(room)
+        room_layout.setContentsMargins(10, 10, 10, 10)
+        room_layout.addWidget(self._label("Steam launch option", "section"))
+        self.session_launch_option = QLineEdit("Unavailable until setup completes.")
+        self.session_launch_option.setReadOnly(True)
+        room_layout.addWidget(self.session_launch_option)
+        session_copy = QPushButton("Copy option")
+        session_copy.clicked.connect(self._copy_launch_option)
+        room_layout.addWidget(session_copy, alignment=Qt.AlignmentFlag.AlignLeft)
+        room_layout.addStretch(1)
+        self.session_tabs.addTab(room, "Room")
+
+        options = QWidget()
+        options_layout = QVBoxLayout(options)
+        options_layout.setContentsMargins(10, 10, 10, 10)
+        options_layout.addWidget(self._label("Create player YAML for future rooms.", "muted"))
+        open_options = QPushButton("Open YAML options")
+        open_options.clicked.connect(self._open_options)
+        options_layout.addWidget(open_options, alignment=Qt.AlignmentFlag.AlignLeft)
+        options_layout.addStretch(1)
+        self.session_tabs.addTab(options, "Options")
+
+        doctor = QWidget()
+        doctor_layout = QVBoxLayout(doctor)
+        doctor_layout.setContentsMargins(10, 10, 10, 10)
+        doctor_layout.setSpacing(10)
+        doctor_layout.addWidget(self._label("Doctor", "section"))
+        doctor_layout.addWidget(self._label(
+            "Check installation, running processes, and gameplay handshake before retrying setup or sharing support evidence.",
+            "muted",
+        ))
+        self.doctor_status.setObjectName("state")
+        doctor_layout.addWidget(self.doctor_status)
+        doctor_layout.addWidget(self._label("EVIDENCE", "stepTitle"))
+        doctor_layout.addWidget(self.doctor_evidence)
+        doctor_layout.addWidget(self.doctor_action)
+        doctor_actions = QHBoxLayout()
+        doctor_run = QPushButton("Run Doctor")
+        doctor_run.setObjectName("primary")
+        doctor_run.clicked.connect(self._run_doctor)
+        handshake = QPushButton("Probe handshake")
+        handshake.clicked.connect(self._probe_handshake)
+        launch_game = QPushButton("Launch DOOM via Steam")
+        launch_game.clicked.connect(self._launch_game)
+        support = QPushButton("Save support bundle")
+        support.clicked.connect(self._save_support_bundle)
+        doctor_actions.addWidget(doctor_run)
+        doctor_actions.addWidget(handshake)
+        doctor_actions.addWidget(launch_game)
+        doctor_actions.addWidget(support)
+        doctor_actions.addStretch(1)
+        doctor_layout.addLayout(doctor_actions)
+        doctor_layout.addStretch(1)
+        self.session_tabs.addTab(doctor, "Doctor")
+        status_layout.addWidget(self.session_tabs, 1)
+        content.addWidget(status, 0, 1)
+        content.setColumnStretch(0, 1)
+        content.setColumnStretch(1, 1)
         status.setMinimumWidth(0)
+        self.status_panel = status
 
         launch = self._surface()
         launch_layout = QGridLayout(launch)
@@ -391,10 +505,23 @@ class LauncherUI(QMainWindow):
         copy_button = QPushButton("Copy option")
         copy_button.clicked.connect(self._copy_launch_option)
         launch_layout.addWidget(copy_button, 2, 1)
+        launch.setVisible(False)
         outer.addWidget(launch)
 
         self._set_step(1)
         self._build_options_tab()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if not hasattr(self, "content_layout"):
+            return
+        compact = self.width() < 920
+        self.content_layout.addWidget(self.configure_panel, 0, 0)
+        self.content_layout.addWidget(self.status_panel, 1 if compact else 0, 0 if compact else 1)
+        self.content_layout.setColumnStretch(0, 1)
+        self.content_layout.setColumnStretch(1, 0 if compact else 1)
+        for index, card in enumerate(self.route_cards):
+            self.routes_layout.addWidget(card, index if self.width() < 920 else 0, 0 if self.width() < 920 else index)
 
     def _build_options_tab(self) -> None:
         scroll = QScrollArea()
@@ -457,6 +584,21 @@ class LauncherUI(QMainWindow):
         actions.addWidget(save)
         layout.addLayout(actions)
         layout.addStretch(1)
+
+    def _open_session(self) -> None:
+        self.session_tabs.setCurrentIndex(0)
+        self.status_panel.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _focus_connection(self) -> None:
+        self.server.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _open_options(self) -> None:
+        self.tabs.setCurrentIndex(1)
+
+    def _open_doctor(self) -> None:
+        self.tabs.setCurrentIndex(0)
+        self.session_tabs.setCurrentIndex(4)
+        self._run_doctor()
 
     def _start_inventory_widget(self) -> QWidget:
         card = self._surface()
@@ -666,7 +808,7 @@ class LauncherUI(QMainWindow):
 
     def _set_step(self, active: int, *, complete_through: int = 0) -> None:
         for index, (_card, number, state) in enumerate(self._step_widgets, start=1):
-            if index == 5 and complete_through >= 5:
+            if index == 4 and complete_through >= 4:
                 color, text = self.COLORS["success"], "Ready"
             elif index <= complete_through:
                 color, text = self.COLORS["success"], "Complete"
@@ -731,7 +873,7 @@ class LauncherUI(QMainWindow):
             except Exception as error:
                 self._append_log(f"Setup error: {error}")
         elif "Steam" in self.next_action:
-            self._append_log("Start DOOM Eternal through Steam when ready. The launcher will not start the game.")
+            self._launch_game()
         elif "Connect" in self.next_action or "Review" in self.next_action:
             self._connect()
 
@@ -773,10 +915,86 @@ class LauncherUI(QMainWindow):
             self._append_log(f"Confirmation error: {error}")
 
     def _copy_launch_option(self) -> None:
-        value = self.launch_option.text()
+        value = self.session_launch_option.text()
         if value and not value.startswith("Unavailable"):
             QApplication.clipboard().setText(value)
             self._append_log("Steam launch option copied. Paste it in Steam manually.")
+
+    def _run_doctor(self) -> None:
+        try:
+            report = self.controller.run_doctor().document()
+            self._render_doctor_report(report)
+        except Exception as error:
+            self.doctor_status.setText("DOCTOR COULD NOT RUN")
+            self.doctor_evidence.setText(str(error))
+            self.doctor_action.setText("Action: Review launcher log, then retry Doctor.")
+            self._append_log(f"Doctor error: {error}")
+
+    def _render_doctor_report(self, report: object) -> None:
+        if not isinstance(report, dict):
+            return
+        diagnostics = report.get("diagnostics", [])
+        if not isinstance(diagnostics, list):
+            diagnostics = []
+        healthy = bool(report.get("ok"))
+        self.doctor_status.setText("DOCTOR CLEAR" if healthy else "DOCTOR NEEDS ATTENTION")
+        self.doctor_status.setStyleSheet(f"color: {self.COLORS['success' if healthy else 'warning']}; font-weight: 700;")
+        evidence: list[str] = []
+        needs_action: list[str] = []
+        for item in diagnostics:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key", "check")).replace("_", " ").upper()
+            status = str(item.get("status", "unknown")).upper()
+            message = str(item.get("message", ""))
+            details = item.get("details")
+            detail_text = f" — {details}" if details else ""
+            evidence.append(f"{key}: {status} — {message}{detail_text}")
+            if status in {"ERROR", "INVALID", "MISSING"}:
+                needs_action.append(message)
+        processes = self.controller.game_processes()
+        if processes:
+            evidence.append("GAME PROCESS: " + ", ".join(
+                f"{item.get('name', 'unknown')} (PID {item.get('pid', '?')})" for item in processes
+            ))
+        else:
+            evidence.append("GAME PROCESS: No supported DOOM or AP client process detected.")
+        self.doctor_evidence.setText("\n".join(evidence) or "No diagnostic evidence returned.")
+        self.doctor_action.setText(
+            "Action: " + (needs_action[0] if needs_action else "Installation checks passed. Probe handshake after entering gameplay.")
+        )
+        self._append_log("Doctor: " + ("clear." if healthy else "action needed."))
+
+    def _probe_handshake(self) -> None:
+        try:
+            result = self.controller.probe_handshake()
+            status = str(result.get("status", "unavailable")).upper()
+            evidence = ", ".join(f"{key}={value}" for key, value in result.items())
+            self.doctor_status.setText(f"HANDSHAKE {status}")
+            self.doctor_evidence.setText(f"HANDSHAKE: {evidence}")
+            self.doctor_action.setText(
+                "Action: Continue playing if handshake is OK; otherwise launch game, enter gameplay, then probe again."
+            )
+            self._append_log(f"Handshake probe: {evidence}")
+        except Exception as error:
+            self._append_log(f"Handshake probe error: {error}")
+
+    def _launch_game(self) -> None:
+        try:
+            url = self.controller.launch_game()
+            self._append_log(f"Steam launch requested: {url}")
+            self.doctor_action.setText("Action: Steam received launch request. Return here and probe handshake after game reaches gameplay.")
+        except Exception as error:
+            self._append_log(f"Steam launch error: {error}")
+
+    def _save_support_bundle(self) -> None:
+        destination = Path.home() / "DOOM-Eternal-Archipelago-support.zip"
+        try:
+            bundle = self.controller.create_support_bundle(destination, logs=self.log.toPlainText().splitlines())
+            self.doctor_action.setText(f"Action: Support bundle saved to {bundle}")
+            self._append_log(f"Support bundle saved: {bundle}")
+        except Exception as error:
+            self._append_log(f"Support bundle error: {error}")
 
     def _send_command(self) -> None:
         text = self.command.text().strip()
@@ -808,6 +1026,7 @@ class LauncherUI(QMainWindow):
             self._append_log(f"Warning: {message}")
             if event.get("field") == "steam_launch_options":
                 self.launch_option.setText("Unavailable — see log.")
+                self.session_launch_option.setText("Unavailable — see log.")
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True
             self._set_connection_controls(False, True)
@@ -821,10 +1040,12 @@ class LauncherUI(QMainWindow):
         elif kind == "room_install_state":
             self.progress.setVisible(False)
             if event.get("steam_launch_option"):
-                self.launch_option.setText(str(event["steam_launch_option"]))
+                option = str(event["steam_launch_option"])
+                self.launch_option.setText(option)
+                self.session_launch_option.setText(option)
             if event.get("state") == "already_installed":
                 self.reinstall_button.setVisible(True)
-                self._set_state("Mod for this room is already installed.", "Room identity and installed package hash match. No reinjection is needed.", action="Ready — start via Steam", step=5, complete=5, state="READY TO PLAY")
+                self._set_state("Mod for this room is already installed.", "Room identity and installed package hash match. No reinjection is needed.", action="Ready — start via Steam", step=4, complete=4, state="READY TO PLAY")
                 self._append_log("Current room mod is already installed; automatic reinstall skipped.")
             else:
                 self.reinstall_button.setVisible(False)
@@ -873,7 +1094,7 @@ class LauncherUI(QMainWindow):
             if bool(event.get("succeeded")):
                 self.guidance.setVisible(False)
                 self.reinstall_button.setVisible(True)
-                self._set_state("Mod installed successfully.", "Now start DOOM Eternal through Steam. Keep this launcher open while you play.", action="Ready — start via Steam", step=5, complete=5, state="READY TO PLAY")
+                self._set_state("Mod installed successfully.", "Now start DOOM Eternal through Steam. Keep this launcher open while you play.", action="Ready — start via Steam", step=4, complete=4, state="READY TO PLAY")
             else:
                 self._set_state("Installation needs another try.", "Review details, then retry setup after fixing the manager issue.", action="Try again", step=4, complete=3, state="ACTION NEEDED")
                 self._append_log("User reported EternalModManager installation failure.")
@@ -882,9 +1103,10 @@ class LauncherUI(QMainWindow):
             option = str(event.get("steam_launch_option", ""))
             if option:
                 self.launch_option.setText(option)
+                self.session_launch_option.setText(option)
             if state == "applied":
                 self.reinstall_button.setVisible(True)
-                self._set_state("Mod installed successfully.", "Now start DOOM Eternal through Steam. Keep this launcher open while you play.", action="Ready — start via Steam", step=5, complete=5, state="READY TO PLAY")
+                self._set_state("Mod installed successfully.", "Now start DOOM Eternal through Steam. Keep this launcher open while you play.", action="Ready — start via Steam", step=4, complete=4, state="READY TO PLAY")
             elif state in {"failed", "timed_out"}:
                 self._set_state("Mod installation did not finish.", "Review details, then retry setup. DOOM Eternal was not started.", action="Try again", step=4, complete=3, state="ACTION NEEDED")
             elif state != "manual_action_required":

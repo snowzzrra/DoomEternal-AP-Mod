@@ -131,6 +131,36 @@
       "ui_type": "toggle"
     },
     {
+      "default": false,
+      "description": "Start with the Automap available.",
+      "display_name": "Start With Automap",
+      "group": "Game Options",
+      "key": "start_with_automap",
+      "source_class": "StartWithAutomap",
+      "ui_type": "toggle"
+    },
+    {
+      "choices": [
+        {
+          "key": "soft",
+          "label": "Soft",
+          "value": 0
+        },
+        {
+          "key": "hardcore",
+          "label": "Hardcore",
+          "value": 1
+        }
+      ],
+      "default": "soft",
+      "description": "Select DeathLink behavior for this slot. Soft is the safe default and dispatches each received DeathLink once; Hardcore retries until confirmed.",
+      "display_name": "DeathLink Mode",
+      "group": "Game Options",
+      "key": "death_link_mode",
+      "source_class": "DeathLinkMode",
+      "ui_type": "choice"
+    },
+    {
       "choices": [
         {
           "key": "random_weapon",
@@ -202,5 +232,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "20896df232d333afde92ebd55ff374cd87ec99d069c4f6126879f043ed57aa03"
+  "source_sha256": "73d0d91a7409f5720869294660a9185b3d29e5b08a80615bc5714da4c0349190"
 }

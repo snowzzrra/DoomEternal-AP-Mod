@@ -40,8 +40,27 @@ def test_command_delivery_is_not_death_confirmation():
     assert receiver.active is not None
 
 
+def test_default_soft_mode_dispatches_once_then_fails_without_confirmation():
+    receiver = DeathLinkReceiver(confirm_timeout=1.0, retry_interval=1.0)
+    spool = FakeSpool()
+    receiver.receive("one", 0.0)
+
+    assert advance(receiver, spool, 1.0).detail == "dispatched"
+    spool.delivered()
+    assert advance(receiver, spool, 2.0).detail == "delivered"
+    result = advance(receiver, spool, 3.0)
+
+    assert result.state is ReceiveState.FAILED
+    assert result.detail == "attempt_limit"
+    assert spool.dispatches == 1
+
+
 def test_first_attempt_can_fail_then_retry_confirms_exactly_once():
-    receiver = DeathLinkReceiver(confirm_timeout=3.0, retry_interval=2.0)
+    receiver = DeathLinkReceiver(
+        confirm_timeout=3.0,
+        retry_interval=2.0,
+        mode="hardcore",
+    )
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
@@ -86,18 +105,13 @@ def test_timeout_is_bounded_and_allows_future_event():
         confirm_timeout=2.0,
         retry_interval=1.0,
         total_timeout=8.0,
-        max_attempts=2,
     )
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
     spool.delivered()
     advance(receiver, spool, 2.0)
-    advance(receiver, spool, 4.0)
-    advance(receiver, spool, 5.0)
-    spool.delivered()
-    advance(receiver, spool, 5.5)
-    result = advance(receiver, spool, 7.5)
+    result = advance(receiver, spool, 4.0)
     assert result.state is ReceiveState.FAILED
     assert result.detail == "attempt_limit"
     assert receiver.active is None

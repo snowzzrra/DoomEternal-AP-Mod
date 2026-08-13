@@ -2226,24 +2226,6 @@ class DoomCommandProcessor(ClientCommandProcessor):
         set_rpc_execution(False)
         self.output("RPC execution paused. Queued commands will be preserved.")
 
-    def _cmd_doom_perk(self, perk_path: str = ""):
-        """Reject the legacy raw perk command in favor of registered AP items."""
-        self.output("Removed: use /doom_test_item <registered perk item ID>.")
-
-    def _cmd_doom_item(self, item_id: str = ""):
-        """Compatibility alias for the canonical directed-test item command."""
-        return self._cmd_doom_test_item(item_id)
-
-    def _cmd_doom_direct_chainsaw(self):
-        """Queue the raw chainsaw give command, bypassing injected AP entities."""
-        self.output("Removed: use /doom_test_item 7770010 through the map-side pipeline.")
-
-    def _cmd_doom_progressive_item(
-        self, item_id: str = "", stage: str = ""
-    ):
-        """Compatibility alias for the canonical staged lab item command."""
-        return self._cmd_doom_test_item(item_id, "--stage", stage)
-
     def _cmd_doom_items_reset(self, confirmation: str = ""):
         """Reset exactly-once item history for the connected seed."""
         if confirmation != "CONFIRM":
@@ -2285,6 +2267,19 @@ class DoomCommandProcessor(ClientCommandProcessor):
         if blocked_info:
             self.output(f"Blocked item: index={blocked_info.get('index')} id={blocked_info.get('item_id')} name={blocked_info.get('item_name')}")
         self.output(f"Detailed diagnostics: {BRIDGE_LOG_DIR}")
+
+    def _cmd_doom_deathlink_diag(self):
+        """Show bounded DeathLink receive evidence and active policy."""
+        receiver = self.ctx.deathlink_receiver
+        self.output(
+            f"DeathLink mode={self.ctx.death_link_mode} enabled={self.ctx.death_link_enabled} "
+            f"policy={'single_dispatch' if receiver.mode == 'soft' else 'retry_until_confirmed'}"
+        )
+        for entry in receiver.instrumentation_dicts()[-8:]:
+            self.output(
+                "DeathLink event={event_id} state={state} detail={detail} "
+                "attempts={attempts} deliveries={deliveries}".format(**entry)
+            )
 
     def _cmd_doom_onboarding_status(self):
         """Show the compact, safe bootstrap onboarding state."""
@@ -2548,7 +2543,9 @@ class DoomEternalContext(CommonContext):
             total_timeout=DEATHLINK_TOTAL_TIMEOUT,
             late_suppression_grace=DEATHLINK_LATE_SUPPRESSION_GRACE,
             max_attempts=DEATHLINK_MAX_ATTEMPTS,
+            mode=self.death_link_mode,
         )
+        self.deathlink_instrumentation = []
         self.last_goal_details_mtime = None
         self.final_sin_completion_candidate = None
         self.cultist_autosave_path = None
@@ -2652,10 +2649,25 @@ class DoomEternalContext(CommonContext):
                         ", ".join(event_id[:12] for event_id in abandoned),
                     )
             slot_data = args.get("slot_data", {})
-            self.death_link_mode = DEFAULT_DEATH_LINK_MODE
+            if not isinstance(slot_data, dict):
+                slot_data = {}
+            configured_mode = slot_data.get("death_link_mode", DEFAULT_DEATH_LINK_MODE)
+            if configured_mode not in {"soft", "hardcore"}:
+                logger.warning(
+                    "[DeathLink] Invalid death_link_mode=%r; using %s.",
+                    configured_mode,
+                    DEFAULT_DEATH_LINK_MODE,
+                )
+                configured_mode = DEFAULT_DEATH_LINK_MODE
+            self.death_link_mode = configured_mode
+            self.deathlink_receiver.configure_mode(self.death_link_mode)
             self.death_link_enabled = bool(slot_data.get("death_link", False))
-            if "death_link_mode" in slot_data:
-                logger.debug("[DeathLink] Ignoring legacy death_link_mode slot data")
+            logger.info(
+                "[DeathLink] mode=%s enabled=%s receive_policy=%s",
+                self.death_link_mode,
+                self.death_link_enabled,
+                "single_dispatch" if self.death_link_mode == "soft" else "retry_until_confirmed",
+            )
             materialized = {}
             configured = slot_data.get("starting_inventory", {})
             if isinstance(configured, dict):
@@ -3667,6 +3679,14 @@ class DoomEternalContext(CommonContext):
         self.session_state.setdefault("goal_sent", False)
         self.session_state.setdefault("cultist_autosave_path", None)
         self.session_state.setdefault("save_slot_observations", {})
+        self.automap_cleanup_delivered = {
+            (key.split("|", 1)[0], key.split("|", 1)[1]): epoch
+            for key, epoch in self.session_state.get("automap_cleanup", {}).items()
+            if "|" in key and isinstance(epoch, int)
+        }
+        self.automap_cleanup_epoch = max(
+            self.automap_cleanup_delivered.values(), default=0
+        )
         sessions[self.state_key] = self.session_state
         processed = self.session_state.get("processed_items", 0)
         if not isinstance(processed, int) or processed < 0:
@@ -3699,6 +3719,11 @@ class DoomEternalContext(CommonContext):
             and isinstance(state, dict)
         }
         self.session_state["save_slot_observations"] = self.save_slot_observations
+        self.session_state["automap_cleanup"] = {
+            f"{map_name}|{location_id}": epoch
+            for (map_name, location_id), epoch in self.automap_cleanup_delivered.items()
+            if isinstance(map_name, str) and isinstance(location_id, str) and isinstance(epoch, int)
+        }
         self.selected_observation_slot = None
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
@@ -3757,6 +3782,11 @@ class DoomEternalContext(CommonContext):
             self.received_deathlink_event_ids
         )[-64:]
         self.session_state["save_slot_observations"] = self.save_slot_observations
+        self.session_state["automap_cleanup"] = {
+            f"{map_name}|{location_id}": epoch
+            for (map_name, location_id), epoch in self.automap_cleanup_delivered.items()
+            if isinstance(map_name, str) and isinstance(location_id, str) and isinstance(epoch, int)
+        }
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
         save_client_state(self.client_state)
@@ -4235,7 +4265,7 @@ class DoomEternalContext(CommonContext):
         for location_id, entity_name in sorted(targets.items()):
             if location_id not in checked:
                 continue
-            delivery_key = (map_name, location_id)
+            delivery_key = (map_name, str(location_id))
             if self.automap_cleanup_delivered.get(delivery_key) == self.automap_cleanup_epoch:
                 continue
             command_id = (
@@ -4250,6 +4280,7 @@ class DoomEternalContext(CommonContext):
             ):
                 continue
             self.automap_cleanup_delivered[delivery_key] = self.automap_cleanup_epoch
+            self.persist_session_state()
             changed = True
             logger.info(
                 "[Automap] Checked-state cleanup queued location=%s map=%s "
@@ -4680,6 +4711,20 @@ class DoomEternalContext(CommonContext):
                 DEATHLINK_KILL_COALESCE_KEY
             ),
         )
+        self.deathlink_instrumentation.append(
+            {
+                "event_id": result.event_id,
+                "state": result.state.value if result.state else None,
+                "detail": result.detail,
+                "mode": self.death_link_mode,
+                "attempts": self.deathlink_receiver.active.attempts
+                if self.deathlink_receiver.active
+                and self.deathlink_receiver.active.event_id == result.event_id
+                else None,
+                "timestamp": time.time(),
+            }
+        )
+        self.deathlink_instrumentation = self.deathlink_instrumentation[-128:]
         event_id = (result.event_id or "unknown")[:12]
         active = self.deathlink_receiver.active
         if result.detail == "dispatched":

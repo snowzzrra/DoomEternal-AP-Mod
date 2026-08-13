@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import csv
 import hashlib
 import json
 import os
@@ -13,14 +14,102 @@ import subprocess
 import tarfile
 import tempfile
 import urllib.request
+import webbrowser
 import zipfile
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
+STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
+
+
+@dataclass(frozen=True)
+class LauncherUserPaths:
+    """Per-user launcher roots. Values never contain credentials."""
+
+    config_dir: Path
+    state_dir: Path
+    data_dir: Path
+
+
+def launcher_user_paths(
+    *,
+    environment: dict[str, str] | None = None,
+    platform_name: str | None = None,
+) -> LauncherUserPaths:
+    env = os.environ if environment is None else environment
+    platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
+    if platform_name == "windows":
+        root = Path(env.get("LOCALAPPDATA") or (Path.home() / "AppData/Local"))
+        root = root / "Doom Eternal Archipelago"
+        return LauncherUserPaths(root / "config", root / "state", root / "data")
+    root_name = "doom-eternal-archipelago"
+    return LauncherUserPaths(
+        Path(env.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / root_name,
+        Path(env.get("XDG_STATE_HOME") or (Path.home() / ".local/state")) / root_name,
+        Path(env.get("XDG_DATA_HOME") or (Path.home() / ".local/share")) / root_name,
+    )
+
+
+def migrate_legacy_launcher_data(legacy_dir: Path, paths: LauncherUserPaths) -> None:
+    """Copy legacy launcher data into user roots without deleting source files."""
+    if not legacy_dir.is_dir():
+        return
+    paths.config_dir.mkdir(parents=True, exist_ok=True)
+    paths.state_dir.mkdir(parents=True, exist_ok=True)
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    for source in sorted(legacy_dir.rglob("*")):
+        if not source.is_file():
+            continue
+        relative = source.relative_to(legacy_dir)
+        destination_root = paths.config_dir if relative.name == "launcher.json" and len(relative.parts) == 1 else paths.state_dir
+        destination = destination_root / relative
+        if destination.exists():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if relative.name == "launcher.json" and len(relative.parts) == 1:
+            try:
+                document = json.loads(source.read_text(encoding="utf-8"))
+                if isinstance(document, dict):
+                    document.pop("password", None)
+                    destination.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                    continue
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                pass
+        shutil.copy2(source, destination)
+
+
+class DiscoveryStatus(str, Enum):
+    FOUND = "found"
+    NOT_FOUND = "not_found"
+    AMBIGUOUS = "ambiguous"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True)
+class DiscoverySentinel:
+    status: str
+    path: str = ""
+    candidates: tuple[str, ...] = ()
+    reason: str = ""
+
+
+def validate_game_root(path: Path) -> Path:
+    root = path.expanduser().resolve()
+    if not (root / "DOOMEternalx64vk.exe").is_file() or not (root / "base").is_dir():
+        raise ValueError(f"invalid DOOM Eternal installation: {root}")
+    return root
+
+
+def validate_save_directory(path: Path) -> Path:
+    root = path.expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError(f"invalid DOOM Eternal save directory: {root}")
+    return root
 
 
 @dataclass(frozen=True)
@@ -482,6 +571,84 @@ class SteamInstallationLocator:
                 if installation is not None and installation not in installations:
                     installations.append(installation)
         return tuple(installations)
+
+    def discover_sentinel(self, manual_game_root: Path | None = None) -> DiscoverySentinel:
+        try:
+            installations = self.discover(manual_game_root)
+        except ValueError as error:
+            return DiscoverySentinel(DiscoveryStatus.INVALID.value, reason=str(error))
+        roots = tuple(str(item.game_root) for item in installations)
+        if len(roots) == 1:
+            return DiscoverySentinel(DiscoveryStatus.FOUND.value, path=roots[0])
+        if len(roots) > 1:
+            return DiscoverySentinel(DiscoveryStatus.AMBIGUOUS.value, candidates=roots)
+        return DiscoverySentinel(DiscoveryStatus.NOT_FOUND.value, reason="Steam installation was not found")
+
+
+def detect_doom_processes(
+    *,
+    process_list: Sequence[Sequence[str]] | None = None,
+) -> tuple[dict[str, object], ...]:
+    """Return bounded process facts; command lines are never exposed."""
+    rows: list[dict[str, object]] = []
+    if process_list is None:
+        if os.name == "nt":
+            try:
+                completed = subprocess.run(
+                    ["tasklist", "/fo", "csv", "/nh"],
+                    capture_output=True, text=True, timeout=3, check=False,
+                )
+                process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
+            except (OSError, subprocess.SubprocessError):
+                process_list = ()
+        else:
+            try:
+                completed = subprocess.run(
+                    ["ps", "-eo", "pid=,comm="], capture_output=True, text=True, timeout=3, check=False
+                )
+                process_list = tuple(tuple(line.split(None, 1)) for line in completed.stdout.splitlines() if line.strip())
+            except (OSError, subprocess.SubprocessError):
+                process_list = ()
+    for row in process_list:
+        if not row:
+            continue
+        name = Path(str(row[-1])).name.casefold()
+        if name not in {"doometernalx64vk.exe", "doometernalx64vk", "ap_client.exe", "ap_client"}:
+            continue
+        pid = str(row[0]) if len(row) > 1 else ""
+        rows.append({"name": name, "pid": pid})
+    return tuple(rows)
+
+
+def launch_doom_via_steam(*, opener: Callable[[str], object] | None = None) -> str:
+    """Open Steam game URL only; never starts executable directly."""
+    (opener or webbrowser.open)(STEAM_GAME_URL)
+    return STEAM_GAME_URL
+
+
+def read_handshake_probe(path: Path) -> dict[str, object]:
+    """Read native handshake marker without opening, changing, or creating it."""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="strict").splitlines()[:32]
+    except (OSError, UnicodeError):
+        return {"status": "unavailable", "path": str(path)}
+    values: dict[str, str] = {}
+    for line in lines:
+        if "=" in line:
+            key, value = line.split("=", 1)
+            if re.fullmatch(r"[A-Za-z0-9_]{1,40}", key):
+                values[key] = value[:200]
+    state = values.get("state", "")
+    if state not in {"menu", "gameplay"}:
+        return {"status": "invalid", "path": str(path)}
+    try:
+        epoch = int(values.get("epoch", "-1"))
+    except ValueError:
+        return {"status": "invalid", "path": str(path)}
+    result: dict[str, object] = {"status": "ok", "state": state, "epoch": epoch}
+    if state == "gameplay":
+        result.update({"slot": values.get("slot", ""), "map_name": values.get("map_name", "")})
+    return result
 
 
 @dataclass(frozen=True)

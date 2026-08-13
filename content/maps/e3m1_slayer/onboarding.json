@@ -50,14 +50,6 @@
     ]
   },
   "challenge_notes": {
-    "man_made_wiki_sources": [
-      7770320,
-      7770321,
-      7770322,
-      7770323,
-      7770324,
-      7770325
-    ],
     "excluded_codex": 7770326,
     "reason": "The vanilla DECL requires six tracked Codex pickups; Codex 7 is outside that six-source equivalence."
   },

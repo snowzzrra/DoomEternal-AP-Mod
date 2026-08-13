@@ -172,18 +172,18 @@ class IntegratedLaunchWorkflow:
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             return InstallState("install_needed", manifest.manifest_hash, reason=f"invalid install record: {error}")
         if recorded_manifest != manifest.manifest_hash:
-            return InstallState("install_needed", manifest.manifest_hash, reason="installed manifest belongs to another room")
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed manifest belongs to another room")
         if not staged.is_file():
-            return InstallState("install_needed", manifest.manifest_hash, reason="recorded installed package is missing")
+            return InstallState("update_required", manifest.manifest_hash, reason="recorded installed package is missing")
         if hashlib.sha256(staged.read_bytes()).hexdigest() != expected_sha:
-            return InstallState("install_needed", manifest.manifest_hash, reason="installed package hash does not match record")
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed package hash does not match record")
         try:
             with zipfile.ZipFile(staged) as package:
                 package_manifest = json.loads(package.read("seed_manifest.json"))
             if package_manifest.get("manifest_hash") != manifest.manifest_hash:
                 raise ValueError("package manifest hash does not match current room")
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
-            return InstallState("install_needed", manifest.manifest_hash, reason=f"installed package validation failed: {error}")
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, f"installed package validation failed: {error}")
         if adapter_state != "applied" and not (adapter_state == "manual_action_required" and windows_confirmed):
             return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
         return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option)

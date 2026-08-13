@@ -14,9 +14,11 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from physical_options import (
+    DEATH_LINK_MODES,
     PHYSICAL_OPTION_KEYS,
     physical_location_ids,
     physical_signature,
+    project_room_config,
     project_map_config,
 )
 from tools.decls.devinv_builder import build_devinv_loadout, output_path_for_map
@@ -32,6 +34,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "starting_inventory_v1",
     "starting_weapon_v1",
     "physical_options_v1",
+    "room_options_v1",
 })
 CLIENT_CONFIG_FIELDS = frozenset({
     "steam_remote_dir",
@@ -83,6 +86,17 @@ class RoomSnapshot:
         for key in PHYSICAL_OPTION_KEYS:
             if not isinstance(slot_data.get(key), bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
+        for key in ("death_link", "start_with_automap"):
+            if key in slot_data and not isinstance(slot_data[key], bool):
+                raise ValueError(f"Connected.slot_data.{key} must be boolean")
+        if "death_link_mode" in slot_data and (
+            not isinstance(slot_data["death_link_mode"], str)
+            or slot_data["death_link_mode"] not in DEATH_LINK_MODES
+        ):
+            raise ValueError(
+                "Connected.slot_data.death_link_mode must be one of "
+                + ", ".join(sorted(DEATH_LINK_MODES))
+            )
 
         def locations(field: str) -> tuple[int, ...]:
             values = connected.get(field)
@@ -149,6 +163,7 @@ class SeedManifest:
             normalized_options.setdefault(key, False)
             if not isinstance(normalized_options[key], bool):
                 raise ValueError(f"manifest option {key} must be boolean")
+        project_room_config(normalized_options)
         if "starting_inventory" in normalized_options:
             inventory = normalized_options["starting_inventory"]
             if not isinstance(inventory, dict):
@@ -160,6 +175,7 @@ class SeedManifest:
             raise ValueError("manifest starting_weapon must be string or null")
         required_capabilities = {"room_mod_v1"}
         required_capabilities.add("physical_options_v1")
+        required_capabilities.add("room_options_v1")
         if normalized_options.get("randomize_dash"):
             required_capabilities.add("randomize_dash_v1")
         if normalized_options.get("starting_inventory"):
@@ -225,6 +241,9 @@ class SeedManifest:
             options={
                 "randomize_dash": slot_data["randomize_dash"],
                 **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
+                "death_link": slot_data.get("death_link", False),
+                "death_link_mode": slot_data.get("death_link_mode", "soft"),
+                "start_with_automap": slot_data.get("start_with_automap", False),
                 **({"starting_inventory": slot_data["starting_inventory"]} if "starting_inventory" in slot_data else {}),
                 **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
             },
@@ -287,6 +306,7 @@ class RoomModPackageBuilder:
         destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
         temporary = destination.with_name(f".{destination.name}.incoming")
         seed_document = manifest.document()
+        room_config = project_room_config(manifest.options)
         receipt = {
             "schema": 1,
             "manifest_hash": manifest.manifest_hash,
@@ -296,6 +316,7 @@ class RoomModPackageBuilder:
             "template_sha256": template_entry["sha256"],
             "starting_inventory": manifest.options.get("starting_inventory", {}),
             "starting_weapon": manifest.options.get("starting_weapon"),
+            "room_config": room_config,
         }
         devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY
@@ -313,10 +334,11 @@ class RoomModPackageBuilder:
                 if path.is_absolute() or ".." in path.parts or info.filename in seen:
                     raise ValueError(f"unsafe or duplicate template member: {info.filename}")
                 seen.add(info.filename)
-                if info.filename in {"seed_manifest.json", "seed_receipt.json", devinv_path}:
+                if info.filename in {"room_config.json", "seed_manifest.json", "seed_receipt.json", devinv_path}:
                     continue
                 output.writestr(info, source.read(info))
             output.writestr(devinv_path, devinv_source)
+            output.writestr("room_config.json", json.dumps(room_config, indent=2, sort_keys=True) + "\n")
             output.writestr("seed_manifest.json", json.dumps(seed_document, indent=2, sort_keys=True) + "\n")
             output.writestr("seed_receipt.json", json.dumps(receipt, indent=2, sort_keys=True) + "\n")
         os.replace(temporary, destination)
@@ -468,8 +490,12 @@ class ModCompiler:
 
     def compile(self, manifest: SeedManifest, output_root: Path) -> Path:
         output_root.mkdir(parents=True, exist_ok=True)
+        room_config = project_room_config(manifest.options)
         (output_root / "seed_manifest.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (output_root / "room_config.json").write_text(
+            json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         for map_key in ("e1m1_intro", "e1m2_war"):
             package = self.root / f"content/maps/{map_key}"

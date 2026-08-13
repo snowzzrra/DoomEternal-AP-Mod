@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import uuid
+from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
 
@@ -20,7 +21,17 @@ from launcher_integration import (
     IntegratedSetupRecord,
     RoomSetupCoordinator,
 )
-from launcher_platform import SteamInstallationLocator
+from launcher_doctor import LauncherDoctor, DoctorReport, write_support_bundle
+from launcher_platform import (
+    SteamInstallationLocator,
+    detect_doom_processes,
+    launch_doom_via_steam,
+    launcher_user_paths,
+    migrate_legacy_launcher_data,
+    read_handshake_probe,
+    validate_game_root,
+    validate_save_directory,
+)
 from launcher_supervisor import BridgeSupervisor
 from options_foundation import load_options_schema, save_player_yaml
 
@@ -47,9 +58,13 @@ class LauncherController:
         self.application_dir = (application_dir or application_directory()).resolve()
         packaged_client = self.application_dir / "client"
         self.client_dir = packaged_client if packaged_client.is_dir() else self.application_dir
-        self.state_dir = self.application_dir / "launcher-data"
+        self.user_paths = launcher_user_paths()
+        migrate_legacy_launcher_data(self.application_dir / "launcher-data", self.user_paths)
+        self.state_dir = self.user_paths.state_dir
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        self.config_path = self.state_dir / "launcher.json"
+        self.user_paths.config_dir.mkdir(parents=True, exist_ok=True)
+        self.user_paths.data_dir.mkdir(parents=True, exist_ok=True)
+        self.config_path = self.user_paths.config_dir / "launcher.json"
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.config = self._load_config()
         self.options_schema = load_options_schema(
@@ -81,13 +96,13 @@ class LauncherController:
             try:
                 value = json.loads(self.config_path.read_text(encoding="utf-8"))
                 if isinstance(value, dict):
+                    value.pop("password", None)
                     return value
             except (OSError, json.JSONDecodeError):
                 pass
         return {}
 
-    def save_config(self, updates: dict[str, object]) -> None:
-        self.config.update(updates)
+    def _persist_config(self) -> None:
         self.config.pop("password", None)
         temporary = self.config_path.with_suffix(".tmp")
         temporary.write_text(
@@ -95,6 +110,10 @@ class LauncherController:
             encoding="utf-8",
         )
         os.replace(temporary, self.config_path)
+
+    def save_config(self, updates: dict[str, object]) -> None:
+        self.config.update(updates)
+        self._persist_config()
         LaunchWorkflow.write_client_config(
             self.client_dir,
             runtime_config=self.config,
@@ -103,6 +122,7 @@ class LauncherController:
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
         installations = SteamInstallationLocator().discover()
+        found["game_discovery"] = asdict(SteamInstallationLocator().discover_sentinel())
         if len(installations) == 1:
             installation = installations[0]
             found["game_root"] = str(installation.game_root)
@@ -140,11 +160,44 @@ class LauncherController:
         elif len(unique_remote) > 1:
             found["ambiguous_steam_remote_dirs"] = [str(path) for path in unique_remote]
         self.config = {**self.config, **found}
+        self._persist_config()
         LaunchWorkflow.write_client_config(
             self.client_dir,
             runtime_config=self.config,
         )
         return found
+
+    def game_processes(self) -> tuple[dict[str, object], ...]:
+        """Return bounded facts for supported game/client processes."""
+        return detect_doom_processes()
+
+    def is_game_running(self) -> bool:
+        return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
+
+    def launch_game(self) -> str:
+        """Launch through Steam URL handler; never execute game binary."""
+        url = launch_doom_via_steam()
+        self.emit("steam_launch_requested", url=url)
+        return url
+
+    def probe_handshake(self) -> dict[str, object]:
+        base = self.config.get("doom_base_dir")
+        if not base:
+            result = {"status": "unavailable", "reason": "DOOM Eternal base directory is not configured"}
+        else:
+            result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
+        self.emit("handshake_probe", **result)
+        return dict(result)
+
+    def run_doctor(self) -> DoctorReport:
+        report = LauncherDoctor(config=self.config, paths=self.user_paths).run()
+        self.emit("doctor_report", report=report.document())
+        return report
+
+    def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
+        bundle = write_support_bundle(destination, self.run_doctor(), logs=logs or [])
+        self.emit("support_bundle_ready", path=str(bundle))
+        return bundle
 
     def emit(self, kind: str, **payload: object) -> None:
         self.events.put({"type": kind, **payload})
@@ -297,12 +350,11 @@ class LauncherController:
     ) -> None:
         if not endpoint.strip() or not slot.strip():
             raise ValueError("server address and slot are required")
-        game = Path(game_root).expanduser().resolve()
-        saves = Path(saves_root).expanduser().resolve()
-        if not (game / "DOOMEternalx64vk.exe").is_file() or not (game / "base").is_dir():
-            raise ValueError("select the DOOM Eternal directory containing DOOMEternalx64vk.exe")
-        if not saves.is_dir():
-            raise ValueError("select the DOOM Eternal save base directory")
+        try:
+            game = validate_game_root(Path(game_root))
+            saves = validate_save_directory(Path(saves_root))
+        except ValueError as error:
+            raise ValueError(str(error)) from error
         self.save_config(
             {
                 "server_address": endpoint.strip(),

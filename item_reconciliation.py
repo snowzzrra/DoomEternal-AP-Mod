@@ -382,6 +382,14 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     normalized["bootstrap"] = bootstrap
     if not isinstance(normalized.get("save_slot_observations"), Mapping):
         normalized["save_slot_observations"] = {}
+    cleanup = normalized.get("automap_cleanup")
+    if not isinstance(cleanup, Mapping):
+        cleanup = {}
+    normalized["automap_cleanup"] = {
+        str(key): int(value)
+        for key, value in cleanup.items()
+        if str(key) and isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    }
     if "goal_sent" in normalized and not isinstance(normalized["goal_sent"], bool):
         normalized["goal_sent"] = False
     if "cultist_autosave_path" in normalized and not (

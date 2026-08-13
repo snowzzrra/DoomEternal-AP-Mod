@@ -46,6 +46,18 @@ class ReceiveResult:
     detail: str
 
 
+@dataclass(frozen=True)
+class DeathLinkInstrumentation:
+    """Structured evidence for one receiver decision."""
+
+    event_id: str | None
+    state: ReceiveState | None
+    detail: str
+    attempts: int
+    deliveries: int
+    timestamp: float
+
+
 class DeathLinkReceiver:
     """Bounded logical events with one observable spool command in flight."""
 
@@ -59,6 +71,7 @@ class DeathLinkReceiver:
         late_suppression_grace: float = 15.0,
         max_attempts: int = 3,
         max_queue: int = 4,
+        mode: str = "soft",
     ):
         limits = (wait_timeout, confirm_timeout, retry_interval, total_timeout, late_suppression_grace)
         if any(value <= 0 for value in limits) or max_attempts < 1 or max_queue < 1:
@@ -68,12 +81,66 @@ class DeathLinkReceiver:
         self.retry_interval = retry_interval
         self.total_timeout = total_timeout
         self.late_suppression_grace = late_suppression_grace
-        self.max_attempts = max_attempts
+        if max_attempts < 1:
+            raise ValueError("invalid DeathLink receiver limits")
+        self.mode = self._validate_mode(mode)
+        self.max_attempts: int | None = 1 if self.mode == "soft" else None
         self.max_queue = max_queue
         self._queue: deque[ReceivedDeathLink] = deque()
         self._recent: dict[str, float] = {}
         self._suppression_event_id: str | None = None
         self._late_suppression: tuple[str, float] | None = None
+        self._instrumentation: deque[DeathLinkInstrumentation] = deque(maxlen=128)
+
+    @staticmethod
+    def _validate_mode(mode: str) -> str:
+        if mode not in {"soft", "hardcore"}:
+            raise ValueError("DeathLink mode must be soft or hardcore")
+        return mode
+
+    @property
+    def instrumentation(self) -> tuple[DeathLinkInstrumentation, ...]:
+        return tuple(self._instrumentation)
+
+    def instrumentation_dicts(self) -> tuple[dict[str, object], ...]:
+        """Return bounded JSON-compatible receiver evidence."""
+        return tuple(
+            {
+                "event_id": entry.event_id,
+                "state": entry.state.value if entry.state else None,
+                "detail": entry.detail,
+                "attempts": entry.attempts,
+                "deliveries": entry.deliveries,
+                "timestamp": entry.timestamp,
+            }
+            for entry in self._instrumentation
+        )
+
+    def configure_mode(self, mode: str) -> None:
+        """Apply slot mode before accepting events; pending work is unchanged."""
+        self.mode = self._validate_mode(mode)
+        # Hardcore keeps same event eligible for retry until total deadline.
+        self.max_attempts = 1 if self.mode == "soft" else None
+
+    def _result(
+        self,
+        event_id: str | None,
+        state: ReceiveState | None,
+        detail: str,
+        now: float,
+    ) -> ReceiveResult:
+        event = self.active if event_id and self.active and self.active.event_id == event_id else None
+        self._instrumentation.append(
+            DeathLinkInstrumentation(
+                event_id=event_id,
+                state=state,
+                detail=detail,
+                attempts=event.attempts if event else 0,
+                deliveries=event.deliveries if event else 0,
+                timestamp=now,
+            )
+        )
+        return ReceiveResult(event_id, state, detail)
 
     @property
     def active(self) -> ReceivedDeathLink | None:
@@ -92,10 +159,10 @@ class DeathLinkReceiver:
             raise ValueError("DeathLink event_id is required")
         self._prune_recent(now)
         if event_id in self._recent or event_id in self.queued_event_ids:
-            return ReceiveResult(event_id, None, "duplicate")
+            return self._result(event_id, None, "duplicate", now)
         self._recent[event_id] = now + self.total_timeout + self.late_suppression_grace
         if len(self._queue) >= self.max_queue:
-            return ReceiveResult(event_id, ReceiveState.FAILED, "queue_full")
+            return self._result(event_id, ReceiveState.FAILED, "queue_full", now)
         event = ReceivedDeathLink(
             event_id=event_id,
             state=ReceiveState.RECEIVED,
@@ -103,7 +170,7 @@ class DeathLinkReceiver:
             next_attempt_at=now,
         )
         self._queue.append(event)
-        return ReceiveResult(event_id, event.state, "queued")
+        return self._result(event_id, event.state, "queued", now)
 
     def advance(
         self,
@@ -115,7 +182,7 @@ class DeathLinkReceiver:
     ) -> ReceiveResult:
         event = self.active
         if event is None:
-            return ReceiveResult(None, None, "idle")
+            return self._result(None, None, "idle", now)
         if now >= event.total_deadline:
             return self._finish(ReceiveState.EXPIRED, "total_timeout", now=now, allow_late_suppression=True)
         if event.state is ReceiveState.RECEIVED:
@@ -125,34 +192,34 @@ class DeathLinkReceiver:
         in_flight = command_in_flight()
         if event.state is ReceiveState.COMMAND_IN_FLIGHT:
             if in_flight:
-                return ReceiveResult(event.event_id, event.state, "awaiting_delivery")
+                return self._result(event.event_id, event.state, "awaiting_delivery", now)
             event.deliveries += 1
             event.state = ReceiveState.AWAITING_CONFIRMATION
             event.confirmation_deadline = now + self.confirm_timeout
             self._suppression_event_id = event.event_id
-            return ReceiveResult(event.event_id, event.state, "delivered")
+            return self._result(event.event_id, event.state, "delivered", now)
 
         if event.state is ReceiveState.AWAITING_CONFIRMATION:
             if event.confirmation_deadline is not None and now < event.confirmation_deadline:
-                return ReceiveResult(event.event_id, event.state, "awaiting_confirmation")
-            if event.attempts >= self.max_attempts:
+                return self._result(event.event_id, event.state, "awaiting_confirmation", now)
+            if self.max_attempts is not None and event.attempts >= self.max_attempts:
                 return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
             event.state = ReceiveState.WAITING_FOR_RETRY
             event.next_attempt_at = now + self.retry_interval
-            return ReceiveResult(event.event_id, event.state, "retry_scheduled")
+            return self._result(event.event_id, event.state, "retry_scheduled", now)
 
         if in_flight:
             if event.attempts:
                 event.state = ReceiveState.COMMAND_IN_FLIGHT
-                return ReceiveResult(event.event_id, event.state, "awaiting_delivery")
+                return self._result(event.event_id, event.state, "awaiting_delivery", now)
             # A timed-out predecessor may still be owned by the consumer. Never
             # adopt or delete that .processing file for this newer event.
-            return ReceiveResult(event.event_id, event.state, "foreign_command_in_flight")
+            return self._result(event.event_id, event.state, "foreign_command_in_flight", now)
         if not safe_gameplay:
-            return ReceiveResult(event.event_id, event.state, "unsafe_gameplay")
+            return self._result(event.event_id, event.state, "unsafe_gameplay", now)
         if now < event.next_attempt_at:
-            return ReceiveResult(event.event_id, event.state, "retry_interval")
-        if event.attempts >= self.max_attempts:
+            return self._result(event.event_id, event.state, "retry_interval", now)
+        if self.max_attempts is not None and event.attempts >= self.max_attempts:
             return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
         try:
             accepted = dispatch()
@@ -161,11 +228,13 @@ class DeathLinkReceiver:
         if not accepted:
             event.state = ReceiveState.WAITING_FOR_RETRY
             event.next_attempt_at = now + self.retry_interval
-            return ReceiveResult(event.event_id, event.state, "rpc_not_accepted")
+            if self.mode == "soft":
+                return self._finish(ReceiveState.FAILED, "rpc_not_accepted", now=now)
+            return self._result(event.event_id, event.state, "rpc_not_accepted", now)
         event.attempts += 1
         event.state = ReceiveState.COMMAND_IN_FLIGHT
         self._suppression_event_id = event.event_id
-        return ReceiveResult(event.event_id, event.state, "dispatched")
+        return self._result(event.event_id, event.state, "dispatched", now)
 
     def confirm_local_death(self, now: float) -> ReceiveResult:
         event = self.active
@@ -178,8 +247,8 @@ class DeathLinkReceiver:
                 # Timeout policy: suppress one death arriving shortly after a delivered
                 # kill. This can suppress a coincidental local death during the bounded
                 # grace window, but prevents a late DeathLink kill from echoing.
-                return ReceiveResult(event_id, ReceiveState.CONFIRMED, "late_echo_suppressed")
-        return ReceiveResult(None, None, "not_linked")
+                return self._result(event_id, ReceiveState.CONFIRMED, "late_echo_suppressed", now)
+        return self._result(None, None, "not_linked", now)
 
     def abandon(self, now: float) -> tuple[str, ...]:
         """Clear room-bound work while retaining bounded suppression for an in-flight kill."""
@@ -209,6 +278,16 @@ class DeathLinkReceiver:
             self._late_suppression = (event.event_id, now + self.late_suppression_grace)
         if self._suppression_event_id == event.event_id:
             self._suppression_event_id = None
+        self._instrumentation.append(
+            DeathLinkInstrumentation(
+                event_id=event.event_id,
+                state=state,
+                detail=detail,
+                attempts=event.attempts,
+                deliveries=event.deliveries,
+                timestamp=now,
+            )
+        )
         return ReceiveResult(event.event_id, state, detail)
 
     def _prune_recent(self, now: float) -> None:
