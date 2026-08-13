@@ -130,7 +130,7 @@
       "target_chain": [],
       "vanilla_reward": "propitem/mastery_token/weapon",
       "decision": "include",
-      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+      "reason": "physical Mastery Token represented by an AP pickup"
     },
     {
       "entity": "pickups_progress_cheats_confetti_instagib_1",

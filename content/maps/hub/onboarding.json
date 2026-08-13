@@ -162,7 +162,7 @@
           "gates": [
             "sentinel_battery_room_target_relay_item_used3"
           ],
-          "conditional_pickup_behavior": "native selection owner removed; targetless item-used relay fires before one-shot AP event; earliest AP access is Visit 2 after cumulative Battery count 5"
+          "conditional_pickup_behavior": "targetless item-used relay fires before the AP event; earliest AP access is Visit 2 after cumulative Battery count 5"
         },
         {
           "entity": "sentinel_battery_room_progress_mod_bot_4",
@@ -203,7 +203,7 @@
           "gates": [
             "sentinel_battery_room_target_relay_item_used"
           ],
-          "conditional_pickup_behavior": "native selection owner removed; targetless item-used relay fires before one-shot AP event; earliest AP access is Visit 2 after cumulative Battery count 7"
+          "conditional_pickup_behavior": "targetless item-used relay fires before the AP event; earliest AP access is Visit 2 after cumulative Battery count 7"
         },
         {
           "entity": "progress_praetor_token_3",
@@ -330,7 +330,7 @@
           "gates": [
             "target_relay_1"
           ],
-          "conditional_pickup_behavior": "unlayered persistent Fortress secret; native ownership reward removed; door/marker targets preserved; earliest AP access is Visit 2 after cumulative Battery count 15"
+          "conditional_pickup_behavior": "unlayered persistent Fortress secret with active door and marker targets; earliest AP access is Visit 2 after cumulative Battery count 15"
         },
         {
           "entity": "pickup_weapon_gauss_rifle_hub_1",
@@ -385,7 +385,7 @@
           "gates": [
             "target_relay_pickup_ballista"
           ],
-          "conditional_pickup_behavior": "from_e1m4 only; direct and nested Ballista grants removed; objective relay preserved before AP event"
+          "conditional_pickup_behavior": "from_e1m4 only; objective relay fires before the AP event"
         },
         {
           "entity": "progress_cheats_fully_upgraded_progression_wheel_final",
@@ -426,7 +426,7 @@
           "gates": [
             "target_relay_close_doors_remove_secret"
           ],
-          "conditional_pickup_behavior": "unlayered persistent Fortress secret; native ownership reward removed; door/marker targets preserved; earliest AP access is Visit 2 after cumulative Battery count 17"
+          "conditional_pickup_behavior": "unlayered persistent Fortress secret with active door and marker targets; earliest AP access is Visit 2 after cumulative Battery count 17"
         }
       ]
     }

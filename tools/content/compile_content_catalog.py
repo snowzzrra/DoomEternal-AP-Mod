@@ -1,8 +1,4 @@
-"""Compile the normalized content catalog into the sibling APWorld.
-
-The generated module is intentionally boring Python so Archipelago never needs
-to import the mod repository at runtime.  ``--check`` is suitable for CI.
-"""
+"""Compile the normalized content catalog into a standalone APWorld module."""
 
 from __future__ import annotations
 
@@ -20,8 +16,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     physical = [item for item in catalog.physical_locations if selected_map in (None, item.map_key)]
     if selected_map is not None and selected_map not in catalog.maps:
         raise ValueError(f"unknown map key: {selected_map}")
-    # A full APWorld table must remain complete. --map is a validation/filter
-    # selector for catalog discovery, not a partial generated module.
+    # --map narrows catalog discovery while output remains a complete APWorld table.
     if selected_map is not None:
         physical = list(catalog.physical_locations)
     rows: list[tuple[str, int | None, str]] = [

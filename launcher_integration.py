@@ -307,6 +307,16 @@ class IntegratedLaunchWorkflow:
             steam_launch_option=steam_option,
             steam_launch_option_diff=steam_diff,
         )
+        actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
+        if actual_hash != record.staged_sha256:
+            raise RuntimeError("post-install room mod hash validation failed")
+        try:
+            with zipfile.ZipFile(staged) as package:
+                installed_manifest = json.loads(package.read("seed_manifest.json"))
+            if installed_manifest.get("manifest_hash") != manifest.manifest_hash:
+                raise ValueError("room identity differs")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
+            raise RuntimeError(f"post-install room mod validation failed: {error}") from error
         payload = {
             **asdict(record),
             "endpoint": endpoint,

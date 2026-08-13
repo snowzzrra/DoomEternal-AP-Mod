@@ -32,6 +32,12 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_Count", "inherit": "target/relay", "required_fields": ["count", "targets"], "forbidden_fields": ["commandText", "currencyList", "gameStat"]},
             "targets": ["parameterized"], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "hub", "e1m3_cult"], "allowed_in_release": True, "frozen": True,
         },
+        "fast_travel_unlock": {
+            "family": "native_fast_travel", "status": "runtime_verified",
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "fast_travel_target_fast_travel_unlock_1", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
+            "shape": {"class": "idTarget_FastTravelUnlock", "inherit": "target/fast_travel_unlock", "required_fields": ["spawnPosition"], "forbidden_fields": ["commandText", "targets", "currencyList", "gameStat"]},
+            "targets": [], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "e1m3_cult", "e1m4_boss", "e2m1_nest", "e2m2_base", "e2m3_core", "e2m4_boss", "e3m1_slayer", "e3m2_hell", "e3m2_hell_b", "e3m3_maykr", "e3m4_boss"], "allowed_in_release": True, "frozen": True,
+        },
         "currency_grant_direct": {
             "family": "currency", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m2_battle/e1m2_battle", "container": "e1m2_battle_patch3.resources", "file": "vanillamaps/e1m2_war.map", "entity": "tutorial_target_give_item_weapon_points; direct AP topology runtime-PASS", "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65"},
@@ -293,6 +299,25 @@ def build_primitive(
 \t\t\t\t\tcurrencyType = "{currency}";
 \t\t\t\t\tcount = {count};
 \t\t\t\t}}
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+'''
+    elif primitive_id == "fast_travel_unlock":
+        if set(parameters) != {"x", "y", "z"}:
+            raise ValueError("fast_travel_unlock requires x, y, and z")
+        if not all(isinstance(parameters[key], (int, float)) for key in ("x", "y", "z")):
+            raise ValueError("fast_travel_unlock coordinates must be numeric")
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tflags = {{
+\t\t\t\tnoFlood = true;
+\t\t\t}}
+\t\t\tspawnPosition = {{
+\t\t\t\tx = {parameters["x"]};
+\t\t\t\ty = {parameters["y"]};
+\t\t\t\tz = {parameters["z"]};
 \t\t\t}}
 \t\t}}
 \t}}

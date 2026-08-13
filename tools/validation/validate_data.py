@@ -603,7 +603,9 @@ def validate_automap_prototypes_only() -> list[str]:
                     "target_policies", {}
                 ).get(entity_name, {}).get("independent_visual") or config.get(
                     "target_policies", {}
-                ).get(entity_name, {}).get("native_entity_contract") is not None:
+                ).get(entity_name, {}).get("native_entity_contract") is not None or config.get(
+                    "target_policies", {}
+                ).get(entity_name, {}).get("preserve_original_visual"):
                     continue
                 bounds = find_entity_block_bounds(generated, entity_name)
                 if bounds is None:

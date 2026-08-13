@@ -13,7 +13,7 @@ from item_classification import (
     notification_style_for_item,
 )
 
-# Any entityDef in this namespace is a forbidden legacy receipt root.
+# Receipt namespace recognized by package validation.
 RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
 NOTIFICATION_RE = re.compile(
     r"entityDef ap_notify_item_((?:major|filler)_\d+(?:_\d+)?_[ab]) \{"
@@ -112,8 +112,9 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
 
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("client identity notification capability diverges from build mode")
-    if capability(manifest_path) is not enabled:
-        raise AssertionError("release manifest notification capability diverges from build mode")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
+        raise AssertionError("release manifest must contain one version field")
     bridge = (client_dir / "bridge_client.py").read_text(encoding="utf-8")
     if "bridge_identity.json" not in bridge or "receipt=ENABLE_ITEM_NOTIFICATIONS" not in bridge:
         raise AssertionError("packaged bridge lacks capability-gated receipt routing")

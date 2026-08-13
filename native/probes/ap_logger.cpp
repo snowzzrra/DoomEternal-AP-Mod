@@ -30,10 +30,8 @@ void LogWarn(const char* msg)  { Log("WARN ", msg); }
 void LogError(const char* msg) { Log("ERROR", msg); }
 
 // -----------------------------------------------------------------------
-// Probe: attempt a real call to confirm that the RPC is functional.
-// m_Initialized only says that the constructor connected to the named pipe.
-// It does not guarantee that the game is ready to receive calls.
-// Use SEH (__try/__except) to catch access violations without crashing.
+// Probe a live RPC call after the constructor connects to the named pipe.
+// SEH (__try/__except) contains access violations inside the readiness check.
 // -----------------------------------------------------------------------
 
 bool ProbeRPC(MeathookInterface* mh) {

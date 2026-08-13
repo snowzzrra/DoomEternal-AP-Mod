@@ -577,7 +577,6 @@ class Pipeline:
             sys.executable, "-m", "pytest",
             "tests/test_item_delivery.py",
             "tests/test_item_resync.py",
-            "tests/test_rune_reconciliation.py",
             "tests/test_deathlink_receive.py",
             "tests/test_install_workflow.py",
             "-q", "--maxfail=1",

@@ -204,7 +204,7 @@
         }
       ],
       "default": "combat_shotgun",
-      "description": "Choose the weapon you start with. Random selects one eligible weapon when the seed is generated. The selected weapon is removed from the item pool.",
+      "description": "Choose the weapon you start with. Random selects one eligible weapon when the seed is generated. That weapon belongs to your starting inventory.",
       "display_name": "Starting Weapon",
       "group": "Game Options",
       "key": "starting_weapon",
@@ -232,5 +232,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "73d0d91a7409f5720869294660a9185b3d29e5b08a80615bc5714da4c0349190"
+  "source_sha256": "b74ebae585b0fb6ad485f01ad9d04055ffd8e203746c6d1dc4c17de33c4a493c"
 }

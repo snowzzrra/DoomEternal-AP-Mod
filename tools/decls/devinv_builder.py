@@ -25,8 +25,7 @@ PAGE_STATS_BLOCK = """\t\tstatsToGive = {
 \t\t}
 """
 
-# This is the hash-locked retail E1M1 loadout.  Keep source in this module so
-# room/package generation never depends on a local vanilla_decls checkout.
+# Hash-locked retail E1M1 loadout used by room and package generation.
 CANONICAL_BASE = """{
 \tedit = {
 \t\tstartingInventory = {
@@ -90,7 +89,7 @@ STARTING_WEAPON_NAMES = frozenset({
     "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Super Shotgun", "Ballista", "Chaingun", "Combat Shotgun",
 })
 
-# Expected vanilla markers that must exist before patching
+# Retail source markers required by the patcher.
 REQUIRED_MARKERS = frozenset({
     "clearAllBeforeApply",
     "currencyToGive",
@@ -98,7 +97,7 @@ REQUIRED_MARKERS = frozenset({
     "CURRENCY_PRAETOR_UPGRADE",
 })
 
-# Must NOT appear in the vanilla source (not already patched)
+# Markers introduced by the generated room loadout.
 FORBIDDEN_MARKERS = frozenset({
     "STAT_SUIT_PAGE_UNLOCKED",
     "statsToGive",
@@ -595,9 +594,14 @@ def main() -> None:
     parser.add_argument("--map-registry", type=Path,
                         default=Path(__file__).resolve().parents[2] / "data" / "map_sources.json")
     parser.add_argument("--map-key", default=OUTPUT_MAP_KEY)
+    parser.add_argument("--slot-data", type=Path,
+                        help="Resolved slot_data JSON containing starting_inventory and starting_weapon")
     args = parser.parse_args()
-
-    override = build_devinv_loadout()
+    slot_data = json.loads(args.slot_data.read_text(encoding="utf-8")) if args.slot_data else {}
+    override = build_devinv_loadout(
+        starting_inventory=slot_data.get("starting_inventory", {}),
+        starting_weapon=slot_data.get("starting_weapon"),
+    )
 
     output_path = output_path_for_map(args.mod_root, args.map_registry, args.map_key)
     output_path.parent.mkdir(parents=True, exist_ok=True)

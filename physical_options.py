@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
+from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
+
 
 PHYSICAL_OPTION_KEYS = (
     "randomize_chainsaw",
@@ -55,7 +57,7 @@ def normalize_physical_options(options: Mapping[str, Any], *, require_all: bool 
 
 
 def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
-    """Project room-wide options without synthesizing native game writers."""
+    """Project room-wide options."""
     death_link = options.get("death_link", False)
     if not isinstance(death_link, bool):
         raise ValueError("room option death_link must be boolean")
@@ -70,17 +72,11 @@ def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
     start_with_automap = options.get("start_with_automap", False)
     if not isinstance(start_with_automap, bool):
         raise ValueError("room option start_with_automap must be boolean")
-    if start_with_automap:
-        raise ValueError(
-            "start_with_automap=true cannot be compiled: verified native Automap "
-            "writer proof is missing"
-        )
-
     return {
         "schema_version": 1,
         "death_link": death_link,
         "death_link_mode": death_link_mode,
-        "start_with_automap": False,
+        "start_with_automap": start_with_automap,
     }
 
 
@@ -99,14 +95,15 @@ def physical_location_ids(options: Mapping[str, Any]) -> set[int]:
 
 
 def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) -> dict[str, Any]:
-    """Remove only false physical-option AP entries from map projection.
-
-    Permanent map controls (including ``remove_entities`` and neutralization
-    fields) are intentionally untouched.
-    """
+    """Project room options onto one map configuration."""
     result = deepcopy(dict(config))
     map_key = result.get("map_key")
     values = normalize_physical_options(options)
+    start_with_automap = options.get("start_with_automap", False)
+    if not isinstance(start_with_automap, bool):
+        raise ValueError("room option start_with_automap must be boolean")
+    if start_with_automap and map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS:
+        result["start_with_automap"] = True
     for key, spec in PHYSICAL_OPTIONS.items():
         if values[key] or spec["map_key"] != map_key:
             continue

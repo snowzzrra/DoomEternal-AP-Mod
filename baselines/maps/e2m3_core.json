@@ -35,20 +35,28 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Canonical region topology assigns public locations and audited campaign graph."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "0.4.0-beta.4: bound Prowler Toy independent trigger collision to authorial pickup clip."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "0.4.0-beta.4: add native Fast Travel unlock entity at supported map activation position."
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "b647b299ef19a0ca5d5e06c5269d9485364ae39b67da25bbd8bf3b38f554249f",
-  "content_revision": "0.4.0-beta.2",
+  "byte_sha256": "8ed8123c8358d9554472490a80266f323c71f9d5356d9c98e968cb14d104114e",
+  "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17063484,
-    "classes": 13744,
-    "entity_count": 13782,
+    "byte_size": 17065808,
+    "classes": 13746,
+    "entity_count": 13784,
     "layers": 6997,
     "targets": 11442,
-    "transforms": 30254,
-    "unique_entity_names": 13745
+    "transforms": 30259,
+    "unique_entity_names": 13747
   },
   "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
   "map_key": "e2m3_core",
@@ -85,6 +93,6 @@
   "publisher_contract_sha256": "5b68333007af515c681165cecb856f15f1ff792282c1e229911eb52faa82bb23",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "7c3bb29edc581611a4394c772a073d776d56251e82b42be1dda92e9830f26824",
-  "semantic_sha256": "e5e97f73e0aef7601af560fd109005450cb3006e2e7aa8d1bc0498fbc5715dff"
+  "scripted_contract_sha256": "9e20200597acdf504372e8108d41ef06c7303e09e74ca4a39d103458e1033f4a",
+  "semantic_sha256": "811911b958bcdf4ff43ad4c69c3cbeaed7e4a69d38c733473b4e99472e60fe88"
 }

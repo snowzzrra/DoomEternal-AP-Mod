@@ -1,9 +1,4 @@
-"""Audited, versioned map-side onboarding actions.
-
-The game consumed dev1 spools while reporting that its inherited entityDef was
-unknown.  Revision 1 is therefore retained only as historical delivery
-evidence; revision 2 deliberately owns a separate spool/state namespace.
-"""
+"""Audited, versioned map-side onboarding actions."""
 
 from collections.abc import Collection
 
@@ -29,10 +24,7 @@ FORBIDDEN_EFFECT_TERMS = (
     "relay", "tutorial", "codex", "checkpoint", "activatelayer", "forcestat",
 )
 
-# The only locally evidenced PlayerStatModifier uses this explicit class and
-# these two fields.  The source's inherit is precisely what dev1 reported as
-# unavailable at runtime, so v2 intentionally instantiates the proven class
-# directly instead of emitting that unavailable entityDef reference.
+# PlayerStatModifier shape proven by local map evidence.
 BOOTSTRAP_STAT_PRIMITIVE = {
     "source": "Tools/kaizo/e3m2_hell_patch2/maps/game/sp/e3m2_hell/e3m2_hell.entities:8213",
     "class": "idTarget_PlayerStatModifier",

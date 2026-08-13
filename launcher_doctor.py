@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
-import tempfile
 import zipfile
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from launcher_platform import (
-    DiscoverySentinel,
     detect_doom_processes,
     redact_secrets,
     validate_game_root,
@@ -25,6 +24,17 @@ class Diagnostic:
     status: str
     message: str
     details: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class RepairAction:
+    """Small, previewable repair limited to launcher-owned state."""
+
+    key: str
+    title: str
+    changes: tuple[str, ...]
+    requires_confirmation: bool = False
+    rollback: str = ""
 
 
 @dataclass(frozen=True)
@@ -70,7 +80,7 @@ def sanitize_support_bundle(document: Mapping[str, object]) -> dict[str, object]
 
 
 def write_support_bundle(destination: Path, report: DoctorReport, *, logs: Sequence[str] = ()) -> Path:
-    """Write only diagnostics and bounded redacted logs; saves are never read."""
+    """Write bounded diagnostics and redacted logs."""
     destination = destination.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = sanitize_support_bundle(report.document())
@@ -90,6 +100,86 @@ class LauncherDoctor:
         self.config = dict(config or {})
         self.paths = paths
 
+    def _state_dir(self) -> Path | None:
+        value = getattr(self.paths, "state_dir", None)
+        return Path(value).expanduser().resolve() if value else None
+
+    def repair_actions(self) -> tuple[RepairAction, ...]:
+        """Offer actions only when launcher receipt proves ownership."""
+        state_dir = self._state_dir()
+        if state_dir is None:
+            return ()
+        receipt_path = state_dir / "launcher_setup.json"
+        if not receipt_path.is_file():
+            return (RepairAction(
+                "reinstall_room_mod", "Install room mod",
+                ("Build and install mod for connected room.",), True,
+                "Installer keeps file backups and verifies installed hash.",
+            ),)
+        try:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict):
+                raise ValueError("record must be an object")
+            staged = Path(str(receipt["staged_mod"])).resolve()
+            digest = str(receipt["staged_sha256"])
+            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            root = Path(str(game_root)).expanduser().resolve()
+            if root.name.casefold() == "base":
+                root = root.parent
+            owned_location = staged.parent == root / "Mods"
+            if not owned_location:
+                raise ValueError("recorded package is outside configured Mods folder")
+            if not staged.is_file():
+                return (RepairAction(
+                    "reinstall_room_mod", "Reinstall missing room mod",
+                    (f"Create launcher-owned package: {staged.name}",), True,
+                    "Installer keeps file backups and verifies installed hash.",
+                ),)
+            actual = hashlib.sha256(staged.read_bytes()).hexdigest()
+            if actual != digest:
+                return (RepairAction(
+                    "reinstall_room_mod", "Reinstall changed room mod",
+                    (f"Replace launcher-owned package: {staged.name}", f"SHA-256: {actual} → {digest}"), True,
+                    "Installer keeps file backups and verifies installed hash.",
+                ),)
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            return (RepairAction(
+                "archive_stale_install_record", "Archive stale install record",
+                (f"Move launcher record to repair backup: {receipt_path.name}",), False,
+                f"Restore {receipt_path.name} from repair backup. ({error})",
+            ),)
+        return ()
+
+    def repair_preview(self) -> tuple[RepairAction, ...]:
+        return self.repair_actions()
+
+    def archive_stale_install_record(self) -> Path:
+        """Move only launcher state receipt into rollback storage."""
+        state_dir = self._state_dir()
+        if state_dir is None:
+            raise ValueError("launcher state directory is unavailable")
+        receipt = state_dir / "launcher_setup.json"
+        if not receipt.is_file():
+            raise ValueError("launcher install record is unavailable")
+        backups = state_dir / "repair-backups"
+        backups.mkdir(parents=True, exist_ok=True)
+        backup = backups / "launcher_setup.json"
+        if backup.exists():
+            raise ValueError("repair backup already exists; restore or remove it first")
+        os.replace(receipt, backup)
+        return backup
+
+    def restore_archived_install_record(self) -> Path:
+        state_dir = self._state_dir()
+        if state_dir is None:
+            raise ValueError("launcher state directory is unavailable")
+        backup = state_dir / "repair-backups" / "launcher_setup.json"
+        receipt = state_dir / "launcher_setup.json"
+        if not backup.is_file() or receipt.exists():
+            raise ValueError("install record rollback is unavailable")
+        os.replace(backup, receipt)
+        return receipt
+
     def run(self) -> DoctorReport:
         checks: list[Diagnostic] = []
         platform_name = "windows" if os.name == "nt" else "linux"
@@ -105,4 +195,12 @@ class LauncherDoctor:
             checks.append(Diagnostic("game", "missing", "DOOM Eternal installation is not configured"))
         checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": list(detect_doom_processes())}))
         checks.append(Diagnostic("config", "ok", "launcher configuration loaded", {"keys": sorted(self.config)}))
+        actions = self.repair_actions()
+        if actions:
+            checks.append(Diagnostic(
+                "room_mod", "invalid", "room mod needs repair",
+                {"actions": [asdict(action) for action in actions]},
+            ))
+        else:
+            checks.append(Diagnostic("room_mod", "ok", "launcher-owned room mod verified"))
         return DoctorReport(self.VERSION, tuple(checks))

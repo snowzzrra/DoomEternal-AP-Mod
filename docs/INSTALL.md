@@ -41,8 +41,7 @@ artifact after verification failure.
 
 YAML is not required for joining. Connected-room options are server-authoritative.
 
-Join only connects the bridge. It does not prepare a package, install or inject
-the mod, or start DOOM Eternal.
+Join connects the prepared room and starts the bridge.
 
 ## Resume
 
@@ -58,8 +57,8 @@ Use **Create YAML** or the **Options** tab for a future room:
 2. Select **Save Player YAML**.
 3. Use saved YAML with Archipelago generation.
 
-Create YAML does not connect to a room or alter an active room. It cannot enable
-features blocked by current runtime capability checks.
+Create YAML writes player options for room generation. Active room options come
+from the server.
 
 ## Prepare and Install
 
@@ -72,8 +71,8 @@ After room connection reports that setup is required, select the explicit
 4. invokes the platform external tool;
 5. reports installation state and any manual action required.
 
-Do not start DOOM Eternal until installation reports success. Launcher never
-starts the game directly; open it through Steam.
+Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
+explicitly through Steam after setup.
 
 ### Windows
 
@@ -85,8 +84,8 @@ starts the game directly; open it through Steam.
 5. Return to launcher and confirm whether installation succeeded.
 6. Start DOOM Eternal through Steam.
 
-EternalModManager has no stable public command-line injector. Launcher cannot
-claim installation merely because its window opened.
+EternalModManager performs the injection through its interactive window. The
+launcher reports success after the workflow confirms completion.
 
 ### Linux / Steam / Proton
 
@@ -112,8 +111,7 @@ WINEDLLOVERRIDES="XINPUT1_3=n,b" %command%
 
 Launcher preserves existing custom arguments and existing
 `WINEDLLOVERRIDES`, keeps one `%command%`, and shows the proposed result. Copy
-the option into DOOM Eternal's Steam **Properties → Launch Options**. Launcher
-does not edit Steam settings directly.
+the option into DOOM Eternal's Steam **Properties → Launch Options**.
 
 ## Stop and resume safely
 
@@ -122,18 +120,32 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Feature limits
 
+Beta.4 campaign contract: `28` Sentinel Battery checks and `13` Battery
+consumers.
+
+### Start With Automap
+
+**Start With Automap** reveals progression-item markers only.
+
+### Fast Travel
+
+Fast Travel uses native replay only for missions already completed by the
+player.
+
 ### DeathLink
 
 When enabled, choose one room mode:
 
-- **Soft:** one received death dispatch; no repeat after the attempt.
-- **Hardcore:** retry received death until confirmed or bounded timeout.
+- **Soft:** one received death applies to its target; normal respawn/checkpoint
+  flow continues.
+- **Hardcore:** received death ignores player extra lives.
 
 ## Diagnostics and support
 
 When available in launcher, run **Doctor** for bounded checks covering platform,
-game installation, processes, and launcher configuration. **Create support
-bundle** exports sanitized diagnostics and bounded logs for troubleshooting.
+game installation, processes, and launcher configuration. **Repair** applies
+only explicit, supported repairs. **Create support bundle** exports sanitized
+diagnostics and bounded logs for troubleshooting.
 Save contents are excluded and secrets are redacted. Review bundle contents
 before sharing.
 

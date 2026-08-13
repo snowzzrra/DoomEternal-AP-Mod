@@ -29,7 +29,7 @@ STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 @dataclass(frozen=True)
 class LauncherUserPaths:
-    """Per-user launcher roots. Values never contain credentials."""
+    """Per-user launcher roots for configuration, state, cache, and logs."""
 
     config_dir: Path
     state_dir: Path
@@ -441,7 +441,7 @@ class LinuxModManagerAdapter:
 
     @staticmethod
     def _configure_first_run(game_root: Path) -> None:
-        """Avoid InjectorShell first-run prompts; never enable game auto-launch."""
+        """Configure InjectorShell for explicit launcher-controlled startup."""
         config = game_root / "EternalModInjector Settings.txt"
         if config.is_file():
             return
@@ -589,7 +589,7 @@ def detect_doom_processes(
     *,
     process_list: Sequence[Sequence[str]] | None = None,
 ) -> tuple[dict[str, object], ...]:
-    """Return bounded process facts; command lines are never exposed."""
+    """Return bounded process facts suitable for diagnostics."""
     rows: list[dict[str, object]] = []
     if process_list is None:
         if os.name == "nt":
@@ -621,7 +621,7 @@ def detect_doom_processes(
 
 
 def launch_doom_via_steam(*, opener: Callable[[str], object] | None = None) -> str:
-    """Open Steam game URL only; never starts executable directly."""
+    """Open DOOM Eternal through its Steam game URL."""
     (opener or webbrowser.open)(STEAM_GAME_URL)
     return STEAM_GAME_URL
 

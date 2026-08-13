@@ -47,11 +47,15 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Canonical region topology assigns public locations and audited campaign graph."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "0.4.0-beta.4: add native Fast Travel unlock entity at supported map activation position."
     }
   ],
   "asset_package_contract_sha256": "ce785644bbfc80f99443669dd8499eeb7ec9f36167985e18b8339867220f39ba",
   "byte_sha256": "98002604105ef896623e1a95f43f0d5a1f7bcddc6522cb61d5129c56e93d0832",
-  "content_revision": "0.4.0-beta.2",
+  "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 143,
     "byte_size": 4311186,

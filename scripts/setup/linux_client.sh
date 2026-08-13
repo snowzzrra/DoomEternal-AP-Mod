@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 AP_PATH="${1:-}"
 
@@ -17,7 +18,7 @@ fi
 "$SCRIPT_DIR/.venv/bin/python" -m pip install --upgrade pip
 "$SCRIPT_DIR/.venv/bin/python" -m pip install \
     -r "$AP_PATH/requirements.txt" \
-    -r "$SCRIPT_DIR/requirements.txt"
+    -r "$REPO_ROOT/requirements.txt"
 
 echo "Client environment created successfully."
 echo "Run $SCRIPT_DIR/run_visual_client_linux.sh next."

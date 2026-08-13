@@ -24,6 +24,10 @@ from item_reconciliation import (
     load_policy_registry,
 )
 from tools.maps.notification_formatting import notification_key
+from tools.maps.start_with_automap import (
+    project_start_with_automap,
+    validate_start_with_automap_projection,
+)
 
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -394,6 +398,7 @@ TARGET_POLICY_CONSUMERS = {
     "no_auto_visual": "generate_map visual branch",
     "preserve_layers": "generate_independent_pickup_trigger",
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
+    "preserve_original_visual": "generate_map original-owner branch",
     "native_entity_contract": "apply_native_entity_contract",
     "checkpoint_cleanup": "apply_checkpoint_cleanup_contract",
 }
@@ -623,12 +628,13 @@ def bind_parent_from_source(policy, block):
         policy["bind_parent"] = bind_match.group(1)
     return policy
 
-def neutralize_conditional_pickup_block(block):
+def neutralize_conditional_pickup_block(block, preserve_original_visual=False):
     """Leave a named vanilla pickup inert without preserving its targets."""
     block = re.sub(r'inherit\s*=\s*"[^"]+";', 'inherit = "info/null";', block, count=1)
     block = re.sub(r'class\s*=\s*"[^"]+";', 'class = "idInfo";', block, count=1)
-    block = remove_property_blocks(block, "renderModelInfo")
-    block = remove_property_blocks(block, "clipModelInfo")
+    if not preserve_original_visual:
+        block = remove_property_blocks(block, "renderModelInfo")
+        block = remove_property_blocks(block, "clipModelInfo")
     for property_name in (
         "useableComponentDecl", "triggerDef", "equipOnPickup", "lootStyle",
         "forceEquip", "canBePossessed",
@@ -637,6 +643,11 @@ def neutralize_conditional_pickup_block(block):
     block = re.sub(
         r'\s*automapPropertiesDecl\s*=\s*(?:"[^"]*"|[^;]+);', "", block
     )
+    if preserve_original_visual:
+        for property_name in ("fxDecl", "thinkComponentDecl"):
+            block = re.sub(
+                rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);', "", block
+            )
     return replace_targets_block(block, [])
 
 
@@ -1586,6 +1597,10 @@ def generate_map(
             / "item_classifications.json"
         )
     map_key = level_config.get("map_key")
+    if not isinstance(map_key, str):
+        raise ValueError("map config requires string map_key")
+    fast_travel_path = Path(__file__).resolve().parents[2] / "data" / "fast_travel.json"
+    fast_travel = json.loads(fast_travel_path.read_text(encoding="utf-8"))
     canonical_visual = canonical_ap_visual_for_map(map_key)
     config_entities = level_config.get("entities", {})
     target_policies = level_config.get("target_policies", {})
@@ -1692,9 +1707,7 @@ def generate_map(
 
     modified_count = 0
     for block in blocks[1:]:
-        # The normalized content contract is the authority.  Inheritance is
-        # deliberately not a gate: any explicitly declared entity can use an
-        # existing strategy, including interactable panels.
+        # Normalized content assigns each declared entity its generation strategy.
         declared_match = re.search(r'entityDef\s+([^\s{]+)', block)
         declared_ap_check = (
             f"AP_CHECK_{declared_match.group(1).strip().upper()}"
@@ -1820,7 +1833,12 @@ def generate_map(
                             )
                         else:
                             new_blocks.append(
-                                "entity {" + neutralize_conditional_pickup_block(block)
+                                "entity {" + neutralize_conditional_pickup_block(
+                                    block,
+                                    preserve_original_visual=target_policy.get(
+                                        "preserve_original_visual", False
+                                    ),
+                                )
                             )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
@@ -1937,6 +1955,14 @@ def generate_map(
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
 
+    map_content = project_start_with_automap(
+        map_content,
+        map_key,
+        bool(level_config.get("start_with_automap", False)),
+    )
+    if level_config.get("start_with_automap", False):
+        validate_start_with_automap_projection(map_content, map_key)
+
     final_content = (
         map_content
         + "\n"
@@ -1950,6 +1976,7 @@ def generate_map(
         )
         + generate_bootstrap_entities()
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
+        + (build_primitive("fast_travel_unlock", "ap_fast_travel_unlock", fast_travel["maps"][map_key]) if map_key in fast_travel["maps"] else "")
     )
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual and modified_count:

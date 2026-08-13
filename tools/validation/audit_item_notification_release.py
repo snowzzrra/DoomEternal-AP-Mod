@@ -141,30 +141,14 @@ def audit_release(
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("bridge_identity notification capability diverges from audit mode")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("item_notifications", {}).get("enabled") is not enabled:
-        raise AssertionError("RELEASE_MANIFEST notification capability diverges from audit mode")
+    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
+        raise AssertionError("RELEASE_MANIFEST must contain one version field")
     _audit_locales(enabled, mod_root)
     classification_path = client_dir / "data" / "item_classifications.json"
     load_item_classification_identity(classification_path)
-    classification_audit = {
-        "schema_version": 1,
-        "sha256": hashlib.sha256(
-            classification_path.read_bytes()
-        ).hexdigest(),
-    }
     records = audit_mod_payload(
         enabled, generated_maps, mod_root, map_registry, decompressor
     )
-    if update_manifest:
-        manifest["item_notification_payload"] = {"maps": records}
-        manifest["item_classification_identity"] = classification_audit
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    elif manifest.get("item_notification_payload", {}).get("maps") != records:
-        raise AssertionError("RELEASE_MANIFEST packaged notifier map audit diverges")
-    elif manifest.get("item_classification_identity") != classification_audit:
-        raise AssertionError(
-            "RELEASE_MANIFEST item classification audit diverges"
-        )
     return records
 
 
@@ -190,6 +174,7 @@ def _extract_playable_zip(
             "doometernal.apworld",
             "README.md",
             "INSTALL.md",
+            "LICENSE",
             "RELEASE_MANIFEST.json",
         }
         roots = {name.split("/", 1)[0] for name in files}
@@ -198,6 +183,7 @@ def _extract_playable_zip(
         required = {
             "README.md",
             "INSTALL.md",
+            "LICENSE",
             "RELEASE_MANIFEST.json",
             "doometernal.apworld",
             "client/resources/mod_templates.zip",

@@ -27,20 +27,24 @@
     {
       "content_revision": "0.4.0-beta.2",
       "reason": "Canonical region topology assigns public locations and audited campaign graph."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "0.4.0-beta.4: add native Fast Travel unlock entity at supported map activation position."
     }
   ],
   "asset_package_contract_sha256": "16ec4530b1b18f7b3aa824d576ef348b756e9dca551c74e0ff48ae1e06b74de7",
-  "byte_sha256": "f38116eea7b620d4f5afb48fad4285687eea17d2a827728fc23b28be24573696",
-  "content_revision": "0.4.0-beta.2",
+  "byte_sha256": "93b89c83b5e00375424f392f209eb3802be96c995533e7475b0b31cfcbe7f56d",
+  "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 226,
-    "byte_size": 11855804,
-    "classes": 11407,
-    "entity_count": 11407,
+    "byte_size": 11856200,
+    "classes": 11408,
+    "entity_count": 11408,
     "layers": 2687,
     "targets": 8671,
-    "transforms": 22863,
-    "unique_entity_names": 11407
+    "transforms": 22864,
+    "unique_entity_names": 11408
   },
   "manifest_sha256": "f927a78a6b9d2e6dbeec77998f45496ddc49513d20ccd4792240ae3f044c444f",
   "map_key": "e1m2_war",
@@ -79,5 +83,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "be073f172eb47dfee1d0d2d0a3cb3e57f1150632420b24356fc9c8a5c422e580",
-  "semantic_sha256": "fc12a5866c922dc68cdad7a8ab6f980ca5a8b7ee48d8da19bf09d04a368b6375"
+  "semantic_sha256": "14dd6b0077742ab7a104e66e3d14d436cebc2a2e3a26d57eeab182e714aea1c9"
 }

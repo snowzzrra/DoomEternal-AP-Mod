@@ -59,20 +59,14 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path):
 
 def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
+        raise AssertionError("RELEASE_MANIFEST must contain one version field")
     bridge = client_dir / "bridge_client.py"
     actual = __import__("hashlib").sha256(bridge.read_bytes()).hexdigest()
-    recorded = manifest.get("mission_bridge", {})
-    if recorded.get("sha256") != actual:
-        raise AssertionError("unpacked bridge SHA diverges from RELEASE_MANIFEST")
-    if recorded.get("revision") != f"mission-unified-{actual[:12]}":
-        raise AssertionError("unpacked bridge revision diverges from RELEASE_MANIFEST")
-    if recorded.get("transition_handler") != "unified":
-        raise AssertionError("RELEASE_MANIFEST does not declare unified transition handler")
-    expected_protocol = manifest.get("content_identity", {}).get("bridge_protocol_version")
-    if recorded.get("protocol") != expected_protocol:
-        raise AssertionError("RELEASE_MANIFEST bridge protocol diverges from content identity")
-    if recorded.get("game") != "DOOM Eternal":
-        raise AssertionError("RELEASE_MANIFEST does not declare current game identity")
+    content_identity = json.loads(
+        (client_dir / "data" / "content_identity.json").read_text(encoding="utf-8")
+    )
+    expected_protocol = content_identity["bridge_protocol_version"]
     identity = json.loads((client_dir / "bridge_identity.json").read_text(encoding="utf-8"))
     if identity.get("protocol") != expected_protocol:
         raise AssertionError("unpacked bridge identity protocol diverges")

@@ -37,6 +37,8 @@ class ReceivedDeathLink:
     confirmation_deadline: float | None = None
     attempts: int = 0
     deliveries: int = 0
+    safe_pauses: int = 0
+    unsafe_pauses: int = 0
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,11 @@ class DeathLinkInstrumentation:
     attempts: int
     deliveries: int
     timestamp: float
+    dispatches: int = 0
+    safe_pauses: int = 0
+    unsafe_pauses: int = 0
+    death_confirmation: bool = False
+    cancel_reason: str | None = None
 
 
 class DeathLinkReceiver:
@@ -112,6 +119,11 @@ class DeathLinkReceiver:
                 "attempts": entry.attempts,
                 "deliveries": entry.deliveries,
                 "timestamp": entry.timestamp,
+                "dispatches": entry.dispatches,
+                "safe_pauses": entry.safe_pauses,
+                "unsafe_pauses": entry.unsafe_pauses,
+                "death_confirmation": entry.death_confirmation,
+                "cancel_reason": entry.cancel_reason,
             }
             for entry in self._instrumentation
         )
@@ -183,7 +195,7 @@ class DeathLinkReceiver:
         event = self.active
         if event is None:
             return self._result(None, None, "idle", now)
-        if now >= event.total_deadline:
+        if self.mode == "soft" and now >= event.total_deadline:
             return self._finish(ReceiveState.EXPIRED, "total_timeout", now=now, allow_late_suppression=True)
         if event.state is ReceiveState.RECEIVED:
             event.state = ReceiveState.WAITING_FOR_SAFE_GAMEPLAY
@@ -202,7 +214,9 @@ class DeathLinkReceiver:
         if event.state is ReceiveState.AWAITING_CONFIRMATION:
             if event.confirmation_deadline is not None and now < event.confirmation_deadline:
                 return self._result(event.event_id, event.state, "awaiting_confirmation", now)
-            if self.max_attempts is not None and event.attempts >= self.max_attempts:
+            if self.mode == "soft" or (
+                self.max_attempts is not None and event.attempts >= self.max_attempts
+            ):
                 return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
             event.state = ReceiveState.WAITING_FOR_RETRY
             event.next_attempt_at = now + self.retry_interval
@@ -212,11 +226,13 @@ class DeathLinkReceiver:
             if event.attempts:
                 event.state = ReceiveState.COMMAND_IN_FLIGHT
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
-            # A timed-out predecessor may still be owned by the consumer. Never
-            # adopt or delete that .processing file for this newer event.
+            # Consumer ownership keeps the existing .processing file bound to
+            # its original event.
             return self._result(event.event_id, event.state, "foreign_command_in_flight", now)
         if not safe_gameplay:
+            event.unsafe_pauses += 1
             return self._result(event.event_id, event.state, "unsafe_gameplay", now)
+        event.safe_pauses += 1
         if now < event.next_attempt_at:
             return self._result(event.event_id, event.state, "retry_interval", now)
         if self.max_attempts is not None and event.attempts >= self.max_attempts:
@@ -250,13 +266,13 @@ class DeathLinkReceiver:
                 return self._result(event_id, ReceiveState.CONFIRMED, "late_echo_suppressed", now)
         return self._result(None, None, "not_linked", now)
 
-    def abandon(self, now: float) -> tuple[str, ...]:
+    def abandon(self, now: float, reason: str = "room_changed") -> tuple[str, ...]:
         """Clear room-bound work while retaining bounded suppression for an in-flight kill."""
         abandoned: list[str] = []
         while self.active is not None:
             result = self._finish(
                 ReceiveState.FAILED,
-                "room_changed",
+                reason,
                 now=now,
                 allow_late_suppression=True,
             )
@@ -286,6 +302,11 @@ class DeathLinkReceiver:
                 attempts=event.attempts,
                 deliveries=event.deliveries,
                 timestamp=now,
+                dispatches=event.attempts,
+                safe_pauses=event.safe_pauses,
+                unsafe_pauses=event.unsafe_pauses,
+                death_confirmation=state is ReceiveState.CONFIRMED,
+                cancel_reason=detail if detail in {"disconnect", "room_changed", "safe_action"} else None,
             )
         )
         return ReceiveResult(event.event_id, state, detail)

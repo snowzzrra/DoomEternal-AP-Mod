@@ -31,7 +31,7 @@ static const char* kQueueSessionNamespacePath = "base\\ap_queue\\active_session_
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "0.4.0-beta.3";
+static const char* kReleaseVersion = "0.4.0-beta.4";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kRpcEntityContractRevision = 3;
 static const int kNativeCommandPolicyRevision = 7;
@@ -1261,9 +1261,8 @@ private:
             "[Mission] MISSION_TRANSITION_TARGET slot=" + activeSlotDirectory_
             + " map=" + canonicalTo
         );
-        // Emit every observed load edge. The Python publisher registry decides
-        // whether the edge is authoritative for zero, one, or many publishers;
-        // a map-side trigger must never disable a native fallback here.
+        // Emit every observed load edge. Python publisher rules assign each
+        // edge to its matching publishers.
         ++sequence_;
         SYSTEMTIME now = {};
         GetSystemTime(&now);
@@ -1423,7 +1422,7 @@ std::optional<std::string> ReceiptCommandNamespace(const std::string& filename) 
     static const std::regex namespaced(R"(^recv-([0-9a-f]{16})-.*\.(cmd|processing)$)");
     std::smatch match;
     if (std::regex_match(filename, match, namespaced)) return match[1].str();
-    if (StartsWith(filename, "recv-")) return std::string(); // legacy/unrecognized receipt
+    if (StartsWith(filename, "recv-")) return std::string(); // unscoped receipt
     return std::nullopt; // generic command
 }
 
@@ -1433,12 +1432,11 @@ void EnsureQueueDirectory(
     const std::optional<std::string>& activeNamespace
 ) {
     CreateDirectoryA(kQueueDirectory, nullptr);
-    // Telemetry is a disposable poll, not a gameplay command. Never recover a
-    // stale condump across a pause, loading screen, crash, or new game session.
+    // Telemetry polls are scoped to the active game session.
     DeleteFileA("base\\ap_queue\\telemetry.cmd");
     DeleteFileA("base\\ap_queue\\telemetry.processing");
 
-    // Recover commands left in-flight if the injector or game was terminated.
+    // Resume gameplay commands owned by the active queue.
     WIN32_FIND_DATAA data = {};
     HANDLE find = FindFirstFileA("base\\ap_queue\\*.processing", &data);
     if (find == INVALID_HANDLE_VALUE) return;

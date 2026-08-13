@@ -1,6 +1,6 @@
 """Minimal command processor surface used by Archipelago CommonClient.
 
-Standalone bridge does not embed Archipelago server implementation.
+Standalone bridge module used by packaged client imports.
 """
 
 from __future__ import annotations

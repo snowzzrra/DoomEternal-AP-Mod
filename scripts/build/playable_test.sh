@@ -244,7 +244,7 @@ rm -rf "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/licenses" \
     "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" \
     "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" \
     "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" \
-    "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/INSTALL.md" \
+    "$OUTPUT_DIR/doometernal.apworld" "$OUTPUT_DIR/README.md" "$OUTPUT_DIR/INSTALL.md" "$OUTPUT_DIR/LICENSE" \
     "$OUTPUT_DIR/RELEASE_MANIFEST.json" "$OUTPUT_DIR/$PTB_ZIP_NAME" \
     "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" \
     "$STALE_DEV_ZIP" \
@@ -415,6 +415,7 @@ PY
 cp "$REPO_ROOT/packaging/EternalMod.json" "$MOD_STAGING_DIR/EternalMod.json"
 cp "$REPO_ROOT/README.md" "$OUTPUT_DIR/README.md"
 cp "$REPO_ROOT/docs/INSTALL.md" "$OUTPUT_DIR/INSTALL.md"
+cp "$REPO_ROOT/docs/LICENSE" "$OUTPUT_DIR/LICENSE"
 cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
     "$REPO_ROOT/deathlink_receive.py" \
@@ -501,21 +502,17 @@ identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
 Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
 PY
 
-TOOLCHAIN_COMPILER="$(distrobox enter doom-cpp -- x86_64-w64-mingw32-g++ --version | head -n 1)"
-
-python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$TOOLCHAIN_COMPILER" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$ENABLE_ITEM_NOTIFICATIONS" <<'PY'
-import hashlib
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$TEMP_DIR/public_files.json" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
-toolchain_compiler = sys.argv[3]
-sys.path.insert(0, sys.argv[4])
+sys.path.insert(0, sys.argv[3])
 from map_registry import load_map_registry, release_plan
 map_manifest_files = [
-    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[5]), authorial=True))
+    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
 ]
 launcher_executable = (
     "DoomEternalArchipelagoLauncher.exe"
@@ -523,21 +520,10 @@ launcher_executable = (
     else "DoomEternalArchipelagoLauncher"
 )
 
-bridge_path = output_dir / "client" / "bridge_client.py"
-client_path = output_dir / "client" / "ap_client.exe"
-bridge_sha256 = hashlib.sha256(bridge_path.read_bytes()).hexdigest()
-client_sha256 = hashlib.sha256(client_path.read_bytes()).hexdigest()
-item_notifications_enabled = sys.argv[6] == "1"
-content_identity = json.loads(
-    (Path(sys.argv[4]) / "data" / "content_identity.json").read_text(encoding="utf-8")
-)
-
-manifest = {
-    "name": "DOOM Eternal Archipelago",
-    "version": release_version,
-    "files": [
+public_files = [
         "README.md",
         "INSTALL.md",
+        "LICENSE",
         "RELEASE_MANIFEST.json",
         "doometernal.apworld",
         "client/ap_client.exe",
@@ -594,37 +580,13 @@ manifest = {
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",
         launcher_executable,
-    ],
-    "ap_client": {
-        "sha256": client_sha256,
-        "size": client_path.stat().st_size,
-        "compiler": toolchain_compiler,
-        "linker_flags": [
-            "-static",
-            "-static-libgcc",
-            "-static-libstdc++",
-            "-lversion",
-        ],
-    },
-    "mission_bridge": {
-        "protocol": content_identity["bridge_protocol_version"],
-        "game": "DOOM Eternal",
-        "sha256": bridge_sha256,
-        "revision": f"mission-unified-{bridge_sha256[:12]}",
-        "transition_handler": "unified",
-    },
-    "content_identity": content_identity,
-    "item_notifications": {
-        "enabled": item_notifications_enabled,
-        "revision": 2,
-        "experimental": False,
-    },
-}
+]
 
 (output_dir / "RELEASE_MANIFEST.json").write_text(
-    json.dumps(manifest, indent=2) + "\n",
+    json.dumps({"version": release_version}, indent=2) + "\n",
     encoding="utf-8",
 )
+Path(sys.argv[5]).write_text(json.dumps(public_files, indent=2) + "\n", encoding="utf-8")
 PY
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
@@ -820,7 +782,7 @@ fi
 (
     cd "$OUTPUT_DIR"
     zip -q -r "${PTB_ZIP_NAME}.tmp" \
-        README.md INSTALL.md RELEASE_MANIFEST.json client doometernal.apworld \
+        README.md INSTALL.md LICENSE RELEASE_MANIFEST.json client doometernal.apworld \
         "$LAUNCHER_EXECUTABLE"
 )
 mv "${OUTPUT_DIR}/${PTB_ZIP_NAME}.tmp" "${OUTPUT_DIR}/${PTB_ZIP_NAME}"
@@ -938,7 +900,7 @@ for package_file in "${PACKAGE_FILES[@]}"; do
 done
 mapfile -t PACKAGE_ROOTS < <(printf '%s\n' "${PACKAGE_ROOTS[@]}" | LC_ALL=C sort)
 mapfile -t EXPECTED_ROOTS < <(printf '%s\n' \
-    "$LAUNCHER_EXECUTABLE" client doometernal.apworld README.md INSTALL.md \
+    "$LAUNCHER_EXECUTABLE" client doometernal.apworld README.md INSTALL.md LICENSE \
     RELEASE_MANIFEST.json | LC_ALL=C sort)
 if [[ "${PACKAGE_ROOTS[*]}" != "${EXPECTED_ROOTS[*]}" ]]; then
     echo "Final ZIP root layout is not exact" >&2
@@ -950,12 +912,12 @@ if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q \
     echo "Final ZIP contains a prohibited external dependency" >&2
     exit 1
 fi
-mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
+mapfile -t ALLOWED_FILES < <(python3 - "$TEMP_DIR/public_files.json" <<'PY'
 import json
 import sys
 
-manifest = json.load(open(sys.argv[1], encoding="utf-8"))
-for name in sorted(set(manifest["files"] + ["doometernal.apworld"])):
+files = json.load(open(sys.argv[1], encoding="utf-8"))
+for name in sorted(set(files + ["doometernal.apworld"])):
     print(name)
 PY
 )

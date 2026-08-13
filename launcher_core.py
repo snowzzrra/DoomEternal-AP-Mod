@@ -608,7 +608,7 @@ class LaunchWorkflow:
 
     @staticmethod
     def client_config_path(client_dir: Path) -> Path:
-        """Resolve config beside native ap_client, never inside launcher-data."""
+        """Resolve config beside native ap_client."""
         candidate = Path(client_dir)
         if candidate.is_file() or candidate.name.casefold() in {"ap_client", "ap_client.exe"}:
             candidate = candidate.parent

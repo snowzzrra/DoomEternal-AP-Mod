@@ -339,12 +339,12 @@
           7770074
         ]
       },
-      "vanilla_class": "idProp2 replaced by independent idTrigger",
+      "vanilla_class": "independent idTrigger",
       "automap_marker_source": null,
       "automap_properties": [],
       "dossier_total_owner": null,
       "collected_state_writer": "AP event only",
-      "reward_edge": "target_give_item_ice_bomb removed",
+      "reward_edge": "AP event ownership",
       "safe_cut": "frozen independent trigger and visual cleanup contract",
       "vanilla_automap": false,
       "vanilla_exploration": false
@@ -355,12 +355,12 @@
           7770056
         ]
       },
-      "vanilla_class": "idProp2 replaced by independent idTrigger",
+      "vanilla_class": "independent idTrigger",
       "automap_marker_source": null,
       "automap_properties": [],
       "dossier_total_owner": null,
       "collected_state_writer": "AP event only",
-      "reward_edge": "original Rocket entity and checkpoint grant removed",
+      "reward_edge": "AP event ownership with checkpoint continuity",
       "safe_cut": "frozen independent trigger with mover-only target graph",
       "vanilla_automap": false,
       "vanilla_exploration": false

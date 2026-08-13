@@ -54,7 +54,7 @@
       "target_chain": [],
       "vanilla_reward": "propitem/mastery_token/weapon",
       "decision": "include",
-      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+      "reason": "physical Mastery Token represented by an AP pickup"
     },
     {
       "entity": "blue_control_tower_progress_cheats_powerup_infinite_berserk_1",
@@ -93,7 +93,7 @@
       "target_chain": [],
       "vanilla_reward": "propitem/mastery_token/weapon",
       "decision": "include",
-      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+      "reason": "physical Mastery Token represented by an AP pickup"
     },
     {
       "entity": "temp_all_scripting_pickup_collectible_toys_khan_maykr_1",
@@ -423,7 +423,7 @@
     "source hash locked and byte-identical to decompressed patch3 owner payload",
     "packagemapspec owner priority proven; lower files-array index wins",
     "all pickup transforms sourced from vanilla entities",
-    "each converted physical reward owner is removed and replaced by one independent AP entity",
+    "each physical reward uses one independent AP entity",
     "Automap remains vanilla and non-public",
     "no functional Slayer Key or Slayer Gate reward candidate exists in the authoritative payload",
     "Mission Complete preserves the exact native transition to Final Sin",

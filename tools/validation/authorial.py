@@ -52,7 +52,7 @@ def check_authorial() -> dict[str, int]:
 
     identity = read_json(ROOT / "data/content_identity.json")
     if set(identity) != set(IDENTITY_FIELDS):
-        raise ValueError("data/content_identity.json fields diverge from beta.3 contract")
+        raise ValueError("data/content_identity.json fields diverge from beta.4 contract")
     for field, expected_type in IDENTITY_FIELDS.items():
         value = identity[field]
         if not isinstance(value, expected_type) or isinstance(value, bool):
@@ -63,8 +63,12 @@ def check_authorial() -> dict[str, int]:
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
     if identity["content_revision"] != identity["release_version"]:
         raise ValueError("data/content_identity.json: content and release revisions diverge")
-    if identity["release_version"] != "0.4.0-beta.3":
+    if identity["release_version"] != "0.4.0-beta.4":
         raise ValueError("data/content_identity.json: invalid beta release revision")
+
+    campaign_goal = read_json(ROOT / "data/campaign_goal_contract.json")
+    if campaign_goal.get("release") != identity["release_version"]:
+        raise ValueError("data/campaign_goal_contract.json: release diverges from content identity")
 
     catalog = load_content_catalog(ROOT)
     location_ids = [location.location_id for location in (*catalog.physical_locations, *catalog.runtime_locations)]

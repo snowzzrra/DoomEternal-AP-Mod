@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import queue
 import html
+import queue
 import re
 from pathlib import Path
-from typing import cast
+from typing import ClassVar, cast
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -17,8 +17,8 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGridLayout,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -29,9 +29,9 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -94,7 +94,7 @@ class NamedRangeControl(QWidget):
 class LauncherUI(QMainWindow):
     """Guided Qt shell; controller events are consumed on Qt main thread."""
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "background": "#0b1016",
         "surface": "#121b25",
         "surface_alt": "#192735",
@@ -126,7 +126,7 @@ class LauncherUI(QMainWindow):
         self.game_root = QLineEdit(str(controller.config.get("game_root", "")))
         self.saves_root = QLineEdit(str(controller.config.get("save_games_dir", "")))
         self.headline = self._label("Configure your game and connect to your room.")
-        self.detail = self._label("We will prepare the mod and never launch DOOM Eternal directly.")
+        self.detail = self._label("The launcher prepares the room mod and opens DOOM Eternal through Steam.")
         self.next_action = "Connect to Archipelago"
         self.overall_state = self._label("READY TO CONFIGURE")
         self._room_connected = False
@@ -139,6 +139,7 @@ class LauncherUI(QMainWindow):
         self.doctor_status = self._label("Run Doctor to check game, launcher, and live bridge evidence.", "muted")
         self.doctor_evidence = self._label("No diagnostic report collected yet.", "muted")
         self.doctor_action = self._label("Action: Run Doctor before requesting support.", "muted")
+        self.repair_actions: dict[str, object] = {}
         self._build()
         self._discover()
         self._timer = QTimer(self)
@@ -484,6 +485,9 @@ class LauncherUI(QMainWindow):
         doctor_actions.addWidget(support)
         doctor_actions.addStretch(1)
         doctor_layout.addLayout(doctor_actions)
+        self.repair_button = QPushButton("Preview repairs")
+        self.repair_button.clicked.connect(self._preview_repairs)
+        doctor_layout.addWidget(self.repair_button, alignment=Qt.AlignmentFlag.AlignLeft)
         doctor_layout.addStretch(1)
         self.session_tabs.addTab(doctor, "Doctor")
         status_layout.addWidget(self.session_tabs, 1)
@@ -498,7 +502,7 @@ class LauncherUI(QMainWindow):
         launch_layout.setContentsMargins(18, 10, 18, 10)
         launch_layout.setColumnStretch(0, 1)
         launch_layout.addWidget(self._label("Steam launch option", "section"), 0, 0, 1, 2)
-        launch_layout.addWidget(self._label("Copy this on Linux; launcher never edits Steam settings.", "muted"), 1, 0, 1, 2)
+        launch_layout.addWidget(self._label("Copy this value into Steam Launch Options on Linux.", "muted"), 1, 0, 1, 2)
         self.launch_option = QLineEdit("Unavailable until setup completes.")
         self.launch_option.setReadOnly(True)
         launch_layout.addWidget(self.launch_option, 2, 0)
@@ -867,6 +871,12 @@ class LauncherUI(QMainWindow):
         elif "Try again" in self.next_action:
             self._retry()
         elif "Prepare" in self.next_action:
+            if QMessageBox.question(
+                self,
+                "Confirm mod update",
+                "Build and install this room mod? Existing launcher-owned files receive backups.",
+            ) != QMessageBox.StandardButton.Yes:
+                return
             try:
                 if not self.controller.prepare_setup():
                     self._append_log("No connected room is available for setup.")
@@ -902,6 +912,12 @@ class LauncherUI(QMainWindow):
             self._append_log("Connect to a room before retrying setup.")
 
     def _reinstall(self) -> None:
+        if QMessageBox.question(
+            self,
+            "Confirm mod reinstall",
+            "Reinstall this room mod? Existing launcher-owned files receive backups.",
+        ) != QMessageBox.StandardButton.Yes:
+            return
         try:
             if not self.controller.reinstall_setup():
                 self._append_log("Connect to a room before reinstalling the mod.")
@@ -964,6 +980,33 @@ class LauncherUI(QMainWindow):
             "Action: " + (needs_action[0] if needs_action else "Installation checks passed. Probe handshake after entering gameplay.")
         )
         self._append_log("Doctor: " + ("clear." if healthy else "action needed."))
+
+    def _preview_repairs(self) -> None:
+        try:
+            actions = self.controller.repair_preview()
+        except Exception as error:
+            self._append_log(f"Repair preview error: {error}")
+            return
+        if not actions:
+            self.doctor_action.setText("Action: No safe repair is needed.")
+            return
+        action = actions[0]
+        changes = "\n".join(f"• {change}" for change in action.changes)
+        prompt = f"{action.title}\n\nChanges:\n{changes}\n\nRollback: {action.rollback}"
+        if action.requires_confirmation:
+            accepted = QMessageBox.question(self, "Confirm repair", prompt) == QMessageBox.StandardButton.Yes
+            if not accepted:
+                return
+        else:
+            accepted = QMessageBox.question(self, "Apply repair", prompt) == QMessageBox.StandardButton.Yes
+            if not accepted:
+                return
+        try:
+            result = self.controller.apply_repair(action.key)
+            self.doctor_action.setText(f"Action: {result}")
+            self._append_log(f"Repair applied: {action.title}")
+        except Exception as error:
+            self._append_log(f"Repair error: {error}")
 
     def _probe_handshake(self) -> None:
         try:

@@ -356,7 +356,7 @@ def accept_map_baseline(
 def generate_frozen_outputs(
     registry_path: Path | None = None,
 ) -> tuple[dict, tempfile.TemporaryDirectory]:
-    """Compatibility helper for isolated legacy tests; pipeline never calls it."""
+    """Build a semantic baseline from isolated generated content."""
     registry = load_map_registry(registry_path or ROOT / "data" / "map_sources.json")
     temporary = tempfile.TemporaryDirectory()
     temp_root = Path(temporary.name)
@@ -385,7 +385,7 @@ def generate_frozen_outputs(
 
 
 def assert_frozen_map_baselines(map_key: str | None = None) -> dict:
-    """Legacy API with compact errors; prefer pipeline-provided output paths."""
+    """Validate a semantic baseline with compact errors."""
     outputs, temporary = generate_frozen_outputs()
     try:
         keys = (map_key,) if map_key else tuple(outputs)

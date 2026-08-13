@@ -2,8 +2,8 @@
   "apworld_revision": "0.4.0",
   "bridge_protocol_version": 4,
   "compiler_revision": 2,
-  "content_revision": "0.4.0-beta.3",
+  "content_revision": "0.4.0-beta.4",
   "content_schema_version": 3,
   "game": "DOOM Eternal",
-  "release_version": "0.4.0-beta.3"
+  "release_version": "0.4.0-beta.4"
 }

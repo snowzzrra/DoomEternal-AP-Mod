@@ -115,6 +115,13 @@ DEATHLINK_MESSAGES = (
     "{player}'s ripping and tearing privileges were revoked.",
 )
 LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
+FAST_TRAVEL_MISSION_COMPLETE_IDS = {
+    "e1m1_intro": 7770122, "e1m2_war": 7770123, "e1m3_cult": 7770124,
+    "e1m4_boss": 7770162, "e2m1_nest": 7770210, "e2m2_base": 7770248,
+    "e2m3_core": 7770289, "e2m4_boss": 7770290, "e3m1_slayer": 7770337,
+    "e3m2_hell": 7770362, "e3m2_hell_b": 7770387, "e3m3_maykr": 7770411,
+    "e3m4_boss": 7770414,
+}
 
 
 def emit_launcher_event(event_type: str, **payload):
@@ -414,7 +421,7 @@ def configure_bridge_logger():
 
 
 def start_bridge_logger(path=None):
-    """Start a fresh production log; imports (including tests) never write it."""
+    """Start a fresh production log for an active client session."""
     target = Path(path or BRIDGE_LOG_PATH)
     target.parent.mkdir(parents=True, exist_ok=True)
     previous = target.with_name("bridge.previous.log")
@@ -1023,7 +1030,7 @@ class GameplaySaveEvidence(NamedTuple):
 
 
 def primary_save_candidates(filename="game_duration.dat"):
-    """Return valid primary slots newest-first; backups never qualify."""
+    """Return valid primary slots newest-first."""
     if (
         STEAM_REMOTE_DIR is None
         or STEAM_ID3 <= 0
@@ -1488,6 +1495,24 @@ def _validated_catalog_maps(active_maps):
 KNOWN_CATALOG_MAPS = _validated_catalog_maps(
     load_foundation_contracts().get("active_maps")
 )
+FAST_TRAVEL_MAP_KEYS = frozenset(
+    map_key for map_key, runtime_map in KNOWN_CATALOG_MAPS.items()
+    if map_key != "hub" and runtime_map in {
+        "game/sp/e1m1_intro/e1m1_intro",
+        "game/sp/e1m2_battle/e1m2_battle",
+        "game/sp/e1m3_cult/e1m3_cult",
+        "game/sp/e1m4_boss/e1m4_boss",
+        "game/sp/e2m1_nest/e2m1_nest",
+        "game/sp/e2m2_base/e2m2_base",
+        "game/sp/e2m3_core/e2m3_core",
+        "game/sp/e2m4_boss/e2m4_boss",
+        "game/sp/e3m1_slayer/e3m1_slayer",
+        "game/sp/e3m2_hell/e3m2_hell",
+        "game/sp/e3m2_hell_b/e3m2_hell_b",
+        "game/sp/e3m3_maykr/e3m3_maykr",
+        "game/sp/e3m4_boss/e3m4_boss",
+    }
+)
 
 MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
     entry["signal"]["unlockable"]: canonical_map_name(entry["runtime_map"])
@@ -1552,7 +1577,7 @@ def command_spool_exists(command_id):
 
 
 def queue_session_namespace(state_key):
-    """Opaque durable queue namespace; never includes connection credentials."""
+    """Opaque durable queue namespace derived from room identity."""
     if not isinstance(state_key, str) or not state_key:
         return None
     return hashlib.sha256(state_key.encode("utf-8")).hexdigest()[:16]
@@ -1791,7 +1816,7 @@ def migrate_direct_item_command_jobs(state_key):
     """Rewrite old queued item jobs to map-side RPC activations.
 
     Only .cmd belongs to the bridge. A .processing file is owned by the native
-    client's in-memory queue and must never be renamed or rewritten here.
+    client's in-memory queue and remains under queue ownership.
     Native startup recovery handles interrupted .processing jobs exactly once.
     """
     try:
@@ -2395,7 +2420,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
     def _cmd_doom_test_location(
         self, location_id: str = "", confirmation: str = ""
     ):
-        """Activate a registered map entrypoint; never fabricate a LocationCheck."""
+        """Activate a registered map entrypoint."""
         try:
             parsed_id = int(location_id)
         except ValueError:
@@ -2443,7 +2468,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output(f"Resumed {resumed} held dev job(s).")
 
     def _cmd_doom_test_discard(self, confirmation: str = ""):
-        """Archive, never delete, pending test jobs."""
+        """Archive pending test jobs for diagnostics."""
         if confirmation != "--confirm":
             self.output("Usage: /doom_test_discard --confirm")
             return
@@ -2558,6 +2583,8 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_epoch = 0
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
         self.automap_cleanup_delivered = {}
+        self.fast_travel_delivered = {}
+        self.fast_travel_eligibility_snapshot = None
         self._launcher_connection_failure_reported = False
 
     def reset_queue_session_authority(self, reason):
@@ -2582,11 +2609,15 @@ class DoomEternalContext(CommonContext):
 
     def handle_connection_loss(self, msg: str) -> None:
         self.reset_queue_session_authority("connection_loss")
+        self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
+        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
         super().handle_connection_loss(msg)
         self._report_launcher_connection_failure(msg)
 
     async def connection_closed(self):
         self.reset_queue_session_authority("connection_closed")
+        self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
+        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
         unexpected_launcher_close = (
             LAUNCHER_EVENTS_ENABLED
             and self.server is not None
@@ -2641,7 +2672,7 @@ class DoomEternalContext(CommonContext):
             previous_state_key = self.state_key
             self.initialize_item_state()
             if previous_state_key and previous_state_key != self.state_key:
-                abandoned = self.deathlink_receiver.abandon(time.monotonic())
+                abandoned = self.deathlink_receiver.abandon(time.monotonic(), "room_changed")
                 discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
                 if abandoned:
                     logger.warning(
@@ -3093,6 +3124,7 @@ class DoomEternalContext(CommonContext):
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
         self.invalidate_active_save_proof()
+        self.fast_travel_eligibility_snapshot = None
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
         self.current_map_name = None
@@ -3684,6 +3716,11 @@ class DoomEternalContext(CommonContext):
             for key, epoch in self.session_state.get("automap_cleanup", {}).items()
             if "|" in key and isinstance(epoch, int)
         }
+        self.fast_travel_delivered = {
+            tuple(value): True
+            for value in self.session_state.get("fast_travel_delivered", [])
+            if isinstance(value, list) and len(value) == 3
+        }
         self.automap_cleanup_epoch = max(
             self.automap_cleanup_delivered.values(), default=0
         )
@@ -3696,9 +3733,8 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = self.session_state.get(
             "cultist_autosave_path"
         )
-        # Never restore an in-flight lethal command across a process restart. Persist
-        # only bounded event identities, preventing old transport packets from
-        # killing the player again after reconnect.
+        # Process restarts preserve bounded event identities while lethal
+        # transport state begins fresh for the new connection.
         self.session_state.pop("deathlinked", None)
         seen_deathlinks = self.session_state.get("received_deathlink_event_ids", [])
         if not isinstance(seen_deathlinks, list):
@@ -3787,6 +3823,9 @@ class DoomEternalContext(CommonContext):
             for (map_name, location_id), epoch in self.automap_cleanup_delivered.items()
             if isinstance(map_name, str) and isinstance(location_id, str) and isinstance(epoch, int)
         }
+        self.session_state["fast_travel_delivered"] = [
+            list(key) for key in self.fast_travel_delivered
+        ]
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
         save_client_state(self.client_state)
@@ -4161,7 +4200,7 @@ class DoomEternalContext(CommonContext):
         return plan, None
 
     def reconcile_owned_runes(self, trigger, *, force=False):
-        """Plan Rune repair once per native/AP fingerprint; never invent a writer."""
+        """Plan Rune reconciliation once per native/AP fingerprint."""
         plan, error = self.compile_owned_rune_plan()
         if error:
             logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
@@ -4252,6 +4291,85 @@ class DoomEternalContext(CommonContext):
         """Open one idempotent cleanup pass after a level-ready marker."""
         self.automap_cleanup_epoch += 1
         return self.automap_cleanup_epoch
+
+    def reconcile_fast_travel_unlock(self, trigger):
+        """Activate native Fast Travel once per room/map/load epoch."""
+        snapshot = getattr(self, "fast_travel_eligibility_snapshot", None)
+        if (
+            not isinstance(snapshot, tuple)
+            or len(snapshot) != 3
+            or not all(isinstance(value, str) and value for value in snapshot[:2])
+            or not isinstance(snapshot[2], int)
+            or isinstance(snapshot[2], bool)
+        ):
+            return False
+        identity, map_key, epoch = snapshot
+        if map_key not in FAST_TRAVEL_MAP_KEYS or not self.has_authoritative_save_proof():
+            return False
+        if not getattr(self, "item_state_ready", False):
+            return False
+        delivery_key = (identity, map_key, epoch)
+        if delivery_key in self.fast_travel_delivered:
+            return False
+        command = "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
+        if not send_command(command, coalesce_key=f"fast-travel-{identity}-{map_key}-{epoch}", already_queued_ok=True):
+            return False
+        self.fast_travel_delivered[delivery_key] = time.time()
+        self.persist_session_state()
+        logger.info("[FastTravel] activated map=%s epoch=%s trigger=%s", map_key, epoch, trigger)
+        return True
+
+    def snapshot_fast_travel_eligibility(self):
+        """Capture Mission Complete eligibility before load-epoch checks can change."""
+        self.fast_travel_eligibility_snapshot = None
+        lease = getattr(self, "runtime_observation_lease", None)
+        epoch = getattr(lease, "gameplay_loaded_ns", None)
+        identity = self.get_ap_state_key()
+        runtime_map = canonical_map_name(self.current_map_name or "")
+        if not runtime_map:
+            pending = getattr(self, "pending_map_identity", None)
+            if isinstance(pending, dict):
+                runtime_map = canonical_map_name(pending.get("runtime_map", ""))
+        map_key = next(
+            (key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map),
+            None,
+        )
+        mission_id = FAST_TRAVEL_MISSION_COMPLETE_IDS.get(map_key)
+        checked = getattr(self, "checked_locations", None)
+        if (
+            not isinstance(identity, str)
+            or not identity
+            or not isinstance(epoch, int)
+            or isinstance(epoch, bool)
+            or map_key not in FAST_TRAVEL_MAP_KEYS
+            or mission_id is None
+            or not isinstance(checked, (set, frozenset, list, tuple))
+            or mission_id not in checked
+        ):
+            return None
+        self.fast_travel_eligibility_snapshot = (identity, map_key, epoch)
+        return self.fast_travel_eligibility_snapshot
+
+    async def process_level_ready(self, newest_path):
+        """Run complete level-ready reconciliation for one accepted load epoch."""
+        self.read_active_map_identity(evidence=read_gameplay_save_evidence())
+        self.snapshot_fast_travel_eligibility()
+        if not rpc_execution_enabled():
+            set_rpc_execution(True)
+        epoch = self.advance_reconciliation_epoch("level_ready")
+        logger.info(
+            "[RPC] Level-ready signal received (%s). RPC armed; "
+            "perk reconciliation epoch %s queued behind native safety gate.",
+            os.path.basename(newest_path),
+            epoch,
+        )
+        self.reconcile_owned_runes("level_ready")
+        self.advance_automap_cleanup_epoch()
+        self.reconcile_checked_automap_cleanup("level_ready")
+        await self.check_mission_challenge_locations()
+        self.automatic_reconcile_inventory("level_ready")
+        self.reconcile_fast_travel_unlock("level_ready")
+        return True
 
     def reconcile_checked_automap_cleanup(self, trigger):
         """Remove only isolated AP visuals for server-checked map locations."""
@@ -4351,7 +4469,7 @@ class DoomEternalContext(CommonContext):
         return f"bootstrap-v{action['revision']}-{action_name}"
 
     def quarantine_v1_bootstrap_spools(self):
-        """Archive stale dev1 jobs so an absent v1 entity is never invoked."""
+        """Archive dev1 jobs under their versioned namespace."""
         for action_name in (*BOOTSTRAP_ACTIONS, "suit_page"):
             command_id = f"bootstrap-v1-{action_name}"
             for suffix in (".cmd", ".processing"):
@@ -5878,18 +5996,6 @@ class DoomEternalContext(CommonContext):
                             and current_lifecycle_epoch != previous_lifecycle_epoch
                         )
                         if lifecycle_accepted:
-                            if not rpc_execution_enabled():
-                                set_rpc_execution(True)
-                            epoch = self.advance_reconciliation_epoch("level_ready")
-                            logger.info(
-                                "[RPC] Level-ready signal received (%s). RPC armed; "
-                                "perk reconciliation epoch %s queued behind native safety gate.",
-                                os.path.basename(newest_path),
-                                epoch,
-                            )
-                            self.reconcile_owned_runes("level_ready")
-                            self.advance_automap_cleanup_epoch()
-                            self.reconcile_checked_automap_cleanup("level_ready")
                             level_ready_resync = True
                     except Exception as e:
                         logger.error("[RPC] Auto-RPC failed to consume telemetry ready file %s: %s", newest_path, e)
@@ -5900,11 +6006,10 @@ class DoomEternalContext(CommonContext):
                         except OSError:
                             pass
 
-                # Consume the load epoch and map marker before observing challenges;
-                # a marker can make the current poll's challenge observation eligible.
-                await self.check_mission_challenge_locations()
                 if level_ready_resync:
-                    self.automatic_reconcile_inventory("level_ready")
+                    await self.process_level_ready(newest_path)
+                else:
+                    await self.check_mission_challenge_locations()
 
                 await self.process_pending_item_receipts("tracker")
 

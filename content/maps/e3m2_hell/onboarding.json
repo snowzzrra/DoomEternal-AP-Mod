@@ -117,7 +117,7 @@
       "target_chain": [],
       "vanilla_reward": "propitem/mastery_token/weapon",
       "decision": "include",
-      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+      "reason": "physical Mastery Token represented by an AP pickup"
     },
     {
       "entity": "pickups_pickup_extra_life_extra_life_1_2_e3m2",
@@ -182,7 +182,7 @@
       "target_chain": [],
       "vanilla_reward": "propitem/mastery_token/weapon",
       "decision": "include",
-      "reason": "physical Mastery Token; grant removed by generic pickup conversion"
+      "reason": "physical Mastery Token represented by an AP pickup"
     },
     {
       "entity": "pickups_progress_praetor_token_3_e3m2",

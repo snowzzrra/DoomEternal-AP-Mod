@@ -16,12 +16,12 @@ from enum import Enum
 from pathlib import Path
 
 from launcher_core import LaunchWorkflow
+from launcher_doctor import DoctorReport, LauncherDoctor, write_support_bundle
 from launcher_integration import (
     IntegratedLaunchWorkflow,
     IntegratedSetupRecord,
     RoomSetupCoordinator,
 )
-from launcher_doctor import LauncherDoctor, DoctorReport, write_support_bundle
 from launcher_platform import (
     SteamInstallationLocator,
     detect_doom_processes,
@@ -37,7 +37,7 @@ from options_foundation import load_options_schema, save_player_yaml
 
 
 def application_directory() -> Path:
-    """Use distribution directory when frozen, never temporary extraction paths."""
+    """Use distribution directory for frozen launcher resources."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
@@ -175,7 +175,7 @@ class LauncherController:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
 
     def launch_game(self) -> str:
-        """Launch through Steam URL handler; never execute game binary."""
+        """Launch through Steam URL handler."""
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
         return url
@@ -193,6 +193,27 @@ class LauncherController:
         report = LauncherDoctor(config=self.config, paths=self.user_paths).run()
         self.emit("doctor_report", report=report.document())
         return report
+
+    def repair_preview(self):
+        return LauncherDoctor(config=self.config, paths=self.user_paths).repair_preview()
+
+    def apply_repair(self, action_key: str) -> str:
+        """Apply selected Doctor action. Room changes require connected-room setup."""
+        doctor = LauncherDoctor(config=self.config, paths=self.user_paths)
+        actions = {action.key: action for action in doctor.repair_preview()}
+        action = actions.get(action_key)
+        if action is None:
+            raise ValueError("repair action is unavailable")
+        if action_key == "archive_stale_install_record":
+            backup = doctor.archive_stale_install_record()
+            self.emit("repair_complete", action=action_key, backup=str(backup))
+            return str(backup)
+        if action_key == "reinstall_room_mod":
+            if not self.setup.start(force=True):
+                raise RuntimeError("connect to room before reinstalling its mod")
+            self.emit("repair_started", action=action_key)
+            return "Room mod reinstall started; installed hash will be checked after setup."
+        raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
         bundle = write_support_bundle(destination, self.run_doctor(), logs=logs or [])

@@ -14,7 +14,7 @@ from launcher_supervisor import BridgeSupervisor
 def main() -> None:
     parser = argparse.ArgumentParser(description="DOOM Eternal Archipelago seed compiler")
     command = parser.add_subparsers(dest="command", required=True)
-    join = command.add_parser("simulate-join", help="offline fixture path; does not connect to Archipelago")
+    join = command.add_parser("simulate-join", help="run an offline room fixture")
     join.add_argument("room_json", type=Path, help="Room/slot data exported by Archipelago")
     join.add_argument("--client-dir", type=Path, required=True)
     join.add_argument("--endpoint", required=True)

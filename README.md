@@ -1,243 +1,246 @@
-# Doom Eternal Archipelago
-
-Game-side repository for the DOOM Eternal Archipelago integration.
-
-This repository owns the mod package, Python bridge, external RPC client,
-runtime manifests, map-generation and validation tools, and release packaging.
-The APWorld source lives in the sibling Archipelago repository and is compiled
-into `doometernal.apworld` during release builds.
+# DOOM Eternal Archipelago
 
 > [!CAUTION]
 > This project is a beta, not a finished 1.0 release. Windows and Linux/Proton
 > are supported.
 
-## Project status
 
-Current beta gate is `0.4.0-beta.3`.
+## 1. What this mod is
 
-- Playable route: `Hell on Earth -> Fortress visit 1 -> Exultia -> Fortress
-  visit 2 -> Cultist Base -> Doom Hunter Base -> Fortress visit 3 -> Super Gore
-  Nest -> Fortress visit 4 -> ARC Complex -> Fortress visit 5 -> Mars Core ->
-  Sentinel Prime -> Fortress visit 6 -> Taras Nabad -> Fortress visit 7 ->
-  Nekravol -> Nekravol Part II -> Urdak -> Final Sin`.
-- Public content: `307` generated map checks + `62` runtime locations = `369`
-  Archipelago locations, plus `1` separate campaign goal.
-- All `13` base-campaign missions are supported.
+DOOM Eternal Archipelago turns the base campaign into an Archipelago
+progression randomizer. Weapons, weapon mods, runes, suit upgrades, equipment,
+resources, and other useful items are distributed across hundreds of objectives
+throughout the campaign. A secret, challenge, collectible, combat encounter, or
+mission milestone can provide the item that opens your next route.
 
-The current beta validates map checks, item delivery, DeathLink, save-derived
-locations, Fortress progression, runtime gating, and APWorld generation across
-the supported campaign route.
+[Archipelago](https://archipelago.gg/) connects randomizers through one shared
+multiworld. Every player keeps playing their own game, while items found across
+the connected worlds travel to their assigned owners. A DOOM Eternal check may
+send an item to someone playing another supported game, and their next check may
+send you a weapon, mod, rune, or upgrade. The server routes each item
+automatically.
 
-### Version compatibility
+This integration is Archipelago-first. A multiworld can include any mix of
+supported games and players. A one-player room works equally well as a solo
+DOOM Eternal randomizer: every item stays inside that campaign, while the same
+generation rules, progression logic, and runtime systems remain active.
 
-Moving to a newer release may require generating a new world. Changes to IDs,
-logic, options, or runtime contracts frequently mean that worlds created for an
-older version are not compatible with the new client and APWorld.
+Current campaign coverage includes:
 
-## Installation
+- all 13 base-campaign missions;
+- 100 connected regions;
+- 307 physical checks inside maps;
+- 62 runtime and meta checks;
+- 369 locations in total;
+- 117 item types;
+- randomized starting weapons and starting inventory;
+- configurable Chainsaw, Dash, first Sentinel Battery, Automap, and DeathLink;
+- room-specific map packages for Windows and Linux/Proton.
 
-See [docs/INSTALL.md](docs/INSTALL.md) for the complete Windows and Linux/Proton
-installation guide, directory layouts, verification steps, and troubleshooting.
+The launcher handles room connection, YAML creation, room package preparation,
+installation guidance, session activity, logs, diagnostics, repair, and explicit
+Steam launch. Each generated room carries its own options and identity, so the
+game, client, save, and installed map package operate as one consistent session.
 
-## Project vision
+## 2. Installation
 
-Bring full Archipelago support to DOOM Eternal through native `.entities` map
-modifications and Meathook RPC integration.
+See the [Windows and Linux/Proton installation guide](docs/INSTALL.md).
 
-Core principles:
+## 3. How it works
 
-- Use native map modifications for location checks and item/trap command
-  entities.
-- Avoid idStudio full-map packages, which are too large for practical
-  multiworld distribution.
-- Preserve the campaign's normal feel wherever possible.
-- Randomize progression, resources, and optional rewards without corrupting
-  saves or vanilla inventory state.
-- Prefer durable native events over console-log polling.
-- Keep the APWorld source in the Archipelago fork and the game-side runtime in
-  this repository.
+### Room generation
 
-## Repository split
+Archipelago reads each player's YAML and creates a room containing options,
+access rules, locations, and item placements. The DOOM Eternal APWorld models
+100 regions and evaluates which objectives are reachable with the player's
+current inventory. Fill logic accounts for weapon progression, Fortress of Doom
+Battery costs, challenge requirements, the mission weapon curve, starting
+inventory, and selected physical options.
 
-This repository:
+Generation produces `slot_data`, the room-authoritative description of the
+player's options and identity. The launcher uses it to prepare the exact map
+package needed by that slot. Starting inventory is also compiled into the
+mission `DevInvLoadout`, making starting ownership available as the campaign
+loads.
 
-- owns the game-side runtime;
-- builds the mod package;
-- contains the Python bridge and external C++ RPC client;
-- contains runtime manifests and item delivery data;
-- contains map generation and validation tools;
-- creates the final beta release ZIP.
+### Authoring campaign content
 
-Sibling repository:
+DOOM Eternal missions store gameplay objects in `.entities` data. These objects
+include pickups, doors, triggers, relays, encounters, objectives, checkpoints,
+Automap stations, mission-completion targets, and the links that connect them.
+The mod works with those native objects and their mission relationships.
+
+Every supported map has an authorial content package under:
 
 ```text
-Archipelago/worlds/doometernal/
+content/maps/<map_key>/
+├── descriptor.json
+├── locations.json
+├── runtime.json
+├── publishers.json
+├── assets.json
+└── onboarding.json
 ```
 
-- owns the APWorld source;
-- defines item IDs, location IDs, regions, options, rules, and generation;
-- is compiled into `doometernal.apworld` during release builds;
-- is not copied into this repository as source.
+Together, these files describe source-map identity, public location IDs,
+physical owners, runtime checks, event publishers, required assets, target
+chains, transforms, and mission-specific contracts. This is the readable source
+used by the map compiler. Catalogs, registries, manifests, and generated map
+files are projections of that content.
 
-## Runtime summary
+Each physical location identifies a native mission entity and its functional
+context. The compiler preserves the pieces that make the objective behave like
+part of the mission: visual presentation, collision, interaction volume,
+Automap ownership, doors, encounter managers, objective relays, checkpoint
+continuity, and other mission scripting. It then gives that objective an
+Archipelago publisher with the location's public ID.
 
-- `ap_client.exe` is an external RPC client, not an injector embedded into the
-  game process.
-- Meathook is an external dependency that provides the in-game RPC server.
-- Safe command execution is protected by a versioned, read-only memory gate.
-  Unknown versions and failed reads stay fail-closed.
-- Physical checks are detected through durable native `ap_event_*` files, not
-  telemetry polling.
-- Mission Complete and the campaign goal use native transition events, with
-  save inspection retained as a fallback where applicable.
+Different check families retain their natural campaign behavior:
 
-### Check flow
+- collectible pickups remain physical objects in their original spaces;
+- secrets retain their doors, markers, and exploration flow;
+- combat encounters publish through their native completion path;
+- mission challenges and weapon masteries use persistent game state;
+- Mission Complete follows the native mission transition;
+- Fortress rooms keep Battery access requirements and room interactions;
+- campaign objectives keep the relays and checkpoints that drive mission flow.
+
+### Map compilation
+
+The map generator reads the supported retail source map, verifies its identity,
+and applies deterministic transformations from the authorial content package.
+It creates location publishers, item-command targets, notification entities,
+physical-option writers, Mission Complete support, Fast Travel support, and
+room-specific starting state.
+
+Generated maps receive semantic validation before packaging. A baseline records
+the accepted structure of each mission: entity counts, public checks, runtime
+checks, regions, important target chains, and content hashes. This makes a map
+edit reviewable at the level of gameplay structure rather than only as a large
+text diff.
+
+Physical options are projected while the room package is prepared. Start With
+Automap, for example, adds one native `idTarget_PlayerStatModifier` per supported
+mission, sets `STAT_AUTOMAP` to `1`, and connects that writer to the mission's
+player starts. The progression-marker perk is separate item ownership compiled
+through the normal starting inventory path.
+
+### Location checks
+
+A completed physical objective activates its `AP_CHECK_*` publisher. The
+publisher writes a durable event named with the public location ID. The Python
+bridge reads that event and submits a standard Archipelago `LocationChecks`
+message. The event remains durable while delivery is in progress, allowing the
+check flow to survive reconnects and short network interruptions.
 
 ```text
-AP-mutated pickup
-  -> AP_CHECK_* relay
-  -> optional AP Codex notification
+native mission objective
+  -> AP_CHECK_* publisher
   -> ap_event_<location_id>.txt
   -> bridge_client.py
-  -> LocationChecks
+  -> Archipelago LocationChecks
   -> server acknowledgement
-  -> event file removed
 ```
 
-Event files remain until the Archipelago server confirms the location in
-`checked_locations`.
+Runtime locations use the same public check protocol with another native source
+of truth. Mission challenges, weapon masteries, mission completion, campaign
+goal, and other persistent states are reconciled from native events or
+structured save data. Each observer is tied to the current room, slot, save,
+map, and load epoch.
 
 ### Item delivery
 
-The bridge asks map-side `ap_rpc_v3_*` entities to perform supported item and
-trap commands:
+The APWorld item table and game-side command table share the same 117 public
+item IDs. When the server sends an item, the bridge resolves its command and
+activates a map-owned `ap_rpc_v3_*` entity:
 
 ```text
 ai_ScriptCmdEnt ap_rpc_v3_<item_id> activate
 ```
 
-The external client imports queued commands only after the bridge arms RPC and
-the memory gate confirms safe gameplay.
+These entities use native game commands for weapons, weapon mods, perks, runes,
+equipment, currencies, resources, traps, and other effects. Replay policy is
+defined per item. Permanent ownership is reconciled after reconnect, while
+consumable and one-shot effects follow their delivery receipt state.
 
-## Map content and validation
+The external `ap_client.exe` carries commands between the bridge and Meathook's
+in-game RPC server. Command dispatch is gated by supported executable identity,
+native memory safety, active map, gameplay state, room identity, and load epoch.
+This keeps delivery synchronized with the mission that owns the command
+entities.
 
-Every enabled map is authored only in
-`content/maps/<map_key>/{descriptor,locations,runtime,publishers,assets,onboarding}.json`.
-`data/map_sources.json`, manifests and runtime registries are compiled
-projections for the client/package and are checked, never hand-edited.
+### Native map systems
 
-To add a map, scaffold its package with `python -m tools.content.new_map`, fill
-the six files, then run `scripts/pipeline.sh fast`, `scripts/pipeline.sh map
-<map_key>`, `scripts/pipeline.sh changed`, and integration before a candidate
-build.
+The implementation uses native DOOM Eternal systems wherever the campaign
+already has a suitable owner or writer:
 
-Each accepted map has an independent semantic baseline in
-`baselines/maps/<map_key>.json`. To accept one intentional map change:
+- Automap ownership uses `STAT_AUTOMAP` and `idTarget_PlayerStatModifier`;
+- replay Fast Travel uses `idTarget_FastTravelUnlock`;
+- Mission Complete uses mission transition publishers;
+- equipment, perks, weapons, mods, runes, and currencies use their supported
+  command or target forms;
+- challenge and mastery state comes from the game's persistent save model;
+- map checks use durable AP publishers attached to the objective's native flow.
 
-```bash
-python -m tools.content.accept_baseline \
-    --map <map_key> \
-    --reason "<intentional content change>"
-```
+The 79 Fast Travel anchors remain destinations owned by the native system. One
+AP-owned unlock target per mission enables that system during eligible replays.
+Eligibility is captured at the beginning of a load epoch from the mission's
+checked Mission Complete state, then held stable for that load.
 
-The authoritative validation entrypoint is:
+### Save, reconnect, and session identity
 
-```bash
-scripts/pipeline.sh fast
-scripts/pipeline.sh map <map_key>
-scripts/pipeline.sh changed
-scripts/pipeline.sh integration
-scripts/pipeline.sh release --build
-```
+The bridge maintains a room-bound snapshot containing checked locations,
+received items, delivery receipts, observer fingerprints, current map state,
+and load epochs. Archipelago is authoritative for received items and completed
+locations. Reconnect compares local state with the server and resumes pending
+work from that shared history.
 
-The release gate uses a content-addressed receipt and builds:
+Room identity also protects generated content. The launcher, installed package,
+bridge, APWorld, slot data, and save association are checked together. Doctor
+reports identity or installation drift. Repair presents a concrete plan, backs
+up owned content, applies confirmed actions, and validates installed files.
 
-```text
-DoomEternalArchipelagoPlayableTest-0.4.0-beta.3.zip
-├── README.md
-├── INSTALL.md
-├── RELEASE_MANIFEST.json
-├── DoomEternalArchipelagoLauncher[.exe]
-├── doometernal.apworld
-└── client/
-    ├── ap_client.exe
-    ├── bridge_client.py
-    ├── bridge_identity.json
-    ├── save_death_probe.exe
-    ├── save_decrypt.py
-    ├── run_bridge.sh
-    ├── launcher_core.py
-    ├── launcher_controller.py
-    ├── launcher_integration.py
-    ├── launcher_platform.py
-    ├── launcher_supervisor.py
-    ├── launcher_ui.py
-    ├── mod_templates/
-    │   ├── index.json
-    │   ├── dash-on.zip
-    │   └── dash-off.zip
-    ├── validate_runtime_install.sh
-    ├── ap_config.example.json
-    ├── data/
-    ├── manifests/
-    └── player_templates/
-```
+### Campaign systems
 
-The release excludes APWorld source, native source, map-generation source,
-tests, vanilla maps, extraction tooling, workspace memory, personal
-configuration, seeds, logs, and local paths.
+- **Starting Weapon** selects one configured weapon or samples one eligible
+  weapon when Random is chosen. Combat Shotgun participates as an opt-in choice.
+- **Sentinel Batteries** form an economy of 28 units: two individual Batteries
+  and thirteen bundles worth two each. The thirteen Fortress consumers each
+  require a balance of two.
+- **Start With Automap** grants native Automap ownership in all 13 missions and
+  starts the player with `Reveal Automap Progression Items`.
+- **Fast Travel** activates the mission's native Fast Travel unlock during a
+  replay whose Mission Complete state was already checked at load start.
+- **DeathLink Soft** dispatches one received death event once. **Hardcore**
+  keeps the same event pending during unsafe gameplay states and dispatches in
+  safe gameplay until death telemetry confirms completion.
+- **Marker cleanup** reconciles server-confirmed locations with their map and
+  Automap presentation across reloads and revisits.
 
-## Current beta logic
+### Repository and runtime architecture
 
-- `randomize_chainsaw`, `randomize_dash`, and `randomize_first_battery`
-  default to `false`; Dash remains experimental.
-- Secret Encounters are normal AP locations on supported missions.
-- Mission Challenges use native save state when their vanilla writer survives;
-  converted physical rewards use server-checked
-  `physical_event_equivalent` predicates. Weapon Masteries use native save
-  state.
-- Some Mission Challenges are completed by equivalent Archipelago checks when
-  randomization replaces the vanilla collectible or upgrade action that
-  normally advances them.
-- Native Mission Challenge registration remains owned by the canonical
-  `gameresources_patch2` `main.decl`; removing registration is runtime-rejected
-  because it removes HUD and tracking. Individual child overrides suppress only
-  Praetor rewards. DHB currently tests one fourth, impossible vanilla Horde
-  registration to block native aggregate Battery completion; runtime pending.
-- Weapon Point rewards remain vanilla until a safe revision-gated hook owns
-  their conversion.
-- Received progression/useful/trap items use the Current major card; filler
-  uses the lateral Codex card. Location feedback uses the Codex presentation.
+Implementation is split across two repositories:
 
+- `Archipelago/worlds/doometernal/` owns APWorld options, items, locations,
+  regions, logic, fill, slot data, and generation output;
+- this repository owns authorial game content, map compilation, runtime
+  observers, item delivery, native client, launcher, validation, and packaging.
 
-## Known probable issues
+The active runtime has three cooperating layers:
 
-- Reloading the current checkpoint remains the recommended first recovery step
-  for rare vanilla scripting desynchronization.
-- Sentinel Battery HUD or Dossier counts may temporarily disagree with actual
-  progression. Fortress socket requirements are authoritative.
-- The in-game notification shows the received item name, but not the complete
-  sender and source-location history. Keep the Archipelago client visible for
-  the full log.
-- DeathLink is currently "hardcore". Extra Lives are ignored and the player is
-  killed directly.
-- The Ice Bomb HUD marker may disappear when Frag Grenade is unavailable, but
-  Ice Bomb itself remains usable.
-- Mission Challenge and Weapon Mastery locations are detected from native save
-  state. A newly completed challenge may wait until the next save write before
-  being checked.
-- Reaching a checkpoint, dying, reloading the current checkpoint, or returning
-  to the main menu forces another save-state check.
-- Sentinel Prime Archipelago locations use a static Codex-based visual
-  replacement. They are fully functional, but currently inherit the Codex
-  material and do not have the animated presentation used by Archipelago
-  locations in other missions.
-- Mission Challenges and Weapon Masteries already completed in a reused DOOM
-  Eternal save are treated as pre-existing progress when that save is first
-  linked to a new Archipelago session. They are not retroactively submitted;
-  using a fresh campaign save is recommended for a new seed.
+1. **Generated mission content** publishes checks and exposes native command
+   entities.
+2. **`bridge_client.py`** speaks the Archipelago protocol, owns durable session
+   state, and coordinates observers and item delivery.
+3. **`ap_client.exe` and Meathook** provide external RPC and native telemetry for
+   the running game.
 
-## Roadmap
+The launcher surrounds those layers. It reads the room schema, creates player
+YAML, discovers supported installations, prepares the room package, supervises
+the bridge, opens DOOM Eternal through Steam, and provides Doctor, Repair, and a
+sanitized support bundle.
+
+## 4. Roadmap
 
 ### 0.1.1 — Runtime stabilization — DONE
 
@@ -253,64 +256,64 @@ configuration, seeds, logs, and local paths.
 
 - Expanded the playable campaign route mission by mission while generalizing
   manifests, regions, mission completion, map checks, and per-map validation.
-- Established the native `.entities` generation pipeline and the shared runtime
-  foundations used for Archipelago locations, item delivery, and optional
-  systems in later releases.
+- Established the native `.entities` generation pipeline and shared runtime
+  foundations used by locations, item delivery, and campaign options.
 
 ### 0.3.x Alpha — Base campaign map expansion — DONE
 
 - `0.3.8`: Final Sin.
-- `0.3.9`: complete base-campaign regression, cleanup, documentation and
-  release stabilization; no major new system.
+- `0.3.9`: complete base-campaign regression, cleanup, documentation, and
+  release stabilization.
 
-### 0.4.0 Beta — Installation, logic and option architecture
+### 0.4.0 Beta — Installation, logic, and option architecture — CURRENT
 
-- Windows + Linux installer/launcher; game-path/version, dependency, injection
-  and client-identity validation. Launcher never starts DOOM Eternal; player
-  opens game through Steam when ready. Includes seed/options-generated mod; final scripted
-  weapon stripping (SSG `5008`, BFG `4701`, Crucible `4137`); subregions;
-  hard/soft/combat logic options; hardcore DeathLink fix; and option-driven
-  features such as randomized starting weapons and configurable starting
-  inventory.
+- Room-specific Windows and Linux/Proton launcher workflow.
+- Starting Weapon Choice, Random, and configurable starting inventory.
+- Hard, Soft, and Combat logic profiles.
+- Physical Chainsaw, Dash, and first Sentinel Battery options.
+- Start With Automap, mission replay Fast Travel, and Soft/Hardcore DeathLink.
+- Doctor, Repair, support bundles, resync, and room identity checks.
+
+### 0.4.0-beta.5 — Meathook-AP integration
+
+- Integrate the dedicated Meathook-AP runtime distribution.
+- Align launcher discovery, installation, diagnostics, and package ownership
+  with that repository.
 
 ### 0.5.x Beta — The Ancient Gods
 
-- Add The Ancient Gods Part One and Part Two campaigns, including their
-  missions, regions, locations, items, progression rules, and completion flow.
-- Extend the existing generation, runtime, and validation architecture to cover
-  DLC-specific mechanics without weakening base-campaign behavior.
+- Add The Ancient Gods Part One and Part Two campaigns, including missions,
+  regions, locations, items, progression rules, and completion flow.
+- Extend generation, runtime, and validation for DLC-specific mechanics.
 
 ### 0.6.x Beta — Mission Access as Items
 
-- Turn mission access into Archipelago progression items. A seed can unlock
-  missions in a randomized order instead of following the vanilla campaign
-  sequence, while generation guarantees a valid starting mission and reachable
-  progression.
+- Turn mission access into Archipelago progression items.
+- Generate a valid starting mission and reachable randomized mission order.
 
 ### 0.7.x Beta — Enemizer
 
-- Add an enemy randomizer that changes enemy placements and encounter
-  compositions while respecting arenas, progression-critical encounters, and
-  runtime safety constraints.
+- Randomize enemy placements and encounter compositions while respecting arena
+  structure, progression-critical encounters, and runtime safety.
 
 ### 0.8.x–0.9.x — Content freeze and polish
 
-- Freeze the planned `1.0` scope and stabilize IDs and data formats.
+- Stabilize public IDs, contracts, and data formats for 1.0.
 - Focus on balance, installation, compatibility, save/reconnect behavior,
-  discoverability, and broader community testing.
-- Finish documentation, diagnostics, support tooling, and release-candidate
-  validation; late `0.9.x` changes are limited to blockers and regressions.
+  discoverability, and community testing.
+- Complete documentation, diagnostics, support tooling, and release-candidate
+  validation.
 
 ### 1.0
 
-- Final stable public release of the completed supported campaigns and systems.
+- Stable public release of the supported campaigns and systems.
 
 ### Post-1.0 / 2.0
 
 - Horde Mode and Master Levels.
-- Hard Mode / checkpoint removal.
+- Hard Mode and checkpoint removal.
 
-## Credits
+## 5. Credits
 
 - The Archipelago project and contributors for the multiworld framework,
   protocol, server, and `CommonClient`.
@@ -334,3 +337,7 @@ configuration, seeds, logs, and local paths.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago 
   logo used by the AP client.
+
+## 6. License
+
+This project is distributed under the [MIT License](docs/LICENSE).
