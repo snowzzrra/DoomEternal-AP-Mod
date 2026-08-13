@@ -17,7 +17,16 @@ esac
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-distrobox enter doom-cpp -- bash -lc "
+if command -v distrobox >/dev/null 2>&1; then
+    TOOLCHAIN_LAUNCHER=(distrobox enter doom-cpp --)
+elif command -v distrobox-host-exec >/dev/null 2>&1; then
+    TOOLCHAIN_LAUNCHER=(distrobox-host-exec distrobox enter doom-cpp --)
+else
+    echo "doom-cpp toolchain requires distrobox or distrobox-host-exec" >&2
+    exit 1
+fi
+
+"${TOOLCHAIN_LAUNCHER[@]}" bash -lc "
     set -euo pipefail
     cd '$REPO_ROOT'
     x86_64-w64-mingw32-gcc -D_M_AMD64 -O2 \
@@ -35,5 +44,15 @@ distrobox enter doom-cpp -- bash -lc "
     rm '$BUILD_DIR/meathook_interface_c.o'
 "
 
-file "$BUILD_DIR/ap_client.exe"
-file "$BUILD_DIR/save_death_probe.exe"
+python3 - "$BUILD_DIR/ap_client.exe" "$BUILD_DIR/save_death_probe.exe" <<'PY'
+from pathlib import Path
+import sys
+
+for argument in sys.argv[1:]:
+    executable = Path(argument)
+    if not executable.is_file() or executable.stat().st_size == 0:
+        raise SystemExit(f"missing native executable: {executable}")
+    if executable.read_bytes()[:2] != b"MZ":
+        raise SystemExit(f"native executable is not PE: {executable}")
+    print(f"native executable: {executable}")
+PY
