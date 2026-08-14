@@ -1,0 +1,40 @@
+[
+    uuid(1c9ca7c8-d421-482d-b85d-79fac33b2658),
+    version(1.0),
+    explicit_handle
+]
+interface ap_runtime_rpc
+{
+    void ap_execute(
+        [in] handle_t binding,
+        [in, string] unsigned char* command);
+    void ap_request_entities(
+        [in] handle_t binding,
+        [in, string] unsigned char* path,
+        [in] boolean begin,
+        [in] int size);
+    void ap_upload_chunk(
+        [in] handle_t binding,
+        [in] int size,
+        [in] int offset,
+        [in, size_is(size)] unsigned char* data);
+    void ap_retrieve_entities(
+        [in] handle_t binding,
+        [in, out] int* size,
+        [out, size_is(*size)] unsigned char* data);
+    void ap_retrieve_encounter(
+        [in] handle_t binding,
+        [in, out] int* size,
+        [out, size_is(*size)] unsigned char* data);
+    void ap_retrieve_checkpoint(
+        [in] handle_t binding,
+        [in, out] int* size,
+        [out, size_is(*size)] unsigned char* data);
+    void ap_retrieve_spawn(
+        [in] handle_t binding,
+        [in, out] int* size,
+        [out, size_is(*size)] unsigned char* data);
+    void ap_health(
+        [in] handle_t binding,
+        [in, out] int* state);
+}

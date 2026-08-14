@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <memory>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -21,10 +22,11 @@
 #include <vector>
 #include "ap_client_path_utils.h"
 #include "game_state_probe.h"
-#include "mhclient.h"
+#include "ap_runtime_rpc_client.h"
 #include "rpc_queue_policy.h"
 
-MeathookInterface* g_MhInterface = nullptr;
+ApRuntimeRpcClient* g_ApRpc = nullptr;
+std::unique_ptr<ApRuntimeRpcClient> g_ApRpcOwner;
 
 static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kQueueSessionNamespacePath = "base\\ap_queue\\active_session_namespace";
@@ -66,12 +68,6 @@ struct CommandJob {
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;
 
-struct RpcWatchdogContext {
-    volatile LONG completed = 0;
-    DWORD startTick = 0;
-    std::string commandId;
-    std::string operation;
-};
 
 struct SaveSnapshot {
     std::string slotDirectory;
@@ -134,18 +130,6 @@ void RotateClientLog() {
     }
 }
 
-DWORD WINAPI RpcCallWatchdog(LPVOID data) {
-    RpcWatchdogContext* context = static_cast<RpcWatchdogContext*>(data);
-    Sleep(kRpcStallWarnMs);
-    if (InterlockedCompareExchange(&context->completed, 0, 0) == 0) {
-        LogDebug(
-            "RPC_CALL_STALLED command_id=" + context->commandId
-            + " operation=" + context->operation
-            + " elapsed_ms=" + std::to_string(GetTickCount() - context->startTick)
-        );
-    }
-    return 0;
-}
 
 std::string TrimLine(std::string value) {
     while (!value.empty() && (value.back() == '\n' || value.back() == '\r' || value.back() == '\0')) {
@@ -441,21 +425,21 @@ std::string CommandIdFromPath(const std::string& path) {
     return std::filesystem::path(path).stem().string();
 }
 
-const char* RpcCallResultName(RpcCallResult result) {
+const char* RpcCallResultName(ApRpcResult result) {
     switch (result) {
-    case PIPE_NOT_FOUND:
+    case AP_RPC_PIPE_MISSING:
         return "PIPE_NOT_FOUND";
-    case PIPE_BUSY:
+    case AP_RPC_PIPE_BUSY:
         return "PIPE_BUSY";
-    case WAIT_NAMED_PIPE_TIMEOUT:
+    case AP_RPC_WAIT_TIMEOUT:
         return "WAIT_NAMED_PIPE_TIMEOUT";
-    case RPC_CALL_DELIVERED:
+    case AP_RPC_DELIVERED:
         return "RPC_CALL_DELIVERED";
-    case RPC_EXCEPTION:
+    case AP_RPC_EXCEPTION:
         return "RPC_EXCEPTION";
-    case UNKNOWN_TRANSPORT_ERROR:
+    case AP_RPC_UNKNOWN:
         return "UNKNOWN_TRANSPORT_ERROR";
-    case RPC_CALL_RESULT_NONE:
+    case AP_RPC_NONE:
     default:
         return "RPC_CALL_RESULT_NONE";
     }
@@ -1640,26 +1624,16 @@ bool ExecuteCommand(const CommandJob& job) {
     const std::string commandId = CommandIdFromPath(job.path);
     const std::string& command = job.command;
     LogDebug("RPC_EXECUTE command_id=" + commandId + DeliveryContextFields());
-    if (g_MhInterface) {
-        g_MhInterface->SetCurrentCommandId(commandId);
-    }
-
-    RpcWatchdogContext* watchdog = new RpcWatchdogContext();
-    watchdog->startTick = GetTickCount();
-    watchdog->commandId = commandId;
-    watchdog->operation = "ExecuteConsoleCommand";
-    HANDLE watchdogThread = CreateThread(nullptr, 0, RpcCallWatchdog, watchdog, 0, nullptr);
+    if (g_ApRpc) g_ApRpc->SetCurrentCommandId(commandId);
 
     if (command.rfind("#DUMP_ENTITIES", 0) == 0) {
         const size_t bufferSize = 128 * 1024 * 1024;
         unsigned char* buffer = static_cast<unsigned char*>(malloc(bufferSize));
         if (!buffer) {
-            InterlockedExchange(&watchdog->completed, 1);
-            if (watchdogThread) CloseHandle(watchdogThread);
             return false;
         }
         size_t actualSize = bufferSize;
-        const bool success = g_MhInterface->GetEntitiesFile(buffer, &actualSize);
+        const bool success = g_ApRpc->RetrieveEntities(buffer, &actualSize);
         if (success) {
             FILE* output = fopen("base\\map.entities", "wb");
             if (output) {
@@ -1667,31 +1641,20 @@ bool ExecuteCommand(const CommandJob& job) {
                 fclose(output);
             } else {
                 free(buffer);
-                InterlockedExchange(&watchdog->completed, 1);
-                if (watchdogThread) CloseHandle(watchdogThread);
                 return false;
             }
         }
         free(buffer);
-        InterlockedExchange(&watchdog->completed, 1);
-        if (watchdogThread) CloseHandle(watchdogThread);
         return success;
     }
 
     if (command.rfind("#PUSH_ENTITIES ", 0) == 0) {
         std::string path = command.substr(15);
-        const bool success = g_MhInterface->PushEntitiesFile(path.data(), nullptr, 0);
-        InterlockedExchange(&watchdog->completed, 1);
-        if (watchdogThread) CloseHandle(watchdogThread);
+        const bool success = g_ApRpc->RequestEntityLoad(path, true, 0);
         return success;
     }
 
-    const bool success = g_MhInterface->ExecuteConsoleCommand(
-        reinterpret_cast<unsigned char*>(const_cast<char*>(command.c_str()))
-    );
-    InterlockedExchange(&watchdog->completed, 1);
-    if (watchdogThread) CloseHandle(watchdogThread);
-    return success;
+    return g_ApRpc->ExecuteConsoleCommand(command);
 }
 
 int main(int argc, char** argv) {
@@ -1778,13 +1741,14 @@ int main(int argc, char** argv) {
             "with a valid install."
         );
     } else {
-        g_MhInterface = new MeathookInterface();
-        g_MhInterface->SetLogCallback(LogDebug);
+        g_ApRpcOwner = std::make_unique<ApRuntimeRpcClient>();
+        g_ApRpc = g_ApRpcOwner.get();
+        g_ApRpc->SetLogCallback(LogDebug);
         LogDebug(
             "Meathook RPC client binding initialized. Waiting for the in-game "
             "Meathook server..."
         );
-        while (!g_MhInterface || !g_MhInterface->m_Initialized) {
+        while (!g_ApRpc || !g_ApRpc->PollHealth()) {
             gameStateProbe.Poll();
             missionTransitionMonitor.Poll(
                 gameStateProbe.IsGameplayLoaded(),
@@ -1841,7 +1805,7 @@ int main(int argc, char** argv) {
             }
         }
         const bool rpcTransportReady =
-            meathookPreflightPassed && g_MhInterface && g_MhInterface->m_Initialized;
+            meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
         const bool rpcEnabled =
             rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
         const std::string gateReason = RpcGateReason(
@@ -1895,7 +1859,7 @@ int main(int argc, char** argv) {
         }
 
         bool dispatchNextImmediately = false;
-        if (!queue.empty() && rpcEnabled && g_MhInterface->m_Initialized) {
+        if (!queue.empty() && rpcEnabled && g_ApRpc->Ready()) {
             CommandJob& job = queue.front();
             const std::string commandId = CommandIdFromPath(job.path);
             const bool normalReceipt = IsNormalReceiptCommandId(commandId);
@@ -1981,16 +1945,16 @@ int main(int argc, char** argv) {
                         + " attempt=" + std::to_string(job.retryAttempt)
                         + " delay_ms=" + std::to_string(delay)
                         + " reason="
-                        + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
-                        + "/" + std::to_string(g_MhInterface->m_LastTransportError)
+                        + RpcCallResultName(g_ApRpc->LastResult())
+                        + "/" + std::to_string(g_ApRpc->LastTransportStatus())
                         + DeliveryContextFields()
                     );
                 } else {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
                         + " kind=non_receipt result=retry"
-                        + " transport=" + RpcCallResultName(g_MhInterface->m_LastRpcCallResult)
-                        + " wait_error=" + std::to_string(g_MhInterface->m_LastTransportError)
+                        + " transport=" + RpcCallResultName(g_ApRpc->LastResult())
+                        + " wait_error=" + std::to_string(g_ApRpc->LastTransportStatus())
                         + DeliveryContextFields()
                     );
                     DeleteFileA(kRpcGatePath);

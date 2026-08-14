@@ -282,20 +282,16 @@ Repair/Fix, and a sanitized support report.
 - Start With Automap, mission replay Fast Travel, and Soft/Hardcore DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
-### 0.4.0-beta.5 — Meathook-AP integration
-
-- Integrate the dedicated Meathook-AP runtime distribution.
-- Align launcher discovery, installation, diagnostics, and package ownership
-  with that repository.
-
 ### 0.5.x Beta — The Ancient Gods
 
 - Add The Ancient Gods Part One and Part Two campaigns, including missions,
   regions, locations, items, progression rules, and completion flow.
 - Extend generation, runtime, and validation for DLC-specific mechanics.
 
-### 0.6.x Beta — Mission Access as Items
+### 0.6.x Beta — New AP-Focused DLL + Random Mission Order
 
+- Create an alternative to meathook to better fit Archipelago needs.
+- Remove all meathook-dependent architecture and work on a new, proprietary, DLL.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 

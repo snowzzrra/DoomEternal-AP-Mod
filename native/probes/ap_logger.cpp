@@ -1,190 +1,84 @@
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
 #include <string>
-#include <ctime>
-#include "mhclient.h"
+#include "../client/ap_runtime_rpc_client.h"
 
-// -----------------------------------------------------------------------
-// Logging helpers
-// -----------------------------------------------------------------------
+static FILE* g_log = nullptr;
 
-static FILE* g_LogFile = nullptr;
-
-void OpenLog() {
-    g_LogFile = fopen("base\\ap_logger.log", "a");
-}
-
-void Log(const char* level, const char* msg) {
-    time_t now = time(nullptr);
-    char ts[32];
-    strftime(ts, sizeof(ts), "%H:%M:%S", localtime(&now));
-    printf("[%s][%s] %s\n", ts, level, msg);
-    if (g_LogFile) {
-        fprintf(g_LogFile, "[%s][%s] %s\n", ts, level, msg);
-        fflush(g_LogFile);
-    }
-}
-
-void LogInfo(const char* msg)  { Log("INFO ", msg); }
-void LogWarn(const char* msg)  { Log("WARN ", msg); }
-void LogError(const char* msg) { Log("ERROR", msg); }
-
-// -----------------------------------------------------------------------
-// Probe a live RPC call after the constructor connects to the named pipe.
-// SEH (__try/__except) contains access violations inside the readiness check.
-// -----------------------------------------------------------------------
-
-bool ProbeRPC(MeathookInterface* mh) {
-    try {
-        char buf[256] = {0};
-        int sz = sizeof(buf);
-        // GetCurrentCheckpoint is safe outside levels: just returns false/empty
-        mh->GetCurrentCheckpoint(&sz, buf);
-        return true;   // completed without structured exception — RPC is alive
-    } catch(...) {
-        return false;  // access violation or similar — not ready yet
-    }
-}
-
-// -----------------------------------------------------------------------
-// Retry connection. Rebuild MeathookInterface on each attempt because the
-// constructor can leave invalid state behind when RPC is unavailable.
-// -----------------------------------------------------------------------
-
-MeathookInterface* ConnectToMeathook(int timeout_seconds) {
-    LogInfo("Waiting for Meathook RPC to become ready...");
-    LogInfo("(This is normal — waiting for game to fully load the DLL)");
-
-    const int interval_ms = 1000;
-    const int max_ms = timeout_seconds * 1000;
-    int elapsed = 0;
-
-    while (elapsed < max_ms) {
-        Sleep(interval_ms);
-        elapsed += interval_ms;
-
-        MeathookInterface* mh = new MeathookInterface();
-
-        if (mh->m_Initialized && ProbeRPC(mh)) {
-            LogInfo("Meathook RPC is ready and probe call succeeded!");
-            return mh;
-        }
-
-        // The server is not ready yet. Discard this instance and retry.
-        delete mh;
-
-        if (elapsed % 5000 == 0) {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "Still waiting... (%ds elapsed)", elapsed / 1000);
-            LogInfo(buf);
-        }
-    }
-
-    LogError("Meathook did not become ready within timeout.");
-    return nullptr;
-}
-
-// -----------------------------------------------------------------------
-// Game-state snapshot
-// -----------------------------------------------------------------------
-
-struct GameSnapshot {
-    char checkpoint[512];
-    char spawnInfo[512];
-    bool hasCheckpoint;
-    bool hasSpawnInfo;
+struct LogFileOwner {
+    ~LogFileOwner() { if (g_log) fclose(g_log); }
 };
 
-GameSnapshot CollectSnapshot(MeathookInterface* mh) {
-    GameSnapshot snap = {};
-    try {
-        int sz = sizeof(snap.checkpoint);
-        snap.hasCheckpoint = mh->GetCurrentCheckpoint(&sz, snap.checkpoint);
-    } catch(...) {
-        snap.hasCheckpoint = false;
-        strncpy(snap.checkpoint, "<exception>", sizeof(snap.checkpoint));
-    }
-    try {
-        snap.hasSpawnInfo = mh->GetSpawnInfo((unsigned char*)snap.spawnInfo);
-    } catch(...) {
-        snap.hasSpawnInfo = false;
-        strncpy(snap.spawnInfo, "<exception>", sizeof(snap.spawnInfo));
-    }
-    return snap;
+static void WriteLog(const char* level, const std::string& message)
+{
+    SYSTEMTIME now = {};
+    GetLocalTime(&now);
+    char timestamp[32] = {};
+    snprintf(timestamp, sizeof(timestamp), "%02u:%02u:%02u", now.wHour, now.wMinute, now.wSecond);
+    printf("[%s][%s] %s\n", timestamp, level, message.c_str());
+    if (g_log) { fprintf(g_log, "[%s][%s] %s\n", timestamp, level, message.c_str()); fflush(g_log); }
 }
 
-void LogSnapshot(const GameSnapshot& snap) {
-    if (snap.hasCheckpoint) {
-        LogInfo((std::string("Checkpoint : ") + snap.checkpoint).c_str());
-    } else {
-        LogWarn("Checkpoint : <unavailable — menu, loading, or not in level>");
+struct Snapshot { std::string checkpoint; std::string spawn; bool has_checkpoint = false; bool has_spawn = false; };
+
+static Snapshot Collect(ApRuntimeRpcClient& rpc)
+{
+    Snapshot snapshot;
+    char checkpoint[512] = {}; int checkpoint_size = sizeof(checkpoint);
+    snapshot.has_checkpoint = rpc.Checkpoint(&checkpoint_size, (unsigned char*)checkpoint, sizeof(checkpoint));
+    if (snapshot.has_checkpoint) {
+        snapshot.checkpoint.assign(checkpoint, checkpoint_size);
+        if (!snapshot.checkpoint.empty() && snapshot.checkpoint.back() == '\0') snapshot.checkpoint.pop_back();
     }
-    if (snap.hasSpawnInfo) {
-        LogInfo((std::string("SpawnInfo  : ") + snap.spawnInfo).c_str());
-    } else {
-        LogWarn("SpawnInfo  : <unavailable>");
+    char spawn[512] = {}; int spawn_size = sizeof(spawn);
+    snapshot.has_spawn = rpc.Spawn(&spawn_size, (unsigned char*)spawn, sizeof(spawn));
+    if (snapshot.has_spawn) {
+        snapshot.spawn.assign(spawn, spawn_size);
+        if (!snapshot.spawn.empty() && snapshot.spawn.back() == '\0') snapshot.spawn.pop_back();
     }
+    return snapshot;
 }
 
-bool SnapshotChanged(const GameSnapshot& prev, const GameSnapshot& curr) {
-    if (prev.hasCheckpoint != curr.hasCheckpoint) return true;
-    if (prev.hasSpawnInfo  != curr.hasSpawnInfo)  return true;
-    if (prev.hasCheckpoint && strcmp(prev.checkpoint, curr.checkpoint) != 0) return true;
-    if (prev.hasSpawnInfo  && strcmp(prev.spawnInfo,  curr.spawnInfo)  != 0) return true;
-    return false;
+static bool Changed(const Snapshot& a, const Snapshot& b)
+{
+    return a.has_checkpoint != b.has_checkpoint || a.has_spawn != b.has_spawn
+        || a.checkpoint != b.checkpoint || a.spawn != b.spawn;
 }
 
-// -----------------------------------------------------------------------
-// Main loop
-// -----------------------------------------------------------------------
-
-void RunLogger(MeathookInterface* mh) {
-    LogInfo("Logger running. Polling game state...");
-    LogInfo("--------------------------------------------------");
-
-    GameSnapshot prev = {};
-    int tick = 0;
-    const int FORCED_LOG_INTERVAL = 20;  // forced log every 10s (20 x 500ms)
-
-    while (true) {
-        Sleep(500);
-        tick++;
-
-        GameSnapshot curr = CollectSnapshot(mh);
-        bool changed   = SnapshotChanged(prev, curr);
-        bool forcedLog = (tick % FORCED_LOG_INTERVAL == 0);
-
-        if (changed || forcedLog) {
-            if (changed) LogInfo(">>> State change detected:");
-            else         LogInfo("--- Periodic snapshot:");
-            LogSnapshot(curr);
-            LogInfo("--------------------------------------------------");
-            prev = curr;
-        }
-    }
-}
-
-// -----------------------------------------------------------------------
-// Entry point
-// -----------------------------------------------------------------------
-
-int main() {
-    OpenLog();
-    LogInfo("=== AP Logger starting ===");
-
-    MeathookInterface* mh = ConnectToMeathook(120);  // 2 minutos de timeout
-
-    if (!mh) {
-        LogError("Could not connect to Meathook. Is xinput1_3.dll in the game folder?");
-        LogError("Is the game running with the Meathook DLL loaded?");
-        if (g_LogFile) fclose(g_LogFile);
-        system("pause");
+int main()
+{
+    g_log = fopen("base\\ap_logger.log", "a");
+    LogFileOwner log_owner;
+    WriteLog("INFO ", "=== AP Logger starting ===");
+    ApRuntimeRpcClient rpc;
+    rpc.SetLogCallback([](const std::string& message) { WriteLog("INFO ", message); });
+    const DWORD deadline = GetTickCount() + 120000;
+    while (!rpc.PollHealth() && static_cast<LONG>(GetTickCount() - deadline) < 0) Sleep(1000);
+    if (!rpc.Ready()) {
+        WriteLog("ERROR", "Could not connect to AP runtime RPC.");
         return 1;
     }
-
-    RunLogger(mh);
-
-    delete mh;
-    if (g_LogFile) fclose(g_LogFile);
-    return 0;
+    Snapshot previous; int tick = 0;
+    bool was_healthy = true;
+    for (;;) {
+        Sleep(500);
+        ++tick;
+        const bool healthy = rpc.PollHealth();
+        if (!healthy) {
+            if (was_healthy) WriteLog("WARN ", "RPC health transitioned to unavailable.");
+            was_healthy = false;
+            continue;
+        }
+        if (!was_healthy) WriteLog("INFO ", "RPC health transitioned to ready.");
+        was_healthy = true;
+        Snapshot current = Collect(rpc);
+        const bool changed = Changed(previous, current);
+        if (changed || tick % 20 == 0) {
+            WriteLog("INFO ", changed ? ">>> State change detected:" : "--- Periodic snapshot:");
+            if (current.has_checkpoint) WriteLog("INFO ", "Checkpoint : " + current.checkpoint); else WriteLog("WARN ", "Checkpoint : <unavailable>");
+            if (current.has_spawn) WriteLog("INFO ", "SpawnInfo  : " + current.spawn); else WriteLog("WARN ", "SpawnInfo  : <unavailable>");
+            previous = current;
+        }
+    }
 }
