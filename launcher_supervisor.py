@@ -7,6 +7,8 @@ import os
 import subprocess
 import sys
 import threading
+import time
+import uuid
 from collections import deque
 from collections.abc import Callable
 from enum import Enum
@@ -265,3 +267,171 @@ class BridgeSupervisor:
                 process.kill()
         except OSError:
             pass
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+class NativeClientSupervisor:
+    """Own one launcher-started ap_client process and its runtime PID record."""
+
+    def __init__(
+        self,
+        *,
+        executable: Path,
+        game_root: Path,
+        state_dir: Path,
+        event_sink: Callable[[dict[str, Any]], None],
+        delay: float = 12.0,
+    ):
+        self.executable = executable.resolve()
+        self.game_root = game_root.resolve()
+        self.state_dir = state_dir
+        self.event_sink = event_sink
+        self.delay = max(0.0, delay)
+        self._process: subprocess.Popen[bytes] | None = None
+        self._thread: threading.Thread | None = None
+        self._stop_requested = threading.Event()
+        self._lock = threading.Lock()
+        self._owner_token = uuid.uuid4().hex
+
+    @property
+    def pid_path(self) -> Path:
+        return self.state_dir / "ap_client.pid.json"
+
+    @property
+    def pid(self) -> int | None:
+        process = self._process
+        return process.pid if process is not None else None
+
+    @property
+    def running(self) -> bool:
+        process = self._process
+        return process is not None and process.poll() is None
+
+    def _record(self, process: subprocess.Popen[bytes]) -> None:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        temporary = self.pid_path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(
+                {
+                    "owner": self._owner_token,
+                    "pid": process.pid,
+                    "executable": str(self.executable),
+                    "game_root": str(self.game_root),
+                    "started": time.time(),
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, self.pid_path)
+
+    def _clear_record(self, process: subprocess.Popen[bytes]) -> None:
+        try:
+            record = json.loads(self.pid_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            record = {}
+        if record.get("owner") == self._owner_token and record.get("pid") == process.pid:
+            try:
+                self.pid_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
+    def start(self) -> None:
+        with self._lock:
+            if self.running or (self._thread is not None and self._thread.is_alive()):
+                raise RuntimeError("ap_client is already supervised")
+            self._stop_requested.clear()
+            self._thread = threading.Thread(
+                target=self._start_after_delay,
+                name="DoomNativeClientStart",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def _start_after_delay(self) -> None:
+        if self._stop_requested.wait(self.delay):
+            return
+        try:
+            process = subprocess.Popen(
+                [str(self.executable), str(self.game_root)],
+                cwd=self.game_root,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as error:
+            self.event_sink({"type": "ap_client_failed", "message": str(error)})
+            return
+        with self._lock:
+            if self._stop_requested.is_set():
+                self._terminate_owned(process, 5.0)
+                return
+            self._process = process
+            try:
+                self._record(process)
+            except OSError as error:
+                self._terminate_owned(process, 5.0)
+                self.event_sink({"type": "ap_client_failed", "message": str(error)})
+                return
+        self.event_sink({"type": "ap_client_started", "pid": process.pid})
+        threading.Thread(target=self._watch, args=(process,), name="DoomNativeClientWait", daemon=True).start()
+
+    def _watch(self, process: subprocess.Popen[bytes]) -> None:
+        returncode = process.wait()
+        with self._lock:
+            if self._process is process:
+                self._process = None
+                self._clear_record(process)
+        self.event_sink(
+            {
+                "type": "ap_client_stopped",
+                "pid": process.pid,
+                "returncode": returncode,
+                "intentional": self._stop_requested.is_set(),
+            }
+        )
+
+    def stop(self, timeout: float = 5.0) -> None:
+        self._stop_requested.set()
+        timeout = max(0.1, timeout)
+        deadline = time.monotonic() + timeout
+        spawn_thread = self._thread
+        if spawn_thread is not None and spawn_thread is not threading.current_thread():
+            spawn_thread.join(timeout=max(0.0, deadline - time.monotonic()))
+        remaining = max(0.0, deadline - time.monotonic())
+        if not self._lock.acquire(timeout=remaining):
+            return
+        try:
+            process = self._process
+        finally:
+            self._lock.release()
+        if process is None:
+            return
+        self._terminate_owned(process, timeout)
+
+    def _terminate_owned(self, process: subprocess.Popen[bytes], timeout: float) -> None:
+        if process.poll() is not None:
+            self._clear_record(process)
+            return
+        try:
+            process.terminate()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                return
+        self._clear_record(process)

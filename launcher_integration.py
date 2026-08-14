@@ -21,6 +21,7 @@ from launcher_platform import (
     SteamLaunchOptionsManager,
     WindowsModManagerAdapter,
     stage_room_mod,
+    find_packaged_meathook_xinput,
 )
 
 EventSink = Callable[[str, dict[str, object]], None]
@@ -275,6 +276,16 @@ class IntegratedLaunchWorkflow:
         )
         config = self._config()
         game_root = self._game_root(config)
+        meathook_artifact = find_packaged_meathook_xinput(self.application_dir)
+        self._emit(
+            "meathook_setup_pending",
+            artifact_available=meathook_artifact is not None,
+            message=(
+                "Packaged Meathook XINPUT1_3.dll artifact is available; setup remains pending."
+                if meathook_artifact is not None
+                else "Packaged Meathook XINPUT1_3.dll artifact is not present; setup remains pending."
+            ),
+        )
         runtime_config = self.base_workflow.write_client_config(
             self.application_dir,
             endpoint=endpoint or str(config.get("server_address") or ""),

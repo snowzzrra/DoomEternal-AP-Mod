@@ -337,6 +337,12 @@ else:
 QUEUE_DIR = os.path.join(DOOM_BASE_DIR, "ap_queue")
 RPC_GATE_PATH = os.path.join(DOOM_BASE_DIR, "ap_rpc_enabled")
 GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
+RUNTIME_CAPABILITY_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.capability"
+RUNTIME_SNAPSHOT_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.snapshot"
+RUNTIME_DEATHLINK_REQUEST_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.deathlink.request"
+RUNTIME_DEATHLINK_EVENT_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.deathlink.event"
+RUNTIME_NATIVE_EVENTS_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.events"
+RUNTIME_NATIVE_EVENTS_ACK_PATH = Path(DOOM_BASE_DIR) / "ap_runtime.events.ack"
 INV_DUMP_DIR = SAVE_GAMES_DIR
 CULTIST_BASE_MAP = "game/sp/e1m3_cult/e1m3_cult"
 DOOM_HUNTER_BASE_MAP = "game/sp/e1m4_boss/e1m4_boss"
@@ -1106,6 +1112,281 @@ def read_gameplay_save_evidence(path=None):
         map_name,
         values.get("provisional", "false").lower() == "true",
     )
+
+
+def read_native_runtime_record(path):
+    """Read typed native transport evidence; missing or malformed means unavailable."""
+    try:
+        values = {}
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+    except (OSError, UnicodeError):
+        return {"status": "unavailable", "error": "record missing"}
+    status = values.get("status", "unavailable")
+    if status not in {"ready", "pending", "unavailable"}:
+        return {"status": "unavailable", "error": "invalid status"}
+    return values
+
+
+def native_runtime_capability():
+    return read_native_runtime_record(RUNTIME_CAPABILITY_PATH)
+
+
+def native_runtime_snapshot():
+    return read_native_runtime_record(RUNTIME_SNAPSHOT_PATH)
+
+
+def native_runtime_authority(capability=None, snapshot=None):
+    """Return strict typed-runtime authority facts; invalid records never win."""
+    capability = native_runtime_capability() if capability is None else capability
+    snapshot = native_runtime_snapshot() if snapshot is None else snapshot
+    truth = lambda record, key: record.get(key) == "true"
+    try:
+        sequence = int(snapshot.get("sequence", "0"))
+        timestamp = int(snapshot.get("timestamp_ms", "0"))
+    except (TypeError, ValueError):
+        sequence = timestamp = 0
+    age_ms = int(time.time() * 1000) - timestamp if timestamp else None
+    compatible = (
+        capability.get("status") == "ready"
+        and truth(capability, "valid")
+        and truth(capability, "protocol_compatible")
+        and truth(capability, "build_supported")
+        and truth(capability, "hooks_ready")
+        and truth(capability, "capability_runtime_snapshot")
+    )
+    fresh = (
+        snapshot.get("status") == "ready"
+        and truth(snapshot, "valid")
+        and truth(snapshot, "fresh")
+        and sequence > 0
+        and timestamp > 0
+        and age_ms is not None
+        and 0 <= age_ms <= 15000
+    )
+    authoritative = compatible and fresh and truth(snapshot, "runtime_ready")
+    return {
+        "authoritative": authoritative,
+        "compatible": compatible,
+        "fresh": fresh,
+        "age_ms": age_ms,
+        "sequence": sequence,
+        "runtime_ready": authoritative,
+        "map": snapshot.get("map", "")
+        if authoritative
+        and truth(capability, "capability_map")
+        and truth(snapshot, "map_valid")
+        and snapshot.get("map", "")
+        else "",
+        "game_state": snapshot.get("game_state", "UNKNOWN")
+        if authoritative and truth(snapshot, "game_state_valid") else "UNKNOWN",
+        "checkpoint": snapshot.get("checkpoint", "")
+        if authoritative and truth(snapshot, "checkpoint_valid") else "",
+    }
+
+
+def native_runtime_safe_gameplay(authority=None, snapshot=None):
+    """Future native gameplay authority predicate; not used for DeathLink dispatch."""
+    authority = authority or native_runtime_authority()
+    snapshot = native_runtime_snapshot() if snapshot is None else snapshot
+    return (
+        authority.get("authoritative") is True
+        and authority.get("game_state") == "GAMEPLAY"
+        and snapshot.get("player_valid") == "true"
+        and snapshot.get("dead_valid") == "true"
+        and snapshot.get("dead") == "false"
+    )
+
+
+def native_deathlink_authority(
+    capability=None,
+    snapshot=None,
+    *,
+    has_authoritative_save_proof=False,
+    observers_safe=False,
+):
+    """Authorize native lethal transport without using native game-state fields."""
+    capability = native_runtime_capability() if capability is None else capability
+    snapshot = native_runtime_snapshot() if snapshot is None else snapshot
+    authority = native_runtime_authority(capability, snapshot)
+    truth = lambda record, key: record.get(key) == "true"
+    return (
+        authority["authoritative"]
+        and truth(capability, "capability_native_deathlink")
+        and truth(snapshot, "player_valid")
+        and truth(snapshot, "dead_valid")
+        and not truth(snapshot, "dead")
+        and has_authoritative_save_proof
+        and observers_safe
+    )
+
+
+def native_deathlink_result(event_id, request_id, runtime_generation=None):
+    """Read one structured native deathlink event, rejecting mismatched identity."""
+    record = read_native_runtime_record(RUNTIME_DEATHLINK_EVENT_PATH)
+    if record.get("event_id") != event_id or record.get("request_id") != request_id:
+        return None
+    if runtime_generation is not None and record.get("runtime_generation") != runtime_generation:
+        return None
+    return record
+
+
+def native_deathlink_failed(event_id, request_id, runtime_generation=None):
+    result = native_deathlink_result(event_id, request_id, runtime_generation)
+    return result is not None and result.get("status") in {
+        "unavailable", "invalid_player", "unsupported", "error", "invalid"
+    }
+
+
+def native_runtime_generation(capability=None):
+    capability = native_runtime_capability() if capability is None else capability
+    return capability.get("runtime_generation", "")
+
+
+def native_event_records(after_sequence=0, runtime_generation=None):
+    record = read_native_runtime_record(RUNTIME_NATIVE_EVENTS_PATH)
+    if record.get("status") != "ready" or record.get("gap") == "true":
+        return []
+    if runtime_generation is not None and record.get("runtime_generation") != runtime_generation:
+        return []
+    events = []
+    index = 0
+    previous_sequence = after_sequence
+    while True:
+        prefix = f"event_{index}_"
+        sequence = record.get(prefix + "sequence")
+        if sequence is None:
+            break
+        try:
+            sequence_value = int(sequence)
+            if sequence_value <= previous_sequence:
+                return []
+            previous_sequence = sequence_value
+            if sequence_value > after_sequence:
+                events.append({
+                    "sequence": sequence_value,
+                    "type": record.get(prefix + "type", ""),
+                    "request_id": record.get(prefix + "request_id", ""),
+                    "runtime_generation": record.get("runtime_generation", ""),
+                })
+        except ValueError:
+            return []
+        index += 1
+    return events
+
+
+def acknowledge_native_events(sequence, runtime_generation=None):
+    if sequence <= 0:
+        return False
+    generation = native_runtime_generation() if runtime_generation is None else runtime_generation
+    temporary = RUNTIME_NATIVE_EVENTS_ACK_PATH.with_name(
+        f".{RUNTIME_NATIVE_EVENTS_ACK_PATH.name}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        RUNTIME_NATIVE_EVENTS_ACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            f"status=acknowledged\nsequence={sequence}\nruntime_generation={generation}\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, RUNTIME_NATIVE_EVENTS_ACK_PATH)
+    except OSError:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        return False
+    return True
+
+
+def native_deathlink_failed(event_id, request_id, runtime_generation=None):
+    result = native_deathlink_result(event_id, request_id, runtime_generation)
+    return result is not None and result.get("status") in {
+        "unavailable",
+        "invalid_player",
+        "unsupported",
+        "error",
+        "invalid",
+    }
+
+
+def native_deathlink_in_flight(event_id, request_id, runtime_generation=None):
+    result = native_deathlink_result(event_id, request_id, runtime_generation)
+    if result is None:
+        request = read_native_runtime_record(RUNTIME_DEATHLINK_REQUEST_PATH)
+        return (
+            request.get("event_id") == event_id
+            and request.get("request_id") == request_id
+            and request.get("status") in {"queued", "pending"}
+        )
+    return result.get("status") in {"queued", "pending"}
+
+
+def native_deathlink_invoked(event_id, request_id, runtime_generation=None):
+    result = native_deathlink_result(event_id, request_id, runtime_generation)
+    return result is not None and result.get("status") == "invoked"
+
+
+def native_deathlink_confirmed(event_id, request_id, runtime_generation=None):
+    if not native_deathlink_invoked(event_id, request_id, runtime_generation):
+        return False
+    events = native_event_records(
+            after_sequence=0,
+            runtime_generation=runtime_generation,
+        )
+    matched = any(event["type"] == "1" and event["request_id"] == request_id for event in events)
+    if matched and events:
+        acknowledge_native_events(max(event["sequence"] for event in events), runtime_generation)
+    return matched
+
+
+def _write_native_deathlink_request(event_id, attempt):
+    request_id = hashlib.sha256(
+        f"{event_id}:{attempt}".encode("utf-8")
+    ).hexdigest()
+    existing = read_native_runtime_record(RUNTIME_DEATHLINK_REQUEST_PATH)
+    if existing.get("request_id") == request_id:
+        return request_id
+    temporary = RUNTIME_DEATHLINK_REQUEST_PATH.with_name(
+        f".{RUNTIME_DEATHLINK_REQUEST_PATH.name}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        RUNTIME_DEATHLINK_REQUEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            "status=queued\n"
+            f"event_id={event_id}\n"
+            f"request_id={request_id}\n"
+            f"runtime_generation={native_runtime_generation()}\n"
+            f"attempt={attempt}\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, RUNTIME_DEATHLINK_REQUEST_PATH)
+    except OSError:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        return None
+    return request_id
+
+
+def emit_runtime_snapshot_event():
+    capability = native_runtime_capability()
+    snapshot = native_runtime_snapshot()
+    authority = native_runtime_authority(capability, snapshot)
+    emit_launcher_event(
+        "runtime_snapshot",
+        capability=capability,
+        snapshot=snapshot,
+        authority=authority,
+        sequence=authority["sequence"],
+    )
+
+
+def native_runtime_unavailable():
+    """Keep legacy durable DeathLink fallback independent of runtime diagnostics."""
+    return True
 
 
 def mastery_save_selection():
@@ -2590,6 +2871,11 @@ class DoomEternalContext(CommonContext):
     def reset_queue_session_authority(self, reason):
         self._queue_session_authoritative = False
         invalidate_queue_session_namespace(reason)
+        for path in (RUNTIME_DEATHLINK_REQUEST_PATH, RUNTIME_DEATHLINK_EVENT_PATH):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
     def _report_launcher_connection_failure(self, message):
         if (
@@ -4815,19 +5101,100 @@ class DoomEternalContext(CommonContext):
     def queue_received_deathlink(self):
         if not self.death_link_enabled:
             return
+        active = self.deathlink_receiver.active
+        def dispatch_deathlink():
+            active = self.deathlink_receiver.active
+            if active is not None and active.transport_kind == "native":
+                if active.native_request_id is None:
+                    return False
+                if (
+                    active.native_runtime_generation
+                    and native_runtime_generation()
+                    != active.native_runtime_generation
+                ):
+                    return False
+                if native_deathlink_failed(
+                    active.event_id,
+                    active.native_request_id,
+                    active.native_runtime_generation,
+                ):
+                    return False
+                return True
+            if active is None or not native_deathlink_authority(
+                has_authoritative_save_proof=self.has_authoritative_save_proof(),
+                observers_safe=not self.runtime_observers_frozen,
+            ):
+                self.deathlink_receiver.bind_console_transport()
+                return send_command(
+                    "ai_ScriptCmdEnt ap_deathlink activate",
+                    coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
+                )
+            request_id = _write_native_deathlink_request(
+                active.event_id,
+                active.attempts + 1,
+            )
+            if request_id is not None:
+                self.deathlink_receiver.bind_native_transport(
+                    request_id,
+                    native_runtime_generation(),
+                )
+            return request_id is not None
+
+        def deathlink_in_flight(event):
+            if event.transport_kind == "native" and event.native_request_id is not None:
+                return native_deathlink_in_flight(
+                    event.event_id,
+                    event.native_request_id,
+                    event.native_runtime_generation,
+                )
+            if event.transport_kind == "native":
+                return True
+            return command_spool_exists(DEATHLINK_KILL_COALESCE_KEY)
+
+        def native_delivery_confirmed(event):
+            return (
+                event.transport_kind == "native"
+                and event.native_request_id is not None
+                and native_deathlink_confirmed(
+                    event.event_id,
+                    event.native_request_id,
+                    event.native_runtime_generation,
+                )
+            )
+
+        def native_delivery_invoked(event):
+            return (
+                event.transport_kind == "native"
+                and event.native_request_id is not None
+                and native_deathlink_invoked(
+                    event.event_id,
+                    event.native_request_id,
+                    event.native_runtime_generation,
+                )
+            )
+
+        def native_delivery_failed(event):
+            return (
+                event.transport_kind == "native"
+                and event.native_request_id is not None
+                and native_deathlink_failed(
+                    event.event_id,
+                    event.native_request_id,
+                    event.native_runtime_generation,
+                )
+            )
+
         result = self.deathlink_receiver.advance(
             now=time.monotonic(),
             safe_gameplay=(
                 not self.runtime_observers_frozen
                 and self.has_authoritative_save_proof()
             ),
-            dispatch=lambda: send_command(
-                "ai_ScriptCmdEnt ap_deathlink activate",
-                coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
-            ),
-            command_in_flight=lambda: command_spool_exists(
-                DEATHLINK_KILL_COALESCE_KEY
-            ),
+            dispatch=dispatch_deathlink,
+            command_in_flight=deathlink_in_flight,
+            delivery_failed=native_delivery_failed,
+            confirmation=native_delivery_confirmed,
+            invoked=native_delivery_invoked,
         )
         self.deathlink_instrumentation.append(
             {
@@ -5945,6 +6312,7 @@ class DoomEternalContext(CommonContext):
         while not self.exit_event.is_set():
             self.last_heartbeat_timestamp = time.time()
             self.heartbeat_iteration_count += 1
+            emit_runtime_snapshot_event()
             if self.heartbeat_iteration_count % 15 == 0:
                 logger.info(
                     "[Tracking] TRACKER_HEARTBEAT active_slot=%s map=%s items_processed=%d/%d",

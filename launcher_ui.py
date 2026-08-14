@@ -1058,9 +1058,9 @@ class LauncherUI(QMainWindow):
             state, reason = str(event.get("state", "")), str(event.get("reason", ""))
             if state == "already_installed":
                 self.drift.hide(); self.reinstall_button.setEnabled(True)
-                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "waiting", self.COLORS["warn"]); self._set_status("rpc", "Waiting for DOOM Eternal", self.COLORS["warn"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_home("WAITING FOR GAME LINK", "Waiting for DOOM Eternal.", "WAITING...", "WAITING", enabled=False)
             else:
                 drift = state == "update_required" or "another room" in reason
                 self.drift.setText("ROOM UPDATE - " + (reason or "This room needs its matching mod.")); self.drift.setVisible(drift)
@@ -1075,13 +1075,32 @@ class LauncherUI(QMainWindow):
             if option:
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
-                self.reinstall_button.setEnabled(True); self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                self.reinstall_button.setEnabled(True); self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "waiting", self.COLORS["warn"]); self._set_status("rpc", "Waiting for DOOM Eternal", self.COLORS["warn"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_home("WAITING FOR GAME LINK", "Start DOOM Eternal and keep this launcher open.", "WAITING...", "WAITING", enabled=False)
             elif state == "manual_action_required":
                 self._set_home("FINISH SETUP", str(event.get("message", "Finish the game manager step, then try again.")), "TRY AGAIN", "ACTION NEEDED")
             else:
                 self._set_home("SETUP NEEDS ATTENTION", str(event.get("message", "Try setup again.")), "TRY AGAIN", "ACTION NEEDED")
+        elif kind == "game_link":
+            state = str(event.get("state", "Unavailable"))
+            tone = self.COLORS["good"] if state == "Ready" else self.COLORS["warn"]
+            self._set_status("rpc", state, tone)
+            if state == "Waiting for DOOM Eternal":
+                detail = "Waiting for DOOM Eternal."
+            elif state == "Needs attention":
+                detail = "Needs attention"
+            elif state == "Update needed":
+                detail = "Update needed"
+            else:
+                detail = state
+            self._set_home(
+                "READY TO PLAY" if state == "Ready" else "WAITING FOR GAME LINK",
+                "Runtime snapshot is fresh and compatible." if state == "Ready" else detail,
+                "PLAY DOOM ETERNAL" if state == "Ready" else "WAITING...",
+                state.upper(),
+                enabled=state == "Ready",
+            )
         elif kind == "manual_action_required":
             message = str(event.get("message", "Finish the game manager step."))
             self._set_home("FINISH SETUP", message, "WAITING", "ACTION NEEDED", enabled=False)
@@ -1095,9 +1114,9 @@ class LauncherUI(QMainWindow):
             if bool(event.get("succeeded")):
                 self.reinstall_button.setEnabled(True)
                 self._set_status("mod", "ready", self.COLORS["good"])
-                self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                self._set_status("game", "waiting", self.COLORS["warn"]); self._set_status("rpc", "Waiting for DOOM Eternal", self.COLORS["warn"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_home("WAITING FOR GAME LINK", "Waiting for DOOM Eternal.", "WAITING...", "WAITING", enabled=False)
             else:
                 self._set_home("SETUP NEEDS RETRY", "Finish installation, then update this room mod.", "TRY AGAIN", "ACTION NEEDED")
         elif kind == "disconnected":

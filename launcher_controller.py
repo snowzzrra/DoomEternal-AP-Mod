@@ -10,10 +10,13 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
+
+RUNTIME_RECORD_MAX_AGE_SECONDS = 15.0
 
 from launcher_core import LaunchWorkflow
 from launcher_doctor import DoctorReport, LauncherDoctor, write_support_bundle
@@ -29,10 +32,11 @@ from launcher_platform import (
     launcher_user_paths,
     migrate_legacy_launcher_data,
     read_handshake_probe,
+    read_runtime_record,
     validate_game_root,
     validate_save_directory,
 )
-from launcher_supervisor import BridgeSupervisor
+from launcher_supervisor import BridgeSupervisor, NativeClientSupervisor
 from options_foundation import load_options_schema, save_player_yaml
 
 
@@ -73,6 +77,9 @@ class LauncherController:
         self.state = LauncherState.IDLE
         self.connected_room = False
         self.supervisor: BridgeSupervisor | None = None
+        self.native_client: NativeClientSupervisor | None = None
+        self.game_link_state = "unknown"
+        self._native_launch_started_at: float | None = None
         self._lifecycle_lock = threading.Lock()
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
@@ -176,18 +183,137 @@ class LauncherController:
 
     def launch_game(self) -> str:
         """Launch through Steam URL handler."""
+        self._native_launch_started_at = time.time()
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
+        self.probe_handshake()
+        executable = self.client_dir / "ap_client.exe"
+        configured_game_root = self.config.get("game_root")
+        game_root = Path(str(configured_game_root)).expanduser() if configured_game_root else None
+        if game_root is None or not game_root.is_dir():
+            self.emit(
+                "native_client",
+                state="missing_game_root",
+                message="DOOM Eternal game root is not configured or does not exist.",
+                path=str(game_root or ""),
+            )
+        elif not executable.is_file():
+            self.emit(
+                "native_client",
+                state="missing_client",
+                message="Packaged ap_client.exe is missing; rebuild or reinstall launcher package.",
+                path=str(executable),
+            )
+        elif os.name == "nt":
+            if self.native_client is not None:
+                self.native_client.stop()
+            self.native_client = NativeClientSupervisor(
+                executable=executable,
+                game_root=game_root,
+                state_dir=self.state_dir,
+                event_sink=self._native_client_event,
+            )
+            try:
+                self.native_client.start()
+            except RuntimeError as error:
+                self.emit("native_client", state="failed", message=str(error))
+        else:
+            self.emit(
+                "native_client",
+                state="external_injector_pending",
+                message="Linux injector remains configured through Steam; launcher does not own its process.",
+            )
         return url
+
+    def _native_client_event(self, event: dict[str, object]) -> None:
+        self.emit("native_client", **event)
+        if event.get("type") == "ap_client_failed" or event.get("state") in {
+            "failed", "missing_game_root", "missing_client"
+        }:
+            self.game_link_state = "Needs attention"
+            self.emit("game_link", state="Needs attention", evidence_status="client_start_failed")
+        if event.get("type") == "ap_client_started":
+            self.probe_handshake()
 
     def probe_handshake(self) -> dict[str, object]:
         base = self.config.get("doom_base_dir")
         if not base:
             result = {"status": "unavailable", "reason": "DOOM Eternal base directory is not configured"}
         else:
-            result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
+            result = read_handshake_probe(
+                Path(str(base)).expanduser() / "ap_gameplay_save.state",
+                fresh_after=self._native_launch_started_at,
+            )
+        result = dict(result)
+        base_path = Path(str(self.config.get("doom_base_dir", ""))).expanduser()
+        result["runtime"] = read_runtime_record(base_path / "ap_runtime.capability")
+        snapshot_path = base_path / "ap_runtime.snapshot"
+        snapshot = read_runtime_record(snapshot_path)
+        result["runtime_record_fresh"] = self._runtime_record_fresh(
+            base_path / "ap_runtime.capability"
+        )
+        result["snapshot_record_fresh"] = self._runtime_record_fresh(snapshot_path)
+        result["snapshot"] = snapshot
         self.emit("handshake_probe", **result)
+        self._update_game_link(result)
         return dict(result)
+
+    @staticmethod
+    def _runtime_record_fresh(path: Path) -> bool:
+        try:
+            return time.time() - path.stat().st_mtime <= RUNTIME_RECORD_MAX_AGE_SECONDS
+        except OSError:
+            return False
+
+    def _update_game_link(self, evidence: dict[str, object] | dict[str, str]) -> None:
+        status = str(evidence.get("status", "unavailable"))
+        runtime_value = evidence.get("runtime")
+        snapshot_value = evidence.get("snapshot")
+        runtime: dict[str, str] = runtime_value if isinstance(runtime_value, dict) else {}
+        snapshot: dict[str, str] = snapshot_value if isinstance(snapshot_value, dict) else {}
+        process = runtime.get("process_available") == "true"
+        rpc = runtime.get("rpc_reachable") == "true"
+        compatible = runtime.get("protocol_compatible") == "true"
+        runtime_valid = runtime.get("valid") == "true"
+        snapshot_valid = snapshot.get("valid") == "true"
+        runtime_record_fresh = evidence.get("runtime_record_fresh") is True
+        snapshot_record_fresh = evidence.get("snapshot_record_fresh") is True
+        try:
+            snapshot_path = Path(str(self.config.get("doom_base_dir", ""))).expanduser() / "ap_runtime.snapshot"
+            snapshot_fresh = snapshot_path.stat().st_mtime >= (self._native_launch_started_at or 0)
+        except OSError:
+            snapshot_fresh = False
+        fresh_snapshot = (
+            bool(snapshot.get("sequence"))
+            and snapshot_valid
+            and snapshot.get("status") == "ready"
+            and snapshot.get("runtime_ready") == "true"
+            and snapshot_fresh
+            and runtime_record_fresh
+            and snapshot_record_fresh
+        )
+        if not process:
+            link = "Waiting for DOOM Eternal"
+        elif runtime.get("protocol_compatible") != "true":
+            link = "Update needed"
+        elif not rpc:
+            link = "Needs attention"
+        elif runtime.get("status") != "ready" or not compatible or not runtime_valid:
+            link = "Needs attention"
+        elif not fresh_snapshot:
+            link = "Waiting for snapshot"
+        elif runtime_valid and compatible:
+            link = "Ready"
+        else:
+            link = "Needs attention"
+        self.game_link_state = link
+        self.emit(
+            "game_link",
+            state=link,
+            evidence_state=evidence.get("state", ""),
+            evidence_status=status,
+            path=evidence.get("path", ""),
+        )
 
     def run_doctor(self) -> DoctorReport:
         report = LauncherDoctor(config=self.config, paths=self.user_paths).run()
@@ -515,4 +641,7 @@ class LauncherController:
         self.emit("windows_installation_confirmed", succeeded=succeeded)
 
     def close(self) -> None:
+        if self.native_client is not None:
+            self.native_client.stop()
+            self.native_client = None
         self.disconnect()
