@@ -27,21 +27,6 @@ REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
-def read_runtime_record(path: Path) -> dict[str, str]:
-    """Read atomic native runtime evidence; malformed records are unavailable."""
-    try:
-        values: dict[str, str] = {}
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if "=" in line:
-                key, value = line.split("=", 1)
-                values[key] = value
-    except (OSError, UnicodeError):
-        return {"status": "unavailable", "error": "record missing"}
-    if values.get("status", "unavailable") not in {"ready", "pending", "unavailable"}:
-        return {"status": "unavailable", "error": "invalid status"}
-    return values
-
-
 @dataclass(frozen=True)
 class LauncherUserPaths:
     """Per-user launcher roots for configuration, state, cache, and logs."""
@@ -154,11 +139,6 @@ LINUX_MOD_INJECTOR = DependencySpec(
     executable_glob="**/EternalModInjectorShell.sh",
     archive_type="tar.gz",
 )
-
-
-def find_packaged_meathook_xinput(application_dir: Path) -> Path | None:
-    """Meathook setup is pending until managed installation is implemented."""
-    return None
 
 
 class DownloadTransport(Protocol):
@@ -646,19 +626,12 @@ def launch_doom_via_steam(*, opener: Callable[[str], object] | None = None) -> s
     return STEAM_GAME_URL
 
 
-def read_handshake_probe(path: Path, *, fresh_after: float | None = None) -> dict[str, object]:
+def read_handshake_probe(path: Path) -> dict[str, object]:
     """Read native handshake marker without opening, changing, or creating it."""
     try:
-        modified_at = path.stat().st_mtime
         lines = path.read_text(encoding="utf-8", errors="strict").splitlines()[:32]
     except (OSError, UnicodeError):
         return {"status": "unavailable", "path": str(path)}
-    if fresh_after is None or modified_at < fresh_after:
-        return {
-            "status": "pending",
-            "reason": "waiting for fresh native handshake evidence",
-            "path": str(path),
-        }
     values: dict[str, str] = {}
     for line in lines:
         if "=" in line:
@@ -672,9 +645,7 @@ def read_handshake_probe(path: Path, *, fresh_after: float | None = None) -> dic
         epoch = int(values.get("epoch", "-1"))
     except ValueError:
         return {"status": "invalid", "path": str(path)}
-    if epoch < 0:
-        return {"status": "invalid", "path": str(path)}
-    result: dict[str, object] = {"status": "ok", "state": state, "epoch": epoch, "fresh": True}
+    result: dict[str, object] = {"status": "ok", "state": state, "epoch": epoch}
     if state == "gameplay":
         result.update({"slot": values.get("slot", ""), "map_name": values.get("map_name", "")})
     return result

@@ -41,9 +41,6 @@ class ReceivedDeathLink:
     deliveries: int = 0
     safe_pauses: int = 0
     unsafe_pauses: int = 0
-    transport_kind: str | None = None
-    native_request_id: str | None = None
-    native_runtime_generation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -167,19 +164,6 @@ class DeathLinkReceiver:
     def queued_event_ids(self) -> tuple[str, ...]:
         return tuple(event.event_id for event in self._queue)
 
-    def bind_native_transport(self, request_id: str, runtime_generation: str) -> None:
-        event = self.active
-        if event is None:
-            return
-        event.transport_kind = "native"
-        event.native_request_id = request_id
-        event.native_runtime_generation = runtime_generation
-
-    def bind_console_transport(self) -> None:
-        event = self.active
-        if event is not None:
-            event.transport_kind = "console"
-
     @property
     def suppression_event_id(self) -> str | None:
         return self._suppression_event_id
@@ -207,11 +191,8 @@ class DeathLinkReceiver:
         *,
         now: float,
         safe_gameplay: bool,
-        dispatch: Callable[..., bool],
-        command_in_flight: Callable[..., bool],
-        confirmation: Callable[..., bool] | None = None,
-        delivery_failed: Callable[..., bool] | None = None,
-        invoked: Callable[..., bool] | None = None,
+        dispatch: Callable[[], bool],
+        command_in_flight: Callable[[], bool],
     ) -> ReceiveResult:
         event = self.active
         if event is None:
@@ -222,24 +203,11 @@ class DeathLinkReceiver:
             event.state = ReceiveState.WAITING_FOR_SAFE_GAMEPLAY
             event.next_attempt_at = min(event.next_attempt_at, now + self.wait_timeout)
 
-        in_flight = self._invoke(event, command_in_flight)
+        in_flight = command_in_flight()
         if event.state is ReceiveState.COMMAND_IN_FLIGHT:
             if in_flight:
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
-            if delivery_failed is not None and self._invoke(event, delivery_failed):
-                if self.mode == "soft":
-                    return self._finish(
-                        ReceiveState.FAILED,
-                        "native_delivery_failed",
-                        now=now,
-                        allow_late_suppression=True,
-                    )
-                event.state = ReceiveState.WAITING_FOR_RETRY
-                event.next_attempt_at = now + self.retry_interval
-                return self._result(event.event_id, event.state, "native_retry_scheduled", now)
             event.deliveries += 1
-            if event.transport_kind == "native" and invoked is not None and not self._invoke(event, invoked):
-                return self._result(event.event_id, event.state, "awaiting_invocation", now)
             if self.mode == "soft":
                 return self._finish(
                     ReceiveState.APPLIED,
@@ -253,8 +221,6 @@ class DeathLinkReceiver:
             return self._result(event.event_id, event.state, "delivered", now)
 
         if event.state is ReceiveState.AWAITING_CONFIRMATION:
-            if confirmation is not None and self._invoke(event, confirmation):
-                return self._finish(ReceiveState.RESOLVED, "native_player_dead", now=now)
             if event.confirmation_deadline is not None and now < event.confirmation_deadline:
                 return self._result(event.event_id, event.state, "awaiting_confirmation", now)
             if self.max_attempts is not None and event.attempts >= self.max_attempts:
@@ -279,7 +245,7 @@ class DeathLinkReceiver:
         if self.max_attempts is not None and event.attempts >= self.max_attempts:
             return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
         try:
-            accepted = self._invoke(event, dispatch)
+            accepted = dispatch()
         except Exception as error:
             return self._finish(ReceiveState.FAILED, f"dispatch_error:{type(error).__name__}", now=now)
         if not accepted:
@@ -292,16 +258,6 @@ class DeathLinkReceiver:
         event.state = ReceiveState.COMMAND_IN_FLIGHT
         self._suppression_event_id = event.event_id
         return self._result(event.event_id, event.state, "dispatched", now)
-
-    @staticmethod
-    def _invoke(event: ReceivedDeathLink, callback: Callable[..., bool]) -> bool:
-        try:
-            return callback(event)
-        except TypeError as error:
-            try:
-                return callback()
-            except TypeError:
-                raise error
 
     def confirm_local_death(self, now: float) -> ReceiveResult:
         event = self.active

@@ -4,7 +4,6 @@
 #include <tlhelp32.h>
 #include <winver.h>
 #include <cstdlib>
-#include <cstring>
 #include <stdio.h>
 #include <algorithm>
 #include <array>
@@ -33,22 +32,6 @@ static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
 static const char* kReleaseVersion = "0.4.0-beta.4";
-static const char* kRuntimeCapabilityPath = "base\\ap_runtime.capability";
-static const char* kDeathLinkRequestPath = "base\\ap_runtime.deathlink.request";
-static const char* kDeathLinkEventPath = "base\\ap_runtime.deathlink.event";
-static const char* kNativeEventPath = "base\\ap_runtime.events";
-static const char* kNativeEventAckPath = "base\\ap_runtime.events.ack";
-
-static const char* RuntimeGameStateName(APGameState state)
-{
-    switch (static_cast<int>(state)) {
-    case 1: return "MAIN_MENU";
-    case 2: return "LOADING";
-    case 3: return "GAMEPLAY";
-    case 4: return "PAUSED";
-    default: return "UNKNOWN";
-    }
-}
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kRpcEntityContractRevision = 3;
 static const int kNativeCommandPolicyRevision = 7;
@@ -1379,324 +1362,6 @@ bool WriteCommandFile(const std::string& path, const std::string& command) {
     return ok;
 }
 
-bool WriteRuntimeRecord(const char* path, const std::string& record) {
-    const std::string temporary = std::string(path) + ".tmp";
-    FILE* file = fopen(temporary.c_str(), "wb");
-    if (!file) return false;
-    const size_t written = fwrite(record.data(), 1, record.size(), file);
-    const bool ok = written == record.size() && fflush(file) == 0;
-    fclose(file);
-    if (!ok) {
-        DeleteFileA(temporary.c_str());
-        return false;
-    }
-    return MoveFileExA(
-        temporary.c_str(), path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
-    ) != 0;
-}
-
-void PublishRuntimeCapability() {
-    RuntimeCapabilityRecord capability;
-    RuntimeSnapshot snapshot;
-    const bool snapshotReady = g_MhInterface && g_MhInterface->PollRuntimeSnapshot();
-    if (g_MhInterface) {
-        capability = g_MhInterface->RuntimeCapabilities();
-        g_MhInterface->GetCachedRuntimeSnapshot(snapshot);
-    }
-    std::string record = "status="
-        + std::string(capability.status == RUNTIME_TRANSPORT_READY ? "ready" :
-            capability.status == RUNTIME_TRANSPORT_PENDING ? "pending" : "unavailable") + "\n"
-        + "valid=" + (capability.valid ? "true" : "false") + "\n"
-        + "build_supported=" + (capability.info.build_supported ? "true" : "false") + "\n"
-        + "hooks_ready=" + (capability.info.hooks_ready ? "true" : "false") + "\n"
-        + "capability_runtime_snapshot="
-            + (capability.info.capability_runtime_snapshot ? "true" : "false") + "\n"
-        + "capability_map="
-            + (capability.info.capability_map ? "true" : "false") + "\n"
-        + "capability_native_deathlink="
-            + (capability.info.capability_native_deathlink ? "true" : "false") + "\n"
-        + "capability_native_events="
-            + (capability.info.capability_native_events ? "true" : "false") + "\n"
-        + "capability_extra_life_telemetry="
-            + (capability.info.capability_extra_life_telemetry ? "true" : "false") + "\n"
-        + "protocol_version=" + std::to_string(capability.info.protocol_version) + "\n"
-        + "runtime_generation="
-            + std::to_string(g_MhInterface ? g_MhInterface->BindingGeneration() : 0)
-            + "\n"
-        + "process_available=" + (capability.valid ? "true" : "false") + "\n"
-        + "rpc_reachable=" + (g_MhInterface && g_MhInterface->IsInitialized() ? "true" : "false") + "\n"
-        + "protocol_compatible=" + (capability.protocolCompatible ? "true" : "false") + "\n";
-    if (!capability.error.empty()) record += "error=" + capability.error + "\n";
-    WriteRuntimeRecord(kRuntimeCapabilityPath, record);
-    if (snapshotReady && snapshot.valid) {
-        const std::string mapName(
-            snapshot.data.map,
-            strnlen(snapshot.data.map, sizeof(snapshot.data.map))
-        );
-        const std::string checkpointName(
-            snapshot.data.checkpoint,
-            strnlen(snapshot.data.checkpoint, sizeof(snapshot.data.checkpoint))
-        );
-        std::string snapshotRecord =
-            "status=ready\nvalid=true\nfresh=true\n"
-            "protocol_version=" + std::to_string(capability.info.protocol_version) + "\n"
-            "sequence=" + std::to_string(snapshot.data.sequence) + "\n"
-            "timestamp_ms=" + std::to_string(snapshot.data.timestamp) + "\n"
-            "runtime_ready=" + (snapshot.data.runtime_ready ? "true" : "false") + "\n"
-            "player_valid=" + (snapshot.data.player_valid ? "true" : "false") + "\n"
-            "health_valid=" + (snapshot.data.health_valid ? "true" : "false") + "\n"
-            "max_health_valid=" + (snapshot.data.max_health_valid ? "true" : "false") + "\n"
-            "health=" + std::to_string(snapshot.data.health) + "\n"
-            "max_health=" + std::to_string(snapshot.data.max_health) + "\n"
-            "dead_valid=" + (snapshot.data.dead_valid ? "true" : "false") + "\n"
-            "dead=" + (snapshot.data.dead ? "true" : "false") + "\n"
-            "game_state_valid=" + (snapshot.data.game_state_valid ? "true" : "false") + "\n"
-            "game_state=" + std::string(RuntimeGameStateName(snapshot.data.game_state)) + "\n"
-            "map_valid=" + (snapshot.data.map_valid ? "true" : "false") + "\n"
-            "map=" + mapName + "\n"
-            "checkpoint_valid=" + (snapshot.data.checkpoint_valid ? "true" : "false") + "\n"
-            "checkpoint=" + checkpointName + "\n";
-        WriteRuntimeRecord("base\\ap_runtime.snapshot", snapshotRecord);
-    } else {
-        const char* status = g_MhInterface && g_MhInterface->IsInitialized()
-            ? "pending" : "unavailable";
-        WriteRuntimeRecord(
-            "base\\ap_runtime.snapshot",
-            std::string("status=") + status + "\nvalid=false\nfresh=false\n"
-                + "protocol_version=0\nsequence=0\ntimestamp_ms=0\n"
-                + "runtime_ready=false\nplayer_valid=false\nhealth_valid=false\n"
-                + "max_health_valid=false\ndead_valid=false\ndead=false\n"
-                + "game_state_valid=false\ngame_state=UNKNOWN\nmap_valid=false\n"
-                + "map=\ncheckpoint_valid=false\ncheckpoint=\n"
-                + "error=typed runtime snapshot unavailable\n"
-        );
-    }
-}
-
-static const char* DeathLinkStatusName(APDeathLinkStatus status)
-{
-    switch (status) {
-    case AP_DEATHLINK_QUEUED: return "queued";
-    case AP_DEATHLINK_INVOKED: return "invoked";
-    case AP_DEATHLINK_UNAVAILABLE: return "unavailable";
-    case AP_DEATHLINK_INVALID_PLAYER: return "invalid_player";
-    case AP_DEATHLINK_UNSUPPORTED: return "unsupported";
-    case AP_DEATHLINK_ERROR: return "error";
-    case AP_DEATHLINK_INVALID: return "invalid";
-    default: return "error";
-    }
-}
-
-static std::string ReadSmallFile(const char* path)
-{
-    FILE* file = fopen(path, "rb");
-    if (!file) return {};
-    char buffer[512] = {};
-    const size_t count = fread(buffer, 1, sizeof(buffer) - 1, file);
-    fclose(file);
-    return std::string(buffer, count);
-}
-
-static std::string RecordValue(const std::string& record, const char* key)
-{
-    const std::string prefix = std::string(key) + "=";
-    const size_t start = record.find(prefix);
-    if (start == std::string::npos) return {};
-    const size_t valueStart = start + prefix.size();
-    const size_t end = record.find('\n', valueStart);
-    return record.substr(valueStart, end == std::string::npos ? end : end - valueStart);
-}
-
-static void PublishDeathLinkResult(
-    const std::string& eventId,
-    const std::string& requestId,
-    const std::string& runtimeGeneration,
-    const NativeDeathLinkResult& result
-)
-{
-    WriteRuntimeRecord(
-        kDeathLinkEventPath,
-        "status=" + std::string(DeathLinkStatusName(result.status)) + "\n"
-        + "event_id=" + eventId + "\nrequest_id=" + requestId + "\n"
-        + "runtime_generation=" + runtimeGeneration + "\n"
-        + "transport_succeeded=" + (result.transportSucceeded ? "true" : "false") + "\n"
-    );
-}
-
-static void PublishNativeEvents(MeathookInterface* interfaceClient, long long& sequence)
-{
-    if (!interfaceClient) return;
-    static std::vector<APEvent> eventRing;
-    static std::string ringGeneration;
-    const std::string generation = std::to_string(interfaceClient->BindingGeneration());
-    if (ringGeneration != generation) {
-        ringGeneration = generation;
-        eventRing.clear();
-    }
-    const std::string acknowledgement = ReadSmallFile(kNativeEventAckPath);
-    if (RecordValue(acknowledgement, "runtime_generation") == generation) {
-        long long acknowledgedSequence = 0;
-        try {
-            acknowledgedSequence = std::stoll(RecordValue(acknowledgement, "sequence"));
-        } catch (...) {
-            acknowledgedSequence = 0;
-        }
-        if (acknowledgedSequence > 0) {
-            eventRing.erase(
-                std::remove_if(
-                    eventRing.begin(), eventRing.end(),
-                    [acknowledgedSequence](const APEvent& event) {
-                        return static_cast<long long>(event.sequence) <= acknowledgedSequence;
-                    }
-                ),
-                eventRing.end()
-            );
-        }
-    }
-    APEventBatch batch = {};
-    if (!interfaceClient->GetAPEventsSinceTyped(sequence, batch)) return;
-    if (batch.count == 0 && eventRing.empty()) {
-        return;
-    }
-    for (ULONG index = 0; index < batch.count && index < 128; ++index) {
-        eventRing.push_back(batch.events[index]);
-    }
-    if (eventRing.size() > 128) {
-        eventRing.erase(eventRing.begin(), eventRing.end() - 128);
-    }
-    const long long latestSequence = batch.count
-        ? static_cast<long long>(batch.latest_sequence)
-        : static_cast<long long>(eventRing.back().sequence);
-    const long long oldestSequence = eventRing.empty()
-        ? static_cast<long long>(batch.oldest_sequence)
-        : static_cast<long long>(eventRing.front().sequence);
-    std::string record = "status=ready\nlatest_sequence="
-        + std::to_string(latestSequence) + "\noldest_sequence="
-        + std::to_string(oldestSequence) + "\ngap="
-        + (batch.gap ? "true" : "false") + "\nruntime_generation="
-        + generation + "\n";
-    for (size_t index = 0; index < eventRing.size(); ++index) {
-        record += "event_" + std::to_string(index) + "_sequence="
-            + std::to_string(eventRing[index].sequence) + "\n"
-            + "event_" + std::to_string(index) + "_type="
-            + std::to_string(static_cast<int>(eventRing[index].type)) + "\n"
-            + "event_" + std::to_string(index) + "_request_id="
-            + std::string(eventRing[index].request_id) + "\n";
-    }
-    sequence = std::max(sequence, latestSequence);
-    WriteRuntimeRecord(kNativeEventPath, record);
-}
-
-static void ProcessNativeDeathLink(MeathookInterface* interfaceClient)
-{
-    if (!interfaceClient) return;
-    const std::string request = ReadSmallFile(kDeathLinkRequestPath);
-    const std::string eventId = RecordValue(request, "event_id");
-    const std::string requestId = RecordValue(request, "request_id");
-    const std::string requestGeneration = RecordValue(request, "runtime_generation");
-    if (eventId.empty() || requestId.empty()) return;
-    const std::string currentGeneration = std::to_string(interfaceClient->BindingGeneration());
-    if (!requestGeneration.empty() && requestGeneration != currentGeneration) {
-        NativeDeathLinkResult result;
-        result.status = AP_DEATHLINK_INVALID;
-        PublishDeathLinkResult(eventId, requestId, currentGeneration, result);
-        return;
-    }
-    const std::string previous = ReadSmallFile(kDeathLinkEventPath);
-    if (RecordValue(previous, "request_id") == requestId) {
-        const std::string previousStatus = RecordValue(previous, "status");
-        if (previousStatus == "invoked" || previousStatus == "error"
-            || previousStatus == "invalid" || previousStatus == "unavailable"
-            || previousStatus == "invalid_player" || previousStatus == "unsupported") {
-            return;
-        }
-    }
-    const NativeDeathLinkResult result = interfaceClient->ApplyDeathLinkTyped(requestId.c_str());
-    PublishDeathLinkResult(eventId, requestId, currentGeneration, result);
-}
-
-bool RuntimeDiagnosticRequested(int argc, char** argv) {
-    return argc > 2 && std::string(argv[2]) == "--runtime-info";
-}
-
-bool InventoryDiagnosticRequested(int argc, char** argv) {
-    return argc > 3 && std::string(argv[2]) == "--runtime-inventory";
-}
-
-static const char* InventoryStatusName(APInventoryStatus status)
-{
-    switch (status) {
-    case AP_INVENTORY_QUEUED: return "queued";
-    case AP_INVENTORY_OK: return "ok";
-    case AP_INVENTORY_UNSUPPORTED: return "unsupported";
-    case AP_INVENTORY_INVALID_ARGUMENT: return "invalid_argument";
-    case AP_INVENTORY_INVALID_PLAYER: return "invalid_player";
-    case AP_INVENTORY_ERROR: return "error";
-    default: return "error";
-    }
-}
-
-void PrintInventoryDiagnostic(const char* declName) {
-    RuntimeCapabilityRecord capability = g_MhInterface
-        ? g_MhInterface->RuntimeCapabilities()
-        : RuntimeCapabilityRecord{};
-    if (!g_MhInterface || !capability.valid || !capability.protocolCompatible
-        || !capability.info.capability_inventory_read) {
-        printf(
-            "inventory status=unavailable valid=false count=0 error=inventory_capability_unavailable\n"
-        );
-        return;
-    }
-    const InventoryItemCountResult result =
-        g_MhInterface->GetInventoryItemCountTyped(declName);
-    printf(
-        "inventory status=%s valid=%s count=%ld error=%s\n",
-        InventoryStatusName(result.status),
-        result.valid ? "true" : "false",
-        result.value,
-        result.diagnostic.empty() ? "" : result.diagnostic.c_str()
-    );
-}
-
-ULONGLONG RuntimeSnapshotAgeMs(const APRuntimeSnapshot& snapshot)
-{
-    FILETIME fileTime = {};
-    GetSystemTimeAsFileTime(&fileTime);
-    ULARGE_INTEGER now = {};
-    now.LowPart = fileTime.dwLowDateTime;
-    now.HighPart = fileTime.dwHighDateTime;
-    const ULONGLONG nowMs =
-        (now.QuadPart - 116444736000000000ULL) / 10000ULL;
-    const ULONGLONG timestamp = static_cast<ULONGLONG>(snapshot.timestamp);
-    return timestamp <= nowMs ? nowMs - timestamp : 0;
-}
-
-void PrintRuntimeDiagnostic() {
-    if (!g_MhInterface || !g_MhInterface->PollRuntimeSnapshot()) {
-        printf("runtime_info unavailable\n");
-        return;
-    }
-    RuntimeCapabilityRecord capability = g_MhInterface->RuntimeCapabilities();
-    RuntimeSnapshot snapshot;
-    g_MhInterface->GetCachedRuntimeSnapshot(snapshot);
-    printf("runtime_info protocol_version=%lu build_supported=%d hooks_ready=%d snapshot=%d\n",
-        capability.info.protocol_version, capability.info.build_supported,
-        capability.info.hooks_ready, capability.info.capability_runtime_snapshot);
-    printf("runtime_snapshot sequence=%lld timestamp=%lld age_ms=%llu fresh=%d runtime_ready=%d "
-           "player_valid=%d health_valid=%d max_health_valid=%d health=%f max_health=%f "
-           "dead_valid=%d dead=%d game_state_valid=%d game_state=%s map_valid=%d map=%s "
-           "checkpoint_valid=%d checkpoint=%s\n",
-        snapshot.data.sequence, snapshot.data.timestamp,
-        RuntimeSnapshotAgeMs(snapshot.data), snapshot.valid,
-        snapshot.data.runtime_ready, snapshot.data.player_valid,
-        snapshot.data.health_valid, snapshot.data.max_health_valid, snapshot.data.health,
-        snapshot.data.max_health, snapshot.data.dead_valid, snapshot.data.dead,
-        snapshot.data.game_state_valid,
-        RuntimeGameStateName(snapshot.data.game_state),
-        snapshot.data.map_valid, snapshot.data.map,
-        snapshot.data.checkpoint_valid, snapshot.data.checkpoint);
-}
-
 bool StartsWith(const std::string& value, const std::string& prefix) {
     return value.rfind(prefix, 0) == 0;
 }
@@ -2119,22 +1784,15 @@ int main(int argc, char** argv) {
             "Meathook RPC client binding initialized. Waiting for the in-game "
             "Meathook server..."
         );
-        LogDebug(
-            "Meathook RPC startup is bounded; runtime capability polling is active."
-        );
-    }
-    PublishRuntimeCapability();
-    if (RuntimeDiagnosticRequested(argc, argv) || InventoryDiagnosticRequested(argc, argv)) {
-        if (RuntimeDiagnosticRequested(argc, argv)) {
-            PrintRuntimeDiagnostic();
-        } else {
-            PrintInventoryDiagnostic(argv[3]);
+        while (!g_MhInterface || !g_MhInterface->m_Initialized) {
+            gameStateProbe.Poll();
+            missionTransitionMonitor.Poll(
+                gameStateProbe.IsGameplayLoaded(),
+                gameStateProbe.IsLoading()
+            );
+            Sleep(100);
         }
-        delete g_MhInterface;
-        g_MhInterface = nullptr;
-        ReleaseMutex(singleInstance);
-        CloseHandle(singleInstance);
-        return 0;
+        LogDebug("Meathook RPC server verified.");
     }
 
     std::deque<CommandJob> queue;
@@ -2142,8 +1800,6 @@ int main(int argc, char** argv) {
     DWORD lastExecution = 0;
     DWORD lastQueueStateLog = 0;
     size_t acknowledgedCommands = 0;
-    long long nativeEventSequence = 0;
-    std::string nativeEventGeneration;
     bool queueWasActive = false;
     bool lastRpcArmed = false;
     bool lastRpcEnabled = false;
@@ -2152,17 +1808,6 @@ int main(int argc, char** argv) {
 
     while (true) {
         gameStateProbe.Poll();
-        PublishRuntimeCapability();
-        const std::string bindingGeneration = std::to_string(
-            g_MhInterface ? g_MhInterface->BindingGeneration() : 0
-        );
-        if (bindingGeneration != nativeEventGeneration) {
-            nativeEventGeneration = bindingGeneration;
-            nativeEventSequence = 0;
-            DeleteFileA(kNativeEventPath);
-        }
-        ProcessNativeDeathLink(g_MhInterface);
-        PublishNativeEvents(g_MhInterface, nativeEventSequence);
         missionTransitionMonitor.Poll(
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading()
@@ -2196,7 +1841,7 @@ int main(int argc, char** argv) {
             }
         }
         const bool rpcTransportReady =
-            meathookPreflightPassed && g_MhInterface && g_MhInterface->IsInitialized();
+            meathookPreflightPassed && g_MhInterface && g_MhInterface->m_Initialized;
         const bool rpcEnabled =
             rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
         const std::string gateReason = RpcGateReason(
@@ -2250,7 +1895,7 @@ int main(int argc, char** argv) {
         }
 
         bool dispatchNextImmediately = false;
-        if (!queue.empty() && rpcEnabled && g_MhInterface->IsInitialized()) {
+        if (!queue.empty() && rpcEnabled && g_MhInterface->m_Initialized) {
             CommandJob& job = queue.front();
             const std::string commandId = CommandIdFromPath(job.path);
             const bool normalReceipt = IsNormalReceiptCommandId(commandId);
