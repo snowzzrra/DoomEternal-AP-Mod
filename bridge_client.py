@@ -139,6 +139,8 @@ FAST_TRAVEL_MISSION_COMPLETE_IDS = {
     "e3m2_hell": 7770362, "e3m2_hell_b": 7770387, "e3m3_maykr": 7770411,
     "e3m4_boss": 7770414,
 }
+FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
+FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
 
 
 def emit_launcher_event(event_type: str, **payload):
@@ -2749,6 +2751,8 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_delivered = {}
         self.fast_travel_delivered = {}
         self.fast_travel_eligibility_snapshot = None
+        self.fast_travel_epoch_state = None
+        self.fast_travel_last_transition = None
         self._launcher_connection_failure_reported = False
 
     def on_print_json(self, args: dict):
@@ -2903,6 +2907,7 @@ class DoomEternalContext(CommonContext):
             )
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
+            self.reconcile_fast_travel_unlock("connected")
             asyncio.create_task(self.check_mission_challenge_locations())
             if self._item_delivery_wakeup:
                 self._schedule_item_delivery("connected")
@@ -2923,6 +2928,7 @@ class DoomEternalContext(CommonContext):
             )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.reconcile_checked_automap_cleanup("server_checked_update")
+            self.reconcile_fast_travel_unlock("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
@@ -3299,6 +3305,8 @@ class DoomEternalContext(CommonContext):
             lease.observe_gameplay_loaded(newest_mtime)
         self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
+        self.fast_travel_epoch_state = None
+        self.fast_travel_last_transition = None
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
         self.current_map_name = None
@@ -3307,6 +3315,7 @@ class DoomEternalContext(CommonContext):
         self.store_pending_map_identity(
             {**marker_data, "gameplay_epoch": newest_mtime}
         )
+        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
         return True
 
     def activate_save_selection(self, selected):
@@ -3624,6 +3633,7 @@ class DoomEternalContext(CommonContext):
                 return fail_proof("no_gameplay_evidence")
             continued = continue_authoritative_active()
             if continued is not None:
+                self.reconcile_fast_travel_unlock("save_proof")
                 return continued
             return fail_proof("no_gameplay_evidence")
 
@@ -3634,6 +3644,7 @@ class DoomEternalContext(CommonContext):
         if evidence and evidence.provisional and marker is None:
             continued = continue_authoritative_active()
             if continued is not None:
+                self.reconcile_fast_travel_unlock("save_proof")
                 return continued
             return fail_proof("provisional")
 
@@ -3744,6 +3755,7 @@ class DoomEternalContext(CommonContext):
             self.arm_final_sin_completion_candidate(
                 selected, details, expected_map, proof_load_epoch
             )
+            self.reconcile_fast_travel_unlock("save_proof")
             return selected
         else:
             if not self.mission_select_observation_map:
@@ -3770,6 +3782,7 @@ class DoomEternalContext(CommonContext):
             self.arm_final_sin_completion_candidate(
                 selected, details, expected_map, proof_load_epoch
             )
+            self.reconcile_fast_travel_unlock("save_proof")
             return selected
 
     def active_game_details(self):
@@ -4466,40 +4479,144 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_epoch += 1
         return self.automap_cleanup_epoch
 
+    def _fast_travel_transition(self, event, *, reason=None, trigger=None):
+        """Emit one lifecycle transition for current Fast Travel epoch."""
+        state = getattr(self, "fast_travel_epoch_state", None)
+        if not isinstance(state, dict):
+            state = {}
+        signature = (
+            event,
+            state.get("identity"),
+            state.get("map_key"),
+            state.get("epoch"),
+            reason,
+        )
+        if signature == getattr(self, "fast_travel_last_transition", None):
+            return
+        self.fast_travel_last_transition = signature
+        if self.fast_travel_epoch_state is state:
+            state["status"] = event.lower()
+        if reason is not None:
+            state["pending_reason"] = reason
+        logger.info(
+            "[FastTravel] %s identity=%s map=%s epoch=%s completed_before_epoch=%s reason=%s trigger=%s",
+            event,
+            state.get("identity") or "<none>",
+            state.get("map_key") or "<none>",
+            state.get("epoch") or "<none>",
+            state.get("completed_before_epoch", False),
+            reason or "<none>",
+            trigger or "<none>",
+        )
+
+    def _fast_travel_snapshot_mismatch(self, snapshot):
+        """Reject epoch work when room, load, or accepted map identity changed."""
+        identity, map_key, epoch = snapshot
+        if identity != self.get_ap_state_key():
+            return "identity_mismatch"
+        lease = getattr(self, "runtime_observation_lease", None)
+        if getattr(lease, "gameplay_loaded_ns", None) != epoch:
+            return "epoch_mismatch"
+        accepted = getattr(self, "cached_map_identity", None)
+        if not isinstance(accepted, dict):
+            return "map_unavailable"
+        if accepted.get("gameplay_epoch") != epoch:
+            return "map_epoch_mismatch"
+        accepted_map_key = accepted.get("map_key")
+        if not isinstance(accepted_map_key, str):
+            accepted_runtime_map = canonical_map_name(accepted.get("runtime_map", ""))
+            accepted_map_key = next(
+                (
+                    key
+                    for key, runtime_map in KNOWN_CATALOG_MAPS.items()
+                    if runtime_map == accepted_runtime_map
+                ),
+                None,
+            )
+        if accepted_map_key != map_key:
+            return "map_mismatch"
+        return None
+
     def reconcile_fast_travel_unlock(self, trigger):
         """Activate native Fast Travel once per room/map/load epoch."""
         snapshot = getattr(self, "fast_travel_eligibility_snapshot", None)
-        if (
-            not isinstance(snapshot, tuple)
-            or len(snapshot) != 3
-            or not all(isinstance(value, str) and value for value in snapshot[:2])
-            or not isinstance(snapshot[2], int)
-            or isinstance(snapshot[2], bool)
-        ):
+        state = getattr(self, "fast_travel_epoch_state", None)
+        if not isinstance(state, dict):
+            self._fast_travel_transition("PENDING", reason="epoch_unavailable", trigger=trigger)
+            return False
+        if not isinstance(snapshot, tuple) or len(snapshot) != 3:
+            if state.get("completed_before_epoch"):
+                self._fast_travel_transition(
+                    "PENDING", reason=state.get("ineligible_reason") or "snapshot_unavailable", trigger=trigger
+                )
             return False
         identity, map_key, epoch = snapshot
-        if map_key not in FAST_TRAVEL_MAP_KEYS or not self.has_authoritative_save_proof():
-            return False
-        if not getattr(self, "item_state_ready", False):
+        snapshot_mismatch = self._fast_travel_snapshot_mismatch(snapshot)
+        if snapshot_mismatch:
+            self._fast_travel_transition(
+                "PENDING", reason=snapshot_mismatch, trigger=trigger
+            )
             return False
         delivery_key = (identity, map_key, epoch)
         if delivery_key in self.fast_travel_delivered:
+            self._fast_travel_transition("ALREADY_DISPATCHED", trigger=trigger)
             return False
+        if not self.has_authoritative_save_proof():
+            self._fast_travel_transition("PENDING", reason="save_proof_unavailable", trigger=trigger)
+            return False
+        if not getattr(self, "item_state_ready", False):
+            self._fast_travel_transition("PENDING", reason="item_state_unavailable", trigger=trigger)
+            return False
+        now = time.monotonic()
+        retry_deadline = state.get("retry_deadline")
+        retry_waiting = isinstance(retry_deadline, (int, float)) and now < retry_deadline
+        if retry_waiting:
+            state["status"] = "pending"
+            return False
+        if retry_deadline is None:
+            self._fast_travel_transition("READY", trigger=trigger)
         command = "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
-        if not send_command(command, coalesce_key=f"fast-travel-{identity}-{map_key}-{epoch}", already_queued_ok=True):
+        if not send_command(
+            command,
+            coalesce_key=f"fast-travel-{identity}-{map_key}-{epoch}",
+            already_queued_ok=True,
+        ):
+            retry_attempt = state.get("retry_attempt", 0)
+            if isinstance(retry_attempt, bool) or not isinstance(retry_attempt, int):
+                retry_attempt = 0
+            retry_attempt += 1
+            backoff = min(
+                FAST_TRAVEL_RETRY_MAX_SECONDS,
+                FAST_TRAVEL_RETRY_BASE_SECONDS
+                * (2 ** min(retry_attempt - 1, 3)),
+            )
+            state["retry_attempt"] = retry_attempt
+            state["retry_deadline"] = now + backoff
+            self._fast_travel_transition("RETRY", reason="queue_unavailable", trigger=trigger)
             return False
+        state["retry_deadline"] = None
+        state["retry_attempt"] = 0
         self.fast_travel_delivered[delivery_key] = time.time()
         self.persist_session_state()
-        logger.info("[FastTravel] activated map=%s epoch=%s trigger=%s", map_key, epoch, trigger)
+        self._fast_travel_transition("QUEUE", trigger=trigger)
         return True
 
-    def snapshot_fast_travel_eligibility(self):
-        """Capture Mission Complete eligibility before load-epoch checks can change."""
-        self.fast_travel_eligibility_snapshot = None
+    def snapshot_fast_travel_eligibility(self, marker_data=None):
+        """Capture server-history eligibility once for each gameplay epoch."""
         lease = getattr(self, "runtime_observation_lease", None)
         epoch = getattr(lease, "gameplay_loaded_ns", None)
+        existing = getattr(self, "fast_travel_epoch_state", None)
+        if isinstance(existing, dict) and existing.get("epoch") is not None:
+            return getattr(self, "fast_travel_eligibility_snapshot", None)
+        if not isinstance(epoch, int) or isinstance(epoch, bool):
+            return None
+
         identity = self.get_ap_state_key()
-        runtime_map = canonical_map_name(self.current_map_name or "")
+        runtime_map = ""
+        if isinstance(marker_data, dict):
+            runtime_map = canonical_map_name(marker_data.get("runtime_map", ""))
+        if not runtime_map:
+            runtime_map = canonical_map_name(self.current_map_name or "")
         if not runtime_map:
             pending = getattr(self, "pending_map_identity", None)
             if isinstance(pending, dict):
@@ -4510,18 +4627,38 @@ class DoomEternalContext(CommonContext):
         )
         mission_id = FAST_TRAVEL_MISSION_COMPLETE_IDS.get(map_key)
         checked = getattr(self, "checked_locations", None)
-        if (
-            not isinstance(identity, str)
-            or not identity
-            or not isinstance(epoch, int)
-            or isinstance(epoch, bool)
-            or map_key not in FAST_TRAVEL_MAP_KEYS
-            or mission_id is None
-            or not isinstance(checked, (set, frozenset, list, tuple))
-            or mission_id not in checked
-        ):
-            return None
-        self.fast_travel_eligibility_snapshot = (identity, map_key, epoch)
+        history_available = isinstance(checked, (set, frozenset, list, tuple))
+        completed_before_epoch = bool(history_available and mission_id in checked)
+        ineligible_reason = None
+        if not identity:
+            ineligible_reason = "room_identity_unavailable"
+        elif map_key not in FAST_TRAVEL_MAP_KEYS or mission_id is None:
+            ineligible_reason = "map_not_supported"
+        elif not history_available:
+            ineligible_reason = "server_history_unavailable"
+        elif not completed_before_epoch:
+            ineligible_reason = "not_completed_before_epoch"
+
+        self.fast_travel_epoch_state = {
+            "identity": identity,
+            "map_key": map_key,
+            "epoch": epoch,
+            "completed_before_epoch": completed_before_epoch,
+            "ineligible_reason": ineligible_reason,
+            "status": "epoch",
+            "pending_reason": None,
+            "retry_attempt": 0,
+            "retry_deadline": None,
+        }
+        self.fast_travel_eligibility_snapshot = (
+            (identity, map_key, epoch)
+            if not ineligible_reason
+            else None
+        )
+        self.fast_travel_last_transition = None
+        self._fast_travel_transition("EPOCH")
+        if ineligible_reason:
+            self._fast_travel_transition("INELIGIBLE", reason=ineligible_reason)
         return self.fast_travel_eligibility_snapshot
 
     async def process_level_ready(self, newest_path):
@@ -5993,6 +6130,8 @@ class DoomEternalContext(CommonContext):
             return
 
         self.current_map_name = map_name
+        self.snapshot_fast_travel_eligibility()
+        self.reconcile_fast_travel_unlock("map_ready")
         if self.last_rpc_map_name is None:
             self.last_rpc_map_name = map_name
             self.onboard_bootstrap("on_supported_map_load")
@@ -6184,6 +6323,7 @@ class DoomEternalContext(CommonContext):
                     await self.process_level_ready(newest_path)
                 else:
                     await self.check_mission_challenge_locations()
+                    self.reconcile_fast_travel_unlock("readiness")
 
                 await self.process_pending_item_receipts("tracker")
 

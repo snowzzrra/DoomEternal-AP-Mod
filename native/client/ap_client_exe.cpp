@@ -23,6 +23,7 @@
 #include "ap_client_path_utils.h"
 #include "game_state_probe.h"
 #include "ap_runtime_rpc_client.h"
+#include "ap_rpc_health_state.h"
 #include "rpc_queue_policy.h"
 
 ApRuntimeRpcClient* g_ApRpc = nullptr;
@@ -1806,6 +1807,8 @@ int main(int argc, char** argv) {
         if (singleInstance) CloseHandle(singleInstance);
         return 0;
     }
+    ApRpcHealthStatePublisher healthStatePublisher(runtimePaths.gameRootDir / "base");
+    healthStatePublisher.PublishStarting();
 
     CommandSourceMap recoveredSources;
     // A previous bridge process may have left its room marker behind. Do not
@@ -1840,6 +1843,7 @@ int main(int argc, char** argv) {
     GameStateProbe gameStateProbe(LogDebug);
     const bool meathookPreflightPassed = preflight.deliveryAllowed;
     if (!meathookPreflightPassed) {
+        healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
         LogDebug(
             "Meathook preflight failed. No valid XINPUT1_3.dll candidate was accepted. "
             "Queued commands will remain pending until the client is restarted "
@@ -1854,6 +1858,13 @@ int main(int argc, char** argv) {
             "Meathook server..."
         );
         while (!g_ApRpc || !g_ApRpc->PollHealth()) {
+            if (g_ApRpc) {
+                healthStatePublisher.PublishHealth(
+                    false, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
+                );
+            } else {
+                healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
+            }
             gameStateProbe.Poll();
             missionTransitionMonitor.Poll(
                 gameStateProbe.IsGameplayLoaded(),
@@ -1861,6 +1872,9 @@ int main(int argc, char** argv) {
             );
             Sleep(100);
         }
+        healthStatePublisher.PublishHealth(
+            true, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
+        );
         LogDebug("Meathook RPC server verified.");
     }
 
@@ -1915,6 +1929,11 @@ int main(int argc, char** argv) {
         }
         const bool rpcTransportReady =
             meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
+        healthStatePublisher.PublishHealth(
+            rpcTransportReady,
+            g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
+            g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
+        );
         const bool rpcEnabled =
             rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
         const std::string gateReason = RpcGateReason(

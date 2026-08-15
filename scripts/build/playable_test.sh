@@ -431,7 +431,8 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/launcher_app.py" "$REPO_ROOT/launcher_controller.py" \
     "$REPO_ROOT/launcher_core.py" "$REPO_ROOT/launcher_integration.py" \
     "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
-    "$REPO_ROOT/launcher_ui.py" "$REPO_ROOT/options_foundation.py" \
+    "$REPO_ROOT/launcher_ui.py" "$REPO_ROOT/launcher_native_health.py" \
+    "$REPO_ROOT/options_foundation.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
     "$REPO_ROOT/publisher_contracts.py" \
@@ -546,6 +547,7 @@ public_files = [
         "client/launcher_platform.py",
         "client/launcher_supervisor.py",
         "client/launcher_ui.py",
+        "client/launcher_native_health.py",
         "client/options_foundation.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
@@ -677,7 +679,7 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
 mkdir -p "$OUTPUT_DIR/client/resources"
 TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
 mkdir -p "$TEMPLATE_STAGE"
-python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" <<'PY'
+python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" <<'PY'
 import hashlib
 import json
 import shutil
@@ -687,27 +689,40 @@ import zipfile
 from itertools import product
 from pathlib import Path
 
-root, staged, template_root, compressor = map(Path, sys.argv[1:])
+root, staged, template_root, compressor, map_sources_path = map(Path, sys.argv[1:])
 sys.path.insert(0, str(root))
 from launcher_core import ModCompiler, SeedManifest
-from physical_options import PHYSICAL_OPTION_KEYS
+from physical_options import (
+    MAP_CONTENT_OPTION_KEYS,
+    PHYSICAL_OPTION_KEYS,
+    map_content_signature,
+)
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
 
 compiler = ModCompiler(root)
+map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
 maps = {
-    "e1m1_intro": ("e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities", root / "vanillamaps/e1m1_intro.map"),
-    "e1m2_war": ("e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities", root / "vanillamaps/e1m2_war.map"),
+    map_key: (
+        source["resource_path"],
+        source["relative_entities_path"],
+        root / "vanillamaps" / source["source_file"],
+    )
+    for map_key, source in map_sources.items()
+    if map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS and source["enabled"]
 }
+if tuple(maps) != SUPPORTED_START_WITH_AUTOMAP_MAPS:
+    raise SystemExit("Automap template map set does not match supported map contract")
 variant_maps = {}
-for bits in product((False, True), repeat=3):
-    options = dict(zip(PHYSICAL_OPTION_KEYS, bits))
-    signature = "".join("1" if value else "0" for value in bits)
+for bits in product((False, True), repeat=len(PHYSICAL_OPTION_KEYS) + len(MAP_CONTENT_OPTION_KEYS)):
+    options = dict(zip(PHYSICAL_OPTION_KEYS + MAP_CONTENT_OPTION_KEYS, bits))
+    signature = map_content_signature(options)
     manifest = SeedManifest.create(
         seed_name="physical-template", team=0, slot=1, options=options,
         active_location_ids=compiler.active_location_ids(options),
     )
     variant_maps[signature] = {}
-    for map_key, (member, vanilla) in maps.items():
+    for map_key, (_, member, vanilla) in maps.items():
         entities = template_root / f"{signature}-{map_key}.entities"
         compiler.compile_map(manifest, vanilla, entities, map_key)
         packed = template_root / f"{signature}-{map_key}.packed"
@@ -728,12 +743,12 @@ for bits in product((False, True), repeat=3):
 
 variants = {}
 for signature, members in variant_maps.items():
-    destination = template_root / f"physical-{signature}.zip"
+    destination = template_root / f"map-content-{signature}.zip"
     mod = template_root / f"mod-{signature}"
     shutil.copytree(staged, mod)
     for map_key, packed in members.items():
-        relative, _ = maps[map_key]
-        target = mod / relative
+        resource_path, relative, _ = maps[map_key]
+        target = mod / Path(resource_path).stem / "maps" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(packed, target)
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
@@ -751,6 +766,7 @@ for signature, members in variant_maps.items():
 (template_root / "index.json").write_text(json.dumps({
     "schema": 2,
     "physical_options": list(PHYSICAL_OPTION_KEYS),
+    "map_content_options": list(MAP_CONTENT_OPTION_KEYS),
     "variants": variants,
 }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 with zipfile.ZipFile(root / "build/release/client/resources/mod_templates.zip", "w", zipfile.ZIP_DEFLATED) as output:
@@ -822,14 +838,14 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json physical-111.zip -d "$TEMP_DIR/template-resource"
-unzip -q "$TEMP_DIR/template-resource/physical-111.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json map-content-1110.zip -d "$TEMP_DIR/template-resource"
+unzip -q "$TEMP_DIR/template-resource/map-content-1110.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$TEMP_DIR/template-resource/physical-111.zip"
+    --zip "$TEMP_DIR/template-resource/map-content-1110.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \

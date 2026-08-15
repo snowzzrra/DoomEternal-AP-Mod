@@ -23,6 +23,7 @@ from launcher_integration import (
     IntegratedSetupRecord,
     RoomSetupCoordinator,
 )
+from launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from launcher_platform import (
     SteamInstallationLocator,
     detect_doom_processes,
@@ -93,6 +94,7 @@ class LauncherController:
             self._setup_event,
             self._setup_result,
         )
+        self._native_health_reader: NativeHealthReader | None = None
 
     def _load_config(self) -> dict[str, object]:
         if self.config_path.is_file():
@@ -191,6 +193,24 @@ class LauncherController:
             result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
         self.emit("handshake_probe", **result)
         return dict(result)
+
+    def read_native_health(self, *, force: bool = False) -> dict[str, object]:
+        """Return normalized native AP health without emitting launcher activity."""
+        base = doom_base_dir_from_config(self.config)
+        if base is None:
+            return {
+                "state": "not_ready",
+                "ready": False,
+                "degraded": False,
+                "reason": "base_directory_unconfigured",
+            }
+        path = base / "ap_rpc_health.state"
+        if self._native_health_reader is None or self._native_health_reader.path != path:
+            self._native_health_reader = NativeHealthReader(path)
+        return self._native_health_reader.read(force=force).document()
+
+    def native_health(self, *, force: bool = False) -> dict[str, object]:
+        return self.read_native_health(force=force)
 
     def run_doctor(self) -> DoctorReport:
         report = LauncherDoctor(config=self.config, paths=self.user_paths).run()

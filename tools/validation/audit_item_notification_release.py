@@ -204,7 +204,15 @@ def _extract_playable_zip(
         }
         document = json.loads(resources.read("index.json"))
         variants = document.get("variants")
-        if document.get("schema") != 2 or not isinstance(variants, dict) or len(variants) != 8:
+        if (
+            document.get("schema") != 2
+            or document.get("physical_options") != [
+                "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
+            ]
+            or document.get("map_content_options") != ["start_with_automap"]
+            or not isinstance(variants, dict)
+            or len(variants) != 16
+        ):
             raise AssertionError("internal room template resource layout is invalid")
         expected_resources = {"index.json"} | {
             entry.get("file") for entry in variants.values()
@@ -241,7 +249,7 @@ def main() -> int:
             mod_roots, client_dir, manifest = _extract_playable_zip(
                 args.playable_zip, Path(directory)
             )
-            first_signature = "111"
+            first_signature = "1110"
             physical_on = audit_release(
                 args.enabled == "1", args.generated_maps, mod_roots[first_signature],
                 client_dir, manifest, args.map_registry, args.decompressor,

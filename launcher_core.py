@@ -15,7 +15,9 @@ from typing import Any, Protocol
 
 from physical_options import (
     DEATH_LINK_MODES,
+    MAP_CONTENT_OPTION_KEYS,
     PHYSICAL_OPTION_KEYS,
+    map_content_signature,
     physical_location_ids,
     physical_signature,
     project_room_config,
@@ -280,7 +282,9 @@ class RoomModPackageBuilder:
             raise ValueError("invalid physical template index")
         if document.get("physical_options") != list(PHYSICAL_OPTION_KEYS):
             raise ValueError("physical template option contract mismatch")
-        key = physical_signature(options)
+        if document.get("map_content_options") != list(MAP_CONTENT_OPTION_KEYS):
+            raise ValueError("map-content template option contract mismatch")
+        key = map_content_signature(options)
         entry = document["variants"].get(key)
         if not isinstance(entry, dict):
             raise ValueError(f"missing physical template variant: {key}")
@@ -312,6 +316,7 @@ class RoomModPackageBuilder:
             "manifest_hash": manifest.manifest_hash,
             "physical_options": physical_options,
             "physical_signature": physical_signature(physical_options),
+            "map_content_signature": map_content_signature(manifest.options),
             "template": template_name,
             "template_sha256": template_entry["sha256"],
             "starting_inventory": manifest.options.get("starting_inventory", {}),
@@ -497,7 +502,9 @@ class ModCompiler:
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        for map_key in ("e1m1_intro", "e1m2_war"):
+        from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
+
+        for map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS:
             package = self.root / f"content/maps/{map_key}"
             config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
             descriptor = json.loads((package / "descriptor.json").read_text(encoding="utf-8"))

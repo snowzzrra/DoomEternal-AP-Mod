@@ -151,6 +151,7 @@ class LauncherUI(QMainWindow):
         self._connection_pending = False
         self._setup_state = "disconnected"
         self._resolved_consent_requests: set[str] = set()
+        self._native_health_presentation: tuple[str, str] | None = None
         self._session_log_limit = 400
         self._configure_style()
         self._build()
@@ -641,6 +642,8 @@ class LauncherUI(QMainWindow):
         icon = "●" if color == self.COLORS["good"] else "◆" if color == self.COLORS["ap"] else "!" if color in (self.COLORS["warn"], self.COLORS["bad"]) else "○"
         indicator.setText(icon)
         label.setText(detail.upper())
+        if key == "rpc":
+            self._native_health_presentation = None
 
     def _set_home(self, title: str, detail: str, action: str, state: str, *, enabled: bool = True) -> None:
         self.hero_title.setText(title)
@@ -1117,6 +1120,24 @@ class LauncherUI(QMainWindow):
             except queue.Empty: break
             self.controller.process_event(event)
             self._present_event(event)
+        self._refresh_native_health()
+
+    def _refresh_native_health(self) -> None:
+        try:
+            health = self.controller.native_health()
+            state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
+        except Exception:
+            state = "not_ready"
+        if state == "ready":
+            presentation = ("ready", self.COLORS["good"])
+        elif state == "degraded":
+            presentation = ("needs attention", self.COLORS["warn"])
+        else:
+            presentation = ("waiting", self.COLORS["muted"])
+        if presentation == self._native_health_presentation:
+            return
+        self._set_status("rpc", *presentation)
+        self._native_health_presentation = presentation
 
     def _present_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))

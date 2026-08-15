@@ -112,7 +112,7 @@ x86_64-w64-mingw32-gcc -D_M_AMD64 -O2 -I"$BUILD_DIR/generated-rpc" \
 clang --target=x86_64-w64-windows-gnu -fms-extensions "${CLANG_SYSROOT[@]}" -O2 \
     -I"$BUILD_DIR/generated-rpc" -c native/client/ap_runtime_rpc_seh.c -o "$BUILD_DIR/ap_runtime_rpc_seh.o"
 x86_64-w64-mingw32-g++ -D_M_AMD64 -std=c++17 -O2 -I. \
-    native/client/ap_client_exe.cpp native/client/ap_client_path_utils.cpp native/client/game_state_probe.cpp native/client/ap_runtime_rpc_client.cpp \
+    native/client/ap_client_exe.cpp native/client/ap_client_path_utils.cpp native/client/game_state_probe.cpp native/client/ap_runtime_rpc_client.cpp native/client/ap_rpc_health_state.cpp \
     "$BUILD_DIR/ap_runtime_rpc_c.o" "$BUILD_DIR/ap_runtime_rpc_seh.o" \
     -o "$BUILD_DIR/ap_client.exe" -lrpcrt4 -lbcrypt -lversion -static -static-libgcc -static-libstdc++
 x86_64-w64-mingw32-g++ -std=c++17 -O2 native/probes/save_death_probe.cpp \

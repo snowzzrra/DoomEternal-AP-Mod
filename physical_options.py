@@ -14,6 +14,10 @@ PHYSICAL_OPTION_KEYS = (
     "randomize_first_battery",
 )
 
+MAP_CONTENT_OPTION_KEYS = (
+    "start_with_automap",
+)
+
 ROOM_OPTION_KEYS = (
     "death_link",
     "death_link_mode",
@@ -83,6 +87,14 @@ def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
 def physical_signature(options: Mapping[str, Any]) -> str:
     values = normalize_physical_options(options)
     return "".join("1" if values[key] else "0" for key in PHYSICAL_OPTION_KEYS)
+
+
+def map_content_signature(options: Mapping[str, Any]) -> str:
+    values = normalize_physical_options(options)
+    start_with_automap = options.get("start_with_automap", False)
+    if not isinstance(start_with_automap, bool):
+        raise ValueError("room option start_with_automap must be boolean")
+    return physical_signature(values) + ("1" if start_with_automap else "0")
 
 
 def physical_location_ids(options: Mapping[str, Any]) -> set[int]:

@@ -787,8 +787,15 @@ class Pipeline:
                         or document.get("physical_options") != [
                             "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
                         ]
+                        or document.get("map_content_options") != ["start_with_automap"]
                         or not isinstance(variants, dict)
-                        or set(variants) != {f"{chainsaw}{dash}{battery}" for chainsaw in "01" for dash in "01" for battery in "01"}
+                        or set(variants) != {
+                            f"{chainsaw}{dash}{battery}{automap}"
+                            for chainsaw in "01"
+                            for dash in "01"
+                            for battery in "01"
+                            for automap in "01"
+                        }
                     ):
                         raise ValueError("internal room template resource layout is invalid")
                     template_names = {"index.json"} | {
