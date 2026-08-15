@@ -51,20 +51,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "0.4.0-beta.4: add native Fast Travel unlock entity at supported map activation position."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Final AP lifecycle and presentation generator"
     }
   ],
   "asset_package_contract_sha256": "26a2c9a87c5428771c8a71ed2613fc15314e55bece57bd1d369bf03e7fb2df9d",
-  "byte_sha256": "bf0398ee7ddf1144004ac0d9d06f5ff49a5fe34baed32711e3f15df9a4e18914",
+  "byte_sha256": "9947e4c92f6f92b1163c0347eb0a6f8918611c85148d69cdf3ab96e1fa3771b9",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15299900,
-    "classes": 12947,
-    "entity_count": 12947,
+    "byte_size": 15299636,
+    "classes": 12948,
+    "entity_count": 12948,
     "layers": 1645,
-    "targets": 45531,
+    "targets": 45516,
     "transforms": 26188,
-    "unique_entity_names": 12947
+    "unique_entity_names": 12948
   },
   "manifest_sha256": "8c008d72eea7172e4de492887baf143ba101e755a509395e2a71eb4531df48a4",
   "map_key": "e3m4_boss",
@@ -81,5 +85,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "e20dc9ad9aef0693b5ab4f6160991e76cd1f0ecc025961eabc15f70e37978f4a",
-  "semantic_sha256": "9d125e7ccbc9b8bf6305771d3b7c7be5b45887c60a0a5db29e3a101c7e4cafde"
+  "semantic_sha256": "6eb61ee31c7f25592037e3d2493b5e0c28eaea42fb8e3f4bcb394fec0648e9ab"
 }

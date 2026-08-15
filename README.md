@@ -34,7 +34,7 @@ Current campaign coverage includes:
 - 369 locations in total;
 - 117 item types;
 - randomized starting weapons and starting inventory;
-- configurable Chainsaw, Dash, first Sentinel Battery, Automap, traps, and
+- configurable Chainsaw, Dash, first Sentinel Battery, AP Automap reveals, traps, and
   DeathLink;
 - room-specific map packages for Windows and Linux/Proton.
 
@@ -95,7 +95,7 @@ files are projections of that content.
 Each physical location identifies a native mission entity and its functional
 context. The compiler preserves the pieces that make the objective behave like
 part of the mission: visual presentation, collision, interaction volume,
-Automap ownership, doors, encounter managers, objective relays, checkpoint
+Automap presentation, doors, encounter managers, objective relays, checkpoint
 continuity, and other mission scripting. It then gives that objective an
 Archipelago publisher with the location's public ID.
 
@@ -178,7 +178,8 @@ entities.
 The implementation uses native DOOM Eternal systems wherever the campaign
 already has a suitable owner or writer:
 
-- Automap ownership uses `STAT_AUTOMAP` and `idTarget_PlayerStatModifier`;
+- AP Automap reveals use the normal Automap acquisition path and a precollected
+  reveal perk;
 - replay Fast Travel uses `idTarget_FastTravelUnlock`;
 - Mission Complete uses mission transition publishers;
 - equipment, perks, weapons, mods, runes, and currencies use their supported

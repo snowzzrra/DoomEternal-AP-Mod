@@ -73,6 +73,10 @@ from publisher_runtime import (
     quarantine_malformed_event,
     read_map_event,
 )
+from automap_visual_registry import (
+    index_automap_visual_registry,
+    load_automap_visual_registry,
+)
 from rune_reconciliation import (
     RUNE_WRITER_EVIDENCE,
     RuneNativeState,
@@ -141,6 +145,42 @@ FAST_TRAVEL_MISSION_COMPLETE_IDS = {
 }
 FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
+AUTOMAP_CLEANUP_RETRY_BASE_SECONDS = 1.0
+AUTOMAP_CLEANUP_RETRY_MAX_SECONDS = 8.0
+
+
+def build_materialization_epoch(native_epoch, marker_mtime_ns):
+    if (
+        isinstance(native_epoch, bool)
+        or not isinstance(native_epoch, int)
+        or isinstance(marker_mtime_ns, bool)
+        or not isinstance(marker_mtime_ns, int)
+        or native_epoch < 0
+        or marker_mtime_ns < 0
+    ):
+        return None
+    return f"{native_epoch}:{marker_mtime_ns}"
+
+
+def valid_materialization_epoch(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9]+:[0-9]+", value) is not None
+
+
+def valid_fast_travel_delivery_key(value):
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        return None
+    if not all(isinstance(component, str) and component for component in value):
+        return None
+    if not re.fullmatch(r"[0-9]+:[0-9]+", value[2]):
+        return None
+    return tuple(value)
+
+
+def gameplay_evidence_mtime_ns():
+    try:
+        return Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
+    except OSError:
+        return None
 
 
 def emit_launcher_event(event_type: str, **payload):
@@ -1253,7 +1293,7 @@ def read_gameplay_save_evidence(path=None):
         state = values.get("state", "")
         epoch = int(values.get("epoch", "-1"))
         slot_directory = values.get("slot", "")
-        map_name = canonical_map_name(values.get("map_name", ""))
+        map_name = canonical_map_name(values.get("map_name", "")) or ""
     except (OSError, UnicodeError, ValueError):
         return None
     if state == "menu":
@@ -1262,7 +1302,6 @@ def read_gameplay_save_evidence(path=None):
         state != "gameplay"
         or epoch < 0
         or not re.fullmatch(r"GAME-AUTOSAVE\d+", slot_directory)
-        or not map_name
     ):
         return None
     return GameplaySaveEvidence(
@@ -1364,7 +1403,6 @@ def read_unlockable_record(payload, entry):
     """Decode one exact native unlockable record; global stats are ignored."""
     signal = entry["signal"]
     unlockable = signal["unlockable"].encode("ascii")
-    stat = signal["rule_0_statname"].encode("ascii")
     manager_type_offset = _mastery_manager_type_offset(payload)
     record_prefix = (
         bytes([len(unlockable) * 2]) + unlockable
@@ -1712,13 +1750,8 @@ if os.path.exists(MANIFESTS_DIR):
                 manifest_data = json.load(f)
                 DECL_TO_LOCATION.update(manifest_data)
 
-# Prototype-only cleanup registry. Each target removes one AP visual entity and
-# has no edge to a vanilla pickup, relay, objective, or progression entity.
-AUTOMAP_COMPLETION_BY_MAP = {
-    canonical_map_name("game/sp/e1m1_intro/e1m1_intro"): {
-        7770015: "ap_remove_location_visual_7770015",
-    },
-}
+AUTOMAP_VISUAL_REGISTRY = load_automap_visual_registry()
+AUTOMAP_VISUALS_BY_MAP = index_automap_visual_registry(AUTOMAP_VISUAL_REGISTRY)
 
 poll_counter = 0
 
@@ -2703,7 +2736,11 @@ class DoomEternalContext(CommonContext):
         self.cached_map_identity = None
         self.pending_map_identity = None
         self.last_accepted_marker_mtime = None
+        self.native_gameplay_epoch = None
         self.last_accepted_map_evidence_epoch = None
+        self.pending_level_ready = {}
+        self.completed_level_ready_epochs = set()
+        self.level_ready_in_flight = set()
         self.session_map_completion_states = {}
         self.last_observer_lease_block = None
         self.save_candidate_tokens = {}
@@ -2746,9 +2783,12 @@ class DoomEternalContext(CommonContext):
         self.last_rpc_map_name = None
         self.room_seed_name = None
         self.current_map_name = None
-        self.automap_cleanup_epoch = 0
+        self.automap_cleanup_epoch = None
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
         self.automap_cleanup_delivered = {}
+        self.automap_cleanup_retry = {}
+        self.automap_cleanup_status = {}
+        self.server_checked_locations_ready = False
         self.fast_travel_delivered = {}
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
@@ -2905,6 +2945,7 @@ class DoomEternalContext(CommonContext):
             self._death_link_task = asyncio.create_task(
                 self.update_death_link(self.death_link_enabled)
             )
+            self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
             self.reconcile_fast_travel_unlock("connected")
@@ -2927,6 +2968,7 @@ class DoomEternalContext(CommonContext):
                 "Archipelago connection was refused"
             )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
+            self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.reconcile_checked_automap_cleanup("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
@@ -3272,6 +3314,8 @@ class DoomEternalContext(CommonContext):
         """Consume newly visible load; return whether lifecycle proof advanced."""
         lease = getattr(self, "runtime_observation_lease", None)
         evidence_epoch = getattr(evidence, "epoch", None)
+        if evidence_epoch is not None:
+            self.native_gameplay_epoch = evidence_epoch
         proof_evidence_epoch = getattr(
             self, "active_save_proof_evidence_epoch", None
         )
@@ -3291,18 +3335,43 @@ class DoomEternalContext(CommonContext):
         if not markers:
             return False
         newest_mtime, newest_path = markers[-1]
-        current = getattr(lease, "gameplay_loaded_ns", None) if lease else None
         started = getattr(lease, "started_ns", None) if lease else None
         if started is not None and newest_mtime < started:
             return False
-        if current is not None and newest_mtime <= current:
+        known_marker_mtime = max(
+            getattr(self, "last_accepted_marker_mtime", 0) or 0,
+            (getattr(self, "pending_map_identity", None) or {}).get("mtime_ns", 0),
+            (getattr(self, "cached_map_identity", None) or {}).get("mtime_ns", 0),
+        )
+        if newest_mtime <= known_marker_mtime:
             return False
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
         if marker_data is None:
             self.invalidate_map_identity("malformed_marker")
             return False
-        if lease is not None:
-            lease.observe_gameplay_loaded(newest_mtime)
+        evidence_mtime_ns = gameplay_evidence_mtime_ns()
+        previous_identity = (
+            getattr(self, "cached_map_identity", None)
+            or getattr(self, "pending_map_identity", None)
+        )
+        causally_bound = bool(
+            evidence_epoch is not None
+            and evidence_mtime_ns is not None
+            and evidence_mtime_ns <= newest_mtime
+        )
+        if (
+            causally_bound
+            and isinstance(previous_identity, dict)
+            and isinstance(previous_identity.get("evidence_mtime_ns"), int)
+            and evidence_mtime_ns <= previous_identity["evidence_mtime_ns"]
+        ):
+            causally_bound = False
+        causal_blocked = bool(
+            isinstance(previous_identity, dict)
+            and isinstance(previous_identity.get("evidence_mtime_ns"), int)
+            and evidence_mtime_ns is not None
+            and evidence_mtime_ns <= previous_identity["evidence_mtime_ns"]
+        )
         self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
@@ -3312,10 +3381,25 @@ class DoomEternalContext(CommonContext):
         self.current_map_name = None
         self.cached_map_identity = None
         self.pending_map_identity = None
-        self.store_pending_map_identity(
-            {**marker_data, "gameplay_epoch": newest_mtime}
+        materialized_epoch = (
+            build_materialization_epoch(evidence_epoch, newest_mtime)
+            if causally_bound
+            else None
         )
-        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+        self.store_pending_map_identity({
+            **marker_data,
+            "native_gameplay_epoch": evidence_epoch if causally_bound else None,
+            "gameplay_epoch": materialized_epoch,
+            "evidence_mtime_ns": evidence_mtime_ns,
+            "causal_bound": causally_bound,
+            "causal_blocked": causal_blocked,
+        })
+        if causally_bound:
+            if lease is not None:
+                lease.observe_gameplay_loaded(newest_mtime)
+            self.snapshot_fast_travel_eligibility(
+                marker_data=self.pending_map_identity
+            )
         return True
 
     def activate_save_selection(self, selected):
@@ -3347,23 +3431,23 @@ class DoomEternalContext(CommonContext):
         self.previous_checkpoint_death = None
 
     def log_save_proof_rejected(
-        self, reason, evidence_slot=None, evidence_map=None, candidate_slot=None, candidate_mtime=None, active_slot=None, details_map=None
+        self, reason, evidence_slot=None, marker_map=None, candidate_slot=None,
+        candidate_mtime=None, active_slot=None,
     ):
         rejection = (
             reason,
             evidence_slot or "<none>",
-            evidence_map or "<none>",
+            marker_map or "<none>",
             candidate_slot or "<none>",
             candidate_mtime or 0,
             active_slot or self.active_save_slot or "<none>",
-            details_map or "<none>",
         )
         if rejection == getattr(self, "last_save_proof_rejection", None):
             return
         self.last_save_proof_rejection = rejection
         logger.info(
-            "SAVE_PROOF_REJECTED reason=%s evidence_slot=%s evidence_map=%s "
-            "candidate_slot=%s candidate_mtime=%s active_slot=%s details_map=%s",
+            "SAVE_PROOF_REJECTED reason=%s evidence_slot=%s marker_map=%s "
+            "candidate_slot=%s candidate_mtime=%s active_slot=%s",
             *rejection,
         )
         logger.info(
@@ -3383,6 +3467,9 @@ class DoomEternalContext(CommonContext):
             self.pending_map_identity = None
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
+        self.fast_travel_eligibility_snapshot = None
+        self.fast_travel_epoch_state = None
+        self.fast_travel_last_transition = None
         return None
 
     def store_pending_map_identity(self, marker_data):
@@ -3409,6 +3496,18 @@ class DoomEternalContext(CommonContext):
         self.pending_map_identity = None
         self.cached_map_identity = marker_data
         self.current_map_name = marker_data["runtime_map"]
+        materialized_epoch = marker_data.get("gameplay_epoch")
+        if (
+            isinstance(materialized_epoch, str)
+            and valid_fast_travel_delivery_key(("room", "map", materialized_epoch))
+            and materialized_epoch
+            not in getattr(self, "completed_level_ready_epochs", set())
+        ):
+            pending_level_ready = getattr(self, "pending_level_ready", {})
+            self.pending_level_ready = pending_level_ready
+            pending_level_ready.setdefault(
+                materialized_epoch, marker_data.get("path")
+            )
         marker_mtime = marker_data["mtime_ns"]
         if self.last_accepted_marker_mtime != marker_mtime:
             self.last_accepted_marker_mtime = marker_mtime
@@ -3436,19 +3535,6 @@ class DoomEternalContext(CommonContext):
                 self.current_map_name = None
                 self.cached_map_identity = None
                 return None
-            cached = self.cached_map_identity
-            lease_epoch = (
-                lease.gameplay_loaded_ns
-                if lease is not None and lease.gameplay_loaded_ns
-                else None
-            )
-            if (
-                cached is not None
-                and (lease_epoch is None or cached.get("gameplay_epoch") == lease_epoch)
-            ):
-                return self.accept_map_identity(
-                    cached, cached.get("evidence_epoch")
-                )
             return self.invalidate_map_identity("gameplay_not_loaded")
 
         if getattr(evidence, "state", None) != "gameplay":
@@ -3459,22 +3545,46 @@ class DoomEternalContext(CommonContext):
                 return None
             return self.invalidate_map_identity("menu")
 
-        lease_epoch = (
-            lease.gameplay_loaded_ns
-            if lease is not None and lease.gameplay_loaded_ns
-            else None
-        )
         evidence_epoch = getattr(evidence, "epoch", None)
+        if evidence_epoch is None:
+            return self.invalidate_map_identity("gameplay_epoch_unavailable")
+        evidence_mtime_ns = gameplay_evidence_mtime_ns()
+        if evidence_mtime_ns is None:
+            return self.invalidate_map_identity("evidence_mtime_unavailable")
 
         if pending is not None:
             pending_mtime = pending.get("mtime_ns", 0)
             if lease is not None and lease.started_ns and pending_mtime < lease.started_ns:
                 return self.invalidate_map_identity("stale_marker")
+            if not pending.get("causal_bound", False):
+                if evidence_mtime_ns > pending_mtime:
+                    return None
+                if (
+                    pending.get("causal_blocked", False)
+                    and evidence_mtime_ns <= pending.get("evidence_mtime_ns", 0)
+                ):
+                    return None
+                pending = {
+                    **pending,
+                    "native_gameplay_epoch": evidence_epoch,
+                    "gameplay_epoch": build_materialization_epoch(
+                        evidence_epoch, pending_mtime
+                    ),
+                    "evidence_mtime_ns": evidence_mtime_ns,
+                    "causal_bound": True,
+                }
+                self.pending_map_identity = pending
+                if lease is not None:
+                    lease.observe_gameplay_loaded(pending_mtime)
             if (
-                lease_epoch is not None
-                and pending.get("gameplay_epoch") != lease_epoch
+                evidence_epoch is None
+                or pending.get("native_gameplay_epoch") != evidence_epoch
+                or pending.get("gameplay_epoch")
+                != build_materialization_epoch(evidence_epoch, pending_mtime)
+                or pending.get("evidence_mtime_ns") != evidence_mtime_ns
+                or not pending.get("causal_bound", False)
             ):
-                return self.invalidate_map_identity("epoch_mismatch")
+                return self.invalidate_map_identity("marker_epoch_mismatch")
             return self.accept_map_identity(pending, evidence_epoch)
 
         cached = self.cached_map_identity
@@ -3484,25 +3594,32 @@ class DoomEternalContext(CommonContext):
                 cached_mtime = cached.get("mtime_ns", 0)
                 if lease is not None and lease.started_ns and cached_mtime < lease.started_ns:
                     return self.invalidate_map_identity("stale_marker")
-                if lease_epoch is not None and cached.get("gameplay_epoch") != lease_epoch:
-                    return self.invalidate_map_identity("epoch_mismatch")
-                cached_evidence_epoch = cached.get("evidence_epoch")
                 if (
-                    cached_evidence_epoch is not None
-                    and cached_evidence_epoch != evidence_epoch
+                    evidence_epoch is None
+                    or cached.get("native_gameplay_epoch") != evidence_epoch
+                    or cached.get("gameplay_epoch")
+                    != build_materialization_epoch(evidence_epoch, cached_mtime)
+                    or cached.get("evidence_mtime_ns") != evidence_mtime_ns
+                    or evidence_mtime_ns > cached_mtime
                 ):
-                    return self.invalidate_map_identity("epoch_mismatch")
+                    return self.invalidate_map_identity("marker_epoch_mismatch")
                 return self.accept_map_identity(cached, evidence_epoch)
             return None
 
         newest_mtime, newest_path = markers[-1]
         if (
             cached is not None
-            and lease_epoch is not None
-            and cached.get("gameplay_epoch") == lease_epoch
-            and cached.get("evidence_epoch") in (None, evidence_epoch)
             and newest_mtime <= cached.get("mtime_ns", 0)
         ):
+            if (
+                evidence_epoch is None
+                or cached.get("native_gameplay_epoch") != evidence_epoch
+                or cached.get("gameplay_epoch")
+                != build_materialization_epoch(evidence_epoch, cached.get("mtime_ns"))
+                or cached.get("evidence_mtime_ns") != evidence_mtime_ns
+                or evidence_mtime_ns > cached.get("mtime_ns", 0)
+            ):
+                return self.invalidate_map_identity("marker_epoch_mismatch")
             return self.accept_map_identity(cached, evidence_epoch)
 
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
@@ -3512,20 +3629,20 @@ class DoomEternalContext(CommonContext):
         if lease is not None and lease.started_ns and newest_mtime < lease.started_ns:
             return self.invalidate_map_identity("stale_marker")
 
-        if lease_epoch is not None and newest_mtime < lease_epoch:
-            return self.invalidate_map_identity("epoch_mismatch")
-
-        if (
-            newest_mtime == self.last_accepted_marker_mtime
-            and self.last_accepted_map_evidence_epoch is not None
-            and self.last_accepted_map_evidence_epoch != evidence_epoch
-        ):
-            return self.invalidate_map_identity("epoch_mismatch")
-
         marker_data = {
             **marker_data,
-            "gameplay_epoch": lease_epoch or newest_mtime,
+            "native_gameplay_epoch": evidence_epoch if evidence_mtime_ns <= newest_mtime else None,
+            "gameplay_epoch": (
+                build_materialization_epoch(evidence_epoch, newest_mtime)
+                if evidence_mtime_ns <= newest_mtime
+                else None
+            ),
+            "evidence_mtime_ns": evidence_mtime_ns,
+            "causal_bound": evidence_mtime_ns <= newest_mtime,
         }
+        if not marker_data["causal_bound"]:
+            self.store_pending_map_identity(marker_data)
+            return None
         return self.accept_map_identity(marker_data, evidence_epoch)
 
     def log_save_proof_accepted(
@@ -3562,7 +3679,6 @@ class DoomEternalContext(CommonContext):
         marker_map = marker["runtime_map"] if marker else None
 
         evidence_slot = evidence.slot_directory if (evidence and getattr(evidence, "slot_directory", None)) else None
-        evidence_state = evidence.state if (evidence and getattr(evidence, "state", None)) else None
         evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
 
         lease = getattr(self, "runtime_observation_lease", None)
@@ -3587,18 +3703,17 @@ class DoomEternalContext(CommonContext):
             and newest.mtime_ns > active.mtime_ns
         )
 
-        def fail_proof(reason, details_map=None):
+        def fail_proof(reason):
             self.runtime_observers_frozen = True
             self.mission_select_observation_map = None
             self.mission_select_observation_epoch = None
             self.log_save_proof_rejected(
                 reason,
                 evidence_slot=evidence_slot,
-                evidence_map=marker_map or (evidence.map_name if evidence else None),
+                marker_map=marker_map,
                 candidate_slot=candidate_slot,
                 candidate_mtime=candidate_mtime,
                 active_slot=self.active_save_slot,
-                details_map=details_map,
             )
             return None
 
@@ -3660,70 +3775,60 @@ class DoomEternalContext(CommonContext):
         if not details:
             return fail_proof("no_game_details")
 
-        details_map = canonical_map_name(details.get("mapName"))
-        expected_map = marker_map or (evidence.map_name if evidence else None) or canonical_map_name(self.current_map_name or "")
+        active_map = marker_map
+        if not active_map:
+            return fail_proof("map_marker_unavailable")
+        continue_target_map = canonical_map_name(details.get("mapName", ""))
+        mission_select_required = bool(
+            active_map in MISSION_CHALLENGE_RUNTIME_MAPS
+            and continue_target_map
+            and continue_target_map != active_map
+        )
         if lease is not None:
             try:
                 evidence_mtime_ns = Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
             except OSError:
                 evidence_mtime_ns = marker["mtime_ns"] if marker else 0
-            live, reason = lease.validate(
+            live, reason = (False, "mission_select_required") if mission_select_required else lease.validate(
                 evidence_mtime_ns=evidence_mtime_ns,
                 evidence_state=evidence.state if evidence else "gameplay",
-                evidence_map=marker_map or (evidence.map_name if evidence else ""),
-                current_map=expected_map,
-                details_map=details_map,
+                current_map=active_map,
             )
-            if live:
-                self.mission_select_observation_map = None
-                self.mission_select_observation_epoch = None
+            mission_select_live = False
             if not live:
-                mission_select_live = False
-                if (
-                    (reason == "map_mismatch" or marker_map is not None)
-                    and expected_map in MISSION_CHALLENGE_RUNTIME_MAPS
-                    and details_map != expected_map
-                ):
+                if mission_select_required:
                     mission_select_live, reason = lease.validate_mission_select(
                         evidence_mtime_ns=evidence_mtime_ns or (marker["mtime_ns"] if marker else 0),
                         evidence_state=evidence.state if evidence else "gameplay",
-                        evidence_map=expected_map,
-                        current_map=expected_map,
-                        mission_map=expected_map,
+                        current_map=active_map,
+                        mission_map=active_map,
                         save_mtime_ns=selected.mtime_ns,
                     )
                 if mission_select_live:
-                    self.mission_select_observation_map = expected_map
+                    self.mission_select_observation_map = active_map
                     self.mission_select_observation_epoch = lease.gameplay_loaded_ns
                     if getattr(self, "last_accepted_mission_select_epoch", None) != lease.gameplay_loaded_ns:
                         self.last_accepted_mission_select_epoch = lease.gameplay_loaded_ns
                         logger.info(
                             "[OBSERVER] MISSION_SELECT_LEASE_ACCEPTED slot=%s map=%s "
-                            "load_epoch=%s save_mtime_ns=%s stale_details_map=%s",
+                            "load_epoch=%s save_mtime_ns=%s",
                             selected.slot_directory,
-                            expected_map,
+                            active_map,
                             lease.gameplay_loaded_ns,
                             selected.mtime_ns,
-                            details_map,
                         )
                 else:
                     self.mission_select_observation_map = None
                     self.mission_select_observation_epoch = None
+            elif live:
+                self.mission_select_observation_map = None
+                self.mission_select_observation_epoch = None
             if not live and not mission_select_live:
                 if reason != self.last_observer_lease_block:
                     logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=%s", reason)
                     self.last_observer_lease_block = reason
-                return fail_proof(reason, details_map=details_map)
+                return fail_proof(reason)
             self.last_observer_lease_block = None
-
-        if self.mission_select_observation_map:
-            pass
-        elif expected_map == "game/hub/hub":
-            if details_map != "game/hub/hub":
-                return fail_proof("map_mismatch", details_map=details_map)
-        else:
-            if details_map != expected_map:
-                return fail_proof("map_mismatch", details_map=details_map)
 
         is_current_active_slot = (
             self.active_save_slot == selected.slot_directory
@@ -3734,12 +3839,12 @@ class DoomEternalContext(CommonContext):
 
         if not is_current_active_slot:
             if self.active_native_evidence_epoch == proof_evidence_epoch and self.active_save_slot is not None:
-                return fail_proof("unproven_epoch", details_map=details_map)
+                return fail_proof("unproven_epoch")
 
             # SAVE_PROOF_ACCEPTED MUST precede SAVE_SLOT_ACTIVE
             self.log_save_proof_accepted(
                 selected.slot_directory,
-                expected_map,
+                active_map,
                 proof_evidence_epoch,
                 selected.mtime_ns,
                 details_token,
@@ -3753,7 +3858,7 @@ class DoomEternalContext(CommonContext):
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
             self.arm_final_sin_completion_candidate(
-                selected, details, expected_map, proof_load_epoch
+                selected, details, active_map, proof_load_epoch
             )
             self.reconcile_fast_travel_unlock("save_proof")
             return selected
@@ -3763,7 +3868,7 @@ class DoomEternalContext(CommonContext):
             if evidence_epoch is not None and self.active_native_evidence_epoch != evidence_epoch:
                 self.log_save_proof_accepted(
                     selected.slot_directory,
-                    expected_map,
+                    active_map,
                     evidence_epoch,
                     selected.mtime_ns,
                     details_token,
@@ -3780,7 +3885,7 @@ class DoomEternalContext(CommonContext):
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
             self.arm_final_sin_completion_candidate(
-                selected, details, expected_map, proof_load_epoch
+                selected, details, active_map, proof_load_epoch
             )
             self.reconcile_fast_travel_unlock("save_proof")
             return selected
@@ -3898,19 +4003,25 @@ class DoomEternalContext(CommonContext):
         self.session_state.setdefault("goal_sent", False)
         self.session_state.setdefault("cultist_autosave_path", None)
         self.session_state.setdefault("save_slot_observations", {})
-        self.automap_cleanup_delivered = {
-            (key.split("|", 1)[0], key.split("|", 1)[1]): epoch
-            for key, epoch in self.session_state.get("automap_cleanup", {}).items()
-            if "|" in key and isinstance(epoch, int)
-        }
-        self.fast_travel_delivered = {
-            tuple(value): True
-            for value in self.session_state.get("fast_travel_delivered", [])
-            if isinstance(value, list) and len(value) == 3
-        }
-        self.automap_cleanup_epoch = max(
-            self.automap_cleanup_delivered.values(), default=0
-        )
+        self.automap_cleanup_delivered = {}
+        for key, epoch in self.session_state.get("automap_cleanup", {}).items():
+            if not isinstance(key, str) or not valid_materialization_epoch(epoch):
+                continue
+            try:
+                decoded = json.loads(key)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                decoded = None
+            if isinstance(decoded, list) and len(decoded) == 3 and all(isinstance(value, str) for value in decoded):
+                self.automap_cleanup_delivered[tuple(decoded)] = epoch
+        self.fast_travel_delivered = {}
+        raw_fast_travel_delivered = self.session_state.get("fast_travel_delivered", [])
+        if not isinstance(raw_fast_travel_delivered, (list, tuple)):
+            raw_fast_travel_delivered = []
+        for value in raw_fast_travel_delivered:
+            key = valid_fast_travel_delivery_key(value)
+            if key is not None:
+                self.fast_travel_delivered[key] = True
+        self.automap_cleanup_epoch = None
         sessions[self.state_key] = self.session_state
         processed = self.session_state.get("processed_items", 0)
         if not isinstance(processed, int) or processed < 0:
@@ -3943,9 +4054,9 @@ class DoomEternalContext(CommonContext):
         }
         self.session_state["save_slot_observations"] = self.save_slot_observations
         self.session_state["automap_cleanup"] = {
-            f"{map_name}|{location_id}": epoch
-            for (map_name, location_id), epoch in self.automap_cleanup_delivered.items()
-            if isinstance(map_name, str) and isinstance(location_id, str) and isinstance(epoch, int)
+            json.dumps([room_identity, map_name, location_id], separators=(",", ":")): epoch
+            for (room_identity, map_name, location_id), epoch in self.automap_cleanup_delivered.items()
+            if all(isinstance(value, str) for value in (room_identity, map_name, location_id)) and valid_materialization_epoch(epoch)
         }
         self.selected_observation_slot = None
         self.session_state.pop("sticky_mastery_observed", None)
@@ -4006,12 +4117,14 @@ class DoomEternalContext(CommonContext):
         )[-64:]
         self.session_state["save_slot_observations"] = self.save_slot_observations
         self.session_state["automap_cleanup"] = {
-            f"{map_name}|{location_id}": epoch
-            for (map_name, location_id), epoch in self.automap_cleanup_delivered.items()
-            if isinstance(map_name, str) and isinstance(location_id, str) and isinstance(epoch, int)
+            json.dumps([room_identity, map_name, location_id], separators=(",", ":")): epoch
+            for (room_identity, map_name, location_id), epoch in self.automap_cleanup_delivered.items()
+            if all(isinstance(value, str) for value in (room_identity, map_name, location_id)) and valid_materialization_epoch(epoch)
         }
         self.session_state["fast_travel_delivered"] = [
-            list(key) for key in self.fast_travel_delivered
+            list(key)
+            for key in self.fast_travel_delivered
+            if valid_fast_travel_delivery_key(key) is not None
         ]
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
@@ -4123,13 +4236,15 @@ class DoomEternalContext(CommonContext):
             return None, "gameplay evidence does not match the active save slot"
         if self.active_native_evidence_epoch != evidence.epoch:
             return None, "gameplay evidence does not match the active epoch"
-        if canonical_map_name(self.current_map_name or "") != evidence.map_name:
-            return None, "gameplay evidence does not match the active map"
+        marker = self.read_active_map_identity(evidence=evidence)
+        if marker is None:
+            return None, "active AP map marker is unavailable"
+        active_map = canonical_map_name(marker["runtime_map"])
         supported = {
             canonical_map_name(name)
             for name in load_foundation_contracts()["active_maps"].values()
         }
-        if evidence.map_name not in supported:
+        if active_map not in supported:
             return None, "active map has no ap_rpc_v3 reconciliation entities"
         if self.items_processed > len(self.items_received):
             return None, "authoritative received-item history is incomplete"
@@ -4476,7 +4591,19 @@ class DoomEternalContext(CommonContext):
 
     def advance_automap_cleanup_epoch(self):
         """Open one idempotent cleanup pass after a level-ready marker."""
-        self.automap_cleanup_epoch += 1
+        previous_epoch = self.automap_cleanup_epoch
+        marker = getattr(self, "cached_map_identity", None)
+        epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
+        if not valid_materialization_epoch(epoch):
+            self.automap_cleanup_epoch = None
+            if previous_epoch != self.automap_cleanup_epoch:
+                self.automap_cleanup_retry.clear()
+                self.automap_cleanup_status.clear()
+            return None
+        self.automap_cleanup_epoch = epoch
+        if previous_epoch != epoch:
+            self.automap_cleanup_retry.clear()
+            self.automap_cleanup_status.clear()
         return self.automap_cleanup_epoch
 
     def _fast_travel_transition(self, event, *, reason=None, trigger=None):
@@ -4514,9 +4641,6 @@ class DoomEternalContext(CommonContext):
         identity, map_key, epoch = snapshot
         if identity != self.get_ap_state_key():
             return "identity_mismatch"
-        lease = getattr(self, "runtime_observation_lease", None)
-        if getattr(lease, "gameplay_loaded_ns", None) != epoch:
-            return "epoch_mismatch"
         accepted = getattr(self, "cached_map_identity", None)
         if not isinstance(accepted, dict):
             return "map_unavailable"
@@ -4551,13 +4675,18 @@ class DoomEternalContext(CommonContext):
                 )
             return False
         identity, map_key, epoch = snapshot
+        delivery_key = valid_fast_travel_delivery_key((identity, map_key, epoch))
+        if delivery_key is None:
+            self._fast_travel_transition(
+                "PENDING", reason="malformed_epoch", trigger=trigger
+            )
+            return False
         snapshot_mismatch = self._fast_travel_snapshot_mismatch(snapshot)
         if snapshot_mismatch:
             self._fast_travel_transition(
                 "PENDING", reason=snapshot_mismatch, trigger=trigger
             )
             return False
-        delivery_key = (identity, map_key, epoch)
         if delivery_key in self.fast_travel_delivered:
             self._fast_travel_transition("ALREADY_DISPATCHED", trigger=trigger)
             return False
@@ -4566,6 +4695,9 @@ class DoomEternalContext(CommonContext):
             return False
         if not getattr(self, "item_state_ready", False):
             self._fast_travel_transition("PENDING", reason="item_state_unavailable", trigger=trigger)
+            return False
+        if not rpc_execution_enabled():
+            self._fast_travel_transition("PENDING", reason="rpc_not_ready", trigger=trigger)
             return False
         now = time.monotonic()
         retry_deadline = state.get("retry_deadline")
@@ -4603,24 +4735,26 @@ class DoomEternalContext(CommonContext):
 
     def snapshot_fast_travel_eligibility(self, marker_data=None):
         """Capture server-history eligibility once for each gameplay epoch."""
-        lease = getattr(self, "runtime_observation_lease", None)
-        epoch = getattr(lease, "gameplay_loaded_ns", None)
+        if not isinstance(marker_data, dict):
+            marker_data = (
+                getattr(self, "cached_map_identity", None)
+                or getattr(self, "pending_map_identity", None)
+            )
+        if not isinstance(marker_data, dict):
+            return None
+        marker_signal = marker_data.get("mtime_ns")
+        native_epoch = marker_data.get("native_gameplay_epoch")
+        if native_epoch is None:
+            native_epoch = getattr(self, "native_gameplay_epoch", None)
+        epoch = build_materialization_epoch(native_epoch, marker_signal)
         existing = getattr(self, "fast_travel_epoch_state", None)
         if isinstance(existing, dict) and existing.get("epoch") is not None:
             return getattr(self, "fast_travel_eligibility_snapshot", None)
-        if not isinstance(epoch, int) or isinstance(epoch, bool):
+        if epoch is None:
             return None
 
         identity = self.get_ap_state_key()
-        runtime_map = ""
-        if isinstance(marker_data, dict):
-            runtime_map = canonical_map_name(marker_data.get("runtime_map", ""))
-        if not runtime_map:
-            runtime_map = canonical_map_name(self.current_map_name or "")
-        if not runtime_map:
-            pending = getattr(self, "pending_map_identity", None)
-            if isinstance(pending, dict):
-                runtime_map = canonical_map_name(pending.get("runtime_map", ""))
+        runtime_map = canonical_map_name(marker_data.get("runtime_map", ""))
         map_key = next(
             (key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map),
             None,
@@ -4661,45 +4795,91 @@ class DoomEternalContext(CommonContext):
             self._fast_travel_transition("INELIGIBLE", reason=ineligible_reason)
         return self.fast_travel_eligibility_snapshot
 
-    async def process_level_ready(self, newest_path):
+    async def process_level_ready(self, newest_path=None):
         """Run complete level-ready reconciliation for one accepted load epoch."""
         self.read_active_map_identity(evidence=read_gameplay_save_evidence())
         self.snapshot_fast_travel_eligibility()
-        if not rpc_execution_enabled():
-            set_rpc_execution(True)
-        epoch = self.advance_reconciliation_epoch("level_ready")
-        logger.info(
-            "[RPC] Level-ready signal received (%s). RPC armed; "
-            "perk reconciliation epoch %s queued behind native safety gate.",
-            os.path.basename(newest_path),
-            epoch,
-        )
-        self.reconcile_owned_runes("level_ready")
-        self.advance_automap_cleanup_epoch()
-        self.reconcile_checked_automap_cleanup("level_ready")
-        await self.check_mission_challenge_locations()
-        self.automatic_reconcile_inventory("level_ready")
-        self.reconcile_fast_travel_unlock("level_ready")
-        return True
+        marker = getattr(self, "cached_map_identity", None)
+        epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
+        pending = getattr(self, "pending_level_ready", {})
+        if not isinstance(epoch, str) or epoch not in pending:
+            return False
+        in_flight = getattr(self, "level_ready_in_flight", set())
+        if epoch in in_flight:
+            return False
+        in_flight.add(epoch)
+        self.level_ready_in_flight = in_flight
+        source_path = pending.get(epoch) or newest_path or marker.get("path")
+        try:
+            if not rpc_execution_enabled():
+                set_rpc_execution(True)
+            reconciliation_epoch = self.advance_reconciliation_epoch("level_ready")
+            logger.info(
+                "[RPC] Level-ready signal received (%s). RPC armed; "
+                "perk reconciliation epoch %s queued behind native safety gate.",
+                os.path.basename(source_path) if source_path else "<marker>",
+                reconciliation_epoch,
+            )
+            self.reconcile_owned_runes("level_ready")
+            self.advance_automap_cleanup_epoch()
+            self.reconcile_checked_automap_cleanup("level_ready")
+            await self.check_mission_challenge_locations()
+            self.automatic_reconcile_inventory("level_ready")
+            self.reconcile_fast_travel_unlock("level_ready")
+            pending.pop(epoch, None)
+            self.completed_level_ready_epochs.add(epoch)
+            return True
+        finally:
+            in_flight.discard(epoch)
 
     def reconcile_checked_automap_cleanup(self, trigger):
         """Remove only isolated AP visuals for server-checked map locations."""
-        map_name = canonical_map_name(self.current_map_name or "")
-        targets = AUTOMAP_COMPLETION_BY_MAP.get(map_name, {})
-        if not targets:
+        if not valid_materialization_epoch(self.automap_cleanup_epoch):
             return False
-        checked = set(getattr(self, "checked_locations", set()))
-        checked.update(getattr(self, "locations_checked", set()))
+        map_name = canonical_map_name(self.current_map_name or "")
+        map_key = next(
+            (key for key, runtime_map in KNOWN_CATALOG_MAPS.items()
+             if canonical_map_name(runtime_map) == map_name),
+            None,
+        )
+        entries = [
+            entry for entry in AUTOMAP_VISUALS_BY_MAP.get(map_key or "", {}).values()
+            if entry["classification"] == "visible_cleanup"
+        ]
+        if not entries:
+            return False
+        room_identity = self.get_ap_state_key()
+        epoch = self.automap_cleanup_epoch
+        if not room_identity:
+            self._automap_cleanup_transition((epoch, "", map_name, ""), "PENDING", "room_identity_unavailable")
+            return False
+        checked = getattr(self, "checked_locations", None)
+        if not self.server_checked_locations_ready or not isinstance(checked, (set, frozenset, list, tuple)):
+            self._automap_cleanup_transition((epoch, room_identity, map_name, ""), "PENDING", "checked_locations_unavailable")
+            return False
+        if not rpc_execution_enabled():
+            self._automap_cleanup_transition((epoch, room_identity, map_name, ""), "PENDING", "rpc_not_ready")
+            return False
+        checked = set(checked)
         changed = False
-        for location_id, entity_name in sorted(targets.items()):
+        now = time.monotonic()
+        for entry in sorted(entries, key=lambda item: item["location_id"]):
+            location_id = entry["location_id"]
             if location_id not in checked:
                 continue
-            delivery_key = (map_name, str(location_id))
+            entity_name = entry["cleanup_entity"]
+            delivery_key = (room_identity, map_name, str(location_id))
+            runtime_key = (epoch, *delivery_key)
             if self.automap_cleanup_delivered.get(delivery_key) == self.automap_cleanup_epoch:
+                self._automap_cleanup_transition(runtime_key, "DELIVERED", trigger)
+                continue
+            retry = self.automap_cleanup_retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})
+            if now < retry["deadline"]:
+                self._automap_cleanup_transition(runtime_key, "RETRY_WAIT", trigger)
                 continue
             command_id = (
                 f"automap-cleanup-{self.automap_cleanup_session}-"
-                f"{location_id}-e{self.automap_cleanup_epoch}"
+                f"{room_identity}-{map_name}-{location_id}-e{self.automap_cleanup_epoch}"
             )
             command = f"ai_ScriptCmdEnt {entity_name} activate"
             if not send_command(
@@ -4707,10 +4887,18 @@ class DoomEternalContext(CommonContext):
                 coalesce_key=command_id,
                 already_queued_ok=True,
             ):
+                retry["attempt"] += 1
+                retry["deadline"] = now + min(
+                    AUTOMAP_CLEANUP_RETRY_MAX_SECONDS,
+                    AUTOMAP_CLEANUP_RETRY_BASE_SECONDS * (2 ** min(retry["attempt"] - 1, 3)),
+                )
+                self._automap_cleanup_transition(runtime_key, "RETRY", "queue_unavailable")
                 continue
             self.automap_cleanup_delivered[delivery_key] = self.automap_cleanup_epoch
+            self.automap_cleanup_retry.pop(runtime_key, None)
             self.persist_session_state()
             changed = True
+            self._automap_cleanup_transition(runtime_key, "QUEUED", trigger)
             logger.info(
                 "[Automap] Checked-state cleanup queued location=%s map=%s "
                 "epoch=%s trigger=%s target=%s",
@@ -4721,6 +4909,16 @@ class DoomEternalContext(CommonContext):
                 entity_name,
             )
         return changed
+
+    def _automap_cleanup_transition(self, delivery_key, status, reason):
+        previous = self.automap_cleanup_status.get(delivery_key)
+        if previous == status:
+            return
+        self.automap_cleanup_status[delivery_key] = status
+        logger.info(
+            "[Automap] cleanup transition status=%s previous=%s reason=%s key=%s",
+            status, previous, reason, delivery_key,
+        )
 
     def bootstrap_actions(self):
         bootstrap = self.session_state.setdefault(
@@ -5299,7 +5497,6 @@ class DoomEternalContext(CommonContext):
             entry = WEAPON_MASTERY_BY_UNLOCKABLE.get(unlockable)
             if entry is None:
                 continue
-            signal = entry["signal"]
             observed_record = (
                 int(record["numUnlockableRules"]),
                 record["rule_0_statname"],
@@ -6054,8 +6251,15 @@ class DoomEternalContext(CommonContext):
     async def check_campaign_goal_save_fallback(self):
         if await self.evaluate_final_sin_completion_candidate():
             return
+        marker = self.read_active_map_identity(evidence=read_gameplay_save_evidence())
+        active_map = canonical_map_name(marker["runtime_map"]) if marker else ""
+        if not active_map:
+            return
         details = self.active_game_details()
         if not details:
+            return
+        record_map = canonical_map_name(details.get("mapName", ""))
+        if not record_map:
             return
         mtime = details.get("_mtime_ns")
         if mtime == self.last_goal_details_mtime:
@@ -6063,19 +6267,18 @@ class DoomEternalContext(CommonContext):
         self.last_goal_details_mtime = mtime
 
         details_path = details.get("_path")
-        map_name = canonical_map_name(details.get("mapName"))
-        if not details_path or not map_name:
+        if not details_path:
             return
 
         is_completed = details.get("completed") == "1"
-        key = (details_path, map_name)
+        key = (details_path, record_map)
         prev_status = self.session_map_completion_states.get(key)
         self.session_map_completion_states[key] = "1" if is_completed else "0"
 
         # Edge fallback triggers only on a fresh in-session transition from incomplete to completed
         fresh_completion = (prev_status == "0" and is_completed)
 
-        if map_name == CULTIST_BASE_MAP:
+        if record_map == CULTIST_BASE_MAP:
             if self.cultist_autosave_path != details_path:
                 self.cultist_autosave_path = details_path
                 self.persist_session_state()
@@ -6085,21 +6288,21 @@ class DoomEternalContext(CommonContext):
             return
 
         completed_cultist_base = (
-            map_name != CULTIST_BASE_MAP
+            record_map != CULTIST_BASE_MAP
             and is_completed
             and details_path == self.cultist_autosave_path
         )
         if completed_cultist_base:
             await self.send_campaign_goal("legacy save fallback")
 
-        if fresh_completion and map_name in {"e3m4_boss", "game/sp/e3m4_boss/e3m4_boss"}:
+        if fresh_completion and record_map in {"e3m4_boss", "game/sp/e3m4_boss/e3m4_boss"}:
             matching = [p for p in PUBLISHERS if p.key == "final_sin_mission_complete"]
             for publisher in matching:
                 await DoomEternalContext.execute_publisher(
                     self, publisher, "save_fallback", "Final Sin save fallback"
                 )
 
-        if fresh_completion and map_name in {"e1m4_boss", "game/sp/e1m4_boss/e1m4_boss"}:
+        if fresh_completion and record_map in {"e1m4_boss", "game/sp/e1m4_boss/e1m4_boss"}:
             matching = [p for p in PUBLISHERS if p.key == "doom_hunter_base_mission_complete"]
             for publisher in matching:
                 await DoomEternalContext.execute_publisher(
@@ -6120,14 +6323,11 @@ class DoomEternalContext(CommonContext):
         evidence = read_gameplay_save_evidence()
         marker = self.read_active_map_identity(evidence=evidence)
 
-        if marker is not None:
-            map_name = marker["runtime_map"]
-        elif evidence and evidence.state == "gameplay":
-            map_name = evidence.map_name
-        else:
+        if marker is None:
             self.last_rpc_map_name = None
             self.current_map_name = None
             return
+        map_name = marker["runtime_map"]
 
         self.current_map_name = map_name
         self.snapshot_fast_travel_eligibility()
@@ -6287,29 +6487,14 @@ class DoomEternalContext(CommonContext):
                 except Exception as exc:
                     logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
 
-                level_ready_resync = False
                 markers = discover_telemetry_markers()
                 if markers:
                     _, newest_path = markers[-1]
                     try:
-                        lease = getattr(self, "runtime_observation_lease", None)
-                        previous_lifecycle_epoch = getattr(
-                            lease, "gameplay_loaded_ns", None
-                        )
-                        lifecycle_accepted = self.ingest_visible_runtime_lifecycle(
+                        self.ingest_visible_runtime_lifecycle(
                             evidence=read_gameplay_save_evidence(),
                             lifecycle_markers=markers,
                         )
-                        current_lifecycle_epoch = getattr(
-                            lease, "gameplay_loaded_ns", None
-                        )
-                        lifecycle_accepted = bool(
-                            lifecycle_accepted
-                            and current_lifecycle_epoch is not None
-                            and current_lifecycle_epoch != previous_lifecycle_epoch
-                        )
-                        if lifecycle_accepted:
-                            level_ready_resync = True
                     except Exception as e:
                         logger.error("[RPC] Auto-RPC failed to consume telemetry ready file %s: %s", newest_path, e)
 
@@ -6319,9 +6504,7 @@ class DoomEternalContext(CommonContext):
                         except OSError:
                             pass
 
-                if level_ready_resync:
-                    await self.process_level_ready(newest_path)
-                else:
+                if not await self.process_level_ready(newest_path if markers else None):
                     await self.check_mission_challenge_locations()
                     self.reconcile_fast_travel_unlock("readiness")
 

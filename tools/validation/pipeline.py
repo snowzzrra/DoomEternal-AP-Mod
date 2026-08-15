@@ -15,13 +15,13 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from tools.content.compile_content_catalog import compile_catalog
+from automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
 from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
 from tools.maps.map_semantic_baseline import (
-    BaselineDrift,
     assert_map_baseline,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
@@ -45,12 +45,14 @@ CORE_MAP_INPUTS = (
     "data/mission_complete_map_contracts.json",
     "data/content_identity.json",
     "data/ap_visual_bundle.json",
+    "data/checked_location_visuals.json",
     "ap_visual_contract.py",
     "tools/maps/ap_map_generator.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/validation/audit_resource_packages.py",
     "content_catalog.py",
+    "automap_visual_registry.py",
     "publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
@@ -69,6 +71,7 @@ PREFLIGHT_PYTHON = (
     "tools/validation/pipeline.py",
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",
+    "automap_visual_registry.py",
 )
 
 
@@ -276,6 +279,7 @@ class Pipeline:
                         "field=filename/marker value=shared campaign goal authority"
                     )
             compile_catalog(check=True)
+            load_automap_visual_registry(ROOT / "data" / "checked_location_visuals.json")
             from options_foundation import load_options_schema
 
             load_options_schema(ROOT / "data" / "options_schema.json")
@@ -506,6 +510,11 @@ class Pipeline:
                 f"field=physical_ap_ids value=missing {sorted(missing)}\n"
                 f"Reproduce:\n  scripts/pipeline.sh map {map_key}"
             )
+        validate_generated_visuals(
+            load_automap_visual_registry(ROOT / "data" / "checked_location_visuals.json"),
+            map_key,
+            text,
+        )
         expected_manifest = json.loads(
             catalog.map(map_key).manifest_path.read_text(encoding="utf-8")
         )
@@ -787,14 +796,13 @@ class Pipeline:
                         or document.get("physical_options") != [
                             "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
                         ]
-                        or document.get("map_content_options") != ["start_with_automap"]
+                        or document.get("map_content_options") != []
                         or not isinstance(variants, dict)
                         or set(variants) != {
-                            f"{chainsaw}{dash}{battery}{automap}"
+                            f"{chainsaw}{dash}{battery}"
                             for chainsaw in "01"
                             for dash in "01"
                             for battery in "01"
-                            for automap in "01"
                         }
                     ):
                         raise ValueError("internal room template resource layout is invalid")

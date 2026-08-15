@@ -43,20 +43,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "0.4.0-beta.4: intentional Sentinel Crystal and AP pickup presentation delta preserves functional owners, triggers, publishers, and progression."
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Final AP lifecycle and presentation generator"
     }
   ],
   "asset_package_contract_sha256": "1301a39fcd94c697ef77009b823431bbb7eab9eaddf9db57e860d5a6071e367f",
-  "byte_sha256": "183ef894c1b7723d86f1e092433133ac971ddfb4f5c9a15a2bd4d8fa2c7c0c2b",
+  "byte_sha256": "32859c971caaadc8f3b81feb6cb6eaee9f1f9f0134037d75e2e520c52f238451",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 706,
-    "byte_size": 10662341,
-    "classes": 9140,
-    "entity_count": 9142,
-    "layers": 2353,
-    "targets": 11994,
-    "transforms": 19054,
-    "unique_entity_names": 9141
+    "byte_size": 10662756,
+    "classes": 9143,
+    "entity_count": 9145,
+    "layers": 2355,
+    "targets": 11969,
+    "transforms": 19057,
+    "unique_entity_names": 9144
   },
   "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
   "map_key": "e1m4_boss",
@@ -87,5 +91,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "dc0c5401512c54369ec4de732d92a156a6882285453cef13a5660d31dc073273",
-  "semantic_sha256": "3cdb38f574161e79daab2e74baaad3d2b93734e1374346f10e9d63159966f395"
+  "semantic_sha256": "e26c4d6a793b9e8f62e1f623ac6ebbd980b4807d42b4df1acac83f61630ac180"
 }

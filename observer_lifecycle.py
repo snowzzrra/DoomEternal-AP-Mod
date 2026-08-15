@@ -208,9 +208,7 @@ class RuntimeObservationLease:
         *,
         evidence_mtime_ns: int,
         evidence_state: str,
-        evidence_map: str,
         current_map: str,
-        details_map: str,
     ) -> tuple[bool, str]:
         if not self.process_probe():
             return False, "game_not_running"
@@ -222,9 +220,7 @@ class RuntimeObservationLease:
             return False, "map_unavailable"
         if evidence_mtime_ns < self.started_ns:
             return False, "stale_runtime_proof"
-        canonical = lambda value: str(value or "").replace("\\", "/").rstrip("/")
-        maps = {canonical(evidence_map), canonical(current_map), canonical(details_map)}
-        if "" in maps or len(maps) != 1:
+        if not str(current_map or "").replace("\\", "/").rstrip("/"):
             return False, "map_mismatch"
         return True, "live"
 
@@ -233,7 +229,6 @@ class RuntimeObservationLease:
         *,
         evidence_mtime_ns: int,
         evidence_state: str,
-        evidence_map: str,
         current_map: str,
         mission_map: str,
         save_mtime_ns: int,
@@ -250,12 +245,7 @@ class RuntimeObservationLease:
         if save_mtime_ns < self.gameplay_loaded_ns:
             return False, "mission_select_save_not_fresh"
         canonical = lambda value: str(value or "").replace("\\", "/").rstrip("/")
-        maps = {
-            canonical(evidence_map),
-            canonical(current_map),
-            canonical(mission_map),
-        }
-        if "" in maps or len(maps) != 1:
+        if not canonical(current_map) or canonical(current_map) != canonical(mission_map):
             return False, "mission_select_map_mismatch"
         return True, "mission_select_live"
 

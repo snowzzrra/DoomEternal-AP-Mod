@@ -36,6 +36,7 @@ SUPPORTED_POLICIES = frozenset(
 SUPPORTED_RECEIPT_FEEDBACK = frozenset(
     {AP_RECEIPT_FEEDBACK, NATIVE_ONLY_RECEIPT_FEEDBACK}
 )
+MATERIALIZATION_EPOCH_PATTERN = re.compile(r"[0-9]+:[0-9]+")
 
 
 @dataclass(frozen=True)
@@ -386,9 +387,13 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     if not isinstance(cleanup, Mapping):
         cleanup = {}
     normalized["automap_cleanup"] = {
-        str(key): int(value)
+        str(key): value
         for key, value in cleanup.items()
-        if str(key) and isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        if (
+            str(key)
+            and isinstance(value, str)
+            and MATERIALIZATION_EPOCH_PATTERN.fullmatch(value) is not None
+        )
     }
     if "goal_sent" in normalized and not isinstance(normalized["goal_sent"], bool):
         normalized["goal_sent"] = False

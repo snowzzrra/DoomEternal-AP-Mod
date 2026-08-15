@@ -13,8 +13,8 @@ from pathlib import Path
 
 from map_registry import load_map_registry, release_plan
 from item_classification import load_item_classification_identity
+from automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
 from tools.validation.validate_item_notification_package import (
-    HEADER_RE,
     LOCATION_NOTIFICATION_RE,
     NOTIFICATION_RE,
     capability,
@@ -71,6 +71,7 @@ def audit_mod_payload(
     decompressor: Path | None,
     *,
     require_generated_identity: bool = True,
+    visual_registry: dict[str, object] | None = None,
 ) -> dict[str, dict[str, int | str]]:
     """Compare every release map against its unpacked, compressed mod payload."""
     records: dict[str, dict[str, int | str]] = {}
@@ -84,6 +85,12 @@ def audit_mod_payload(
                 raise AssertionError(f"missing generated or packaged map: {plan.map_key}")
             generated = _normalized(generated_path.read_bytes())
             packaged = _normalized(_read_entities(packaged_path, decompressor, temporary))
+            if visual_registry is not None:
+                validate_generated_visuals(
+                    visual_registry,
+                    plan.map_key,
+                    generated.decode("utf-8"),
+                )
             generated_notifications = set(NOTIFICATION_RE.findall(generated.decode("utf-8")))
             packaged_notifications = set(NOTIFICATION_RE.findall(packaged.decode("utf-8")))
             packaged_locations = set(
@@ -142,13 +149,34 @@ def audit_release(
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("bridge_identity notification capability diverges from audit mode")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
-        raise AssertionError("RELEASE_MANIFEST must contain one version field")
+    if set(manifest) != {"version", "checked_location_visuals"} or not isinstance(manifest["version"], str):
+        raise AssertionError("RELEASE_MANIFEST must contain version and checked-location visual registry")
+    registry_path = client_dir / "data" / "checked_location_visuals.json"
+    registry = manifest["checked_location_visuals"]
+    if not isinstance(registry, dict):
+        raise AssertionError("RELEASE_MANIFEST checked-location visual record must be an object")
+    visual_registry = load_automap_visual_registry(registry_path)
+    if registry != {
+        "path": "client/data/checked_location_visuals.json",
+        "sha256": hashlib.sha256(registry_path.read_bytes()).hexdigest(),
+        "authoritative_fingerprint": visual_registry["authoritative_fingerprint"],
+        "generated_map_sha256": {
+            plan.map_key: hashlib.sha256(
+                (generated_maps / plan.generated_output).read_bytes()
+            ).hexdigest()
+            for plan in release_plan(load_map_registry(map_registry, authorial=True))
+        },
+        "templates_sha256": hashlib.sha256(
+            (client_dir / "resources/mod_templates.zip").read_bytes()
+        ).hexdigest(),
+    }:
+        raise AssertionError("RELEASE_MANIFEST checked-location visual registry hash drifted")
     _audit_locales(enabled, mod_root)
     classification_path = client_dir / "data" / "item_classifications.json"
     load_item_classification_identity(classification_path)
     records = audit_mod_payload(
-        enabled, generated_maps, mod_root, map_registry, decompressor
+        enabled, generated_maps, mod_root, map_registry, decompressor,
+        visual_registry=visual_registry,
     )
     return records
 
@@ -209,9 +237,9 @@ def _extract_playable_zip(
             or document.get("physical_options") != [
                 "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
             ]
-            or document.get("map_content_options") != ["start_with_automap"]
+            or document.get("map_content_options") != []
             or not isinstance(variants, dict)
-            or len(variants) != 16
+            or len(variants) != 8
         ):
             raise AssertionError("internal room template resource layout is invalid")
         expected_resources = {"index.json"} | {

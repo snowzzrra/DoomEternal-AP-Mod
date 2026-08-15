@@ -61,6 +61,7 @@ SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \
     -m tools.content.compile_options_schema --check
 python3 - "$REPO_ROOT" "$TEMP_DIR" <<'PY'
 import json
+import hashlib
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
@@ -421,7 +422,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/deathlink_receive.py" \
     "$REPO_ROOT/campaign_goal_contract.py" \
     "$REPO_ROOT/challenge_registry.py" \
-    "$REPO_ROOT/content_catalog.py" \
+    "$REPO_ROOT/content_catalog.py" "$REPO_ROOT/automap_visual_registry.py" \
     "$REPO_ROOT/ap_visual_contract.py" \
     "$REPO_ROOT/foundation.py" \
     "$REPO_ROOT/item_classification.py" \
@@ -506,6 +507,7 @@ Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="ut
 PY
 
 python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$TEMP_DIR/public_files.json" <<'PY'
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -515,9 +517,16 @@ release_version = sys.argv[2]
 sys.path.insert(0, sys.argv[3])
 from map_registry import load_map_registry, release_plan
 from tools.validation.release_layout import expected_release_roots
-map_manifest_files = [
-    plan.client_manifest for plan in release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
-]
+plans = release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
+map_manifest_files = [plan.client_manifest for plan in plans]
+generated_map_hashes = {
+    plan.map_key: hashlib.sha256(
+        (output_dir / "build" / "generated-maps" / plan.generated_output).read_bytes()
+    ).hexdigest()
+    for plan in plans
+}
+visual_registry_path = output_dir / "client/data/checked_location_visuals.json"
+template_path = output_dir / "client/resources/mod_templates.zip"
 launcher_executable = (
     "DoomEternalArchipelagoLauncher.exe"
     if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
@@ -534,6 +543,7 @@ public_files = [
         "client/campaign_goal_contract.py",
         "client/challenge_registry.py",
         "client/content_catalog.py",
+        "client/automap_visual_registry.py",
         "client/ap_visual_contract.py",
         "client/foundation.py",
         "client/item_classification.py",
@@ -572,6 +582,7 @@ public_files = [
         "client/data/map_sources.json",
         "client/data/foundation_contracts.json",
         "client/data/catalog.json",
+        "client/data/checked_location_visuals.json",
         "client/data/generated_content.py",
         "client/data/campaign_goal_contract.json",
         "client/data/observer_contracts.json",
@@ -585,7 +596,16 @@ public_files = [
 ]
 
 (output_dir / "RELEASE_MANIFEST.json").write_text(
-    json.dumps({"version": release_version}, indent=2) + "\n",
+    json.dumps({
+        "version": release_version,
+        "checked_location_visuals": {
+            "path": "client/data/checked_location_visuals.json",
+            "sha256": hashlib.sha256(visual_registry_path.read_bytes()).hexdigest(),
+            "authoritative_fingerprint": json.loads(visual_registry_path.read_text(encoding="utf-8"))["authoritative_fingerprint"],
+            "generated_map_sha256": generated_map_hashes,
+            "templates_sha256": hashlib.sha256(template_path.read_bytes()).hexdigest(),
+        },
+    }, indent=2) + "\n",
     encoding="utf-8",
 )
 Path(sys.argv[5]).write_text(json.dumps(public_files, indent=2) + "\n", encoding="utf-8")
@@ -698,10 +718,15 @@ from physical_options import (
     map_content_signature,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
+from content_catalog import load_content_catalog
 
 compiler = ModCompiler(root)
 map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
+campaign_map_specs = tuple(
+    spec for spec in load_content_catalog(root).enabled_maps()
+    if spec.key != "hub"
+)
+campaign_map_keys = tuple(spec.key for spec in campaign_map_specs)
 maps = {
     map_key: (
         source["resource_path"],
@@ -709,10 +734,10 @@ maps = {
         root / "vanillamaps" / source["source_file"],
     )
     for map_key, source in map_sources.items()
-    if map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS and source["enabled"]
+    if map_key in campaign_map_keys and source["enabled"]
 }
-if tuple(maps) != SUPPORTED_START_WITH_AUTOMAP_MAPS:
-    raise SystemExit("Automap template map set does not match supported map contract")
+if tuple(maps) != campaign_map_keys:
+    raise SystemExit("Campaign template map set does not match map contract")
 variant_maps = {}
 for bits in product((False, True), repeat=len(PHYSICAL_OPTION_KEYS) + len(MAP_CONTENT_OPTION_KEYS)):
     options = dict(zip(PHYSICAL_OPTION_KEYS + MAP_CONTENT_OPTION_KEYS, bits))
@@ -838,14 +863,14 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json map-content-1110.zip -d "$TEMP_DIR/template-resource"
-unzip -q "$TEMP_DIR/template-resource/map-content-1110.zip" -d "$MOD_AUDIT_DIR"
+unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json map-content-111.zip -d "$TEMP_DIR/template-resource"
+unzip -q "$TEMP_DIR/template-resource/map-content-111.zip" -d "$MOD_AUDIT_DIR"
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$TEMP_DIR/template-resource/map-content-1110.zip"
+    --zip "$TEMP_DIR/template-resource/map-content-111.zip"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \

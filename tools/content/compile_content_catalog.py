@@ -184,6 +184,7 @@ def compile_catalog(
     from challenge_registry import challenge_registry_document
     from map_registry import _catalog_registry
     from publisher_contracts import publisher_contracts_document
+    from automap_visual_registry import build_authorial_registry
 
     compiled_sources = _catalog_registry(catalog.root)
 
@@ -200,6 +201,7 @@ def compile_catalog(
         "challenge_location_registry.json": challenge_registry_document(catalog),
         "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
         "campaign_goal_contract.json": dict(catalog.campaign_goal),
+        "checked_location_visuals.json": build_authorial_registry(catalog.root),
     }
     for name, value in generated_data.items():
         rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"

@@ -880,7 +880,7 @@ class LauncherUI(QMainWindow):
             self.room_options.setText("This room did not send a settings summary.")
             return
         traps = [(key, value) for key, value in sorted(slot_data.items()) if "trap" in str(key).casefold()]
-        core = [(key, value) for key, value in sorted(slot_data.items()) if key in {"randomize_dash", "death_link", "death_link_mode", "start_with_automap"}]
+        core = [(key, value) for key, value in sorted(slot_data.items()) if key in {"randomize_dash", "death_link", "death_link_mode", "reveal_ap_locations_on_automap"}]
         lines = [f"{str(key).replace('_', ' ').title()}: {value}" for key, value in core]
         if traps:
             lines.append("Traps: " + ", ".join(f"{str(key).replace('_', ' ').title()} {value}%" if isinstance(value, int) and "percentage" in str(key) else f"{str(key).replace('_', ' ').title()}: {value}" for key, value in traps))

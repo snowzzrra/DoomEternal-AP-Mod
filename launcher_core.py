@@ -88,7 +88,7 @@ class RoomSnapshot:
         for key in PHYSICAL_OPTION_KEYS:
             if not isinstance(slot_data.get(key), bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
-        for key in ("death_link", "start_with_automap"):
+        for key in ("death_link", "reveal_ap_locations_on_automap"):
             if key in slot_data and not isinstance(slot_data[key], bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
         if "death_link_mode" in slot_data and (
@@ -245,7 +245,9 @@ class SeedManifest:
                 **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
                 "death_link": slot_data.get("death_link", False),
                 "death_link_mode": slot_data.get("death_link_mode", "soft"),
-                "start_with_automap": slot_data.get("start_with_automap", False),
+                "reveal_ap_locations_on_automap": slot_data.get(
+                    "reveal_ap_locations_on_automap", False
+                ),
                 **({"starting_inventory": slot_data["starting_inventory"]} if "starting_inventory" in slot_data else {}),
                 **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
             },
@@ -502,9 +504,14 @@ class ModCompiler:
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
+        from content_catalog import load_content_catalog
 
-        for map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS:
+        campaign_maps = tuple(
+            spec for spec in load_content_catalog(self.root).enabled_maps()
+            if spec.key != "hub"
+        )
+        for map_spec in campaign_maps:
+            map_key = map_spec.key
             package = self.root / f"content/maps/{map_key}"
             config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
             descriptor = json.loads((package / "descriptor.json").read_text(encoding="utf-8"))

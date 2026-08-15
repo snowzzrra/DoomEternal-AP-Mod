@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
+from automap_visual_registry import build_authorial_registry, load_automap_visual_registry
 from challenge_registry import all_location_entries, load_challenge_registry
 from foundation import (
     compile_all_item_plans,
@@ -740,6 +741,16 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Generated Automap helper validation failed: {exc}")
     errors.extend(validate_automap_prototypes_only())
+    try:
+        packaged_visuals = load_automap_visual_registry(
+            ROOT / "data" / "checked_location_visuals.json"
+        )
+        if packaged_visuals != build_authorial_registry(ROOT):
+            errors.append(
+                "checked_location_visuals.json diverges from authoritative catalog/policy"
+            )
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
+        errors.append(f"Checked-location visual registry invalid: {exc}")
     challenge_registry = load_challenge_registry()
     mastery_entries = challenge_registry["weapon_masteries"]
     for entry in mastery_entries:

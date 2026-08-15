@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import hashlib
 import importlib.util
 import json
 import os
@@ -72,8 +73,16 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path):
 
 def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
-        raise AssertionError("RELEASE_MANIFEST must contain one version field")
+    if set(manifest) != {"version", "checked_location_visuals"} or not isinstance(manifest["version"], str):
+        raise AssertionError("RELEASE_MANIFEST must contain version and checked-location visual registry")
+    registry_path = client_dir / "data" / "checked_location_visuals.json"
+    registry_record = manifest["checked_location_visuals"]
+    if not registry_path.is_file() or not isinstance(registry_record, dict):
+        raise AssertionError("packaged checked-location visual registry is missing")
+    if registry_record.get("path") != "client/data/checked_location_visuals.json":
+        raise AssertionError("packaged checked-location visual registry path drifted")
+    if registry_record.get("sha256") != hashlib.sha256(registry_path.read_bytes()).hexdigest():
+        raise AssertionError("packaged checked-location visual registry hash drifted")
     bridge = client_dir / "bridge_client.py"
     actual = __import__("hashlib").sha256(bridge.read_bytes()).hexdigest()
     content_identity = json.loads(

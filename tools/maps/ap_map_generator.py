@@ -24,23 +24,20 @@ from item_reconciliation import (
     load_policy_registry,
 )
 from tools.maps.notification_formatting import notification_key
-from tools.maps.start_with_automap import (
-    project_start_with_automap,
-    validate_start_with_automap_projection,
-)
-
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
 NOTIFICATION_ENTITY_PREFIX = "ap_notify_"
 LOCATION_NOTIFICATION_PREFIX = "ap_notify_location_"
 EVENT_ENTITY_PREFIX = "ap_event_"
+AP_LIFECYCLE_ENTITY_PREFIX = "ap_lifecycle_"
 GENERATED_NAME_PREFIXES = (
     "AP_CHECK_",
     RPC_ENTITY_PREFIX,
     *BOOTSTRAP_ENTITY_PREFIXES,
     NOTIFICATION_ENTITY_PREFIX,
     EVENT_ENTITY_PREFIX,
+    AP_LIFECYCLE_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
     ITEM_NOTIFICATION_PREFIX.rstrip("_"),  # ap_notify_item
 )
@@ -1069,6 +1066,32 @@ def build_universal_physical_policy(
     }
 
 
+def resolved_automap_visual_policy(location_id, policy):
+    """Resolve packaged presentation names from generator visual policy."""
+    if policy.get("no_auto_visual"):
+        return {"classification": "no_visual", "policy": "no_auto_visual"}
+    visual = policy.get("independent_visual")
+    if visual is None:
+        return {
+            "classification": "visible_cleanup",
+            "presentation_entity": f"ap_location_visual_{location_id}",
+            "cleanup_entity": f"ap_remove_location_visual_{location_id}",
+            "policy": "generated_universal",
+        }
+    if not isinstance(visual, dict):
+        raise ValueError(f"location {location_id}: independent_visual must be object")
+    presentation = visual.get("entity_name", visual.get("entity"))
+    cleanup = visual.get("cleanup_entity")
+    if not isinstance(presentation, str) or not isinstance(cleanup, str):
+        raise ValueError(f"location {location_id}: independent_visual names must be strings")
+    return {
+        "classification": "visible_cleanup",
+        "presentation_entity": presentation,
+        "cleanup_entity": cleanup,
+        "policy": "explicit_independent_visual",
+    }
+
+
 def build_independent_targets(block, ap_check_id, policy):
     """Keep only explicit safe vanilla targets, then append one AP check."""
     vanilla_targets = extract_target_names(block)
@@ -1541,6 +1564,48 @@ entity {{
 """
 
 
+def generate_ap_lifecycle_entity(map_key):
+    """Return one unlayered AP-owned first-think lifecycle entrypoint."""
+    if not isinstance(map_key, str) or not re.fullmatch(r"[a-z0-9_]+", map_key):
+        raise ValueError(f"invalid AP lifecycle map key: {map_key!r}")
+    return f'''entity {{
+\tentityDef {AP_LIFECYCLE_ENTITY_PREFIX}{map_key} {{
+\t\tinherit = "target/level_activate";
+\t\tclass = "idTarget_FirstThinkActivate";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tflags = {{
+\t\t\t\tnoFlood = true;
+\t\t\t}}
+\t\t\ttargets = {{
+\t\t\t\tnum = 1;
+\t\t\t\titem[0] = "ap_rpc_auto_enable";
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+'''
+
+
+def validate_ap_lifecycle_entity(content, map_key):
+    """Enforce exactly one unlayered AP lifecycle target in generated content."""
+    name = f"{AP_LIFECYCLE_ENTITY_PREFIX}{map_key}"
+    if content.count(f"entityDef {name} {{") != 1:
+        raise ValueError(f"AP lifecycle entity count mismatch: {name}")
+    bounds = find_entity_block_bounds(content, name)
+    if bounds is None:
+        raise ValueError(f"AP lifecycle entity missing: {name}")
+    block = content[bounds[0]:bounds[1]]
+    if re.search(r"\blayers\s*=", block):
+        raise ValueError(f"AP lifecycle entity must be unlayered: {name}")
+    if extract_target_names(block) != ["ap_rpc_auto_enable"]:
+        raise ValueError(f"AP lifecycle target mismatch: {name}")
+
+
 def generate_bootstrap_entities():
     """Return map bootstrap entities."""
     return ""
@@ -1782,6 +1847,20 @@ def generate_map(
                             visual["_model_override"] = visual_asset["model"]
                         else:
                             visual["model"] = visual_asset["model"]
+                if (
+                    "native_entity_contract" in target_policy
+                    and not target_policy.get("no_auto_visual")
+                    and not target_policy.get("independent_visual")
+                ):
+                    universal = build_universal_physical_policy(
+                        ap_check_id, location_id, block, default_visual_model,
+                        policy=target_policy,
+                    )
+                    target_policy["independent_visual"] = universal["independent_visual"]
+                    target_policy.setdefault("completion_targets", []).extend(
+                        target for target in universal["completion_targets"]
+                        if target not in target_policy["completion_targets"]
+                    )
                 target_policy = bind_parent_from_source(target_policy, block)
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
@@ -1812,6 +1891,9 @@ def generate_map(
                         completion_targets=target_policy.get("completion_targets"),
                         include_notification=include_ap_feedback,
                     ))
+                    visual = generate_inert_location_visual(block, target_policy)
+                    if visual:
+                        new_blocks.append(visual)
                     if include_ap_feedback:
                         new_blocks.append(
                             generate_pickup_notification(location_id)
@@ -1903,35 +1985,6 @@ def generate_map(
                 else:
                     raise ValueError(f"Legacy non-independent physical check logic hit for {entity_name}")
 
-        if 'class = "idPlayerStart";' in block:
-            # We want to add a targets block inside the edit block
-            # Find edit = {
-            edit_match = re.search(r'edit\s*=\s*\{', block)
-            if edit_match:
-                insert_idx = edit_match.end()
-                
-                # Check if it already has targets
-                targets_match = re.search(r'targets\s*=\s*\{([^}]*)\}', block)
-                if targets_match:
-                    # Append to existing targets
-                    targets_content = targets_match.group(1)
-                    num_match = re.search(r'num\s*=\s*(\d+);', targets_content)
-                    if num_match:
-                        num = int(num_match.group(1))
-                        # Replace num with num+1
-                        new_targets_content = re.sub(
-                            r'num\s*=\s*\d+;',
-                            f'num = {num + 1};',
-                            targets_content
-                        )
-                        # Append the new item at the end, right before the closing brace
-                        new_targets = f"targets = {{{new_targets_content}\n\t\t\t\titem[{num}] = \"ap_rpc_auto_enable\";\n\t\t\t}}"
-                        block = block[:targets_match.start()] + new_targets + block[targets_match.end():]
-                else:
-                    # Insert new targets block
-                    injection = '\n\t\t\ttargets = {\n\t\t\t\tnum = 1;\n\t\t\t\titem[0] = "ap_rpc_auto_enable";\n\t\t\t}'
-                    block = block[:insert_idx] + injection + block[insert_idx:]
-
         new_blocks.append("entity {" + block)
 
     map_content = "".join(new_blocks)
@@ -1988,14 +2041,6 @@ def generate_map(
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
 
-    map_content = project_start_with_automap(
-        map_content,
-        map_key,
-        bool(level_config.get("start_with_automap", False)),
-    )
-    if level_config.get("start_with_automap", False):
-        validate_start_with_automap_projection(map_content, map_key)
-
     final_content = (
         map_content
         + "\n"
@@ -2009,8 +2054,10 @@ def generate_map(
         )
         + generate_bootstrap_entities()
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
+        + generate_ap_lifecycle_entity(map_key)
         + (build_primitive("fast_travel_unlock", "ap_fast_travel_unlock", fast_travel["maps"][map_key]) if map_key in fast_travel["maps"] else "")
     )
+    validate_ap_lifecycle_entity(final_content, map_key)
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual and modified_count:
         assert_canonical_ap_visuals(final_content, map_key, canonical_visual)

@@ -5,9 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
-from tools.maps.start_with_automap import SUPPORTED_START_WITH_AUTOMAP_MAPS
-
-
 PHYSICAL_OPTION_KEYS = (
     "randomize_chainsaw",
     "randomize_dash",
@@ -15,13 +12,12 @@ PHYSICAL_OPTION_KEYS = (
 )
 
 MAP_CONTENT_OPTION_KEYS = (
-    "start_with_automap",
 )
 
 ROOM_OPTION_KEYS = (
     "death_link",
     "death_link_mode",
-    "start_with_automap",
+    "reveal_ap_locations_on_automap",
 )
 DEATH_LINK_MODES = frozenset({"soft", "hardcore"})
 
@@ -73,14 +69,18 @@ def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
             + ", ".join(sorted(DEATH_LINK_MODES))
         )
 
-    start_with_automap = options.get("start_with_automap", False)
-    if not isinstance(start_with_automap, bool):
-        raise ValueError("room option start_with_automap must be boolean")
+    reveal_ap_locations_on_automap = options.get(
+        "reveal_ap_locations_on_automap", False
+    )
+    if not isinstance(reveal_ap_locations_on_automap, bool):
+        raise ValueError(
+            "room option reveal_ap_locations_on_automap must be boolean"
+        )
     return {
         "schema_version": 1,
         "death_link": death_link,
         "death_link_mode": death_link_mode,
-        "start_with_automap": start_with_automap,
+        "reveal_ap_locations_on_automap": reveal_ap_locations_on_automap,
     }
 
 
@@ -90,11 +90,7 @@ def physical_signature(options: Mapping[str, Any]) -> str:
 
 
 def map_content_signature(options: Mapping[str, Any]) -> str:
-    values = normalize_physical_options(options)
-    start_with_automap = options.get("start_with_automap", False)
-    if not isinstance(start_with_automap, bool):
-        raise ValueError("room option start_with_automap must be boolean")
-    return physical_signature(values) + ("1" if start_with_automap else "0")
+    return physical_signature(options)
 
 
 def physical_location_ids(options: Mapping[str, Any]) -> set[int]:
@@ -111,11 +107,15 @@ def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) ->
     result = deepcopy(dict(config))
     map_key = result.get("map_key")
     values = normalize_physical_options(options)
-    start_with_automap = options.get("start_with_automap", False)
-    if not isinstance(start_with_automap, bool):
-        raise ValueError("room option start_with_automap must be boolean")
-    if start_with_automap and map_key in SUPPORTED_START_WITH_AUTOMAP_MAPS:
-        result["start_with_automap"] = True
+    reveal_ap_locations_on_automap = options.get(
+        "reveal_ap_locations_on_automap", False
+    )
+    if not isinstance(reveal_ap_locations_on_automap, bool):
+        raise ValueError(
+            "room option reveal_ap_locations_on_automap must be boolean"
+        )
+    if reveal_ap_locations_on_automap:
+        result["reveal_ap_locations_on_automap"] = True
     for key, spec in PHYSICAL_OPTIONS.items():
         if values[key] or spec["map_key"] != map_key:
             continue
