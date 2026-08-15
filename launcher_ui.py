@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import cast
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QDialog, QFrame, QGridLayout, QInputDialog,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox,
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from launcher_controller import LauncherController
+from launcher_platform import redact_secrets
 from options_foundation import load_start_inventory_catalog, suggested_yaml_filename
 
 
@@ -148,8 +149,12 @@ class LauncherUI(QMainWindow):
         self.room_event: dict[str, object] = {}
         self._room_connected = False
         self._connection_pending = False
+        self._setup_state = "disconnected"
+        self._resolved_consent_requests: set[str] = set()
+        self._session_log_limit = 400
         self._configure_style()
         self._build()
+        self._set_setup_state("disconnected")
         self._load_icon()
         self._install_shortcuts()
         self._discover()
@@ -430,7 +435,7 @@ class LauncherUI(QMainWindow):
         self.stop_button = QPushButton("DISCONNECT")
         self.stop_button.clicked.connect(self._disconnect)
         self.stop_button.setEnabled(False)
-        self.reinstall_button = QPushButton("UPDATE MOD")
+        self.reinstall_button = QPushButton("INSTALL MOD")
         self.reinstall_button.clicked.connect(self._reinstall)
         self.reinstall_button.setEnabled(False)
         controls.addWidget(self.stop_button)
@@ -445,22 +450,40 @@ class LauncherUI(QMainWindow):
         outer.setContentsMargins(28, 24, 28, 30)
         outer.setSpacing(14)
         outer.addWidget(self._status_strip())
+        self.session_setup = self._card("hero")
+        setup_layout = QHBoxLayout(self.session_setup)
+        setup_layout.setContentsMargins(20, 16, 20, 16)
+        setup_copy = QVBoxLayout()
+        self.session_setup_title = self._label("ROOM MOD", "section")
+        self.session_setup_detail = self._label("Connect to a room to check its mod.", "muted")
+        setup_copy.addWidget(self.session_setup_title)
+        setup_copy.addWidget(self.session_setup_detail)
+        setup_layout.addLayout(setup_copy, 1)
+        self.session_setup_action = QPushButton("INSTALL MOD")
+        self.session_setup_action.setObjectName("primary")
+        self.session_setup_action.clicked.connect(self._run_setup_action)
+        setup_layout.addWidget(self.session_setup_action, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        outer.addWidget(self.session_setup)
         header = QHBoxLayout()
         header.addWidget(self._label("SESSION", "title"))
         header.addStretch(1)
+        self.session_nav_buttons: list[QPushButton] = []
         for text, page in (("ACTIVITY", 0), ("LOG", 1), ("ROOM", 2)):
             button = QPushButton(text)
             button.setObjectName("sessionNav")
             button.setCheckable(True)
             button.setChecked(page == 0)
-            button.clicked.connect(lambda checked=False, target=page: self.session_stack.setCurrentIndex(target))
+            button.clicked.connect(lambda checked=False, target=page: self._show_session_tab(target))
             header.addWidget(button)
+            self.session_nav_buttons.append(button)
         outer.addLayout(header)
         self.session_stack = QStackedWidget()
         self.session_stack.addWidget(self._activity_card())
         self.session_stack.addWidget(self._session_log_page())
         self.session_stack.addWidget(self._session_card())
+        self.session_stack.currentChanged.connect(self._sync_session_tabs)
         outer.addWidget(self.session_stack, 1)
+        self._sync_session_tabs(0)
         return body
 
     def _session_log_page(self) -> QFrame:
@@ -471,6 +494,7 @@ class LauncherUI(QMainWindow):
         self.session_log = QPlainTextEdit()
         self.session_log.setReadOnly(True)
         self.session_log.setFont(QFont("monospace", 10))
+        self.session_log.document().setMaximumBlockCount(self._session_log_limit)
         layout.addWidget(self.session_log, 1)
         return card
 
@@ -597,6 +621,14 @@ class LauncherUI(QMainWindow):
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == index)
 
+    def _show_session_tab(self, index: int) -> None:
+        self.session_stack.setCurrentIndex(index)
+        self._sync_session_tabs(index)
+
+    def _sync_session_tabs(self, index: int) -> None:
+        for number, button in enumerate(self.session_nav_buttons):
+            button.setChecked(number == index)
+
     def _set_status(self, key: str, detail: str, color: str) -> None:
         item, indicator, _name, label = self.statuses[key]
         tone = {
@@ -616,6 +648,37 @@ class LauncherUI(QMainWindow):
         self.hero_action.setText(action)
         self.hero_action.setEnabled(enabled)
         self.top_state.setText(state)
+
+    def _set_setup_state(self, state: str, detail: str = "") -> None:
+        presentations = {
+            "disconnected": ("ROOM MOD", "Connect to a room to check its mod.", "INSTALL MOD", False, "READY"),
+            "checking": ("CHECKING MOD", "Checking this room's mod before play.", "CHECKING...", False, "CONNECTED"),
+            "install_needed": ("INSTALL MOD", "Install this room's mod before playing.", "INSTALL MOD", True, "ACTION NEEDED"),
+            "update_required": ("UPDATE MOD", "This room needs its matching mod before playing.", "UPDATE MOD", True, "ACTION NEEDED"),
+            "installing": ("INSTALLING MOD", "Preparing this room for play.", "INSTALLING...", False, "WORKING"),
+            "updating": ("UPDATING MOD", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
+            "ready": ("READY TO PLAY", "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.", "", False, "READY"),
+            "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
+        }
+        title, fallback, action, enabled, top_state = presentations[state]
+        self._setup_state = state
+        copy = detail or fallback
+        self.session_setup_title.setText(title)
+        self.session_setup_detail.setText(copy)
+        self.session_setup_action.setText(action)
+        self.session_setup_action.setEnabled(enabled)
+        self.session_setup_action.setVisible(state != "ready")
+        self.reinstall_button.setText(action)
+        self.reinstall_button.setEnabled(enabled)
+        self.reinstall_button.setVisible(state != "ready")
+        self._set_home(title, copy, action, top_state, enabled=enabled)
+        self.hero_action.setVisible(state != "ready")
+
+    def _run_setup_action(self) -> None:
+        if self._setup_state in {"install_needed", "update_required"}:
+            self._prepare()
+        elif self._setup_state == "failed":
+            self._prepare(force=True)
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -673,6 +736,9 @@ class LauncherUI(QMainWindow):
         self._connect()
 
     def _primary_action(self) -> None:
+        if self._setup_state in {"install_needed", "update_required", "failed", "ready"}:
+            self._run_setup_action()
+            return
         text = self.hero_action.text()
         if "JOIN" in text or "RETRY" in text:
             self._focus_join()
@@ -680,8 +746,6 @@ class LauncherUI(QMainWindow):
             self._resume()
         elif "UPDATE" in text or "PREPARE" in text or "TRY AGAIN" in text:
             self._prepare(force="UPDATE" in text or "TRY AGAIN" in text)
-        elif "PLAY" in text:
-            self._launch_game()
 
     def _connect(self) -> None:
         try:
@@ -713,23 +777,65 @@ class LauncherUI(QMainWindow):
         if not self._room_connected:
             self._append_log("Connect to a room before preparing its mod.")
             return
+        if self._setup_state in {"installing", "updating"}:
+            self._append_log("Room mod setup is already active.")
+            return
         if QMessageBox.question(self, "Confirm room mod", "Prepare and install mod bound to this room?") != QMessageBox.StandardButton.Yes:
             return
         try:
             started = self.controller.reinstall_setup() if force else self.controller.prepare_setup()
             if not started:
                 self._append_log("Setup is already active or room is unavailable.")
+                return
+            self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         except Exception as error:
+            self._set_setup_state("failed", str(error))
             self._append_log(f"Setup error: {error}")
 
     def _reinstall(self) -> None:
-        self._prepare(force=True)
+        self._run_setup_action()
 
     def _confirm_windows(self, succeeded: bool) -> None:
         try:
             self.controller.confirm_windows_installation(succeeded)
         except Exception as error:
             self._append_log(f"Installation confirmation error: {error}")
+
+    def _request_dependency_consent(self, event: dict[str, object]) -> None:
+        request_id = str(event.get("request_id", ""))
+        if not request_id or request_id in self._resolved_consent_requests:
+            self._append_log("Ignored duplicate or invalid dependency consent request.")
+            return
+        self._resolved_consent_requests.add(request_id)
+        name = str(event.get("name") or "Required dependency")
+        version = str(event.get("version") or "unspecified version")
+        details = [
+            f"{name} ({version}) is required to finish room setup.",
+            "This download is verified against its published SHA-256 before use.",
+            "Review source and checksum before accepting.",
+        ]
+        if event.get("url"):
+            details.append(f"Source: {event['url']}")
+        if event.get("sha256"):
+            details.append(f"SHA-256: {event['sha256']}")
+        self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Dependency download approval")
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.setText("Room setup needs your approval")
+        dialog.setInformativeText("\n\n".join(details))
+        accept = dialog.addButton("Download and verify", QMessageBox.ButtonRole.AcceptRole)
+        dialog.addButton("Cancel setup", QMessageBox.ButtonRole.RejectRole)
+        accepted = False
+        try:
+            dialog.exec()
+            accepted = dialog.clickedButton() is accept
+        except Exception as error:
+            self._append_log(f"Dependency consent dialog failed: {error}")
+        finally:
+            self.controller.resolve_consent(request_id, accepted)
+        if not accepted:
+            self._set_setup_state("failed", "Dependency download declined. Retry setup when ready.")
 
     def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit) -> None:
         layout.addWidget(self._label(label, "eyebrow"), row, 0)
@@ -754,10 +860,17 @@ class LauncherUI(QMainWindow):
 
     def _render_room(self, event: dict[str, object]) -> None:
         self.room_event = dict(event)
-        seed = str(event.get("seed_name", "Unknown seed"))
+        def text_or(value: object, fallback: str) -> str:
+            text = str(value).strip() if value is not None else ""
+            return text or fallback
+
+        seed = text_or(event.get("seed_name"), "Unknown seed")
         team, slot = event.get("team", "?"), event.get("slot", "?")
-        endpoint = str(event.get("endpoint") or self.controller.config.get("server_address", "Unknown server"))
-        player = str(event.get("slot_name") or self.controller.config.get("slot", slot))
+        endpoint = text_or(event.get("endpoint") or self.controller.config.get("server_address"), "Unknown server")
+        player = text_or(
+            event.get("slot_name") or event.get("player_name") or self.controller.config.get("slot"),
+            f"Slot {slot}",
+        )
         self.room_summary.setText(f"Server: {endpoint}\nPlayer: {player}\nSeed: {seed} | Team {team}, Slot {slot}")
         slot_data = event.get("slot_data")
         if not isinstance(slot_data, dict):
@@ -978,14 +1091,6 @@ class LauncherUI(QMainWindow):
         except Exception as error:
             self._append_log(f"Game connection check error: {error}")
 
-    def _launch_game(self) -> None:
-        try:
-            self.controller.launch_game()
-            self._set_status("game", "launch requested", self.COLORS["good"])
-            self._append_log("DOOM Eternal launch requested.")
-        except Exception as error:
-            self._append_log(f"DOOM Eternal launch error: {error}")
-
     def _save_support_bundle(self) -> None:
         try:
             path = self.controller.create_support_bundle(Path.home() / "DOOM-Eternal-Archipelago-support.zip", logs=self.log.toPlainText().splitlines())
@@ -1011,11 +1116,23 @@ class LauncherUI(QMainWindow):
             try: event = self.controller.events.get_nowait()
             except queue.Empty: break
             self.controller.process_event(event)
-            self._activity_event(event)
+            self._present_event(event)
+
+    def _present_event(self, event: dict[str, object]) -> None:
+        kind = str(event.get("type", "event"))
+        try:
             self._handle_event(event)
+        except Exception as error:
+            self._append_log(f"UI lifecycle presentation failed for {kind}: {type(error).__name__}: {error}")
+        try:
+            self._activity_event(event)
+        except Exception as error:
+            self._append_log(f"UI activity presentation failed for {kind}: {type(error).__name__}: {error}")
 
     def _activity_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
+        if kind == "log":
+            return
         semantic = {
             "connected": ("CONNECTED", self.COLORS["good"]), "disconnected": ("DISCONNECTED", self.COLORS["muted"]),
             "error": ("NEEDS ATTENTION", self.COLORS["bad"]), "setup_failed": ("NEEDS ATTENTION", self.COLORS["bad"]),
@@ -1023,6 +1140,7 @@ class LauncherUI(QMainWindow):
             "setup_ready": ("READY", self.COLORS["good"]), "command_sent": ("MESSAGE SENT", self.COLORS["ap"]),
             "item": ("ITEM RECEIVED", self.COLORS["good"]), "location": ("CHECK COMPLETE", self.COLORS["ap"]),
             "deathlink": ("DEATHLINK", self.COLORS["warn"]),
+            "archipelago": ("ARCHIPELAGO", self.COLORS["doom_hot"]),
         }
         segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
         fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Status", "state"), ("Reason", "reason"), ("Message", "message"))
@@ -1031,14 +1149,55 @@ class LauncherUI(QMainWindow):
         self.activity.insertRow(row)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
         signal = QTableWidgetItem(segment)
-        signal.setForeground(color)
+        signal.setForeground(QBrush(QColor(color)))
         self.activity.setItem(row, 1, signal)
-        self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
+        if kind == "archipelago":
+            detail_label = QLabel()
+            detail_label.setTextFormat(Qt.TextFormat.RichText)
+            detail_label.setWordWrap(True)
+            detail_label.setText(self._archipelago_activity_detail(event))
+            self.activity.setCellWidget(row, 2, detail_label)
+            self.activity.resizeRowToContents(row)
+        else:
+            self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
         while self.activity.rowCount() > 100:
             self.activity.removeRow(self.activity.rowCount() - 1)
 
+    def _archipelago_activity_detail(self, event: dict[str, object]) -> str:
+        plain = str(event.get("plain") or "Archipelago update received")
+        segments = event.get("segments")
+        if event.get("schema") != 1 or not isinstance(segments, list):
+            return html.escape(plain)
+        colors = {
+            "text": self.COLORS["text"],
+            "location": self.COLORS["ap"],
+            "player_self": self.COLORS["good"],
+            "player_remote": self.COLORS["doom_hot"],
+            "item_filler": "#8fc8e8",
+            "item_useful": "#438bc4",
+            "item_progression": "#bd84e8",
+            "item_trap": self.COLORS["doom"],
+        }
+        rendered: list[str] = []
+        for segment in segments:
+            if not isinstance(segment, dict):
+                continue
+            text = html.escape(str(segment.get("text") or ""))
+            if not text:
+                continue
+            segment_type = str(segment.get("type") or "text")
+            if segment_type == "player":
+                color = colors["player_self"] if bool(segment.get("self")) else colors["player_remote"]
+            elif segment_type == "item":
+                color = colors.get(f"item_{segment.get('classification')}", colors["text"])
+            else:
+                color = colors.get(segment_type, colors["text"])
+            rendered.append(f'<span style="color:{color};">{text}</span>')
+        return "".join(rendered) or html.escape(plain)
+
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
+        self._append_session_event(event)
         if kind == "log":
             self._append_log(str(event.get("message", "")))
             return
@@ -1047,7 +1206,7 @@ class LauncherUI(QMainWindow):
             self._set_connection_controls(False); self._render_room(event)
             self._set_status("room", "connected", self.COLORS["good"])
             self._set_status("mod", "checking", self.COLORS["ap"])
-            self._set_home("ROOM CONNECTED", "Checking your room before play.", "CHECKING...", "CONNECTED", enabled=False)
+            self._set_setup_state("checking")
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True; self._set_connection_controls(False)
             self._set_status("room", "connecting", self.COLORS["ap"])
@@ -1057,34 +1216,43 @@ class LauncherUI(QMainWindow):
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             state, reason = str(event.get("state", "")), str(event.get("reason", ""))
             if state == "already_installed":
-                self.drift.hide(); self.reinstall_button.setEnabled(True)
+                self.drift.hide()
                 self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_setup_state("ready")
             else:
                 drift = state == "update_required" or "another room" in reason
                 self.drift.setText("ROOM UPDATE - " + (reason or "This room needs its matching mod.")); self.drift.setVisible(drift)
-                self.reinstall_button.setEnabled(False)
                 self._set_status("mod", "update needed", self.COLORS["warn"]); self._set_status("game", "waiting", self.COLORS["warn"])
-                self._set_home("UPDATE MOD", reason or "Prepare this room before play.", "UPDATE MOD", "ACTION NEEDED")
+                setup_copy = (
+                    "Another room's mod is installed. Update to this room's mod."
+                    if "another room" in reason
+                    else "This room's installed mod needs an update."
+                )
+                self._set_setup_state(
+                    "update_required" if state == "update_required" else "install_needed",
+                    setup_copy if state == "update_required" else "Install this room's mod before playing.",
+                )
         elif kind in {"setup_started", "mod_building", "runtime_config_ready", "mod_staged", "injector_started"}:
-            self.reinstall_button.setEnabled(False); self._set_status("mod", "updating", self.COLORS["ap"])
-            self._set_home("UPDATING MOD", "Preparing your room for play.", "UPDATING...", "WORKING", enabled=False)
+            self._set_status("mod", "updating", self.COLORS["ap"])
+            self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
+        elif kind == "dependency_consent_required":
+            self._request_dependency_consent(event)
         elif kind == "setup_ready":
             option = str(event.get("steam_launch_option", "")); state = str(event.get("adapter_state", ""))
             if option:
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
-                self.reinstall_button.setEnabled(True); self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_setup_state("ready")
             elif state == "manual_action_required":
-                self._set_home("FINISH SETUP", str(event.get("message", "Finish the game manager step, then try again.")), "TRY AGAIN", "ACTION NEEDED")
+                self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
             else:
-                self._set_home("SETUP NEEDS ATTENTION", str(event.get("message", "Try setup again.")), "TRY AGAIN", "ACTION NEEDED")
+                self._set_setup_state("failed", str(event.get("message", "Try setup again.")))
         elif kind == "manual_action_required":
             message = str(event.get("message", "Finish the game manager step."))
-            self._set_home("FINISH SETUP", message, "WAITING", "ACTION NEEDED", enabled=False)
+            self._set_setup_state("installing", message)
             complete = QMessageBox.question(
                 self,
                 "Confirm mod installation",
@@ -1093,18 +1261,18 @@ class LauncherUI(QMainWindow):
             self._confirm_windows(complete)
         elif kind == "windows_installation_confirmed":
             if bool(event.get("succeeded")):
-                self.reinstall_button.setEnabled(True)
                 self._set_status("mod", "ready", self.COLORS["good"])
                 self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._show_page(2)
-                self._set_home("READY TO PLAY", "Your room is ready. Start DOOM Eternal and keep this launcher open.", "PLAY DOOM ETERNAL", "READY")
+                self._set_setup_state("ready")
             else:
-                self._set_home("SETUP NEEDS RETRY", "Finish installation, then update this room mod.", "TRY AGAIN", "ACTION NEEDED")
+                self._set_setup_state("failed", "Finish installation, then retry this room mod.")
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
-            self.reinstall_button.setEnabled(False); self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
+            self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
             for key in self.statuses:
                 self._set_status(key, "waiting", self.COLORS["muted"])
+            self._set_setup_state("disconnected")
             self._set_home("SESSION ENDED", "Update room details or reconnect.", "JOIN A ROOM", "OFFLINE")
         elif kind in {"setup_failed", "error"}:
             message = str(event.get("message", "Unknown error"))
@@ -1112,16 +1280,30 @@ class LauncherUI(QMainWindow):
                 self._connection_pending = False; self._set_connection_controls(True); self._set_status("room", "failed", self.COLORS["bad"])
                 self._set_home("CONNECTION FAILED", message, "RETRY JOIN", "CONNECTION FAILED")
             else:
-                self._set_status("mod", "failed", self.COLORS["bad"]); self._set_home("SETUP FAILED", message, "TRY AGAIN", "ACTION NEEDED")
+                self._set_status("mod", "failed", self.COLORS["bad"]); self._set_setup_state("failed", message)
         elif kind == "warning":
             self._append_log("Warning: " + str(event.get("message", "")))
 
     def _append_log(self, text: str) -> None:
-        if not text:
+        sanitized = redact_secrets(text).replace("\r", " ").strip()
+        if not sanitized:
             return
-        self.log.appendPlainText(text)
+        self.log.appendPlainText(sanitized)
         if hasattr(self, "session_log"):
-            self.session_log.appendPlainText(text)
+            self.session_log.appendPlainText(sanitized)
+
+    def _append_session_event(self, event: dict[str, object]) -> None:
+        kind = str(event.get("type", "event"))
+        if "heartbeat" in kind.casefold() or kind == "log":
+            return
+        details = []
+        for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
+            value = event.get(key)
+            if value not in (None, ""):
+                details.append(f"{key}={value}")
+        self._append_log(
+            f"{datetime.now().strftime('%H:%M:%S')} {kind}: {' | '.join(details) or 'received'}"
+        )
 
     def _load_icon(self) -> None:
         icon = self.controller.client_dir / "doom_logo.png"

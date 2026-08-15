@@ -40,6 +40,10 @@ private:
     ApRpcResult result_ = AP_RPC_NONE;
     std::string command_id_ = "-";
     unsigned long long call_sequence_ = 0;
+    bool health_log_initialized_ = false;
+    bool health_available_ = false;
+    DWORD next_health_summary_tick_ = 0;
+    unsigned long health_suppressed_failures_ = 0;
     LogCallback log_callback_;
 
     bool Prepare(const char* operation, DWORD* start_tick, unsigned long long* call_id);

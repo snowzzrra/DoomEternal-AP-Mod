@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import importlib.util
 import json
 import os
@@ -27,6 +28,18 @@ def install_ap_stubs() -> None:
     sys.modules["CommonClient"] = common
     net = types.ModuleType("NetUtils")
     net.ClientStatus = types.SimpleNamespace(CLIENT_GOAL=30)
+    net.JSONMessagePart = dict
+    net.JSONTypes = enum.Enum(
+        "JSONTypes",
+        {
+            name: name
+            for name in (
+                "text", "color", "player_id", "player_name", "item_name",
+                "item_id", "location_name", "location_id", "hint_status",
+            )
+        },
+        type=str,
+    )
     sys.modules["NetUtils"] = net
 
 

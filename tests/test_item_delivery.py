@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import importlib
 import sys
 from collections import deque, namedtuple
@@ -23,7 +24,8 @@ def _bridge_module():
             pass
 
         class CommonContext:
-            pass
+            def on_print_json(self, _args):
+                pass
 
         common.ClientCommandProcessor = ClientCommandProcessor
         common.CommonContext = CommonContext
@@ -32,6 +34,18 @@ def _bridge_module():
         common.server_loop = lambda *_args, **_kwargs: None
         net = ModuleType("NetUtils")
         net.ClientStatus = SimpleNamespace(CLIENT_GOAL=30)
+        net.JSONMessagePart = dict
+        net.JSONTypes = enum.Enum(
+            "JSONTypes",
+            {
+                name: name
+                for name in (
+                    "text", "color", "player_id", "player_name", "item_name",
+                    "item_id", "location_name", "location_id", "hint_status",
+                )
+            },
+            type=str,
+        )
         sys.modules.update(
             colorama=colorama,
             Utils=utils,
@@ -69,6 +83,11 @@ def _context(items=(), *, processed=0, ready=True):
     context.item_delivery_blocked = False
     context.item_delivery_blocked_info = None
     context.item_names = {}
+    context.player_names = {1: "Self", 2: "Remote"}
+    context.slot = 1
+    context.team = 0
+    context.slot_info = {}
+    context.slot_concerns_self = lambda player: player == context.slot
     context.current_map_name = None
     context.active_save_slot = None
     context.output = lambda *_args, **_kwargs: None
@@ -80,6 +99,37 @@ def _context(items=(), *, processed=0, ready=True):
     context.observe_received_item_history = lambda: SimpleNamespace(duplicates=())
     bridge.received_item_classification = lambda *_args, **_kwargs: {}
     return context
+
+
+def test_archipelago_event_formatter_sanitizes_typed_parts_and_flags(monkeypatch):
+    context = _context()
+    args = {
+        "data": [
+            {"type": "player_id", "text": "1"},
+            {"type": "text", "text": " found "},
+            {"type": "player_id", "text": "2"},
+            {"type": "item_name", "text": "Trap <item>", "flags": 0b111},
+            {"type": "item_name", "text": "Progression", "flags": 0b011},
+            {"type": "item_name", "text": "Useful", "flags": 0b010},
+            {"type": "item_name", "text": "Filler", "flags": 0},
+            {"type": "item_id", "text": "bad", "player": 1, "flags": 0},
+            {"type": "unknown", "text": "<raw>"},
+        ],
+    }
+    emitted = []
+    monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
+    context.on_print_json(args)
+    assert emitted[0][0] == "archipelago"
+    event = emitted[0][1]
+
+    assert event["schema"] == 1
+    assert [segment["self"] for segment in event["segments"][:3:2]] == [True, False]
+    assert [segment["classification"] for segment in event["segments"][3:7]] == [
+        "trap", "progression", "useful", "filler",
+    ]
+    assert event["segments"][7]["type"] == "text"
+    assert event["segments"][8] == {"type": "text", "text": "<raw>"}
+    assert "<raw>" in event["plain"]
 
 
 def _spool(context, calls, result=True):

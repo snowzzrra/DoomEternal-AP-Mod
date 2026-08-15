@@ -6,6 +6,9 @@
 extern "C" {
 #endif
 
+void ApRpcSetImplicitBinding(RPC_BINDING_HANDLE binding);
+void ApRpcClearImplicitBinding(void);
+
 RPC_STATUS ApRpcExecute(RPC_BINDING_HANDLE binding, unsigned char* command);
 RPC_STATUS ApRpcRequestEntities(
     RPC_BINDING_HANDLE binding, unsigned char* path, unsigned char begin, int size);

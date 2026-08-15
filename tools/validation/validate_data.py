@@ -1229,17 +1229,20 @@ def main(argv: list[str] | None = None) -> int:
     rpc_idl = rpc_idl_path.read_text(encoding="utf-8", errors="ignore")
     normalized_idl = re.sub(r"\s+", " ", rpc_idl).strip()
     if any(fragment not in normalized_idl for fragment in
-           ("1c9ca7c8-d421-482d-b85d-79fac33b2658", "version(1.0)", "explicit_handle")):
+           ("1c9ca7c8-d421-482d-b85d-79fac33b2658", "version(1.0)",
+            "implicit_handle(handle_t ap_runtime_rpc__MIDL_AutoBindHandle)")):
         errors.append("AP runtime RPC IDL is missing required interface metadata")
+    if "explicit_handle" in normalized_idl:
+        errors.append("AP runtime RPC IDL must use implicit binding")
     exact_rpc_declarations = (
-        "void ap_execute( [in] handle_t binding, [in, string] unsigned char* command);",
-        "void ap_request_entities( [in] handle_t binding, [in, string] unsigned char* path, [in] boolean begin, [in] int size);",
-        "void ap_upload_chunk( [in] handle_t binding, [in] int size, [in] int offset, [in, size_is(size)] unsigned char* data);",
-        "void ap_retrieve_entities( [in] handle_t binding, [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_encounter( [in] handle_t binding, [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_checkpoint( [in] handle_t binding, [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_spawn( [in] handle_t binding, [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_health( [in] handle_t binding, [in, out] int* state);",
+        "void ap_execute( [in, string] unsigned char* command);",
+        "void ap_request_entities( [in, string] unsigned char* path, [in] boolean begin, [in] int size);",
+        "void ap_upload_chunk( [in] int size, [in] int offset, [in, size_is(size)] unsigned char* data);",
+        "void ap_retrieve_entities( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
+        "void ap_retrieve_encounter( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
+        "void ap_retrieve_checkpoint( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
+        "void ap_retrieve_spawn( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
+        "void ap_health( [in, out] int* state);",
     )
     expected_interface_body = "interface ap_runtime_rpc { " + " ".join(exact_rpc_declarations) + " }"
     interface_match = re.search(r"interface ap_runtime_rpc \{ (.*) \}", normalized_idl)
@@ -1248,6 +1251,14 @@ def main(argv: list[str] | None = None) -> int:
     wrapper_source = (ROOT / "native" / "client" / "ap_runtime_rpc_client.cpp").read_text(encoding="utf-8")
     if "ncacn_np" not in wrapper_source or r"\\pipe\\meathook_interface_rpc" not in wrapper_source:
         errors.append("AP runtime RPC wrapper is missing private transport constants")
+    seh_source = (ROOT / "native" / "client" / "ap_runtime_rpc_seh.c").read_text(encoding="utf-8")
+    if (
+        "ApRpcSetImplicitBinding(binding)" not in seh_source
+        or "ApRpcClearImplicitBinding()" not in seh_source
+        or "RpcTryExcept" not in seh_source
+        or "ap_execute(command)" not in seh_source
+    ):
+        errors.append("AP runtime RPC SEH wrapper does not enforce implicit binding ABI")
     forbidden_paths = [ROOT / name for name in
                        ("meathook_interface.h", "meathook_interface_c.c", "mhclient.h", "mhclient.cpp",
                         "native/client/meathook_interface.h", "native/client/meathook_interface_c.c",

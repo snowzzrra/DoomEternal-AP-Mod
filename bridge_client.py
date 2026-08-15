@@ -115,6 +115,23 @@ DEATHLINK_MESSAGES = (
     "{player}'s ripping and tearing privileges were revoked.",
 )
 LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
+ARCHIPELAGO_EVENT_SCHEMA = 1
+ARCHIPELAGO_EVENT_PLAIN_LIMIT = 512
+ARCHIPELAGO_EVENT_SEGMENT_LIMIT = 128
+ARCHIPELAGO_EVENT_SEGMENT_COUNT = 64
+_ARCHIPELAGO_TEXT_TYPES = frozenset({
+    "text",
+    "color",
+    "hint_status",
+})
+_ARCHIPELAGO_ITEM_TYPES = frozenset({
+    "item_name",
+    "item_id",
+})
+_ARCHIPELAGO_LOCATION_TYPES = frozenset({
+    "location_name",
+    "location_id",
+})
 FAST_TRAVEL_MISSION_COMPLETE_IDS = {
     "e1m1_intro": 7770122, "e1m2_war": 7770123, "e1m3_cult": 7770124,
     "e1m4_boss": 7770162, "e2m1_nest": 7770210, "e2m2_base": 7770248,
@@ -129,6 +146,153 @@ def emit_launcher_event(event_type: str, **payload):
         return
     event = {"type": event_type, **payload}
     print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
+
+
+def _bounded_event_text(value, limit):
+    """Return bounded plain text with control characters removed."""
+    if not isinstance(value, str):
+        return ""
+    value = value.replace("\r", " ").replace("\n", " ")
+    output = []
+    for character in value:
+        if not character.isprintable():
+            continue
+        if len(output) >= limit:
+            break
+        output.append(character)
+    return "".join(output)
+
+
+def _fallback_archipelago_segment(part):
+    raw_text = part.get("text") if isinstance(part, dict) else None
+    if not isinstance(raw_text, str):
+        raw_text = "[unavailable]"
+    return {"type": "text", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+
+
+def _valid_part_type(part):
+    if not isinstance(part, dict):
+        return None
+    part_type = part.get("type", JSONTypes.text.value)
+    part_type = getattr(part_type, "value", part_type)
+    return part_type if isinstance(part_type, str) else None
+
+
+def _item_event_classification(flags):
+    if not isinstance(flags, int) or isinstance(flags, bool) or flags < 0:
+        return None
+    from item_classification import (
+        ITEM_CLASSIFICATION_PROGRESSION,
+        ITEM_CLASSIFICATION_TRAP,
+        ITEM_CLASSIFICATION_USEFUL,
+    )
+
+    if flags & ITEM_CLASSIFICATION_TRAP:
+        return "trap"
+    if flags & ITEM_CLASSIFICATION_PROGRESSION:
+        return "progression"
+    if flags & ITEM_CLASSIFICATION_USEFUL:
+        return "useful"
+    return "filler"
+
+
+def _format_archipelago_part(context, part: "JSONMessagePart"):
+    part_type = _valid_part_type(part)
+    if part_type in _ARCHIPELAGO_TEXT_TYPES:
+        raw_text = part.get("text") if isinstance(part, dict) else None
+        if isinstance(raw_text, str):
+            return {"type": "text", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+        return _fallback_archipelago_segment(part)
+
+    if part_type in _ARCHIPELAGO_ITEM_TYPES:
+        raw_text = part.get("text") if isinstance(part, dict) else None
+        classification = _item_event_classification(part.get("flags", 0)) if isinstance(part, dict) else None
+        if not isinstance(raw_text, str) or classification is None:
+            return _fallback_archipelago_segment(part)
+        if part_type == JSONTypes.item_id.value:
+            player = part.get("player")
+            if not isinstance(player, int) or isinstance(player, bool):
+                return _fallback_archipelago_segment(part)
+            try:
+                item_text = context.item_names.lookup_in_slot(int(raw_text), player)
+            except (AttributeError, TypeError, ValueError, KeyError, LookupError, AssertionError):
+                return _fallback_archipelago_segment(part)
+            if not isinstance(item_text, str):
+                return _fallback_archipelago_segment(part)
+            raw_text = item_text
+        return {
+            "type": "item",
+            "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT),
+            "classification": classification,
+        }, raw_text
+
+    if part_type in _ARCHIPELAGO_LOCATION_TYPES:
+        raw_text = part.get("text") if isinstance(part, dict) else None
+        if not isinstance(raw_text, str):
+            return _fallback_archipelago_segment(part)
+        if part_type == JSONTypes.location_id.value:
+            player = part.get("player")
+            if not isinstance(player, int) or isinstance(player, bool):
+                return _fallback_archipelago_segment(part)
+            try:
+                location_text = context.location_names.lookup_in_slot(int(raw_text), player)
+            except (AttributeError, TypeError, ValueError, KeyError, LookupError, AssertionError):
+                return _fallback_archipelago_segment(part)
+            if not isinstance(location_text, str):
+                return _fallback_archipelago_segment(part)
+            raw_text = location_text
+        return {"type": "location", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+
+    if part_type in {JSONTypes.player_id.value, JSONTypes.player_name.value}:
+        raw_text = part.get("text") if isinstance(part, dict) else None
+        player = part.get("player") if isinstance(part, dict) else None
+        if part_type == JSONTypes.player_id.value:
+            if not isinstance(raw_text, str):
+                return _fallback_archipelago_segment(part)
+            try:
+                player = int(raw_text)
+            except (TypeError, ValueError):
+                return _fallback_archipelago_segment(part)
+            try:
+                player_text = context.player_names.get(player, raw_text)
+            except (AttributeError, TypeError):
+                return _fallback_archipelago_segment(part)
+            if not isinstance(player_text, str):
+                return _fallback_archipelago_segment(part)
+            raw_text = player_text
+        if not isinstance(raw_text, str) or not isinstance(player, int) or isinstance(player, bool):
+            return _fallback_archipelago_segment(part)
+        try:
+            is_self = bool(context.slot_concerns_self(player))
+        except Exception:
+            return _fallback_archipelago_segment(part)
+        return {
+            "type": "player",
+            "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT),
+            "self": is_self,
+        }, raw_text
+
+    return _fallback_archipelago_segment(part)
+
+
+def format_archipelago_event(context, args):
+    parts = args.get("data") if isinstance(args, dict) else None
+    if not isinstance(parts, (list, tuple)):
+        parts = (None,)
+    segments = []
+    plain_parts = []
+    for part in parts[:ARCHIPELAGO_EVENT_SEGMENT_COUNT]:
+        try:
+            segment, raw_text = _format_archipelago_part(context, part)
+        except Exception:
+            segment, raw_text = _fallback_archipelago_segment(part)
+        segments.append(segment)
+        plain_parts.append(raw_text if isinstance(raw_text, str) else "[unavailable]")
+    return {
+        "schema": ARCHIPELAGO_EVENT_SCHEMA,
+        "plain": _bounded_event_text("".join(plain_parts), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+        "segments": segments,
+    }
 
 ENABLE_ITEM_NOTIFICATIONS = False
 ITEM_DELIVERY_BATCH_SIZE = 16
@@ -253,7 +417,7 @@ from CommonClient import (  # noqa: E402
     gui_enabled,
     server_loop,
 )
-from NetUtils import ClientStatus  # noqa: E402
+from NetUtils import ClientStatus, JSONMessagePart, JSONTypes  # noqa: E402
 
 if "doom_base_dir" in config and "save_games_dir" in config:
     try:
@@ -2586,6 +2750,16 @@ class DoomEternalContext(CommonContext):
         self.fast_travel_delivered = {}
         self.fast_travel_eligibility_snapshot = None
         self._launcher_connection_failure_reported = False
+
+    def on_print_json(self, args: dict):
+        try:
+            super().on_print_json(args)
+        except Exception:
+            logger.exception("[Bridge] Archipelago PrintJSON logging failed")
+        try:
+            emit_launcher_event("archipelago", **format_archipelago_event(self, args))
+        except Exception:
+            logger.exception("[Bridge] Archipelago PrintJSON event formatting failed")
 
     def reset_queue_session_authority(self, reason):
         self._queue_session_authoritative = False

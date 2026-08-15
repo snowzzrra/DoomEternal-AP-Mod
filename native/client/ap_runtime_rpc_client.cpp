@@ -11,6 +11,7 @@ const char* kProtocol = "ncacn_np";
 const char* kEndpoint = "\\pipe\\meathook_interface_rpc";
 const char* kPipe = "\\\\.\\pipe\\meathook_interface_rpc";
 const DWORD kHealthInterval = 1000;
+const DWORD kHealthSummaryInterval = 12000;
 const size_t kMaxCommand = 64 * 1024;
 const size_t kMaxPath = 32 * 1024;
 }
@@ -30,6 +31,7 @@ void ApRuntimeRpcClient::SetLogCallback(LogCallback callback)
 void ApRuntimeRpcClient::DropBinding()
 {
     ready_ = false;
+    ApRpcClearImplicitBinding();
     if (binding_ != nullptr) {
         RpcBindingFree(&binding_);
         binding_ = nullptr;
@@ -130,7 +132,46 @@ void ApRuntimeRpcClient::Record(
             << " elapsed_ms=" << GetTickCount() - start_tick
             << " result=" << static_cast<int>(result)
             << " status=" << status;
-    const bool health_success = strcmp(operation, "health") == 0 && result == AP_RPC_DELIVERED;
+    const bool health_operation = strcmp(operation, "health") == 0;
+    const bool health_success = health_operation && result == AP_RPC_DELIVERED;
+    if (health_operation && !RpcTraceEnabled()) {
+        const DWORD now = GetTickCount();
+        const bool transition = !health_log_initialized_ || health_available_ != health_success;
+        if (transition) {
+            const bool recovery = health_log_initialized_ && health_success;
+            std::ostringstream health_message;
+            health_message << "RPC_HEALTH_"
+                << (recovery ? "RECOVERY" : "TRANSITION")
+                << " state=" << (health_success ? "available" : "unavailable")
+                << " result=" << static_cast<int>(result)
+                << " status=" << status;
+            if (health_suppressed_failures_ != 0) {
+                health_message << " suppressed_failures=" << health_suppressed_failures_;
+            }
+            if (log_callback_) {
+                log_callback_(health_message.str());
+            }
+            health_log_initialized_ = true;
+            health_available_ = health_success;
+            health_suppressed_failures_ = 0;
+            next_health_summary_tick_ = now + kHealthSummaryInterval;
+        } else if (!health_success) {
+            ++health_suppressed_failures_;
+            if (TickReached(now, next_health_summary_tick_)) {
+                if (log_callback_) {
+                    log_callback_(
+                        "RPC_HEALTH_SUMMARY state=unavailable suppressed_failures="
+                        + std::to_string(health_suppressed_failures_)
+                        + " last_result=" + std::to_string(static_cast<int>(result))
+                        + " last_status=" + std::to_string(status)
+                    );
+                }
+                health_suppressed_failures_ = 0;
+                next_health_summary_tick_ = now + kHealthSummaryInterval;
+            }
+        }
+        return;
+    }
     if (log_callback_ && (!health_success || RpcTraceEnabled())) {
         log_callback_(message.str());
     }

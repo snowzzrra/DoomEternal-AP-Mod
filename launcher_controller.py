@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ from launcher_platform import (
     launch_doom_via_steam,
     launcher_user_paths,
     migrate_legacy_launcher_data,
+    redact_secrets,
     read_handshake_probe,
     validate_game_root,
     validate_save_directory,
@@ -66,6 +68,7 @@ class LauncherController:
         self.user_paths.data_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.user_paths.config_dir / "launcher.json"
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
+        self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
         self.options_schema = load_options_schema(
             self.client_dir / "data" / "options_schema.json"
@@ -216,10 +219,11 @@ class LauncherController:
         raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
+        diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
         bundle = write_support_bundle(
             destination,
             self.run_doctor(),
-            logs=logs or [],
+            logs=diagnostic_logs,
             config=self.config,
             paths=self.user_paths,
             application_dir=self.client_dir,
@@ -228,7 +232,24 @@ class LauncherController:
         return bundle
 
     def emit(self, kind: str, **payload: object) -> None:
-        self.events.put({"type": kind, **payload})
+        event = {"type": kind, **payload}
+        self._record_event(event)
+        self.events.put(event)
+
+    def _record_diagnostic(self, text: object) -> None:
+        sanitized = redact_secrets(str(text)).replace("\r", " ").replace("\n", " ").strip()
+        if sanitized:
+            self.diagnostic_history.append(sanitized[:1000])
+
+    def _record_event(self, event: dict[str, object]) -> None:
+        kind = str(event.get("type", "event"))
+        if "heartbeat" in kind.casefold():
+            return
+        fields = []
+        for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
+            if key in event and event[key] not in (None, ""):
+                fields.append(f"{key}={event[key]}")
+        self._record_diagnostic(f"{kind}: {' | '.join(fields) or 'received'}")
 
     def _worker_event(
         self, supervisor: BridgeSupervisor, event: dict[str, object]
@@ -278,6 +299,7 @@ class LauncherController:
                 elif self.state is not LauncherState.FAILED:
                     self.state = LauncherState.FAILED
         if emit_event:
+            self._record_event(event)
             self.events.put(event)
         if stop_failed_worker:
             supervisor.stop(emit_disconnected=False)
@@ -288,10 +310,11 @@ class LauncherController:
 
     def _worker_log(self, text: str) -> None:
         if text:
-            self.emit("log", message=text)
+            self._record_diagnostic(f"worker: {text}")
+            self.events.put({"type": "log", "message": text})
 
     def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
-        self.events.put({"type": kind, **payload})
+        self.emit(kind, **payload)
 
     def _setup_result(self, record: IntegratedSetupRecord) -> None:
         self.last_setup = record

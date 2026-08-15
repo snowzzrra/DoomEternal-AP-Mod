@@ -42,6 +42,8 @@ static const DWORD kCommandSpacingMs = 250;
 static const DWORD kQueueStateLogMs = 5000;
 static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
+static const DWORD kQueueNoiseSummaryMs = 12000;
+static const DWORD kDeliveredRemovalRetryMs = 1000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 std::string CanonicalMapName(std::string name) {
@@ -67,6 +69,22 @@ struct CommandJob {
 };
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;
+
+struct DeliveredSpool {
+    std::string path;
+    DWORD nextRemovalAttemptTick = 0;
+    unsigned int removalAttempt = 0;
+};
+
+struct QueueDedupeLogState {
+    bool active = false;
+    DWORD nextSummaryTick = 0;
+    size_t suppressed = 0;
+};
+
+QueueDedupeLogState g_QueueDedupeLogState;
+
+std::string DeliveryContextFields();
 
 
 struct SaveSnapshot {
@@ -118,6 +136,41 @@ void LogDebug(const std::string& message) {
         fprintf(file, "[%s] %s\n", timestamp, message.c_str());
         fclose(file);
     }
+}
+
+void NoteQueueDedupe(const std::string& commandId) {
+    const DWORD now = GetTickCount();
+    if (!g_QueueDedupeLogState.active) {
+        g_QueueDedupeLogState.active = true;
+        g_QueueDedupeLogState.nextSummaryTick = now + kQueueNoiseSummaryMs;
+        g_QueueDedupeLogState.suppressed = 0;
+        LogDebug(
+            "QUEUE_DUPLICATE_REJECT command_id=" + commandId
+            + " reason=known_command_id RPC_QUEUE_DEDUPE transition=active"
+            + DeliveryContextFields()
+        );
+        return;
+    }
+    ++g_QueueDedupeLogState.suppressed;
+    if (static_cast<LONG>(now - g_QueueDedupeLogState.nextSummaryTick) >= 0) {
+        LogDebug(
+            "RPC_QUEUE_DEDUPE summary suppressed="
+            + std::to_string(g_QueueDedupeLogState.suppressed)
+        );
+        g_QueueDedupeLogState.suppressed = 0;
+        g_QueueDedupeLogState.nextSummaryTick = now + kQueueNoiseSummaryMs;
+    }
+}
+
+void RecoverQueueDedupeLog() {
+    if (!g_QueueDedupeLogState.active) {
+        return;
+    }
+    LogDebug(
+        "RPC_QUEUE_DEDUPE recovery suppressed="
+        + std::to_string(g_QueueDedupeLogState.suppressed)
+    );
+    g_QueueDedupeLogState = {};
 }
 
 void RotateClientLog() {
@@ -1413,7 +1466,8 @@ std::optional<std::string> ReceiptCommandNamespace(const std::string& filename) 
 void EnsureQueueDirectory(
     CommandSourceMap& recoveredSources,
     std::unordered_set<std::string>& heldReceiptLogs,
-    const std::optional<std::string>& activeNamespace
+    const std::optional<std::string>& activeNamespace,
+    const std::unordered_set<std::string>& activeCommandIds
 ) {
     CreateDirectoryA(kQueueDirectory, nullptr);
     // Telemetry polls are scoped to the active game session.
@@ -1441,6 +1495,10 @@ void EnsureQueueDirectory(
                     continue;
                 }
             }
+            const std::string commandId = CommandIdFromPath(processingPath);
+            if (activeCommandIds.find(commandId) != activeCommandIds.end()) {
+                continue;
+            }
             const std::string queuedPath =
                 processingPath.substr(0, processingPath.size() - std::string(".processing").size()) + ".cmd";
             std::string command;
@@ -1467,7 +1525,6 @@ void EnsureQueueDirectory(
                     processingPath.c_str(), queuedPath.c_str(),
                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
                 )) {
-                const std::string commandId = CommandIdFromPath(processingPath);
                 recoveredSources[commandId] = "recovered_processing";
                 LogDebug(
                     "QUEUE_SESSION_RECOVER command_id=" + commandId
@@ -1520,6 +1577,13 @@ void ImportSpoolFiles(
             }
             continue;
         }
+        const std::string queuedCommandId = CommandIdFromPath(queuedPath);
+        if (knownCommandIds.find(queuedCommandId) != knownCommandIds.end()) {
+            ++duplicateCount;
+            NoteQueueDedupe(queuedCommandId);
+            DeleteFileA(queuedPath.c_str());
+            continue;
+        }
         const std::string processingPath = queuedPath.substr(0, queuedPath.size() - 4) + ".processing";
         if (!MoveFileExA(queuedPath.c_str(), processingPath.c_str(), MOVEFILE_WRITE_THROUGH)) {
             continue;
@@ -1530,11 +1594,8 @@ void ImportSpoolFiles(
             const std::string commandId = CommandIdFromPath(processingPath);
             if (!RememberRpcCommandId(knownCommandIds, commandId)) {
                 ++duplicateCount;
-                LogDebug(
-                    "QUEUE_DUPLICATE_REJECT command_id=" + commandId
-                    + " reason=known_command_id"
-                    + DeliveryContextFields()
-                );
+                NoteQueueDedupe(commandId);
+                DeleteFileA(processingPath.c_str());
                 continue;
             }
             const auto recovered = recoveredSources.find(commandId);
@@ -1562,8 +1623,8 @@ void ImportSpoolFiles(
             DeleteFileA(processingPath.c_str());
         }
     }
-    if (duplicateCount > 0) {
-        LogDebug("RPC_QUEUE_DEDUPE count=" + std::to_string(duplicateCount));
+    if (duplicateCount == 0) {
+        RecoverQueueDedupeLog();
     }
 }
 
@@ -1618,6 +1679,49 @@ void QuarantineFailedJob(const CommandJob& job) {
         failedPath.c_str(),
         MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
     );
+}
+
+bool SpoolRemoved(const std::string& path) {
+    if (DeleteFileA(path.c_str())) {
+        return true;
+    }
+    const DWORD error = GetLastError();
+    return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+}
+
+void RetryDeliveredSpoolRemovals(
+    std::unordered_map<std::string, DeliveredSpool>& deliveredSpools,
+    std::unordered_set<std::string>& knownCommandIds
+) {
+    const DWORD now = GetTickCount();
+    for (auto entry = deliveredSpools.begin(); entry != deliveredSpools.end();) {
+        DeliveredSpool& spool = entry->second;
+        if (!ReceiptDispatchReady(now, spool.nextRemovalAttemptTick)) {
+            ++entry;
+            continue;
+        }
+        if (SpoolRemoved(spool.path)) {
+            LogDebug(
+                "ACK_REMOVE_RETRY command_id=" + entry->first
+                + " path=" + std::filesystem::path(spool.path).filename().string()
+            );
+            knownCommandIds.erase(entry->first);
+            entry = deliveredSpools.erase(entry);
+            continue;
+        }
+        ++spool.removalAttempt;
+        spool.nextRemovalAttemptTick = now + std::min(
+            kDeliveredRemovalRetryMs << std::min(spool.removalAttempt - 1, 3U),
+            8000UL
+        );
+        if (spool.removalAttempt == 1) {
+            LogDebug(
+                "ACK_REMOVE_RETRY_PENDING command_id=" + entry->first
+                + " path=" + std::filesystem::path(spool.path).filename().string()
+            );
+        }
+        ++entry;
+    }
 }
 
 bool ExecuteCommand(const CommandJob& job) {
@@ -1718,7 +1822,8 @@ int main(int argc, char** argv) {
         }
     }
     std::unordered_set<std::string> heldReceiptLogs;
-    EnsureQueueDirectory(recoveredSources, heldReceiptLogs, std::nullopt);
+    const std::unordered_set<std::string> noActiveCommandIds;
+    EnsureQueueDirectory(recoveredSources, heldReceiptLogs, std::nullopt, noActiveCommandIds);
     DeleteFileA(kRpcGatePath);
     const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
     const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
@@ -1761,6 +1866,7 @@ int main(int argc, char** argv) {
 
     std::deque<CommandJob> queue;
     std::unordered_set<std::string> knownCommandIds;
+    std::unordered_map<std::string, DeliveredSpool> deliveredSpools;
     DWORD lastExecution = 0;
     DWORD lastQueueStateLog = 0;
     size_t acknowledgedCommands = 0;
@@ -1776,6 +1882,7 @@ int main(int argc, char** argv) {
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading()
         );
+        RetryDeliveredSpoolRemovals(deliveredSpools, knownCommandIds);
         std::optional<std::string> activeNamespace;
         if (startupNamespaceCleared) {
             activeNamespace = ActiveQueueSessionNamespace();
@@ -1787,7 +1894,9 @@ int main(int argc, char** argv) {
                 startupNamespaceCleared = true;
             }
         }
-        EnsureQueueDirectory(recoveredSources, heldReceiptLogs, activeNamespace);
+        EnsureQueueDirectory(
+            recoveredSources, heldReceiptLogs, activeNamespace, knownCommandIds
+        );
         ImportSpoolFiles(
             queue,
             knownCommandIds,
@@ -1907,31 +2016,43 @@ int main(int argc, char** argv) {
                 );
             }
             if (ExecuteCommand(job)) {
-                DeleteFileA(job.path.c_str());
+                const bool spoolRemoved = SpoolRemoved(job.path);
                 if (normalReceipt) {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
                         + " kind=" + ReceiptCommandKind(commandId)
-                        + " result=ack_executed_persistence_unknown"
+                        + " result=ack_executed"
+                        + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
                         + " elapsed_ms="
                         + std::to_string(GetTickCount() - dispatchTick)
                         + DeliveryContextFields()
                     );
-                    LogDebug(
-                        "ACK_REMOVE command_id=" + commandId
-                        + " path=" + std::filesystem::path(job.path).filename().string()
-                        + DeliveryContextFields()
-                    );
+                    if (spoolRemoved) {
+                        LogDebug(
+                            "ACK_REMOVE command_id=" + commandId
+                            + " path=" + std::filesystem::path(job.path).filename().string()
+                            + DeliveryContextFields()
+                        );
+                    }
                     dispatchNextImmediately = true;
                 } else {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
-                        + " kind=non_receipt result=ack_executed_persistence_unknown"
+                        + " kind=non_receipt result=ack_executed"
+                        + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
                         + DeliveryContextFields()
                     );
                 }
                 ++acknowledgedCommands;
-                knownCommandIds.erase(commandId);
+                if (!spoolRemoved) {
+                    deliveredSpools[commandId] = {
+                        job.path,
+                        GetTickCount() + kDeliveredRemovalRetryMs,
+                        0,
+                    };
+                } else {
+                    knownCommandIds.erase(commandId);
+                }
                 queue.pop_front();
             } else {
                 if (normalReceipt) {
