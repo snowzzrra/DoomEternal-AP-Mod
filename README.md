@@ -34,7 +34,7 @@ Current campaign coverage includes:
 - 369 locations in total;
 - 117 item types;
 - randomized starting weapons and starting inventory;
-- configurable Chainsaw, Dash, first Sentinel Battery, AP Automap reveals, traps, and
+- configurable Chainsaw, Dash, first Sentinel Battery, Start With Automap, traps, and
   DeathLink;
 - room-specific map packages for Windows and Linux/Proton.
 
@@ -123,11 +123,10 @@ checks, regions, important target chains, and content hashes. This makes a map
 edit reviewable at the level of gameplay structure rather than only as a large
 text diff.
 
-Physical options are projected while the room package is prepared. Start With
-Automap, for example, adds one native `idTarget_PlayerStatModifier` per supported
-mission, sets `STAT_AUTOMAP` to `1`, and connects that writer to the mission's
-player starts. The progression-marker perk is separate item ownership compiled
-through the normal starting inventory path.
+Physical options are projected while the room package is prepared. **Start With
+Automap** defaults to OFF. When enabled, AP precollects **Reveal Automap
+Progression Items** and programmatically drives native Automap interaction. The
+native Automap station remains a normal map entity.
 
 ### Location checks
 
@@ -178,8 +177,9 @@ entities.
 The implementation uses native DOOM Eternal systems wherever the campaign
 already has a suitable owner or writer:
 
-- AP Automap reveals use the normal Automap acquisition path and a precollected
-  reveal perk;
+- Start With Automap precollects **Reveal Automap Progression Items** and
+  programmatically drives native Automap interaction; the native Automap station
+  remains a normal map entity;
 - replay Fast Travel uses `idTarget_FastTravelUnlock`;
 - Mission Complete uses mission transition publishers;
 - equipment, perks, weapons, mods, runes, and currencies use their supported
@@ -212,9 +212,9 @@ up owned content, applies confirmed actions, and validates installed files.
 - **Sentinel Batteries** form an economy of 28 units: two individual Batteries
   and thirteen bundles worth two each. The thirteen Fortress consumers each
   require a balance of two.
-- **Start With Automap** grants native Automap ownership in all 13 missions and
-  reveals progression-item markers. Automap stations are absent when this option
-  is enabled.
+- **Start With Automap** defaults to OFF. ON precollects **Reveal Automap
+  Progression Items** and programmatically drives native Automap interaction.
+  The native Automap station remains a normal map entity.
 - **Trap Percentage** replaces that percentage of filler padding with traps. It
   does not replace progression items or other pool items. **Enabled Traps** selects
   trap types eligible for those filler slots; with no enabled types, no traps are

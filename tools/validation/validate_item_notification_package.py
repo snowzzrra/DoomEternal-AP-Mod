@@ -113,8 +113,23 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("client identity notification capability diverges from build mode")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if set(manifest) != {"version"} or not isinstance(manifest["version"], str):
-        raise AssertionError("release manifest must contain one version field")
+    registry = manifest.get("checked_location_visuals")
+    if (
+        set(manifest) != {"version", "checked_location_visuals"}
+        or not isinstance(manifest["version"], str)
+        or not manifest["version"]
+        or not isinstance(registry, dict)
+        or set(registry) != {
+            "path",
+            "sha256",
+            "authoritative_fingerprint",
+            "generated_map_sha256",
+            "templates_sha256",
+        }
+    ):
+        raise AssertionError(
+            "release manifest must contain version and checked-location visual registry"
+        )
     bridge = (client_dir / "bridge_client.py").read_text(encoding="utf-8")
     if "bridge_identity.json" not in bridge or "receipt=ENABLE_ITEM_NOTIFICATIONS" not in bridge:
         raise AssertionError("packaged bridge lacks capability-gated receipt routing")

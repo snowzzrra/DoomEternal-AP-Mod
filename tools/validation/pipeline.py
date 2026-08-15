@@ -48,6 +48,7 @@ CORE_MAP_INPUTS = (
     "data/checked_location_visuals.json",
     "ap_visual_contract.py",
     "tools/maps/ap_map_generator.py",
+    "tools/maps/start_with_automap.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/validation/audit_resource_packages.py",
@@ -65,6 +66,7 @@ PREFLIGHT_PYTHON = (
     "tools/content/new_map.py",
     "tools/content/describe_map.py",
     "tools/maps/ap_map_generator.py",
+    "tools/maps/start_with_automap.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/maps/map_semantic_baseline.py",
     "tools/decls/rune_slot_builder.py",
@@ -625,6 +627,7 @@ class Pipeline:
             "item_classification.py", "item_reconciliation.py", "map_registry.py",
             "observer_lifecycle.py", "publisher_contracts.py",
             "publisher_runtime.py", "save_decrypt.py",
+            "tools/maps/start_with_automap.py",
         ):
             release_inputs[relative] = _sha256(ROOT / relative)
         return _canonical_hash({

@@ -77,6 +77,10 @@ from automap_visual_registry import (
     index_automap_visual_registry,
     load_automap_visual_registry,
 )
+from tools.maps.start_with_automap import (
+    SUPPORTED_START_WITH_AUTOMAP_MAPS,
+    start_with_automap_helper_names,
+)
 from rune_reconciliation import (
     RUNE_WRITER_EVIDENCE,
     RuneNativeState,
@@ -147,6 +151,8 @@ FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
 AUTOMAP_CLEANUP_RETRY_BASE_SECONDS = 1.0
 AUTOMAP_CLEANUP_RETRY_MAX_SECONDS = 8.0
+START_WITH_AUTOMAP_RETRY_BASE_SECONDS = 1.0
+START_WITH_AUTOMAP_RETRY_MAX_SECONDS = 8.0
 
 
 def build_materialization_epoch(native_epoch, marker_mtime_ns):
@@ -1769,7 +1775,9 @@ def log_delivery_event(event: str, **fields) -> None:
     logger.info("DELIVERY_EVENT %s", json.dumps(record, sort_keys=True, separators=(",", ":")))
 
 
-def command_spool_exists(command_id):
+def command_spool_exists(command_id, state_key=None, room_scoped=True):
+    if room_scoped:
+        command_id = room_scoped_command_id(command_id, state_key)
     queued_path = os.path.join(QUEUE_DIR, f"{command_id}.cmd")
     processing_path = os.path.join(QUEUE_DIR, f"{command_id}.processing")
     return os.path.exists(queued_path) or os.path.exists(processing_path)
@@ -1780,6 +1788,29 @@ def queue_session_namespace(state_key):
     if not isinstance(state_key, str) or not state_key:
         return None
     return hashlib.sha256(state_key.encode("utf-8")).hexdigest()[:16]
+
+
+def active_queue_session_namespace():
+    """Read native queue authority published for current AP room."""
+    marker = Path(QUEUE_DIR) / "active_session_namespace"
+    try:
+        value = marker.read_text(encoding="ascii").strip()
+    except (FileNotFoundError, OSError, UnicodeError):
+        return None
+    return value if re.fullmatch(r"[0-9a-f]{16}", value) else None
+
+
+def room_scoped_command_id(command_id, state_key=None):
+    """Use native receipt gate namespace for every room-bound spool job."""
+    namespace = queue_session_namespace(state_key) if state_key else None
+    if namespace is None:
+        namespace = active_queue_session_namespace()
+    if namespace is None:
+        return command_id
+    prefix = f"recv-{namespace}-"
+    if command_id.startswith(prefix):
+        return command_id
+    return f"{prefix}{command_id}"
 
 
 def quarantine_incompatible_receipt_jobs(state_key):
@@ -1912,6 +1943,8 @@ def send_command(
     arm_rpc=True,
     already_queued_ok=False,
     delivery_fields=None,
+    state_key=None,
+    room_scoped=True,
 ):
     """Atomically enqueue one command without overwriting another command.
 
@@ -1922,8 +1955,10 @@ def send_command(
     try:
         os.makedirs(QUEUE_DIR, exist_ok=True)
         command_id = coalesce_key or f"{time.time_ns():020d}-{uuid.uuid4().hex}"
+        if room_scoped:
+            command_id = room_scoped_command_id(command_id, state_key)
         if coalesce_key:
-            if command_spool_exists(coalesce_key):
+            if command_spool_exists(command_id, room_scoped=room_scoped):
                 if delivery_fields is not None:
                     log_delivery_event(
                         "QUEUE_DUPLICATE_REJECT",
@@ -1962,7 +1997,7 @@ def send_command(
                     os.remove(temporary_path)
                 except FileNotFoundError:
                     pass
-            processing_path = os.path.join(QUEUE_DIR, f"{coalesce_key}.processing")
+            processing_path = os.path.join(QUEUE_DIR, f"{command_id}.processing")
             if os.path.exists(processing_path):
                 try:
                     os.remove(command_path)
@@ -2316,12 +2351,15 @@ def request_telemetry_dump():
     return send_command(
         f"condump {TELEMETRY_DUMP_PREFIX}.txt",
         coalesce_key="telemetry",
+        room_scoped=False,
     )
 
 
-def discard_queued_coalesced_command(coalesce_key):
+def discard_queued_coalesced_command(coalesce_key, state_key=None):
     """Cancel only an unclaimed command; consumer owns every .processing file."""
-    discard_unclaimed_command(Path(QUEUE_DIR), coalesce_key)
+    discard_unclaimed_command(
+        Path(QUEUE_DIR), room_scoped_command_id(coalesce_key, state_key)
+    )
 
 
 def set_rpc_execution(enabled):
@@ -2788,6 +2826,10 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_delivered = {}
         self.automap_cleanup_retry = {}
         self.automap_cleanup_status = {}
+        self.start_with_automap_enabled = False
+        self.start_with_automap_attempts = {}
+        self.start_with_automap_retry = {}
+        self.start_with_automap_status = {}
         self.server_checked_locations_ready = False
         self.fast_travel_delivered = {}
         self.fast_travel_eligibility_snapshot = None
@@ -2826,16 +2868,18 @@ class DoomEternalContext(CommonContext):
         self.exit_event.set()
 
     def handle_connection_loss(self, msg: str) -> None:
+        state_key = self.state_key
         self.reset_queue_session_authority("connection_loss")
         self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
-        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
+        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY, state_key)
         super().handle_connection_loss(msg)
         self._report_launcher_connection_failure(msg)
 
     async def connection_closed(self):
+        state_key = self.state_key
         self.reset_queue_session_authority("connection_closed")
         self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
-        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
+        discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY, state_key)
         unexpected_launcher_close = (
             LAUNCHER_EVENTS_ENABLED
             and self.server is not None
@@ -2856,7 +2900,7 @@ class DoomEternalContext(CommonContext):
             if not re.fullmatch(r"ai_ScriptCmdEnt [A-Za-z0-9_]+ activate", command):
                 raise ValueError("Directed tests accept only map-side entity activation")
             command_id = f"{correlation}-cmd-{index:02d}"
-            if not send_command(command, coalesce_key=command_id):
+            if not send_command(command, coalesce_key=command_id, state_key=self.state_key):
                 return None
             logger.info(
                 "[Test] correlation=%s action=%s map=%s command_id=%s command=%s effect=unknown",
@@ -2891,7 +2935,9 @@ class DoomEternalContext(CommonContext):
             self.initialize_item_state()
             if previous_state_key and previous_state_key != self.state_key:
                 abandoned = self.deathlink_receiver.abandon(time.monotonic(), "room_changed")
-                discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
+                discard_queued_coalesced_command(
+                    DEATHLINK_KILL_COALESCE_KEY, previous_state_key
+                )
                 if abandoned:
                     logger.warning(
                         "[DeathLink] Cleared room-bound receive events after slot change: %s.",
@@ -2911,6 +2957,12 @@ class DoomEternalContext(CommonContext):
             self.death_link_mode = configured_mode
             self.deathlink_receiver.configure_mode(self.death_link_mode)
             self.death_link_enabled = bool(slot_data.get("death_link", False))
+            configured_start_with_automap = slot_data.get("start_with_automap", False)
+            self.start_with_automap_enabled = (
+                configured_start_with_automap
+                if isinstance(configured_start_with_automap, bool)
+                else False
+            )
             logger.info(
                 "[DeathLink] mode=%s enabled=%s receive_policy=%s",
                 self.death_link_mode,
@@ -2948,6 +3000,7 @@ class DoomEternalContext(CommonContext):
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
+            self.reconcile_start_with_automap("server_connected")
             self.reconcile_fast_travel_unlock("connected")
             asyncio.create_task(self.check_mission_challenge_locations())
             if self._item_delivery_wakeup:
@@ -2970,6 +3023,7 @@ class DoomEternalContext(CommonContext):
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.reconcile_checked_automap_cleanup("server_checked_update")
+            self.reconcile_start_with_automap("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
@@ -4013,6 +4067,23 @@ class DoomEternalContext(CommonContext):
                 decoded = None
             if isinstance(decoded, list) and len(decoded) == 3 and all(isinstance(value, str) for value in decoded):
                 self.automap_cleanup_delivered[tuple(decoded)] = epoch
+        self.start_with_automap_attempts = {}
+        raw_start_with_automap = self.session_state.get("start_with_automap", {})
+        if isinstance(raw_start_with_automap, dict):
+            for key, state in raw_start_with_automap.items():
+                if not isinstance(state, dict):
+                    continue
+                try:
+                    decoded = json.loads(key)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    decoded = None
+                if (
+                    isinstance(decoded, list)
+                    and len(decoded) == 3
+                    and all(isinstance(value, str) and value for value in decoded)
+                    and valid_materialization_epoch(decoded[2])
+                ):
+                    self.start_with_automap_attempts[tuple(decoded)] = state
         self.fast_travel_delivered = {}
         raw_fast_travel_delivered = self.session_state.get("fast_travel_delivered", [])
         if not isinstance(raw_fast_travel_delivered, (list, tuple)):
@@ -4057,6 +4128,17 @@ class DoomEternalContext(CommonContext):
             json.dumps([room_identity, map_name, location_id], separators=(",", ":")): epoch
             for (room_identity, map_name, location_id), epoch in self.automap_cleanup_delivered.items()
             if all(isinstance(value, str) for value in (room_identity, map_name, location_id)) and valid_materialization_epoch(epoch)
+        }
+        self.session_state["start_with_automap"] = {
+            json.dumps(list(key), separators=(",", ":")): state
+            for key, state in self.start_with_automap_attempts.items()
+            if (
+                isinstance(key, tuple)
+                and len(key) == 3
+                and all(isinstance(value, str) and value for value in key)
+                and valid_materialization_epoch(key[2])
+                and isinstance(state, dict)
+            )
         }
         self.selected_observation_slot = None
         self.session_state.pop("sticky_mastery_observed", None)
@@ -4284,6 +4366,7 @@ class DoomEternalContext(CommonContext):
                 command.command,
                 coalesce_key=command.spool_id,
                 already_queued_ok=True,
+                state_key=self.state_key,
                 delivery_fields={
                     "item_id": command.item_id,
                     "item_name": command.name,
@@ -4712,6 +4795,7 @@ class DoomEternalContext(CommonContext):
             command,
             coalesce_key=f"fast-travel-{identity}-{map_key}-{epoch}",
             already_queued_ok=True,
+            state_key=self.state_key,
         ):
             retry_attempt = state.get("retry_attempt", 0)
             if isinstance(retry_attempt, bool) or not isinstance(retry_attempt, int):
@@ -4823,6 +4907,7 @@ class DoomEternalContext(CommonContext):
             self.reconcile_owned_runes("level_ready")
             self.advance_automap_cleanup_epoch()
             self.reconcile_checked_automap_cleanup("level_ready")
+            self.reconcile_start_with_automap("level_ready")
             await self.check_mission_challenge_locations()
             self.automatic_reconcile_inventory("level_ready")
             self.reconcile_fast_travel_unlock("level_ready")
@@ -4886,6 +4971,7 @@ class DoomEternalContext(CommonContext):
                 command,
                 coalesce_key=command_id,
                 already_queued_ok=True,
+                state_key=self.state_key,
             ):
                 retry["attempt"] += 1
                 retry["deadline"] = now + min(
@@ -4909,6 +4995,120 @@ class DoomEternalContext(CommonContext):
                 entity_name,
             )
         return changed
+
+    def _start_with_automap_transition(self, delivery_key, status, reason):
+        previous = self.start_with_automap_status.get(delivery_key)
+        if previous == status:
+            return
+        self.start_with_automap_status[delivery_key] = status
+        logger.info(
+            "[Automap] start_with_automap transition status=%s previous=%s "
+            "reason=%s key=%s",
+            status,
+            previous,
+            reason,
+            delivery_key,
+        )
+
+    def reconcile_start_with_automap(self, trigger):
+        """Queue native station touch/use relay commands for current load epoch."""
+        if not self.start_with_automap_enabled:
+            return False
+        marker = getattr(self, "cached_map_identity", None)
+        map_key = marker.get("map_key") if isinstance(marker, dict) else None
+        epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
+        room_identity = self.get_ap_state_key()
+        delivery_key = (room_identity or "", map_key or "", epoch or "")
+        if not room_identity:
+            self._start_with_automap_transition(
+                delivery_key, "PENDING", "room_identity_unavailable"
+            )
+            return False
+        if map_key not in SUPPORTED_START_WITH_AUTOMAP_MAPS:
+            self._start_with_automap_transition(
+                delivery_key, "PENDING", "helper_unavailable"
+            )
+            return False
+        if not valid_materialization_epoch(epoch):
+            self._start_with_automap_transition(
+                delivery_key, "PENDING", "materialization_epoch_unavailable"
+            )
+            return False
+        if not rpc_execution_enabled():
+            self._start_with_automap_transition(delivery_key, "PENDING", "rpc_not_ready")
+            return False
+
+        attempts = self.start_with_automap_attempts.setdefault(
+            (room_identity, map_key, epoch),
+            {"touch": "pending", "use": "pending", "attempt": 0, "deadline": 0.0},
+        )
+        for phase in ("touch", "use"):
+            if attempts.get(phase) in {"queued", "spooled"}:
+                attempts[phase] = "submitted"
+        retry_key = (room_identity, map_key, epoch)
+        retry = self.start_with_automap_retry.setdefault(
+            retry_key, {"attempt": 0, "deadline": 0.0}
+        )
+        now = time.monotonic()
+        if now < retry["deadline"]:
+            self._start_with_automap_transition(delivery_key, "RETRY_WAIT", trigger)
+            return False
+
+        touch_name, use_name = start_with_automap_helper_names(map_key)
+        command_prefix = hashlib.sha256(
+            json.dumps(list(retry_key), separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:20]
+        phase_command_ids = {
+            phase: room_scoped_command_id(
+                f"start-with-automap-{command_prefix}-{phase}", self.state_key
+            )
+            for phase in ("touch", "use")
+        }
+        for phase, entity_name, action in (
+            ("touch", touch_name, "IA_TOUCH"),
+            ("use", use_name, "IA_USE_SUCCEED"),
+        ):
+            command_id = phase_command_ids[phase]
+            if attempts.get(phase) == "submitted":
+                continue
+            if not send_command(
+                f"ai_ScriptCmdEnt {entity_name} activate",
+                coalesce_key=command_id,
+                already_queued_ok=True,
+                state_key=self.state_key,
+            ):
+                retry["attempt"] += 1
+                retry["deadline"] = now + min(
+                    START_WITH_AUTOMAP_RETRY_MAX_SECONDS,
+                    START_WITH_AUTOMAP_RETRY_BASE_SECONDS
+                    * (2 ** min(retry["attempt"] - 1, 3)),
+                )
+                attempts["attempt"] = retry["attempt"]
+                attempts["deadline"] = retry["deadline"]
+                self.persist_session_state()
+                self._start_with_automap_transition(
+                    delivery_key, "RETRY", f"{phase}_queue_unavailable"
+                )
+                return False
+            attempts[phase] = "submitted"
+            attempts["last_trigger"] = trigger
+            attempts["timestamp"] = time.time()
+            self.persist_session_state()
+            logger.info(
+                "[Automap] start_with_automap submitted phase=%s map=%s epoch=%s "
+                "target=%s action=%s",
+                phase,
+                map_key,
+                epoch,
+                entity_name,
+                action,
+            )
+        attempts["status"] = "submitted"
+        retry["attempt"] = 0
+        retry["deadline"] = 0.0
+        self.persist_session_state()
+        self._start_with_automap_transition(delivery_key, "SUBMITTED", trigger)
+        return True
 
     def _automap_cleanup_transition(self, delivery_key, status, reason):
         previous = self.automap_cleanup_status.get(delivery_key)
@@ -5015,7 +5215,7 @@ class DoomEternalContext(CommonContext):
             return False
         command_id = self.bootstrap_command_id(action_name)
         if not send_command(bootstrap_activation(action_name), coalesce_key=command_id,
-                            already_queued_ok=True):
+                            already_queued_ok=True, state_key=self.state_key):
             state.update(status="retryable_failure", trigger=trigger, timestamp=time.time())
             self.persist_session_state()
             return False
@@ -5035,7 +5235,9 @@ class DoomEternalContext(CommonContext):
         self.quarantine_v1_bootstrap_spools()
         for action_name in BOOTSTRAP_ACTIONS:
             state = self.bootstrap_action_state(action_name)
-            if state["status"] == "queued" and not command_spool_exists(self.bootstrap_command_id(action_name)):
+            if state["status"] == "queued" and not command_spool_exists(
+                self.bootstrap_command_id(action_name), self.state_key
+            ):
                 state["status"] = "delivered_effect_unknown"
                 state["timestamp"] = time.time()
                 logger.info("[Bootstrap] v2 spool consumed; effect remains unknown: %s", action_name)
@@ -5274,6 +5476,7 @@ class DoomEternalContext(CommonContext):
                 commands[command_index],
                 coalesce_key=command_id,
                 already_queued_ok=True,
+                state_key=self.state_key,
                 delivery_fields={
                     "receipt_index": item_index,
                     "item_id": item_id,
@@ -5333,9 +5536,10 @@ class DoomEternalContext(CommonContext):
             dispatch=lambda: send_command(
                 "ai_ScriptCmdEnt ap_deathlink activate",
                 coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
+                state_key=self.state_key,
             ),
             command_in_flight=lambda: command_spool_exists(
-                DEATHLINK_KILL_COALESCE_KEY
+                DEATHLINK_KILL_COALESCE_KEY, self.state_key
             ),
         )
         self.deathlink_instrumentation.append(
@@ -5836,7 +6040,9 @@ class DoomEternalContext(CommonContext):
             return
         receive_result = self.deathlink_receiver.confirm_local_death(time.monotonic())
         if receive_result.detail in {"echo_suppressed", "late_echo_suppressed"}:
-            discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
+            discard_queued_coalesced_command(
+                DEATHLINK_KILL_COALESCE_KEY, self.state_key
+            )
             logger.info(
                 "[DeathLink] %s confirmed by death telemetry; linked echo suppressed (%s).",
                 (receive_result.event_id or "unknown")[:12],

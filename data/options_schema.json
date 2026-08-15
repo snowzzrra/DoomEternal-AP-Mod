@@ -144,11 +144,11 @@
     },
     {
       "default": false,
-      "description": "Reveals AP item locations after mission Automap is obtained normally and does not grant Automap.",
-      "display_name": "Reveal AP Locations on Automap",
+      "description": "Start with the Automap available.",
+      "display_name": "Start With Automap",
       "group": "Game Options",
-      "key": "reveal_ap_locations_on_automap",
-      "source_class": "RevealAPLocationsOnAutomap",
+      "key": "start_with_automap",
+      "source_class": "StartWithAutomap",
       "ui_type": "toggle"
     },
     {
@@ -338,5 +338,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "0e36871fd00c422db8a1473077c5be5f05ce0e38f2993ca9dfc705feed8ba8e2"
+  "source_sha256": "92379482571c9ce5ff80a4690867b11fdb7d1a10db1193cfc2ec5d5aa4745902"
 }

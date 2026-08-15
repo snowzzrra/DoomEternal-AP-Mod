@@ -39,20 +39,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Final AP lifecycle and presentation generator"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Include executable Start With Automap helpers in shipped-map baseline audit"
     }
   ],
   "asset_package_contract_sha256": "5a150841d01b6714748a785e83921beae8c74894cceb1c0e01bc5b61e6474722",
-  "byte_sha256": "f15be7927efb01e63b01a65c2451d164861fcee3bb8c8ff7944886dfb76f6eec",
+  "byte_sha256": "b9572a24f968c7e869e81363436c1d4c78fc3a7cadf02283fcbc5a8e68fcdbb3",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 40,
-    "byte_size": 11968834,
-    "classes": 10417,
-    "entity_count": 10419,
+    "byte_size": 11969886,
+    "classes": 10419,
+    "entity_count": 10421,
     "layers": 5406,
-    "targets": 18753,
-    "transforms": 22242,
-    "unique_entity_names": 10418
+    "targets": 18755,
+    "transforms": 22244,
+    "unique_entity_names": 10420
   },
   "manifest_sha256": "13eeb48eb9c1f6246400296e59dea33faa79bf50dfc0866e2e966459517282b0",
   "map_key": "e1m1_intro",
@@ -84,5 +88,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "aa10ef45e3d0f3d4cb3b9859afacad3139fe29d8eec6787c4cbb383900e946da",
-  "semantic_sha256": "acc792c97c592d8a7c3f63c97e89a067b1aa5371781cc2a6ea76f298d488d725"
+  "semantic_sha256": "e5d9da5184921a130a5fac1c4317408142d75d6d2b43519b6b533ea694962fcd"
 }

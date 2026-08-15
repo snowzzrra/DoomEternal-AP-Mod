@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds, generate_map
+from tools.maps.start_with_automap import validate_start_with_automap_helpers
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 PROTOTYPE_ENTITIES = {
@@ -59,6 +60,7 @@ def assert_separate_automap_helper_guard() -> int:
                 ROOT / source["level_config"], output_root / f"{map_key}.json", items,
             )
             generated = output.read_text()
+            validate_start_with_automap_helpers(source_text, generated, map_key)
             helper_names = re.findall(r'entityDef\s+(ap_automap_location_\d+)\s*\{', generated)
             secret_automap_owners = {
                 entry["location_id"]: entry["automap_owner"]

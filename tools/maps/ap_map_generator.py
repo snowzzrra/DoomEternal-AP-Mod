@@ -24,6 +24,7 @@ from item_reconciliation import (
     load_policy_registry,
 )
 from tools.maps.notification_formatting import notification_key
+from tools.maps.start_with_automap import generate_start_with_automap_helpers
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
@@ -39,6 +40,7 @@ GENERATED_NAME_PREFIXES = (
     EVENT_ENTITY_PREFIX,
     AP_LIFECYCLE_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
+    "ap_start_with_automap_",
     ITEM_NOTIFICATION_PREFIX.rstrip("_"),  # ap_notify_item
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
@@ -1793,6 +1795,7 @@ def generate_map(
         content = remove_balanced_entity_blocks(content, legacy_prefix)
     content = remove_balanced_entity_blocks(content, "ap_deathlink")
     content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
+    content = remove_balanced_entity_blocks(content, "ap_start_with_automap_")
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
@@ -1988,6 +1991,7 @@ def generate_map(
         new_blocks.append("entity {" + block)
 
     map_content = "".join(new_blocks)
+    map_content += generate_start_with_automap_helpers(map_content, map_key)
     secret_blocks = []
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]

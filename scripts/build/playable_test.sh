@@ -442,6 +442,10 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
+mkdir -p "$OUTPUT_DIR/client/tools/maps"
+cp "$REPO_ROOT/tools/__init__.py" "$OUTPUT_DIR/client/tools/__init__.py"
+cp "$REPO_ROOT/tools/maps/start_with_automap.py" \
+     "$OUTPUT_DIR/client/tools/maps/start_with_automap.py"
 cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
     "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
@@ -506,6 +510,110 @@ identity["revision"] = f"mission-unified-{identity['sha256'][:12]}"
 Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
 PY
 
+mkdir -p "$OUTPUT_DIR/client/resources"
+TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
+mkdir -p "$TEMPLATE_STAGE"
+python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" <<'PY'
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import zipfile
+from itertools import product
+from pathlib import Path
+
+root, staged, template_root, compressor, map_sources_path = map(Path, sys.argv[1:])
+sys.path.insert(0, str(root))
+from launcher_core import ModCompiler, SeedManifest
+from physical_options import (
+    MAP_CONTENT_OPTION_KEYS,
+    PHYSICAL_OPTION_KEYS,
+    map_content_signature,
+)
+from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from content_catalog import load_content_catalog
+
+compiler = ModCompiler(root)
+map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
+campaign_map_specs = tuple(
+    spec for spec in load_content_catalog(root).enabled_maps()
+    if spec.key != "hub"
+)
+campaign_map_keys = tuple(spec.key for spec in campaign_map_specs)
+maps = {
+    map_key: (
+        source["resource_path"],
+        source["relative_entities_path"],
+        root / "vanillamaps" / source["source_file"],
+    )
+    for map_key, source in map_sources.items()
+    if map_key in campaign_map_keys and source["enabled"]
+}
+if tuple(maps) != campaign_map_keys:
+    raise SystemExit("Campaign template map set does not match map contract")
+variant_maps = {}
+for bits in product((False, True), repeat=len(PHYSICAL_OPTION_KEYS) + len(MAP_CONTENT_OPTION_KEYS)):
+    options = dict(zip(PHYSICAL_OPTION_KEYS + MAP_CONTENT_OPTION_KEYS, bits))
+    signature = map_content_signature(options)
+    manifest = SeedManifest.create(
+        seed_name="physical-template", team=0, slot=1, options=options,
+        active_location_ids=compiler.active_location_ids(options),
+    )
+    variant_maps[signature] = {}
+    for map_key, (_, member, vanilla) in maps.items():
+        entities = template_root / f"{signature}-{map_key}.entities"
+        compiler.compile_map(manifest, vanilla, entities, map_key)
+        packed = template_root / f"{signature}-{map_key}.packed"
+        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+        variant_maps[signature][map_key] = packed
+    patch_mission_complete_maps(
+        root / "data/mission_complete_map_contracts.json",
+        {
+            map_key: template_root / f"{signature}-{map_key}.entities"
+            for map_key in maps
+        },
+        staged,
+    )
+    for map_key in maps:
+        entities = template_root / f"{signature}-{map_key}.entities"
+        packed = template_root / f"{signature}-{map_key}.packed"
+        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+
+variants = {}
+for signature, members in variant_maps.items():
+    destination = template_root / f"map-content-{signature}.zip"
+    mod = template_root / f"mod-{signature}"
+    shutil.copytree(staged, mod)
+    for map_key, packed in members.items():
+        resource_path, relative, _ = maps[map_key]
+        target = mod / Path(resource_path).stem / "maps" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(packed, target)
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
+        for path in sorted(mod.rglob("*")):
+            if path.is_file():
+                output.write(path, path.relative_to(mod).as_posix())
+    variants[signature] = {
+        "file": destination.name,
+        "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
+        "maps": {
+            key: hashlib.sha256(value.read_bytes()).hexdigest()
+            for key, value in members.items()
+        },
+    }
+(template_root / "index.json").write_text(json.dumps({
+    "schema": 2,
+    "physical_options": list(PHYSICAL_OPTION_KEYS),
+    "map_content_options": list(MAP_CONTENT_OPTION_KEYS),
+    "variants": variants,
+}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+with zipfile.ZipFile(root / "build/release/client/resources/mod_templates.zip", "w", zipfile.ZIP_DEFLATED) as output:
+    output.write(template_root / "index.json", "index.json")
+    for entry in variants.values():
+        output.write(template_root / entry["file"], entry["file"])
+PY
+
 python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$TEMP_DIR/public_files.json" <<'PY'
 import hashlib
 import json
@@ -565,6 +673,8 @@ public_files = [
         "client/publisher_runtime.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
+        "client/tools/__init__.py",
+        "client/tools/maps/start_with_automap.py",
         "client/run_bridge.sh",
         "client/doom_logo.png",
         "client/resources/mod_templates.zip",
@@ -695,110 +805,6 @@ python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps"
-
-mkdir -p "$OUTPUT_DIR/client/resources"
-TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
-mkdir -p "$TEMPLATE_STAGE"
-python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" <<'PY'
-import hashlib
-import json
-import shutil
-import subprocess
-import sys
-import zipfile
-from itertools import product
-from pathlib import Path
-
-root, staged, template_root, compressor, map_sources_path = map(Path, sys.argv[1:])
-sys.path.insert(0, str(root))
-from launcher_core import ModCompiler, SeedManifest
-from physical_options import (
-    MAP_CONTENT_OPTION_KEYS,
-    PHYSICAL_OPTION_KEYS,
-    map_content_signature,
-)
-from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from content_catalog import load_content_catalog
-
-compiler = ModCompiler(root)
-map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-campaign_map_specs = tuple(
-    spec for spec in load_content_catalog(root).enabled_maps()
-    if spec.key != "hub"
-)
-campaign_map_keys = tuple(spec.key for spec in campaign_map_specs)
-maps = {
-    map_key: (
-        source["resource_path"],
-        source["relative_entities_path"],
-        root / "vanillamaps" / source["source_file"],
-    )
-    for map_key, source in map_sources.items()
-    if map_key in campaign_map_keys and source["enabled"]
-}
-if tuple(maps) != campaign_map_keys:
-    raise SystemExit("Campaign template map set does not match map contract")
-variant_maps = {}
-for bits in product((False, True), repeat=len(PHYSICAL_OPTION_KEYS) + len(MAP_CONTENT_OPTION_KEYS)):
-    options = dict(zip(PHYSICAL_OPTION_KEYS + MAP_CONTENT_OPTION_KEYS, bits))
-    signature = map_content_signature(options)
-    manifest = SeedManifest.create(
-        seed_name="physical-template", team=0, slot=1, options=options,
-        active_location_ids=compiler.active_location_ids(options),
-    )
-    variant_maps[signature] = {}
-    for map_key, (_, member, vanilla) in maps.items():
-        entities = template_root / f"{signature}-{map_key}.entities"
-        compiler.compile_map(manifest, vanilla, entities, map_key)
-        packed = template_root / f"{signature}-{map_key}.packed"
-        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
-        variant_maps[signature][map_key] = packed
-    patch_mission_complete_maps(
-        root / "data/mission_complete_map_contracts.json",
-        {
-            map_key: template_root / f"{signature}-{map_key}.entities"
-            for map_key in maps
-        },
-        staged,
-    )
-    for map_key in maps:
-        entities = template_root / f"{signature}-{map_key}.entities"
-        packed = template_root / f"{signature}-{map_key}.packed"
-        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
-
-variants = {}
-for signature, members in variant_maps.items():
-    destination = template_root / f"map-content-{signature}.zip"
-    mod = template_root / f"mod-{signature}"
-    shutil.copytree(staged, mod)
-    for map_key, packed in members.items():
-        resource_path, relative, _ = maps[map_key]
-        target = mod / Path(resource_path).stem / "maps" / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(packed, target)
-    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
-        for path in sorted(mod.rglob("*")):
-            if path.is_file():
-                output.write(path, path.relative_to(mod).as_posix())
-    variants[signature] = {
-        "file": destination.name,
-        "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
-        "maps": {
-            key: hashlib.sha256(value.read_bytes()).hexdigest()
-            for key, value in members.items()
-        },
-    }
-(template_root / "index.json").write_text(json.dumps({
-    "schema": 2,
-    "physical_options": list(PHYSICAL_OPTION_KEYS),
-    "map_content_options": list(MAP_CONTENT_OPTION_KEYS),
-    "variants": variants,
-}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-with zipfile.ZipFile(root / "build/release/client/resources/mod_templates.zip", "w", zipfile.ZIP_DEFLATED) as output:
-    output.write(template_root / "index.json", "index.json")
-    for entry in variants.values():
-        output.write(template_root / entry["file"], entry["file"])
-PY
 
 if [[ -e "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" ]]; then
     echo "Obsolete universal mod ZIP exists in public release root" >&2
