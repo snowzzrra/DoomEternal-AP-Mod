@@ -1757,6 +1757,58 @@ AUTOMAP_VISUALS_BY_MAP = index_automap_visual_registry(AUTOMAP_VISUAL_REGISTRY)
 
 poll_counter = 0
 
+SPOOL_ID_MAX_BYTES = 128
+SPOOL_ID_HASH_HEX_LENGTH = 20
+_WINDOWS_ILLEGAL_SPOOL_ID_CHARS = frozenset('<>:"|?*')
+_WINDOWS_RESERVED_SPOOL_ID_NAMES = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+})
+
+
+def validate_spool_id(command_id):
+    """Reject command IDs that cannot be one filesystem component."""
+    if not isinstance(command_id, str) or not command_id:
+        raise ValueError("spool command ID must be a non-empty string")
+    if len(command_id.encode("utf-8")) > SPOOL_ID_MAX_BYTES:
+        raise ValueError(
+            f"spool command ID exceeds {SPOOL_ID_MAX_BYTES} UTF-8 bytes"
+        )
+    if any(character in command_id for character in "/\\"):
+        raise ValueError("spool command ID contains a path separator")
+    if any(
+        ord(character) < 32 or ord(character) == 127
+        for character in command_id
+    ):
+        raise ValueError("spool command ID contains a control character")
+    if any(character in _WINDOWS_ILLEGAL_SPOOL_ID_CHARS for character in command_id):
+        raise ValueError("spool command ID contains a Windows-illegal character")
+    if command_id.endswith((".", " ")):
+        raise ValueError("spool command ID has a Windows-illegal trailing character")
+    if command_id in {".", ".."}:
+        raise ValueError("spool command ID is a traversal component")
+    windows_stem = command_id.split(".", 1)[0].upper()
+    if windows_stem in _WINDOWS_RESERVED_SPOOL_ID_NAMES:
+        raise ValueError("spool command ID is a Windows-reserved device name")
+    return command_id
+
+
+def stable_spool_id(prefix, *logical_components):
+    """Return bounded ID for logical coalescing identity."""
+    validate_spool_id(prefix)
+    canonical = json.dumps(
+        logical_components,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return validate_spool_id(
+        f"{prefix}-{digest[:SPOOL_ID_HASH_HEX_LENGTH]}"
+    )
+
 
 def log_delivery_event(event: str, **fields) -> None:
     """Emit bounded, correlation-friendly delivery diagnostics only."""
@@ -1774,6 +1826,7 @@ def log_delivery_event(event: str, **fields) -> None:
 def command_spool_exists(command_id, state_key=None, room_scoped=True):
     if room_scoped:
         command_id = room_scoped_command_id(command_id, state_key)
+    validate_spool_id(command_id)
     queued_path = os.path.join(QUEUE_DIR, f"{command_id}.cmd")
     processing_path = os.path.join(QUEUE_DIR, f"{command_id}.processing")
     return os.path.exists(queued_path) or os.path.exists(processing_path)
@@ -1949,10 +2002,11 @@ def send_command(
     large condump backlog behind the player-state gate.
     """
     try:
-        os.makedirs(QUEUE_DIR, exist_ok=True)
         command_id = coalesce_key or f"{time.time_ns():020d}-{uuid.uuid4().hex}"
         if room_scoped:
             command_id = room_scoped_command_id(command_id, state_key)
+        validate_spool_id(command_id)
+        os.makedirs(QUEUE_DIR, exist_ok=True)
         if coalesce_key:
             if command_spool_exists(command_id, room_scoped=room_scoped):
                 if delivery_fields is not None:
@@ -3540,15 +3594,32 @@ class DoomEternalContext(CommonContext):
             self.invalidate_active_save_proof()
             return self.invalidate_map_identity("game_not_running")
 
-        if evidence is not None and getattr(evidence, "state", None) != "gameplay":
-            self.invalidate_active_save_proof()
-            return self.invalidate_map_identity("menu")
         cached = self.cached_map_identity
         if not isinstance(cached, dict):
+            if evidence is not None and getattr(evidence, "state", None) != "gameplay":
+                self.invalidate_active_save_proof()
+                return self.invalidate_map_identity("menu")
             return None
         marker_mtime = cached.get("mtime_ns", 0)
         if lease is not None and lease.started_ns and marker_mtime < lease.started_ns:
             return self.invalidate_map_identity("stale_marker")
+        if evidence is not None and getattr(evidence, "state", None) != "gameplay":
+            self.invalidate_active_save_proof()
+            hold_signature = (
+                marker_mtime,
+                getattr(evidence, "state", None),
+                bool(getattr(evidence, "provisional", False)),
+            )
+            if hold_signature != getattr(self, "last_map_identity_hold_signature", None):
+                self.last_map_identity_hold_signature = hold_signature
+                logger.info(
+                    "[MAP] MAP_IDENTITY_HELD map=%s epoch=%s evidence_state=%s",
+                    cached.get("map_key", "<unknown>"),
+                    cached.get("gameplay_epoch", "<unknown>"),
+                    getattr(evidence, "state", "<unknown>"),
+                )
+            return self.accept_map_identity(cached, getattr(evidence, "epoch", None))
+        self.last_map_identity_hold_signature = None
         return self.accept_map_identity(cached, getattr(evidence, "epoch", None))
 
     def log_save_proof_accepted(
@@ -4645,7 +4716,9 @@ class DoomEternalContext(CommonContext):
         command = "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
         if not send_command(
             command,
-            coalesce_key=f"fast-travel-{identity}-{map_key}-{epoch}",
+            coalesce_key=stable_spool_id(
+                "fast-travel", identity, map_key, epoch
+            ),
             already_queued_ok=True,
             state_key=self.state_key,
         ):
@@ -4729,7 +4802,8 @@ class DoomEternalContext(CommonContext):
 
     async def process_level_ready(self, newest_path=None):
         """Run complete level-ready reconciliation for one accepted load epoch."""
-        self.read_active_map_identity(evidence=read_gameplay_save_evidence())
+        evidence = read_gameplay_save_evidence()
+        self.read_active_map_identity(evidence=evidence)
         self.snapshot_fast_travel_eligibility()
         marker = getattr(self, "cached_map_identity", None)
         epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
@@ -4739,8 +4813,38 @@ class DoomEternalContext(CommonContext):
         in_flight = getattr(self, "level_ready_in_flight", set())
         if epoch in in_flight:
             return False
+        evidence_state = getattr(evidence, "state", None)
+        if evidence_state != "gameplay":
+            pending_signature = (epoch, "evidence_not_gameplay", evidence_state)
+            if pending_signature != getattr(self, "last_level_ready_pending_signature", None):
+                self.last_level_ready_pending_signature = pending_signature
+                logger.info(
+                    "[RPC] LEVEL_READY_PENDING epoch=%s reason=evidence_not_gameplay state=%s",
+                    epoch,
+                    evidence_state or "unavailable",
+                )
+                logger.info(
+                    "[MAP] RUNTIME_EFFECTS_PENDING reason=evidence_not_gameplay state=%s",
+                    evidence_state or "unavailable",
+                )
+            return False
+        if not self.has_authoritative_save_proof():
+            pending_signature = (epoch, "save_proof_unavailable", evidence_state)
+            if pending_signature != getattr(self, "last_level_ready_pending_signature", None):
+                self.last_level_ready_pending_signature = pending_signature
+                logger.info(
+                    "[RPC] LEVEL_READY_PENDING epoch=%s reason=save_proof_unavailable",
+                    epoch,
+                )
+                logger.info(
+                    "[MAP] RUNTIME_EFFECTS_PENDING reason=save_proof_unavailable state=%s",
+                    evidence_state,
+                )
+            return False
         in_flight.add(epoch)
         self.level_ready_in_flight = in_flight
+        self.last_level_ready_pending_signature = None
+        logger.info("[RPC] LEVEL_READY_EXECUTE epoch=%s", epoch)
         source_path = pending.get(epoch) or newest_path or marker.get("path")
         try:
             if not rpc_execution_enabled():
@@ -4810,9 +4914,13 @@ class DoomEternalContext(CommonContext):
             if now < retry["deadline"]:
                 self._automap_cleanup_transition(runtime_key, "RETRY_WAIT", trigger)
                 continue
-            command_id = (
-                f"automap-cleanup-{self.automap_cleanup_session}-"
-                f"{room_identity}-{map_name}-{location_id}-e{self.automap_cleanup_epoch}"
+            command_id = stable_spool_id(
+                "automap-cleanup",
+                self.automap_cleanup_session,
+                room_identity,
+                map_name,
+                location_id,
+                self.automap_cleanup_epoch,
             )
             command = f"ai_ScriptCmdEnt {entity_name} activate"
             if not send_command(
@@ -6384,6 +6492,8 @@ class DoomEternalContext(CommonContext):
         map_name = marker["runtime_map"]
 
         self.current_map_name = map_name
+        if getattr(evidence, "state", None) != "gameplay":
+            return
         self.snapshot_fast_travel_eligibility()
         self.reconcile_fast_travel_unlock("map_ready")
         if self.last_rpc_map_name is None:
@@ -6523,13 +6633,15 @@ class DoomEternalContext(CommonContext):
 
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
+                    evidence = read_gameplay_save_evidence()
                     if getattr(self, "_queue_session_authoritative", False):
                         if not ensure_queue_session_namespace(self.state_key):
                             self.reset_queue_session_authority("namespace_publish_failed")
                         else:
                             migrate_direct_item_command_jobs(self.state_key)
-                    self.onboard_bootstrap("on_reconnect")
-                    self.reconcile_checked_automap_cleanup("connect_or_reconnect")
+                    if getattr(evidence, "state", None) == "gameplay":
+                        self.onboard_bootstrap("on_reconnect")
+                        self.reconcile_checked_automap_cleanup("connect_or_reconnect")
                     if not self.repair_item_mappings():
                         await asyncio.sleep(0.25)
                         continue
@@ -6546,7 +6658,7 @@ class DoomEternalContext(CommonContext):
                     _, newest_path = markers[-1]
                     try:
                         self.ingest_visible_runtime_lifecycle(
-                            evidence=read_gameplay_save_evidence(),
+                            evidence=evidence,
                             lifecycle_markers=markers,
                         )
                     except Exception as e:
