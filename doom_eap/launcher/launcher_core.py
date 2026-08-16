@@ -28,6 +28,7 @@ DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 2
 MOD_CONTRACT_REVISION = 1
+AUTOMAP_REVEAL_ITEM = "Reveal Automap Progression Items"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v1",
     "randomize_dash_v1",
@@ -86,7 +87,10 @@ class RoomSnapshot:
         for key in PHYSICAL_OPTION_KEYS:
             if not isinstance(slot_data.get(key), bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
-        for key in ("death_link", "start_with_automap"):
+        for key in (
+            "death_link",
+            "start_with_automap",
+        ):
             if key in slot_data and not isinstance(slot_data[key], bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
         if "death_link_mode" in slot_data and (
@@ -234,6 +238,10 @@ class SeedManifest:
         unknown = sorted(set(snapshot.active_location_ids) - known_location_ids)
         if unknown:
             raise ValueError(f"session contains unknown DOOM Eternal location IDs: {unknown}")
+        starting_inventory = dict(slot_data.get("starting_inventory", {}))
+        start_with_automap = slot_data.get("start_with_automap", False)
+        if start_with_automap:
+            starting_inventory[AUTOMAP_REVEAL_ITEM] = 1
         return cls.create(
             seed_name=snapshot.seed_name,
             team=snapshot.team,
@@ -243,8 +251,8 @@ class SeedManifest:
                 **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
                 "death_link": slot_data.get("death_link", False),
                 "death_link_mode": slot_data.get("death_link_mode", "soft"),
-                "start_with_automap": slot_data.get("start_with_automap", False),
-                **({"starting_inventory": slot_data["starting_inventory"]} if "starting_inventory" in slot_data else {}),
+                "start_with_automap": start_with_automap,
+                **({"starting_inventory": starting_inventory} if starting_inventory else {}),
                 **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
             },
             active_location_ids=list(snapshot.active_location_ids),

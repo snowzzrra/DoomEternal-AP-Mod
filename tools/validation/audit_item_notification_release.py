@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
+import json
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -31,8 +34,15 @@ from tools.release.room_payloads import (
     assemble_room_files,
     canonical_json,
     load_room_payload_manifest,
+    read_zip,
     resource_metadata,
+    select_room_payloads,
+    sha256_bytes,
     write_deterministic_zip,
+)
+from tools.maps.ap_map_generator import (
+    apply_composable_map_transforms,
+    find_entity_block_bounds,
 )
 
 
@@ -56,6 +66,20 @@ def _read_entities(path: Path, decompressor: Path | None, temporary: Path) -> by
     return output.read_bytes()
 
 
+def _read_cached_entities(
+    payload: bytes,
+    decompressor: Path | None,
+    temporary: Path,
+    cache: dict[str, bytes],
+) -> tuple[str, bytes]:
+    digest = sha256_bytes(payload)
+    if digest not in cache:
+        encoded = temporary / f"{digest}.entities"
+        encoded.write_bytes(payload)
+        cache[digest] = _read_entities(encoded, decompressor, temporary)
+    return digest, cache[digest]
+
+
 def _map_payload_path(mod_root: Path, plan) -> Path:
     resource_name = Path(plan.resource_path).stem
     return mod_root / resource_name / "maps" / plan.relative_entities_path
@@ -75,6 +99,262 @@ def _assert_notifications(content: str, map_key: str) -> None:
             raise AssertionError(f"notification is one-shot: {map_key}/{suffix}")
 
 
+AP_RUNTIME_ENTITY_RE = re.compile(r"\bentityDef\s+((?:ap_|AP_CHECK_)[A-Za-z0-9_]+)\s*\{")
+GLOBAL_OPTION_KEYS = (*PHYSICAL_OPTIONS, "start_with_automap")
+
+
+def _runtime_entity_blocks(content: str) -> dict[str, str]:
+    blocks: dict[str, str] = {}
+    for name in AP_RUNTIME_ENTITY_RE.findall(content):
+        bounds = find_entity_block_bounds(content, name)
+        if bounds is None or name in blocks:
+            raise AssertionError(f"runtime entity is missing or duplicated: {name}")
+        blocks[name] = content[bounds[0]:bounds[1]].replace("\r\n", "\n")
+    return blocks
+
+
+def _physical_entity_family(spec: dict[str, object], name: str) -> bool:
+    location_id = str(spec["location_id"])
+    projected_names = {
+        f"{prefix}{location_id}"
+        for prefix in (
+            "ap_automap_location_",
+            "ap_location_visual_",
+            "ap_remove_location_visual_",
+            "ap_notify_location_",
+            "ap_event_",
+        )
+    }
+    projected_names.add(str(spec["entity"]))
+    projected_names.add(f"ap_independent_{spec['vanilla_entity']}")
+    return name in projected_names
+
+
+def _assert_runtime_contract_families(
+    map_key: str,
+    blocks: dict[str, str],
+    fast_travel_maps: set[str],
+) -> None:
+    required = {
+        f"ap_lifecycle_{map_key}",
+        "ap_rpc_auto_enable",
+        "ap_deathlink",
+    }
+    if map_key in fast_travel_maps:
+        required.add("ap_fast_travel_unlock")
+    absent = sorted(required - set(blocks))
+    if absent:
+        raise AssertionError(f"runtime contract owners absent: map={map_key} entities={absent}")
+
+    lifecycle = blocks[f"ap_lifecycle_{map_key}"]
+    if (
+        'class = "idTarget_FirstThinkActivate";' not in lifecycle
+        or 'item[0] = "ap_rpc_auto_enable";' not in lifecycle
+        or re.search(r"\blayers\s*=", lifecycle)
+    ):
+        raise AssertionError(f"FirstThink lifecycle contract drift: {map_key}")
+    active_map = blocks["ap_rpc_auto_enable"]
+    if "AP_ACTIVE_MAP_V1" not in active_map or f"map_key={map_key}" not in active_map:
+        raise AssertionError(f"active-map publisher contract drift: {map_key}")
+    if map_key in fast_travel_maps and (
+        'class = "idTarget_FastTravelUnlock";' not in blocks["ap_fast_travel_unlock"]
+    ):
+        raise AssertionError(f"Fast Travel writer contract drift: {map_key}")
+
+    families = {
+        "AP checks": lambda name: name.startswith("AP_CHECK_"),
+        "AP event owners": lambda name: name.startswith("ap_event_"),
+        "item RPC owners": lambda name: name.startswith("ap_rpc_v3_"),
+        "notification owners": lambda name: name.startswith("ap_notify_"),
+        "Automap presentations": lambda name: name.startswith("ap_automap_location_"),
+        "visual cleanup targets": lambda name: name.startswith("ap_remove_location_visual_"),
+    }
+    empty = [label for label, matches in families.items() if not any(matches(name) for name in blocks)]
+    if empty:
+        raise AssertionError(f"runtime contract families absent: map={map_key} families={empty}")
+
+
+def _global_option_states() -> list[dict[str, bool]]:
+    return [
+        dict(zip(GLOBAL_OPTION_KEYS, values, strict=True))
+        for values in itertools.product((False, True), repeat=len(GLOBAL_OPTION_KEYS))
+    ]
+
+
+def _audit_room_selection(
+    resource_dir: Path,
+    payload_manifest: dict[str, object],
+) -> tuple[
+    list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
+    dict[str, bytes],
+    dict[str, bytes],
+]:
+    manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
+    base_members = read_zip(resource_dir / BASE_RESOURCE_NAME)
+    payload_members = read_zip(resource_dir / ROOM_PAYLOAD_RESOURCE_NAME)
+    expected_base_members = set(cast(list[str], payload_manifest["base_members"]))
+    if set(base_members) != expected_base_members:
+        raise AssertionError("room payload base member set drifted")
+    expected_payload_members = {
+        state["member"]
+        for record in manifest_maps.values()
+        for state in record["states"]
+        if state["source"] == "replacement"
+    }
+    if set(payload_members) != expected_payload_members:
+        raise AssertionError("room payload archive member set drifted")
+
+    selections = []
+    for state_index, options in enumerate(_global_option_states()):
+        selected = select_room_payloads(payload_manifest, options)
+        if len(selected) != len(manifest_maps):
+            raise AssertionError(
+                f"synthetic room payload selection is incomplete: state={state_index}"
+            )
+        for map_key, state in selected.items():
+            record = manifest_maps[map_key]
+            expected_options = {
+                key: options[key] for key in record["option_keys"]
+            }
+            if state["options"] != expected_options:
+                raise AssertionError(
+                    f"synthetic room payload state selection drifted: {map_key}"
+                )
+            target = str(record["target_member"])
+            if target not in base_members:
+                raise AssertionError(f"base room payload target is missing: {map_key}/{target}")
+            if state["source"] == "base":
+                selected_bytes = base_members[target]
+            else:
+                member = str(state["member"])
+                if member not in payload_members:
+                    raise AssertionError(f"room payload member is missing: {map_key}/{member}")
+                selected_bytes = payload_members[member]
+            if sha256_bytes(selected_bytes) != state["sha256"]:
+                raise AssertionError(f"room payload state hash drifted: {map_key}")
+        selections.append((options, selected))
+    if not any(
+        state["source"] == "replacement"
+        for _, selected in selections
+        for state in selected.values()
+    ):
+        raise AssertionError("synthetic room payload did not select replacements")
+    return selections, base_members, payload_members
+
+
+def _audit_final_physical_states(
+    resource_dir: Path,
+    payload_manifest: dict[str, object],
+    generated_maps: Path,
+    map_registry: Path,
+    decompressor: Path | None,
+    selections: list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
+    base_members: dict[str, bytes],
+    payload_members: dict[str, bytes],
+    content_cache: dict[str, bytes],
+) -> dict[str, int]:
+    plans = {plan.map_key: plan for plan in release_plan(load_map_registry(map_registry))}
+    fast_travel = json.loads((map_registry.parent / "fast_travel.json").read_text(encoding="utf-8"))
+    fast_travel_maps = set(fast_travel["maps"])
+    authoritative_content: dict[str, str] = {}
+    authoritative: dict[str, dict[str, str]] = {}
+    for map_key, plan in plans.items():
+        content = (generated_maps / plan.generated_output).read_text(encoding="utf-8")
+        authoritative_content[map_key] = content
+        authoritative[map_key] = _runtime_entity_blocks(content)
+        _assert_runtime_contract_families(map_key, authoritative[map_key], fast_travel_maps)
+
+    unique_map_states: set[tuple[str, str]] = set()
+    unique_payload_hashes: set[str] = set()
+    parsed_payloads: dict[str, dict[str, str]] = {}
+    expected_payloads: dict[tuple[str, bool, tuple[tuple[str, bool], ...]], dict[str, str]] = {}
+    with tempfile.TemporaryDirectory() as directory:
+        temporary = Path(directory)
+        manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
+        for state_index, (options, selected) in enumerate(selections):
+            for map_key, state in selected.items():
+                record = manifest_maps[map_key]
+                target = str(record["target_member"])
+                if state["source"] == "base":
+                    encoded_bytes = base_members[target]
+                else:
+                    encoded_bytes = payload_members[str(state["member"])]
+                state_sha256 = sha256_bytes(encoded_bytes)
+                if state_sha256 != state["sha256"]:
+                    raise AssertionError(f"room payload state hash drifted: {map_key}")
+                unique_map_states.add((map_key, state_sha256))
+                unique_payload_hashes.add(state_sha256)
+                _read_cached_entities(
+                    encoded_bytes, decompressor, temporary, content_cache
+                )
+                if state_sha256 not in parsed_payloads:
+                    parsed_payloads[state_sha256] = _runtime_entity_blocks(
+                        content_cache[state_sha256].decode("utf-8")
+                    )
+                actual = parsed_payloads[state_sha256]
+                relevant_options = tuple(
+                    (option_key, options[option_key])
+                    for option_key, spec in PHYSICAL_OPTIONS.items()
+                    if spec["map_key"] == map_key
+                )
+                expected_key = (
+                    map_key,
+                    options["start_with_automap"],
+                    relevant_options,
+                )
+                if expected_key not in expected_payloads:
+                    expected_content = authoritative_content[map_key]
+                    if options["start_with_automap"]:
+                        expected_content = apply_composable_map_transforms(
+                            expected_content, map_key, {"start_with_automap": True}
+                        )
+                    expected = _runtime_entity_blocks(expected_content)
+                    for option_key, spec in PHYSICAL_OPTIONS.items():
+                        if spec["map_key"] == map_key and not options[option_key]:
+                            expected = {
+                                name: block
+                                for name, block in expected.items()
+                                if not _physical_entity_family(spec, name)
+                            }
+                    expected_payloads[expected_key] = expected
+                expected = expected_payloads[expected_key]
+                if set(actual) != set(expected):
+                    missing = sorted(set(expected) - set(actual))
+                    extra = sorted(set(actual) - set(expected))
+                    raise AssertionError(
+                        f"final runtime entity inventory drift: state={state_index} "
+                        f"map={map_key} missing={missing} extra={extra}"
+                    )
+                changed = [name for name in expected if actual[name] != expected[name]]
+                if changed:
+                    raise AssertionError(
+                        f"final runtime entity blocks drift: state={state_index} "
+                        f"map={map_key} entities={sorted(changed)}"
+                    )
+                required = set()
+                if map_key in fast_travel_maps:
+                    required.add("ap_fast_travel_unlock")
+                if map_key == "e1m1_intro":
+                    required.update({
+                        "ap_remove_location_visual_7770008",
+                        "ap_remove_location_visual_7770009",
+                        "ap_remove_location_visual_7770014",
+                        "ap_remove_location_visual_7770017",
+                    })
+                absent = sorted(required - set(actual))
+                if absent:
+                    raise AssertionError(
+                        f"runtime targets absent in final state: state={state_index} "
+                        f"map={map_key} entities={absent}"
+                    )
+    return {
+        "global_states": len(selections),
+        "unique_map_states": len(unique_map_states),
+        "unique_payload_hashes": len(unique_payload_hashes),
+        "decompressed_payloads": len(content_cache),
+    }
+
+
 def audit_mod_payload(
     enabled: bool,
     generated_maps: Path,
@@ -84,11 +364,13 @@ def audit_mod_payload(
     *,
     require_generated_identity: bool = True,
     visual_registry: dict[str, object] | None = None,
+    content_cache: dict[str, bytes] | None = None,
 ) -> dict[str, dict[str, int | str]]:
     """Audit release maps against unpacked payloads and room-selected physical bases."""
     records: dict[str, dict[str, int | str]] = {}
     plans = release_plan(load_map_registry(map_registry))
     physical_map_keys = {str(spec["map_key"]) for spec in PHYSICAL_OPTIONS.values()}
+    content_cache = content_cache if content_cache is not None else {}
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         for plan in plans:
@@ -97,17 +379,22 @@ def audit_mod_payload(
             if not generated_path.is_file() or not packaged_path.is_file():
                 raise AssertionError(f"missing generated or packaged map: {plan.map_key}")
             generated = _normalized(generated_path.read_bytes())
-            packaged = _normalized(_read_entities(packaged_path, decompressor, temporary))
+            _, packaged = _read_cached_entities(
+                packaged_path.read_bytes(), decompressor, temporary, content_cache
+            )
+            packaged = _normalized(packaged)
+            generated_text = generated.decode("utf-8")
+            packaged_text = packaged.decode("utf-8")
             if visual_registry is not None:
                 validate_generated_visuals(
                     visual_registry,
                     plan.map_key,
-                    generated.decode("utf-8"),
+                    generated_text,
                 )
-            generated_notifications = set(NOTIFICATION_RE.findall(generated.decode("utf-8")))
-            packaged_notifications = set(NOTIFICATION_RE.findall(packaged.decode("utf-8")))
+            generated_notifications = set(NOTIFICATION_RE.findall(generated_text))
+            packaged_notifications = set(NOTIFICATION_RE.findall(packaged_text))
             packaged_locations = set(
-                LOCATION_NOTIFICATION_RE.findall(packaged.decode("utf-8"))
+                LOCATION_NOTIFICATION_RE.findall(packaged_text)
             )
             generated_identity_required = (
                 require_generated_identity and plan.map_key not in physical_map_keys
@@ -119,13 +406,13 @@ def audit_mod_payload(
                     raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
                 if generated_identity_required and generated_notifications != packaged_notifications:
                     raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
-                _assert_notifications(packaged.decode("utf-8"), plan.map_key)
-            elif "entityDef ap_rpc_item_" in packaged.decode("utf-8") or packaged_notifications:
+                _assert_notifications(packaged_text, plan.map_key)
+            elif "entityDef ap_rpc_item_" in packaged_text or packaged_notifications:
                 raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
             records[plan.map_key] = {
                 "generated_source_sha256": hashlib.sha256(generated).hexdigest(),
                 "packaged_payload_sha256": hashlib.sha256(packaged).hexdigest(),
-                "effect_entity_count": packaged.decode("utf-8").count("entityDef ap_rpc_v3_"),
+                "effect_entity_count": packaged_text.count("entityDef ap_rpc_v3_"),
                 "notification_entity_count": len(packaged_notifications),
                 "major_notification_count": sum(
                     suffix.startswith("major_")
@@ -156,7 +443,12 @@ def _audit_room_resources(
     client_dir: Path,
     manifest: dict[str, object],
     map_registry: Path,
-) -> None:
+) -> tuple[
+    dict[str, Any],
+    list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
+    dict[str, bytes],
+    dict[str, bytes],
+]:
     compiler = cast(dict[str, Any], manifest["room_compiler"])
     resources = cast(dict[str, Any], compiler["resources"])
     resource_dir = client_dir / "resources"
@@ -176,41 +468,76 @@ def _audit_room_resources(
         resource_dir / ROOM_PAYLOAD_MANIFEST_NAME,
         known_maps=known_maps,
     )
-    scenarios = (
-        {"randomize_chainsaw": False, "randomize_dash": False, "randomize_first_battery": False},
-        {"randomize_chainsaw": True, "randomize_dash": False, "randomize_first_battery": False},
-        {"randomize_chainsaw": False, "randomize_dash": True, "randomize_first_battery": False},
-        {"randomize_chainsaw": False, "randomize_dash": False, "randomize_first_battery": True},
-        {"randomize_chainsaw": False, "randomize_dash": True, "randomize_first_battery": True},
-        {"randomize_chainsaw": True, "randomize_dash": True, "randomize_first_battery": True},
+    selections, base_members, payload_members = _audit_room_selection(
+        resource_dir, payload_manifest
     )
-    assembled = {}
-    selected = {}
-    for options in scenarios:
-        assembled, selected = assemble_room_files(
-            resource_dir / BASE_RESOURCE_NAME,
-            resource_dir / ROOM_PAYLOAD_RESOURCE_NAME,
-            payload_manifest,
-            options,
-        )
-        if len(selected) != len(payload_manifest["maps"]):
-            raise AssertionError("synthetic room payload selection is incomplete")
-        for map_key, state in selected.items():
-            expected = {
-                key: options[key]
-                for key in payload_manifest["maps"][map_key]["option_keys"]
-            }
-            if state["options"] != expected:
-                raise AssertionError(f"synthetic room payload state selection drifted: {map_key}")
-    if not any(state["source"] == "replacement" for state in selected.values()):
-        raise AssertionError("synthetic room payload did not select replacements")
+    _, selected = selections[-1]
+    assembled = dict(base_members)
+    manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
+    for map_key, state in selected.items():
+        if state["source"] == "replacement":
+            target = str(manifest_maps[map_key]["target_member"])
+            assembled[target] = payload_members[str(state["member"])]
     with tempfile.TemporaryDirectory() as directory:
         package = Path(directory) / "synthetic-room.zip"
-        assembled["room_config.json"] = canonical_json({"start_with_automap": False})
+        assembled["room_config.json"] = canonical_json(
+            {"start_with_automap": False}
+        )
         write_deterministic_zip(assembled, package)
         with zipfile.ZipFile(package) as archive:
             if set(archive.namelist()) != set(assembled):
                 raise AssertionError("synthetic room package member set drifted")
+    print(
+        "Room selection audit: "
+        f"{len(selections)} global choices, "
+        f"{len({(map_key, state['sha256']) for _, selected in selections for map_key, state in selected.items()})} "
+        "unique map payload states"
+    )
+    return payload_manifest, selections, base_members, payload_members
+
+
+def _audit_final_content(
+    enabled: bool,
+    generated_maps: Path,
+    mod_root: Path,
+    client_dir: Path,
+    map_registry: Path,
+    decompressor: Path | None,
+    payload_manifest: dict[str, Any],
+    selections: list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
+    base_members: dict[str, bytes],
+    payload_members: dict[str, bytes],
+    visual_registry: dict[str, object],
+) -> dict[str, dict[str, int | str]]:
+    content_cache: dict[str, bytes] = {}
+    stats = _audit_final_physical_states(
+        client_dir / "resources",
+        payload_manifest,
+        generated_maps,
+        map_registry,
+        decompressor,
+        selections,
+        base_members,
+        payload_members,
+        content_cache,
+    )
+    records = audit_mod_payload(
+        enabled,
+        generated_maps,
+        mod_root,
+        map_registry,
+        decompressor,
+        visual_registry=visual_registry,
+        content_cache=content_cache,
+    )
+    print(
+        "Final content audit: "
+        f"{stats['global_states']} global choices, "
+        f"{stats['unique_map_states']} unique map states, "
+        f"{stats['unique_payload_hashes']} unique payload SHA-256 values, "
+        f"{len(content_cache)} decompressed payloads"
+    )
+    return records
 
 
 def audit_release(
@@ -230,7 +557,9 @@ def audit_release(
         package_root=manifest_path.parent,
         generated_maps=generated_maps,
     )
-    _audit_room_resources(client_dir, manifest, map_registry)
+    payload_manifest, selections, base_members, payload_members = _audit_room_resources(
+        client_dir, manifest, map_registry
+    )
     registry_path = client_dir / "data" / "checked_location_visuals.json"
     registry = manifest["checked_location_visuals"]
     visual_registry = load_automap_visual_registry(registry_path)
@@ -249,9 +578,18 @@ def audit_release(
     _audit_locales(enabled, mod_root)
     classification_path = client_dir / "data" / "item_classifications.json"
     load_item_classification_identity(classification_path)
-    records = audit_mod_payload(
-        enabled, generated_maps, mod_root, map_registry, decompressor,
-        visual_registry=visual_registry,
+    records = _audit_final_content(
+        enabled,
+        generated_maps,
+        mod_root,
+        client_dir,
+        map_registry,
+        decompressor,
+        payload_manifest,
+        selections,
+        base_members,
+        payload_members,
+        visual_registry,
     )
     return records
 
@@ -347,10 +685,6 @@ def main() -> int:
                 client_dir, manifest, args.map_registry, args.decompressor,
             )
             _audit_locales(args.enabled == "1", mod_roots["direct"])
-            audit_mod_payload(
-                args.enabled == "1", args.generated_maps, mod_roots["direct"],
-                args.map_registry, args.decompressor,
-            )
         return 0
     if not all((args.mod_root, args.client_dir, args.release_manifest)):
         parser.error("local audit requires --mod-root, --client-dir, and --release-manifest")

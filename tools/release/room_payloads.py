@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 import zipfile
 from collections.abc import Mapping
 from itertools import product
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+from doom_eap.content.physical_options import map_physical_option_keys
 
 BASE_RESOURCE_NAME = "base_mod.zip"
 ROOM_PAYLOAD_RESOURCE_NAME = "room_payloads.zip"
@@ -95,6 +96,7 @@ def validate_room_payload_manifest(
     physical_option_keys = {
         "randomize_chainsaw", "randomize_dash", "randomize_first_battery",
     }
+    map_option_keys = physical_option_keys | {"start_with_automap"}
     maps = document.get("maps")
     if not isinstance(maps, Mapping) or not maps:
         raise ValueError("room payload manifest maps are missing")
@@ -117,9 +119,22 @@ def validate_room_payload_manifest(
         if target_member not in normalized_base_members or target_member in seen_targets:
             raise ValueError(f"room payload target member is not unique/base-backed: {map_key}")
         seen_targets.add(target_member)
-        if not isinstance(option_keys, list) or not all(isinstance(key, str) for key in option_keys):
+        state_policy = record.get("state_policy", "cartesian")
+        if state_policy == "cartesian":
+            expected_option_keys = sorted(
+                ("start_with_automap",) + map_physical_option_keys(map_key)
+            )
+        elif state_policy == "off_only":
+            expected_option_keys = list(map_physical_option_keys(map_key))
+        else:
+            raise ValueError(f"room payload state policy is invalid: {map_key}")
+        if (
+            not isinstance(option_keys, list)
+            or not all(isinstance(key, str) for key in option_keys)
+            or option_keys != expected_option_keys
+        ):
             raise ValueError(f"room payload option keys are invalid: {map_key}")
-        if option_keys != sorted(set(option_keys)) or not set(option_keys) <= physical_option_keys:
+        if not set(option_keys) <= map_option_keys:
             raise ValueError(f"room payload option key coverage is invalid: {map_key}")
         if not isinstance(states, list) or not states:
             raise ValueError(f"room payload states are missing: {map_key}")
@@ -151,10 +166,17 @@ def validate_room_payload_manifest(
                 seen_members.add(member)
             elif source != "base":
                 raise ValueError(f"room payload replacement member is missing: {map_key}")
-        expected_states = {
-            tuple(sorted(zip(option_keys, values)))
-            for values in product((False, True), repeat=len(option_keys))
-        }
+        if state_policy == "off_only":
+            expected_states = {
+                tuple(sorted((key, False) for key in option_keys))
+            }
+        elif state_policy == "cartesian":
+            expected_states = {
+                tuple(sorted(zip(option_keys, values)))
+                for values in product((False, True), repeat=len(option_keys))
+            }
+        else:
+            raise ValueError(f"room payload state policy is invalid: {map_key}")
         if state_keys != expected_states:
             raise ValueError(f"room payload state coverage is incomplete: {map_key}")
     if known_maps is not None:

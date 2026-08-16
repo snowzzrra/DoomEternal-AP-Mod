@@ -24,7 +24,6 @@ from doom_eap.runtime.item_reconciliation import (
     load_policy_registry,
 )
 from tools.maps.notification_formatting import notification_key
-from tools.maps.start_with_automap import generate_start_with_automap_helpers
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
@@ -40,7 +39,6 @@ GENERATED_NAME_PREFIXES = (
     EVENT_ENTITY_PREFIX,
     AP_LIFECYCLE_ENTITY_PREFIX,
     "ap_rpc_auto_enable",
-    "ap_start_with_automap_",
     ITEM_NOTIFICATION_PREFIX.rstrip("_"),  # ap_notify_item
 )
 SECRET_ENCOUNTER_ARG_LABEL = ""
@@ -232,6 +230,116 @@ def find_entity_block_bounds(content, entity_name):
     open_brace_index = content.find("{", block_start)
     block_end = find_matching_brace(content, open_brace_index)
     return block_start, block_end
+
+
+START_WITH_AUTOMAP_GRAPH = "interactables/ap_start_with_automap_station"
+START_WITH_AUTOMAP_TRIGGER = "trigger/interact/ap_start_with_automap"
+
+
+def load_start_with_automap_positions():
+    root = Path(__file__).resolve().parents[2]
+    document = json.loads(
+        (root / "data" / "start_with_automap.json").read_text(encoding="utf-8")
+    )
+    if document.get("schema_version") != 1:
+        raise ValueError("unsupported start_with_automap position schema")
+    positions = document.get("maps")
+    if not isinstance(positions, dict):
+        raise ValueError("start_with_automap positions must be a map")
+    return positions
+
+
+def _replace_decl_property(block, property_name, replacement):
+    match = re.search(rf"\b{re.escape(property_name)}\s*=\s*\{{", block)
+    if match is None:
+        raise ValueError(f"Automap entity is missing {property_name}")
+    close_brace = find_matching_brace(block, block.find("{", match.start()))
+    return block[:match.start()] + replacement + block[close_brace:]
+
+
+def _start_with_automap_station_block(content):
+    matches = list(
+        re.finditer(r"\bclass\s*=\s*\"idInteractable_Automap\";", content)
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            "Start With Automap requires exactly one native idInteractable_Automap"
+        )
+    class_match = matches[0]
+    entity_matches = list(
+        re.finditer(r"entityDef\s+([^\s{]+)\s*\{", content[: class_match.start()])
+    )
+    if not entity_matches:
+        raise ValueError("Automap entityDef name is missing")
+    entity_name = entity_matches[-1].group(1)
+    bounds = find_entity_block_bounds(content, entity_name)
+    if bounds is None or not (bounds[0] <= class_match.start() < bounds[1]):
+        raise ValueError(f"Could not locate native Automap entity: {entity_name}")
+    return entity_name, bounds
+
+
+def apply_start_with_automap_transform(content, map_key):
+    """Move native Automap ownership to map start without adding helper entities."""
+    positions = load_start_with_automap_positions()
+    if map_key not in positions:
+        raise ValueError(f"Start With Automap position is missing for {map_key}")
+    position = positions[map_key]
+    if not isinstance(position, list) or len(position) != 3:
+        raise ValueError(f"Start With Automap position is invalid for {map_key}")
+
+    entity_name, (start, end) = _start_with_automap_station_block(content)
+    block = content[start:end]
+    original_targets = extract_target_names(block)
+    required_fields = {
+        'class = "idInteractable_Automap";': "class",
+        'saveType = "SGS_GAME_DATA";': "saveType",
+        'automapPropertiesDecl = "automap_station";': "automapPropertiesDecl",
+        'useStat = "STAT_AUTOMAP";': "useStat",
+        'interactionGraph = "interactables/automap_station";': "native interaction graph",
+        'triggerDef = "trigger/interact/use_panel";': "native trigger definition",
+    }
+    for snippet, label in required_fields.items():
+        if block.count(snippet) != 1:
+            raise ValueError(f"Native Automap contract missing {label}: {entity_name}")
+
+    coordinates = "\n".join(
+        f"\t\t\t\t{axis} = {value};"
+        for axis, value in zip(("x", "y", "z"), position)
+    )
+    block = _replace_decl_property(
+        block,
+        "spawnPosition",
+        "spawnPosition = {\n" + coordinates + "\n\t\t\t}",
+    )
+    block = _replace_decl_property(
+        block,
+        "renderModelInfo",
+        'renderModelInfo = {\n\t\t\tmodel = "";\n\t\t}',
+    )
+    block = _replace_decl_property(
+        block,
+        "clipModelInfo",
+        'clipModelInfo = {\n\t\t\ttype = "CLIPMODEL_NONE";\n\t\t}',
+    )
+    block = block.replace(
+        'interactionGraph = "interactables/automap_station";',
+        f'interactionGraph = "{START_WITH_AUTOMAP_GRAPH}";',
+        1,
+    )
+    block = block.replace(
+        'triggerDef = "trigger/interact/use_panel";',
+        f'triggerDef = "{START_WITH_AUTOMAP_TRIGGER}";',
+        1,
+    )
+    if extract_target_names(block) != original_targets:
+        raise ValueError(f"Start With Automap changed native targets: {entity_name}")
+    return content[:start] + block + content[end:]
+
+
+def apply_composable_map_transforms(content, map_key, level_config):
+    if level_config.get("start_with_automap", False):
+        return apply_start_with_automap_transform(content, map_key)
+    return content
 
 
 def remove_inline_currency_transaction(content, contract):
@@ -1732,6 +1840,7 @@ def generate_map(
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
+    content = apply_composable_map_transforms(content, map_key, level_config)
     for contract in level_config.get("inline_currency_removals", []):
         content = remove_inline_currency_transaction(content, contract)
     validate_target_policies(config_entities, target_policies, content)
@@ -1795,7 +1904,6 @@ def generate_map(
         content = remove_balanced_entity_blocks(content, legacy_prefix)
     content = remove_balanced_entity_blocks(content, "ap_deathlink")
     content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
-    content = remove_balanced_entity_blocks(content, "ap_start_with_automap_")
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
@@ -1912,11 +2020,6 @@ def generate_map(
                         )
 
                     manifest_data[ap_check_id] = location_id
-                    if target_policy.get("independent_visual"):
-                        cleanup = target_policy["independent_visual"].get("cleanup_entity")
-                        if cleanup and cleanup not in target_policy.setdefault("independent_targets", [ap_check_id]):
-                            target_policy["independent_targets"].append(cleanup)
-
                     if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
                         universal = build_universal_physical_policy(
                             ap_check_id, location_id, block, default_visual_model, policy=target_policy
@@ -1924,8 +2027,17 @@ def generate_map(
                         target_policy["independent_visual"] = universal["independent_visual"]
                         if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("completion_targets", []):
                             target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])
-                        if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("independent_targets", []):
-                            target_policy.setdefault("independent_targets", target_policy.get("independent_targets", [ap_check_id])).append(universal["independent_visual"]["cleanup_entity"])
+                    if target_policy.get("independent_visual"):
+                        cleanup = target_policy["independent_visual"].get("cleanup_entity")
+                        if cleanup and cleanup not in target_policy.setdefault(
+                            "independent_targets", [ap_check_id]
+                        ):
+                            target_policy["independent_targets"].append(cleanup)
+                        target_policy["completion_targets"] = [
+                            target
+                            for target in target_policy.get("completion_targets", [])
+                            if target != cleanup
+                        ]
                     visual_policy = target_policy.get("independent_visual")
                     if visual_policy and "_model_override" not in visual_policy:
                         asset_key = (
@@ -1991,7 +2103,6 @@ def generate_map(
         new_blocks.append("entity {" + block)
 
     map_content = "".join(new_blocks)
-    map_content += generate_start_with_automap_helpers(map_content, map_key)
     secret_blocks = []
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]

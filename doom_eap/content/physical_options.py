@@ -40,6 +40,13 @@ PHYSICAL_OPTIONS = {
 }
 
 
+def map_physical_option_keys(map_key: str) -> tuple[str, ...]:
+    return tuple(sorted(
+        key for key, spec in PHYSICAL_OPTIONS.items()
+        if spec["map_key"] == map_key
+    ))
+
+
 def normalize_physical_options(options: Mapping[str, Any], *, require_all: bool = False) -> dict[str, bool]:
     """Return physical flags without inventing values for real room data."""
     result: dict[str, bool] = {}
@@ -94,6 +101,10 @@ def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) ->
     result = deepcopy(dict(config))
     map_key = result.get("map_key")
     values = normalize_physical_options(options)
+    start_with_automap = options.get("start_with_automap", False)
+    if not isinstance(start_with_automap, bool):
+        raise ValueError("room option start_with_automap must be boolean")
+    result["start_with_automap"] = start_with_automap
     for key, spec in PHYSICAL_OPTIONS.items():
         if values[key] or spec["map_key"] != map_key:
             continue

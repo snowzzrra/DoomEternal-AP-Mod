@@ -39,6 +39,15 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
     options = []
     excluded = []
     for key, option_type in world.options_dataclass.type_hints.items():
+        if int(getattr(option_type, "visibility", 1)) == 0:
+            excluded.append(
+                {
+                    "key": key,
+                    "source_class": option_type.__name__,
+                    "reason": "hidden_compatibility_option",
+                }
+            )
+            continue
         base = {
             "key": key,
             "display_name": getattr(option_type, "display_name", key),

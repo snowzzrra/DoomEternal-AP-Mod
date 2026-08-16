@@ -39,20 +39,28 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Include executable Start With Automap helpers in shipped-map baseline audit"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Remove unsupported Automap ownership helper entities; preserve vanilla station and AP marker owners"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Use one local visual cleanup activation path"
     }
   ],
   "asset_package_contract_sha256": "72471cdcc64d478556872821583a709e172c3989989de7ef3eda56d79f045caa",
-  "byte_sha256": "9b5d88ad8ca4a0a3d518dcd1bab097bbf1d127f87fff92e4db2babcc740182ae",
+  "byte_sha256": "ef17f645c09c1b06a0dab461c891d557c3fb1e386a7902fd6582da6d863458f1",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 175,
-    "byte_size": 7014833,
-    "classes": 7637,
-    "entity_count": 7637,
+    "byte_size": 7012977,
+    "classes": 7635,
+    "entity_count": 7635,
     "layers": 448,
-    "targets": 3413,
-    "transforms": 15454,
-    "unique_entity_names": 7637
+    "targets": 3395,
+    "transforms": 15452,
+    "unique_entity_names": 7635
   },
   "manifest_sha256": "7c0bbc619316382cdd08bd845b9d3663f8e29126eb796338e8e09dbc2f0cc007",
   "map_key": "e3m2_hell",
@@ -86,5 +94,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "70f5931c15d0f9190e30970e8ee3913911cfc7c7685d56770b9cb769ed614bf6",
-  "semantic_sha256": "6f8282e62f523e1c12e9659167b1f0f24354fd6072fb5095174ed48a33a18a6e"
+  "semantic_sha256": "e985beaadd07b09a40360a7842be6b1d66a9e4528ba35e64611ad8a0fad15e6d"
 }

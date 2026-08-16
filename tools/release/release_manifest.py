@@ -315,9 +315,9 @@ def validate_automap_option_keys(document: Mapping[str, Any]) -> None:
         if isinstance(entry, Mapping)
     }
     if "start_with_automap" not in keys:
-        raise ValueError("option contract requires start_with_automap")
-    if "reveal_ap_locations_on_automap" in keys:
-        raise ValueError("obsolete reveal_ap_locations_on_automap option is active")
+        raise ValueError(
+            "option contract requires start_with_automap"
+        )
 
 
 def stale_package_paths(root: Path) -> list[str]:

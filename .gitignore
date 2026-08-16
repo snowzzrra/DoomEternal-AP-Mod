@@ -44,6 +44,14 @@ vanillamaps/
 vanilla_decls/
 gameresources/
 !packaging/mod_assets/
+!packaging/mod_assets/gameresources/
+!packaging/mod_assets/gameresources/generated/
+!packaging/mod_assets/gameresources/generated/decls/
+!packaging/mod_assets/gameresources/generated/decls/entitydef/
+!packaging/mod_assets/gameresources/generated/decls/entitydef/trigger/
+!packaging/mod_assets/gameresources/generated/decls/entitydef/trigger/interact/
+!packaging/mod_assets/gameresources/generated/decls/interaction/
+!packaging/mod_assets/gameresources/generated/decls/interaction/interactables/
 !packaging/mod_assets/e2m4_boss_patch2/
 !packaging/mod_assets/e2m4_boss_patch2/art/
 !packaging/mod_assets/e2m4_boss_patch2/art/pickups/

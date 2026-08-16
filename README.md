@@ -177,9 +177,9 @@ entities.
 The implementation uses native DOOM Eternal systems wherever the campaign
 already has a suitable owner or writer:
 
-- Start With Automap precollects **Reveal Automap Progression Items** and
-  programmatically drives native Automap interaction; the native Automap station
-  remains a normal map entity;
+- Start With Automap precollects **Reveal Automap Progression Items**;
+  each mission's native Automap station moves to its deterministic start position
+  and uses the shared AP contact graph;
 - replay Fast Travel uses `idTarget_FastTravelUnlock`;
 - Mission Complete uses mission transition publishers;
 - equipment, perks, weapons, mods, runes, and currencies use their supported
@@ -212,9 +212,9 @@ up owned content, applies confirmed actions, and validates installed files.
 - **Sentinel Batteries** form an economy of 28 units: two individual Batteries
   and thirteen bundles worth two each. The thirteen Fortress consumers each
   require a balance of two.
-- **Start With Automap** defaults to OFF. ON precollects **Reveal Automap
-  Progression Items** and programmatically drives native Automap interaction.
-  The native Automap station remains a normal map entity.
+- **Start With Automap** defaults to OFF. ON precollects exactly one
+  **Reveal Automap Progression Items**. AP progression-item markers become visible
+  through each mission's transformed native Automap station.
 - **Trap Percentage** replaces that percentage of filler padding with traps. It
   does not replace progression items or other pool items. **Enabled Traps** selects
   trap types eligible for those filler slots; with no enabled types, no traps are

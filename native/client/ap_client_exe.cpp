@@ -45,6 +45,7 @@ static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
 static const DWORD kQueueNoiseSummaryMs = 12000;
 static const DWORD kDeliveredRemovalRetryMs = 1000;
+static const DWORD kMapBoundOneShotLifetimeMs = 5000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 std::string CanonicalMapName(std::string name) {
@@ -1636,6 +1637,40 @@ bool IsTelemetryJob(const CommandJob& job) {
     return filename.rfind("telemetry.", 0) == 0;
 }
 
+bool IsMapBoundOneShot(const CommandJob& job) {
+    static const std::regex cleanup(
+        R"(^ai_ScriptCmdEnt ap_remove_location_visual_[0-9]+ activate$)"
+    );
+    return job.command == "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
+        || std::regex_match(job.command, cleanup);
+}
+
+void DiscardExpiredMapBoundJobs(
+    std::deque<CommandJob>& queue,
+    std::unordered_set<std::string>& knownCommandIds,
+    DWORD now
+) {
+    auto job = queue.begin();
+    while (job != queue.end()) {
+        if (!IsMapBoundOneShot(*job)
+                || now - job->importedTick < kMapBoundOneShotLifetimeMs) {
+            ++job;
+            continue;
+        }
+        const std::string commandId = CommandIdFromPath(job->path);
+        DeleteFileA(job->path.c_str());
+        knownCommandIds.erase(commandId);
+        LogDebug(
+            "QUEUE_STALE_DROP command_id=" + commandId
+            + " kind=map_bound_one_shot age_ms="
+            + std::to_string(now - job->importedTick)
+            + " effect=unconfirmed"
+            + DeliveryContextFields()
+        );
+        job = queue.erase(job);
+    }
+}
+
 void DiscardTelemetryJobs(std::deque<CommandJob>& queue) {
     auto job = queue.begin();
     while (job != queue.end()) {
@@ -1962,6 +1997,7 @@ int main(int argc, char** argv) {
         if (!rpcEnabled) {
             DiscardTelemetryJobs(queue);
         }
+        DiscardExpiredMapBoundJobs(queue, knownCommandIds, now);
         const bool queueActive = !queue.empty();
         if ((queueActive || queueWasActive)
                 && now - lastQueueStateLog >= kQueueStateLogMs) {
@@ -2040,7 +2076,7 @@ int main(int argc, char** argv) {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
                         + " kind=" + ReceiptCommandKind(commandId)
-                        + " result=ack_executed"
+                        + " result=command_consumed_unverified"
                         + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
                         + " elapsed_ms="
                         + std::to_string(GetTickCount() - dispatchTick)
@@ -2057,7 +2093,7 @@ int main(int argc, char** argv) {
                 } else {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
-                        + " kind=non_receipt result=ack_executed"
+                        + " kind=non_receipt result=command_consumed_unverified"
                         + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
                         + DeliveryContextFields()
                     );

@@ -103,7 +103,6 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     packaged_tools = client_dir / "tools"
     expected_tools = {
         Path("__init__.py"),
-        Path("maps") / "start_with_automap.py",
         Path("release") / "__init__.py",
         Path("release") / "room_payloads.py",
     }
@@ -114,7 +113,7 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     } if packaged_tools.is_dir() else set()
     if actual_tools != expected_tools:
         raise AssertionError(
-            "packaged Start With Automap helper surface drifted: "
+            "packaged runtime tool surface drifted: "
             f"{sorted(str(path) for path in actual_tools)}"
         )
     return actual

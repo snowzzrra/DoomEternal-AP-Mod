@@ -77,10 +77,6 @@ from doom_eap.content.automap_visual_registry import (
     index_automap_visual_registry,
     load_automap_visual_registry,
 )
-from tools.maps.start_with_automap import (
-    SUPPORTED_START_WITH_AUTOMAP_MAPS,
-    start_with_automap_helper_names,
-)
 from doom_eap.runtime.rune_reconciliation import (
     RUNE_WRITER_EVIDENCE,
     RuneNativeState,
@@ -153,8 +149,6 @@ FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
 AUTOMAP_CLEANUP_RETRY_BASE_SECONDS = 1.0
 AUTOMAP_CLEANUP_RETRY_MAX_SECONDS = 8.0
-START_WITH_AUTOMAP_RETRY_BASE_SECONDS = 1.0
-START_WITH_AUTOMAP_RETRY_MAX_SECONDS = 8.0
 
 
 def build_materialization_epoch(native_epoch, marker_mtime_ns):
@@ -1963,6 +1957,34 @@ def hold_orphaned_dev_jobs():
     return held
 
 
+def quarantine_stale_map_bound_commands(reason):
+    """Archive bridge-owned map one-shots before accepting a new load epoch."""
+    commands = (
+        re.compile(r"^ai_ScriptCmdEnt ap_remove_location_visual_[0-9]+ activate$"),
+        re.compile(r"^ai_ScriptCmdEnt ap_fast_travel_unlock activate$"),
+    )
+    quarantined = 0
+    for source in Path(QUEUE_DIR).glob("*.cmd"):
+        try:
+            command = source.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError):
+            continue
+        if not any(pattern.fullmatch(command) for pattern in commands):
+            continue
+        target = source.with_suffix(f".stale-{uuid.uuid4().hex[:8]}")
+        try:
+            os.replace(source, target)
+            quarantined += 1
+            logger.warning(
+                "QUEUE_STALE_QUARANTINE command_id=%s reason=%s effect=unconfirmed",
+                source.stem,
+                reason,
+            )
+        except OSError as error:
+            logger.error("[Queue] Could not quarantine %s: %s", source, error)
+    return quarantined
+
+
 def dev_job_paths():
     paths = []
     for suffix in ("cmd", "processing", "held"):
@@ -2873,15 +2895,12 @@ class DoomEternalContext(CommonContext):
         self.current_map_name = None
         self.automap_cleanup_epoch = None
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
-        self.automap_cleanup_delivered = {}
+        self.automap_cleanup_submitted = {}
+        self.automap_local_cleanup_owned = set()
         self.automap_cleanup_retry = {}
         self.automap_cleanup_status = {}
-        self.start_with_automap_enabled = False
-        self.start_with_automap_attempts = {}
-        self.start_with_automap_retry = {}
-        self.start_with_automap_status = {}
         self.server_checked_locations_ready = False
-        self.fast_travel_delivered = {}
+        self.fast_travel_submitted = {}
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
         self.fast_travel_last_transition = None
@@ -3007,12 +3026,6 @@ class DoomEternalContext(CommonContext):
             self.death_link_mode = configured_mode
             self.deathlink_receiver.configure_mode(self.death_link_mode)
             self.death_link_enabled = bool(slot_data.get("death_link", False))
-            configured_start_with_automap = slot_data.get("start_with_automap", False)
-            self.start_with_automap_enabled = (
-                configured_start_with_automap
-                if isinstance(configured_start_with_automap, bool)
-                else False
-            )
             logger.info(
                 "[DeathLink] mode=%s enabled=%s receive_policy=%s",
                 self.death_link_mode,
@@ -3050,7 +3063,6 @@ class DoomEternalContext(CommonContext):
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.onboard_bootstrap("on_connect")
             self.reconcile_checked_automap_cleanup("server_connected")
-            self.reconcile_start_with_automap("server_connected")
             self.reconcile_fast_travel_unlock("connected")
             asyncio.create_task(self.check_mission_challenge_locations())
             if self._item_delivery_wakeup:
@@ -3073,7 +3085,6 @@ class DoomEternalContext(CommonContext):
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             self.reconcile_checked_automap_cleanup("server_checked_update")
-            self.reconcile_start_with_automap("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
@@ -3429,7 +3440,7 @@ class DoomEternalContext(CommonContext):
             else discover_active_map_markers()
         )
         if not markers:
-            return False
+            return self.advance_known_map_materialization(evidence)
         newest_mtime, newest_path = markers[-1]
         started = getattr(lease, "started_ns", None) if lease else None
         if started is not None and newest_mtime < started:
@@ -3440,7 +3451,7 @@ class DoomEternalContext(CommonContext):
             (getattr(self, "cached_map_identity", None) or {}).get("mtime_ns", 0),
         )
         if newest_mtime <= known_marker_mtime:
-            return False
+            return self.advance_known_map_materialization(evidence)
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
         if marker_data is None:
             self.invalidate_map_identity("malformed_marker")
@@ -3449,6 +3460,7 @@ class DoomEternalContext(CommonContext):
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
         self.fast_travel_last_transition = None
+        self.fast_travel_submitted.clear()
         self.mission_select_observation_map = None
         self.mission_select_observation_epoch = None
         self.current_map_name = None
@@ -3460,11 +3472,77 @@ class DoomEternalContext(CommonContext):
             "gameplay_epoch": build_materialization_epoch(newest_mtime, newest_mtime),
             "evidence_mtime_ns": gameplay_evidence_mtime_ns(),
             "evidence_epoch": evidence_epoch,
+            "materialization_evidence_epoch": (
+                evidence_epoch
+                if evidence is not None
+                and getattr(evidence, "state", None) == "gameplay"
+                and canonical_map_name(getattr(evidence, "map_name", ""))
+                == canonical_map_name(marker_data.get("runtime_map", ""))
+                else None
+            ),
         }
+        quarantine_stale_map_bound_commands("fresh_first_think_epoch")
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
         self.accept_map_identity(marker_data, evidence_epoch)
         self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+        return True
+
+    def advance_known_map_materialization(self, evidence):
+        """Advance epoch from a fresh native load edge without changing map identity."""
+        cached = getattr(self, "cached_map_identity", None)
+        if (
+            not isinstance(cached, dict)
+            or evidence is None
+            or getattr(evidence, "state", None) != "gameplay"
+            or getattr(evidence, "provisional", False)
+        ):
+            return False
+        evidence_epoch = getattr(evidence, "epoch", None)
+        if isinstance(evidence_epoch, bool) or not isinstance(evidence_epoch, int):
+            return False
+        if canonical_map_name(getattr(evidence, "map_name", "")) != canonical_map_name(
+            cached.get("runtime_map", "")
+        ):
+            return False
+        bound_epoch = cached.get("materialization_evidence_epoch")
+        if bound_epoch is None:
+            cached["materialization_evidence_epoch"] = evidence_epoch
+            cached["evidence_epoch"] = evidence_epoch
+            return False
+        if evidence_epoch == bound_epoch:
+            return False
+        evidence_mtime = gameplay_evidence_mtime_ns()
+        epoch = build_materialization_epoch(evidence_epoch, evidence_mtime)
+        if not valid_materialization_epoch(epoch) or epoch == cached.get("gameplay_epoch"):
+            return False
+
+        quarantine_stale_map_bound_commands("secondary_materialization_epoch")
+        self.invalidate_active_save_proof()
+        self.fast_travel_eligibility_snapshot = None
+        self.fast_travel_epoch_state = None
+        self.fast_travel_last_transition = None
+        self.fast_travel_submitted.clear()
+        marker_data = {
+            **cached,
+            "native_gameplay_epoch": evidence_epoch,
+            "gameplay_epoch": epoch,
+            "evidence_mtime_ns": evidence_mtime,
+            "evidence_epoch": evidence_epoch,
+            "materialization_evidence_epoch": evidence_epoch,
+            "secondary_materialization": True,
+        }
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None:
+            lease.observe_gameplay_loaded(evidence_mtime)
+        self.accept_map_identity(marker_data, evidence_epoch)
+        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+        logger.info(
+            "[MAP] MATERIALIZATION_EPOCH_SECONDARY map=%s epoch=%s "
+            "source=native_same_map_load_edge",
+            marker_data.get("map_key", "<unknown>"),
+            epoch,
+        )
         return True
 
     def activate_save_selection(self, selected):
@@ -3980,41 +4058,11 @@ class DoomEternalContext(CommonContext):
         self.session_state.setdefault("goal_sent", False)
         self.session_state.setdefault("cultist_autosave_path", None)
         self.session_state.setdefault("save_slot_observations", {})
-        self.automap_cleanup_delivered = {}
-        for key, epoch in self.session_state.get("automap_cleanup", {}).items():
-            if not isinstance(key, str) or not valid_materialization_epoch(epoch):
-                continue
-            try:
-                decoded = json.loads(key)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                decoded = None
-            if isinstance(decoded, list) and len(decoded) == 3 and all(isinstance(value, str) for value in decoded):
-                self.automap_cleanup_delivered[tuple(decoded)] = epoch
-        self.start_with_automap_attempts = {}
-        raw_start_with_automap = self.session_state.get("start_with_automap", {})
-        if isinstance(raw_start_with_automap, dict):
-            for key, state in raw_start_with_automap.items():
-                if not isinstance(state, dict):
-                    continue
-                try:
-                    decoded = json.loads(key)
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    decoded = None
-                if (
-                    isinstance(decoded, list)
-                    and len(decoded) == 3
-                    and all(isinstance(value, str) and value for value in decoded)
-                    and valid_materialization_epoch(decoded[2])
-                ):
-                    self.start_with_automap_attempts[tuple(decoded)] = state
-        self.fast_travel_delivered = {}
-        raw_fast_travel_delivered = self.session_state.get("fast_travel_delivered", [])
-        if not isinstance(raw_fast_travel_delivered, (list, tuple)):
-            raw_fast_travel_delivered = []
-        for value in raw_fast_travel_delivered:
-            key = valid_fast_travel_delivery_key(value)
-            if key is not None:
-                self.fast_travel_delivered[key] = True
+        self.automap_cleanup_submitted = {}
+        self.automap_local_cleanup_owned = set()
+        self.fast_travel_submitted = {}
+        self.session_state.pop("automap_cleanup", None)
+        self.session_state.pop("fast_travel_delivered", None)
         self.automap_cleanup_epoch = None
         sessions[self.state_key] = self.session_state
         processed = self.session_state.get("processed_items", 0)
@@ -4047,22 +4095,6 @@ class DoomEternalContext(CommonContext):
             and isinstance(state, dict)
         }
         self.session_state["save_slot_observations"] = self.save_slot_observations
-        self.session_state["automap_cleanup"] = {
-            json.dumps([room_identity, map_name, location_id], separators=(",", ":")): epoch
-            for (room_identity, map_name, location_id), epoch in self.automap_cleanup_delivered.items()
-            if all(isinstance(value, str) for value in (room_identity, map_name, location_id)) and valid_materialization_epoch(epoch)
-        }
-        self.session_state["start_with_automap"] = {
-            json.dumps(list(key), separators=(",", ":")): state
-            for key, state in self.start_with_automap_attempts.items()
-            if (
-                isinstance(key, tuple)
-                and len(key) == 3
-                and all(isinstance(value, str) and value for value in key)
-                and valid_materialization_epoch(key[2])
-                and isinstance(state, dict)
-            )
-        }
         self.selected_observation_slot = None
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
@@ -4121,16 +4153,8 @@ class DoomEternalContext(CommonContext):
             self.received_deathlink_event_ids
         )[-64:]
         self.session_state["save_slot_observations"] = self.save_slot_observations
-        self.session_state["automap_cleanup"] = {
-            json.dumps([room_identity, map_name, location_id], separators=(",", ":")): epoch
-            for (room_identity, map_name, location_id), epoch in self.automap_cleanup_delivered.items()
-            if all(isinstance(value, str) for value in (room_identity, map_name, location_id)) and valid_materialization_epoch(epoch)
-        }
-        self.session_state["fast_travel_delivered"] = [
-            list(key)
-            for key in self.fast_travel_delivered
-            if valid_fast_travel_delivery_key(key) is not None
-        ]
+        self.session_state.pop("automap_cleanup", None)
+        self.session_state.pop("fast_travel_delivered", None)
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
         save_client_state(self.client_state)
@@ -4605,11 +4629,15 @@ class DoomEternalContext(CommonContext):
             if previous_epoch != self.automap_cleanup_epoch:
                 self.automap_cleanup_retry.clear()
                 self.automap_cleanup_status.clear()
+                self.automap_cleanup_submitted.clear()
+                self.automap_local_cleanup_owned.clear()
             return None
         self.automap_cleanup_epoch = epoch
         if previous_epoch != epoch:
             self.automap_cleanup_retry.clear()
             self.automap_cleanup_status.clear()
+            self.automap_cleanup_submitted.clear()
+            self.automap_local_cleanup_owned.clear()
         return self.automap_cleanup_epoch
 
     def _fast_travel_transition(self, event, *, reason=None, trigger=None):
@@ -4693,8 +4721,8 @@ class DoomEternalContext(CommonContext):
                 "PENDING", reason=snapshot_mismatch, trigger=trigger
             )
             return False
-        if delivery_key in self.fast_travel_delivered:
-            self._fast_travel_transition("ALREADY_DISPATCHED", trigger=trigger)
+        if delivery_key in self.fast_travel_submitted:
+            self._fast_travel_transition("COMMAND_QUEUED_UNVERIFIED", trigger=trigger)
             return False
         if not self.has_authoritative_save_proof():
             self._fast_travel_transition("PENDING", reason="save_proof_unavailable", trigger=trigger)
@@ -4737,9 +4765,8 @@ class DoomEternalContext(CommonContext):
             return False
         state["retry_deadline"] = None
         state["retry_attempt"] = 0
-        self.fast_travel_delivered[delivery_key] = time.time()
-        self.persist_session_state()
-        self._fast_travel_transition("QUEUE", trigger=trigger)
+        self.fast_travel_submitted[delivery_key] = time.time()
+        self._fast_travel_transition("COMMAND_QUEUED_UNVERIFIED", trigger=trigger)
         return True
 
     def snapshot_fast_travel_eligibility(self, marker_data=None):
@@ -4859,7 +4886,6 @@ class DoomEternalContext(CommonContext):
             self.reconcile_owned_runes("level_ready")
             self.advance_automap_cleanup_epoch()
             self.reconcile_checked_automap_cleanup("level_ready")
-            self.reconcile_start_with_automap("level_ready")
             await self.check_mission_challenge_locations()
             self.automatic_reconcile_inventory("level_ready")
             self.reconcile_fast_travel_unlock("level_ready")
@@ -4907,8 +4933,15 @@ class DoomEternalContext(CommonContext):
             entity_name = entry["cleanup_entity"]
             delivery_key = (room_identity, map_name, str(location_id))
             runtime_key = (epoch, *delivery_key)
-            if self.automap_cleanup_delivered.get(delivery_key) == self.automap_cleanup_epoch:
-                self._automap_cleanup_transition(runtime_key, "DELIVERED", trigger)
+            if (epoch, location_id) in self.automap_local_cleanup_owned:
+                self._automap_cleanup_transition(
+                    runtime_key, "LOCAL_FLOW_OWNS_EFFECT", trigger
+                )
+                continue
+            if self.automap_cleanup_submitted.get(delivery_key) == self.automap_cleanup_epoch:
+                self._automap_cleanup_transition(
+                    runtime_key, "COMMAND_QUEUED_UNVERIFIED", trigger
+                )
                 continue
             retry = self.automap_cleanup_retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})
             if now < retry["deadline"]:
@@ -4936,11 +4969,12 @@ class DoomEternalContext(CommonContext):
                 )
                 self._automap_cleanup_transition(runtime_key, "RETRY", "queue_unavailable")
                 continue
-            self.automap_cleanup_delivered[delivery_key] = self.automap_cleanup_epoch
+            self.automap_cleanup_submitted[delivery_key] = self.automap_cleanup_epoch
             self.automap_cleanup_retry.pop(runtime_key, None)
-            self.persist_session_state()
             changed = True
-            self._automap_cleanup_transition(runtime_key, "QUEUED", trigger)
+            self._automap_cleanup_transition(
+                runtime_key, "COMMAND_QUEUED_UNVERIFIED", trigger
+            )
             logger.info(
                 "[Automap] Checked-state cleanup queued location=%s map=%s "
                 "epoch=%s trigger=%s target=%s",
@@ -4952,118 +4986,30 @@ class DoomEternalContext(CommonContext):
             )
         return changed
 
-    def _start_with_automap_transition(self, delivery_key, status, reason):
-        previous = self.start_with_automap_status.get(delivery_key)
-        if previous == status:
-            return
-        self.start_with_automap_status[delivery_key] = status
-        logger.info(
-            "[Automap] start_with_automap transition status=%s previous=%s "
-            "reason=%s key=%s",
-            status,
-            previous,
-            reason,
-            delivery_key,
-        )
-
-    def reconcile_start_with_automap(self, trigger):
-        """Queue native station touch/use relay commands for current load epoch."""
-        if not self.start_with_automap_enabled:
-            return False
+    def record_local_automap_cleanup_ownership(self, location_id, event_paths):
+        """Bind local pickup cleanup ownership to current materialization epoch."""
         marker = getattr(self, "cached_map_identity", None)
-        map_key = marker.get("map_key") if isinstance(marker, dict) else None
-        epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
-        room_identity = self.get_ap_state_key()
-        delivery_key = (room_identity or "", map_key or "", epoch or "")
-        if not room_identity:
-            self._start_with_automap_transition(
-                delivery_key, "PENDING", "room_identity_unavailable"
-            )
+        if not isinstance(marker, dict):
             return False
-        if map_key not in SUPPORTED_START_WITH_AUTOMAP_MAPS:
-            self._start_with_automap_transition(
-                delivery_key, "PENDING", "helper_unavailable"
-            )
+        epoch = marker.get("gameplay_epoch")
+        map_key = marker.get("map_key")
+        entry = AUTOMAP_VISUALS_BY_MAP.get(map_key or "", {}).get(location_id)
+        if not valid_materialization_epoch(epoch) or not entry:
             return False
-        if not valid_materialization_epoch(epoch):
-            self._start_with_automap_transition(
-                delivery_key, "PENDING", "materialization_epoch_unavailable"
-            )
+        if entry.get("classification") != "visible_cleanup":
             return False
-        if not rpc_execution_enabled():
-            self._start_with_automap_transition(delivery_key, "PENDING", "rpc_not_ready")
+        try:
+            event_mtime = max(Path(path).stat().st_mtime_ns for path in event_paths)
+        except (OSError, ValueError):
             return False
-
-        attempts = self.start_with_automap_attempts.setdefault(
-            (room_identity, map_key, epoch),
-            {"touch": "pending", "use": "pending", "attempt": 0, "deadline": 0.0},
+        if event_mtime < marker.get("mtime_ns", 0):
+            return False
+        self.automap_local_cleanup_owned.add((epoch, location_id))
+        self._automap_cleanup_transition(
+            (epoch, self.get_ap_state_key() or "", marker.get("runtime_map", ""), str(location_id)),
+            "LOCAL_FLOW_OWNS_EFFECT",
+            "native_ap_check_event",
         )
-        for phase in ("touch", "use"):
-            if attempts.get(phase) in {"queued", "spooled"}:
-                attempts[phase] = "submitted"
-        retry_key = (room_identity, map_key, epoch)
-        retry = self.start_with_automap_retry.setdefault(
-            retry_key, {"attempt": 0, "deadline": 0.0}
-        )
-        now = time.monotonic()
-        if now < retry["deadline"]:
-            self._start_with_automap_transition(delivery_key, "RETRY_WAIT", trigger)
-            return False
-
-        touch_name, use_name = start_with_automap_helper_names(map_key)
-        command_prefix = hashlib.sha256(
-            json.dumps(list(retry_key), separators=(",", ":")).encode("utf-8")
-        ).hexdigest()[:20]
-        phase_command_ids = {
-            phase: room_scoped_command_id(
-                f"start-with-automap-{command_prefix}-{phase}", self.state_key
-            )
-            for phase in ("touch", "use")
-        }
-        for phase, entity_name, action in (
-            ("touch", touch_name, "IA_TOUCH"),
-            ("use", use_name, "IA_USE_SUCCEED"),
-        ):
-            command_id = phase_command_ids[phase]
-            if attempts.get(phase) == "submitted":
-                continue
-            if not send_command(
-                f"ai_ScriptCmdEnt {entity_name} activate",
-                coalesce_key=command_id,
-                already_queued_ok=True,
-                state_key=self.state_key,
-            ):
-                retry["attempt"] += 1
-                retry["deadline"] = now + min(
-                    START_WITH_AUTOMAP_RETRY_MAX_SECONDS,
-                    START_WITH_AUTOMAP_RETRY_BASE_SECONDS
-                    * (2 ** min(retry["attempt"] - 1, 3)),
-                )
-                attempts["attempt"] = retry["attempt"]
-                attempts["deadline"] = retry["deadline"]
-                self.persist_session_state()
-                self._start_with_automap_transition(
-                    delivery_key, "RETRY", f"{phase}_queue_unavailable"
-                )
-                return False
-            attempts[phase] = "submitted"
-            attempts["last_trigger"] = trigger
-            attempts["timestamp"] = time.time()
-            self.persist_session_state()
-            logger.info(
-                "[Automap] start_with_automap submitted phase=%s map=%s epoch=%s "
-                "target=%s action=%s",
-                phase,
-                map_key,
-                epoch,
-                entity_name,
-                action,
-            )
-        attempts["status"] = "submitted"
-        retry["attempt"] = 0
-        retry["deadline"] = 0.0
-        self.persist_session_state()
-        self._start_with_automap_transition(delivery_key, "SUBMITTED", trigger)
         return True
 
     def _automap_cleanup_transition(self, delivery_key, status, reason):
@@ -6582,6 +6528,7 @@ class DoomEternalContext(CommonContext):
                 )
                 continue
             if location_id not in self.locations_checked:
+                self.record_local_automap_cleanup_ownership(location_id, paths)
                 pending_locations.append(location_id)
 
         if not pending_locations:

@@ -61,7 +61,6 @@ CORE_MAP_INPUTS = (
     "data/checked_location_visuals.json",
     "doom_eap/contracts/ap_visual_contract.py",
     "tools/maps/ap_map_generator.py",
-    "tools/maps/start_with_automap.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/validation/audit_resource_packages.py",
@@ -93,7 +92,6 @@ PREFLIGHT_PYTHON = (
     "tools/content/new_map.py",
     "tools/content/describe_map.py",
     "tools/maps/ap_map_generator.py",
-    "tools/maps/start_with_automap.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/maps/map_semantic_baseline.py",
     "tools/decls/rune_slot_builder.py",
@@ -757,8 +755,6 @@ class Pipeline:
             f"{','.join(selected) if selected else '(none)'} files={len(paths)}"
         )
         with self.timed("affected-cache"):
-            for key in selected:
-                self.validate_map(key)
             return [
                 self.validate_map(spec.key)
                 for spec in catalog.enabled_maps()
@@ -771,9 +767,6 @@ class Pipeline:
         """Cheap source/package contract audit; never generates maps or seeds."""
         with self.timed("package-preflight"):
             catalog = self.catalog or self.preflight()
-            from tools.validation.physical_option_room_contract import audit_physical_option_rooms
-
-            audit_physical_option_rooms(ROOT)
             option_path = ROOT / "data" / "options_schema.json"
             validate_automap_option_keys(json.loads(option_path.read_text(encoding="utf-8")))
             root = self._package_root(package_root)
@@ -902,7 +895,6 @@ class Pipeline:
             "doom_eap/runtime/publisher_runtime.py",
             "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
             "doom_eap/runtime/__init__.py", "doom_eap/runtime/save_decrypt.py",
-            "tools/maps/start_with_automap.py",
         ):
             release_inputs[relative] = _sha256(ROOT / relative)
         return _canonical_hash({

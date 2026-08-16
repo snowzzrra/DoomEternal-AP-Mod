@@ -1,0 +1,141 @@
+{
+	edit = {
+		subGraphs = {
+			num = 2;
+			item[0] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "activate_to_use";
+					nodes = {
+						num = 1;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "activate";
+								position = { y = 16; }
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/automap_pod/automap_pod.md6";
+										animWebPath = "animweb/interact/automap/automap_interact/automap_interact/idle";
+									}
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = { x = -96; y = -32; }
+				}
+			}
+			item[1] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "usable";
+					nodes = {
+						num = 3;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle";
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/automap_pod/automap_pod.md6";
+										animWebPath = "animweb/interact/automap/automap_interact/automap_interact/idle";
+									}
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used";
+								position = { y = 128; }
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/automap_pod/automap_pod.md6";
+										animWebPath = "animweb/interact/automap/automap_interact/automap_interact/used";
+									}
+								}
+								signalEnterAfterAnim = true;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "trigger";
+								position = { y = 64; }
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+					}
+					position = { x = -96; y = 96; }
+				}
+			}
+		}
+		links = {
+			num = 4;
+			item[0] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_To_idle";
+					startNode = "activate";
+					endNode = "idle";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = { num = 1; item[0] = "IA_ACTIVATE_ANY"; }
+					}
+				}
+			}
+			item[1] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "trigger_To_used";
+					startNode = "trigger";
+					endNode = "used";
+					syncEntityDef = "interact/automap/automap_sync";
+					syncAnimPath = "animweb/interact/automap/automap_syncanimweb/autoSyncAnim/automap";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = { num = 1; item[0] = "IA_TOUCHING"; }
+					}
+				}
+			}
+			item[2] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "trigger_To_idle";
+					startNode = "trigger";
+					endNode = "idle";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = { num = 1; item[0] = "IA_UNTOUCH"; }
+					}
+				}
+			}
+			item[3] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_To_trigger";
+					startNode = "idle";
+					endNode = "trigger";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = { num = 2; item[0] = "IA_TOUCH"; item[1] = "IA_TOUCHING"; }
+					}
+				}
+			}
+		}
+	}
+}

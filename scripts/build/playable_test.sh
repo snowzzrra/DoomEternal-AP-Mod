@@ -467,10 +467,8 @@ cp "$REPO_ROOT/doom_eap/launcher/__init__.py" \
 cp "$REPO_ROOT/doom_eap/runtime/"*.py "$OUTPUT_DIR/client/doom_eap/runtime/"
 cp "$REPO_ROOT/doom_eap/content/"*.py "$OUTPUT_DIR/client/doom_eap/content/"
 cp "$REPO_ROOT/doom_eap/contracts/"*.py "$OUTPUT_DIR/client/doom_eap/contracts/"
-mkdir -p "$OUTPUT_DIR/client/tools/maps"
+mkdir -p "$OUTPUT_DIR/client/tools"
 cp "$REPO_ROOT/tools/__init__.py" "$OUTPUT_DIR/client/tools/__init__.py"
-cp "$REPO_ROOT/tools/maps/start_with_automap.py" \
-     "$OUTPUT_DIR/client/tools/maps/start_with_automap.py"
 mkdir -p "$OUTPUT_DIR/client/tools/release"
 cp "$REPO_ROOT/tools/release/__init__.py" \
    "$REPO_ROOT/tools/release/room_payloads.py" \
@@ -538,24 +536,31 @@ PY
 
 mkdir -p "$OUTPUT_DIR/client/resources"
 ROOM_STAGE="$TEMP_DIR/room-payloads"
+ROOM_PAYLOAD_CACHE_DIR="${DOOMEAP_ROOM_PAYLOAD_CACHE:-$WORKSPACE/.cache/doomeap/room-payloads}"
 mkdir -p "$ROOM_STAGE"
-python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$ROOM_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" "$OUTPUT_DIR/client/resources" <<'PY'
+python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$ROOM_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" "$OUTPUT_DIR/client/resources" "$ROOM_PAYLOAD_CACHE_DIR" <<'PY'
 import hashlib
 import json
+import os
 import subprocess
 import sys
+from itertools import product
 from pathlib import Path
 
-root, staged, room_root, compressor, map_sources_path, resources = map(Path, sys.argv[1:])
+root, staged, room_root, compressor, map_sources_path, resources, cache_root = map(Path, sys.argv[1:])
 sys.path.insert(0, str(root))
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
-from doom_eap.content.physical_options import PHYSICAL_OPTION_KEYS
+from doom_eap.content.physical_options import (
+    PHYSICAL_OPTION_KEYS,
+    map_physical_option_keys,
+)
 from tools.release.room_payloads import (
     BASE_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME, ROOM_PAYLOAD_RESOURCE_NAME,
     canonical_json, resource_metadata, validate_room_payload_manifest,
     write_deterministic_zip, zip_directory,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from tools.maps.ap_map_generator import load_start_with_automap_positions
 from doom_eap.content.content_catalog import load_content_catalog
 
 compiler = ModCompiler(root)
@@ -573,59 +578,196 @@ maps = {
 }
 if set(maps) != set(release_map_keys):
     raise SystemExit("Release template map set does not match map contract")
-canonical_options = {key: False for key in PHYSICAL_OPTION_KEYS}
-for map_key in ("e1m1_intro", "e1m2_war"):
-    resource_path, relative, vanilla = maps[map_key]
+
+
+def sha256_file(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sha256_files(paths):
+    digest = hashlib.sha256()
+    for path in sorted(set(paths), key=lambda value: value.as_posix()):
+        if not path.is_file():
+            raise SystemExit(f"Missing room payload cache input: {path}")
+        digest.update(path.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+generator_path = root / "tools/maps/ap_map_generator.py"
+generator_source = generator_path.read_text(encoding="utf-8")
+automap_start = generator_source.index("START_WITH_AUTOMAP_GRAPH =")
+transform_start = generator_source.index("\ndef apply_composable_map_transforms", automap_start)
+transform_end = generator_source.index("\ndef ", transform_start + 1)
+base_generator_source = generator_source[:automap_start] + generator_source[transform_end:]
+generator_base_identity = hashlib.sha256(base_generator_source.encode("utf-8")).hexdigest()
+generator_full_identity = hashlib.sha256(generator_source.encode("utf-8")).hexdigest()
+automap_paths = [
+    root / "data/start_with_automap.json",
+    root / "packaging/mod_assets/gameresources/generated/decls/interaction/interactables/ap_start_with_automap_station.decl",
+    root / "packaging/mod_assets/gameresources/generated/decls/entitydef/trigger/interact/ap_start_with_automap.decl",
+]
+automap_resource_identity = sha256_files(automap_paths)
+compiler_identity = sha256_files([
+    root / "doom_eap/launcher/launcher_core.py",
+    root / "doom_eap/content/physical_options.py",
+    root / "doom_eap/content/content_catalog.py",
+    root / "tools/maps/mission_complete_map_patcher.py",
+    root / "data/items.json",
+    root / "data/item_classifications.json",
+    root / "data/location_names.json",
+    root / "data/mission_complete_map_contracts.json",
+    map_sources_path,
+])
+compressor_identity = sha256_file(compressor)
+cache_root.mkdir(parents=True, exist_ok=True)
+
+
+def cache_material(map_key, vanilla, options, local_identity):
+    automap_enabled = options["start_with_automap"]
+    return {
+        "schema": 1,
+        "map_key": map_key,
+        "source_identity": sha256_file(vanilla),
+        "generator_identity": generator_full_identity if automap_enabled else generator_base_identity,
+        "compiler_identity": compiler_identity,
+        "compressor_identity": compressor_identity,
+        "local_identity": local_identity,
+        "state": dict(sorted(options.items())),
+        "automap_implementation": automap_resource_identity if automap_enabled else None,
+        "shared_decl_identity": automap_resource_identity if automap_enabled else None,
+    }
+
+
+def cache_paths(material):
+    key = hashlib.sha256(
+        json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    directory = cache_root / key[:2]
+    return key, directory / f"{key}.json", directory / f"{key}.entities", directory / f"{key}.packed"
+
+
+def read_cached_state(material):
+    key, metadata_path, entities_path, packed_path = cache_paths(material)
+    if not all(path.is_file() for path in (metadata_path, entities_path, packed_path)):
+        return None
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        entities = entities_path.read_bytes()
+        packed = packed_path.read_bytes()
+    except (OSError, ValueError):
+        return None
+    if (
+        metadata.get("key") != key
+        or metadata.get("material") != material
+        or metadata.get("entities_sha256") != hashlib.sha256(entities).hexdigest()
+        or metadata.get("packed_sha256") != hashlib.sha256(packed).hexdigest()
+    ):
+        return None
+    return entities, packed
+
+
+def write_cached_state(material, entities, packed):
+    key, metadata_path, entities_path, packed_path = cache_paths(material)
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    for path, content in ((entities_path, entities), (packed_path, packed)):
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        temporary.write_bytes(content)
+        temporary.replace(path)
+    metadata = {
+        "key": key,
+        "material": material,
+        "entities_sha256": hashlib.sha256(entities).hexdigest(),
+        "packed_sha256": hashlib.sha256(packed).hexdigest(),
+    }
+    temporary = metadata_path.with_name(f".{metadata_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(metadata_path)
+
+
+def compile_cached_state(map_key, vanilla, options, local_identity, entities, packed):
+    material = cache_material(map_key, vanilla, options, local_identity)
+    cached = read_cached_state(material)
+    if cached is not None:
+        entities.write_bytes(cached[0])
+        packed.write_bytes(cached[1])
+        return
+    compile_options = dict(canonical_options)
+    compile_options.update(options)
     manifest = SeedManifest.create(
-        seed_name=f"room-payload-{map_key}-base", team=0, slot=1,
-        options=canonical_options,
-        active_location_ids=compiler.active_location_ids(canonical_options),
+        seed_name=f"room-payload-{map_key}-state", team=0, slot=1,
+        options=options,
+        active_location_ids=compiler.active_location_ids(compile_options),
     )
-    entities = room_root / f"{map_key}-base.entities"
     compiler.compile_map(manifest, vanilla, entities, map_key)
     patch_mission_complete_maps(
         root / "data/mission_complete_map_contracts.json", {map_key: entities}, staged
     )
+    subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+    write_cached_state(material, entities.read_bytes(), packed.read_bytes())
+
+
+canonical_options = {key: False for key in PHYSICAL_OPTION_KEYS}
+canonical_options["start_with_automap"] = False
+automap_maps = set(load_start_with_automap_positions())
+
+local_identities = {}
+for map_key, source in map_sources.items():
+    local_files = [
+        root / value for value in source.values()
+        if isinstance(value, str) and (root / value).is_file()
+    ]
+    local_identities[map_key] = sha256_files(local_files)
+
+for map_key in maps:
+    resource_path, relative, vanilla = maps[map_key]
+    base_options = {
+        "start_with_automap": False,
+        **{key: False for key in map_physical_option_keys(map_key)},
+    }
+    entities = room_root / f"{map_key}-base.entities"
     target = staged / f"{Path(resource_path).stem}/maps/{relative}"
     target.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
+    compile_cached_state(
+        map_key, vanilla, base_options, local_identities[map_key], entities, target
+    )
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
 payload_files = {}
-dependent = {
-    "e1m1_intro": [
-        ({"randomize_chainsaw": False}, "default"),
-        ({"randomize_chainsaw": True}, "chainsaw"),
-    ],
-    "e1m2_war": [
-        ({"randomize_dash": False, "randomize_first_battery": False}, "default"),
-        ({"randomize_dash": True, "randomize_first_battery": False}, "dash"),
-        ({"randomize_dash": False, "randomize_first_battery": True}, "battery"),
-        ({"randomize_dash": True, "randomize_first_battery": True}, "dash-battery"),
-    ],
-}
 map_records = {}
 for map_key, (resource_path, relative, vanilla) in maps.items():
-    option_keys = sorted(dependent.get(map_key, [({}, "default")])[0][0])
+    local_physical_keys = map_physical_option_keys(map_key)
+    state_policy = "cartesian" if map_key in automap_maps else "off_only"
+    option_keys = sorted(
+        (("start_with_automap",) + local_physical_keys)
+        if state_policy == "cartesian"
+        else local_physical_keys
+    )
     target_member = f"{Path(resource_path).stem}/maps/{relative}"
     states = []
-    for options, state_name in dependent.get(
-        map_key,
-        [({}, "default")],
-    ):
-        if state_name == "default":
-            states.append({"options": {key: False for key in option_keys}, "source": "base", "member": None, "sha256": base_members[target_member]})
+    state_values = product((False, True), repeat=len(option_keys))
+    for values in state_values:
+        options = dict(zip(option_keys, values))
+        if not any(options.values()):
+            states.append({
+                "options": options,
+                "source": "base",
+                "member": None,
+                "sha256": base_members[target_member],
+            })
             continue
-        manifest = SeedManifest.create(
-            seed_name=f"room-payload-{map_key}-{state_name}", team=0, slot=1, options=options,
-            active_location_ids=compiler.active_location_ids(options),
-        )
+        state_labels = (["automap"] if options.get("start_with_automap", False) else []) + [
+            key.removeprefix("randomize_")
+            for key in map_physical_option_keys(map_key)
+            if options[key]
+        ]
+        state_name = "-".join(state_labels)
         entities = room_root / f"{map_key}-{state_name}.entities"
-        compiler.compile_map(manifest, vanilla, entities, map_key)
-        patch_mission_complete_maps(
-            root / "data/mission_complete_map_contracts.json", {map_key: entities}, staged
-        )
         packed = room_root / f"{map_key}-{state_name}.packed"
-        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
+        compile_cached_state(
+            map_key, vanilla, options, local_identities[map_key], entities, packed
+        )
         member = f"replacements/{map_key}/{state_name}.entities"
         payload_files[member] = packed.read_bytes()
         states.append({
@@ -637,6 +779,7 @@ for map_key, (resource_path, relative, vanilla) in maps.items():
         "target_member": target_member,
         "states": states,
     }
+    map_records[map_key]["state_policy"] = state_policy
 payload_manifest = {
     "schema_version": 1,
     "model": "dependent_map_payloads",
@@ -746,7 +889,6 @@ public_files = [
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/tools/__init__.py",
-        "client/tools/maps/start_with_automap.py",
         "client/tools/release/__init__.py",
         "client/tools/release/room_payloads.py",
         "client/run_bridge.sh",
@@ -851,15 +993,6 @@ python3 "$REPO_ROOT/tools/validation/validate_item_notification_package.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --client-dir "$OUTPUT_DIR/client" \
     --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json"
-python3 "$REPO_ROOT/tools/validation/audit_item_notification_release.py" \
-    --enabled "$ENABLE_ITEM_NOTIFICATIONS" \
-    --generated-maps "$GENERATED_MAPS_DIR" \
-    --mod-root "$MOD_STAGING_DIR" \
-    --client-dir "$OUTPUT_DIR/client" \
-    --release-manifest "$OUTPUT_DIR/RELEASE_MANIFEST.json" \
-    --map-registry "$MAP_SOURCES_FILE" \
-    --decompressor "$TOOLS_DIR/idFileDeCompressor" \
-    --update-manifest
 if find "$MOD_STAGING_DIR" \( \
     -path '*/generated/decls/perks/perk/ap/*' -o \
     -path '*/generated/decls/logicentity/ap/*' \

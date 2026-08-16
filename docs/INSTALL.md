@@ -137,8 +137,9 @@ consumers.
 
 ### Start With Automap
 
-**Start With Automap** grants Automap at mission start and reveals progression-item
-markers. Automap stations are absent when the option is enabled.
+**Start With Automap** adds exactly one **Reveal Automap Progression
+Items** to starting inventory. Each mission's native Automap station moves to its
+deterministic start position and reveals markers through the shared AP contact graph.
 
 ### Traps
 
