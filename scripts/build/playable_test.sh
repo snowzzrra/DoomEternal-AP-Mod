@@ -560,11 +560,8 @@ from doom_eap.content.content_catalog import load_content_catalog
 
 compiler = ModCompiler(root)
 map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-campaign_map_specs = tuple(
-    spec for spec in load_content_catalog(root).enabled_maps()
-    if spec.key != "hub"
-)
-campaign_map_keys = tuple(spec.key for spec in campaign_map_specs)
+release_map_specs = tuple(load_content_catalog(root).enabled_maps())
+release_map_keys = tuple(spec.key for spec in release_map_specs)
 maps = {
     map_key: (
         source["resource_path"],
@@ -572,10 +569,10 @@ maps = {
         root / "vanillamaps" / source["source_file"],
     )
     for map_key, source in map_sources.items()
-    if map_key in campaign_map_keys and source["enabled"]
+    if map_key in release_map_keys and source["enabled"]
 }
-if tuple(maps) != campaign_map_keys:
-    raise SystemExit("Campaign template map set does not match map contract")
+if set(maps) != set(release_map_keys):
+    raise SystemExit("Release template map set does not match map contract")
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
 payload_files = {}
 dependent = {
@@ -592,7 +589,7 @@ dependent = {
 }
 map_records = {}
 for map_key, (resource_path, relative, vanilla) in maps.items():
-    option_keys = sorted(dependent.get(map_key, [{}])[0][0])
+    option_keys = sorted(dependent.get(map_key, [({}, "default")])[0][0])
     target_member = f"{Path(resource_path).stem}/maps/{relative}"
     states = []
     for options, state_name in dependent.get(

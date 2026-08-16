@@ -20,8 +20,8 @@ def _run_bridge_worker(arguments: list[str]) -> int:
 def _run_ui() -> int:
     from PySide6.QtWidgets import QApplication
 
-    from .launcher_controller import LauncherController
-    from .launcher_ui import LauncherUI
+    from doom_eap.launcher.launcher_controller import LauncherController
+    from doom_eap.launcher.launcher_ui import LauncherUI
 
     application = QApplication(sys.argv[:1])
     application.setApplicationName("DOOM Eternal Archipelago")

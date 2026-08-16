@@ -9,7 +9,7 @@ import json
 import re
 from pathlib import Path
 
-from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.content_catalog import discover_maps, load_content_catalog
 from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
     load_publisher_contracts,
@@ -419,9 +419,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         name: value for name, value in contracts.items()
         if isinstance(value, dict) and "map_key" in value
     }
-    unknown_keys = set(generated_maps) - {
-        plan.key for plan in __import__("content_catalog").discover_maps(root)
-    }
+    unknown_keys = set(generated_maps) - {plan.key for plan in discover_maps(root)}
     if unknown_keys:
         raise ValueError(f"unknown generated map input: {sorted(unknown_keys)}")
     contract_items = {

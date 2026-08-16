@@ -139,6 +139,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--specpath",
         str(build_root / "spec"),
         "--paths",
+        str(REPO_ROOT),
+        "--paths",
         str(REPO_ROOT / "packaging/standalone_runtime"),
         "--paths",
         str(archipelago_source),

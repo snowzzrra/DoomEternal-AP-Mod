@@ -254,6 +254,7 @@ def audit_release(
 def _extract_playable_zip(
     playable_zip: Path,
     destination: Path,
+    mod_root: Path,
 ) -> tuple[dict[str, Path], Path, Path]:
     with zipfile.ZipFile(playable_zip) as archive:
         files = {info.filename for info in archive.infolist() if not info.is_dir()}
@@ -307,7 +308,6 @@ def _extract_playable_zip(
             "randomize_first_battery": True,
         },
     )
-    mod_root = destination / "assembled-room-mod"
     for member, content in assembled.items():
         path = mod_root / member
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -331,8 +331,11 @@ def main() -> int:
         if any((args.mod_root, args.client_dir, args.release_manifest, args.update_manifest)):
             parser.error("--playable-zip cannot be combined with local payload arguments")
         with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
             mod_roots, client_dir, manifest = _extract_playable_zip(
-                args.playable_zip, Path(directory)
+                args.playable_zip,
+                workspace / "release",
+                workspace / "assembled-room-mod",
             )
             audit_release(
                 args.enabled == "1", args.generated_maps, mod_roots["direct"],
