@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, cast
 
+from doom_eap.content.physical_options import PHYSICAL_OPTIONS
 from doom_eap.content.map_registry import load_map_registry, release_plan
 from doom_eap.content.item_classification import load_item_classification_identity
 from doom_eap.content.automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
@@ -84,9 +85,10 @@ def audit_mod_payload(
     require_generated_identity: bool = True,
     visual_registry: dict[str, object] | None = None,
 ) -> dict[str, dict[str, int | str]]:
-    """Compare every release map against its unpacked, compressed mod payload."""
+    """Audit release maps against unpacked payloads and room-selected physical bases."""
     records: dict[str, dict[str, int | str]] = {}
     plans = release_plan(load_map_registry(map_registry))
+    physical_map_keys = {str(spec["map_key"]) for spec in PHYSICAL_OPTIONS.values()}
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         for plan in plans:
@@ -107,12 +109,15 @@ def audit_mod_payload(
             packaged_locations = set(
                 LOCATION_NOTIFICATION_RE.findall(packaged.decode("utf-8"))
             )
-            if require_generated_identity and generated != packaged:
+            generated_identity_required = (
+                require_generated_identity and plan.map_key not in physical_map_keys
+            )
+            if generated_identity_required and generated != packaged:
                 raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
             if enabled:
                 if not packaged_notifications:
                     raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
-                if require_generated_identity and generated_notifications != packaged_notifications:
+                if generated_identity_required and generated_notifications != packaged_notifications:
                     raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
                 _assert_notifications(packaged.decode("utf-8"), plan.map_key)
             elif "entityDef ap_rpc_item_" in packaged.decode("utf-8") or packaged_notifications:

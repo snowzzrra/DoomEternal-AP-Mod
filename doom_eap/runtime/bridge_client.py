@@ -3361,21 +3361,13 @@ class DoomEternalContext(CommonContext):
         self.runtime_observers_frozen = True
 
     def ingest_visible_runtime_lifecycle(self, evidence=None, lifecycle_markers=None):
-        """Consume newly visible load; return whether lifecycle proof advanced."""
+        """Accept fresh FirstThink markers as live-map and load-epoch authority."""
         lease = getattr(self, "runtime_observation_lease", None)
         evidence_epoch = getattr(evidence, "epoch", None)
         if evidence_epoch is not None:
             self.native_gameplay_epoch = evidence_epoch
-        proof_evidence_epoch = getattr(
-            self, "active_save_proof_evidence_epoch", None
-        )
-        if (
-            getattr(self, "active_save_proof_authoritative", False)
-            and evidence_epoch is not None
-            and proof_evidence_epoch is not None
-            and evidence_epoch != proof_evidence_epoch
-        ):
-            self.invalidate_active_save_proof()
+        if lease is not None and not lease.process_probe():
+            return False
 
         markers = (
             lifecycle_markers
@@ -3399,29 +3391,6 @@ class DoomEternalContext(CommonContext):
         if marker_data is None:
             self.invalidate_map_identity("malformed_marker")
             return False
-        evidence_mtime_ns = gameplay_evidence_mtime_ns()
-        previous_identity = (
-            getattr(self, "cached_map_identity", None)
-            or getattr(self, "pending_map_identity", None)
-        )
-        causally_bound = bool(
-            evidence_epoch is not None
-            and evidence_mtime_ns is not None
-            and evidence_mtime_ns <= newest_mtime
-        )
-        if (
-            causally_bound
-            and isinstance(previous_identity, dict)
-            and isinstance(previous_identity.get("evidence_mtime_ns"), int)
-            and evidence_mtime_ns <= previous_identity["evidence_mtime_ns"]
-        ):
-            causally_bound = False
-        causal_blocked = bool(
-            isinstance(previous_identity, dict)
-            and isinstance(previous_identity.get("evidence_mtime_ns"), int)
-            and evidence_mtime_ns is not None
-            and evidence_mtime_ns <= previous_identity["evidence_mtime_ns"]
-        )
         self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
@@ -3431,25 +3400,17 @@ class DoomEternalContext(CommonContext):
         self.current_map_name = None
         self.cached_map_identity = None
         self.pending_map_identity = None
-        materialized_epoch = (
-            build_materialization_epoch(evidence_epoch, newest_mtime)
-            if causally_bound
-            else None
-        )
-        self.store_pending_map_identity({
+        marker_data = {
             **marker_data,
-            "native_gameplay_epoch": evidence_epoch if causally_bound else None,
-            "gameplay_epoch": materialized_epoch,
-            "evidence_mtime_ns": evidence_mtime_ns,
-            "causal_bound": causally_bound,
-            "causal_blocked": causal_blocked,
-        })
-        if causally_bound:
-            if lease is not None:
-                lease.observe_gameplay_loaded(newest_mtime)
-            self.snapshot_fast_travel_eligibility(
-                marker_data=self.pending_map_identity
-            )
+            "native_gameplay_epoch": newest_mtime,
+            "gameplay_epoch": build_materialization_epoch(newest_mtime, newest_mtime),
+            "evidence_mtime_ns": gameplay_evidence_mtime_ns(),
+            "evidence_epoch": evidence_epoch,
+        }
+        if lease is not None:
+            lease.observe_gameplay_loaded(newest_mtime)
+        self.accept_map_identity(marker_data, evidence_epoch)
+        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
         return True
 
     def activate_save_selection(self, selected):
@@ -3538,7 +3499,7 @@ class DoomEternalContext(CommonContext):
             )
         return self.pending_map_identity
 
-    def accept_map_identity(self, marker_data, evidence_epoch):
+    def accept_map_identity(self, marker_data, evidence_epoch=None):
         marker_data = {
             **marker_data,
             "evidence_epoch": evidence_epoch,
@@ -3579,121 +3540,16 @@ class DoomEternalContext(CommonContext):
             self.invalidate_active_save_proof()
             return self.invalidate_map_identity("game_not_running")
 
-        pending = getattr(self, "pending_map_identity", None)
-        if evidence is None:
-            if pending is not None:
-                self.current_map_name = None
-                self.cached_map_identity = None
-                return None
-            return self.invalidate_map_identity("gameplay_not_loaded")
-
-        if getattr(evidence, "state", None) != "gameplay":
+        if evidence is not None and getattr(evidence, "state", None) != "gameplay":
             self.invalidate_active_save_proof()
-            if pending is not None:
-                self.current_map_name = None
-                self.cached_map_identity = None
-                return None
             return self.invalidate_map_identity("menu")
-
-        evidence_epoch = getattr(evidence, "epoch", None)
-        if evidence_epoch is None:
-            return self.invalidate_map_identity("gameplay_epoch_unavailable")
-        evidence_mtime_ns = gameplay_evidence_mtime_ns()
-        if evidence_mtime_ns is None:
-            return self.invalidate_map_identity("evidence_mtime_unavailable")
-
-        if pending is not None:
-            pending_mtime = pending.get("mtime_ns", 0)
-            if lease is not None and lease.started_ns and pending_mtime < lease.started_ns:
-                return self.invalidate_map_identity("stale_marker")
-            if not pending.get("causal_bound", False):
-                if evidence_mtime_ns > pending_mtime:
-                    return None
-                if (
-                    pending.get("causal_blocked", False)
-                    and evidence_mtime_ns <= pending.get("evidence_mtime_ns", 0)
-                ):
-                    return None
-                pending = {
-                    **pending,
-                    "native_gameplay_epoch": evidence_epoch,
-                    "gameplay_epoch": build_materialization_epoch(
-                        evidence_epoch, pending_mtime
-                    ),
-                    "evidence_mtime_ns": evidence_mtime_ns,
-                    "causal_bound": True,
-                }
-                self.pending_map_identity = pending
-                if lease is not None:
-                    lease.observe_gameplay_loaded(pending_mtime)
-            if (
-                evidence_epoch is None
-                or pending.get("native_gameplay_epoch") != evidence_epoch
-                or pending.get("gameplay_epoch")
-                != build_materialization_epoch(evidence_epoch, pending_mtime)
-                or pending.get("evidence_mtime_ns") != evidence_mtime_ns
-                or not pending.get("causal_bound", False)
-            ):
-                return self.invalidate_map_identity("marker_epoch_mismatch")
-            return self.accept_map_identity(pending, evidence_epoch)
-
         cached = self.cached_map_identity
-        markers = discover_active_map_markers()
-        if not markers:
-            if cached is not None:
-                cached_mtime = cached.get("mtime_ns", 0)
-                if lease is not None and lease.started_ns and cached_mtime < lease.started_ns:
-                    return self.invalidate_map_identity("stale_marker")
-                if (
-                    evidence_epoch is None
-                    or cached.get("native_gameplay_epoch") != evidence_epoch
-                    or cached.get("gameplay_epoch")
-                    != build_materialization_epoch(evidence_epoch, cached_mtime)
-                    or cached.get("evidence_mtime_ns") != evidence_mtime_ns
-                    or evidence_mtime_ns > cached_mtime
-                ):
-                    return self.invalidate_map_identity("marker_epoch_mismatch")
-                return self.accept_map_identity(cached, evidence_epoch)
+        if not isinstance(cached, dict):
             return None
-
-        newest_mtime, newest_path = markers[-1]
-        if (
-            cached is not None
-            and newest_mtime <= cached.get("mtime_ns", 0)
-        ):
-            if (
-                evidence_epoch is None
-                or cached.get("native_gameplay_epoch") != evidence_epoch
-                or cached.get("gameplay_epoch")
-                != build_materialization_epoch(evidence_epoch, cached.get("mtime_ns"))
-                or cached.get("evidence_mtime_ns") != evidence_mtime_ns
-                or evidence_mtime_ns > cached.get("mtime_ns", 0)
-            ):
-                return self.invalidate_map_identity("marker_epoch_mismatch")
-            return self.accept_map_identity(cached, evidence_epoch)
-
-        marker_data = parse_active_map_marker(newest_path, newest_mtime)
-        if marker_data is None:
-            return self.invalidate_map_identity("malformed_marker")
-
-        if lease is not None and lease.started_ns and newest_mtime < lease.started_ns:
+        marker_mtime = cached.get("mtime_ns", 0)
+        if lease is not None and lease.started_ns and marker_mtime < lease.started_ns:
             return self.invalidate_map_identity("stale_marker")
-
-        marker_data = {
-            **marker_data,
-            "native_gameplay_epoch": evidence_epoch if evidence_mtime_ns <= newest_mtime else None,
-            "gameplay_epoch": (
-                build_materialization_epoch(evidence_epoch, newest_mtime)
-                if evidence_mtime_ns <= newest_mtime
-                else None
-            ),
-            "evidence_mtime_ns": evidence_mtime_ns,
-            "causal_bound": evidence_mtime_ns <= newest_mtime,
-        }
-        if not marker_data["causal_bound"]:
-            self.store_pending_map_identity(marker_data)
-            return None
-        return self.accept_map_identity(marker_data, evidence_epoch)
+        return self.accept_map_identity(cached, getattr(evidence, "epoch", None))
 
     def log_save_proof_accepted(
         self, slot, map_name, epoch, duration_token, details_token, proof="non_provisional_fresh_map_match"
@@ -4822,11 +4678,7 @@ class DoomEternalContext(CommonContext):
             )
         if not isinstance(marker_data, dict):
             return None
-        marker_signal = marker_data.get("mtime_ns")
-        native_epoch = marker_data.get("native_gameplay_epoch")
-        if native_epoch is None:
-            native_epoch = getattr(self, "native_gameplay_epoch", None)
-        epoch = build_materialization_epoch(native_epoch, marker_signal)
+        epoch = marker_data.get("gameplay_epoch")
         existing = getattr(self, "fast_travel_epoch_state", None)
         if isinstance(existing, dict) and existing.get("epoch") is not None:
             return getattr(self, "fast_travel_eligibility_snapshot", None)

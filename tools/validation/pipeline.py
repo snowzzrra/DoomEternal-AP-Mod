@@ -72,6 +72,7 @@ CORE_MAP_INPUTS = (
 PREFLIGHT_PYTHON = (
     "doom_eap/contracts/ap_visual_contract.py",
     "doom_eap/runtime/bridge_client.py",
+    "doom_eap/content/physical_options.py",
     "doom_eap/content/content_catalog.py",
     "doom_eap/contracts/publisher_contracts.py",
     "doom_eap/launcher/launcher_app.py",
@@ -97,6 +98,7 @@ PREFLIGHT_PYTHON = (
     "tools/maps/map_semantic_baseline.py",
     "tools/decls/rune_slot_builder.py",
     "tools/validation/pipeline.py",
+    "tools/validation/physical_option_room_contract.py",
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",
     "doom_eap/content/automap_visual_registry.py",
@@ -769,6 +771,9 @@ class Pipeline:
         """Cheap source/package contract audit; never generates maps or seeds."""
         with self.timed("package-preflight"):
             catalog = self.catalog or self.preflight()
+            from tools.validation.physical_option_room_contract import audit_physical_option_rooms
+
+            audit_physical_option_rooms(ROOT)
             option_path = ROOT / "data" / "options_schema.json"
             validate_automap_option_keys(json.loads(option_path.read_text(encoding="utf-8")))
             root = self._package_root(package_root)

@@ -573,6 +573,22 @@ maps = {
 }
 if set(maps) != set(release_map_keys):
     raise SystemExit("Release template map set does not match map contract")
+canonical_options = {key: False for key in PHYSICAL_OPTION_KEYS}
+for map_key in ("e1m1_intro", "e1m2_war"):
+    resource_path, relative, vanilla = maps[map_key]
+    manifest = SeedManifest.create(
+        seed_name=f"room-payload-{map_key}-base", team=0, slot=1,
+        options=canonical_options,
+        active_location_ids=compiler.active_location_ids(canonical_options),
+    )
+    entities = room_root / f"{map_key}-base.entities"
+    compiler.compile_map(manifest, vanilla, entities, map_key)
+    patch_mission_complete_maps(
+        root / "data/mission_complete_map_contracts.json", {map_key: entities}, staged
+    )
+    target = staged / f"{Path(resource_path).stem}/maps/{relative}"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
 payload_files = {}
 dependent = {

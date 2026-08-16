@@ -23,16 +23,19 @@ PHYSICAL_OPTIONS = {
         "map_key": "e1m1_intro",
         "location_id": 7770001,
         "entity": "AP_CHECK_BARGE_PICKUP_WEAPON_CHAINSAW_1",
+        "vanilla_entity": "barge_pickup_weapon_chainsaw_1",
     },
     "randomize_dash": {
         "map_key": "e1m2_war",
         "location_id": 7770083,
         "entity": "AP_CHECK_CAPITOL_PROGRESS_DASH_1",
+        "vanilla_entity": "capitol_progress_dash_1",
     },
     "randomize_first_battery": {
         "map_key": "e1m2_war",
         "location_id": 7770084,
         "entity": "AP_CHECK_CAPITOL_PROGRESS_SENTINEL_BATTERY_1_E1M2",
+        "vanilla_entity": "capitol_progress_sentinel_battery_1_e1m2",
     },
 }
 

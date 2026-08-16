@@ -14,6 +14,7 @@ from typing import Any, Protocol
 
 from doom_eap.content.physical_options import (
     DEATH_LINK_MODES,
+    PHYSICAL_OPTIONS,
     PHYSICAL_OPTION_KEYS,
     physical_location_ids,
     project_room_config,
@@ -443,10 +444,14 @@ class ModCompiler:
                 "randomize_dash": options,
                 "randomize_first_battery": False,
             }
-        return [location_id for location_id in ids if location_id not in (
-            set(site_id for site_id in (7770001, DASH_LOCATION_ID, 7770084))
-            - physical_location_ids(options)
-        )]
+        physical_ids = {
+            int(spec["location_id"])
+            for spec in PHYSICAL_OPTIONS.values()
+        }
+        return [
+            location_id for location_id in ids
+            if location_id not in (physical_ids - physical_location_ids(options))
+        ]
 
     def known_location_ids(self) -> set[int]:
         return set(self.active_location_ids({key: True for key in PHYSICAL_OPTION_KEYS}))
