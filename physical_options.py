@@ -11,13 +11,10 @@ PHYSICAL_OPTION_KEYS = (
     "randomize_first_battery",
 )
 
-MAP_CONTENT_OPTION_KEYS = (
-)
-
 ROOM_OPTION_KEYS = (
     "death_link",
     "death_link_mode",
-    "reveal_ap_locations_on_automap",
+    "start_with_automap",
 )
 DEATH_LINK_MODES = frozenset({"soft", "hardcore"})
 
@@ -69,28 +66,15 @@ def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
             + ", ".join(sorted(DEATH_LINK_MODES))
         )
 
-    reveal_ap_locations_on_automap = options.get(
-        "reveal_ap_locations_on_automap", False
-    )
-    if not isinstance(reveal_ap_locations_on_automap, bool):
-        raise ValueError(
-            "room option reveal_ap_locations_on_automap must be boolean"
-        )
+    start_with_automap = options.get("start_with_automap", False)
+    if not isinstance(start_with_automap, bool):
+        raise ValueError("room option start_with_automap must be boolean")
     return {
         "schema_version": 1,
         "death_link": death_link,
         "death_link_mode": death_link_mode,
-        "reveal_ap_locations_on_automap": reveal_ap_locations_on_automap,
+        "start_with_automap": start_with_automap,
     }
-
-
-def physical_signature(options: Mapping[str, Any]) -> str:
-    values = normalize_physical_options(options)
-    return "".join("1" if values[key] else "0" for key in PHYSICAL_OPTION_KEYS)
-
-
-def map_content_signature(options: Mapping[str, Any]) -> str:
-    return physical_signature(options)
 
 
 def physical_location_ids(options: Mapping[str, Any]) -> set[int]:
@@ -107,15 +91,6 @@ def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) ->
     result = deepcopy(dict(config))
     map_key = result.get("map_key")
     values = normalize_physical_options(options)
-    reveal_ap_locations_on_automap = options.get(
-        "reveal_ap_locations_on_automap", False
-    )
-    if not isinstance(reveal_ap_locations_on_automap, bool):
-        raise ValueError(
-            "room option reveal_ap_locations_on_automap must be boolean"
-        )
-    if reveal_ap_locations_on_automap:
-        result["reveal_ap_locations_on_automap"] = True
     for key, spec in PHYSICAL_OPTIONS.items():
         if values[key] or spec["map_key"] != map_key:
             continue

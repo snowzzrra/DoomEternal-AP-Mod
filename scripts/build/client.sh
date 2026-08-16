@@ -14,9 +14,6 @@ case "$BUILD_DIR/" in
         ;;
 esac
 
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR/generated-rpc"
-
 TOOLCHAIN_LAUNCHER=()
 for launcher in distrobox distrobox-host-exec; do
     command -v "$launcher" >/dev/null 2>&1 || continue
@@ -33,6 +30,36 @@ for launcher in distrobox distrobox-host-exec; do
     done
 done
 [ "${#TOOLCHAIN_LAUNCHER[@]}" -gt 0 ] || { echo "Neither doom-cpp nor emile-dev-2026 is available through distrobox." >&2; exit 1; }
+
+CACHE_ROOT="${AP_BUILD_CACHE_ROOT:-$REPO_ROOT/.cache/ap-build}"
+TOOLCHAIN_ID="$("${TOOLCHAIN_LAUNCHER[@]}" bash -s <<'IDENTITY'
+set -euo pipefail
+for tool in x86_64-w64-mingw32-gcc x86_64-w64-mingw32-g++ x86_64-w64-mingw32-widl widl x86_64-w64-mingw32-strip x86_64-w64-mingw32-objdump clang; do
+    if command -v "$tool" >/dev/null 2>&1; then
+        printf 'tool=%s path=%s\n' "$tool" "$(command -v "$tool")"
+        "$tool" --version 2>&1 || true
+    fi
+done
+if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+    printf 'sysroot=%s\n' "$(x86_64-w64-mingw32-gcc -print-sysroot)"
+fi
+IDENTITY
+)"
+CACHE_CONFIG="$(python3 -c 'import json,sys; print(json.dumps({"toolchain": sys.argv[1], "flags": "rpc=widl --win64 -Oif -h -c; cxx=-std=c++17 -O2 -static; strip=x86_64-w64-mingw32-strip"}))' "$TOOLCHAIN_ID")"
+CACHE_KEY="$(PYTHONPATH="$REPO_ROOT" python3 -m tools.release.build_cache key \
+    --kind native-client --root "$REPO_ROOT" \
+    --input native/client --input native/probes/save_death_probe.cpp \
+    --input scripts/build/client.sh --config "$CACHE_CONFIG")"
+
+rm -rf "$BUILD_DIR"
+if PYTHONPATH="$REPO_ROOT" python3 -m tools.release.build_cache restore \
+    --cache-root "$CACHE_ROOT" --kind native-client --key "$CACHE_KEY" \
+    --output-root "$BUILD_DIR" --output ap_client.exe --output save_death_probe.exe; then
+    echo "NATIVE_CLIENT cache=hit key=$CACHE_KEY"
+    exit 0
+else
+    echo "NATIVE_CLIENT cache=miss reason=missing-or-invalid-entry key=$CACHE_KEY"
+fi
 
 "${TOOLCHAIN_LAUNCHER[@]}" bash -s -- "$REPO_ROOT" "$BUILD_DIR" <<'BUILD'
 set -euo pipefail
@@ -124,3 +151,7 @@ x86_64-w64-mingw32-objdump -f "$BUILD_DIR/ap_client.exe" | grep -E 'file format 
 x86_64-w64-mingw32-objdump -p "$BUILD_DIR/ap_client.exe" | grep -i 'RPCRT4.dll'
 rm "$BUILD_DIR/ap_runtime_rpc_c.o" "$BUILD_DIR/ap_runtime_rpc_seh.o"
 BUILD
+
+PYTHONPATH="$REPO_ROOT" python3 -m tools.release.build_cache publish \
+    --cache-root "$CACHE_ROOT" --kind native-client --key "$CACHE_KEY" \
+    --output-root "$BUILD_DIR" --output ap_client.exe --output save_death_probe.exe

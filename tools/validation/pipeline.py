@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
 import os
 import shutil
@@ -12,7 +11,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -28,7 +26,15 @@ from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 from tools.validation.audit_resource_packages import (
     audit_source_asset_dependencies,
 )
-from tools.validation.release_layout import expected_release_roots
+from tools.release.apworld_cache import apworld_fingerprint
+from tools.release.release_manifest import (
+    build_release_manifest,
+    load_release_manifest,
+    stale_package_paths,
+    validate_automap_option_keys,
+    validate_release_manifest,
+    validate_source_layout,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent
@@ -38,7 +44,7 @@ MAP_CACHE_ROOT = CACHE_ROOT / "maps"
 RECEIPTS_ROOT = CACHE_ROOT / "receipts"
 WORKSPACES_ROOT = CACHE_ROOT / "workspaces"
 IDENTITY_PATH = ROOT / "data" / "content_identity.json"
-PIPELINE_VERSION = "2"
+PIPELINE_VERSION = "4"
 CORE_MAP_INPUTS = (
     "data/items.json",
     "data/item_replay_policies.json",
@@ -61,7 +67,31 @@ PREFLIGHT_PYTHON = (
     "bridge_client.py",
     "content_catalog.py",
     "publisher_contracts.py",
+    "launcher_app.py",
+    "launcher_cli.py",
+    "launcher_controller.py",
+    "launcher_core.py",
+    "launcher_doctor.py",
+    "launcher_integration.py",
+    "launcher_native_health.py",
+    "launcher_platform.py",
+    "launcher_supervisor.py",
+    "launcher_ui.py",
     "publisher_runtime.py",
+    "doom_eap/__init__.py",
+    "doom_eap/launcher/__init__.py",
+    "doom_eap/launcher/launcher_app.py",
+    "doom_eap/launcher/launcher_cli.py",
+    "doom_eap/launcher/launcher_controller.py",
+    "doom_eap/launcher/launcher_core.py",
+    "doom_eap/launcher/launcher_doctor.py",
+    "doom_eap/launcher/launcher_integration.py",
+    "doom_eap/launcher/launcher_native_health.py",
+    "doom_eap/launcher/launcher_platform.py",
+    "doom_eap/launcher/launcher_supervisor.py",
+    "doom_eap/launcher/launcher_ui.py",
+    "doom_eap/runtime/__init__.py",
+    "doom_eap/runtime/publisher_runtime.py",
     "tools/content/compile_content_catalog.py",
     "tools/content/new_map.py",
     "tools/content/describe_map.py",
@@ -89,6 +119,52 @@ def _canonical_hash(value: object) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _member_hashes(root: Path) -> dict[str, dict[str, int | str]] | None:
+    """Return complete regular-file inventory, rejecting unsafe trees."""
+    if root.is_symlink() or not root.is_dir():
+        return None
+    members: dict[str, dict[str, int | str]] = {}
+    try:
+        for path in sorted(root.rglob("*")):
+            if path.is_symlink():
+                return None
+            if not path.is_file():
+                continue
+            members[path.relative_to(root).as_posix()] = {
+                "sha256": _sha256(path),
+                "size": path.stat().st_size,
+            }
+    except OSError:
+        return None
+    return members
+
+
+def _merge_members(
+    target: dict[str, dict[str, int | str]],
+    prefix: str,
+    source: Path,
+) -> bool:
+    if not source.exists() and not source.is_symlink():
+        return True
+    members = _member_hashes(source)
+    if members is None:
+        return False
+    for relative, metadata in members.items():
+        destination = f"{prefix}/{relative}" if prefix else relative
+        previous = target.get(destination)
+        if previous is not None and previous != metadata:
+            return False
+        target[destination] = metadata
+    return True
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
 
 
 def _run(
@@ -123,6 +199,8 @@ class Pipeline:
         self.generation_counts: dict[str, int] = {}
         self.cache_hits: dict[str, bool] = {}
         self.integration_receipt: Path | None = None
+        self.workspace_cache_hit: bool | None = None
+        self.receipt_cache_hit: bool | None = None
 
     def timed(self, name: str):
         pipeline = self
@@ -285,6 +363,9 @@ class Pipeline:
             from options_foundation import load_options_schema
 
             load_options_schema(ROOT / "data" / "options_schema.json")
+            validate_automap_option_keys(
+                json.loads((ROOT / "data" / "options_schema.json").read_text(encoding="utf-8"))
+            )
             identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
             generated: dict[str, object] = {}
             exec(
@@ -309,6 +390,7 @@ class Pipeline:
                         "  python -m tools.content.compile_content_catalog"
                     )
             self.catalog = catalog
+            validate_source_layout(ROOT, catalog)
             return catalog
 
     def _map_inputs(self, map_key: str) -> dict[str, str]:
@@ -377,6 +459,65 @@ class Pipeline:
         inputs = self._map_inputs(map_key)
         return _canonical_hash(inputs), inputs
 
+    def _cached_map_artifact(
+        self,
+        *,
+        map_key: str,
+        digest: str,
+        inputs: dict[str, str],
+        directory: Path,
+        output: Path,
+        manifest: Path,
+        metadata_path: Path,
+    ) -> MapArtifact | None:
+        patch_mod = directory / "patch_mod"
+        raw = directory / f"{map_key}.raw.entities"
+        try:
+            if not directory.is_dir() or any(
+                child.name not in {
+                    output.name, manifest.name, metadata_path.name, raw.name, "patch_mod",
+                }
+                for child in directory.iterdir()
+            ):
+                return None
+            if any(path.is_symlink() for path in (
+                output, manifest, metadata_path, raw, patch_mod,
+            )):
+                return None
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            patch_members = {} if not patch_mod.exists() else _member_hashes(patch_mod)
+            if not isinstance(metadata, dict) or patch_members is None:
+                return None
+            if (
+                metadata.get("schema_version") != 2
+                or metadata.get("map_key") != map_key
+                or metadata.get("digest") != digest
+                or metadata.get("inputs") != inputs
+                or not output.is_file()
+                or not manifest.is_file()
+                or metadata.get("output_sha256") != _sha256(output)
+                or metadata.get("output_size") != output.stat().st_size
+                or metadata.get("manifest_sha256") != _sha256(manifest)
+                or metadata.get("manifest_size") != manifest.stat().st_size
+                or not raw.is_file()
+                or metadata.get("raw_sha256") != _sha256(raw)
+                or metadata.get("raw_size") != raw.stat().st_size
+                or metadata.get("patch_mod_members") != patch_members
+            ):
+                return None
+            return MapArtifact(
+                map_key,
+                digest,
+                directory,
+                output,
+                manifest,
+                patch_mod,
+                metadata["output_sha256"],
+                True,
+            )
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
     def generate(self, map_key: str) -> MapArtifact:
         catalog = self.catalog or self.preflight()
         spec = catalog.map(map_key)
@@ -386,43 +527,20 @@ class Pipeline:
         manifest = directory / f"{map_key}.json"
         metadata_path = directory / "metadata.json"
         if not self.no_cache:
-            missing = []
-            if not output.is_file():
-                missing.append("entities")
-            if not manifest.is_file():
-                missing.append("manifest")
-            if not metadata_path.is_file():
-                missing.append("metadata")
-            if missing:
-                print(f"MAP {map_key} cache=invalid digest={digest[:16]} reason=missing_{'_'.join(missing)}")
-            elif output.is_file() and manifest.is_file() and metadata_path.is_file():
-                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                if (
-                    metadata.get("inputs") == inputs
-                    and metadata.get("output_sha256") == _sha256(output)
-                    and metadata.get("output_size") == output.stat().st_size
-                    and metadata.get("manifest_sha256") == _sha256(manifest)
-                    and metadata.get("manifest_size") == manifest.stat().st_size
-                ):
-                    self.cache_hits[map_key] = True
-                    print(f"MAP {map_key} cache=hit digest={digest[:16]}")
-                    return MapArtifact(
-                        map_key, digest, directory, output, manifest,
-                        directory / "patch_mod", metadata["output_sha256"], True,
-                    )
-                else:
-                    reasons = []
-                    if metadata.get("inputs") != inputs:
-                        reasons.append("inputs")
-                    if metadata.get("output_sha256") != _sha256(output):
-                        reasons.append("output_sha256")
-                    if metadata.get("output_size") != output.stat().st_size:
-                        reasons.append("output_size")
-                    if metadata.get("manifest_sha256") != _sha256(manifest):
-                        reasons.append("manifest_sha256")
-                    if metadata.get("manifest_size") != manifest.stat().st_size:
-                        reasons.append("manifest_size")
-                    print(f"MAP {map_key} cache=invalid digest={digest[:16]} reason={'_'.join(reasons)}")
+            cached = self._cached_map_artifact(
+                map_key=map_key,
+                digest=digest,
+                inputs=inputs,
+                directory=directory,
+                output=output,
+                manifest=manifest,
+                metadata_path=metadata_path,
+            )
+            if cached is not None:
+                self.cache_hits[map_key] = True
+                print(f"MAP {map_key} cache=hit digest={digest[:16]}")
+                return cached
+            print(f"MAP {map_key} cache=invalid digest={digest[:16]} reason=integrity")
         with self.timed(f"generate:{map_key}"):
             directory.parent.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(prefix=f".{digest}.", dir=directory.parent))
@@ -453,8 +571,11 @@ class Pipeline:
                     {map_key: final},
                     patch_mod,
                 )
+                patch_members = {} if not patch_mod.exists() else _member_hashes(patch_mod)
+                if patch_members is None:
+                    raise ValueError(f"generated patch_mod is not a regular file tree: {patch_mod}")
                 metadata = {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "map_key": map_key,
                     "digest": digest,
                     "inputs": inputs,
@@ -464,14 +585,15 @@ class Pipeline:
                     "output_size": final.stat().st_size,
                     "manifest_sha256": _sha256(generated_manifest),
                     "manifest_size": generated_manifest.stat().st_size,
+                    "patch_mod_members": patch_members,
                 }
                 (temporary / "metadata.json").write_text(
                     json.dumps(metadata, indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
                     newline="\n",
                 )
-                if directory.exists():
-                    shutil.rmtree(directory)
+                if directory.exists() or directory.is_symlink():
+                    _remove_path(directory)
                 os.replace(temporary, directory)
             except BaseException:
                 shutil.rmtree(temporary, ignore_errors=True)
@@ -479,10 +601,26 @@ class Pipeline:
         self.generation_counts[map_key] = self.generation_counts.get(map_key, 0) + 1
         self.cache_hits[map_key] = False
         print(f"MAP {map_key} cache=miss digest={digest[:16]}")
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        artifact = self._cached_map_artifact(
+            map_key=map_key,
+            digest=digest,
+            inputs=inputs,
+            directory=directory,
+            output=output,
+            manifest=manifest,
+            metadata_path=metadata_path,
+        )
+        if artifact is None:
+            raise ValueError(f"generated map cache failed integrity check: {directory}")
         return MapArtifact(
-            map_key, digest, directory, output, manifest,
-            directory / "patch_mod", metadata["output_sha256"], False,
+            artifact.map_key,
+            artifact.digest,
+            artifact.directory,
+            artifact.output,
+            artifact.manifest,
+            artifact.patch_mod,
+            artifact.output_sha256,
+            False,
         )
 
     def validate_map(
@@ -575,31 +713,146 @@ class Pipeline:
             selected = {spec.key for spec in catalog.enabled_maps()}
         return sorted(selected), sorted(paths)
 
-    def integration(self, map_keys: Sequence[str] | None = None, *, full: bool = True) -> list[MapArtifact]:
-        catalog = self.preflight()
-        keys = list(map_keys or [spec.key for spec in catalog.enabled_maps()])
-        artifacts = []
-        for key in keys:
-            artifacts.append(self.validate_map(key))
-        # _run([sys.executable, "tools/validation/validate_data.py"])
+    def _run_focused_tests(self, tests: Sequence[str]) -> None:
+        if not tests:
+            return
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}:{env.get('PYTHONPATH', '')}"
         env["SKIP_REQUIREMENTS_UPDATE"] = "1"
-        _run([
-            sys.executable, "-m", "pytest",
-            "tests/test_item_delivery.py",
-            "tests/test_item_resync.py",
-            "tests/test_deathlink_receive.py",
-            "tests/test_install_workflow.py",
-            "-q", "--maxfail=1",
-        ], env=env)
-        if full:
-            self.apworld_smoke()
-            self.integration_receipt = self.receipt(
-                artifacts, ("preflight", "integration", "apworld", "content_audit", "protocol")
-            )
-            print(f"INTEGRATION_RECEIPT {self.integration_receipt}")
+        command = [sys.executable, "-m", "pytest"]
+        command.extend(tests)
+        command.extend(("-q", "--maxfail=1"))
+        _run(command, env=env)
+
+    def integration(
+        self,
+        map_keys: Sequence[str] | None = None,
+        *,
+        tests: Sequence[str] = (),
+        full: bool = False,
+    ) -> list[MapArtifact]:
+        catalog = self.catalog or self.preflight()
+        keys = list(map_keys or [spec.key for spec in catalog.enabled_maps()])
+        artifacts = []
+        with self.timed("integration"):
+            for key in keys:
+                artifacts.append(self.validate_map(key))
+            if full:
+                self.apworld_contract_smoke(tests)
+                self.integration_receipt = self.receipt(
+                    artifacts,
+                    ("preflight", "integration", "apworld-contract", "content_audit", "protocol"),
+                )
+                print(f"INTEGRATION_RECEIPT {self.integration_receipt}")
+            else:
+                self._run_focused_tests(tests)
         return artifacts
+
+    def affected_cache(self) -> list[MapArtifact]:
+        """Refresh affected map cache, then expose complete assembler inputs."""
+        catalog = self.catalog or self.preflight()
+        selected, paths = self.selection()
+        print(
+            "AFFECTED maps="
+            f"{','.join(selected) if selected else '(none)'} files={len(paths)}"
+        )
+        with self.timed("affected-cache"):
+            for key in selected:
+                self.validate_map(key)
+            return [
+                self.validate_map(spec.key)
+                for spec in catalog.enabled_maps()
+            ]
+
+    def _package_root(self, explicit: Path | None = None) -> Path | None:
+        return explicit
+
+    def package_preflight(self, package_root: Path | None = None) -> None:
+        """Cheap source/package contract audit; never generates maps or seeds."""
+        with self.timed("package-preflight"):
+            catalog = self.catalog or self.preflight()
+            option_path = ROOT / "data" / "options_schema.json"
+            validate_automap_option_keys(json.loads(option_path.read_text(encoding="utf-8")))
+            root = self._package_root(package_root)
+            if root is None:
+                synthetic = build_release_manifest(
+                    ROOT,
+                    generated_maps=None,
+                    room_resources=ROOT / ".cache" / "ap_pipeline" / "source-contract-resources",
+                    public_files=[],
+                )
+                validate_release_manifest(synthetic)
+                print("PACKAGE_PREFLIGHT package=source-synthetic checked")
+                return
+            if not root.exists():
+                raise ValueError(f"component=package root={root} value=missing")
+            stale = stale_package_paths(root)
+            if stale:
+                raise ValueError(f"component=package field=stale_layout value={stale}")
+            manifest_path = root / "RELEASE_MANIFEST.json"
+            if not manifest_path.is_file():
+                raise ValueError(f"component=package file={manifest_path} field=manifest value=missing")
+            generated_maps = ROOT / "build" / "generated-maps"
+            generated_root = generated_maps if generated_maps.is_dir() else None
+            manifest = load_release_manifest(
+                manifest_path,
+                package_root=root,
+                generated_maps=generated_root,
+            )
+            expected = build_release_manifest(
+                ROOT,
+                generated_maps=generated_root,
+                release_version=manifest["version"],
+            )
+            for field in ("checked_location_visuals", "room_compiler", "base_resources"):
+                actual_value = manifest[field]
+                expected_value = expected[field]
+                if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:
+                    actual_value = dict(actual_value)
+                    actual_value["generated_map_sha256"] = {}
+                if actual_value != expected_value:
+                    raise ValueError(f"component=package field=manifest_disagreement value={field}")
+            packaged_options = root / "client" / "data" / "options_schema.json"
+            if packaged_options.is_file():
+                validate_automap_option_keys(json.loads(packaged_options.read_text(encoding="utf-8")))
+            print(f"PACKAGE_PREFLIGHT package=checked root={root}")
+
+    def playtest(self) -> None:
+        """Validate, create receipt, then delegate packaging to package builder."""
+        self.preflight()
+        artifacts = self.affected_cache()
+        self.package_preflight()
+        receipt = self.receipt(artifacts, ("preflight", "affected", "package-preflight"))
+        document = json.loads(receipt.read_text(encoding="utf-8"))
+        env = os.environ.copy()
+        env["AP_PIPELINE_RECEIPT"] = str(receipt)
+        env["AP_PIPELINE_ARTIFACT_ROOT"] = document["artifact_root"]
+        with self.timed("assembler"):
+            _run(["bash", "scripts/build/playable_test.sh"], env=env)
+
+    def full(self, tests: Sequence[str] = ()) -> None:
+        self.integration(tests=tests, full=True)
+
+    def seed_smoke(self) -> None:
+        with self.timed("seed-smoke"):
+            self.preflight()
+            self.apworld_contract_smoke()
+            with self.timed("seed-smoke-generate"):
+                python = ARCHIPELAGO / ".venv" / "bin" / "python"
+                env = os.environ.copy()
+                env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
+                env["SKIP_REQUIREMENTS_UPDATE"] = "1"
+                smoke_root = CACHE_ROOT / "seed-smoke"
+                smoke_root.mkdir(parents=True, exist_ok=True)
+                print(
+                    "APWORLD seed-smoke fingerprint="
+                    f"{apworld_fingerprint(ARCHIPELAGO / 'worlds' / 'doometernal')}"
+                )
+                _run([
+                    str(python), str(ARCHIPELAGO / "Generate.py"),
+                    "--player_files_path", str(ROOT / "player_templates"),
+                    "--outputpath", str(smoke_root),
+                ], cwd=ROOT, env=env)
 
     def _workspace_digest(self, artifacts: Sequence[MapArtifact]) -> str:
         identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
@@ -626,7 +879,22 @@ class Pipeline:
             "challenge_registry.py", "content_catalog.py", "foundation.py",
             "item_classification.py", "item_reconciliation.py", "map_registry.py",
             "observer_lifecycle.py", "publisher_contracts.py",
-            "publisher_runtime.py", "save_decrypt.py",
+            "launcher_app.py", "launcher_cli.py", "launcher_controller.py",
+            "launcher_core.py", "launcher_doctor.py", "launcher_integration.py",
+            "launcher_native_health.py", "launcher_platform.py",
+            "launcher_supervisor.py", "launcher_ui.py", "publisher_runtime.py",
+            "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
+            "doom_eap/launcher/launcher_app.py",
+            "doom_eap/launcher/launcher_cli.py",
+            "doom_eap/launcher/launcher_controller.py",
+            "doom_eap/launcher/launcher_core.py",
+            "doom_eap/launcher/launcher_doctor.py",
+            "doom_eap/launcher/launcher_integration.py",
+            "doom_eap/launcher/launcher_native_health.py",
+            "doom_eap/launcher/launcher_platform.py",
+            "doom_eap/launcher/launcher_supervisor.py",
+            "doom_eap/launcher/launcher_ui.py", "doom_eap/runtime/__init__.py",
+            "doom_eap/runtime/publisher_runtime.py", "save_decrypt.py",
             "tools/maps/start_with_automap.py",
         ):
             release_inputs[relative] = _sha256(ROOT / relative)
@@ -638,13 +906,95 @@ class Pipeline:
             "pipeline_version": PIPELINE_VERSION,
         })
 
+    def _workspace_members(
+        self,
+        artifacts: Sequence[MapArtifact],
+    ) -> dict[str, dict[str, int | str]] | None:
+        members: dict[str, dict[str, int | str]] = {}
+        for artifact in artifacts:
+            for prefix, source in (
+                ("maps", artifact.output),
+                ("manifests", artifact.manifest),
+            ):
+                if source.is_symlink() or not source.is_file():
+                    return None
+                metadata = {
+                    "sha256": _sha256(source),
+                    "size": source.stat().st_size,
+                }
+                destination = f"{prefix}/{source.name}"
+                if destination in members and members[destination] != metadata:
+                    return None
+                members[destination] = metadata
+            if not _merge_members(members, "mod", artifact.patch_mod):
+                return None
+        return members
+
+    def _receipt_matches(
+        self,
+        receipt_path: Path,
+        *,
+        workspace_digest: str,
+        artifact_root: Path,
+        members: dict[str, dict[str, int | str]],
+        artifacts: Sequence[MapArtifact],
+    ) -> bool:
+        try:
+            document = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(document, dict):
+                return False
+            if (
+                document.get("schema_version") != 3
+                or document.get("workspace_digest") != workspace_digest
+                or document.get("artifact_root") != str(artifact_root)
+                or document.get("workspace_members") != members
+                or document.get("content_identity")
+                != json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
+            ):
+                return False
+            expected_maps = self._receipt_maps(artifacts)
+            if document.get("maps") != expected_maps:
+                return False
+            return _member_hashes(artifact_root) == members
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return False
+
+    def _receipt_maps(self, artifacts: Sequence[MapArtifact]) -> dict[str, dict[str, object]]:
+        return {
+            item.map_key: {
+                "digest": item.digest,
+                "output": item.output.name,
+                "output_sha256": item.output_sha256,
+                "output_size": item.output.stat().st_size,
+                "output_source": str(item.output),
+                "output_destination": f"build/generated-maps/{item.output.name}",
+                "manifest": item.manifest.name,
+                "manifest_sha256": _sha256(item.manifest),
+                "manifest_size": item.manifest.stat().st_size,
+                "manifest_source": str(item.manifest),
+                "manifest_destination": f".staging/manifests/{item.manifest.name}",
+            }
+            for item in artifacts
+        }
+
     def receipt(self, artifacts: Sequence[MapArtifact], stages: Sequence[str]) -> Path:
         workspace_digest = self._workspace_digest(artifacts)
         artifact_root = WORKSPACES_ROOT / workspace_digest
         receipt_path = RECEIPTS_ROOT / f"{workspace_digest}.json"
-        if not artifact_root.exists():
+        members = self._workspace_members(artifacts)
+        if members is None:
+            raise ValueError("workspace sources are not a complete regular-file cache")
+        self.workspace_cache_hit = False
+        if not self.no_cache and artifact_root.exists():
+            self.workspace_cache_hit = _member_hashes(artifact_root) == members
+            if not self.workspace_cache_hit:
+                print(f"WORKSPACE cache=invalid digest={workspace_digest[:16]} reason=integrity")
+                if artifact_root.exists() or artifact_root.is_symlink():
+                    _remove_path(artifact_root)
+        if not self.workspace_cache_hit:
+            CACHE_ROOT.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(
-                prefix=f".{workspace_digest}.", dir=WORKSPACES_ROOT.parent
+                prefix=f".{workspace_digest}.", dir=CACHE_ROOT
             ))
             try:
                 maps_dir = temporary / "maps"
@@ -666,26 +1016,31 @@ class Pipeline:
             except BaseException:
                 shutil.rmtree(temporary, ignore_errors=True)
                 raise
+        if _member_hashes(artifact_root) != members:
+            raise ValueError(f"workspace cache failed integrity check: {artifact_root}")
+        self.receipt_cache_hit = (
+            not self.no_cache
+            and self.workspace_cache_hit is True
+            and receipt_path.is_file()
+            and not receipt_path.is_symlink()
+            and self._receipt_matches(
+                receipt_path,
+                workspace_digest=workspace_digest,
+                artifact_root=artifact_root,
+                members=members,
+                artifacts=artifacts,
+            )
+        )
+        if self.receipt_cache_hit:
+            return receipt_path
+        if receipt_path.exists():
+            print(f"RECEIPT cache=invalid digest={workspace_digest[:16]} reason=integrity")
         document = {
-            "schema_version": 2,
+            "schema_version": 3,
             "workspace_digest": workspace_digest,
             "content_identity": json.loads(IDENTITY_PATH.read_text(encoding="utf-8")),
-            "maps": {
-                item.map_key: {
-                    "digest": item.digest,
-                    "output": item.output.name,
-                    "output_sha256": item.output_sha256,
-                    "output_size": item.output.stat().st_size,
-                    "output_source": str(item.output),
-                    "output_destination": f"build/generated-maps/{item.output.name}",
-                    "manifest": item.manifest.name,
-                    "manifest_sha256": _sha256(item.manifest),
-                    "manifest_size": item.manifest.stat().st_size,
-                    "manifest_source": str(item.manifest),
-                    "manifest_destination": f".staging/manifests/{item.manifest.name}",
-                }
-                for item in artifacts
-            },
+            "maps": self._receipt_maps(artifacts),
+            "workspace_members": members,
             "stages": list(stages),
             "tools": {
                 "pipeline": PIPELINE_VERSION,
@@ -694,35 +1049,49 @@ class Pipeline:
             "artifact_root": str(artifact_root),
         }
         RECEIPTS_ROOT.mkdir(parents=True, exist_ok=True)
-        receipt_path.write_text(
-            json.dumps(document, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-            newline="\n",
+        receipt_fd, receipt_name = tempfile.mkstemp(
+            prefix=f".{workspace_digest}.", suffix=".json", dir=RECEIPTS_ROOT
         )
+        os.close(receipt_fd)
+        temporary_receipt = Path(receipt_name)
+        try:
+            temporary_receipt.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            os.replace(temporary_receipt, receipt_path)
+        except BaseException:
+            temporary_receipt.unlink(missing_ok=True)
+            raise
         return receipt_path
 
-    def apworld_smoke(self) -> None:
-        python = ARCHIPELAGO / ".venv" / "bin" / "python"
-        env = os.environ.copy()
-        env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
-        env["AP_TEST_WORLDS"] = "doometernal"
-        test_root = ARCHIPELAGO / "worlds" / "doometernal" / "test"
-        if any(path.name not in {"__init__.py", "bases.py"} for path in test_root.glob("test_*.py")):
-            _run([
-                str(python), "-m", "pytest", "-c", str(ARCHIPELAGO / "pytest.ini"),
-                str(test_root),
-                "-q", "--maxfail=1",
-            ], cwd=WORKSPACE, env=env)
-        smoke_root = CACHE_ROOT / "seed-smoke"
-        smoke_root.mkdir(parents=True, exist_ok=True)
-        env["SKIP_REQUIREMENTS_UPDATE"] = "1"
-        _run([
-            str(python), str(ARCHIPELAGO / "Generate.py"),
-            "--player_files_path", str(ROOT / "player_templates"),
-            "--outputpath", str(smoke_root),
-        ], cwd=ROOT, env=env)
+    def apworld_contract_smoke(self, tests: Sequence[str] = ()) -> None:
+        with self.timed("apworld-contract"):
+            python = ARCHIPELAGO / ".venv" / "bin" / "python"
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
+            env["AP_TEST_WORLDS"] = "doometernal"
+            contract = (
+                "from worlds.doometernal import DoomEternalWorld; "
+                "assert DoomEternalWorld.game; "
+                "assert DoomEternalWorld.item_name_to_id; "
+                "assert DoomEternalWorld.location_name_to_id"
+            )
+            _run([str(python), "-c", contract], cwd=WORKSPACE, env=env)
+            print(
+                "APWORLD contract fingerprint="
+                f"{apworld_fingerprint(ARCHIPELAGO / 'worlds' / 'doometernal')}"
+            )
+            if tests:
+                self._run_focused_tests(tests)
 
-    def release(self, *, build: bool = False) -> tuple[Path, list[MapArtifact]]:
+    def release(
+        self,
+        *,
+        build: bool = False,
+        tests: Sequence[str] = (),
+    ) -> tuple[Path, list[MapArtifact]]:
         catalog = self.preflight()
         pending_imports = [
             asset.key for asset in catalog.assets
@@ -733,7 +1102,7 @@ class Pipeline:
                 "component=assets map=* field=model_importer value=pending "
                 f"bundles={pending_imports}"
             )
-        artifacts = self.integration()
+        artifacts = self.integration(tests=tests, full=True)
         assert self.integration_receipt is not None
         receipt = self.integration_receipt
         if build:
@@ -742,116 +1111,26 @@ class Pipeline:
             env["AP_PIPELINE_RECEIPT"] = str(receipt)
             env["AP_PIPELINE_ARTIFACT_ROOT"] = document["artifact_root"]
             _run(["bash", "scripts/build/playable_test.sh"], env=env)
-            for key, item in document["maps"].items():
-                packaged = ROOT / "build" / "release" / "build" / "generated-maps" / item["output"]
-                if not packaged.is_file():
-                    continue
-                if _sha256(packaged) != item["output_sha256"]:
-                    raise ValueError(
-                        f"component=build map={key} file={packaged} "
-                        "field=sha256 value=does not match validation receipt"
-                    )
-            identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
-            zip_path = ROOT / "build" / "release" / (
-                f"DoomEternalArchipelagoPlayableTest-{identity['release_version']}.zip"
-            )
-            if not zip_path.is_file():
-                print("RELEASE_ARTIFACT_NOT_PUBLISHED reason=zip_missing")
-                raise ValueError(
-                    f"component=build file={zip_path} field=zip value=missing after build\n"
-                    "RELEASE_ARTIFACT_NOT_PUBLISHED"
-                )
-            if not zipfile.is_zipfile(zip_path):
-                print("RELEASE_ARTIFACT_NOT_PUBLISHED reason=zip_invalid")
-                raise ValueError(
-                    f"component=build file={zip_path} field=zip value=invalid\n"
-                    "RELEASE_ARTIFACT_NOT_PUBLISHED"
-                )
-            with zipfile.ZipFile(zip_path) as outer:
-                files = {info.filename for info in outer.infolist() if not info.is_dir()}
-                if "DoomEternalArchipelagoBeta.zip" in files:
-                    raise ValueError("obsolete universal mod ZIP entered release")
-                launchers = files & {
-                    "DoomEternalArchipelagoLauncher",
-                    "DoomEternalArchipelagoLauncher.exe",
-                }
-                if len(launchers) != 1 or any(
-                    name.startswith("client/DoomEternalArchipelagoLauncher")
-                    for name in files
-                ):
-                    raise ValueError("public launcher layout is invalid")
-                expected_roots = expected_release_roots(next(iter(launchers)))
-                roots = {name.split("/", 1)[0] for name in files}
-                if roots != expected_roots:
-                    raise ValueError(
-                        f"public ZIP root layout is not exact: {sorted(roots)}"
-                    )
-                if "client/resources/mod_templates.zip" not in files:
-                    raise ValueError("internal room template resource is missing")
-                with zipfile.ZipFile(io.BytesIO(outer.read("client/resources/mod_templates.zip"))) as resources:
-                    resource_files = {
-                        info.filename for info in resources.infolist() if not info.is_dir()
-                    }
-                    document = json.loads(resources.read("index.json"))
-                    variants = document.get("variants")
-                    if (
-                        document.get("schema") != 2
-                        or document.get("physical_options") != [
-                            "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
-                        ]
-                        or document.get("map_content_options") != []
-                        or not isinstance(variants, dict)
-                        or set(variants) != {
-                            f"{chainsaw}{dash}{battery}"
-                            for chainsaw in "01"
-                            for dash in "01"
-                            for battery in "01"
-                        }
-                    ):
-                        raise ValueError("internal room template resource layout is invalid")
-                    template_names = {"index.json"} | {
-                        entry.get("file") for entry in variants.values()
-                        if isinstance(entry, dict) and isinstance(entry.get("file"), str)
-                    }
-                    if resource_files != template_names:
-                        raise ValueError("internal room template resource files are invalid")
-                    template_payloads = [resources.read(entry["file"]) for entry in variants.values()]
-                if any(
-                    "mod_templates" in Path(name).parts or "licenses" in Path(name).parts
-                    for name in files
-                ):
-                    raise ValueError("public ZIP exposes internal room resources")
-                if any(Path(name).name == "DoomEternalArchipelagoBeta.zip" for name in files):
-                    raise ValueError("fixed mod ZIP entered public release")
-                if any(
-                    "DoomEternalArchipelagoPlayableTest-" in Path(name).name
-                    for name in files
-                    if name.lower().endswith(".zip")
-                ):
-                    raise ValueError("prior release candidate entered public ZIP")
-            for payload in template_payloads:
-                with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    if not zipfile.is_zipfile(handle.name):
-                        raise ValueError("mod template ZIP audit failed")
-            print(f"ARTIFACT {zip_path}")
-            print(f"SHA256 {_sha256(zip_path)}")
-            print(f"CONTENT_REVISION {identity['content_revision']}")
-            for spec in (self.catalog or load_content_catalog()).enabled_maps():
-                print(
-                    f"GENERATIONS map={spec.key} "
-                    f"count={self.generation_counts.get(spec.key, 0)}"
-                )
+            self.package_preflight()
         return receipt, artifacts
 
     def report(self) -> None:
         total = time.perf_counter() - self.started
         print(f"PIPELINE duration={total:.3f}s")
-        for name, duration in sorted(
-            self.timings, key=lambda item: item[1], reverse=True
-        )[:5]:
-            print(f"SLOW operation={name} duration={duration:.3f}s")
+        for name, duration in self.timings:
+            print(f"STAGE name={name} duration_ms={duration * 1000:.3f}")
+        hits = sum(value for value in self.cache_hits.values())
+        misses = len(self.cache_hits) - hits
+        workspace_hits = int(self.workspace_cache_hit is True)
+        workspace_misses = int(self.workspace_cache_hit is False)
+        receipt_hits = int(self.receipt_cache_hit is True)
+        receipt_misses = int(self.receipt_cache_hit is False)
+        print(
+            "CACHE summary=maps "
+            f"hits={hits} misses={misses} "
+            f"workspace_hits={workspace_hits} workspace_misses={workspace_misses} "
+            f"receipt_hits={receipt_hits} receipt_misses={receipt_misses}"
+        )
         for key in sorted(self.cache_hits):
             print(
                 f"CACHE map={key} status={'hit' if self.cache_hits[key] else 'miss'} "
@@ -862,13 +1141,18 @@ class Pipeline:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("phase", choices=(
-        "fast", "map", "changed", "integration", "release", "cache-key",
+        "fast", "map", "affected", "changed", "integration",
+        "package-preflight", "package", "playtest", "full", "release",
+        "seed-smoke", "cache-key",
     ))
     parser.add_argument("map_key", nargs="?")
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--baseline-diff", action="store_true")
     parser.add_argument("--show-selection", action="store_true")
+    parser.add_argument("--map", dest="maps", action="append", default=[])
+    parser.add_argument("--test", dest="tests", action="append", default=[])
+    parser.add_argument("--package-root", type=Path)
     return parser
 
 
@@ -882,7 +1166,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not args.map_key:
                 raise ValueError("map phase requires <map_key>")
             pipeline.map(args.map_key)
-        elif args.phase == "changed":
+        elif args.phase in {"changed", "affected"}:
             selected, paths = pipeline.selection()
             if args.show_selection:
                 print("CHANGED FILES")
@@ -890,11 +1174,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print("SELECTED MAPS")
                 print("\n".join(f"  {key}" for key in selected) or "  (none)")
             if selected:
-                pipeline.integration(selected, full=False)
+                pipeline.integration(selected, tests=args.tests)
         elif args.phase == "integration":
-            pipeline.integration()
+            selected = args.maps or ([args.map_key] if args.map_key else None)
+            pipeline.integration(selected, tests=args.tests)
+        elif args.phase == "package-preflight":
+            pipeline.package_preflight(args.package_root)
+        elif args.phase in {"package", "playtest"}:
+            pipeline.playtest()
+        elif args.phase == "full":
+            pipeline.full(args.tests)
         elif args.phase == "release":
-            pipeline.release(build=args.build)
+            pipeline.release(build=args.build, tests=args.tests)
+        elif args.phase == "seed-smoke":
+            pipeline.seed_smoke()
         elif args.phase == "cache-key":
             if not args.map_key:
                 raise ValueError("cache-key phase requires <map_key>")

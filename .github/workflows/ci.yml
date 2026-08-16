@@ -11,7 +11,7 @@ jobs:
       - name: Install smoke dependencies
         run: python -m pip install --requirement requirements-ci.txt
       - name: Compile Python
-        run: python -m compileall -q bridge_client.py deathlink_receive.py launcher_core.py launcher_cli.py launcher_supervisor.py tools/content tools/validation
+        run: python -m compileall -q bridge_client.py deathlink_receive.py doom_eap launcher_app.py launcher_cli.py launcher_controller.py launcher_core.py launcher_doctor.py launcher_integration.py launcher_native_health.py launcher_platform.py launcher_supervisor.py launcher_ui.py publisher_runtime.py tools/content tools/validation
       - name: Validate authorial content
         run: python -m tools.validation.authorial --check-authorial
       - name: Validate packaged options schema

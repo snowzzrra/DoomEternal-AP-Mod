@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Any, cast
 
 from map_registry import load_map_registry, release_plan
 from item_classification import load_item_classification_identity
@@ -22,6 +22,17 @@ from tools.validation.validate_item_notification_package import (
     string_table_names,
 )
 from tools.validation.release_layout import expected_release_roots
+from tools.release.release_manifest import load_release_manifest
+from tools.release.room_payloads import (
+    BASE_RESOURCE_NAME,
+    ROOM_PAYLOAD_MANIFEST_NAME,
+    ROOM_PAYLOAD_RESOURCE_NAME,
+    assemble_room_files,
+    canonical_json,
+    load_room_payload_manifest,
+    resource_metadata,
+    write_deterministic_zip,
+)
 
 
 def _normalized(content: bytes) -> bytes:
@@ -136,6 +147,67 @@ def _audit_locales(enabled: bool, mod_root: Path) -> None:
         raise AssertionError("payload locale string names diverge")
 
 
+def _audit_room_resources(
+    client_dir: Path,
+    manifest: dict[str, object],
+    map_registry: Path,
+) -> None:
+    compiler = cast(dict[str, Any], manifest["room_compiler"])
+    resources = cast(dict[str, Any], compiler["resources"])
+    resource_dir = client_dir / "resources"
+    expected = {BASE_RESOURCE_NAME, ROOM_PAYLOAD_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME}
+    if set(resources) != expected:
+        raise AssertionError("release manifest room compiler resource contract is incomplete")
+    for name in expected:
+        actual = resource_metadata(resource_dir / name)
+        actual["path"] = f"client/resources/{name}"
+        if actual != resources[name]:
+            raise AssertionError(f"room compiler resource metadata drifted: {name}")
+    known_maps = {
+        plan.map_key: f"{Path(plan.resource_path).stem}/maps/{plan.relative_entities_path}"
+        for plan in release_plan(load_map_registry(map_registry))
+    }
+    payload_manifest = load_room_payload_manifest(
+        resource_dir / ROOM_PAYLOAD_MANIFEST_NAME,
+        known_maps=known_maps,
+    )
+    scenarios = (
+        {"randomize_chainsaw": False, "randomize_dash": False, "randomize_first_battery": False},
+        {"randomize_chainsaw": True, "randomize_dash": False, "randomize_first_battery": False},
+        {"randomize_chainsaw": False, "randomize_dash": True, "randomize_first_battery": False},
+        {"randomize_chainsaw": False, "randomize_dash": False, "randomize_first_battery": True},
+        {"randomize_chainsaw": False, "randomize_dash": True, "randomize_first_battery": True},
+        {"randomize_chainsaw": True, "randomize_dash": True, "randomize_first_battery": True},
+    )
+    assembled = {}
+    selected = {}
+    for options in scenarios:
+        assembled, selected = assemble_room_files(
+            resource_dir / BASE_RESOURCE_NAME,
+            resource_dir / ROOM_PAYLOAD_RESOURCE_NAME,
+            payload_manifest,
+            options,
+        )
+        if len(selected) != len(payload_manifest["maps"]):
+            raise AssertionError("synthetic room payload selection is incomplete")
+        for map_key, state in selected.items():
+            expected = {
+                key: options[key]
+                for key in payload_manifest["maps"][map_key]["option_keys"]
+            }
+            if state["options"] != expected:
+                raise AssertionError(f"synthetic room payload state selection drifted: {map_key}")
+    if not any(state["source"] == "replacement" for state in selected.values()):
+        raise AssertionError("synthetic room payload did not select replacements")
+    with tempfile.TemporaryDirectory() as directory:
+        package = Path(directory) / "synthetic-room.zip"
+        assembled["room_config.json"] = canonical_json({"start_with_automap": False})
+        write_deterministic_zip(assembled, package)
+        with zipfile.ZipFile(package) as archive:
+            if set(archive.namelist()) != set(assembled):
+                raise AssertionError("synthetic room package member set drifted")
+
+
 def audit_release(
     enabled: bool,
     generated_maps: Path,
@@ -148,28 +220,26 @@ def audit_release(
 ) -> dict[str, dict[str, int | str]]:
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("bridge_identity notification capability diverges from audit mode")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if set(manifest) != {"version", "checked_location_visuals"} or not isinstance(manifest["version"], str):
-        raise AssertionError("RELEASE_MANIFEST must contain version and checked-location visual registry")
+    manifest = load_release_manifest(
+        manifest_path,
+        package_root=manifest_path.parent,
+        generated_maps=generated_maps,
+    )
+    _audit_room_resources(client_dir, manifest, map_registry)
     registry_path = client_dir / "data" / "checked_location_visuals.json"
     registry = manifest["checked_location_visuals"]
-    if not isinstance(registry, dict):
-        raise AssertionError("RELEASE_MANIFEST checked-location visual record must be an object")
     visual_registry = load_automap_visual_registry(registry_path)
-    if registry != {
-        "path": "client/data/checked_location_visuals.json",
-        "sha256": hashlib.sha256(registry_path.read_bytes()).hexdigest(),
-        "authoritative_fingerprint": visual_registry["authoritative_fingerprint"],
-        "generated_map_sha256": {
-            plan.map_key: hashlib.sha256(
-                (generated_maps / plan.generated_output).read_bytes()
-            ).hexdigest()
-            for plan in release_plan(load_map_registry(map_registry, authorial=True))
-        },
-        "templates_sha256": hashlib.sha256(
-            (client_dir / "resources/mod_templates.zip").read_bytes()
-        ).hexdigest(),
-    }:
+    expected_visuals = {
+        plan.map_key: hashlib.sha256(
+            (generated_maps / plan.generated_output).read_bytes()
+        ).hexdigest()
+        for plan in release_plan(load_map_registry(map_registry, authorial=True))
+    }
+    if registry["sha256"] != hashlib.sha256(registry_path.read_bytes()).hexdigest():
+        raise AssertionError("RELEASE_MANIFEST checked-location visual registry hash drifted")
+    if registry["authoritative_fingerprint"] != visual_registry["authoritative_fingerprint"]:
+        raise AssertionError("RELEASE_MANIFEST checked-location visual fingerprint drifted")
+    if registry["generated_map_sha256"] != expected_visuals:
         raise AssertionError("RELEASE_MANIFEST checked-location visual registry hash drifted")
     _audit_locales(enabled, mod_root)
     classification_path = client_dir / "data" / "item_classifications.json"
@@ -207,13 +277,12 @@ def _extract_playable_zip(
             "LICENSE",
             "RELEASE_MANIFEST.json",
             "doometernal.apworld",
-            "client/resources/mod_templates.zip",
         }
         missing = required - files
         if missing:
             raise AssertionError(f"playable ZIP lacks public layout files: {sorted(missing)}")
         if any(
-            "licenses" in Path(name).parts or "mod_templates" in Path(name).parts
+            "licenses" in Path(name).parts
             for name in files
         ):
             raise AssertionError("playable ZIP exposes internal resources")
@@ -225,37 +294,25 @@ def _extract_playable_zip(
         if nested_candidates:
             raise AssertionError(f"playable ZIP contains prior candidate: {sorted(nested_candidates)}")
         archive.extractall(destination)
-    mod_roots = {}
-    with zipfile.ZipFile(destination / "client" / "resources" / "mod_templates.zip") as resources:
-        resource_files = {
-            info.filename for info in resources.infolist() if not info.is_dir()
-        }
-        document = json.loads(resources.read("index.json"))
-        variants = document.get("variants")
-        if (
-            document.get("schema") != 2
-            or document.get("physical_options") != [
-                "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
-            ]
-            or document.get("map_content_options") != []
-            or not isinstance(variants, dict)
-            or len(variants) != 8
-        ):
-            raise AssertionError("internal room template resource layout is invalid")
-        expected_resources = {"index.json"} | {
-            entry.get("file") for entry in variants.values()
-            if isinstance(entry, dict) and isinstance(entry.get("file"), str)
-        }
-        if resource_files != expected_resources:
-            raise AssertionError("internal room template resource files are invalid")
-        resources.extractall(destination / "template-resources")
-    for signature, entry in variants.items():
-        mod_zip = destination / "template-resources" / entry["file"]
-        mod_root = destination / f"mod-{signature}"
-        with zipfile.ZipFile(mod_zip) as archive:
-            archive.extractall(mod_root)
-        mod_roots[signature] = mod_root
-    return mod_roots, destination / "client", destination / "RELEASE_MANIFEST.json"
+    client_dir = destination / "client"
+    resource_dir = client_dir / "resources"
+    payload_manifest = load_room_payload_manifest(resource_dir / ROOM_PAYLOAD_MANIFEST_NAME)
+    assembled, _ = assemble_room_files(
+        resource_dir / BASE_RESOURCE_NAME,
+        resource_dir / ROOM_PAYLOAD_RESOURCE_NAME,
+        payload_manifest,
+        {
+            "randomize_chainsaw": True,
+            "randomize_dash": True,
+            "randomize_first_battery": True,
+        },
+    )
+    mod_root = destination / "assembled-room-mod"
+    for member, content in assembled.items():
+        path = mod_root / member
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    return {"direct": mod_root}, client_dir, destination / "RELEASE_MANIFEST.json"
 
 
 def main() -> int:
@@ -277,23 +334,15 @@ def main() -> int:
             mod_roots, client_dir, manifest = _extract_playable_zip(
                 args.playable_zip, Path(directory)
             )
-            first_signature = "1110"
-            physical_on = audit_release(
-                args.enabled == "1", args.generated_maps, mod_roots[first_signature],
+            audit_release(
+                args.enabled == "1", args.generated_maps, mod_roots["direct"],
                 client_dir, manifest, args.map_registry, args.decompressor,
             )
-            for mod_root in mod_roots.values():
-                _audit_locales(args.enabled == "1", mod_root)
-            for signature, mod_root in mod_roots.items():
-                audit = audit_mod_payload(
-                args.enabled == "1", args.generated_maps, mod_root,
+            _audit_locales(args.enabled == "1", mod_roots["direct"])
+            audit_mod_payload(
+                args.enabled == "1", args.generated_maps, mod_roots["direct"],
                 args.map_registry, args.decompressor,
-                require_generated_identity=False,
-                )
-                for map_key in physical_on:
-                    for field in ("major_notification_count", "filler_notification_count"):
-                        if physical_on[map_key][field] != audit[map_key][field]:
-                            raise AssertionError(f"physical template notification payloads diverge: {signature}/{map_key}")
+            )
         return 0
     if not all((args.mod_root, args.client_dir, args.release_manifest)):
         parser.error("local audit requires --mod-root, --client-dir, and --release-manifest")

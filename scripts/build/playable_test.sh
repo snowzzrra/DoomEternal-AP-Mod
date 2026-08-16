@@ -433,6 +433,7 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/launcher_core.py" "$REPO_ROOT/launcher_integration.py" \
     "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
     "$REPO_ROOT/launcher_ui.py" "$REPO_ROOT/launcher_native_health.py" \
+    "$REPO_ROOT/launcher_doctor.py" \
     "$REPO_ROOT/options_foundation.py" \
     "$REPO_ROOT/map_registry.py" \
     "$REPO_ROOT/observer_lifecycle.py" \
@@ -442,10 +443,28 @@ cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
+mkdir -p "$OUTPUT_DIR/client/doom_eap/launcher" "$OUTPUT_DIR/client/doom_eap/runtime"
+cp "$REPO_ROOT/doom_eap/__init__.py" "$OUTPUT_DIR/client/doom_eap/"
+cp "$REPO_ROOT/doom_eap/launcher/__init__.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_app.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_controller.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_core.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_doctor.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_integration.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_native_health.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_platform.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_supervisor.py" \
+   "$REPO_ROOT/doom_eap/launcher/launcher_ui.py" \
+   "$OUTPUT_DIR/client/doom_eap/launcher/"
+cp "$REPO_ROOT/doom_eap/runtime/"*.py "$OUTPUT_DIR/client/doom_eap/runtime/"
 mkdir -p "$OUTPUT_DIR/client/tools/maps"
 cp "$REPO_ROOT/tools/__init__.py" "$OUTPUT_DIR/client/tools/__init__.py"
 cp "$REPO_ROOT/tools/maps/start_with_automap.py" \
      "$OUTPUT_DIR/client/tools/maps/start_with_automap.py"
+mkdir -p "$OUTPUT_DIR/client/tools/release"
+cp "$REPO_ROOT/tools/release/__init__.py" \
+   "$REPO_ROOT/tools/release/room_payloads.py" \
+   "$OUTPUT_DIR/client/tools/release/"
 cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
     "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
@@ -470,13 +489,10 @@ for map_row in "${MAP_ROWS[@]}"; do
     cp "$REPO_ROOT/$manifest_path" "$OUTPUT_DIR/client/manifests/"
 done
 cp -R "$REPO_ROOT/player_templates" "$OUTPUT_DIR/client/"
-(
-    cd "$WORKSPACE/Archipelago"
-    SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \
-        Launcher.py "Build APWorlds" -- "DOOM Eternal" --skip_open_folder
-)
-cp "$WORKSPACE/Archipelago/build/apworlds/doometernal.apworld" \
-    "$OUTPUT_DIR/doometernal.apworld"
+SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" -m tools.release.apworld_cache \
+    --output "$OUTPUT_DIR/doometernal.apworld" \
+    --archipelago-source "$WORKSPACE/Archipelago" \
+    --archipelago-python "$ARCHIPELAGO_PYTHON"
 chmod +x "$OUTPUT_DIR/client/run_bridge.sh"
 
 LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-$ARCHIPELAGO_PYTHON}"
@@ -511,25 +527,23 @@ Path(sys.argv[2]).write_text(json.dumps(identity, indent=2) + "\n", encoding="ut
 PY
 
 mkdir -p "$OUTPUT_DIR/client/resources"
-TEMPLATE_STAGE="$TEMP_DIR/mod_templates"
-mkdir -p "$TEMPLATE_STAGE"
-python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$TEMPLATE_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" <<'PY'
+ROOM_STAGE="$TEMP_DIR/room-payloads"
+mkdir -p "$ROOM_STAGE"
+python3 - "$REPO_ROOT" "$MOD_STAGING_DIR" "$ROOM_STAGE" "$TOOLS_DIR/idFileDeCompressor" "$MAP_SOURCES_FILE" "$OUTPUT_DIR/client/resources" <<'PY'
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
-import zipfile
-from itertools import product
 from pathlib import Path
 
-root, staged, template_root, compressor, map_sources_path = map(Path, sys.argv[1:])
+root, staged, room_root, compressor, map_sources_path, resources = map(Path, sys.argv[1:])
 sys.path.insert(0, str(root))
-from launcher_core import ModCompiler, SeedManifest
-from physical_options import (
-    MAP_CONTENT_OPTION_KEYS,
-    PHYSICAL_OPTION_KEYS,
-    map_content_signature,
+from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
+from physical_options import PHYSICAL_OPTION_KEYS
+from tools.release.room_payloads import (
+    BASE_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME, ROOM_PAYLOAD_RESOURCE_NAME,
+    canonical_json, resource_metadata, validate_room_payload_manifest,
+    write_deterministic_zip, zip_directory,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 from content_catalog import load_content_catalog
@@ -552,69 +566,70 @@ maps = {
 }
 if tuple(maps) != campaign_map_keys:
     raise SystemExit("Campaign template map set does not match map contract")
-variant_maps = {}
-for bits in product((False, True), repeat=len(PHYSICAL_OPTION_KEYS) + len(MAP_CONTENT_OPTION_KEYS)):
-    options = dict(zip(PHYSICAL_OPTION_KEYS + MAP_CONTENT_OPTION_KEYS, bits))
-    signature = map_content_signature(options)
-    manifest = SeedManifest.create(
-        seed_name="physical-template", team=0, slot=1, options=options,
-        active_location_ids=compiler.active_location_ids(options),
-    )
-    variant_maps[signature] = {}
-    for map_key, (_, member, vanilla) in maps.items():
-        entities = template_root / f"{signature}-{map_key}.entities"
+base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
+payload_files = {}
+dependent = {
+    "e1m1_intro": [
+        ({"randomize_chainsaw": False}, "default"),
+        ({"randomize_chainsaw": True}, "chainsaw"),
+    ],
+    "e1m2_war": [
+        ({"randomize_dash": False, "randomize_first_battery": False}, "default"),
+        ({"randomize_dash": True, "randomize_first_battery": False}, "dash"),
+        ({"randomize_dash": False, "randomize_first_battery": True}, "battery"),
+        ({"randomize_dash": True, "randomize_first_battery": True}, "dash-battery"),
+    ],
+}
+map_records = {}
+for map_key, (resource_path, relative, vanilla) in maps.items():
+    option_keys = sorted(dependent.get(map_key, [{}])[0][0])
+    target_member = f"{Path(resource_path).stem}/maps/{relative}"
+    states = []
+    for options, state_name in dependent.get(
+        map_key,
+        [({}, "default")],
+    ):
+        if state_name == "default":
+            states.append({"options": {key: False for key in option_keys}, "source": "base", "member": None, "sha256": base_members[target_member]})
+            continue
+        manifest = SeedManifest.create(
+            seed_name=f"room-payload-{map_key}-{state_name}", team=0, slot=1, options=options,
+            active_location_ids=compiler.active_location_ids(options),
+        )
+        entities = room_root / f"{map_key}-{state_name}.entities"
         compiler.compile_map(manifest, vanilla, entities, map_key)
-        packed = template_root / f"{signature}-{map_key}.packed"
+        patch_mission_complete_maps(
+            root / "data/mission_complete_map_contracts.json", {map_key: entities}, staged
+        )
+        packed = room_root / f"{map_key}-{state_name}.packed"
         subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
-        variant_maps[signature][map_key] = packed
-    patch_mission_complete_maps(
-        root / "data/mission_complete_map_contracts.json",
-        {
-            map_key: template_root / f"{signature}-{map_key}.entities"
-            for map_key in maps
-        },
-        staged,
-    )
-    for map_key in maps:
-        entities = template_root / f"{signature}-{map_key}.entities"
-        packed = template_root / f"{signature}-{map_key}.packed"
-        subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
-
-variants = {}
-for signature, members in variant_maps.items():
-    destination = template_root / f"map-content-{signature}.zip"
-    mod = template_root / f"mod-{signature}"
-    shutil.copytree(staged, mod)
-    for map_key, packed in members.items():
-        resource_path, relative, _ = maps[map_key]
-        target = mod / Path(resource_path).stem / "maps" / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(packed, target)
-    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
-        for path in sorted(mod.rglob("*")):
-            if path.is_file():
-                output.write(path, path.relative_to(mod).as_posix())
-    variants[signature] = {
-        "file": destination.name,
-        "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
-        "maps": {
-            key: hashlib.sha256(value.read_bytes()).hexdigest()
-            for key, value in members.items()
-        },
+        member = f"replacements/{map_key}/{state_name}.entities"
+        payload_files[member] = packed.read_bytes()
+        states.append({
+            "options": options, "source": "replacement", "member": member,
+            "sha256": hashlib.sha256(packed.read_bytes()).hexdigest(),
+        })
+    map_records[map_key] = {
+        "option_keys": option_keys,
+        "target_member": target_member,
+        "states": states,
     }
-(template_root / "index.json").write_text(json.dumps({
-    "schema": 2,
-    "physical_options": list(PHYSICAL_OPTION_KEYS),
-    "map_content_options": list(MAP_CONTENT_OPTION_KEYS),
-    "variants": variants,
-}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-with zipfile.ZipFile(root / "build/release/client/resources/mod_templates.zip", "w", zipfile.ZIP_DEFLATED) as output:
-    output.write(template_root / "index.json", "index.json")
-    for entry in variants.values():
-        output.write(template_root / entry["file"], entry["file"])
+payload_manifest = {
+    "schema_version": 1,
+    "model": "dependent_map_payloads",
+    "physical_option_keys": list(PHYSICAL_OPTION_KEYS),
+    "base_members": sorted(base_members),
+    "maps": map_records,
+}
+validate_room_payload_manifest(
+    payload_manifest,
+    known_maps={record_key: record["target_member"] for record_key, record in map_records.items()},
+)
+write_deterministic_zip(payload_files, resources / ROOM_PAYLOAD_RESOURCE_NAME)
+(resources / ROOM_PAYLOAD_MANIFEST_NAME).write_bytes(canonical_json(payload_manifest))
 PY
 
-python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" "$TEMP_DIR/public_files.json" <<'PY'
+python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" <<'PY'
 import hashlib
 import json
 import sys
@@ -634,7 +649,6 @@ generated_map_hashes = {
     for plan in plans
 }
 visual_registry_path = output_dir / "client/data/checked_location_visuals.json"
-template_path = output_dir / "client/resources/mod_templates.zip"
 launcher_executable = (
     "DoomEternalArchipelagoLauncher.exe"
     if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
@@ -666,18 +680,36 @@ public_files = [
         "client/launcher_supervisor.py",
         "client/launcher_ui.py",
         "client/launcher_native_health.py",
+        "client/launcher_doctor.py",
         "client/options_foundation.py",
         "client/map_registry.py",
         "client/observer_lifecycle.py",
         "client/publisher_contracts.py",
         "client/publisher_runtime.py",
+        "client/doom_eap/__init__.py",
+        "client/doom_eap/launcher/__init__.py",
+        "client/doom_eap/launcher/launcher_app.py",
+        "client/doom_eap/launcher/launcher_controller.py",
+        "client/doom_eap/launcher/launcher_core.py",
+        "client/doom_eap/launcher/launcher_doctor.py",
+        "client/doom_eap/launcher/launcher_integration.py",
+        "client/doom_eap/launcher/launcher_native_health.py",
+        "client/doom_eap/launcher/launcher_platform.py",
+        "client/doom_eap/launcher/launcher_supervisor.py",
+        "client/doom_eap/launcher/launcher_ui.py",
+        "client/doom_eap/runtime/__init__.py",
+        "client/doom_eap/runtime/publisher_runtime.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/tools/__init__.py",
         "client/tools/maps/start_with_automap.py",
+        "client/tools/release/__init__.py",
+        "client/tools/release/room_payloads.py",
         "client/run_bridge.sh",
         "client/doom_logo.png",
-        "client/resources/mod_templates.zip",
+        "client/resources/base_mod.zip",
+        "client/resources/room_payloads.zip",
+        "client/resources/room_payload_manifest.json",
         "client/runtime_install.sh",
         "client/validate_runtime_install.sh",
         "client/ap_config.example.json",
@@ -705,20 +737,17 @@ public_files = [
         launcher_executable,
 ]
 
-(output_dir / "RELEASE_MANIFEST.json").write_text(
-    json.dumps({
-        "version": release_version,
-        "checked_location_visuals": {
-            "path": "client/data/checked_location_visuals.json",
-            "sha256": hashlib.sha256(visual_registry_path.read_bytes()).hexdigest(),
-            "authoritative_fingerprint": json.loads(visual_registry_path.read_text(encoding="utf-8"))["authoritative_fingerprint"],
-            "generated_map_sha256": generated_map_hashes,
-            "templates_sha256": hashlib.sha256(template_path.read_bytes()).hexdigest(),
-        },
-    }, indent=2) + "\n",
-    encoding="utf-8",
+from tools.release.release_manifest import build_release_manifest, write_release_manifest
+write_release_manifest(
+    output_dir / "RELEASE_MANIFEST.json",
+    build_release_manifest(
+        Path(sys.argv[3]),
+        generated_maps=output_dir / "build/generated-maps",
+        public_files=public_files,
+        release_version=release_version,
+        room_resources=output_dir / "client/resources",
+    ),
 )
-Path(sys.argv[5]).write_text(json.dumps(public_files, indent=2) + "\n", encoding="utf-8")
 PY
 
 if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
@@ -869,14 +898,39 @@ assert not any(
 PY
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
-unzip -q "$EXTRACTED_AUDIT_DIR/client/resources/mod_templates.zip" index.json map-content-111.zip -d "$TEMP_DIR/template-resource"
-unzip -q "$TEMP_DIR/template-resource/map-content-111.zip" -d "$MOD_AUDIT_DIR"
+MOD_AUDIT_ZIP="$TEMP_DIR/assembled-room-mod.zip"
+python3 - "$EXTRACTED_AUDIT_DIR/client/resources" "$MOD_AUDIT_DIR" "$MOD_AUDIT_ZIP" <<'PY'
+import sys
+from pathlib import Path
+from tools.release.room_payloads import (
+    BASE_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME, ROOM_PAYLOAD_RESOURCE_NAME,
+    assemble_room_files, load_room_payload_manifest, write_deterministic_zip,
+)
+
+resources, mod_root, archive = map(Path, sys.argv[1:])
+manifest = load_room_payload_manifest(resources / ROOM_PAYLOAD_MANIFEST_NAME)
+assembled, _ = assemble_room_files(
+    resources / BASE_RESOURCE_NAME,
+    resources / ROOM_PAYLOAD_RESOURCE_NAME,
+    manifest,
+    {
+        "randomize_chainsaw": True,
+        "randomize_dash": True,
+        "randomize_first_battery": True,
+    },
+)
+for member, content in assembled.items():
+    target = mod_root / member
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+write_deterministic_zip(assembled, archive)
+PY
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
     --generated-maps "$GENERATED_MAPS_DIR" \
     --source-map-root "$REPO_ROOT/vanillamaps" \
-    --zip "$TEMP_DIR/template-resource/map-content-111.zip"
+    --zip "$MOD_AUDIT_ZIP"
 if find "$MOD_AUDIT_DIR" -path '*/generated/decls/propitem/propitem/ap*' -o \
     -path '*/generated/decls/propitem/propitem/equipment/ice_bomb.decl' -o \
     -path '*/generated/decls/propitem/propitem/weapon/rocket_launcher/base.decl' -o \
@@ -963,11 +1017,11 @@ if printf '%s\n' "${PACKAGE_FILES[@]}" | grep -E -i -q \
     echo "Final ZIP contains a prohibited external dependency" >&2
     exit 1
 fi
-mapfile -t ALLOWED_FILES < <(python3 - "$TEMP_DIR/public_files.json" <<'PY'
+mapfile -t ALLOWED_FILES < <(python3 - "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" <<'PY'
 import json
 import sys
 
-files = json.load(open(sys.argv[1], encoding="utf-8"))
+files = json.load(open(sys.argv[1], encoding="utf-8"))["public_files"]
 for name in sorted(set(files + ["doometernal.apworld"])):
     print(name)
 PY
@@ -997,6 +1051,6 @@ if [[ ! -f "$OUTPUT_DIR/$PTB_ZIP_NAME" ]] || \
     exit 1
 fi
 echo "Playable development build created at: $OUTPUT_DIR"
-echo "Room mod template resource: $OUTPUT_DIR/client/resources/mod_templates.zip"
+echo "Room compiler resources: $OUTPUT_DIR/client/resources/base_mod.zip, room_payloads.zip, room_payload_manifest.json"
 echo "Development bundle: $OUTPUT_DIR/$PTB_ZIP_NAME"
 echo "Build log: $BUILD_LOG"

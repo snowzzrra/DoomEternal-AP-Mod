@@ -1,4 +1,4 @@
-from launcher_core import LaunchWorkflow, ModCompiler, RoomSnapshot, release_identity
+from doom_eap.launcher.launcher_core import LaunchWorkflow, ModCompiler, RoomSnapshot, release_identity
 
 
 def _snapshot() -> RoomSnapshot:

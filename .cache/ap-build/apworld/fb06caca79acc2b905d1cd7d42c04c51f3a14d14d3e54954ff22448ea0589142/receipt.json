@@ -1,0 +1,11 @@
+{
+  "key": "fb06caca79acc2b905d1cd7d42c04c51f3a14d14d3e54954ff22448ea0589142",
+  "kind": "apworld",
+  "outputs": {
+    "doometernal.apworld": {
+      "sha256": "bfec07f4aa0dcf01f78239fd62ab4f1492122a8f248442f00007dbcb3d5af785",
+      "size": 231398
+    }
+  },
+  "schema": 1
+}

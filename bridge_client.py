@@ -67,7 +67,7 @@ from observer_lifecycle import (
 from publisher_contracts import (
     load_publisher_contracts,
 )
-from publisher_runtime import (
+from doom_eap.runtime.publisher_runtime import (
     PublisherEngine,
     publisher_acknowledged,
     quarantine_malformed_event,
