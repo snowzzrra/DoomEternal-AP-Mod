@@ -1,4 +1,4 @@
-from deathlink_receive import DeathLinkReceiver, ReceiveState
+from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState
 
 
 class FakeSpool:

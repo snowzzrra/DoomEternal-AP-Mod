@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Add root to sys.path to import from challenge_registry
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from challenge_registry import load_challenge_registry
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 from tools.decls.mission_challenge_decl_builder import (
     AGGREGATE_SOURCE_OWNER,
     AGGREGATE_TARGET_OWNER,

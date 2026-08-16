@@ -20,6 +20,7 @@ FORBIDDEN_CLEANUP_TERMS = (
     "vanilla", "progression", "relay", "objective", "encounter", "door",
     "elevator", "mission complete", "mission_complete",
 )
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _canonical_hash(value: object) -> str:
@@ -97,7 +98,7 @@ def _authoritative_fingerprint(root: Path, catalog: Any) -> str:
             "resource": _resource_identity(spec),
         })
     locations = []
-    from content_catalog import thaw_content
+    from doom_eap.content.content_catalog import thaw_content
     for location in sorted(catalog.physical_locations, key=lambda item: (item.map_key, item.location_id)):
         if not catalog.maps[location.map_key].enabled:
             continue
@@ -120,7 +121,7 @@ def _resolved_visual_policy(location_id: int, policy: dict[str, Any]) -> dict[st
 
 
 def build_authorial_registry(root: Path) -> dict[str, Any]:
-    from content_catalog import load_content_catalog, thaw_content
+    from doom_eap.content.content_catalog import load_content_catalog, thaw_content
 
     catalog = load_content_catalog(root)
     identity = json.loads((root / "data" / "content_identity.json").read_text(encoding="utf-8"))
@@ -248,15 +249,14 @@ def _validate_common(document: Any) -> dict[str, Any]:
 
 def load_automap_visual_registry(path: Path | None = None) -> dict[str, Any]:
     if path is None:
-        path = Path(__file__).resolve().with_name("data") / "checked_location_visuals.json"
+        path = REPO_ROOT / "data" / "checked_location_visuals.json"
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
         _validate_common(document)
         identity = json.loads(path.with_name("content_identity.json").read_text(encoding="utf-8"))
         _require(document["content_revision"] == identity["content_revision"], "visual registry content revision stale")
         _require(document["compiler_revision"] == identity["compiler_revision"], "visual registry compiler revision stale")
-        root = path.parent.parent
-        expected_rows = _manifest_rows(root)
+        expected_rows = _manifest_rows(REPO_ROOT)
         expected = {(row["map_key"], row["location_id"], row["ap_check"]): row for row in expected_rows}
         actual = {(entry["map_key"], entry["location_id"], entry["ap_check"]): entry for entry in document["entries"]}
         _require(set(actual) == set(expected), "visual registry diverges from packaged catalog")
@@ -272,7 +272,7 @@ def load_automap_visual_registry(path: Path | None = None) -> dict[str, Any]:
                 "source_sha256": source.get("source_sha256", ""),
                 "resource": _packaged_resource_identity(source),
             }
-            for map_key, source in json.loads((root / "data" / "map_sources.json").read_text(encoding="utf-8"))["maps"].items()
+            for map_key, source in json.loads((REPO_ROOT / "data" / "map_sources.json").read_text(encoding="utf-8"))["maps"].items()
             if source.get("enabled", True)
         }
         for map_key, expected_map in expected_maps.items():

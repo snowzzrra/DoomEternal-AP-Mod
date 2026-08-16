@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from physical_options import (
+from doom_eap.content.physical_options import (
     DEATH_LINK_MODES,
     PHYSICAL_OPTION_KEYS,
     physical_location_ids,
@@ -21,7 +21,8 @@ from physical_options import (
 )
 from tools.decls.devinv_builder import build_devinv_loadout, output_path_for_map
 
-ROOT = Path(__file__).resolve().parents[2]
+MODULE_DIR = Path(__file__).resolve().parent
+ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 2
@@ -459,7 +460,7 @@ class ModCompiler:
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        from content_catalog import load_content_catalog
+        from doom_eap.content.content_catalog import load_content_catalog
 
         campaign_maps = tuple(
             spec for spec in load_content_catalog(self.root).enabled_maps()
@@ -489,8 +490,8 @@ class ModCompiler:
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,
                     map_key: str = "e1m2_war") -> Path:
         """Compile one physical-option map. Caller supplies legal local vanilla dump."""
-        from item_classification import load_item_classifications
-        from item_reconciliation import load_policy_registry
+        from doom_eap.content.item_classification import load_item_classifications
+        from doom_eap.runtime.item_reconciliation import load_policy_registry
         from tools.maps.ap_map_generator import generate_map
 
         item_definitions = json.loads(

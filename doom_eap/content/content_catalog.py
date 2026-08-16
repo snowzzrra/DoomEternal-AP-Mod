@@ -14,12 +14,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from ap_visual_contract import load_ap_visual_contract
-from publisher_contracts import (EFFECT_STRATEGIES, TRIGGER_STRATEGIES,
+from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
+from doom_eap.contracts.publisher_contracts import (EFFECT_STRATEGIES, TRIGGER_STRATEGIES,
                                  PublisherContract, publisher_contracts_from_document)
 
 
-ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
 PHYSICAL_STRATEGIES = frozenset({
     "prop_pickup", "interactable", "codex", "audio_terminal",
     "secret_encounter", "armor_terminal", "independent_trigger",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from content_catalog import discover_maps
+from doom_eap.content.content_catalog import discover_maps
 from tools.maps.map_semantic_baseline import accept_map_baseline
 from tools.validation.pipeline import Pipeline
 

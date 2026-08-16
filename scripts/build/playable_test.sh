@@ -65,9 +65,9 @@ import hashlib
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from challenge_registry import challenge_registry_document
-from content_catalog import load_content_catalog
-from publisher_contracts import publisher_contracts_document
+from doom_eap.contracts.challenge_registry import challenge_registry_document
+from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.contracts.publisher_contracts import publisher_contracts_document
 catalog = load_content_catalog(Path(sys.argv[1]))
 target = Path(sys.argv[2])
 (target / "challenge_location_registry.json").write_text(
@@ -272,7 +272,7 @@ fi
 cp -R "$REPO_ROOT/packaging/mod_assets/." "$MOD_STAGING_DIR/"
 
 mapfile -t MAP_ROWS < <(
-    python3 "$REPO_ROOT/map_registry.py" release-rows --authorial --registry "$MAP_SOURCES_FILE"
+    python3 -m doom_eap.content.map_registry release-rows --authorial --registry "$MAP_SOURCES_FILE"
 )
 MISSION_MAP_ARGS=()
 
@@ -417,33 +417,41 @@ cp "$REPO_ROOT/packaging/EternalMod.json" "$MOD_STAGING_DIR/EternalMod.json"
 cp "$REPO_ROOT/README.md" "$OUTPUT_DIR/README.md"
 cp "$REPO_ROOT/docs/INSTALL.md" "$OUTPUT_DIR/INSTALL.md"
 cp "$REPO_ROOT/docs/LICENSE" "$OUTPUT_DIR/LICENSE"
-cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" \
-    "$REPO_ROOT/bridge_client.py" "$REPO_ROOT/bootstrap_actions.py" \
-    "$REPO_ROOT/deathlink_receive.py" \
-    "$REPO_ROOT/campaign_goal_contract.py" \
-    "$REPO_ROOT/challenge_registry.py" \
-    "$REPO_ROOT/content_catalog.py" "$REPO_ROOT/automap_visual_registry.py" \
-    "$REPO_ROOT/ap_visual_contract.py" \
-    "$REPO_ROOT/foundation.py" \
-    "$REPO_ROOT/item_classification.py" \
-    "$REPO_ROOT/item_contracts.py" \
-    "$REPO_ROOT/item_reconciliation.py" \
-    "$REPO_ROOT/rune_reconciliation.py" \
-    "$REPO_ROOT/launcher_app.py" "$REPO_ROOT/launcher_controller.py" \
-    "$REPO_ROOT/launcher_core.py" "$REPO_ROOT/launcher_integration.py" \
-    "$REPO_ROOT/launcher_platform.py" "$REPO_ROOT/launcher_supervisor.py" \
-    "$REPO_ROOT/launcher_ui.py" "$REPO_ROOT/launcher_native_health.py" \
-    "$REPO_ROOT/launcher_doctor.py" \
-    "$REPO_ROOT/options_foundation.py" \
-    "$REPO_ROOT/map_registry.py" \
-    "$REPO_ROOT/observer_lifecycle.py" \
-    "$REPO_ROOT/publisher_contracts.py" \
-    "$REPO_ROOT/publisher_runtime.py" \
-    "$REPO_ROOT/scripts/launch/run_bridge.sh" "$REPO_ROOT/save_decrypt.py" \
+cp "$CLIENT_BUILD_DIR/ap_client.exe" "$CLIENT_BUILD_DIR/save_death_probe.exe" "$OUTPUT_DIR/client/"
+cp "$REPO_ROOT/doom_eap/runtime/bridge_client.py" "$OUTPUT_DIR/client/bridge_client.py"
+cp "$REPO_ROOT/doom_eap/runtime/bootstrap_actions.py" "$OUTPUT_DIR/client/bootstrap_actions.py"
+cp "$REPO_ROOT/doom_eap/runtime/deathlink_receive.py" "$OUTPUT_DIR/client/deathlink_receive.py"
+cp "$REPO_ROOT/doom_eap/contracts/campaign_goal_contract.py" "$OUTPUT_DIR/client/campaign_goal_contract.py"
+cp "$REPO_ROOT/doom_eap/contracts/challenge_registry.py" "$OUTPUT_DIR/client/challenge_registry.py"
+cp "$REPO_ROOT/doom_eap/content/content_catalog.py" "$OUTPUT_DIR/client/content_catalog.py"
+cp "$REPO_ROOT/doom_eap/content/automap_visual_registry.py" "$OUTPUT_DIR/client/automap_visual_registry.py"
+cp "$REPO_ROOT/doom_eap/contracts/ap_visual_contract.py" "$OUTPUT_DIR/client/ap_visual_contract.py"
+cp "$REPO_ROOT/doom_eap/contracts/foundation.py" "$OUTPUT_DIR/client/foundation.py"
+cp "$REPO_ROOT/doom_eap/content/item_classification.py" "$OUTPUT_DIR/client/item_classification.py"
+cp "$REPO_ROOT/doom_eap/contracts/item_contracts.py" "$OUTPUT_DIR/client/item_contracts.py"
+cp "$REPO_ROOT/doom_eap/runtime/item_reconciliation.py" "$OUTPUT_DIR/client/item_reconciliation.py"
+cp "$REPO_ROOT/doom_eap/runtime/rune_reconciliation.py" "$OUTPUT_DIR/client/rune_reconciliation.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_app.py" "$OUTPUT_DIR/client/launcher_app.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_controller.py" "$OUTPUT_DIR/client/launcher_controller.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_core.py" "$OUTPUT_DIR/client/launcher_core.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_integration.py" "$OUTPUT_DIR/client/launcher_integration.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_platform.py" "$OUTPUT_DIR/client/launcher_platform.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_supervisor.py" "$OUTPUT_DIR/client/launcher_supervisor.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_ui.py" "$OUTPUT_DIR/client/launcher_ui.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_native_health.py" "$OUTPUT_DIR/client/launcher_native_health.py"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_doctor.py" "$OUTPUT_DIR/client/launcher_doctor.py"
+cp "$REPO_ROOT/doom_eap/content/options_foundation.py" "$OUTPUT_DIR/client/options_foundation.py"
+cp "$REPO_ROOT/doom_eap/content/map_registry.py" "$OUTPUT_DIR/client/map_registry.py"
+cp "$REPO_ROOT/doom_eap/runtime/observer_lifecycle.py" "$OUTPUT_DIR/client/observer_lifecycle.py"
+cp "$REPO_ROOT/doom_eap/contracts/publisher_contracts.py" "$OUTPUT_DIR/client/publisher_contracts.py"
+cp "$REPO_ROOT/doom_eap/runtime/publisher_runtime.py" "$OUTPUT_DIR/client/publisher_runtime.py"
+cp "$REPO_ROOT/doom_eap/runtime/save_decrypt.py" "$OUTPUT_DIR/client/save_decrypt.py"
+cp "$REPO_ROOT/scripts/launch/run_bridge.sh" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
-mkdir -p "$OUTPUT_DIR/client/doom_eap/launcher" "$OUTPUT_DIR/client/doom_eap/runtime"
+mkdir -p "$OUTPUT_DIR/client/doom_eap/launcher" "$OUTPUT_DIR/client/doom_eap/runtime" \
+    "$OUTPUT_DIR/client/doom_eap/content" "$OUTPUT_DIR/client/doom_eap/contracts"
 cp "$REPO_ROOT/doom_eap/__init__.py" "$OUTPUT_DIR/client/doom_eap/"
 cp "$REPO_ROOT/doom_eap/launcher/__init__.py" \
    "$REPO_ROOT/doom_eap/launcher/launcher_app.py" \
@@ -457,6 +465,8 @@ cp "$REPO_ROOT/doom_eap/launcher/__init__.py" \
    "$REPO_ROOT/doom_eap/launcher/launcher_ui.py" \
    "$OUTPUT_DIR/client/doom_eap/launcher/"
 cp "$REPO_ROOT/doom_eap/runtime/"*.py "$OUTPUT_DIR/client/doom_eap/runtime/"
+cp "$REPO_ROOT/doom_eap/content/"*.py "$OUTPUT_DIR/client/doom_eap/content/"
+cp "$REPO_ROOT/doom_eap/contracts/"*.py "$OUTPUT_DIR/client/doom_eap/contracts/"
 mkdir -p "$OUTPUT_DIR/client/tools/maps"
 cp "$REPO_ROOT/tools/__init__.py" "$OUTPUT_DIR/client/tools/__init__.py"
 cp "$REPO_ROOT/tools/maps/start_with_automap.py" \
@@ -539,14 +549,14 @@ from pathlib import Path
 root, staged, room_root, compressor, map_sources_path, resources = map(Path, sys.argv[1:])
 sys.path.insert(0, str(root))
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
-from physical_options import PHYSICAL_OPTION_KEYS
+from doom_eap.content.physical_options import PHYSICAL_OPTION_KEYS
 from tools.release.room_payloads import (
     BASE_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME, ROOM_PAYLOAD_RESOURCE_NAME,
     canonical_json, resource_metadata, validate_room_payload_manifest,
     write_deterministic_zip, zip_directory,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from content_catalog import load_content_catalog
+from doom_eap.content.content_catalog import load_content_catalog
 
 compiler = ModCompiler(root)
 map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
@@ -638,7 +648,7 @@ from pathlib import Path
 output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
 sys.path.insert(0, sys.argv[3])
-from map_registry import load_map_registry, release_plan
+from doom_eap.content.map_registry import load_map_registry, release_plan
 from tools.validation.release_layout import expected_release_roots
 plans = release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
 map_manifest_files = [plan.client_manifest for plan in plans]
@@ -687,6 +697,20 @@ public_files = [
         "client/publisher_contracts.py",
         "client/publisher_runtime.py",
         "client/doom_eap/__init__.py",
+        "client/doom_eap/content/__init__.py",
+        "client/doom_eap/content/automap_visual_registry.py",
+        "client/doom_eap/content/content_catalog.py",
+        "client/doom_eap/content/item_classification.py",
+        "client/doom_eap/content/map_registry.py",
+        "client/doom_eap/content/options_foundation.py",
+        "client/doom_eap/content/physical_options.py",
+        "client/doom_eap/contracts/__init__.py",
+        "client/doom_eap/contracts/ap_visual_contract.py",
+        "client/doom_eap/contracts/campaign_goal_contract.py",
+        "client/doom_eap/contracts/challenge_registry.py",
+        "client/doom_eap/contracts/foundation.py",
+        "client/doom_eap/contracts/item_contracts.py",
+        "client/doom_eap/contracts/publisher_contracts.py",
         "client/doom_eap/launcher/__init__.py",
         "client/doom_eap/launcher/launcher_app.py",
         "client/doom_eap/launcher/launcher_controller.py",
@@ -698,7 +722,14 @@ public_files = [
         "client/doom_eap/launcher/launcher_supervisor.py",
         "client/doom_eap/launcher/launcher_ui.py",
         "client/doom_eap/runtime/__init__.py",
+        "client/doom_eap/runtime/bootstrap_actions.py",
+        "client/doom_eap/runtime/bridge_client.py",
+        "client/doom_eap/runtime/deathlink_receive.py",
+        "client/doom_eap/runtime/item_reconciliation.py",
+        "client/doom_eap/runtime/observer_lifecycle.py",
         "client/doom_eap/runtime/publisher_runtime.py",
+        "client/doom_eap/runtime/rune_reconciliation.py",
+        "client/doom_eap/runtime/save_decrypt.py",
         "client/save_death_probe.exe",
         "client/save_decrypt.py",
         "client/tools/__init__.py",

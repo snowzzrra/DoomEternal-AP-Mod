@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from item_classification import notification_entity_name
-from map_registry import load_map_registry, release_plan
+from doom_eap.content.item_classification import notification_entity_name
+from doom_eap.content.map_registry import load_map_registry, release_plan
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 VALID_STATUSES = {
     "runtime_verified",
@@ -133,7 +135,7 @@ def load_primitive_registry() -> dict[str, Any]:
 
 def load_runtime_foundation_contracts(data_dir: Path | None = None) -> dict[str, Any]:
     """Load foundation contracts using runtime compiled projections only."""
-    data_dir = data_dir or (Path(__file__).resolve().parent / "data")
+    data_dir = data_dir or (REPO_ROOT / "data")
     contracts = dict(DELIVERY_CONTRACTS)
     registry = load_map_registry(root=data_dir.parent, authorial=False)
     plans = release_plan(registry)
@@ -149,7 +151,7 @@ def load_foundation_contracts(*, data_dir: Path | None = None, authorial: bool =
     if not authorial:
         return load_runtime_foundation_contracts(data_dir)
     contracts = dict(DELIVERY_CONTRACTS)
-    root = Path(__file__).resolve().parent
+    root = REPO_ROOT
     registry = load_map_registry(root=root, authorial=True)
     plans = release_plan(registry)
     contracts["active_maps"] = {plan.map_key: plan.runtime_map for plan in plans}

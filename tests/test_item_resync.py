@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
 
-from item_reconciliation import (
+from doom_eap.runtime.item_reconciliation import (
     NEVER_REPLAY,
     REPLAY_IDEMPOTENT,
     ReplayPolicy,
@@ -70,7 +70,7 @@ def test_reconciliation_history_stops_at_processed_boundary():
     definitions = {item: "simple" for item in range(13)}
     registry = _registry(*[(item_id, REPLAY_IDEMPOTENT) for item_id in range(13)])
 
-    with patch("item_reconciliation.compile_item_delivery_plan", _fake_delivery):
+    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
         plan = compile_reconciliation_plan(
             observed.historical_authoritative_item_ids,
             definitions,
@@ -183,7 +183,7 @@ def test_legacy_session_migration_is_identity_bound_before_normalization():
 
 def test_never_replay_has_zero_commands():
     definitions = {1: "simple"}
-    with patch("item_reconciliation.compile_item_delivery_plan", _fake_delivery):
+    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
         plan = compile_reconciliation_plan(
             [1, 1], definitions, _registry((1, NEVER_REPLAY)), "room-0-1", 4
         )
@@ -194,7 +194,7 @@ def test_never_replay_has_zero_commands():
 
 def test_replay_safe_plan_is_one_silent_reconciliation_command():
     definitions = {1: "simple"}
-    with patch("item_reconciliation.compile_item_delivery_plan", _fake_delivery):
+    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
         plan = compile_reconciliation_plan(
             [1], definitions, _registry((1, REPLAY_IDEMPOTENT)), "room-0-1", 4
         )

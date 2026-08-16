@@ -11,7 +11,7 @@ def _run_bridge_worker(arguments: list[str]) -> int:
     if archipelago_source and archipelago_source not in sys.path:
         sys.path.insert(0, archipelago_source)
 
-    from bridge_client import launch
+    from doom_eap.runtime.bridge_client import launch
 
     launch(*(argument for argument in arguments if argument != "--bridge-worker"))
     return 0

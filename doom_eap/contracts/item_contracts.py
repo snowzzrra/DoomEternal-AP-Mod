@@ -7,7 +7,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-ITEM_RUNTIME_CONTRACTS_FILE = Path(__file__).with_name("data") / "item_runtime_contracts.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ITEM_RUNTIME_CONTRACTS_FILE = REPO_ROOT / "data" / "item_runtime_contracts.json"
 DEFAULT_DEATH_LINK_MODE = "soft"
 
 
@@ -35,8 +36,8 @@ def validate_item_contracts(
     policies: Mapping[int, Any],
     contracts: Mapping[int, Mapping[str, Any]] | None = None,
 ) -> None:
-    from foundation import compile_item_delivery_plan
-    from item_classification import notification_entity_name
+    from doom_eap.contracts.foundation import compile_item_delivery_plan
+    from doom_eap.content.item_classification import notification_entity_name
 
     contracts = contracts or load_item_runtime_contracts()
     for item_id, contract in contracts.items():

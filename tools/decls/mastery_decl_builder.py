@@ -8,7 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from challenge_registry import load_challenge_registry
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
@@ -70,7 +70,7 @@ def _remove_single_block(source: str, field: str, entry_name: str) -> str:
 def _assert_proven_observer(masteries: list[dict]) -> None:
     if len(masteries) != 13:
         raise ValueError("refusing to strip rewards without the complete base mastery registry")
-    bridge = (ROOT / "bridge_client.py").read_text(encoding="utf-8")
+    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_client.py").read_text(encoding="utf-8")
     required = (
         "check_weapon_mastery_locations",
         "read_weapon_mastery_records",

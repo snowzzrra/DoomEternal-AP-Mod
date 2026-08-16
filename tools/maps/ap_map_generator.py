@@ -6,19 +6,19 @@ import os
 import re
 from pathlib import Path
 
-from ap_visual_contract import load_ap_visual_contract
-from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
-from foundation import (
+from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
+from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
+from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
     build_primitive,
     validate_primitive_registry,
 )
-from item_classification import (
+from doom_eap.content.item_classification import (
     load_item_classifications,
     notification_entity_name,
     notification_style_for_item,
 )
-from item_reconciliation import (
+from doom_eap.runtime.item_reconciliation import (
     AP_RECEIPT_FEEDBACK,
     SUPPORTED_RECEIPT_FEEDBACK,
     load_policy_registry,
@@ -52,7 +52,7 @@ def canonical_ap_visual_for_map(map_key):
     """Resolve the global AP visual only for registry-enabled campaign maps."""
     if not map_key:
         return None
-    from content_catalog import load_content_catalog
+    from doom_eap.content.content_catalog import load_content_catalog
 
     catalog = load_content_catalog()
     if map_key not in {spec.key for spec in catalog.enabled_maps()}:

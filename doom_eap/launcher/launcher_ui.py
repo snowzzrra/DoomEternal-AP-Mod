@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from .launcher_controller import LauncherController
 from .launcher_platform import redact_secrets
-from options_foundation import load_start_inventory_catalog, suggested_yaml_filename
+from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
 
 
 class NamedRangeControl(QWidget):

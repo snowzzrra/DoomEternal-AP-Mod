@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from content_catalog import ContentCatalog, load_content_catalog
+from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
@@ -181,10 +181,10 @@ def compile_catalog(
                     dst.write_bytes(content_bytes)
                     changed = True
 
-    from challenge_registry import challenge_registry_document
-    from map_registry import _catalog_registry
-    from publisher_contracts import publisher_contracts_document
-    from automap_visual_registry import build_authorial_registry
+    from doom_eap.contracts.challenge_registry import challenge_registry_document
+    from doom_eap.content.map_registry import _catalog_registry
+    from doom_eap.contracts.publisher_contracts import publisher_contracts_document
+    from doom_eap.content.automap_visual_registry import build_authorial_registry
 
     compiled_sources = _catalog_registry(catalog.root)
 
@@ -218,7 +218,7 @@ def compile_catalog(
         )
         write_artifact(catalog.root / "manifests" / f"{spec.key}.json", json.dumps(manifest, indent=4) + "\n")
 
-    from foundation import load_foundation_contracts
+    from doom_eap.contracts.foundation import load_foundation_contracts
 
     compiled_foundation = load_foundation_contracts(authorial=True)
     foundation_rendered = json.dumps(compiled_foundation, indent=2, sort_keys=True) + "\n"

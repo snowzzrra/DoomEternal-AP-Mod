@@ -10,7 +10,7 @@ import re
 import zipfile
 from pathlib import Path
 
-from challenge_registry import load_challenge_registry
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CHILD_SOURCE_OWNER = "gameresources"
@@ -151,7 +151,7 @@ def _assert_reward_owner(entries: list[dict]) -> None:
 
 
 def _assert_proven_observer() -> None:
-    bridge = (ROOT / "bridge_client.py").read_text(encoding="utf-8")
+    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_client.py").read_text(encoding="utf-8")
     required = (
         "read_mission_challenge_records",
         "observe_mission_challenges",

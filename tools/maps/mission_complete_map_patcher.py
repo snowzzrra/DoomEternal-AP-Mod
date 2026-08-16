@@ -9,8 +9,8 @@ import json
 import re
 from pathlib import Path
 
-from content_catalog import load_content_catalog
-from publisher_contracts import (
+from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
     load_publisher_contracts,
     map_publishers_for_owner,

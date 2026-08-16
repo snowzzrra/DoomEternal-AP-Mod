@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from foundation import compile_item_delivery_plan
+from doom_eap.contracts.foundation import compile_item_delivery_plan
 
 REPLAY_IDEMPOTENT = "replay_idempotent"
 SPECIAL_PROGRESSIVE = "special_progressive"

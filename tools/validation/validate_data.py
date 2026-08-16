@@ -14,17 +14,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
-from automap_visual_registry import build_authorial_registry, load_automap_visual_registry
-from challenge_registry import all_location_entries, load_challenge_registry
-from foundation import (
+from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
+from doom_eap.content.automap_visual_registry import build_authorial_registry, load_automap_visual_registry
+from doom_eap.contracts.challenge_registry import all_location_entries, load_challenge_registry
+from doom_eap.contracts.foundation import (
     compile_all_item_plans,
     load_foundation_contracts,
     load_primitive_registry,
     validate_primitive_registry,
 )
-from item_classification import load_item_classification_identity
-from map_registry import load_map_registry, validation_plan
+from doom_eap.content.item_classification import load_item_classification_identity
+from doom_eap.content.map_registry import load_map_registry, validation_plan
 from tools.decls.devinv_builder import load_devinv_mapping
 from tools.content.compile_start_inventory_catalog import compile_catalog
 from tools.maps import ap_map_generator
@@ -822,7 +822,11 @@ def main(argv: list[str] | None = None) -> int:
     # Parse ast of a few key python files
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (ROOT / "bridge_client.py", ROOT / "tools" / "maps" / "ap_map_generator.py", ROOT / "challenge_registry.py")
+        for path in (
+            ROOT / "doom_eap" / "runtime" / "bridge_client.py",
+            ROOT / "tools" / "maps" / "ap_map_generator.py",
+            ROOT / "doom_eap" / "contracts" / "challenge_registry.py",
+        )
     )
     for forbidden in (
         "append_graph_entries", "watchers_for_map", "AP_RUNTIME_CHECK_",

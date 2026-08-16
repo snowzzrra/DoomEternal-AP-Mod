@@ -162,7 +162,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
     }
     sys.path.insert(0, str(ROOT))
     try:
-        from options_foundation import validate_options_schema
+        from doom_eap.content.options_foundation import validate_options_schema
 
         return validate_options_schema(document)
     finally:

@@ -17,31 +17,31 @@ from collections import deque
 from pathlib import Path
 from typing import NamedTuple
 
-from bootstrap_actions import (
+from doom_eap.runtime.bootstrap_actions import (
     BOOTSTRAP_ACTIONS,
     BOOTSTRAP_REVISION,
     BOOTSTRAP_STAT_PRIMITIVE,
     received_any_suit_upgrade,
 )
-from campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
-from challenge_registry import (
+from doom_eap.contracts.campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
+from doom_eap.contracts.challenge_registry import (
     aggregate_ready,
     canonical_map_name,
     load_challenge_registry,
 )
-from deathlink_receive import DeathLinkReceiver, ReceiveState, discard_unclaimed_command
-from foundation import (
+from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState, discard_unclaimed_command
+from doom_eap.contracts.foundation import (
     compile_item_delivery_plan,
     load_foundation_contracts,
     load_primitive_registry,
 )
-from item_classification import (
+from doom_eap.content.item_classification import (
     load_item_classification_identity,
     normalize_network_classification,
     notification_style_for_item,
 )
-from item_contracts import DEFAULT_DEATH_LINK_MODE, start_inventory_eligible
-from item_reconciliation import (
+from doom_eap.contracts.item_contracts import DEFAULT_DEATH_LINK_MODE, start_inventory_eligible
+from doom_eap.runtime.item_reconciliation import (
     AP_RECEIPT_FEEDBACK,
     CLIENT_STATE_VERSION,
     HISTORICAL_OWNERSHIP,
@@ -58,13 +58,13 @@ from item_reconciliation import (
     receipt_history_fingerprint,
     receipt_identity,
 )
-from observer_lifecycle import (
+from doom_eap.runtime.observer_lifecycle import (
     RuntimeObservationLease,
     SaveObserverBaselineStore,
     observer_registry_revision,
     unlockable_record_complete,
 )
-from publisher_contracts import (
+from doom_eap.contracts.publisher_contracts import (
     load_publisher_contracts,
 )
 from doom_eap.runtime.publisher_runtime import (
@@ -73,7 +73,7 @@ from doom_eap.runtime.publisher_runtime import (
     quarantine_malformed_event,
     read_map_event,
 )
-from automap_visual_registry import (
+from doom_eap.content.automap_visual_registry import (
     index_automap_visual_registry,
     load_automap_visual_registry,
 )
@@ -81,7 +81,7 @@ from tools.maps.start_with_automap import (
     SUPPORTED_START_WITH_AUTOMAP_MAPS,
     start_with_automap_helper_names,
 )
-from rune_reconciliation import (
+from doom_eap.runtime.rune_reconciliation import (
     RUNE_WRITER_EVIDENCE,
     RuneNativeState,
     compile_rune_reconciliation_plan,
@@ -92,10 +92,12 @@ from rune_reconciliation import (
 try:
     from .save_decrypt import decrypt, steam_id64
 except ImportError:
-    from save_decrypt import decrypt, steam_id64
+    from doom_eap.runtime.save_decrypt import decrypt, steam_id64
 
+MODULE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
 APPLICATION_DIR = Path(
-    os.environ.get("DOOM_AP_APPLICATION_DIR", Path(__file__).resolve().parent)
+    os.environ.get("DOOM_AP_APPLICATION_DIR", REPO_ROOT)
 ).resolve()
 CONFIG_FILE = Path(
     os.environ.get("DOOM_AP_CONFIG_FILE", APPLICATION_DIR / "ap_config.json")
@@ -105,7 +107,7 @@ if not BRIDGE_FILE.is_file():
     BRIDGE_FILE = Path(__file__).resolve()
 BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
 _CONTENT_IDENTITY = json.loads(
-    (Path(__file__).resolve().with_name("data") / "content_identity.json").read_text(encoding="utf-8")
+    (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
 )
 BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
 BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
@@ -229,7 +231,7 @@ def _valid_part_type(part):
 def _item_event_classification(flags):
     if not isinstance(flags, int) or isinstance(flags, bool) or flags < 0:
         return None
-    from item_classification import (
+    from doom_eap.content.item_classification import (
         ITEM_CLASSIFICATION_PROGRESSION,
         ITEM_CLASSIFICATION_TRAP,
         ITEM_CLASSIFICATION_USEFUL,
@@ -1597,20 +1599,16 @@ def probe_checkpoint_death(path):
 
 
 # Load item definitions
-ITEMS_FILE = os.path.join(os.path.dirname(__file__), "data", "items.json")
+ITEMS_FILE = REPO_ROOT / "data" / "items.json"
 with open(ITEMS_FILE, encoding="utf-8") as f:
     # Keys in JSON are strings, convert them to ints
     _raw_items = json.load(f)
     ITEM_ID_TO_COMMAND = {int(k): v for k, v in _raw_items.items()}
-ITEM_REPLAY_POLICIES_FILE = os.path.join(
-    os.path.dirname(__file__), "data", "item_replay_policies.json"
-)
+ITEM_REPLAY_POLICIES_FILE = REPO_ROOT / "data" / "item_replay_policies.json"
 ITEM_REPLAY_POLICIES = load_policy_registry(
     Path(ITEM_REPLAY_POLICIES_FILE), ITEM_ID_TO_COMMAND
 )
-ITEM_CLASSIFICATIONS_FILE = os.path.join(
-    os.path.dirname(__file__), "data", "item_classifications.json"
-)
+ITEM_CLASSIFICATIONS_FILE = REPO_ROOT / "data" / "item_classifications.json"
 _item_classification_document = json.loads(
     Path(ITEM_CLASSIFICATIONS_FILE).read_text(encoding="utf-8")
 )
@@ -1654,9 +1652,7 @@ def received_item_classification(item_id, network_classification):
     notification_style_for_item(item_id, expected)
     return expected
 
-RUNTIME_LOCATIONS_FILE = os.path.join(
-    os.path.dirname(__file__), "data", "runtime_locations.json"
-)
+RUNTIME_LOCATIONS_FILE = REPO_ROOT / "data" / "runtime_locations.json"
 with open(RUNTIME_LOCATIONS_FILE, encoding="utf-8") as f:
     RUNTIME_LOCATIONS = json.load(f)
 CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
@@ -1748,7 +1744,7 @@ PUBLISHER_MAP_EVENT_FILENAMES = frozenset(
 )
 # Load ALL level manifests dynamically
 DECL_TO_LOCATION = {}
-MANIFESTS_DIR = os.path.join(os.path.dirname(__file__), "manifests")
+MANIFESTS_DIR = REPO_ROOT / "manifests"
 if os.path.exists(MANIFESTS_DIR):
     for filename in os.listdir(MANIFESTS_DIR):
         if filename.endswith(".json"):

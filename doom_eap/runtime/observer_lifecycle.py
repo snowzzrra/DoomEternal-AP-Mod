@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 
-ROOT = Path(__file__).resolve().parent
-OBSERVER_CONTRACT_PATH = ROOT / "data" / "observer_contracts.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+OBSERVER_CONTRACT_PATH = REPO_ROOT / "data" / "observer_contracts.json"
 logger = logging.getLogger(__name__)
 
 TH32CS_SNAPPROCESS = 0x00000002

@@ -12,8 +12,8 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
-from automap_visual_registry import load_automap_visual_registry
-from content_catalog import ContentCatalog, load_content_catalog
+from doom_eap.content.automap_visual_registry import load_automap_visual_registry
+from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
 from tools.validation.release_layout import validate_public_file_members
 
 MANIFEST_SCHEMA_VERSION = 2
@@ -327,10 +327,10 @@ def stale_package_paths(root: Path) -> list[str]:
 
     validate_source_contract(source_root)
     source_files = (
-        "launcher_core.py",
-        "launcher_integration.py",
-        "launcher_platform.py",
-        "physical_options.py",
+        "doom_eap/launcher/launcher_core.py",
+        "doom_eap/launcher/launcher_integration.py",
+        "doom_eap/launcher/launcher_platform.py",
+        "doom_eap/content/physical_options.py",
         "scripts/build/playable_test.sh",
         "tools/release/room_payloads.py",
         "tools/validation/audit_item_notification_release.py",

@@ -11,7 +11,7 @@ NetworkItem = namedtuple("NetworkItem", "item location player flags")
 
 def _bridge_module():
     try:
-        return importlib.import_module("bridge_client")
+        return importlib.import_module("doom_eap.runtime.bridge_client")
     except ModuleNotFoundError:
         colorama = ModuleType("colorama")
         colorama.init = lambda: None
@@ -52,7 +52,7 @@ def _bridge_module():
             CommonClient=common,
             NetUtils=net,
         )
-        return importlib.import_module("bridge_client")
+        return importlib.import_module("doom_eap.runtime.bridge_client")
 
 
 bridge = _bridge_module()

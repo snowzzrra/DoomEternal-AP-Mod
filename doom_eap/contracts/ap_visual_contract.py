@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parent
-CONTRACT_PATH = ROOT / "data" / "ap_visual_bundle.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
+CONTRACT_PATH = REPO_ROOT / "data" / "ap_visual_bundle.json"
 
 
 def load_ap_visual_contract(root: Path = ROOT) -> dict[str, Any]:

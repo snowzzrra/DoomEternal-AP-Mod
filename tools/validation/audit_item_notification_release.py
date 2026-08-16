@@ -11,9 +11,9 @@ import zipfile
 from pathlib import Path
 from typing import Any, cast
 
-from map_registry import load_map_registry, release_plan
-from item_classification import load_item_classification_identity
-from automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
+from doom_eap.content.map_registry import load_map_registry, release_plan
+from doom_eap.content.item_classification import load_item_classification_identity
+from doom_eap.content.automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
 from tools.validation.validate_item_notification_package import (
     LOCATION_NOTIFICATION_RE,
     NOTIFICATION_RE,

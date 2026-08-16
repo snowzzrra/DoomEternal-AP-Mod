@@ -8,7 +8,7 @@ import re
 import json
 from pathlib import Path
 
-from map_registry import load_map_registry
+from doom_eap.content.map_registry import load_map_registry
 from tools.decls.devinv_builder import validate_devinv_source
 
 

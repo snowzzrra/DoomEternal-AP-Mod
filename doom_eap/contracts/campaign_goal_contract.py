@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-CONTRACT_PATH = ROOT / "data" / "campaign_goal_contract.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CONTRACT_PATH = REPO_ROOT / "data" / "campaign_goal_contract.json"
 REQUIRED_FIELDS = {
     "schema_version",
     "release",

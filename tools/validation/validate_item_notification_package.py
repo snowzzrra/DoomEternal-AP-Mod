@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-from item_classification import (
+from doom_eap.content.item_classification import (
     load_item_classification_identity,
     notification_style_for_item,
 )

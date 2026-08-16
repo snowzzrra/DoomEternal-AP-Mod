@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from content_catalog import load_content_catalog
+from doom_eap.content.content_catalog import load_content_catalog
 
 ROOT = Path(__file__).resolve().parents[2]
 JSON_ROOTS = ("content", "data", "level_configs", "manifests")

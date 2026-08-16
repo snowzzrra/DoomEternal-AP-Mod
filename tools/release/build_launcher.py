@@ -57,9 +57,6 @@ def _source_inputs(label: str, root: Path, *, pattern: str | None = None) -> lis
 
 def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs: list[tuple[str, Path]] = []
-    # Root modules are the compatibility wrappers and direct launcher dependencies.
-    for path in sorted(REPO_ROOT.glob("*.py")):
-        inputs.extend(_source_inputs(f"root/{path.name}", path))
     inputs.extend(_source_inputs("doom_eap", REPO_ROOT / "doom_eap"))
     inputs.extend(_source_inputs("tools/decls", REPO_ROOT / "tools/decls"))
     inputs.extend(_source_inputs("tools/maps", REPO_ROOT / "tools/maps"))
@@ -146,12 +143,12 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--paths",
         str(archipelago_source),
         "--add-data",
-        f"{REPO_ROOT / 'bridge_client.py'}{data_separator}.",
+        f"{REPO_ROOT / 'doom_eap/runtime/bridge_client.py'}{data_separator}.",
         "--add-data",
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
-        str(REPO_ROOT / "launcher_app.py"),
+        str(REPO_ROOT / "doom_eap/launcher/launcher_app.py"),
     ]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]

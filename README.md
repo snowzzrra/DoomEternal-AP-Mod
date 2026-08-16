@@ -235,12 +235,16 @@ Implementation is split across two repositories:
 - this repository owns authorial game content, map compilation, runtime
   observers, item delivery, native client, launcher, validation, and packaging.
 
+Source modules are organized under `doom_eap/`: `runtime/` owns bridge and game
+observers, `launcher/` owns launcher commands and UI, `content/` owns catalog
+and option definitions, and `contracts/` owns shared content contracts.
+
 The active runtime has three cooperating layers:
 
 1. **Generated mission content** publishes checks and exposes native command
    entities.
-2. **`bridge_client.py`** speaks the Archipelago protocol, owns durable session
-   state, and coordinates observers and item delivery.
+2. **`doom_eap.runtime.bridge_client`** speaks the Archipelago protocol, owns
+   durable session state, and coordinates observers and item delivery.
 3. **`ap_client.exe` and Meathook** provide external RPC and native telemetry for
    the running game.
 

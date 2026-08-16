@@ -15,9 +15,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from content_catalog import ContentCatalog, load_content_catalog, thaw_content
+from doom_eap.content.content_catalog import (
+    ContentCatalog,
+    load_content_catalog,
+    thaw_content,
+)
 from tools.content.compile_content_catalog import compile_catalog
-from automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
+from doom_eap.content.automap_visual_registry import (
+    load_automap_visual_registry,
+    validate_generated_visuals,
+)
 from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
 from tools.maps.map_semantic_baseline import (
     assert_map_baseline,
@@ -52,34 +59,21 @@ CORE_MAP_INPUTS = (
     "data/content_identity.json",
     "data/ap_visual_bundle.json",
     "data/checked_location_visuals.json",
-    "ap_visual_contract.py",
+    "doom_eap/contracts/ap_visual_contract.py",
     "tools/maps/ap_map_generator.py",
     "tools/maps/start_with_automap.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
     "tools/validation/audit_resource_packages.py",
-    "content_catalog.py",
-    "automap_visual_registry.py",
-    "publisher_contracts.py",
+    "doom_eap/content/content_catalog.py",
+    "doom_eap/content/automap_visual_registry.py",
+    "doom_eap/contracts/publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
-    "ap_visual_contract.py",
-    "bridge_client.py",
-    "content_catalog.py",
-    "publisher_contracts.py",
-    "launcher_app.py",
-    "launcher_cli.py",
-    "launcher_controller.py",
-    "launcher_core.py",
-    "launcher_doctor.py",
-    "launcher_integration.py",
-    "launcher_native_health.py",
-    "launcher_platform.py",
-    "launcher_supervisor.py",
-    "launcher_ui.py",
-    "publisher_runtime.py",
-    "doom_eap/__init__.py",
-    "doom_eap/launcher/__init__.py",
+    "doom_eap/contracts/ap_visual_contract.py",
+    "doom_eap/runtime/bridge_client.py",
+    "doom_eap/content/content_catalog.py",
+    "doom_eap/contracts/publisher_contracts.py",
     "doom_eap/launcher/launcher_app.py",
     "doom_eap/launcher/launcher_cli.py",
     "doom_eap/launcher/launcher_controller.py",
@@ -90,8 +84,10 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/launcher_platform.py",
     "doom_eap/launcher/launcher_supervisor.py",
     "doom_eap/launcher/launcher_ui.py",
-    "doom_eap/runtime/__init__.py",
     "doom_eap/runtime/publisher_runtime.py",
+    "doom_eap/__init__.py",
+    "doom_eap/launcher/__init__.py",
+    "doom_eap/runtime/__init__.py",
     "tools/content/compile_content_catalog.py",
     "tools/content/new_map.py",
     "tools/content/describe_map.py",
@@ -103,7 +99,7 @@ PREFLIGHT_PYTHON = (
     "tools/validation/pipeline.py",
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",
-    "automap_visual_registry.py",
+    "doom_eap/content/automap_visual_registry.py",
 )
 
 
@@ -360,7 +356,7 @@ class Pipeline:
                     )
             compile_catalog(check=True)
             load_automap_visual_registry(ROOT / "data" / "checked_location_visuals.json")
-            from options_foundation import load_options_schema
+            from doom_eap.content.options_foundation import load_options_schema
 
             load_options_schema(ROOT / "data" / "options_schema.json")
             validate_automap_option_keys(
@@ -675,8 +671,10 @@ class Pipeline:
     def map(self, map_key: str) -> MapArtifact:
         return self.validate_map(map_key)
 
-    def selection(self) -> tuple[list[str], list[str]]:
-        catalog = self.catalog or self.preflight()
+    def selection(self, *, preflight: bool = True) -> tuple[list[str], list[str]]:
+        catalog = self.catalog or (
+            self.preflight() if preflight else load_content_catalog()
+        )
         paths = []
         for repository in (ROOT, ARCHIPELAGO):
             output = subprocess.run(
@@ -875,15 +873,17 @@ class Pipeline:
             if path.is_file() and "__pycache__" not in path.parts
         }
         for relative in (
-            "bridge_client.py", "bootstrap_actions.py", "campaign_goal_contract.py",
-            "challenge_registry.py", "content_catalog.py", "foundation.py",
-            "item_classification.py", "item_reconciliation.py", "map_registry.py",
-            "observer_lifecycle.py", "publisher_contracts.py",
-            "launcher_app.py", "launcher_cli.py", "launcher_controller.py",
-            "launcher_core.py", "launcher_doctor.py", "launcher_integration.py",
-            "launcher_native_health.py", "launcher_platform.py",
-            "launcher_supervisor.py", "launcher_ui.py", "publisher_runtime.py",
-            "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
+            "doom_eap/runtime/bridge_client.py",
+            "doom_eap/runtime/bootstrap_actions.py",
+            "doom_eap/contracts/campaign_goal_contract.py",
+            "doom_eap/contracts/challenge_registry.py",
+            "doom_eap/content/content_catalog.py",
+            "doom_eap/contracts/foundation.py",
+            "doom_eap/content/item_classification.py",
+            "doom_eap/runtime/item_reconciliation.py",
+            "doom_eap/content/map_registry.py",
+            "doom_eap/runtime/observer_lifecycle.py",
+            "doom_eap/contracts/publisher_contracts.py",
             "doom_eap/launcher/launcher_app.py",
             "doom_eap/launcher/launcher_cli.py",
             "doom_eap/launcher/launcher_controller.py",
@@ -893,8 +893,10 @@ class Pipeline:
             "doom_eap/launcher/launcher_native_health.py",
             "doom_eap/launcher/launcher_platform.py",
             "doom_eap/launcher/launcher_supervisor.py",
-            "doom_eap/launcher/launcher_ui.py", "doom_eap/runtime/__init__.py",
-            "doom_eap/runtime/publisher_runtime.py", "save_decrypt.py",
+            "doom_eap/launcher/launcher_ui.py",
+            "doom_eap/runtime/publisher_runtime.py",
+            "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
+            "doom_eap/runtime/__init__.py", "doom_eap/runtime/save_decrypt.py",
             "tools/maps/start_with_automap.py",
         ):
             release_inputs[relative] = _sha256(ROOT / relative)
@@ -1167,13 +1169,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise ValueError("map phase requires <map_key>")
             pipeline.map(args.map_key)
         elif args.phase in {"changed", "affected"}:
-            selected, paths = pipeline.selection()
+            selected, paths = pipeline.selection(preflight=not args.show_selection)
             if args.show_selection:
                 print("CHANGED FILES")
                 print("\n".join(f"  {path}" for path in paths) or "  (none)")
                 print("SELECTED MAPS")
                 print("\n".join(f"  {key}" for key in selected) or "  (none)")
-            if selected:
+            if selected and not args.show_selection:
                 pipeline.integration(selected, tests=args.tests)
         elif args.phase == "integration":
             selected = args.maps or ([args.map_key] if args.map_key else None)

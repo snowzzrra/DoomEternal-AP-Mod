@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from content_catalog import load_content_catalog, thaw_content
+from doom_eap.content.content_catalog import load_content_catalog, thaw_content
 from tools.maps.map_semantic_baseline import baseline_path
 
 

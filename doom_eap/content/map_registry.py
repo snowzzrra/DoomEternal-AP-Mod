@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
 DEFAULT_REGISTRY_PATH = ROOT / "data" / "map_sources.json"  # compiled runtime projection
 ROOT_KEYS = {"schema_version", "baseline_map_keys", "maps"}
 MAP_KEYS = {
@@ -41,7 +42,7 @@ class MapPlan:
 
 
 def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
-    from content_catalog import load_content_catalog
+    from doom_eap.content.content_catalog import load_content_catalog
 
     catalog = load_content_catalog(root)
     maps = {}
@@ -82,7 +83,7 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
 
 def load_runtime_map_registry(data_dir: Path | None = None) -> dict[str, Any]:
     """Load compiled map_sources.json projection for runtime/client consumption."""
-    data_dir = data_dir or (Path(__file__).resolve().parent / "data")
+    data_dir = data_dir or (REPO_ROOT / "data")
     path = data_dir / "map_sources.json"
     registry = json.loads(path.read_text(encoding="utf-8"))
     validate_map_registry(registry)

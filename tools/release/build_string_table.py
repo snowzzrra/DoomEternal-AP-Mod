@@ -99,7 +99,7 @@ def build_string_table(
         if location_names_path is None:
             location_names_path = default_location_names
         if location_names_path.resolve() == default_location_names.resolve():
-            from content_catalog import load_content_catalog
+            from doom_eap.content.content_catalog import load_content_catalog
             location_identity = {
                 "schema_version": 1,
                 "locations": {

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from publisher_contracts import (
+from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
     publishers_by_trigger,
     trigger_key,

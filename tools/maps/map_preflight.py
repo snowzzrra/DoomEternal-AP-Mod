@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from map_registry import validation_plan
+from doom_eap.content.map_registry import validation_plan
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
 
 AUDIT_KEYS = {

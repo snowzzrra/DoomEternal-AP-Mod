@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Iterable
 
-from content_catalog import AssetSpec, load_content_catalog
+from doom_eap.content.content_catalog import AssetSpec, load_content_catalog
 from tools.maps.ap_map_generator import resolve_donor_model_override
 
 

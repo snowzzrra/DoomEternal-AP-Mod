@@ -9,8 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
-from content_catalog import ContentCatalog, load_content_catalog, thaw_content
-from map_registry import load_map_registry, release_plan
+from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog, thaw_content
+from doom_eap.content.map_registry import load_map_registry, release_plan
 from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
 

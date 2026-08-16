@@ -8,11 +8,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from content_catalog import RUNTIME_STRATEGIES
+from doom_eap.content.content_catalog import RUNTIME_STRATEGIES
 
 
-ROOT = Path(__file__).resolve().parent
-REGISTRY_PATH = ROOT / "data" / "challenge_location_registry.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
+REGISTRY_PATH = REPO_ROOT / "data" / "challenge_location_registry.json"
 MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY = {
     "e1m3": "game/sp/e1m3_cult/e1m3_cult",
     "e1m4": "game/sp/e1m4_boss/e1m4_boss",
@@ -43,7 +44,7 @@ def _thaw(value: Any) -> Any:
 
 def challenge_registry_document(catalog=None) -> dict:
     if catalog is None:
-        from content_catalog import load_content_catalog
+        from doom_eap.content.content_catalog import load_content_catalog
         catalog = load_content_catalog()
     registry = {
         "schema_version": 10,

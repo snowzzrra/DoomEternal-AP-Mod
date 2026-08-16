@@ -11,7 +11,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from foundation import load_foundation_contracts
+from doom_eap.contracts.foundation import load_foundation_contracts
 
 
 def generate(map_key: str) -> list[str]:

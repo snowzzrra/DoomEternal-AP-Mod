@@ -36,14 +36,15 @@ from .launcher_platform import (
     validate_save_directory,
 )
 from .launcher_supervisor import BridgeSupervisor
-from options_foundation import load_options_schema, save_player_yaml
+from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
 
 def application_directory() -> Path:
     """Use distribution directory for frozen launcher resources."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
+    module_dir = Path(__file__).resolve().parent
+    return module_dir if (module_dir / "data").is_dir() else Path(__file__).resolve().parents[2]
 
 
 class LauncherState(str, Enum):
@@ -370,7 +371,7 @@ class LauncherController:
     def _entrypoint(self) -> Path:
         if getattr(sys, "frozen", False):
             return Path(sys.executable).resolve()
-        return self.client_dir / "launcher_app.py"
+        return self.client_dir / "doom_eap" / "launcher" / "launcher_app.py"
 
     def _archipelago_source(self) -> Path | None:
         if getattr(sys, "frozen", False):
