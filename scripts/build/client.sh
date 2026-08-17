@@ -15,21 +15,34 @@ case "$BUILD_DIR/" in
 esac
 
 TOOLCHAIN_LAUNCHER=()
-for launcher in distrobox distrobox-host-exec; do
-    command -v "$launcher" >/dev/null 2>&1 || continue
-    for container in doom-cpp emile-dev-2026; do
-        if [ "$launcher" = distrobox ]; then
-            candidate=(distrobox enter "$container" --)
-        else
-            candidate=(distrobox-host-exec distrobox enter "$container" --)
-        fi
-        if "${candidate[@]}" true >/dev/null 2>&1; then
-            TOOLCHAIN_LAUNCHER=("${candidate[@]}")
-            break 2
-        fi
-    done
+_has_direct_toolchain=true
+for _tool in x86_64-w64-mingw32-gcc x86_64-w64-mingw32-g++ clang; do
+    if ! command -v "$_tool" >/dev/null 2>&1; then
+        _has_direct_toolchain=false
+        break
+    fi
 done
-[ "${#TOOLCHAIN_LAUNCHER[@]}" -gt 0 ] || { echo "Neither doom-cpp nor emile-dev-2026 is available through distrobox." >&2; exit 1; }
+if ! command -v x86_64-w64-mingw32-widl >/dev/null 2>&1 && ! command -v widl >/dev/null 2>&1; then
+    _has_direct_toolchain=false
+fi
+
+if [ "$_has_direct_toolchain" = false ]; then
+    for launcher in distrobox distrobox-host-exec; do
+        command -v "$launcher" >/dev/null 2>&1 || continue
+        for container in doom-cpp emile-dev-2026; do
+            if [ "$launcher" = distrobox ]; then
+                candidate=(distrobox enter "$container" --)
+            else
+                candidate=(distrobox-host-exec distrobox enter "$container" --)
+            fi
+            if "${candidate[@]}" true >/dev/null 2>&1; then
+                TOOLCHAIN_LAUNCHER=("${candidate[@]}")
+                break 2
+            fi
+        done
+    done
+    [ "${#TOOLCHAIN_LAUNCHER[@]}" -gt 0 ] || { echo "Direct MinGW/Clang toolchain not found and neither doom-cpp nor emile-dev-2026 is available through distrobox." >&2; exit 1; }
+fi
 
 CACHE_ROOT="${AP_BUILD_CACHE_ROOT:-$REPO_ROOT/.cache/ap-build}"
 TOOLCHAIN_ID="$("${TOOLCHAIN_LAUNCHER[@]}" bash -s <<'IDENTITY'
