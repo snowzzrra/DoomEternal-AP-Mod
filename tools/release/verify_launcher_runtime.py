@@ -2,14 +2,18 @@
 """Preflight verification for launcher and standalone AP client runtime imports.
 
 Verifies path precedence, stub resolution, third-party dependency availability,
-and bridge client importability without building or running anything.
+and bridge client importability without building, starting the UI, or invoking
+interactive setup prompts.
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib
+import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -104,15 +108,84 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             )
         print(f"  [OK] {mod_name} -> {mod_path}")
 
-    # 4. Verify Bridge Client Importability
-    print("--> Checking DOOM Eternal bridge client importability...")
-    bridge_mod = importlib.import_module("doom_eap.runtime.bridge_client")
-    print(f"  [OK] doom_eap.runtime.bridge_client -> {bridge_mod.__file__}")
+    # 4. Hermetic Bridge Client Verification
+    print("--> Checking DOOM Eternal bridge client importability (hermetic setup)...")
+    env_keys = ("DOOM_AP_CONFIG_FILE", "DOOM_AP_APPLICATION_DIR", "ARCHIPELAGO_SOURCE")
+    orig_env = {k: os.environ.get(k) for k in env_keys}
 
-    # 5. Verify Launcher App Module
-    print("--> Checking DOOM Eternal launcher app importability...")
-    launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
-    print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
+    with tempfile.TemporaryDirectory(prefix="doomeap_preflight_hermetic_") as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str)
+        fake_doom = tmp_dir / "fake-doom"
+        (fake_doom / "base" / "classicwads").mkdir(parents=True, exist_ok=True)
+        (fake_doom / "DOOMEternalx64vk.exe").write_bytes(b"")
+        fake_saves = tmp_dir / "fake-saves" / "id Software" / "DOOMEternal" / "base"
+        fake_saves.mkdir(parents=True, exist_ok=True)
+        fake_steam = tmp_dir / "fake-steam" / "userdata" / "12345678" / "782330" / "remote"
+        fake_steam.mkdir(parents=True, exist_ok=True)
+        fake_app = tmp_dir / "app"
+        fake_app.mkdir(parents=True, exist_ok=True)
+        fake_config = tmp_dir / "ap_config.json"
+        fake_config.write_text(
+            json.dumps({
+                "doom_base_dir": str(fake_doom),
+                "save_games_dir": str(fake_saves),
+                "steam_remote_dir": str(fake_steam),
+                "steam_id3": 12345678,
+            }, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        try:
+            os.environ["DOOM_AP_CONFIG_FILE"] = str(fake_config)
+            os.environ["DOOM_AP_APPLICATION_DIR"] = str(fake_app)
+            os.environ["ARCHIPELAGO_SOURCE"] = str(ap_source)
+
+            # Invalidate bridge_client cache and re-import under hermetic environment
+            sys.modules.pop("doom_eap.runtime.bridge_client", None)
+            bridge_mod = importlib.import_module("doom_eap.runtime.bridge_client")
+
+            # Verify hermetic paths are active
+            if bridge_mod.CONFIG_FILE.resolve() != fake_config.resolve():
+                raise RuntimeError(
+                    f"Bridge client used unexpected config: {bridge_mod.CONFIG_FILE} != {fake_config}"
+                )
+            if Path(bridge_mod.DOOM_BASE_DIR).resolve() != (fake_doom / "base").resolve():
+                raise RuntimeError(
+                    f"Bridge client DOOM_BASE_DIR mismatch: {bridge_mod.DOOM_BASE_DIR} != {fake_doom / 'base'}"
+                )
+            if Path(bridge_mod.SAVE_GAMES_DIR).resolve() != fake_saves.resolve():
+                raise RuntimeError(
+                    f"Bridge client SAVE_GAMES_DIR mismatch: {bridge_mod.SAVE_GAMES_DIR} != {fake_saves}"
+                )
+            if Path(bridge_mod.STEAM_REMOTE_DIR).resolve() != fake_steam.resolve():
+                raise RuntimeError(
+                    f"Bridge client STEAM_REMOTE_DIR mismatch: {bridge_mod.STEAM_REMOTE_DIR} != {fake_steam}"
+                )
+            if bridge_mod.STEAM_ID3 != 12345678:
+                raise RuntimeError(
+                    f"Bridge client STEAM_ID3 mismatch: {bridge_mod.STEAM_ID3} != 12345678"
+                )
+
+            print(f"  [OK] doom_eap.runtime.bridge_client -> {bridge_mod.__file__}")
+            print(f"  [OK] Hermetic DOOM_BASE_DIR -> {bridge_mod.DOOM_BASE_DIR}")
+            print(f"  [OK] Hermetic SAVE_GAMES_DIR -> {bridge_mod.SAVE_GAMES_DIR}")
+            print(f"  [OK] Hermetic STEAM_REMOTE_DIR -> {bridge_mod.STEAM_REMOTE_DIR}")
+
+            # 5. Verify Launcher App Module
+            print("--> Checking DOOM Eternal launcher app importability...")
+            sys.modules.pop("doom_eap.launcher.launcher_app", None)
+            launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
+            print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
+
+        finally:
+            # Restore environment
+            for k, v in orig_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            # Clear bridge module so caller does not retain temporary paths
+            sys.modules.pop("doom_eap.runtime.bridge_client", None)
 
     print("\nStandalone runtime preflight verification: ALL CHECKS PASSED.")
 

@@ -220,6 +220,7 @@ jobs:
           python3 -m tools.release.build_launcher --help
 
       - name: Standalone Runtime Import Preflight
+        timeout-minutes: 1
         run: |
           python3 -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
 
@@ -280,6 +281,7 @@ jobs:
           python -m tools.release.build_launcher --help
 
       - name: Standalone Runtime Import Preflight
+        timeout-minutes: 1
         run: |
           python -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
 
