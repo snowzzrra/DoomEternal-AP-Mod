@@ -3,6 +3,10 @@
 #include "ap_runtime_rpc.h"
 #include "ap_runtime_rpc_seh.h"
 
+#if defined(__MINGW32__) || defined(__MINGW64__)
+int RPC_ENTRY RpcExceptionFilter(unsigned long ExceptionCode);
+#endif
+
 void* __RPC_USER MIDL_user_allocate(size_t size)
 {
     return HeapAlloc(GetProcessHeap(), 0, size);

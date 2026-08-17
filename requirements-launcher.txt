@@ -1,2 +1,9 @@
-PySide6>=6.8,<7
-PyInstaller>=6.11,<7
+PySide6==6.11.1
+PyInstaller==6.22.1
+colorama==0.4.6
+websockets==13.1
+PyYAML==6.0.3
+pathspec==1.0.4
+typing_extensions==4.15.0
+certifi==2026.2.25
+platformdirs==4.10.1

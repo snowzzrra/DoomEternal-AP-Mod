@@ -144,6 +144,27 @@ jobs:
           sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 wine64-tools clang
           command -v widl
 
+      - name: Native Toolchain & Linkability Preflight
+        run: |
+          command -v widl
+          command -v x86_64-w64-mingw32-gcc
+          command -v x86_64-w64-mingw32-g++
+          command -v clang
+          command -v x86_64-w64-mingw32-strip
+          command -v x86_64-w64-mingw32-objdump
+          echo "--> Checking required MinGW import libraries..."
+          for lib in librpcrt4.a libbcrypt.a libversion.a; do
+            p=$(x86_64-w64-mingw32-gcc -print-file-name=$lib)
+            if [ "$p" = "$lib" ] || [ ! -f "$p" ]; then
+              echo "Error: Missing required MinGW import library: $lib" >&2
+              exit 1
+            fi
+            echo "  [OK] $lib -> $p"
+          done
+          echo "--> Checking RpcExceptionFilter in librpcrt4.a..."
+          LIBRPCRT4=$(x86_64-w64-mingw32-gcc -print-file-name=librpcrt4.a)
+          x86_64-w64-mingw32-nm -A "$LIBRPCRT4" | grep -E "RpcExceptionFilter|I_RpcExceptionFilter"
+
       - name: Build and Validate Native Client
         run: |
           bash scripts/build/client.sh build/release/build/client
@@ -194,10 +215,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
+      - name: Launcher CLI Preflight
+        run: |
+          python3 -m tools.release.build_launcher --help
+
+      - name: Standalone Runtime Import Preflight
+        run: |
+          python3 -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
+
       - name: Build Linux Launcher
         run: |
           mkdir -p build/release
-          python3 tools/release/build_launcher.py \
+          python3 -m tools.release.build_launcher \
             --output-dir build/release \
             --archipelago-source Archipelago \
             --name DoomEternalArchipelagoLauncher
@@ -246,9 +275,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
+      - name: Launcher CLI Preflight
+        run: |
+          python -m tools.release.build_launcher --help
+
+      - name: Standalone Runtime Import Preflight
+        run: |
+          python -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
+
       - name: Build Windows Launcher
         run: |
-          python tools/release/build_launcher.py --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
+          python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
 
       - name: Validate Windows Launcher
         shell: bash
