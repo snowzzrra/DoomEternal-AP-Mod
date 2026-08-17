@@ -141,6 +141,7 @@ def _assert_runtime_contract_families(
     }
     if map_key in fast_travel_maps:
         required.add("ap_fast_travel_unlock")
+        required.add("ap_fast_travel_unlock_native")
     absent = sorted(required - set(blocks))
     if absent:
         raise AssertionError(f"runtime contract owners absent: map={map_key} entities={absent}")
@@ -155,10 +156,17 @@ def _assert_runtime_contract_families(
     active_map = blocks["ap_rpc_auto_enable"]
     if "AP_ACTIVE_MAP_V1" not in active_map or f"map_key={map_key}" not in active_map:
         raise AssertionError(f"active-map publisher contract drift: {map_key}")
-    if map_key in fast_travel_maps and (
-        'class = "idTarget_FastTravelUnlock";' not in blocks["ap_fast_travel_unlock"]
-    ):
-        raise AssertionError(f"Fast Travel writer contract drift: {map_key}")
+    if map_key in fast_travel_maps:
+        ft_relay = blocks["ap_fast_travel_unlock"]
+        if 'class = "idTarget_Count";' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay class drift: {map_key}")
+        if 'inherit = "target/relay";' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay inherit drift: {map_key}")
+        if '"ap_fast_travel_unlock_native"' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay missing native target: {map_key}")
+        ft_native = blocks["ap_fast_travel_unlock_native"]
+        if 'class = "idTarget_FastTravelUnlock";' not in ft_native:
+            raise AssertionError(f"Fast Travel native class drift: {map_key}")
 
     families = {
         "AP checks": lambda name: name.startswith("AP_CHECK_"),

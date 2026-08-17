@@ -1597,6 +1597,50 @@ def inject_secret_encounter_completion(
     return content[:block_start] + updated_block + content[block_end:]
 
 
+def discover_map_group_unlocks(content):
+    """Return sorted entity names of all idTarget_MapGroupUnlock blocks in map content."""
+    class_marker = 'class = "idTarget_MapGroupUnlock";'
+    results = []
+    start = 0
+    while True:
+        pos = content.find(class_marker, start)
+        if pos == -1:
+            break
+        # Walk backwards to find the nearest entityDef declaration
+        entity_def_pos = content.rfind("entityDef ", 0, pos)
+        if entity_def_pos != -1:
+            # Extract the entity name from "entityDef <name> {"
+            snippet = content[entity_def_pos:entity_def_pos + 200]
+            match = re.match(r'entityDef\s+(\S+)', snippet)
+            if match:
+                results.append(match.group(1))
+        start = pos + len(class_marker)
+    return sorted(set(results))
+
+
+def generate_fast_travel_relay(map_key, fast_travel_coords, vanilla_content):
+    """Emit ap_fast_travel_unlock relay + ap_fast_travel_unlock_native primitive.
+
+    The relay activates all native idTarget_MapGroupUnlock entities
+    in the map, then activates ap_fast_travel_unlock_native (the actual
+    idTarget_FastTravelUnlock). Zero-group maps emit a relay with only
+    the native target.
+    """
+    map_group_unlocks = discover_map_group_unlocks(vanilla_content)
+    native_block = build_primitive(
+        "fast_travel_unlock",
+        "ap_fast_travel_unlock_native",
+        fast_travel_coords,
+    )
+    relay_targets = [*map_group_unlocks, "ap_fast_travel_unlock_native"]
+    relay_block = build_primitive(
+        "target_count_relay",
+        "ap_fast_travel_unlock",
+        {"targets": relay_targets},
+    )
+    return relay_block + native_block
+
+
 def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
@@ -2007,6 +2051,8 @@ def generate_map(
         content = remove_balanced_entity_blocks(content, legacy_prefix)
     content = remove_balanced_entity_blocks(content, "ap_deathlink")
     content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
+    content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock_native")
+    content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock")
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
@@ -2308,7 +2354,7 @@ def generate_map(
         + generate_bootstrap_entities()
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
         + generate_ap_lifecycle_entity(map_key)
-        + (build_primitive("fast_travel_unlock", "ap_fast_travel_unlock", fast_travel["maps"][map_key]) if map_key in fast_travel["maps"] else "")
+        + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
     validate_ap_lifecycle_entity(final_content, map_key)
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
