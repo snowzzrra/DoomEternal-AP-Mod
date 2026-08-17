@@ -708,7 +708,10 @@ class LauncherUI(QMainWindow):
                 "READY",
             )
         else:
-            self.detected_paths.setText("DOOM Eternal needs a game folder")
+            if not self.game_root.text():
+                self.detected_paths.setText("DOOM Eternal wasn't found automatically. Select your DOOM Eternal installation folder to continue.")
+            else:
+                self.detected_paths.setText("DOOM Eternal save directory wasn't found automatically. Select your save directory to continue.")
             self._set_home(
                 "WELCOME BACK" if has_session else "JOIN A ROOM",
                 "Reconnect to your saved room and continue playing." if has_session else "Connect to your Archipelago room and start playing.",

@@ -127,8 +127,8 @@ class LauncherController:
 
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
-        installations = SteamInstallationLocator().discover()
-        found["game_discovery"] = asdict(SteamInstallationLocator().discover_sentinel())
+        installations, sentinel = SteamInstallationLocator().inspect_discovery()
+        found["game_discovery"] = asdict(sentinel)
         if len(installations) == 1:
             installation = installations[0]
             found["game_root"] = str(installation.game_root)

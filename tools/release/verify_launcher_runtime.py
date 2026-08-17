@@ -177,6 +177,25 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
             print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
 
+            # 6. Verify Frozen Mode Identity Resolution
+            print("--> Checking bridge runtime identity in simulated frozen environment...")
+            from doom_eap.runtime.bridge_client import resolve_bridge_identity
+            with tempfile.TemporaryDirectory(prefix="doomeap_preflight_frozen_") as frozen_dir_str:
+                frozen_dir = Path(frozen_dir_str)
+                missing_module = frozen_dir / "_MEI99999/doom_eap/runtime/bridge_client.py"
+                missing_app = frozen_dir / "app"
+                b_file, b_sha, b_rev = resolve_bridge_identity(
+                    application_dir=missing_app,
+                    repo_root=root,
+                    module_file=missing_module,
+                    is_frozen=True,
+                )
+                if not b_sha or len(b_sha) != 64 or not b_rev.startswith("mission-unified-"):
+                    raise RuntimeError(
+                        f"Frozen mode identity resolution failed: sha={b_sha}, rev={b_rev}"
+                    )
+                print(f"  [OK] Frozen bridge identity -> sha256={b_sha[:12]}... revision={b_rev}")
+
         finally:
             # Restore environment
             for k, v in orig_env.items():

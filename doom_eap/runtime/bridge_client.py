@@ -98,15 +98,61 @@ APPLICATION_DIR = Path(
 CONFIG_FILE = Path(
     os.environ.get("DOOM_AP_CONFIG_FILE", APPLICATION_DIR / "ap_config.json")
 )
-BRIDGE_FILE = APPLICATION_DIR / "bridge_client.py"
-if not BRIDGE_FILE.is_file():
-    BRIDGE_FILE = Path(__file__).resolve()
-BRIDGE_SHA256 = hashlib.sha256(BRIDGE_FILE.read_bytes()).hexdigest()
+def resolve_bridge_identity(
+    application_dir: Path | None = None,
+    repo_root: Path | None = None,
+    module_file: Path | None = None,
+    is_frozen: bool | None = None,
+) -> tuple[Path, str, str]:
+    """Resolve bridge client file reference, deterministic SHA-256, and revision string.
+
+    In source/development mode and unpacked release packages, hashes physical Python source bytes.
+    In frozen standalone mode (PyInstaller), computes deterministic identity without reading
+    non-materialized source files.
+    """
+    frozen = bool(getattr(sys, "frozen", False)) if is_frozen is None else is_frozen
+    app_dir = (application_dir or (Path(sys.executable).resolve().parent if frozen else Path(__file__).resolve().parent)).resolve()
+    root = (repo_root or (Path(__file__).resolve().parent if (Path(__file__).resolve().parent / "data").is_dir() else Path(__file__).resolve().parents[2])).resolve()
+    mod_file = (module_file or Path(__file__)).resolve()
+
+    candidate = app_dir / "bridge_client.py"
+    if candidate.is_file():
+        sha256 = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        return candidate, sha256, f"mission-unified-{sha256[:12]}"
+
+    if mod_file.is_file():
+        sha256 = hashlib.sha256(mod_file.read_bytes()).hexdigest()
+        return mod_file, sha256, f"mission-unified-{sha256[:12]}"
+
+    for id_path in (app_dir / "bridge_identity.json", root / "data" / "bridge_identity.json"):
+        if id_path.is_file():
+            try:
+                doc = json.loads(id_path.read_text(encoding="utf-8"))
+                if isinstance(doc, dict) and "sha256" in doc:
+                    sha = str(doc["sha256"])
+                    rev = str(doc.get("revision", f"mission-unified-{sha[:12]}"))
+                    file_ref = Path(sys.executable).resolve() if frozen else mod_file
+                    return file_ref, sha, rev
+            except Exception:
+                pass
+
+    content_id_path = root / "data" / "content_identity.json"
+    if content_id_path.is_file():
+        sha256 = hashlib.sha256(content_id_path.read_bytes()).hexdigest()
+    else:
+        sha256 = hashlib.sha256(b"doom-eternal-archipelago-bridge-runtime").hexdigest()
+
+    file_ref = Path(sys.executable).resolve() if frozen else mod_file
+    return file_ref, sha256, f"mission-unified-{sha256[:12]}"
+
+
+BRIDGE_FILE, BRIDGE_SHA256, BRIDGE_REVISION = resolve_bridge_identity(
+    APPLICATION_DIR, REPO_ROOT, Path(__file__).resolve()
+)
 _CONTENT_IDENTITY = json.loads(
     (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
 )
 BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
-BRIDGE_REVISION = f"mission-unified-{BRIDGE_SHA256[:12]}"
 TRANSITION_HANDLER = "unified"
 GAME_NAME = _CONTENT_IDENTITY["game"]
 DEATHLINK_RECEIVE_TIMEOUT = 20.0

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import os
 import re
+import time
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -203,12 +205,25 @@ def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
     return useful[0][2]
 
 
+def _log_freshness(stat_result: os.stat_result) -> tuple[str, str]:
+    now = time.time()
+    age_seconds = max(0.0, now - stat_result.st_mtime)
+    iso_time = datetime.datetime.fromtimestamp(
+        stat_result.st_mtime, tz=datetime.timezone.utc
+    ).isoformat()
+    if age_seconds < 86400 * 2:
+        return "active_session", iso_time
+    age_days = int(age_seconds // 86400)
+    return f"historical_stale ({age_days} days old)", iso_time
+
+
 def _support_log_tails(
     config: Mapping[str, object] | None,
     paths: object | None,
     application_dir: Path | None = None,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, dict[str, object]]]:
     tails: dict[str, str] = {}
+    provenance: dict[str, dict[str, object]] = {}
     for archive_name, candidates in (
         ("bridge.log", _bridge_log_candidates(config, paths, application_dir)),
         ("ap_client.log", _native_log_candidates(config)),
@@ -216,10 +231,21 @@ def _support_log_tails(
         selected = _most_recent_log(candidates)
         if selected is None:
             continue
+        try:
+            stat_res = selected.stat()
+            freshness, iso_time = _log_freshness(stat_res)
+            provenance[archive_name] = {
+                "source_path": _safe_path(selected),
+                "size_bytes": stat_res.st_size,
+                "modified_iso": iso_time,
+                "freshness": freshness,
+            }
+        except OSError:
+            pass
         tail = _read_log_tail(selected)
         if tail is not None:
             tails[archive_name] = tail
-    return tails
+    return tails, provenance
 
 
 def write_support_bundle(
@@ -231,16 +257,18 @@ def write_support_bundle(
     paths: object | None = None,
     application_dir: Path | None = None,
 ) -> Path:
-    """Write bounded diagnostics and redacted logs."""
+    """Write bounded diagnostics and redacted logs with freshness metadata."""
     destination = destination.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    tails, provenance = _support_log_tails(config, paths, application_dir)
     payload = sanitize_support_bundle(report.document())
+    payload["log_provenance"] = sanitize_support_value(provenance)
     safe_logs = "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)[-20000:]
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
         archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
-        for name, tail in _support_log_tails(config, paths, application_dir).items():
+        for name, tail in tails.items():
             archive.writestr(name, tail)
     os.replace(temporary, destination)
     return destination
@@ -345,7 +373,11 @@ class LauncherDoctor:
             except ValueError as error:
                 checks.append(Diagnostic("game", "invalid", str(error)))
         else:
-            checks.append(Diagnostic("game", "missing", "DOOM Eternal installation is not configured"))
+            game_discovery = self.config.get("game_discovery")
+            details: dict[str, object] | None = None
+            if isinstance(game_discovery, dict):
+                details = {"discovery": game_discovery}
+            checks.append(Diagnostic("game", "missing", "DOOM Eternal installation is not configured", details))
         checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": list(detect_doom_processes())}))
         checks.append(Diagnostic("config", "ok", "launcher configuration loaded", {"keys": sorted(self.config)}))
         actions = self.repair_actions()

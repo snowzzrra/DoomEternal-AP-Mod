@@ -16,7 +16,7 @@ import tempfile
 import urllib.request
 import webbrowser
 import zipfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
@@ -96,6 +96,7 @@ class DiscoverySentinel:
     path: str = ""
     candidates: tuple[str, ...] = ()
     reason: str = ""
+    trace: tuple[dict[str, object], ...] = ()
 
 
 def validate_game_root(path: Path) -> Path:
@@ -505,24 +506,86 @@ class SteamInstallation:
     manifest: Path
 
 
+def query_windows_registry_steam_roots(
+    registry_query: Callable[[], Sequence[Path]] | None = None,
+) -> tuple[Path, ...]:
+    """Discover installed Steam client roots from authoritative Windows registry locations."""
+    if registry_query is not None:
+        return tuple(dict.fromkeys(registry_query()))
+    if os.name != "nt":
+        return ()
+    roots: list[Path] = []
+    try:
+        import winreg
+
+        registry_values = (
+            (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath"),
+        )
+        for hive, key_name, value_name in registry_values:
+            try:
+                with winreg.OpenKey(hive, key_name) as key:
+                    value, _ = winreg.QueryValueEx(key, value_name)
+                if value and isinstance(value, str):
+                    path = Path(value.replace("/", "\\")).expanduser()
+                    roots.append(path)
+            except (FileNotFoundError, OSError):
+                continue
+    except ImportError:
+        pass
+    return tuple(dict.fromkeys(roots))
+
+
 class SteamInstallationLocator:
     """Locate Steam App ID 782330 without starting Steam or game."""
 
     APP_MANIFEST = f"appmanifest_{DOOM_ETERNAL_APP_ID}.acf"
 
-    def __init__(self, candidate_roots: Sequence[Path] | None = None):
-        self.candidate_roots = tuple(candidate_roots or self.default_roots())
+    def __init__(
+        self,
+        candidate_roots: Sequence[Path] | None = None,
+        *,
+        platform_name: str | None = None,
+        registry_query: Callable[[], Sequence[Path]] | None = None,
+        environment: Mapping[str, str] | None = None,
+    ):
+        self.candidate_roots = tuple(
+            self.default_roots(
+                platform_name=platform_name,
+                registry_query=registry_query,
+                environment=environment,
+            )
+            if candidate_roots is None
+            else candidate_roots
+        )
 
     @staticmethod
-    def default_roots() -> tuple[Path, ...]:
-        home = Path.home()
-        roots = [
-            home / ".local/share/Steam",
-            home / ".steam/steam",
-        ]
-        program_files = os.environ.get("PROGRAMFILES(X86)") or os.environ.get("PROGRAMFILES")
-        if program_files:
-            roots.append(Path(program_files) / "Steam")
+    def default_roots(
+        *,
+        platform_name: str | None = None,
+        registry_query: Callable[[], Sequence[Path]] | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> tuple[Path, ...]:
+        env = os.environ if environment is None else environment
+        platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
+        roots: list[Path] = []
+        if platform_name == "windows":
+            roots.extend(query_windows_registry_steam_roots(registry_query))
+            for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES", "PROGRAMW6432"):
+                value = env.get(variable)
+                if value:
+                    roots.append(Path(value) / "Steam")
+        else:
+            home = Path.home()
+            roots.extend(
+                (
+                    home / ".local/share/Steam",
+                    home / ".steam/steam",
+                    home / ".steam/root",
+                    home / ".steam",
+                )
+            )
         return tuple(dict.fromkeys(roots))
 
     @staticmethod
@@ -531,9 +594,31 @@ class SteamInstallationLocator:
         libraries = [steam_root]
         if configuration.is_file():
             text = configuration.read_text(encoding="utf-8", errors="replace")
-            for raw in re.findall(r'"path"\s+"((?:\\\\.|[^"\\])*)"', text):
+            parsed_paths: list[Path] = []
+            try:
+                document = ValveVdfParser.parse(text)
+                for top_key, top_val in document.items():
+                    if isinstance(top_val, dict):
+                        for item_key, item_val in top_val.items():
+                            if isinstance(item_val, dict):
+                                for prop_key, prop_val in item_val.items():
+                                    if prop_key.casefold() == "path" and isinstance(prop_val, str):
+                                        parsed_paths.append(Path(prop_val))
+                            elif isinstance(item_val, str) and item_key.isdigit():
+                                parsed_paths.append(Path(item_val))
+            except Exception:
+                pass
+
+            for raw in re.findall(r'"path"\s+"((?:\\\\.|[^"\\])*)"', text, re.IGNORECASE):
                 value = raw.replace("\\\\", "\\")
-                libraries.append(Path(value))
+                parsed_paths.append(Path(value))
+            for raw in re.findall(r'"\d+"\s+"((?:\\\\.|[^"\\])*)"', text):
+                value = raw.replace("\\\\", "\\")
+                parsed_paths.append(Path(value))
+
+            for path in parsed_paths:
+                if path not in libraries:
+                    libraries.append(path)
         return tuple(dict.fromkeys(libraries))
 
     @staticmethod
@@ -542,39 +627,171 @@ class SteamInstallationLocator:
         if not manifest.is_file():
             return None
         text = manifest.read_text(encoding="utf-8", errors="replace")
-        match = re.search(r'"installdir"\s+"([^"]+)"', text)
-        if match is None:
+        installdir: str | None = None
+        try:
+            document = ValveVdfParser.parse(text)
+            for top_key, top_val in document.items():
+                if isinstance(top_val, dict):
+                    for prop_key, prop_val in top_val.items():
+                        if prop_key.casefold() == "installdir" and isinstance(prop_val, str):
+                            installdir = prop_val
+                            break
+        except Exception:
+            pass
+        if not installdir:
+            match = re.search(r'"installdir"\s+"([^"]+)"', text, re.IGNORECASE)
+            if match is not None:
+                installdir = match.group(1)
+        if not installdir:
             return None
-        game_root = library / "steamapps/common" / match.group(1)
+        game_root = library / "steamapps/common" / installdir
         if not (game_root / "DOOMEternalx64vk.exe").is_file() or not (game_root / "base").is_dir():
             return None
         return SteamInstallation(library.resolve(), game_root.resolve(), manifest.resolve())
 
-    def discover(self, manual_game_root: Path | None = None) -> tuple[SteamInstallation, ...]:
+    def inspect_discovery(
+        self, manual_game_root: Path | None = None
+    ) -> tuple[tuple[SteamInstallation, ...], DiscoverySentinel]:
         installations: list[SteamInstallation] = []
+        trace: list[dict[str, object]] = []
+        any_root_exists = False
+        any_manifest_exists = False
+        any_installdir_found = False
+
         if manual_game_root is not None:
             game_root = manual_game_root.resolve()
-            if not (game_root / "DOOMEternalx64vk.exe").is_file() or not (game_root / "base").is_dir():
-                raise ValueError(f"invalid DOOM Eternal installation: {game_root}")
+            valid = (game_root / "DOOMEternalx64vk.exe").is_file() and (game_root / "base").is_dir()
+            trace.append({
+                "source": "manual",
+                "path": str(game_root),
+                "valid": valid,
+            })
+            if not valid:
+                return (), DiscoverySentinel(
+                    DiscoveryStatus.INVALID.value,
+                    reason=f"invalid DOOM Eternal installation: {game_root}",
+                    trace=tuple(trace),
+                )
             installations.append(SteamInstallation(game_root.parent, game_root, Path()))
+
         for root in self.candidate_roots:
-            for library in self._declared_libraries(root):
-                installation = self._installation(library)
-                if installation is not None and installation not in installations:
-                    installations.append(installation)
-        return tuple(installations)
+            root_exists = root.is_dir()
+            root_info: dict[str, object] = {
+                "root": str(root),
+                "exists": root_exists,
+            }
+            if not root_exists:
+                trace.append(root_info)
+                continue
+
+            any_root_exists = True
+            vdf_path = root / "steamapps/libraryfolders.vdf"
+            vdf_exists = vdf_path.is_file()
+            declared = self._declared_libraries(root)
+            root_info["vdf_path"] = str(vdf_path)
+            root_info["vdf_exists"] = vdf_exists
+            root_info["declared_library_count"] = len(declared)
+            root_info["declared_libraries"] = [str(lib) for lib in declared]
+
+            lib_checks: list[dict[str, object]] = []
+            for library in declared:
+                manifest_path = library / "steamapps" / self.APP_MANIFEST
+                manifest_exists = manifest_path.is_file()
+                check: dict[str, object] = {
+                    "library": str(library),
+                    "manifest_path": str(manifest_path),
+                    "manifest_exists": manifest_exists,
+                }
+                if manifest_exists:
+                    any_manifest_exists = True
+                    installation = self._installation(library)
+                    if installation is not None:
+                        any_installdir_found = True
+                        check["game_root"] = str(installation.game_root)
+                        check["valid"] = True
+                        if not any(item.game_root == installation.game_root for item in installations):
+                            installations.append(installation)
+                    else:
+                        text = manifest_path.read_text(encoding="utf-8", errors="replace")
+                        match = re.search(r'"installdir"\s+"([^"]+)"', text, re.IGNORECASE)
+                        if match:
+                            any_installdir_found = True
+                            candidate_game = library / "steamapps/common" / match.group(1)
+                            check["game_root"] = str(candidate_game)
+                            check["valid"] = False
+                            check["has_exe"] = (candidate_game / "DOOMEternalx64vk.exe").is_file()
+                            check["has_base"] = (candidate_game / "base").is_dir()
+                        else:
+                            check["valid"] = False
+                            check["error"] = "installdir missing from manifest"
+                lib_checks.append(check)
+
+            root_info["checks"] = lib_checks
+            trace.append(root_info)
+
+        inst_roots = tuple(str(item.game_root) for item in installations)
+        if len(inst_roots) == 1:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.FOUND.value,
+                path=inst_roots[0],
+                reason="DOOM Eternal installation discovered",
+                trace=tuple(trace),
+            )
+        elif len(inst_roots) > 1:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.AMBIGUOUS.value,
+                candidates=inst_roots,
+                reason=f"multiple DOOM Eternal installations found ({len(inst_roots)})",
+                trace=tuple(trace),
+            )
+        elif not any_root_exists:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.NOT_FOUND.value,
+                reason="Steam root directory not found",
+                trace=tuple(trace),
+            )
+        elif not any_manifest_exists:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.NOT_FOUND.value,
+                reason=f"DOOM Eternal app manifest ({self.APP_MANIFEST}) not found in declared Steam libraries",
+                trace=tuple(trace),
+            )
+        elif any_installdir_found and not installations:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.INVALID.value,
+                reason="DOOM Eternal manifest found but game files (DOOMEternalx64vk.exe/base) are invalid",
+                trace=tuple(trace),
+            )
+        else:
+            sentinel = DiscoverySentinel(
+                DiscoveryStatus.NOT_FOUND.value,
+                reason="Steam installation was not found",
+                trace=tuple(trace),
+            )
+
+        return tuple(installations), sentinel
+
+    def discover(self, manual_game_root: Path | None = None) -> tuple[SteamInstallation, ...]:
+        installations, _ = self.inspect_discovery(manual_game_root)
+        return installations
 
     def discover_sentinel(self, manual_game_root: Path | None = None) -> DiscoverySentinel:
-        try:
-            installations = self.discover(manual_game_root)
-        except ValueError as error:
-            return DiscoverySentinel(DiscoveryStatus.INVALID.value, reason=str(error))
-        roots = tuple(str(item.game_root) for item in installations)
-        if len(roots) == 1:
-            return DiscoverySentinel(DiscoveryStatus.FOUND.value, path=roots[0])
-        if len(roots) > 1:
-            return DiscoverySentinel(DiscoveryStatus.AMBIGUOUS.value, candidates=roots)
-        return DiscoverySentinel(DiscoveryStatus.NOT_FOUND.value, reason="Steam installation was not found")
+        _, sentinel = self.inspect_discovery(manual_game_root)
+        return sentinel
+
+    def diagnose(self, manual_game_root: Path | None = None) -> dict[str, object]:
+        installations, sentinel = self.inspect_discovery(manual_game_root)
+        return {
+            "sentinel": asdict(sentinel),
+            "installations": [
+                {
+                    "library_root": str(item.library_root),
+                    "game_root": str(item.game_root),
+                    "manifest": str(item.manifest),
+                }
+                for item in installations
+            ],
+        }
 
 
 def detect_doom_processes(
