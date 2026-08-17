@@ -54,10 +54,6 @@
     },
     {
       "content_revision": "0.4.0-beta.4",
-      "reason": "Include executable Start With Automap helpers in shipped-map baseline audit"
-    },
-    {
-      "content_revision": "0.4.0-beta.4",
       "reason": "Remove unsupported Automap ownership helper entities; preserve vanilla station and AP marker owners"
     },
     {

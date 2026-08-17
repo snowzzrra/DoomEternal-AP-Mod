@@ -144,11 +144,11 @@
     },
     {
       "default": false,
-      "description": "Start with the Automap available.",
-      "display_name": "Start With Automap",
+      "description": "Start with the AP progression-item reveal capability on the Automap.",
+      "display_name": "Reveal AP Locations on Automap",
       "group": "Game Options",
-      "key": "start_with_automap",
-      "source_class": "StartWithAutomap",
+      "key": "reveal_ap_locations_on_automap",
+      "source_class": "RevealAPLocationsOnAutomap",
       "ui_type": "toggle"
     },
     {
@@ -338,5 +338,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "92379482571c9ce5ff80a4690867b11fdb7d1a10db1193cfc2ec5d5aa4745902"
+  "source_sha256": "05d004839a349cf73bf0a827e8ac8091c1ce029b9d8d5f2eb49cc93e3311d043"
 }

@@ -31,13 +31,17 @@ std::unique_ptr<ApRuntimeRpcClient> g_ApRpcOwner;
 
 static const char* kQueueDirectory = "base\\ap_queue";
 static const char* kQueueSessionNamespacePath = "base\\ap_queue\\active_session_namespace";
+static const char* kMaterializationLeasePath = "base\\ap_queue\\active_materialization_lease";
+static const char* kMaterializationLeaseHeader = "AP_MATERIALIZATION_LEASE_V1";
+static const char* kExecutionClassHeader = "AP_EXECUTION_CLASS_V1";
+static const char* kMapEntityOperationHeader = "AP_MAP_ENTITY_OPERATION_V1";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
 static const char* kReleaseVersion = "0.4.0-beta.4";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kRpcEntityContractRevision = 3;
-static const int kNativeCommandPolicyRevision = 7;
+static const int kNativeCommandPolicyRevision = 10;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kQueueStateLogMs = 5000;
@@ -45,7 +49,6 @@ static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
 static const DWORD kQueueNoiseSummaryMs = 12000;
 static const DWORD kDeliveredRemovalRetryMs = 1000;
-static const DWORD kMapBoundOneShotLifetimeMs = 5000;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 std::string CanonicalMapName(std::string name) {
@@ -60,6 +63,17 @@ std::string CanonicalMapName(std::string name) {
     return name;
 }
 
+enum class CommandExecutionClass {
+    PlayerRuntime,
+    MapEntitySafe,
+};
+
+enum class MapEntityOperation {
+    None,
+    CheckedVisualHide,
+    FastTravelUnlock,
+};
+
 struct CommandJob {
     std::string path;
     std::string command;
@@ -68,6 +82,9 @@ struct CommandJob {
     std::string source = "cmd";
     DWORD importedTick = 0;
     std::optional<std::string> receiptNamespace;
+    std::optional<std::string> materializationLease;
+    CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
+    MapEntityOperation mapEntityOperation = MapEntityOperation::None;
 };
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;
@@ -1380,14 +1397,101 @@ private:
     DWORD nextConfigRetryTick_ = 0;
 };
 
-bool ReadCommandFile(const std::string& path, std::string& command) {
+bool ReadCommandFile(
+    const std::string& path,
+    std::string& command,
+    std::optional<std::string>* materializationLease = nullptr,
+    CommandExecutionClass* executionClass = nullptr,
+    MapEntityOperation* mapEntityOperation = nullptr
+) {
     FILE* file = fopen(path.c_str(), "rb");
     if (!file) return false;
 
     char buffer[4096] = {};
     const size_t read = fread(buffer, 1, sizeof(buffer) - 1, file);
     fclose(file);
-    command = TrimLine(std::string(buffer, read));
+    const std::string contents(buffer, read);
+    if (materializationLease) materializationLease->reset();
+    if (executionClass) *executionClass = CommandExecutionClass::PlayerRuntime;
+    if (mapEntityOperation) *mapEntityOperation = MapEntityOperation::None;
+
+    bool sawExecutionClass = false;
+    bool sawMaterializationLease = false;
+    bool sawMapEntityOperation = false;
+    CommandExecutionClass parsedExecutionClass = CommandExecutionClass::PlayerRuntime;
+    MapEntityOperation parsedMapEntityOperation = MapEntityOperation::None;
+    size_t payloadOffset = 0;
+    const std::string leasePrefix = std::string(kMaterializationLeaseHeader) + " ";
+    const std::string executionPrefix = std::string(kExecutionClassHeader) + " ";
+    const std::string operationPrefix = std::string(kMapEntityOperationHeader) + " ";
+    while (payloadOffset < contents.size()) {
+        const size_t lineEnd = contents.find('\n', payloadOffset);
+        const std::string line = TrimLine(contents.substr(
+            payloadOffset,
+            lineEnd == std::string::npos ? contents.size() - payloadOffset : lineEnd - payloadOffset
+        ));
+
+        if (line.rfind(std::string(kExecutionClassHeader), 0) == 0) {
+            if (sawExecutionClass || line.rfind(executionPrefix, 0) != 0) {
+                return false;
+            }
+            const std::string value = line.substr(executionPrefix.size());
+            if (value == "PLAYER_RUNTIME") {
+                parsedExecutionClass = CommandExecutionClass::PlayerRuntime;
+            } else if (value == "MAP_ENTITY_SAFE") {
+                parsedExecutionClass = CommandExecutionClass::MapEntitySafe;
+            } else {
+                return false;
+            }
+            sawExecutionClass = true;
+        } else if (line.rfind(std::string(kMapEntityOperationHeader), 0) == 0) {
+            if (sawMapEntityOperation || line.rfind(operationPrefix, 0) != 0) {
+                return false;
+            }
+            const std::string value = line.substr(operationPrefix.size());
+            if (value == "CHECKED_VISUAL_HIDE") {
+                parsedMapEntityOperation = MapEntityOperation::CheckedVisualHide;
+            } else if (value == "FAST_TRAVEL_UNLOCK") {
+                parsedMapEntityOperation = MapEntityOperation::FastTravelUnlock;
+            } else {
+                return false;
+            }
+            sawMapEntityOperation = true;
+        } else if (line.rfind(std::string(kMaterializationLeaseHeader), 0) == 0) {
+            if (sawMaterializationLease || line.rfind(leasePrefix, 0) != 0) {
+                return false;
+            }
+            const std::string lease = line.substr(leasePrefix.size());
+            static const std::regex validLease(R"(^[0-9]+:[0-9]+$)");
+            if (!std::regex_match(lease, validLease)) {
+                return false;
+            }
+            if (materializationLease) *materializationLease = lease;
+            sawMaterializationLease = true;
+        } else {
+            if (line.rfind("AP_", 0) == 0) {
+                return false;
+            }
+            break;
+        }
+
+        if (lineEnd == std::string::npos) {
+            return false;
+        }
+        payloadOffset = lineEnd + 1;
+    }
+
+    command = TrimLine(contents.substr(payloadOffset));
+    if (parsedExecutionClass == CommandExecutionClass::MapEntitySafe
+            && parsedMapEntityOperation == MapEntityOperation::None) {
+        return false;
+    }
+    if (parsedExecutionClass == CommandExecutionClass::PlayerRuntime
+            && parsedMapEntityOperation != MapEntityOperation::None) {
+        return false;
+    }
+    if (executionClass) *executionClass = parsedExecutionClass;
+    if (mapEntityOperation) *mapEntityOperation = parsedMapEntityOperation;
     return !command.empty();
 }
 
@@ -1457,6 +1561,19 @@ std::optional<std::string> ActiveQueueSessionNamespace() {
     return value;
 }
 
+std::optional<std::string> ActiveMaterializationLease() {
+    std::ifstream input(kMaterializationLeasePath);
+    std::string value;
+    if (!std::getline(input, value)) return std::nullopt;
+    value = TrimLine(value);
+    const std::string prefix = std::string(kMaterializationLeaseHeader) + " ";
+    if (!StartsWith(value, prefix)) return std::nullopt;
+    value = value.substr(prefix.size());
+    static const std::regex validLease(R"(^[0-9]+:[0-9]+$)");
+    if (!std::regex_match(value, validLease)) return std::nullopt;
+    return value;
+}
+
 std::optional<std::string> ReceiptCommandNamespace(const std::string& filename) {
     static const std::regex namespaced(R"(^recv-([0-9a-f]{16})-.*\.(cmd|processing)$)");
     std::smatch match;
@@ -1504,7 +1621,9 @@ void EnsureQueueDirectory(
             const std::string queuedPath =
                 processingPath.substr(0, processingPath.size() - std::string(".processing").size()) + ".cmd";
             std::string command;
-            if (ReadCommandFile(processingPath, command)) {
+            CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
+            if (ReadCommandFile(processingPath, command, nullptr, &executionClass)
+                    && executionClass == CommandExecutionClass::PlayerRuntime) {
                 const std::optional<std::string> migrated =
                     MigratedDirectItemCommand(data.cFileName, command);
                 if (migrated.has_value()) {
@@ -1556,6 +1675,20 @@ std::vector<std::string> FindQueuedFiles() {
     return paths;
 }
 
+bool MapEntityOperationMatchesCommand(
+    MapEntityOperation operation,
+    const std::string& command
+) {
+    if (operation == MapEntityOperation::FastTravelUnlock) {
+        return command == "ai_ScriptCmdEnt ap_fast_travel_unlock activate";
+    }
+    if (operation != MapEntityOperation::CheckedVisualHide) return false;
+    static const std::regex cleanup(
+        R"(^ai_ScriptCmdEnt ap_hide_location_visual_[0-9]+ activate$)"
+    );
+    return std::regex_match(command, cleanup);
+}
+
 void ImportSpoolFiles(
     std::deque<CommandJob>& queue,
     std::unordered_set<std::string>& knownCommandIds,
@@ -1592,7 +1725,25 @@ void ImportSpoolFiles(
         }
 
         std::string command;
-        if (ReadCommandFile(processingPath, command)) {
+        std::optional<std::string> materializationLease;
+        CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
+        MapEntityOperation mapEntityOperation = MapEntityOperation::None;
+        if (ReadCommandFile(
+                processingPath,
+                command,
+                &materializationLease,
+                &executionClass,
+                &mapEntityOperation
+        )) {
+            if (executionClass == CommandExecutionClass::MapEntitySafe
+                    && !MapEntityOperationMatchesCommand(mapEntityOperation, command)) {
+                LogDebug(
+                    "Discarding MAP_ENTITY_SAFE command with invalid operation payload: "
+                    + processingPath
+                );
+                DeleteFileA(processingPath.c_str());
+                continue;
+            }
             const std::string commandId = CommandIdFromPath(processingPath);
             if (!RememberRpcCommandId(knownCommandIds, commandId)) {
                 ++duplicateCount;
@@ -1614,6 +1765,9 @@ void ImportSpoolFiles(
                 source,
                 GetTickCount(),
                 receiptNamespace,
+                materializationLease,
+                executionClass,
+                mapEntityOperation,
             });
             LogDebug(
                 "QUEUE_IMPORT command_id=" + commandId
@@ -1637,23 +1791,44 @@ bool IsTelemetryJob(const CommandJob& job) {
     return filename.rfind("telemetry.", 0) == 0;
 }
 
-bool IsMapBoundOneShot(const CommandJob& job) {
-    static const std::regex cleanup(
-        R"(^ai_ScriptCmdEnt ap_remove_location_visual_[0-9]+ activate$)"
-    );
-    return job.command == "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
-        || std::regex_match(job.command, cleanup);
+bool IsMapEntitySafeJob(const CommandJob& job) {
+    return job.executionClass == CommandExecutionClass::MapEntitySafe;
 }
 
-void DiscardExpiredMapBoundJobs(
+bool MapEntitySafeLeaseMatchesCurrent(const CommandJob& job) {
+    if (!IsMapEntitySafeJob(job)) return true;
+    if (!MapEntityOperationMatchesCommand(job.mapEntityOperation, job.command)) return false;
+    const std::optional<std::string> currentLease = ActiveMaterializationLease();
+    return job.materializationLease.has_value()
+        && currentLease.has_value()
+        && job.materializationLease.value() == currentLease.value();
+}
+
+bool CommandExecutionGateOpen(
+    const CommandJob& job,
+    bool rpcArmed,
+    bool rpcTransportReady,
+    const GameStateProbe& gameStateProbe
+) {
+    if (!rpcArmed || !rpcTransportReady) return false;
+    if (IsMapEntitySafeJob(job)) {
+        return gameStateProbe.IsMapEntitySafe()
+            && MapEntitySafeLeaseMatchesCurrent(job);
+    }
+    return gameStateProbe.IsSafeForRpc();
+}
+
+void DiscardMapEntitySafeJobsWithMismatchedLease(
     std::deque<CommandJob>& queue,
     std::unordered_set<std::string>& knownCommandIds,
-    DWORD now
+    const std::optional<std::string>& currentLease
 ) {
     auto job = queue.begin();
     while (job != queue.end()) {
-        if (!IsMapBoundOneShot(*job)
-                || now - job->importedTick < kMapBoundOneShotLifetimeMs) {
+        if (!IsMapEntitySafeJob(*job)
+                || (job->materializationLease.has_value()
+                    && currentLease.has_value()
+                    && job->materializationLease.value() == currentLease.value())) {
             ++job;
             continue;
         }
@@ -1662,8 +1837,7 @@ void DiscardExpiredMapBoundJobs(
         knownCommandIds.erase(commandId);
         LogDebug(
             "QUEUE_STALE_DROP command_id=" + commandId
-            + " kind=map_bound_one_shot age_ms="
-            + std::to_string(now - job->importedTick)
+            + " kind=map_entity_safe reason=materialization_lease_mismatch"
             + " effect=unconfirmed"
             + DeliveryContextFields()
         );
@@ -1997,7 +2171,9 @@ int main(int argc, char** argv) {
         if (!rpcEnabled) {
             DiscardTelemetryJobs(queue);
         }
-        DiscardExpiredMapBoundJobs(queue, knownCommandIds, now);
+        DiscardMapEntitySafeJobsWithMismatchedLease(
+            queue, knownCommandIds, ActiveMaterializationLease()
+        );
         const bool queueActive = !queue.empty();
         if ((queueActive || queueWasActive)
                 && now - lastQueueStateLog >= kQueueStateLogMs) {
@@ -2009,7 +2185,9 @@ int main(int argc, char** argv) {
         }
         queueWasActive = queueActive;
 
-        if (!queue.empty() && !rpcEnabled && now - lastStallLog >= kRpcStallWarnMs) {
+        const bool frontGateOpen = !queue.empty()
+            && CommandExecutionGateOpen(queue.front(), rpcArmed, rpcTransportReady, gameStateProbe);
+        if (!queue.empty() && !frontGateOpen && now - lastStallLog >= kRpcStallWarnMs) {
             const DWORD oldestAge = now - queue.front().importedTick;
             const QueueSnapshot diskQueue = CountQueueFiles();
             LogDebug(
@@ -2023,7 +2201,10 @@ int main(int argc, char** argv) {
         }
 
         bool dispatchNextImmediately = false;
-        if (!queue.empty() && rpcEnabled && g_ApRpc->Ready()) {
+        if (!queue.empty()
+                && rpcArmed
+                && rpcTransportReady
+                && g_ApRpc->Ready()) {
             CommandJob& job = queue.front();
             const std::string commandId = CommandIdFromPath(job.path);
             const bool normalReceipt = IsNormalReceiptCommandId(commandId);
@@ -2059,6 +2240,22 @@ int main(int argc, char** argv) {
                     queue.pop_front();
                     continue;
                 }
+            }
+            if (!MapEntitySafeLeaseMatchesCurrent(job)) {
+                LogDebug(
+                    "QUEUE_STALE_DROP command_id=" + commandId
+                    + " kind=map_entity_safe reason=materialization_lease_mismatch"
+                    + " effect=unconfirmed"
+                    + DeliveryContextFields()
+                );
+                DeleteFileA(job.path.c_str());
+                knownCommandIds.erase(commandId);
+                queue.pop_front();
+                continue;
+            }
+            if (!CommandExecutionGateOpen(job, rpcArmed, rpcTransportReady, gameStateProbe)) {
+                Sleep(50);
+                continue;
             }
             const DWORD dispatchTick = GetTickCount();
             if (normalReceipt) {

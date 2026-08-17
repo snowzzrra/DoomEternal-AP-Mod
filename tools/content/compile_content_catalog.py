@@ -116,20 +116,19 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     return "\n".join(lines)
 
 
-def compile_catalog(
+def _compile_catalog(
     output: Path = DEFAULT_OUTPUT,
     *,
     output_root: Path | None = None,
     check: bool = False,
     map_key: str | None = None,
     source_only: bool = False,
-) -> bool:
+) -> tuple[Path, ...]:
     catalog = load_content_catalog()
     rendered = render(catalog, map_key)
-    changed = False
+    changed_paths: list[Path] = []
 
     def write_artifact(path: Path, payload: str) -> None:
-        nonlocal changed
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         if check:
             if current != payload:
@@ -137,49 +136,37 @@ def compile_catalog(
         elif current != payload:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(payload, encoding="utf-8", newline="\n")
-            changed = True
+            changed_paths.append(path)
 
-    current = output.read_text(encoding="utf-8") if output.exists() else ""
-    if check:
-        if current != rendered:
-            raise ValueError(
-                f"component=apworld file={output} field=generated_content value=stale\n"
-                "Reproduce:\n"
-                "  python -m tools.content.compile_content_catalog --check\n"
-                "Fix:\n"
-                "  python -m tools.content.compile_content_catalog"
-            )
-    else:
-        if current != rendered:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(rendered, encoding="utf-8", newline="\n")
-            changed = True
+    def write_bytes_artifact(path: Path, payload: bytes) -> None:
+        current = path.read_bytes() if path.is_file() else None
+        if check:
+            if current != payload:
+                raise ValueError(
+                    f"component=compiled_content file={path} field=synchronization value=stale"
+                )
+        elif current != payload:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            changed_paths.append(path)
+
+    write_artifact(output, rendered)
 
     if source_only:
-        return changed
+        return tuple(changed_paths)
 
     if output_root is None:
         output_root = MOD_ROOT / "build" / "staging" / "runtime_catalog"
 
-    output_root.mkdir(parents=True, exist_ok=True)
-
     staging_gen = output_root / "generated_content.py"
-    current_gen = staging_gen.read_text(encoding="utf-8") if staging_gen.exists() else ""
-    if current_gen != rendered:
-        if not check:
-            staging_gen.write_text(rendered, encoding="utf-8", newline="\n")
-            changed = True
+    write_artifact(staging_gen, rendered)
 
     for json_name in ["content_identity.json", "items.json", "item_replay_policies.json"]:
         src = catalog.root / "data" / json_name
         if src.exists():
             content_bytes = src.read_bytes()
             dst = output_root / json_name
-            current_bytes = dst.read_bytes() if dst.exists() else b""
-            if current_bytes != content_bytes:
-                if not check:
-                    dst.write_bytes(content_bytes)
-                    changed = True
+            write_bytes_artifact(dst, content_bytes)
 
     from doom_eap.contracts.challenge_registry import challenge_registry_document
     from doom_eap.content.map_registry import _catalog_registry
@@ -216,19 +203,17 @@ def compile_catalog(
                 for item in locations.get("secret_encounters", [])
             }
         )
-        write_artifact(catalog.root / "manifests" / f"{spec.key}.json", json.dumps(manifest, indent=4) + "\n")
+        write_artifact(
+            catalog.root / "manifests" / f"{spec.key}.json",
+            json.dumps(manifest, indent=4) + "\n",
+        )
 
     from doom_eap.contracts.foundation import load_foundation_contracts
 
     compiled_foundation = load_foundation_contracts(authorial=True)
     foundation_rendered = json.dumps(compiled_foundation, indent=2, sort_keys=True) + "\n"
     for dst_path in [output_root / "foundation_contracts.json", catalog.root / "data" / "foundation_contracts.json"]:
-        curr = dst_path.read_text(encoding="utf-8") if dst_path.exists() else ""
-        if curr != foundation_rendered:
-            if not check:
-                dst_path.parent.mkdir(parents=True, exist_ok=True)
-                dst_path.write_text(foundation_rendered, encoding="utf-8", newline="\n")
-                changed = True
+        write_artifact(dst_path, foundation_rendered)
 
     identity_src = catalog.root / "data" / "content_identity.json"
     identity_data = json.loads(identity_src.read_text(encoding="utf-8")) if identity_src.exists() else {}
@@ -242,13 +227,59 @@ def compile_catalog(
     }
     catalog_rendered = json.dumps(catalog_dict, indent=2, sort_keys=True) + "\n"
     staging_catalog = output_root / "catalog.json"
-    current_catalog = staging_catalog.read_text(encoding="utf-8") if staging_catalog.exists() else ""
-    if current_catalog != catalog_rendered:
-        if not check:
-            staging_catalog.write_text(catalog_rendered, encoding="utf-8", newline="\n")
-            changed = True
+    write_artifact(staging_catalog, catalog_rendered)
 
-    return changed
+    return tuple(changed_paths)
+
+
+def materialize_catalog(
+    output: Path = DEFAULT_OUTPUT,
+    *,
+    output_root: Path | None = None,
+    map_key: str | None = None,
+    source_only: bool = False,
+) -> tuple[Path, ...]:
+    return _compile_catalog(
+        output,
+        output_root=output_root,
+        map_key=map_key,
+        source_only=source_only,
+    )
+
+
+def check_catalog(
+    output: Path = DEFAULT_OUTPUT,
+    *,
+    output_root: Path | None = None,
+    map_key: str | None = None,
+    source_only: bool = False,
+) -> None:
+    _compile_catalog(
+        output,
+        output_root=output_root,
+        check=True,
+        map_key=map_key,
+        source_only=source_only,
+    )
+
+
+def compile_catalog(
+    output: Path = DEFAULT_OUTPUT,
+    *,
+    output_root: Path | None = None,
+    check: bool = False,
+    map_key: str | None = None,
+    source_only: bool = False,
+) -> bool:
+    return bool(
+        _compile_catalog(
+            output,
+            output_root=output_root,
+            check=check,
+            map_key=map_key,
+            source_only=source_only,
+        )
+    )
 
 
 def main() -> int:

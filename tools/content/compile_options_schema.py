@@ -182,24 +182,46 @@ def serialized(document: dict[str, Any]) -> str:
     return json.dumps(document, indent=2, sort_keys=True) + "\n"
 
 
+def materialize_schema(
+    ap_root: Path = DEFAULT_AP_ROOT,
+    output: Path = DEFAULT_OUTPUT,
+) -> tuple[Path, ...]:
+    expected = serialized(compile_schema(ap_root.resolve()))
+    current = output.read_text(encoding="utf-8") if output.is_file() else None
+    if current == expected:
+        return ()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(expected, encoding="utf-8", newline="\n")
+    return (output,)
+
+
+def check_schema(
+    ap_root: Path = DEFAULT_AP_ROOT,
+    output: Path = DEFAULT_OUTPUT,
+) -> None:
+    expected = serialized(compile_schema(ap_root.resolve()))
+    try:
+        actual = output.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(f"options schema missing: {error}") from error
+    if actual != expected:
+        raise ValueError("data/options_schema.json is stale; regenerate projection")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archipelago-root", type=Path, default=DEFAULT_AP_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
-    expected = serialized(compile_schema(args.archipelago_root.resolve()))
     if args.check:
         try:
-            actual = args.output.read_text(encoding="utf-8")
-        except OSError as error:
-            raise SystemExit(f"options schema missing: {error}") from error
-        if actual != expected:
-            raise SystemExit("data/options_schema.json is stale; regenerate projection")
+            check_schema(args.archipelago_root, args.output)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
         print("options schema: up-to-date")
         return 0
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(expected, encoding="utf-8", newline="\n")
+    materialize_schema(args.archipelago_root, args.output)
     print(args.output)
     return 0
 

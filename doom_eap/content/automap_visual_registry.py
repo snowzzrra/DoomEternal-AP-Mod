@@ -17,8 +17,9 @@ FORBIDDEN_VISUAL_TERMS = (
     "mission_complete",
 )
 FORBIDDEN_CLEANUP_TERMS = (
-    "vanilla", "progression", "relay", "objective", "encounter", "door",
-    "elevator", "mission complete", "mission_complete",
+    "vanilla", "progression", "relay", "reward", "useable", "inventory",
+    "currency", "functional", "objective", "encounter", "door", "elevator",
+    "mission complete", "mission_complete",
 )
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -166,6 +167,7 @@ def build_authorial_registry(root: Path) -> dict[str, Any]:
             entry.update({
                 "presentation_entity": resolved["presentation_entity"],
                 "cleanup_entity": resolved["cleanup_entity"],
+                "reconciliation_entity": resolved["reconciliation_entity"],
                 "direct_target": resolved["presentation_entity"],
             })
         entries.append(entry)
@@ -235,11 +237,30 @@ def _validate_common(document: Any) -> dict[str, Any]:
         _require(source_identity["resource_sha256"] == _canonical_hash(source_identity["resource"]), "source resource hash drift")
         _require(entry["classification"] in {"visible_cleanup", "no_visual", "event_only"}, "invalid visual classification")
         if entry["classification"] == "visible_cleanup":
-            for field in ("presentation_entity", "cleanup_entity", "direct_target"):
+            for field in (
+                "presentation_entity", "cleanup_entity", "reconciliation_entity",
+                "direct_target",
+            ):
                 _require(bool(isinstance(entry.get(field), str) and ENTITY_NAME_RE.fullmatch(entry[field])), f"invalid visual target name: {field}")
             _require(entry["direct_target"] == entry["presentation_entity"], "visual direct target mismatch")
+            expected_endpoints = {
+                "presentation_entity": f"ap_location_visual_{entry['location_id']}",
+                "cleanup_entity": f"ap_remove_location_visual_{entry['location_id']}",
+                "reconciliation_entity": f"ap_hide_location_visual_{entry['location_id']}",
+            }
+            for field, expected in expected_endpoints.items():
+                _require(entry[field] == expected, f"visual endpoint name drift: {field}")
         else:
-            _require(not any(field in entry for field in ("presentation_entity", "cleanup_entity", "direct_target")), "special visual entry has cleanup fields")
+            _require(
+                not any(
+                    field in entry
+                    for field in (
+                        "presentation_entity", "cleanup_entity",
+                        "reconciliation_entity", "direct_target",
+                    )
+                ),
+                "special visual entry has cleanup fields",
+            )
     counts = document.get("counts")
     _require(isinstance(counts, dict), "checked-location visuals counts missing")
     actual = {kind: sum(entry["classification"] == kind for entry in entries) for kind in ("visible_cleanup", "no_visual", "event_only")}
@@ -311,27 +332,62 @@ def validate_generated_visuals(document: dict[str, Any], map_key: str, content: 
         for entry in entries
         if entry["classification"] == "visible_cleanup"
     }
+    expected_reconciliations = {
+        entry["reconciliation_entity"]
+        for entry in entries
+        if entry["classification"] == "visible_cleanup"
+    }
     actual_visuals = set(re.findall(r"entityDef\s+(ap_location_visual_[0-9]+)\s*\{", content))
     actual_cleanups = set(re.findall(r"entityDef\s+(ap_remove_location_visual_[0-9]+)\s*\{", content))
+    actual_reconciliations = set(re.findall(r"entityDef\s+(ap_hide_location_visual_[0-9]+)\s*\{", content))
     _require(actual_visuals == expected_visuals, f"generated AP presentation set drift: {map_key}")
     _require(actual_cleanups == expected_cleanups, f"generated AP cleanup set drift: {map_key}")
+    _require(actual_reconciliations == expected_reconciliations, f"generated AP reconciliation set drift: {map_key}")
     forbidden_cleanup = tuple(term.casefold() for term in FORBIDDEN_CLEANUP_TERMS)
+    forbidden_endpoint_pattern = re.compile(
+        r"(?<![A-Za-z0-9_])(?:"
+        + "|".join(re.escape(term) for term in forbidden_cleanup)
+        + r")(?![A-Za-z0-9_])"
+    )
     for entry in entries:
         if entry["classification"] != "visible_cleanup":
             default_visual = f"ap_location_visual_{entry['location_id']}"
             default_cleanup = f"ap_remove_location_visual_{entry['location_id']}"
+            default_reconciliation = f"ap_hide_location_visual_{entry['location_id']}"
             _require(find_entity_block_bounds(content, default_visual) is None, f"special location has AP presentation: {entry['location_id']}")
             _require(find_entity_block_bounds(content, default_cleanup) is None, f"special location has AP cleanup: {entry['location_id']}")
+            _require(find_entity_block_bounds(content, default_reconciliation) is None, f"special location has AP reconciliation: {entry['location_id']}")
             continue
         visual_bounds = find_entity_block_bounds(content, entry["presentation_entity"])
         cleanup_bounds = find_entity_block_bounds(content, entry["cleanup_entity"])
+        reconciliation_bounds = find_entity_block_bounds(content, entry["reconciliation_entity"])
         _require(visual_bounds is not None, f"missing AP presentation entity: {entry['presentation_entity']}")
         _require(cleanup_bounds is not None, f"missing AP cleanup entity: {entry['cleanup_entity']}")
+        _require(reconciliation_bounds is not None, f"missing AP reconciliation entity: {entry['reconciliation_entity']}")
         visual_start, visual_end = cast(tuple[int, int], visual_bounds)
         cleanup_start, cleanup_end = cast(tuple[int, int], cleanup_bounds)
+        reconciliation_start, reconciliation_end = cast(tuple[int, int], reconciliation_bounds)
         visual = content[visual_start:visual_end]
         cleanup = content[cleanup_start:cleanup_end]
+        reconciliation = content[reconciliation_start:reconciliation_end]
         _require(extract_target_names(cleanup) == [entry["direct_target"]], f"cleanup target graph drift: {entry['location_id']}")
-        _require('class = "idTarget_Remove";' in cleanup, f"cleanup class drift: {entry['location_id']}")
+        _require(extract_target_names(reconciliation) == [entry["direct_target"]], f"reconciliation target graph drift: {entry['location_id']}")
+        _require(
+            re.findall(r'class\s*=\s*"([^"]+)";', cleanup) == ["idTarget_Remove"],
+            f"cleanup class drift: {entry['location_id']}",
+        )
+        _require(
+            re.findall(r'class\s*=\s*"([^"]+)";', reconciliation) == ["idTarget_Hide"],
+            f"reconciliation class drift: {entry['location_id']}",
+        )
+        _require('reuseable = true;' in reconciliation, f"reconciliation reuseability drift: {entry['location_id']}")
+        for endpoint in (cleanup, reconciliation):
+            _require('networkReplicated = false;' in endpoint, f"endpoint replication drift: {entry['location_id']}")
+            _require('noFlood = true;' in endpoint, f"endpoint flood drift: {entry['location_id']}")
+        layer_pattern = re.compile(r'\blayers\s*\{\s*"[^"]+"\s*\}', re.DOTALL)
+        bind_pattern = re.compile(r'\bbindInfo\s*=\s*\{\s*bindParent\s*=\s*"[^"]+";\s*\}', re.DOTALL)
+        _require(layer_pattern.findall(cleanup) == layer_pattern.findall(reconciliation), f"endpoint layer drift: {entry['location_id']}")
+        _require(bind_pattern.findall(cleanup) == bind_pattern.findall(reconciliation), f"endpoint bind drift: {entry['location_id']}")
         _require(not any(term in visual.casefold() for term in FORBIDDEN_VISUAL_TERMS), f"functional AP presentation entity: {entry['location_id']}")
-        _require(not any(term in cleanup.casefold() for term in forbidden_cleanup), f"forbidden cleanup graph: {entry['location_id']}")
+        _require(not forbidden_endpoint_pattern.search(cleanup.casefold()), f"forbidden cleanup graph: {entry['location_id']}")
+        _require(not forbidden_endpoint_pattern.search(reconciliation.casefold()), f"forbidden reconciliation graph: {entry['location_id']}")

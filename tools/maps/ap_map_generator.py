@@ -232,116 +232,6 @@ def find_entity_block_bounds(content, entity_name):
     return block_start, block_end
 
 
-START_WITH_AUTOMAP_GRAPH = "interactables/ap_start_with_automap_station"
-START_WITH_AUTOMAP_TRIGGER = "trigger/interact/ap_start_with_automap"
-
-
-def load_start_with_automap_positions():
-    root = Path(__file__).resolve().parents[2]
-    document = json.loads(
-        (root / "data" / "start_with_automap.json").read_text(encoding="utf-8")
-    )
-    if document.get("schema_version") != 1:
-        raise ValueError("unsupported start_with_automap position schema")
-    positions = document.get("maps")
-    if not isinstance(positions, dict):
-        raise ValueError("start_with_automap positions must be a map")
-    return positions
-
-
-def _replace_decl_property(block, property_name, replacement):
-    match = re.search(rf"\b{re.escape(property_name)}\s*=\s*\{{", block)
-    if match is None:
-        raise ValueError(f"Automap entity is missing {property_name}")
-    close_brace = find_matching_brace(block, block.find("{", match.start()))
-    return block[:match.start()] + replacement + block[close_brace:]
-
-
-def _start_with_automap_station_block(content):
-    matches = list(
-        re.finditer(r"\bclass\s*=\s*\"idInteractable_Automap\";", content)
-    )
-    if len(matches) != 1:
-        raise ValueError(
-            "Start With Automap requires exactly one native idInteractable_Automap"
-        )
-    class_match = matches[0]
-    entity_matches = list(
-        re.finditer(r"entityDef\s+([^\s{]+)\s*\{", content[: class_match.start()])
-    )
-    if not entity_matches:
-        raise ValueError("Automap entityDef name is missing")
-    entity_name = entity_matches[-1].group(1)
-    bounds = find_entity_block_bounds(content, entity_name)
-    if bounds is None or not (bounds[0] <= class_match.start() < bounds[1]):
-        raise ValueError(f"Could not locate native Automap entity: {entity_name}")
-    return entity_name, bounds
-
-
-def apply_start_with_automap_transform(content, map_key):
-    """Move native Automap ownership to map start without adding helper entities."""
-    positions = load_start_with_automap_positions()
-    if map_key not in positions:
-        raise ValueError(f"Start With Automap position is missing for {map_key}")
-    position = positions[map_key]
-    if not isinstance(position, list) or len(position) != 3:
-        raise ValueError(f"Start With Automap position is invalid for {map_key}")
-
-    entity_name, (start, end) = _start_with_automap_station_block(content)
-    block = content[start:end]
-    original_targets = extract_target_names(block)
-    required_fields = {
-        'class = "idInteractable_Automap";': "class",
-        'saveType = "SGS_GAME_DATA";': "saveType",
-        'automapPropertiesDecl = "automap_station";': "automapPropertiesDecl",
-        'useStat = "STAT_AUTOMAP";': "useStat",
-        'interactionGraph = "interactables/automap_station";': "native interaction graph",
-        'triggerDef = "trigger/interact/use_panel";': "native trigger definition",
-    }
-    for snippet, label in required_fields.items():
-        if block.count(snippet) != 1:
-            raise ValueError(f"Native Automap contract missing {label}: {entity_name}")
-
-    coordinates = "\n".join(
-        f"\t\t\t\t{axis} = {value};"
-        for axis, value in zip(("x", "y", "z"), position)
-    )
-    block = _replace_decl_property(
-        block,
-        "spawnPosition",
-        "spawnPosition = {\n" + coordinates + "\n\t\t\t}",
-    )
-    block = _replace_decl_property(
-        block,
-        "renderModelInfo",
-        'renderModelInfo = {\n\t\t\tmodel = "";\n\t\t}',
-    )
-    block = _replace_decl_property(
-        block,
-        "clipModelInfo",
-        'clipModelInfo = {\n\t\t\ttype = "CLIPMODEL_NONE";\n\t\t}',
-    )
-    block = block.replace(
-        'interactionGraph = "interactables/automap_station";',
-        f'interactionGraph = "{START_WITH_AUTOMAP_GRAPH}";',
-        1,
-    )
-    block = block.replace(
-        'triggerDef = "trigger/interact/use_panel";',
-        f'triggerDef = "{START_WITH_AUTOMAP_TRIGGER}";',
-        1,
-    )
-    if extract_target_names(block) != original_targets:
-        raise ValueError(f"Start With Automap changed native targets: {entity_name}")
-    return content[:start] + block + content[end:]
-
-
-def apply_composable_map_transforms(content, map_key, level_config):
-    if level_config.get("start_with_automap", False):
-        return apply_start_with_automap_transform(content, map_key)
-    return content
-
-
 def remove_inline_currency_transaction(content, contract):
     """Remove one exact inline GiveItems currency mutation, fail closed."""
     required = {
@@ -769,19 +659,191 @@ def is_sentinel_crystal_source(block):
     )
 
 
-def remove_sentinel_crystal_head(block):
-    for property_name in (
-        "renderModelInfo",
-        "automapPropertiesDecl",
-        "fxDecl",
-    ):
-        block = remove_property_blocks(block, property_name)
-        block = re.sub(
-            rf'\s*{re.escape(property_name)}\s*=\s*(?:"[^"]*"|[^;]+);',
-            "",
+SENTINEL_CRYSTAL_TOP_MODEL = "art/kit/sentinel/prop/argent_cell_top.lwo"
+SENTINEL_CRYSTAL_OWNER_MARKERS = (
+    'inherit = "progress/argent_cell";',
+    'class = "idInteractable_WorldCache";',
+    'automapPropertiesDecl = "argent_cell";',
+    'model = "md6def/objects/interact/argent_cell/argent_cell.md6";',
+    'animWebDecl = "animweb/interact/argent_cell/argent_cell_interact";',
+    'interactionGraph = "interactables/progress";',
+    'markForGameUsed = true;',
+)
+
+
+def is_sentinel_crystal_top(block):
+    return (
+        re.findall(r'\binherit\s*=\s*"([^"]+)";', block)
+        == ["destructible/interact/argent_cell"]
+        and re.findall(r'\bclass\s*=\s*"([^"]+)";', block)
+        == ["idDestructible"]
+        and re.findall(
+            r'\brenderModelInfo\s*=\s*\{.*?\bmodel\s*=\s*"([^"]+)";',
             block,
+            flags=re.DOTALL,
         )
-    return block
+        == [SENTINEL_CRYSTAL_TOP_MODEL]
+    )
+
+
+def _entity_name_from_block(block):
+    match = re.search(r'\bentityDef\s+([^\s{]+)', block)
+    return match.group(1) if match else None
+
+
+def _spawn_position_from_block(block):
+    match = re.search(r'\bspawnPosition\s*=\s*\{([^}]*)\}', block)
+    if match is None:
+        return None
+    values = []
+    for axis in ("x", "y", "z"):
+        axis_match = re.search(
+            rf'\b{axis}\s*=\s*([-+0-9.eE]+);', match.group(1)
+        )
+        if axis_match is None:
+            return None
+        values.append(float(axis_match.group(1)))
+    return tuple(values)
+
+
+def _list_item_names(block, property_name):
+    property_match = re.search(
+        rf'\b{re.escape(property_name)}\s*=\s*\{{', block
+    )
+    if property_match is None:
+        return []
+    property_end = find_matching_brace(block, property_match.end() - 1)
+    return re.findall(
+        r'\bitem\[\d+\]\s*=\s*"([^"]+)";',
+        block[property_match.start():property_end],
+    )
+
+
+def find_sentinel_crystal_pairs(blocks):
+    """Resolve each functional crystal owner to its exact destructible top."""
+    named_blocks = [
+        (_entity_name_from_block(block), block)
+        for block in blocks
+    ]
+    top_blocks = [
+        (name, block)
+        for name, block in named_blocks
+        if name and is_sentinel_crystal_top(block)
+    ]
+    pairs = {}
+    for source_name, source_block in named_blocks:
+        if not source_name or not is_sentinel_crystal_source(source_block):
+            continue
+        owner_names = _list_item_names(source_block, "stateActivateList")
+        candidates = [
+            (top_name, top_block)
+            for top_name, top_block in top_blocks
+            if top_name in owner_names
+            and _spawn_position_from_block(top_block)
+            == _spawn_position_from_block(source_block)
+        ]
+        if len(candidates) != 1:
+            raise ValueError(
+                "Sentinel Crystal requires exactly one paired top: "
+                f"{source_name} (found {len(candidates)})"
+            )
+        pairs[source_name] = candidates[0][0]
+    return pairs
+
+
+def remove_exact_list_reference(block, property_name, target_name):
+    """Remove one dangling owner reference and renumber remaining list items."""
+    property_match = re.search(
+        rf'\b{re.escape(property_name)}\s*=\s*\{{', block
+    )
+    if property_match is None:
+        raise ValueError(
+            f"Sentinel Crystal owner reference list missing: {property_name}"
+        )
+    property_end = find_matching_brace(block, property_match.end() - 1)
+    property_block = block[property_match.start():property_end]
+    item_pattern = re.compile(
+        r'(?m)^([ \t]*)item\[\d+\](\s*=\s*"([^"]+)";)[ \t]*(?:\n|$)'
+    )
+    item_matches = list(item_pattern.finditer(property_block))
+    matching = [
+        match for match in item_matches if match.group(3) == target_name
+    ]
+    if len(matching) != 1:
+        raise ValueError(
+            "Sentinel Crystal owner reference drift for "
+            f"{target_name}: found {len(matching)}"
+        )
+
+    updated_property = property_block
+    removed_index = item_matches.index(matching[0])
+    for index, match in reversed(list(enumerate(item_matches))):
+        if match.group(3) == target_name:
+            updated_property = (
+                updated_property[:match.start()]
+                + updated_property[match.end():]
+            )
+        else:
+            replacement_index = index - (1 if index > removed_index else 0)
+            updated_property = (
+                updated_property[:match.start()]
+                + f"{match.group(1)}item[{replacement_index}]"
+                + match.group(2)
+                + updated_property[match.end():]
+            )
+    updated_property, replacements = re.subn(
+        r'(\bnum\s*=\s*)\d+;',
+        rf'\g<1>{len(item_matches) - 1};',
+        updated_property,
+        count=1,
+    )
+    if replacements != 1:
+        raise ValueError("Sentinel Crystal owner reference count is missing")
+    return block[:property_match.start()] + updated_property + block[property_end:]
+
+
+def assert_sentinel_crystal_owner_intact(block, entity_name):
+    missing = [marker for marker in SENTINEL_CRYSTAL_OWNER_MARKERS if marker not in block]
+    if missing:
+        raise ValueError(
+            f"Sentinel Crystal functional owner drift for {entity_name}: "
+            + ", ".join(missing)
+        )
+
+
+def assert_sentinel_crystal_transform(content, pairs):
+    """Keep native crystal owners while proving only paired tops disappeared."""
+    for source_name, top_name in pairs.items():
+        source_bounds = find_entity_block_bounds(content, source_name)
+        if source_bounds is None:
+            raise ValueError(f"Sentinel Crystal functional owner missing: {source_name}")
+        source_block = content[source_bounds[0]:source_bounds[1]]
+        assert_sentinel_crystal_owner_intact(source_block, source_name)
+        if top_name in source_block:
+            raise ValueError(
+                f"Sentinel Crystal owner retains removed top reference: {source_name}"
+            )
+        if content.count(f"entityDef {top_name} {{") != 0:
+            raise ValueError(f"Sentinel Crystal top was not removed: {top_name}")
+        if SENTINEL_CRYSTAL_TOP_MODEL in content:
+            raise ValueError(
+                f"Sentinel Crystal top model remains after removal: {top_name}"
+            )
+        trigger_name = f"ap_independent_{source_name}"
+        trigger_bounds = find_entity_block_bounds(content, trigger_name)
+        if trigger_bounds is None:
+            raise ValueError(f"Sentinel Crystal AP trigger missing: {trigger_name}")
+        trigger_block = content[trigger_bounds[0]:trigger_bounds[1]]
+        trigger_targets = extract_target_names(trigger_block)
+        if top_name in trigger_targets:
+            raise ValueError(
+                f"Sentinel Crystal AP trigger retains removed top: {trigger_name}"
+            )
+        ap_check = f"AP_CHECK_{source_name.upper()}"
+        if ap_check not in trigger_targets:
+            raise ValueError(
+                f"Sentinel Crystal AP trigger lost AP check: {trigger_name}"
+            )
 
 
 def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
@@ -859,7 +921,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 
 
 def generate_inert_location_visual(block, policy):
-    """Create a rendered marker and its optional isolated cleanup target."""
+    """Create rendered marker plus local-removal and reconciliation targets."""
     visual = policy.get("independent_visual")
     if not visual:
         return ""
@@ -892,6 +954,19 @@ def generate_inert_location_visual(block, policy):
         if bind_parent else ""
     )
     cleanup_name = visual.get("cleanup_entity")
+    reconciliation_name = visual.get("reconciliation_entity")
+    if cleanup_name and not reconciliation_name:
+        location_match = re.fullmatch(
+            r"ap_location_visual_(\d+)", visual["entity_name"]
+        )
+        if location_match:
+            reconciliation_name = (
+                f"ap_hide_location_visual_{location_match.group(1)}"
+            )
+    if cleanup_name and not reconciliation_name:
+        raise ValueError(
+            f"AP visual reconciliation entity is missing: {visual['entity_name']}"
+        )
     cleanup = ""
     if cleanup_name:
         cleanup = f'''entity {{
@@ -908,6 +983,30 @@ def generate_inert_location_visual(block, policy):
 \t\t\t\tnoFlood = true;
 {bind_info_line}
 \t\t\t}}
+\t\t\ttargets = {{
+\t\t\t\tnum = 1;
+\t\t\t\titem[0] = "{visual["entity_name"]}";
+\t\t\t}}
+\t\t}}
+\t}}
+}}
+'''
+    reconciliation = ""
+    if reconciliation_name:
+        reconciliation = f'''entity {{
+{layers}\tentityDef {reconciliation_name} {{
+\t\tinherit = "target/hide";
+\t\tclass = "idTarget_Hide";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\treuseable = true;
+\t\t\tflags = {{
+\t\t\t\tnoFlood = true;
+{bind_info_line}\t\t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
 \t\t\t\titem[0] = "{visual["entity_name"]}";
@@ -949,7 +1048,7 @@ def generate_inert_location_visual(block, policy):
 \t\t}}
 \t}}
 }}
-''' + cleanup
+''' + cleanup + reconciliation
 
 
 def donor_kind_from_block(block):
@@ -1136,6 +1235,7 @@ def build_universal_physical_policy(
     """
     visual_name = f"ap_location_visual_{location_id}"
     cleanup_name = f"ap_remove_location_visual_{location_id}"
+    reconciliation_name = f"ap_hide_location_visual_{location_id}"
 
     policy = policy or {}
     configured_position = policy.get("independent_position")
@@ -1171,6 +1271,7 @@ def build_universal_physical_policy(
             "position": position,
             "scale": [1.0, 1.0, 1.0],
             "cleanup_entity": cleanup_name,
+            "reconciliation_entity": reconciliation_name,
         },
         "completion_targets": [cleanup_name],
     }
@@ -1186,18 +1287,21 @@ def resolved_automap_visual_policy(location_id, policy):
             "classification": "visible_cleanup",
             "presentation_entity": f"ap_location_visual_{location_id}",
             "cleanup_entity": f"ap_remove_location_visual_{location_id}",
+            "reconciliation_entity": f"ap_hide_location_visual_{location_id}",
             "policy": "generated_universal",
         }
     if not isinstance(visual, dict):
         raise ValueError(f"location {location_id}: independent_visual must be object")
     presentation = visual.get("entity_name", visual.get("entity"))
     cleanup = visual.get("cleanup_entity")
+    reconciliation = f"ap_hide_location_visual_{location_id}"
     if not isinstance(presentation, str) or not isinstance(cleanup, str):
         raise ValueError(f"location {location_id}: independent_visual names must be strings")
     return {
         "classification": "visible_cleanup",
         "presentation_entity": presentation,
         "cleanup_entity": cleanup,
+        "reconciliation_entity": reconciliation,
         "policy": "explicit_independent_visual",
     }
 
@@ -1840,7 +1944,6 @@ def generate_map(
 
     source_metadata = validate_source_file(input_file, output_file)
     content = source_metadata["content"]
-    content = apply_composable_map_transforms(content, map_key, level_config)
     for contract in level_config.get("inline_currency_removals", []):
         content = remove_inline_currency_transaction(content, contract)
     validate_target_policies(config_entities, target_policies, content)
@@ -1908,14 +2011,19 @@ def generate_map(
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
     blocks = content.split("entity {")
+    sentinel_crystal_pairs = find_sentinel_crystal_pairs(blocks[1:])
+    sentinel_crystal_top_names = set(sentinel_crystal_pairs.values())
     new_blocks = [blocks[0]]
 
     modified_count = 0
     for block in blocks[1:]:
         # Normalized content assigns each declared entity its generation strategy.
         declared_match = re.search(r'entityDef\s+([^\s{]+)', block)
+        declared_entity_name = declared_match.group(1).strip() if declared_match else ""
+        if declared_entity_name in sentinel_crystal_top_names:
+            continue
         declared_ap_check = (
-            f"AP_CHECK_{declared_match.group(1).strip().upper()}"
+            f"AP_CHECK_{declared_entity_name.upper()}"
             if declared_match else ""
         )
         if declared_ap_check in config_entities:
@@ -1973,6 +2081,11 @@ def generate_map(
                         if target not in target_policy["completion_targets"]
                     )
                 target_policy = bind_parent_from_source(target_policy, block)
+                if target_policy.get("independent_visual"):
+                    target_policy["independent_visual"].setdefault(
+                        "reconciliation_entity",
+                        f"ap_hide_location_visual_{location_id}",
+                    )
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 
@@ -2014,6 +2127,13 @@ def generate_map(
                     continue
 
                 if target_policy.get("independent_ap_trigger"):
+                    sentinel_top_name = sentinel_crystal_pairs.get(entity_name)
+                    if sentinel_top_name:
+                        target_policy["preserve_targets"] = [
+                            target
+                            for target in target_policy.get("preserve_targets", [])
+                            if target != sentinel_top_name
+                        ]
                     if target_policy.get("remove_original", False) or (not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual")):
                         target_policy["independent_targets"] = build_independent_targets(
                             block, ap_check_id, target_policy
@@ -2039,6 +2159,11 @@ def generate_map(
                             if target != cleanup
                         ]
                     visual_policy = target_policy.get("independent_visual")
+                    if visual_policy:
+                        visual_policy.setdefault(
+                            "reconciliation_entity",
+                            f"ap_hide_location_visual_{location_id}",
+                        )
                     if visual_policy and "_model_override" not in visual_policy:
                         asset_key = (
                             visual_policy.get("asset") or default_visual_asset
@@ -2067,8 +2192,20 @@ def generate_map(
                                 )
                             )
                     elif is_sentinel_crystal_source(block):
+                        sentinel_top_name = sentinel_crystal_pairs[entity_name]
+                        native = remove_exact_list_reference(
+                            block,
+                            "stateActivateList",
+                            sentinel_top_name,
+                        )
+                        native = remove_exact_list_reference(
+                            native,
+                            "targets",
+                            sentinel_top_name,
+                        )
+                        assert_sentinel_crystal_owner_intact(native, entity_name)
                         new_blocks.append(
-                            "entity {" + remove_sentinel_crystal_head(block)
+                            "entity {" + native
                         )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
@@ -2103,6 +2240,7 @@ def generate_map(
         new_blocks.append("entity {" + block)
 
     map_content = "".join(new_blocks)
+    assert_sentinel_crystal_transform(map_content, sentinel_crystal_pairs)
     secret_blocks = []
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]

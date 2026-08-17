@@ -309,17 +309,6 @@ def validate_source_layout(root: Path, catalog: ContentCatalog | None = None) ->
             raise ValueError(f"impossible source layout: manifest {spec.key}")
 
 
-def validate_automap_option_keys(document: Mapping[str, Any]) -> None:
-    keys = {
-        entry.get("key") for entry in document.get("options", [])
-        if isinstance(entry, Mapping)
-    }
-    if "start_with_automap" not in keys:
-        raise ValueError(
-            "option contract requires start_with_automap"
-        )
-
-
 def stale_package_paths(root: Path) -> list[str]:
     """Return stale room markers from source contract inputs, not build output."""
     source_root = Path(__file__).resolve().parents[2]

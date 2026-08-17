@@ -17,6 +17,7 @@
       "location_id": 7770001,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770001",
+      "reconciliation_entity": "ap_hide_location_visual_7770001",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -44,6 +45,7 @@
       "location_id": 7770002,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770002",
+      "reconciliation_entity": "ap_hide_location_visual_7770002",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -71,6 +73,7 @@
       "location_id": 7770003,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770003",
+      "reconciliation_entity": "ap_hide_location_visual_7770003",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -98,6 +101,7 @@
       "location_id": 7770004,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770004",
+      "reconciliation_entity": "ap_hide_location_visual_7770004",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -125,6 +129,7 @@
       "location_id": 7770005,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770005",
+      "reconciliation_entity": "ap_hide_location_visual_7770005",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -152,6 +157,7 @@
       "location_id": 7770006,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770006",
+      "reconciliation_entity": "ap_hide_location_visual_7770006",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -179,6 +185,7 @@
       "location_id": 7770007,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770007",
+      "reconciliation_entity": "ap_hide_location_visual_7770007",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -206,6 +213,7 @@
       "location_id": 7770008,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770008",
+      "reconciliation_entity": "ap_hide_location_visual_7770008",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -233,6 +241,7 @@
       "location_id": 7770009,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770009",
+      "reconciliation_entity": "ap_hide_location_visual_7770009",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -260,6 +269,7 @@
       "location_id": 7770010,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770010",
+      "reconciliation_entity": "ap_hide_location_visual_7770010",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -287,6 +297,7 @@
       "location_id": 7770011,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770011",
+      "reconciliation_entity": "ap_hide_location_visual_7770011",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -314,6 +325,7 @@
       "location_id": 7770012,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770012",
+      "reconciliation_entity": "ap_hide_location_visual_7770012",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -341,6 +353,7 @@
       "location_id": 7770013,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770013",
+      "reconciliation_entity": "ap_hide_location_visual_7770013",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -368,6 +381,7 @@
       "location_id": 7770014,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770014",
+      "reconciliation_entity": "ap_hide_location_visual_7770014",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -395,6 +409,7 @@
       "location_id": 7770015,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770015",
+      "reconciliation_entity": "ap_hide_location_visual_7770015",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -422,6 +437,7 @@
       "location_id": 7770016,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770016",
+      "reconciliation_entity": "ap_hide_location_visual_7770016",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -449,6 +465,7 @@
       "location_id": 7770017,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770017",
+      "reconciliation_entity": "ap_hide_location_visual_7770017",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -476,6 +493,7 @@
       "location_id": 7770018,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770018",
+      "reconciliation_entity": "ap_hide_location_visual_7770018",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -503,6 +521,7 @@
       "location_id": 7770019,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770019",
+      "reconciliation_entity": "ap_hide_location_visual_7770019",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -530,6 +549,7 @@
       "location_id": 7770020,
       "map_key": "e1m1_intro",
       "presentation_entity": "ap_location_visual_7770020",
+      "reconciliation_entity": "ap_hide_location_visual_7770020",
       "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
       "source_identity": {
         "descriptor_sha256": "026dba21ade83f9782f630a82ddca8ab0677143ce79c065a8f8586a63c7945f2",
@@ -557,6 +577,7 @@
       "location_id": 7770021,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770021",
+      "reconciliation_entity": "ap_hide_location_visual_7770021",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -584,6 +605,7 @@
       "location_id": 7770023,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770023",
+      "reconciliation_entity": "ap_hide_location_visual_7770023",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -611,6 +633,7 @@
       "location_id": 7770024,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770024",
+      "reconciliation_entity": "ap_hide_location_visual_7770024",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -638,6 +661,7 @@
       "location_id": 7770025,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770025",
+      "reconciliation_entity": "ap_hide_location_visual_7770025",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -665,6 +689,7 @@
       "location_id": 7770026,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770026",
+      "reconciliation_entity": "ap_hide_location_visual_7770026",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -692,6 +717,7 @@
       "location_id": 7770027,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770027",
+      "reconciliation_entity": "ap_hide_location_visual_7770027",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -719,6 +745,7 @@
       "location_id": 7770028,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770028",
+      "reconciliation_entity": "ap_hide_location_visual_7770028",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -746,6 +773,7 @@
       "location_id": 7770029,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770029",
+      "reconciliation_entity": "ap_hide_location_visual_7770029",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -773,6 +801,7 @@
       "location_id": 7770030,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770030",
+      "reconciliation_entity": "ap_hide_location_visual_7770030",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -800,6 +829,7 @@
       "location_id": 7770031,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770031",
+      "reconciliation_entity": "ap_hide_location_visual_7770031",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -827,6 +857,7 @@
       "location_id": 7770032,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770032",
+      "reconciliation_entity": "ap_hide_location_visual_7770032",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -854,6 +885,7 @@
       "location_id": 7770034,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770034",
+      "reconciliation_entity": "ap_hide_location_visual_7770034",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -881,6 +913,7 @@
       "location_id": 7770035,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770035",
+      "reconciliation_entity": "ap_hide_location_visual_7770035",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -908,6 +941,7 @@
       "location_id": 7770036,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770036",
+      "reconciliation_entity": "ap_hide_location_visual_7770036",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -935,6 +969,7 @@
       "location_id": 7770037,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770037",
+      "reconciliation_entity": "ap_hide_location_visual_7770037",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -962,6 +997,7 @@
       "location_id": 7770038,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770038",
+      "reconciliation_entity": "ap_hide_location_visual_7770038",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -989,6 +1025,7 @@
       "location_id": 7770039,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770039",
+      "reconciliation_entity": "ap_hide_location_visual_7770039",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1016,6 +1053,7 @@
       "location_id": 7770040,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770040",
+      "reconciliation_entity": "ap_hide_location_visual_7770040",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1043,6 +1081,7 @@
       "location_id": 7770041,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770041",
+      "reconciliation_entity": "ap_hide_location_visual_7770041",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1070,6 +1109,7 @@
       "location_id": 7770042,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770042",
+      "reconciliation_entity": "ap_hide_location_visual_7770042",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1097,6 +1137,7 @@
       "location_id": 7770043,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770043",
+      "reconciliation_entity": "ap_hide_location_visual_7770043",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1124,6 +1165,7 @@
       "location_id": 7770044,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770044",
+      "reconciliation_entity": "ap_hide_location_visual_7770044",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1151,6 +1193,7 @@
       "location_id": 7770045,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770045",
+      "reconciliation_entity": "ap_hide_location_visual_7770045",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1178,6 +1221,7 @@
       "location_id": 7770083,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770083",
+      "reconciliation_entity": "ap_hide_location_visual_7770083",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1205,6 +1249,7 @@
       "location_id": 7770084,
       "map_key": "e1m2_war",
       "presentation_entity": "ap_location_visual_7770084",
+      "reconciliation_entity": "ap_hide_location_visual_7770084",
       "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
       "source_identity": {
         "descriptor_sha256": "7291bea69fe36c061f646d5a2399106e46f9e5465d934d8215e29685bac8bb5c",
@@ -1280,6 +1325,7 @@
       "location_id": 7770046,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770046",
+      "reconciliation_entity": "ap_hide_location_visual_7770046",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1307,6 +1353,7 @@
       "location_id": 7770047,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770047",
+      "reconciliation_entity": "ap_hide_location_visual_7770047",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1334,6 +1381,7 @@
       "location_id": 7770048,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770048",
+      "reconciliation_entity": "ap_hide_location_visual_7770048",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1361,6 +1409,7 @@
       "location_id": 7770049,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770049",
+      "reconciliation_entity": "ap_hide_location_visual_7770049",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1388,6 +1437,7 @@
       "location_id": 7770050,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770050",
+      "reconciliation_entity": "ap_hide_location_visual_7770050",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1415,6 +1465,7 @@
       "location_id": 7770051,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770051",
+      "reconciliation_entity": "ap_hide_location_visual_7770051",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1442,6 +1493,7 @@
       "location_id": 7770052,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770052",
+      "reconciliation_entity": "ap_hide_location_visual_7770052",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1469,6 +1521,7 @@
       "location_id": 7770053,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770053",
+      "reconciliation_entity": "ap_hide_location_visual_7770053",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1496,6 +1549,7 @@
       "location_id": 7770054,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770054",
+      "reconciliation_entity": "ap_hide_location_visual_7770054",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1547,6 +1601,7 @@
       "location_id": 7770057,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770057",
+      "reconciliation_entity": "ap_hide_location_visual_7770057",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1574,6 +1629,7 @@
       "location_id": 7770058,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770058",
+      "reconciliation_entity": "ap_hide_location_visual_7770058",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1601,6 +1657,7 @@
       "location_id": 7770059,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770059",
+      "reconciliation_entity": "ap_hide_location_visual_7770059",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1628,6 +1685,7 @@
       "location_id": 7770060,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770060",
+      "reconciliation_entity": "ap_hide_location_visual_7770060",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1655,6 +1713,7 @@
       "location_id": 7770061,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770061",
+      "reconciliation_entity": "ap_hide_location_visual_7770061",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1682,6 +1741,7 @@
       "location_id": 7770062,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770062",
+      "reconciliation_entity": "ap_hide_location_visual_7770062",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1709,6 +1769,7 @@
       "location_id": 7770063,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770063",
+      "reconciliation_entity": "ap_hide_location_visual_7770063",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1736,6 +1797,7 @@
       "location_id": 7770064,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770064",
+      "reconciliation_entity": "ap_hide_location_visual_7770064",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1763,6 +1825,7 @@
       "location_id": 7770065,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770065",
+      "reconciliation_entity": "ap_hide_location_visual_7770065",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1790,6 +1853,7 @@
       "location_id": 7770066,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770066",
+      "reconciliation_entity": "ap_hide_location_visual_7770066",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1817,6 +1881,7 @@
       "location_id": 7770067,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770067",
+      "reconciliation_entity": "ap_hide_location_visual_7770067",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1844,6 +1909,7 @@
       "location_id": 7770069,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770069",
+      "reconciliation_entity": "ap_hide_location_visual_7770069",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1871,6 +1937,7 @@
       "location_id": 7770070,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770070",
+      "reconciliation_entity": "ap_hide_location_visual_7770070",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1898,6 +1965,7 @@
       "location_id": 7770071,
       "map_key": "e1m3_cult",
       "presentation_entity": "ap_location_visual_7770071",
+      "reconciliation_entity": "ap_hide_location_visual_7770071",
       "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
       "source_identity": {
         "descriptor_sha256": "8b1c4fcc1e8602ba774de51e6d91f40a3cac4181a8acebebde79ff86bca8dfb7",
@@ -1973,6 +2041,7 @@
       "location_id": 7770143,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770143",
+      "reconciliation_entity": "ap_hide_location_visual_7770143",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2000,6 +2069,7 @@
       "location_id": 7770144,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770144",
+      "reconciliation_entity": "ap_hide_location_visual_7770144",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2027,6 +2097,7 @@
       "location_id": 7770145,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770145",
+      "reconciliation_entity": "ap_hide_location_visual_7770145",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2054,6 +2125,7 @@
       "location_id": 7770146,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770146",
+      "reconciliation_entity": "ap_hide_location_visual_7770146",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2081,6 +2153,7 @@
       "location_id": 7770147,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770147",
+      "reconciliation_entity": "ap_hide_location_visual_7770147",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2108,6 +2181,7 @@
       "location_id": 7770148,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770148",
+      "reconciliation_entity": "ap_hide_location_visual_7770148",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2135,6 +2209,7 @@
       "location_id": 7770149,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770149",
+      "reconciliation_entity": "ap_hide_location_visual_7770149",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2162,6 +2237,7 @@
       "location_id": 7770150,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770150",
+      "reconciliation_entity": "ap_hide_location_visual_7770150",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2189,6 +2265,7 @@
       "location_id": 7770151,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770151",
+      "reconciliation_entity": "ap_hide_location_visual_7770151",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2216,6 +2293,7 @@
       "location_id": 7770152,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770152",
+      "reconciliation_entity": "ap_hide_location_visual_7770152",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2243,6 +2321,7 @@
       "location_id": 7770153,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770153",
+      "reconciliation_entity": "ap_hide_location_visual_7770153",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2270,6 +2349,7 @@
       "location_id": 7770154,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770154",
+      "reconciliation_entity": "ap_hide_location_visual_7770154",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2297,6 +2377,7 @@
       "location_id": 7770155,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770155",
+      "reconciliation_entity": "ap_hide_location_visual_7770155",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2324,6 +2405,7 @@
       "location_id": 7770156,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770156",
+      "reconciliation_entity": "ap_hide_location_visual_7770156",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2351,6 +2433,7 @@
       "location_id": 7770157,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770157",
+      "reconciliation_entity": "ap_hide_location_visual_7770157",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2378,6 +2461,7 @@
       "location_id": 7770158,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770158",
+      "reconciliation_entity": "ap_hide_location_visual_7770158",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2405,6 +2489,7 @@
       "location_id": 7770159,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770159",
+      "reconciliation_entity": "ap_hide_location_visual_7770159",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2432,6 +2517,7 @@
       "location_id": 7770160,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770160",
+      "reconciliation_entity": "ap_hide_location_visual_7770160",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2459,6 +2545,7 @@
       "location_id": 7770161,
       "map_key": "e1m4_boss",
       "presentation_entity": "ap_location_visual_7770161",
+      "reconciliation_entity": "ap_hide_location_visual_7770161",
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "source_identity": {
         "descriptor_sha256": "cf31a7ac087f462f66c6bad736115b37f22b578bfe2610794e532fedf00f16ce",
@@ -2486,6 +2573,7 @@
       "location_id": 7770176,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770176",
+      "reconciliation_entity": "ap_hide_location_visual_7770176",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2513,6 +2601,7 @@
       "location_id": 7770177,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770177",
+      "reconciliation_entity": "ap_hide_location_visual_7770177",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2540,6 +2629,7 @@
       "location_id": 7770178,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770178",
+      "reconciliation_entity": "ap_hide_location_visual_7770178",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2567,6 +2657,7 @@
       "location_id": 7770179,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770179",
+      "reconciliation_entity": "ap_hide_location_visual_7770179",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2594,6 +2685,7 @@
       "location_id": 7770180,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770180",
+      "reconciliation_entity": "ap_hide_location_visual_7770180",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2621,6 +2713,7 @@
       "location_id": 7770181,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770181",
+      "reconciliation_entity": "ap_hide_location_visual_7770181",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2648,6 +2741,7 @@
       "location_id": 7770182,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770182",
+      "reconciliation_entity": "ap_hide_location_visual_7770182",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2675,6 +2769,7 @@
       "location_id": 7770183,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770183",
+      "reconciliation_entity": "ap_hide_location_visual_7770183",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2702,6 +2797,7 @@
       "location_id": 7770184,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770184",
+      "reconciliation_entity": "ap_hide_location_visual_7770184",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2729,6 +2825,7 @@
       "location_id": 7770185,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770185",
+      "reconciliation_entity": "ap_hide_location_visual_7770185",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2756,6 +2853,7 @@
       "location_id": 7770186,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770186",
+      "reconciliation_entity": "ap_hide_location_visual_7770186",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2783,6 +2881,7 @@
       "location_id": 7770187,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770187",
+      "reconciliation_entity": "ap_hide_location_visual_7770187",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2810,6 +2909,7 @@
       "location_id": 7770188,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770188",
+      "reconciliation_entity": "ap_hide_location_visual_7770188",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2837,6 +2937,7 @@
       "location_id": 7770189,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770189",
+      "reconciliation_entity": "ap_hide_location_visual_7770189",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2864,6 +2965,7 @@
       "location_id": 7770190,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770190",
+      "reconciliation_entity": "ap_hide_location_visual_7770190",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2891,6 +2993,7 @@
       "location_id": 7770191,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770191",
+      "reconciliation_entity": "ap_hide_location_visual_7770191",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2918,6 +3021,7 @@
       "location_id": 7770192,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770192",
+      "reconciliation_entity": "ap_hide_location_visual_7770192",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2945,6 +3049,7 @@
       "location_id": 7770193,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770193",
+      "reconciliation_entity": "ap_hide_location_visual_7770193",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2972,6 +3077,7 @@
       "location_id": 7770194,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770194",
+      "reconciliation_entity": "ap_hide_location_visual_7770194",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -2999,6 +3105,7 @@
       "location_id": 7770195,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770195",
+      "reconciliation_entity": "ap_hide_location_visual_7770195",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3026,6 +3133,7 @@
       "location_id": 7770196,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770196",
+      "reconciliation_entity": "ap_hide_location_visual_7770196",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3053,6 +3161,7 @@
       "location_id": 7770197,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770197",
+      "reconciliation_entity": "ap_hide_location_visual_7770197",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3080,6 +3189,7 @@
       "location_id": 7770198,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770198",
+      "reconciliation_entity": "ap_hide_location_visual_7770198",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3107,6 +3217,7 @@
       "location_id": 7770199,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770199",
+      "reconciliation_entity": "ap_hide_location_visual_7770199",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3134,6 +3245,7 @@
       "location_id": 7770200,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770200",
+      "reconciliation_entity": "ap_hide_location_visual_7770200",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3161,6 +3273,7 @@
       "location_id": 7770201,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770201",
+      "reconciliation_entity": "ap_hide_location_visual_7770201",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3236,6 +3349,7 @@
       "location_id": 7770204,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770204",
+      "reconciliation_entity": "ap_hide_location_visual_7770204",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3263,6 +3377,7 @@
       "location_id": 7770205,
       "map_key": "e2m1_nest",
       "presentation_entity": "ap_location_visual_7770205",
+      "reconciliation_entity": "ap_hide_location_visual_7770205",
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "d5477235c490b27a46a81784239589e7bb26a33a92abfb25453f27c233b5370f",
@@ -3290,6 +3405,7 @@
       "location_id": 7770211,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770211",
+      "reconciliation_entity": "ap_hide_location_visual_7770211",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3317,6 +3433,7 @@
       "location_id": 7770212,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770212",
+      "reconciliation_entity": "ap_hide_location_visual_7770212",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3344,6 +3461,7 @@
       "location_id": 7770213,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770213",
+      "reconciliation_entity": "ap_hide_location_visual_7770213",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3371,6 +3489,7 @@
       "location_id": 7770214,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770214",
+      "reconciliation_entity": "ap_hide_location_visual_7770214",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3398,6 +3517,7 @@
       "location_id": 7770215,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770215",
+      "reconciliation_entity": "ap_hide_location_visual_7770215",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3425,6 +3545,7 @@
       "location_id": 7770216,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770216",
+      "reconciliation_entity": "ap_hide_location_visual_7770216",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3452,6 +3573,7 @@
       "location_id": 7770217,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770217",
+      "reconciliation_entity": "ap_hide_location_visual_7770217",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3479,6 +3601,7 @@
       "location_id": 7770218,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770218",
+      "reconciliation_entity": "ap_hide_location_visual_7770218",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3506,6 +3629,7 @@
       "location_id": 7770219,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770219",
+      "reconciliation_entity": "ap_hide_location_visual_7770219",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3533,6 +3657,7 @@
       "location_id": 7770220,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770220",
+      "reconciliation_entity": "ap_hide_location_visual_7770220",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3560,6 +3685,7 @@
       "location_id": 7770221,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770221",
+      "reconciliation_entity": "ap_hide_location_visual_7770221",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3587,6 +3713,7 @@
       "location_id": 7770222,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770222",
+      "reconciliation_entity": "ap_hide_location_visual_7770222",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3614,6 +3741,7 @@
       "location_id": 7770223,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770223",
+      "reconciliation_entity": "ap_hide_location_visual_7770223",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3641,6 +3769,7 @@
       "location_id": 7770224,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770224",
+      "reconciliation_entity": "ap_hide_location_visual_7770224",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3668,6 +3797,7 @@
       "location_id": 7770225,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770225",
+      "reconciliation_entity": "ap_hide_location_visual_7770225",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3695,6 +3825,7 @@
       "location_id": 7770226,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770226",
+      "reconciliation_entity": "ap_hide_location_visual_7770226",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3722,6 +3853,7 @@
       "location_id": 7770227,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770227",
+      "reconciliation_entity": "ap_hide_location_visual_7770227",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3749,6 +3881,7 @@
       "location_id": 7770228,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770228",
+      "reconciliation_entity": "ap_hide_location_visual_7770228",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3776,6 +3909,7 @@
       "location_id": 7770229,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770229",
+      "reconciliation_entity": "ap_hide_location_visual_7770229",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3803,6 +3937,7 @@
       "location_id": 7770230,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770230",
+      "reconciliation_entity": "ap_hide_location_visual_7770230",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3830,6 +3965,7 @@
       "location_id": 7770231,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770231",
+      "reconciliation_entity": "ap_hide_location_visual_7770231",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3857,6 +3993,7 @@
       "location_id": 7770232,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770232",
+      "reconciliation_entity": "ap_hide_location_visual_7770232",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3884,6 +4021,7 @@
       "location_id": 7770233,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770233",
+      "reconciliation_entity": "ap_hide_location_visual_7770233",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3911,6 +4049,7 @@
       "location_id": 7770234,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770234",
+      "reconciliation_entity": "ap_hide_location_visual_7770234",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3938,6 +4077,7 @@
       "location_id": 7770235,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770235",
+      "reconciliation_entity": "ap_hide_location_visual_7770235",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3965,6 +4105,7 @@
       "location_id": 7770236,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770236",
+      "reconciliation_entity": "ap_hide_location_visual_7770236",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -3992,6 +4133,7 @@
       "location_id": 7770237,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770237",
+      "reconciliation_entity": "ap_hide_location_visual_7770237",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4019,6 +4161,7 @@
       "location_id": 7770240,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770240",
+      "reconciliation_entity": "ap_hide_location_visual_7770240",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4094,6 +4237,7 @@
       "location_id": 7770249,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770249",
+      "reconciliation_entity": "ap_hide_location_visual_7770249",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4121,6 +4265,7 @@
       "location_id": 7770250,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770250",
+      "reconciliation_entity": "ap_hide_location_visual_7770250",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4148,6 +4293,7 @@
       "location_id": 7770251,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770251",
+      "reconciliation_entity": "ap_hide_location_visual_7770251",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4175,6 +4321,7 @@
       "location_id": 7770252,
       "map_key": "e2m2_base",
       "presentation_entity": "ap_location_visual_7770252",
+      "reconciliation_entity": "ap_hide_location_visual_7770252",
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "a54b09a0f3bc506efed09ee436971effa03451e5a964175c3421c96eacb27a5c",
@@ -4202,6 +4349,7 @@
       "location_id": 7770256,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770256",
+      "reconciliation_entity": "ap_hide_location_visual_7770256",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4229,6 +4377,7 @@
       "location_id": 7770257,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770257",
+      "reconciliation_entity": "ap_hide_location_visual_7770257",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4256,6 +4405,7 @@
       "location_id": 7770258,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770258",
+      "reconciliation_entity": "ap_hide_location_visual_7770258",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4283,6 +4433,7 @@
       "location_id": 7770259,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770259",
+      "reconciliation_entity": "ap_hide_location_visual_7770259",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4310,6 +4461,7 @@
       "location_id": 7770260,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770260",
+      "reconciliation_entity": "ap_hide_location_visual_7770260",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4337,6 +4489,7 @@
       "location_id": 7770261,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770261",
+      "reconciliation_entity": "ap_hide_location_visual_7770261",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4364,6 +4517,7 @@
       "location_id": 7770262,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770262",
+      "reconciliation_entity": "ap_hide_location_visual_7770262",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4391,6 +4545,7 @@
       "location_id": 7770263,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770263",
+      "reconciliation_entity": "ap_hide_location_visual_7770263",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4418,6 +4573,7 @@
       "location_id": 7770264,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770264",
+      "reconciliation_entity": "ap_hide_location_visual_7770264",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4445,6 +4601,7 @@
       "location_id": 7770265,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770265",
+      "reconciliation_entity": "ap_hide_location_visual_7770265",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4472,6 +4629,7 @@
       "location_id": 7770266,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770266",
+      "reconciliation_entity": "ap_hide_location_visual_7770266",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4499,6 +4657,7 @@
       "location_id": 7770267,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770267",
+      "reconciliation_entity": "ap_hide_location_visual_7770267",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4526,6 +4685,7 @@
       "location_id": 7770268,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770268",
+      "reconciliation_entity": "ap_hide_location_visual_7770268",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4553,6 +4713,7 @@
       "location_id": 7770269,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770269",
+      "reconciliation_entity": "ap_hide_location_visual_7770269",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4580,6 +4741,7 @@
       "location_id": 7770270,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770270",
+      "reconciliation_entity": "ap_hide_location_visual_7770270",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4607,6 +4769,7 @@
       "location_id": 7770271,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770271",
+      "reconciliation_entity": "ap_hide_location_visual_7770271",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4634,6 +4797,7 @@
       "location_id": 7770272,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770272",
+      "reconciliation_entity": "ap_hide_location_visual_7770272",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4661,6 +4825,7 @@
       "location_id": 7770273,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770273",
+      "reconciliation_entity": "ap_hide_location_visual_7770273",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4688,6 +4853,7 @@
       "location_id": 7770274,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770274",
+      "reconciliation_entity": "ap_hide_location_visual_7770274",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4715,6 +4881,7 @@
       "location_id": 7770275,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770275",
+      "reconciliation_entity": "ap_hide_location_visual_7770275",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4742,6 +4909,7 @@
       "location_id": 7770276,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770276",
+      "reconciliation_entity": "ap_hide_location_visual_7770276",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4769,6 +4937,7 @@
       "location_id": 7770277,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770277",
+      "reconciliation_entity": "ap_hide_location_visual_7770277",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4796,6 +4965,7 @@
       "location_id": 7770278,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770278",
+      "reconciliation_entity": "ap_hide_location_visual_7770278",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4823,6 +4993,7 @@
       "location_id": 7770279,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770279",
+      "reconciliation_entity": "ap_hide_location_visual_7770279",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4850,6 +5021,7 @@
       "location_id": 7770280,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770280",
+      "reconciliation_entity": "ap_hide_location_visual_7770280",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4877,6 +5049,7 @@
       "location_id": 7770281,
       "map_key": "e2m3_core",
       "presentation_entity": "ap_location_visual_7770281",
+      "reconciliation_entity": "ap_hide_location_visual_7770281",
       "runtime_map": "game/sp/e2m3_core/e2m3_core",
       "source_identity": {
         "descriptor_sha256": "1d0dd8cc834c3954200e12f4c0bd5a735c2e9104187d95e4d53a1260cecea3f3",
@@ -4952,6 +5125,7 @@
       "location_id": 7770291,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770291",
+      "reconciliation_entity": "ap_hide_location_visual_7770291",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -4979,6 +5153,7 @@
       "location_id": 7770292,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770292",
+      "reconciliation_entity": "ap_hide_location_visual_7770292",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5006,6 +5181,7 @@
       "location_id": 7770293,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770293",
+      "reconciliation_entity": "ap_hide_location_visual_7770293",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5033,6 +5209,7 @@
       "location_id": 7770294,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770294",
+      "reconciliation_entity": "ap_hide_location_visual_7770294",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5060,6 +5237,7 @@
       "location_id": 7770295,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770295",
+      "reconciliation_entity": "ap_hide_location_visual_7770295",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5087,6 +5265,7 @@
       "location_id": 7770296,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770296",
+      "reconciliation_entity": "ap_hide_location_visual_7770296",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5114,6 +5293,7 @@
       "location_id": 7770297,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770297",
+      "reconciliation_entity": "ap_hide_location_visual_7770297",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5141,6 +5321,7 @@
       "location_id": 7770298,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770298",
+      "reconciliation_entity": "ap_hide_location_visual_7770298",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5168,6 +5349,7 @@
       "location_id": 7770299,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770299",
+      "reconciliation_entity": "ap_hide_location_visual_7770299",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5195,6 +5377,7 @@
       "location_id": 7770300,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770300",
+      "reconciliation_entity": "ap_hide_location_visual_7770300",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5222,6 +5405,7 @@
       "location_id": 7770301,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770301",
+      "reconciliation_entity": "ap_hide_location_visual_7770301",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5249,6 +5433,7 @@
       "location_id": 7770302,
       "map_key": "e2m4_boss",
       "presentation_entity": "ap_location_visual_7770302",
+      "reconciliation_entity": "ap_hide_location_visual_7770302",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
@@ -5276,6 +5461,7 @@
       "location_id": 7770303,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770303",
+      "reconciliation_entity": "ap_hide_location_visual_7770303",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5303,6 +5489,7 @@
       "location_id": 7770306,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770306",
+      "reconciliation_entity": "ap_hide_location_visual_7770306",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5330,6 +5517,7 @@
       "location_id": 7770307,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770307",
+      "reconciliation_entity": "ap_hide_location_visual_7770307",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5357,6 +5545,7 @@
       "location_id": 7770308,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770308",
+      "reconciliation_entity": "ap_hide_location_visual_7770308",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5384,6 +5573,7 @@
       "location_id": 7770309,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770309",
+      "reconciliation_entity": "ap_hide_location_visual_7770309",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5411,6 +5601,7 @@
       "location_id": 7770310,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770310",
+      "reconciliation_entity": "ap_hide_location_visual_7770310",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5438,6 +5629,7 @@
       "location_id": 7770311,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770311",
+      "reconciliation_entity": "ap_hide_location_visual_7770311",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5465,6 +5657,7 @@
       "location_id": 7770312,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770312",
+      "reconciliation_entity": "ap_hide_location_visual_7770312",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5492,6 +5685,7 @@
       "location_id": 7770313,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770313",
+      "reconciliation_entity": "ap_hide_location_visual_7770313",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5519,6 +5713,7 @@
       "location_id": 7770314,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770314",
+      "reconciliation_entity": "ap_hide_location_visual_7770314",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5546,6 +5741,7 @@
       "location_id": 7770315,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770315",
+      "reconciliation_entity": "ap_hide_location_visual_7770315",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5573,6 +5769,7 @@
       "location_id": 7770316,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770316",
+      "reconciliation_entity": "ap_hide_location_visual_7770316",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5600,6 +5797,7 @@
       "location_id": 7770317,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770317",
+      "reconciliation_entity": "ap_hide_location_visual_7770317",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5627,6 +5825,7 @@
       "location_id": 7770318,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770318",
+      "reconciliation_entity": "ap_hide_location_visual_7770318",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5654,6 +5853,7 @@
       "location_id": 7770319,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770319",
+      "reconciliation_entity": "ap_hide_location_visual_7770319",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5681,6 +5881,7 @@
       "location_id": 7770320,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770320",
+      "reconciliation_entity": "ap_hide_location_visual_7770320",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5708,6 +5909,7 @@
       "location_id": 7770321,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770321",
+      "reconciliation_entity": "ap_hide_location_visual_7770321",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5735,6 +5937,7 @@
       "location_id": 7770322,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770322",
+      "reconciliation_entity": "ap_hide_location_visual_7770322",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5762,6 +5965,7 @@
       "location_id": 7770323,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770323",
+      "reconciliation_entity": "ap_hide_location_visual_7770323",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5789,6 +5993,7 @@
       "location_id": 7770324,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770324",
+      "reconciliation_entity": "ap_hide_location_visual_7770324",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5816,6 +6021,7 @@
       "location_id": 7770325,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770325",
+      "reconciliation_entity": "ap_hide_location_visual_7770325",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5843,6 +6049,7 @@
       "location_id": 7770326,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770326",
+      "reconciliation_entity": "ap_hide_location_visual_7770326",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5870,6 +6077,7 @@
       "location_id": 7770327,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770327",
+      "reconciliation_entity": "ap_hide_location_visual_7770327",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5897,6 +6105,7 @@
       "location_id": 7770328,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770328",
+      "reconciliation_entity": "ap_hide_location_visual_7770328",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5924,6 +6133,7 @@
       "location_id": 7770329,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770329",
+      "reconciliation_entity": "ap_hide_location_visual_7770329",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -5951,6 +6161,7 @@
       "location_id": 7770330,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770330",
+      "reconciliation_entity": "ap_hide_location_visual_7770330",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -6026,6 +6237,7 @@
       "location_id": 7770338,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770338",
+      "reconciliation_entity": "ap_hide_location_visual_7770338",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -6053,6 +6265,7 @@
       "location_id": 7770339,
       "map_key": "e3m1_slayer",
       "presentation_entity": "ap_location_visual_7770339",
+      "reconciliation_entity": "ap_hide_location_visual_7770339",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
@@ -6080,6 +6293,7 @@
       "location_id": 7770340,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770340",
+      "reconciliation_entity": "ap_hide_location_visual_7770340",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6107,6 +6321,7 @@
       "location_id": 7770341,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770341",
+      "reconciliation_entity": "ap_hide_location_visual_7770341",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6134,6 +6349,7 @@
       "location_id": 7770342,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770342",
+      "reconciliation_entity": "ap_hide_location_visual_7770342",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6161,6 +6377,7 @@
       "location_id": 7770343,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770343",
+      "reconciliation_entity": "ap_hide_location_visual_7770343",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6188,6 +6405,7 @@
       "location_id": 7770344,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770344",
+      "reconciliation_entity": "ap_hide_location_visual_7770344",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6215,6 +6433,7 @@
       "location_id": 7770345,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770345",
+      "reconciliation_entity": "ap_hide_location_visual_7770345",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6242,6 +6461,7 @@
       "location_id": 7770346,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770346",
+      "reconciliation_entity": "ap_hide_location_visual_7770346",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6269,6 +6489,7 @@
       "location_id": 7770347,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770347",
+      "reconciliation_entity": "ap_hide_location_visual_7770347",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6296,6 +6517,7 @@
       "location_id": 7770348,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770348",
+      "reconciliation_entity": "ap_hide_location_visual_7770348",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6323,6 +6545,7 @@
       "location_id": 7770349,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770349",
+      "reconciliation_entity": "ap_hide_location_visual_7770349",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6350,6 +6573,7 @@
       "location_id": 7770350,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770350",
+      "reconciliation_entity": "ap_hide_location_visual_7770350",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6377,6 +6601,7 @@
       "location_id": 7770351,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770351",
+      "reconciliation_entity": "ap_hide_location_visual_7770351",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6404,6 +6629,7 @@
       "location_id": 7770352,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770352",
+      "reconciliation_entity": "ap_hide_location_visual_7770352",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6431,6 +6657,7 @@
       "location_id": 7770353,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770353",
+      "reconciliation_entity": "ap_hide_location_visual_7770353",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6458,6 +6685,7 @@
       "location_id": 7770354,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770354",
+      "reconciliation_entity": "ap_hide_location_visual_7770354",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6485,6 +6713,7 @@
       "location_id": 7770355,
       "map_key": "e3m2_hell",
       "presentation_entity": "ap_location_visual_7770355",
+      "reconciliation_entity": "ap_hide_location_visual_7770355",
       "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
       "source_identity": {
         "descriptor_sha256": "6456ae4e8550a64968b6894550e6b7f7dcfabef2101cbbe3a88a837747e4095b",
@@ -6560,6 +6789,7 @@
       "location_id": 7770363,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770363",
+      "reconciliation_entity": "ap_hide_location_visual_7770363",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6587,6 +6817,7 @@
       "location_id": 7770364,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770364",
+      "reconciliation_entity": "ap_hide_location_visual_7770364",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6614,6 +6845,7 @@
       "location_id": 7770365,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770365",
+      "reconciliation_entity": "ap_hide_location_visual_7770365",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6641,6 +6873,7 @@
       "location_id": 7770366,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770366",
+      "reconciliation_entity": "ap_hide_location_visual_7770366",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6668,6 +6901,7 @@
       "location_id": 7770367,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770367",
+      "reconciliation_entity": "ap_hide_location_visual_7770367",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6695,6 +6929,7 @@
       "location_id": 7770368,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770368",
+      "reconciliation_entity": "ap_hide_location_visual_7770368",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6722,6 +6957,7 @@
       "location_id": 7770369,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770369",
+      "reconciliation_entity": "ap_hide_location_visual_7770369",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6749,6 +6985,7 @@
       "location_id": 7770370,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770370",
+      "reconciliation_entity": "ap_hide_location_visual_7770370",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6776,6 +7013,7 @@
       "location_id": 7770371,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770371",
+      "reconciliation_entity": "ap_hide_location_visual_7770371",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6803,6 +7041,7 @@
       "location_id": 7770372,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770372",
+      "reconciliation_entity": "ap_hide_location_visual_7770372",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6830,6 +7069,7 @@
       "location_id": 7770373,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770373",
+      "reconciliation_entity": "ap_hide_location_visual_7770373",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6857,6 +7097,7 @@
       "location_id": 7770374,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770374",
+      "reconciliation_entity": "ap_hide_location_visual_7770374",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6884,6 +7125,7 @@
       "location_id": 7770375,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770375",
+      "reconciliation_entity": "ap_hide_location_visual_7770375",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6911,6 +7153,7 @@
       "location_id": 7770376,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770376",
+      "reconciliation_entity": "ap_hide_location_visual_7770376",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6938,6 +7181,7 @@
       "location_id": 7770377,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770377",
+      "reconciliation_entity": "ap_hide_location_visual_7770377",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6965,6 +7209,7 @@
       "location_id": 7770378,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770378",
+      "reconciliation_entity": "ap_hide_location_visual_7770378",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -6992,6 +7237,7 @@
       "location_id": 7770379,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770379",
+      "reconciliation_entity": "ap_hide_location_visual_7770379",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -7019,6 +7265,7 @@
       "location_id": 7770380,
       "map_key": "e3m2_hell_b",
       "presentation_entity": "ap_location_visual_7770380",
+      "reconciliation_entity": "ap_hide_location_visual_7770380",
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
@@ -7094,6 +7341,7 @@
       "location_id": 7770388,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770388",
+      "reconciliation_entity": "ap_hide_location_visual_7770388",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7121,6 +7369,7 @@
       "location_id": 7770389,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770389",
+      "reconciliation_entity": "ap_hide_location_visual_7770389",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7148,6 +7397,7 @@
       "location_id": 7770390,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770390",
+      "reconciliation_entity": "ap_hide_location_visual_7770390",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7175,6 +7425,7 @@
       "location_id": 7770391,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770391",
+      "reconciliation_entity": "ap_hide_location_visual_7770391",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7202,6 +7453,7 @@
       "location_id": 7770392,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770392",
+      "reconciliation_entity": "ap_hide_location_visual_7770392",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7229,6 +7481,7 @@
       "location_id": 7770393,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770393",
+      "reconciliation_entity": "ap_hide_location_visual_7770393",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7256,6 +7509,7 @@
       "location_id": 7770394,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770394",
+      "reconciliation_entity": "ap_hide_location_visual_7770394",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7283,6 +7537,7 @@
       "location_id": 7770395,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770395",
+      "reconciliation_entity": "ap_hide_location_visual_7770395",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7310,6 +7565,7 @@
       "location_id": 7770396,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770396",
+      "reconciliation_entity": "ap_hide_location_visual_7770396",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7337,6 +7593,7 @@
       "location_id": 7770397,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770397",
+      "reconciliation_entity": "ap_hide_location_visual_7770397",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7364,6 +7621,7 @@
       "location_id": 7770398,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770398",
+      "reconciliation_entity": "ap_hide_location_visual_7770398",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7391,6 +7649,7 @@
       "location_id": 7770399,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770399",
+      "reconciliation_entity": "ap_hide_location_visual_7770399",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7418,6 +7677,7 @@
       "location_id": 7770400,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770400",
+      "reconciliation_entity": "ap_hide_location_visual_7770400",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7445,6 +7705,7 @@
       "location_id": 7770401,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770401",
+      "reconciliation_entity": "ap_hide_location_visual_7770401",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7472,6 +7733,7 @@
       "location_id": 7770402,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770402",
+      "reconciliation_entity": "ap_hide_location_visual_7770402",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7499,6 +7761,7 @@
       "location_id": 7770403,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770403",
+      "reconciliation_entity": "ap_hide_location_visual_7770403",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7526,6 +7789,7 @@
       "location_id": 7770404,
       "map_key": "e3m3_maykr",
       "presentation_entity": "ap_location_visual_7770404",
+      "reconciliation_entity": "ap_hide_location_visual_7770404",
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
@@ -7601,6 +7865,7 @@
       "location_id": 7770412,
       "map_key": "e3m4_boss",
       "presentation_entity": "ap_location_visual_7770412",
+      "reconciliation_entity": "ap_hide_location_visual_7770412",
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
@@ -7628,6 +7893,7 @@
       "location_id": 7770413,
       "map_key": "e3m4_boss",
       "presentation_entity": "ap_location_visual_7770413",
+      "reconciliation_entity": "ap_hide_location_visual_7770413",
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
@@ -7655,6 +7921,7 @@
       "location_id": 7770415,
       "map_key": "e3m4_boss",
       "presentation_entity": "ap_location_visual_7770415",
+      "reconciliation_entity": "ap_hide_location_visual_7770415",
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
@@ -7682,6 +7949,7 @@
       "location_id": 7770416,
       "map_key": "e3m4_boss",
       "presentation_entity": "ap_location_visual_7770416",
+      "reconciliation_entity": "ap_hide_location_visual_7770416",
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
@@ -7709,6 +7977,7 @@
       "location_id": 7770417,
       "map_key": "e3m4_boss",
       "presentation_entity": "ap_location_visual_7770417",
+      "reconciliation_entity": "ap_hide_location_visual_7770417",
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
@@ -7736,6 +8005,7 @@
       "location_id": 7770072,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770072",
+      "reconciliation_entity": "ap_hide_location_visual_7770072",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7763,6 +8033,7 @@
       "location_id": 7770073,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770073",
+      "reconciliation_entity": "ap_hide_location_visual_7770073",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7790,6 +8061,7 @@
       "location_id": 7770074,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770074",
+      "reconciliation_entity": "ap_hide_location_visual_7770074",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7817,6 +8089,7 @@
       "location_id": 7770081,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770081",
+      "reconciliation_entity": "ap_hide_location_visual_7770081",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7844,6 +8117,7 @@
       "location_id": 7770086,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770086",
+      "reconciliation_entity": "ap_hide_location_visual_7770086",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7871,6 +8145,7 @@
       "location_id": 7770087,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770087",
+      "reconciliation_entity": "ap_hide_location_visual_7770087",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7898,6 +8173,7 @@
       "location_id": 7770088,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770088",
+      "reconciliation_entity": "ap_hide_location_visual_7770088",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7925,6 +8201,7 @@
       "location_id": 7770163,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770163",
+      "reconciliation_entity": "ap_hide_location_visual_7770163",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7952,6 +8229,7 @@
       "location_id": 7770164,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770164",
+      "reconciliation_entity": "ap_hide_location_visual_7770164",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -7979,6 +8257,7 @@
       "location_id": 7770165,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770165",
+      "reconciliation_entity": "ap_hide_location_visual_7770165",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8006,6 +8285,7 @@
       "location_id": 7770166,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770166",
+      "reconciliation_entity": "ap_hide_location_visual_7770166",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8033,6 +8313,7 @@
       "location_id": 7770167,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770167",
+      "reconciliation_entity": "ap_hide_location_visual_7770167",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8060,6 +8341,7 @@
       "location_id": 7770168,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770168",
+      "reconciliation_entity": "ap_hide_location_visual_7770168",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8087,6 +8369,7 @@
       "location_id": 7770169,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770169",
+      "reconciliation_entity": "ap_hide_location_visual_7770169",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8114,6 +8397,7 @@
       "location_id": 7770170,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770170",
+      "reconciliation_entity": "ap_hide_location_visual_7770170",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8141,6 +8425,7 @@
       "location_id": 7770171,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770171",
+      "reconciliation_entity": "ap_hide_location_visual_7770171",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8168,6 +8453,7 @@
       "location_id": 7770253,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770253",
+      "reconciliation_entity": "ap_hide_location_visual_7770253",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8195,6 +8481,7 @@
       "location_id": 7770254,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770254",
+      "reconciliation_entity": "ap_hide_location_visual_7770254",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
@@ -8222,6 +8509,7 @@
       "location_id": 7770255,
       "map_key": "hub",
       "presentation_entity": "ap_location_visual_7770255",
+      "reconciliation_entity": "ap_hide_location_visual_7770255",
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",

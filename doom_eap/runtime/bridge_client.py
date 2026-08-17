@@ -543,6 +543,16 @@ else:
         print("Configuration saved to ap_config.json!\n")
 
 QUEUE_DIR = os.path.join(DOOM_BASE_DIR, "ap_queue")
+EXECUTION_CLASS_HEADER = "AP_EXECUTION_CLASS_V1"
+PLAYER_RUNTIME = "PLAYER_RUNTIME"
+MAP_ENTITY_SAFE = "MAP_ENTITY_SAFE"
+VALID_EXECUTION_CLASSES = frozenset({PLAYER_RUNTIME, MAP_ENTITY_SAFE})
+MAP_ENTITY_OPERATION_HEADER = "AP_MAP_ENTITY_OPERATION_V1"
+CHECKED_VISUAL_HIDE = "CHECKED_VISUAL_HIDE"
+FAST_TRAVEL_UNLOCK = "FAST_TRAVEL_UNLOCK"
+VALID_MAP_ENTITY_OPERATIONS = frozenset({CHECKED_VISUAL_HIDE, FAST_TRAVEL_UNLOCK})
+MATERIALIZATION_LEASE_HEADER = "AP_MATERIALIZATION_LEASE_V1"
+MATERIALIZATION_LEASE_MARKER = "active_materialization_lease"
 RPC_GATE_PATH = os.path.join(DOOM_BASE_DIR, "ap_rpc_enabled")
 GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
 INV_DUMP_DIR = SAVE_GAMES_DIR
@@ -1843,6 +1853,44 @@ def active_queue_session_namespace():
     return value if re.fullmatch(r"[0-9a-f]{16}", value) else None
 
 
+def publish_materialization_lease(epoch):
+    """Atomically publish current gameplay materialization for native queue use."""
+    marker = Path(QUEUE_DIR) / MATERIALIZATION_LEASE_MARKER
+    if not valid_materialization_epoch(epoch):
+        try:
+            marker.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            logger.error("[Queue] Could not clear materialization lease: %s", error)
+        return False
+
+    temporary = None
+    try:
+        os.makedirs(QUEUE_DIR, exist_ok=True)
+        contents = f"{MATERIALIZATION_LEASE_HEADER} {epoch}\n"
+        if marker.is_file() and marker.read_text(encoding="ascii") == contents:
+            return True
+        temporary = marker.with_name(f".{MATERIALIZATION_LEASE_MARKER}-{uuid.uuid4().hex}.tmp")
+        with temporary.open("x", encoding="ascii", newline="\n") as file:
+            file.write(contents)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, marker)
+        logger.info("[Queue] Published materialization lease: %s", epoch)
+        return True
+    except (OSError, UnicodeError) as error:
+        logger.error("[Queue] Could not publish materialization lease: %s", error)
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+        return False
+
+
 def room_scoped_command_id(command_id, state_key=None):
     """Use native receipt gate namespace for every room-bound spool job."""
     namespace = queue_session_namespace(state_key) if state_key else None
@@ -1957,34 +2005,6 @@ def hold_orphaned_dev_jobs():
     return held
 
 
-def quarantine_stale_map_bound_commands(reason):
-    """Archive bridge-owned map one-shots before accepting a new load epoch."""
-    commands = (
-        re.compile(r"^ai_ScriptCmdEnt ap_remove_location_visual_[0-9]+ activate$"),
-        re.compile(r"^ai_ScriptCmdEnt ap_fast_travel_unlock activate$"),
-    )
-    quarantined = 0
-    for source in Path(QUEUE_DIR).glob("*.cmd"):
-        try:
-            command = source.read_text(encoding="utf-8").strip()
-        except (OSError, UnicodeError):
-            continue
-        if not any(pattern.fullmatch(command) for pattern in commands):
-            continue
-        target = source.with_suffix(f".stale-{uuid.uuid4().hex[:8]}")
-        try:
-            os.replace(source, target)
-            quarantined += 1
-            logger.warning(
-                "QUEUE_STALE_QUARANTINE command_id=%s reason=%s effect=unconfirmed",
-                source.stem,
-                reason,
-            )
-        except OSError as error:
-            logger.error("[Queue] Could not quarantine %s: %s", source, error)
-    return quarantined
-
-
 def dev_job_paths():
     paths = []
     for suffix in ("cmd", "processing", "held"):
@@ -2016,6 +2036,9 @@ def send_command(
     delivery_fields=None,
     state_key=None,
     room_scoped=True,
+    materialization_lease=None,
+    execution_class=PLAYER_RUNTIME,
+    operation=None,
 ):
     """Atomically enqueue one command without overwriting another command.
 
@@ -2024,6 +2047,16 @@ def send_command(
     large condump backlog behind the player-state gate.
     """
     try:
+        if execution_class not in VALID_EXECUTION_CLASSES:
+            logger.error("[Queue] Refusing command with invalid execution class: %r", execution_class)
+            return False
+        if execution_class == MAP_ENTITY_SAFE:
+            if operation not in VALID_MAP_ENTITY_OPERATIONS:
+                logger.error("[Queue] Refusing MAP_ENTITY_SAFE command with invalid operation: %r", operation)
+                return False
+        elif operation is not None:
+            logger.error("[Queue] Refusing PLAYER_RUNTIME command with map operation: %r", operation)
+            return False
         command_id = coalesce_key or f"{time.time_ns():020d}-{uuid.uuid4().hex}"
         if room_scoped:
             command_id = room_scoped_command_id(command_id, state_key)
@@ -2046,8 +2079,17 @@ def send_command(
             QUEUE_DIR, f".{command_id}-{uuid.uuid4().hex}.tmp"
         )
         command_path = os.path.join(QUEUE_DIR, f"{command_id}.cmd")
+        if materialization_lease is not None and not valid_materialization_epoch(materialization_lease):
+            logger.error("[Queue] Refusing command with invalid materialization lease: %r", materialization_lease)
+            return False
+        payload = f"{EXECUTION_CLASS_HEADER} {execution_class}\n"
+        if execution_class == MAP_ENTITY_SAFE:
+            payload += f"{MAP_ENTITY_OPERATION_HEADER} {operation}\n"
+        if materialization_lease is not None:
+            payload += f"{MATERIALIZATION_LEASE_HEADER} {materialization_lease}\n"
+        payload += cmd.strip() + "\n"
         with open(temporary_path, "x", encoding="utf-8", newline="\n") as f:
-            f.write(cmd.strip() + "\n")
+            f.write(payload)
             f.flush()
             os.fsync(f.fileno())
         if coalesce_key:
@@ -3481,7 +3523,6 @@ class DoomEternalContext(CommonContext):
                 else None
             ),
         }
-        quarantine_stale_map_bound_commands("fresh_first_think_epoch")
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
         self.accept_map_identity(marker_data, evidence_epoch)
@@ -3517,7 +3558,6 @@ class DoomEternalContext(CommonContext):
         if not valid_materialization_epoch(epoch) or epoch == cached.get("gameplay_epoch"):
             return False
 
-        quarantine_stale_map_bound_commands("secondary_materialization_epoch")
         self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
@@ -3606,6 +3646,7 @@ class DoomEternalContext(CommonContext):
             self.last_marker_reject_reason = reason
         self.current_map_name = None
         self.cached_map_identity = None
+        publish_materialization_lease(None)
         if clear_pending:
             self.pending_map_identity = None
         self.mission_select_observation_map = None
@@ -3619,6 +3660,7 @@ class DoomEternalContext(CommonContext):
         self.pending_map_identity = {**marker_data, "evidence_epoch": None}
         self.current_map_name = None
         self.cached_map_identity = None
+        publish_materialization_lease(None)
         self.runtime_observers_frozen = True
         if getattr(self, "last_pending_marker_mtime", None) != marker_data["mtime_ns"]:
             self.last_pending_marker_mtime = marker_data["mtime_ns"]
@@ -3640,6 +3682,7 @@ class DoomEternalContext(CommonContext):
         self.cached_map_identity = marker_data
         self.current_map_name = marker_data["runtime_map"]
         materialized_epoch = marker_data.get("gameplay_epoch")
+        publish_materialization_lease(materialized_epoch)
         if (
             isinstance(materialized_epoch, str)
             and valid_fast_travel_delivery_key(("room", "map", materialized_epoch))
@@ -4749,6 +4792,9 @@ class DoomEternalContext(CommonContext):
             ),
             already_queued_ok=True,
             state_key=self.state_key,
+            materialization_lease=epoch,
+            execution_class=MAP_ENTITY_SAFE,
+            operation=FAST_TRAVEL_UNLOCK,
         ):
             retry_attempt = state.get("retry_attempt", 0)
             if isinstance(retry_attempt, bool) or not isinstance(retry_attempt, int):
@@ -4930,7 +4976,7 @@ class DoomEternalContext(CommonContext):
             location_id = entry["location_id"]
             if location_id not in checked:
                 continue
-            entity_name = entry["cleanup_entity"]
+            entity_name = entry["reconciliation_entity"]
             delivery_key = (room_identity, map_name, str(location_id))
             runtime_key = (epoch, *delivery_key)
             if (epoch, location_id) in self.automap_local_cleanup_owned:
@@ -4961,6 +5007,9 @@ class DoomEternalContext(CommonContext):
                 coalesce_key=command_id,
                 already_queued_ok=True,
                 state_key=self.state_key,
+                materialization_lease=epoch,
+                execution_class=MAP_ENTITY_SAFE,
+                operation=CHECKED_VISUAL_HIDE,
             ):
                 retry["attempt"] += 1
                 retry["deadline"] = now + min(

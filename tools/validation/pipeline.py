@@ -20,7 +20,18 @@ from doom_eap.content.content_catalog import (
     load_content_catalog,
     thaw_content,
 )
-from tools.content.compile_content_catalog import compile_catalog
+from tools.content.compile_content_catalog import (
+    check_catalog as check_compiled_catalog,
+    materialize_catalog as materialize_content_catalog,
+)
+from tools.content.compile_options_schema import (
+    check_schema as check_compiled_options_schema,
+    materialize_schema as materialize_options_schema,
+)
+from tools.content.compile_start_inventory_catalog import (
+    check_catalog as check_start_inventory_catalog,
+    materialize_catalog as materialize_start_inventory_catalog,
+)
 from doom_eap.content.automap_visual_registry import (
     load_automap_visual_registry,
     validate_generated_visuals,
@@ -38,7 +49,6 @@ from tools.release.release_manifest import (
     build_release_manifest,
     load_release_manifest,
     stale_package_paths,
-    validate_automap_option_keys,
     validate_release_manifest,
     validate_source_layout,
 )
@@ -51,7 +61,7 @@ MAP_CACHE_ROOT = CACHE_ROOT / "maps"
 RECEIPTS_ROOT = CACHE_ROOT / "receipts"
 WORKSPACES_ROOT = CACHE_ROOT / "workspaces"
 IDENTITY_PATH = ROOT / "data" / "content_identity.json"
-PIPELINE_VERSION = "4"
+PIPELINE_VERSION = "5"
 CORE_MAP_INPUTS = (
     "data/items.json",
     "data/item_replay_policies.json",
@@ -63,7 +73,6 @@ CORE_MAP_INPUTS = (
     "tools/maps/ap_map_generator.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
-    "tools/validation/audit_resource_packages.py",
     "doom_eap/content/content_catalog.py",
     "doom_eap/content/automap_visual_registry.py",
     "doom_eap/contracts/publisher_contracts.py",
@@ -89,6 +98,8 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/__init__.py",
     "doom_eap/runtime/__init__.py",
     "tools/content/compile_content_catalog.py",
+    "tools/content/compile_options_schema.py",
+    "tools/content/compile_start_inventory_catalog.py",
     "tools/content/new_map.py",
     "tools/content/describe_map.py",
     "tools/maps/ap_map_generator.py",
@@ -194,6 +205,7 @@ class Pipeline:
         self.timings: list[tuple[str, float]] = []
         self.generation_counts: dict[str, int] = {}
         self.cache_hits: dict[str, bool] = {}
+        self.compiled_content_changed_paths: tuple[Path, ...] = ()
         self.integration_receipt: Path | None = None
         self.workspace_cache_hit: bool | None = None
         self.receipt_cache_hit: bool | None = None
@@ -354,40 +366,34 @@ class Pipeline:
                         "file=data/publisher_contracts.json "
                         "field=filename/marker value=shared campaign goal authority"
                     )
-            compile_catalog(check=True)
-            load_automap_visual_registry(ROOT / "data" / "checked_location_visuals.json")
-            from doom_eap.content.options_foundation import load_options_schema
-
-            load_options_schema(ROOT / "data" / "options_schema.json")
-            validate_automap_option_keys(
-                json.loads((ROOT / "data" / "options_schema.json").read_text(encoding="utf-8"))
-            )
-            identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
-            generated: dict[str, object] = {}
-            exec(
-                (ARCHIPELAGO / "worlds" / "doometernal" / "generated_content.py")
-                .read_text(encoding="utf-8"),
-                generated,
-            )
-            checks = {
-                "CONTENT_SCHEMA_VERSION": identity["content_schema_version"],
-                "CONTENT_REVISION": identity["content_revision"],
-                "BRIDGE_PROTOCOL_VERSION": identity["bridge_protocol_version"],
-            }
-            for name, expected in checks.items():
-                if generated.get(name) != expected:
-                    raise ValueError(
-                        f"component=apworld map=* "
-                        "file=Archipelago/worlds/doometernal/generated_content.py "
-                        f"field={name} value={generated.get(name)!r} expected={expected!r}\n"
-                        "Reproduce:\n"
-                        "  python -m tools.content.compile_content_catalog --check\n"
-                        "Fix:\n"
-                        "  python -m tools.content.compile_content_catalog"
-                    )
             self.catalog = catalog
             validate_source_layout(ROOT, catalog)
             return catalog
+
+    def materialize_compiled_content(self) -> tuple[Path, ...]:
+        """Materialize canonical content projections after read-only preflight."""
+        if self.catalog is None:
+            self.preflight()
+        with self.timed("materialize-compiled-content"):
+            changed = [
+                *materialize_content_catalog(),
+                *materialize_options_schema(ARCHIPELAGO, ROOT / "data" / "options_schema.json"),
+                *materialize_start_inventory_catalog(ROOT / "data" / "start_inventory_catalog.json"),
+            ]
+        self.compiled_content_changed_paths = tuple(changed)
+        status = "changed" if changed else "up-to-date"
+        print(f"CONTENT materialization status={status} changed={len(changed)}")
+        for path in changed:
+            print(f"CONTENT changed_path={path}")
+        return self.compiled_content_changed_paths
+
+    def check_compiled_content(self) -> None:
+        """Check all canonical content projections for synchronization."""
+        with self.timed("check-compiled-content"):
+            check_compiled_catalog()
+            check_compiled_options_schema(ARCHIPELAGO, ROOT / "data" / "options_schema.json")
+            check_start_inventory_catalog(ROOT / "data" / "start_inventory_catalog.json")
+        print("CONTENT synchronization=checked")
 
     def _map_inputs(self, map_key: str) -> dict[str, str]:
         catalog = self.catalog or load_content_catalog()
@@ -412,7 +418,6 @@ class Pipeline:
                     f"  scripts/pipeline.sh map {map_key}"
                 )
             result[str(path.relative_to(ROOT))] = _sha256(path)
-        result["pipeline_version"] = PIPELINE_VERSION
         result["publisher_contract"] = _canonical_hash([
             {
                 "key": publisher.key,
@@ -747,7 +752,7 @@ class Pipeline:
         return artifacts
 
     def affected_cache(self) -> list[MapArtifact]:
-        """Refresh affected map cache, then expose complete assembler inputs."""
+        """Run explicit semantic validation for maps selected from working-tree paths."""
         catalog = self.catalog or self.preflight()
         selected, paths = self.selection()
         print(
@@ -760,6 +765,12 @@ class Pipeline:
                 for spec in catalog.enabled_maps()
             ]
 
+    def materialize_maps(self) -> list[MapArtifact]:
+        """Produce or reuse required map artifacts without semantic auditing."""
+        catalog = self.catalog or self.preflight()
+        with self.timed("materialize-maps"):
+            return [self.generate(spec.key) for spec in catalog.enabled_maps()]
+
     def _package_root(self, explicit: Path | None = None) -> Path | None:
         return explicit
 
@@ -767,8 +778,6 @@ class Pipeline:
         """Cheap source/package contract audit; never generates maps or seeds."""
         with self.timed("package-preflight"):
             catalog = self.catalog or self.preflight()
-            option_path = ROOT / "data" / "options_schema.json"
-            validate_automap_option_keys(json.loads(option_path.read_text(encoding="utf-8")))
             root = self._package_root(package_root)
             if root is None:
                 synthetic = build_release_manifest(
@@ -809,24 +818,26 @@ class Pipeline:
                 if actual_value != expected_value:
                     raise ValueError(f"component=package field=manifest_disagreement value={field}")
             packaged_options = root / "client" / "data" / "options_schema.json"
-            if packaged_options.is_file():
-                validate_automap_option_keys(json.loads(packaged_options.read_text(encoding="utf-8")))
             print(f"PACKAGE_PREFLIGHT package=checked root={root}")
 
     def playtest(self) -> None:
-        """Validate, create receipt, then delegate packaging to package builder."""
+        """Create a candidate through cheap checks, materialization, and artifact smoke."""
         self.preflight()
-        artifacts = self.affected_cache()
+        self.materialize_compiled_content()
         self.package_preflight()
-        receipt = self.receipt(artifacts, ("preflight", "affected", "package-preflight"))
+        artifacts = self.materialize_maps()
+        receipt = self.receipt(artifacts, ("preflight", "package-preflight", "materialize-maps"))
         document = json.loads(receipt.read_text(encoding="utf-8"))
         env = os.environ.copy()
         env["AP_PIPELINE_RECEIPT"] = str(receipt)
         env["AP_PIPELINE_ARTIFACT_ROOT"] = document["artifact_root"]
+        env["AP_PIPELINE_DEEP_AUDIT"] = "0"
         with self.timed("assembler"):
             _run(["bash", "scripts/build/playable_test.sh"], env=env)
 
     def full(self, tests: Sequence[str] = ()) -> None:
+        self.preflight()
+        self.check_compiled_content()
         self.integration(tests=tests, full=True)
 
     def seed_smoke(self) -> None:
@@ -855,13 +866,13 @@ class Pipeline:
         apworld_files = {
             str(path.relative_to(ARCHIPELAGO)): _sha256(path)
             for path in sorted((ARCHIPELAGO / "worlds" / "doometernal").rglob("*.py"))
+            if "test" not in path.parts and "tests" not in path.parts
         }
         release_roots = (
             ROOT / "data",
             ROOT / "packaging",
             ROOT / "scripts" / "build",
             ROOT / "tools" / "release",
-            ROOT / "tools" / "validation",
             ROOT / "native",
         )
         release_inputs = {
@@ -902,7 +913,6 @@ class Pipeline:
             "maps": {item.map_key: item.digest for item in artifacts},
             "apworld": apworld_files,
             "release_inputs": release_inputs,
-            "pipeline_version": PIPELINE_VERSION,
         })
 
     def _workspace_members(
@@ -1092,6 +1102,7 @@ class Pipeline:
         tests: Sequence[str] = (),
     ) -> tuple[Path, list[MapArtifact]]:
         catalog = self.preflight()
+        self.check_compiled_content()
         pending_imports = [
             asset.key for asset in catalog.assets
             if asset.dependency_policy == "model_importer_bundle_pending"
@@ -1109,6 +1120,7 @@ class Pipeline:
             env = os.environ.copy()
             env["AP_PIPELINE_RECEIPT"] = str(receipt)
             env["AP_PIPELINE_ARTIFACT_ROOT"] = document["artifact_root"]
+            env["AP_PIPELINE_DEEP_AUDIT"] = "1"
             _run(["bash", "scripts/build/playable_test.sh"], env=env)
             self.package_preflight()
         return receipt, artifacts
@@ -1141,7 +1153,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("phase", choices=(
         "fast", "map", "affected", "changed", "integration",
-        "package-preflight", "package", "playtest", "full", "release",
+        "package-preflight", "package", "playtest", "audit", "full", "release",
         "seed-smoke", "cache-key",
     ))
     parser.add_argument("map_key", nargs="?")
@@ -1181,7 +1193,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pipeline.package_preflight(args.package_root)
         elif args.phase in {"package", "playtest"}:
             pipeline.playtest()
-        elif args.phase == "full":
+        elif args.phase in {"audit", "full"}:
             pipeline.full(args.tests)
         elif args.phase == "release":
             pipeline.release(build=args.build, tests=args.tests)

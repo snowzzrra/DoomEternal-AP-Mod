@@ -41,7 +41,6 @@ from tools.release.room_payloads import (
     write_deterministic_zip,
 )
 from tools.maps.ap_map_generator import (
-    apply_composable_map_transforms,
     find_entity_block_bounds,
 )
 
@@ -100,7 +99,7 @@ def _assert_notifications(content: str, map_key: str) -> None:
 
 
 AP_RUNTIME_ENTITY_RE = re.compile(r"\bentityDef\s+((?:ap_|AP_CHECK_)[A-Za-z0-9_]+)\s*\{")
-GLOBAL_OPTION_KEYS = (*PHYSICAL_OPTIONS, "start_with_automap")
+GLOBAL_OPTION_KEYS = tuple(PHYSICAL_OPTIONS)
 
 
 def _runtime_entity_blocks(content: str) -> dict[str, str]:
@@ -267,7 +266,7 @@ def _audit_final_physical_states(
     unique_map_states: set[tuple[str, str]] = set()
     unique_payload_hashes: set[str] = set()
     parsed_payloads: dict[str, dict[str, str]] = {}
-    expected_payloads: dict[tuple[str, bool, tuple[tuple[str, bool], ...]], dict[str, str]] = {}
+    expected_payloads: dict[tuple[str, tuple[tuple[str, bool], ...]], dict[str, str]] = {}
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
@@ -299,15 +298,10 @@ def _audit_final_physical_states(
                 )
                 expected_key = (
                     map_key,
-                    options["start_with_automap"],
                     relevant_options,
                 )
                 if expected_key not in expected_payloads:
                     expected_content = authoritative_content[map_key]
-                    if options["start_with_automap"]:
-                        expected_content = apply_composable_map_transforms(
-                            expected_content, map_key, {"start_with_automap": True}
-                        )
                     expected = _runtime_entity_blocks(expected_content)
                     for option_key, spec in PHYSICAL_OPTIONS.items():
                         if spec["map_key"] == map_key and not options[option_key]:
@@ -481,7 +475,7 @@ def _audit_room_resources(
     with tempfile.TemporaryDirectory() as directory:
         package = Path(directory) / "synthetic-room.zip"
         assembled["room_config.json"] = canonical_json(
-            {"start_with_automap": False}
+            {"schema_version": 1, "death_link": False, "death_link_mode": "soft"}
         )
         write_deterministic_zip(assembled, package)
         with zipfile.ZipFile(package) as archive:

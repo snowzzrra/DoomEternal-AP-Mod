@@ -28,7 +28,7 @@ DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 2
 MOD_CONTRACT_REVISION = 1
-AUTOMAP_REVEAL_ITEM = "Reveal Automap Progression Items"
+REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v1",
     "randomize_dash_v1",
@@ -84,13 +84,14 @@ class RoomSnapshot:
             raise ValueError("Connected.slot_data must be an object")
         if not isinstance(slot_data.get("randomize_dash"), bool):
             raise ValueError("Connected.slot_data.randomize_dash must be boolean")
+        if not isinstance(slot_data.get(REVEAL_AP_LOCATIONS_OPTION_KEY), bool):
+            raise ValueError(
+                f"Connected.slot_data.{REVEAL_AP_LOCATIONS_OPTION_KEY} must be boolean"
+            )
         for key in PHYSICAL_OPTION_KEYS:
             if not isinstance(slot_data.get(key), bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
-        for key in (
-            "death_link",
-            "start_with_automap",
-        ):
+        for key in ("death_link",):
             if key in slot_data and not isinstance(slot_data[key], bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
         if "death_link_mode" in slot_data and (
@@ -167,6 +168,11 @@ class SeedManifest:
             normalized_options.setdefault(key, False)
             if not isinstance(normalized_options[key], bool):
                 raise ValueError(f"manifest option {key} must be boolean")
+        normalized_options.setdefault(REVEAL_AP_LOCATIONS_OPTION_KEY, False)
+        if not isinstance(normalized_options[REVEAL_AP_LOCATIONS_OPTION_KEY], bool):
+            raise ValueError(
+                f"manifest option {REVEAL_AP_LOCATIONS_OPTION_KEY} must be boolean"
+            )
         project_room_config(normalized_options)
         if "starting_inventory" in normalized_options:
             inventory = normalized_options["starting_inventory"]
@@ -239,19 +245,16 @@ class SeedManifest:
         if unknown:
             raise ValueError(f"session contains unknown DOOM Eternal location IDs: {unknown}")
         starting_inventory = dict(slot_data.get("starting_inventory", {}))
-        start_with_automap = slot_data.get("start_with_automap", False)
-        if start_with_automap:
-            starting_inventory[AUTOMAP_REVEAL_ITEM] = 1
         return cls.create(
             seed_name=snapshot.seed_name,
             team=snapshot.team,
             slot=snapshot.slot,
             options={
                 "randomize_dash": slot_data["randomize_dash"],
+                REVEAL_AP_LOCATIONS_OPTION_KEY: slot_data[REVEAL_AP_LOCATIONS_OPTION_KEY],
                 **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
                 "death_link": slot_data.get("death_link", False),
                 "death_link_mode": slot_data.get("death_link_mode", "soft"),
-                "start_with_automap": start_with_automap,
                 **({"starting_inventory": starting_inventory} if starting_inventory else {}),
                 **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
             },
@@ -481,28 +484,42 @@ class ModCompiler:
         )
         for map_spec in campaign_maps:
             map_key = map_spec.key
-            package = self.root / f"content/maps/{map_key}"
-            config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
-            descriptor = json.loads((package / "descriptor.json").read_text(encoding="utf-8"))
-            config.setdefault("map_key", descriptor["key"])
-            config.setdefault("runtime_map", descriptor["runtime_map"])
-            assets_path = package / "assets.json"
-            if assets_path.is_file():
-                assets = json.loads(assets_path.read_text(encoding="utf-8"))
-                config = {
-                    **config,
-                    "assets": assets.get("assets", []),
-                    "default_visual_asset": assets.get("default_visual_asset"),
-                }
-            projected = project_map_config(config, manifest.options)
+            projected = self.project_map_config(manifest, map_key)
             (output_root / f"{map_key}.locations.json").write_text(
                 json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
         return output_root
 
+    def project_map_config(self, manifest: SeedManifest, map_key: str) -> dict[str, Any]:
+        """Project supported campaign config for one map-local transform state."""
+        from doom_eap.content.content_catalog import load_content_catalog
+
+        campaign_keys = {
+            spec.key for spec in load_content_catalog(self.root).enabled_maps()
+            if spec.key != "hub"
+        }
+        if map_key not in campaign_keys:
+            raise ValueError(
+                f"map-local room transforms are unsupported for map: {map_key}"
+            )
+        package = self.root / f"content/maps/{map_key}"
+        config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
+        descriptor = json.loads((package / "descriptor.json").read_text(encoding="utf-8"))
+        config.setdefault("map_key", descriptor["key"])
+        config.setdefault("runtime_map", descriptor["runtime_map"])
+        assets_path = package / "assets.json"
+        if assets_path.is_file():
+            assets = json.loads(assets_path.read_text(encoding="utf-8"))
+            config = {
+                **config,
+                "assets": assets.get("assets", []),
+                "default_visual_asset": assets.get("default_visual_asset"),
+            }
+        return project_map_config(config, manifest.options)
+
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,
                     map_key: str = "e1m2_war") -> Path:
-        """Compile one physical-option map. Caller supplies legal local vanilla dump."""
+        """Compile one supported campaign map with map-local room transforms."""
         from doom_eap.content.item_classification import load_item_classifications
         from doom_eap.runtime.item_reconciliation import load_policy_registry
         from tools.maps.ap_map_generator import generate_map
@@ -515,11 +532,16 @@ class ModCompiler:
             {int(item_id): definition for item_id, definition in item_definitions.items()},
         )
         with tempfile.TemporaryDirectory() as temporary:
-            staged = self.compile(manifest, Path(temporary))
+            staged = Path(temporary)
+            projected = self.project_map_config(manifest, map_key)
+            config_path = staged / f"{map_key}.locations.json"
+            config_path.write_text(
+                json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             generate_map(
                 vanilla_entities,
                 output_entities,
-                staged / f"{map_key}.locations.json",
+                config_path,
                 output_entities.with_suffix(".manifest.json"),
                 item_definitions,
                 item_names={item_id: policy.name for item_id, policy in policies.items()},
@@ -695,6 +717,9 @@ class LaunchWorkflow:
         active = self.compiler.active_location_ids(physical_options)
         slot_data = {
             **physical_options,
+            REVEAL_AP_LOCATIONS_OPTION_KEY: bool(
+                options.get(REVEAL_AP_LOCATIONS_OPTION_KEY, False)
+            ),
             **({"starting_inventory": options["starting_inventory"]} if "starting_inventory" in options else {}),
             **({"starting_weapon": options["starting_weapon"]} if "starting_weapon" in options else {}),
         }

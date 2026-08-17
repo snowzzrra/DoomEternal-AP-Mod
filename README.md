@@ -123,11 +123,10 @@ checks, regions, important target chains, and content hashes. This makes a map
 edit reviewable at the level of gameplay structure rather than only as a large
 text diff.
 
-Physical options are projected while the room package is prepared. **Start With
+Physical options are projected while the room package is prepared.
+**Start With
 Automap** defaults to OFF. When enabled, AP precollects **Reveal Automap
-Progression Items** and programmatically drives native Automap interaction. The
-native Automap station remains a normal map entity.
-
+Progression Items**.
 ### Location checks
 
 A completed physical objective activates its `AP_CHECK_*` publisher. The
@@ -177,9 +176,6 @@ entities.
 The implementation uses native DOOM Eternal systems wherever the campaign
 already has a suitable owner or writer:
 
-- Start With Automap precollects **Reveal Automap Progression Items**;
-  each mission's native Automap station moves to its deterministic start position
-  and uses the shared AP contact graph;
 - replay Fast Travel uses `idTarget_FastTravelUnlock`;
 - Mission Complete uses mission transition publishers;
 - equipment, perks, weapons, mods, runes, and currencies use their supported
@@ -239,6 +235,17 @@ Source modules are organized under `doom_eap/`: `runtime/` owns bridge and game
 observers, `launcher/` owns launcher commands and UI, `content/` owns catalog
 and option definitions, and `contracts/` owns shared content contracts.
 
+### Developer build modes
+
+`scripts/pipeline.sh playtest` creates a candidate through cheap preflight,
+digest-backed materialization, package assembly and structural artifact smoke.
+`scripts/pipeline.sh audit`/`full` run explicit semantic map validation.
+`scripts/pipeline.sh release --build` is formal package validation. `affected`
+is diagnostic only; it does not determine build correctness. Room payload states
+are finite transitional 0.4.x artifacts. Future seed compilation uses
+project-controlled `vanillamaps` source, never player installation sources;
+Enemizer requires that seed-time compiler and cannot extend payload enumeration.
+
 The active runtime has three cooperating layers:
 
 1. **Generated mission content** publishes checks and exposes native command
@@ -284,7 +291,7 @@ Repair/Fix, and a sanitized support report.
 - Starting Weapon Choice, Random, and configurable starting inventory.
 - Hard, Soft, and Combat logic profiles.
 - Physical Chainsaw, Dash, and first Sentinel Battery options.
-- Start With Automap, mission replay Fast Travel, and Soft/Hardcore DeathLink.
+- Start With Automap, mission replay Fast Travel and Soft/Hardcore DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
 ### 0.5.x Beta — The Ancient Gods

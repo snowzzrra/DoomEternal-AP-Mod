@@ -55,19 +55,39 @@ def compile_catalog() -> dict[str, object]:
     }
 
 
+def materialize_catalog(output: Path = OUTPUT) -> tuple[Path, ...]:
+    rendered = json.dumps(compile_catalog(), indent=2) + "\n"
+    current = output.read_text(encoding="utf-8") if output.is_file() else None
+    if current == rendered:
+        return ()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(rendered, encoding="utf-8", newline="\n")
+    return (output,)
+
+
+def check_catalog(output: Path = OUTPUT) -> None:
+    rendered = json.dumps(compile_catalog(), indent=2) + "\n"
+    try:
+        actual = output.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(f"starting inventory catalog missing: {error}") from error
+    if actual != rendered:
+        raise ValueError("data/start_inventory_catalog.json is stale; regenerate projection")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
-    rendered = json.dumps(compile_catalog(), indent=2) + "\n"
     if args.check:
-        if not args.output.is_file() or args.output.read_text(encoding="utf-8") != rendered:
-            raise SystemExit("data/start_inventory_catalog.json is stale; regenerate projection")
+        try:
+            check_catalog(args.output)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
         print("starting inventory catalog: up-to-date")
         return 0
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(rendered, encoding="utf-8", newline="\n")
+    materialize_catalog(args.output)
     print(args.output)
     return 0
 

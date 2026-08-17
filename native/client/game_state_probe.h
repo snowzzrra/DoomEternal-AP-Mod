@@ -13,6 +13,7 @@ public:
 
     void Poll();
     bool IsSafeForRpc() const;
+    bool IsMapEntitySafe() const;
     bool IsGameplayLoaded() const;
     bool IsLoading() const;
 
@@ -22,7 +23,7 @@ private:
     DWORD FindGameProcess() const;
     bool FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) const;
     bool FindIdGameSystemLocal(uintptr_t& address) const;
-    bool ReadState(std::string& state, bool& safeForRpc);
+    bool ReadState(std::string& state, bool& safeForRpc, bool& mapEntitySafe);
     void Report(const std::string& state);
 
     template <typename T>
@@ -47,6 +48,7 @@ private:
     uintptr_t idGameSystemLocal_;
     DWORD nextAttachAttempt_;
     bool safeForRpc_;
+    bool mapEntitySafe_;
     bool gameplayLoaded_;
     bool loading_;
     std::string lastReport_;

@@ -78,6 +78,7 @@ GameStateProbe::GameStateProbe(LogFunction logFunction)
       idGameSystemLocal_(0),
       nextAttachAttempt_(0),
       safeForRpc_(false),
+      mapEntitySafe_(false),
       gameplayLoaded_(false),
       loading_(false) {}
 
@@ -263,12 +264,18 @@ void GameStateProbe::Detach() {
     moduleSize_ = 0;
     idGameSystemLocal_ = 0;
     safeForRpc_ = false;
+    mapEntitySafe_ = false;
     gameplayLoaded_ = false;
     loading_ = false;
 }
 
-bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) {
+bool GameStateProbe::ReadState(
+    std::string& state,
+    bool& safeForRpc,
+    bool& mapEntitySafe
+) {
     safeForRpc = false;
+    mapEntitySafe = false;
     unsigned char isLoading = 0;
     unsigned char isLoading2 = 0;
     unsigned char isInGame = 0;
@@ -302,19 +309,22 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) {
         playerState = "map_read_failed";
     } else if (!IsPlausiblePointer(mapInstance)) {
         playerState = mapInstance == 0 ? "map_null" : "map_invalid";
-    } else if (!Read(mapInstance + kPlayerOffset, player)) {
-        playerState = "player_read_failed";
-    } else if (!IsPlausiblePointer(player)) {
-        playerState = player == 0 ? "player_null" : "player_invalid";
-    } else if (!Read(player + kGameWasPausedOffset, gameWasPaused)
-            || !Read(player + kHideReticleOffset, hideReticle)
-            || !Read(player + kHideHudForCinematicOffset, hideHudForCinematic)) {
-        playerState = "flags_read_failed";
-    } else if (gameWasPaused > 1 || hideReticle > 1 || hideHudForCinematic > 1) {
-        playerState = "flags_unexpected";
     } else {
-        playerAvailable = true;
-        playerState = "available";
+        mapEntitySafe = true;
+        if (!Read(mapInstance + kPlayerOffset, player)) {
+            playerState = "player_read_failed";
+        } else if (!IsPlausiblePointer(player)) {
+            playerState = player == 0 ? "player_null" : "player_invalid";
+        } else if (!Read(player + kGameWasPausedOffset, gameWasPaused)
+                || !Read(player + kHideReticleOffset, hideReticle)
+                || !Read(player + kHideHudForCinematicOffset, hideHudForCinematic)) {
+            playerState = "flags_read_failed";
+        } else if (gameWasPaused > 1 || hideReticle > 1 || hideHudForCinematic > 1) {
+            playerState = "flags_unexpected";
+        } else {
+            playerAvailable = true;
+            playerState = "available";
+        }
     }
 
     const bool cutsceneActive = cutsceneId > 1;
@@ -332,12 +342,19 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) {
         && !hideReticle
         && !hideHudForCinematic;
     safeForRpc = safeCandidate;
+    mapEntitySafe = mapEntitySafe
+        && !isLoading
+        && isLoading2 == 0
+        && isInGame
+        && !cutsceneActive;
     gameplayLoaded_ = gameplayLoaded;
 
     state = std::string("Memory state: gameplay_loaded=")
         + (gameplayLoaded ? "YES" : "NO")
         + " safe_candidate="
         + (safeCandidate ? "YES" : "NO")
+        + " map_entity_safe="
+        + (mapEntitySafe ? "YES" : "NO")
         + " isLoading=" + BoolText(isLoading)
         + " isLoading2=" + std::to_string(isLoading2)
         + " isInGame=" + BoolText(isInGame)
@@ -355,6 +372,10 @@ bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc) {
 
 bool GameStateProbe::IsSafeForRpc() const {
     return safeForRpc_;
+}
+
+bool GameStateProbe::IsMapEntitySafe() const {
+    return mapEntitySafe_;
 }
 
 bool GameStateProbe::IsGameplayLoaded() const {
@@ -400,10 +421,13 @@ void GameStateProbe::Poll() {
 
     std::string state;
     bool safeForRpc = false;
-    if (!ReadState(state, safeForRpc)) {
+    bool mapEntitySafe = false;
+    if (!ReadState(state, safeForRpc, mapEntitySafe)) {
         gameplayLoaded_ = false;
+        mapEntitySafe_ = false;
         loading_ = false;
     }
     safeForRpc_ = safeForRpc;
+    mapEntitySafe_ = mapEntitySafe;
     Report(state);
 }

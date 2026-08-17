@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 if [[ -z "${AP_PIPELINE_RECEIPT:-}" ]]; then
-    exec "$REPO_ROOT/scripts/pipeline.sh" release --build "$@"
+    exec "$REPO_ROOT/scripts/pipeline.sh" playtest "$@"
 fi
 export PYTHONPATH="$REPO_ROOT"
 WORKSPACE="$(cd "$REPO_ROOT/.." && pwd)"
@@ -50,6 +50,7 @@ RELEASE_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]
 PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
+DEEP_AUDIT="${AP_PIPELINE_DEEP_AUDIT:-0}"
 GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
@@ -58,7 +59,7 @@ PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steam
 
 mkdir -p "$TEMP_DIR"
 SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \
-    -m tools.content.compile_options_schema --check
+    -m tools.content.compile_options_schema
 python3 - "$REPO_ROOT" "$TEMP_DIR" <<'PY'
 import json
 import hashlib
@@ -117,14 +118,6 @@ trap 'report_build_failure "$LINENO" "$BASH_COMMAND"' ERR
 mkdir -p "$(dirname "$BUILD_LOG")"
 : > "$BUILD_LOG"
 exec > >(tee -a "$BUILD_LOG") 2>&1
-
-if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" && -z "${AP_PIPELINE_RECEIPT:-}" ]]; then
-    run_build_step "scripted location contract validation" \
-        python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
-        --contracts "$REPO_ROOT/data/scripted_location_contracts.json"
-    run_build_step "release data validation" \
-        python3 "$REPO_ROOT/tools/validation/validate_data.py"
-fi
 
 if [[ "${AP_PRESERVE_CONFIG:-0}" == "1" && -f "$OUTPUT_DIR/client/ap_config.json" ]]; then
     cp "$OUTPUT_DIR/client/ap_config.json" "$TEMP_DIR/ap_config.json"
@@ -382,18 +375,19 @@ python3 "$REPO_ROOT/tools/decls/devinv_builder.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --map-registry "$MAP_SOURCES_FILE" \
     --audit-output "$TEMP_DIR/devinv-override.json"
-python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
-    --registry "$TEMP_DIR/challenge_location_registry.json" \
-    --mod-root "$MOD_STAGING_DIR"
-
-python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
-    --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
-    --verify-generated-map "$OUTPUT_DIR/build/generated-maps/hub.entities" \
-    --location 7770074
-python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
-    --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
-    --verify-generated-map "$OUTPUT_DIR/build/generated-maps/e1m3_cult.entities" \
-    --location 7770056
+if [[ "$DEEP_AUDIT" == "1" ]]; then
+    python3 "$REPO_ROOT/tools/validation/validate_challenge_overrides.py" \
+        --registry "$TEMP_DIR/challenge_location_registry.json" \
+        --mod-root "$MOD_STAGING_DIR"
+    python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
+        --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
+        --verify-generated-map "$OUTPUT_DIR/build/generated-maps/hub.entities" \
+        --location 7770074
+    python3 "$REPO_ROOT/tools/validation/audit_scripted_location.py" \
+        --contracts "$REPO_ROOT/data/scripted_location_contracts.json" \
+        --verify-generated-map "$OUTPUT_DIR/build/generated-maps/e1m3_cult.entities" \
+        --location 7770056
+fi
 
 ICE_DECL_RELATIVE="generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl"
 python3 "$REPO_ROOT/tools/maps/logic_decl_patcher.py" \
@@ -477,7 +471,7 @@ cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
     "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
-python3 -m tools.content.compile_start_inventory_catalog --check
+python3 -m tools.content.compile_start_inventory_catalog
 cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/item_classifications.json" \
     "$REPO_ROOT/data/start_inventory_catalog.json" \
@@ -544,7 +538,7 @@ import json
 import os
 import subprocess
 import sys
-from itertools import product
+import tempfile
 from pathlib import Path
 
 root, staged, room_root, compressor, map_sources_path, resources, cache_root = map(Path, sys.argv[1:])
@@ -556,11 +550,10 @@ from doom_eap.content.physical_options import (
 )
 from tools.release.room_payloads import (
     BASE_RESOURCE_NAME, ROOM_PAYLOAD_MANIFEST_NAME, ROOM_PAYLOAD_RESOURCE_NAME,
-    canonical_json, resource_metadata, validate_room_payload_manifest,
+    canonical_json, plan_map_local_states, resource_metadata, validate_room_payload_manifest,
     write_deterministic_zip, zip_directory,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from tools.maps.ap_map_generator import load_start_with_automap_positions
 from doom_eap.content.content_catalog import load_content_catalog
 
 compiler = ModCompiler(root)
@@ -577,7 +570,7 @@ maps = {
     if map_key in release_map_keys and source["enabled"]
 }
 if set(maps) != set(release_map_keys):
-    raise SystemExit("Release template map set does not match map contract")
+    raise SystemExit("Room payload map set does not match map contract")
 
 
 def sha256_file(path):
@@ -597,19 +590,7 @@ def sha256_files(paths):
 
 
 generator_path = root / "tools/maps/ap_map_generator.py"
-generator_source = generator_path.read_text(encoding="utf-8")
-automap_start = generator_source.index("START_WITH_AUTOMAP_GRAPH =")
-transform_start = generator_source.index("\ndef apply_composable_map_transforms", automap_start)
-transform_end = generator_source.index("\ndef ", transform_start + 1)
-base_generator_source = generator_source[:automap_start] + generator_source[transform_end:]
-generator_base_identity = hashlib.sha256(base_generator_source.encode("utf-8")).hexdigest()
-generator_full_identity = hashlib.sha256(generator_source.encode("utf-8")).hexdigest()
-automap_paths = [
-    root / "data/start_with_automap.json",
-    root / "packaging/mod_assets/gameresources/generated/decls/interaction/interactables/ap_start_with_automap_station.decl",
-    root / "packaging/mod_assets/gameresources/generated/decls/entitydef/trigger/interact/ap_start_with_automap.decl",
-]
-automap_resource_identity = sha256_files(automap_paths)
+generator_identity = sha256_file(generator_path)
 compiler_identity = sha256_files([
     root / "doom_eap/launcher/launcher_core.py",
     root / "doom_eap/content/physical_options.py",
@@ -619,6 +600,7 @@ compiler_identity = sha256_files([
     root / "data/item_classifications.json",
     root / "data/location_names.json",
     root / "data/mission_complete_map_contracts.json",
+    root / "data/publisher_contracts.json",
     map_sources_path,
 ])
 compressor_identity = sha256_file(compressor)
@@ -626,18 +608,15 @@ cache_root.mkdir(parents=True, exist_ok=True)
 
 
 def cache_material(map_key, vanilla, options, local_identity):
-    automap_enabled = options["start_with_automap"]
     return {
         "schema": 1,
         "map_key": map_key,
         "source_identity": sha256_file(vanilla),
-        "generator_identity": generator_full_identity if automap_enabled else generator_base_identity,
+        "generator_identity": generator_identity,
         "compiler_identity": compiler_identity,
         "compressor_identity": compressor_identity,
         "local_identity": local_identity,
         "state": dict(sorted(options.items())),
-        "automap_implementation": automap_resource_identity if automap_enabled else None,
-        "shared_decl_identity": automap_resource_identity if automap_enabled else None,
     }
 
 
@@ -702,16 +681,21 @@ def compile_cached_state(map_key, vanilla, options, local_identity, entities, pa
         active_location_ids=compiler.active_location_ids(compile_options),
     )
     compiler.compile_map(manifest, vanilla, entities, map_key)
-    patch_mission_complete_maps(
-        root / "data/mission_complete_map_contracts.json", {map_key: entities}, staged
-    )
+    with tempfile.TemporaryDirectory(prefix=f"room-payload-{map_key}-patch-") as patch_root:
+        audit = patch_mission_complete_maps(
+            root / "data/mission_complete_map_contracts.json", {map_key: entities}, Path(patch_root)
+        )
+    if audit["unrelated_generated_entity_diff_count"] != 0:
+        raise SystemExit(f"Room payload patch changed unrelated entities: {map_key}")
     subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
     write_cached_state(material, entities.read_bytes(), packed.read_bytes())
 
 
 canonical_options = {key: False for key in PHYSICAL_OPTION_KEYS}
-canonical_options["start_with_automap"] = False
-automap_maps = set(load_start_with_automap_positions())
+state_plans = {
+    plan.map_key: plan
+    for plan in plan_map_local_states(tuple(maps))
+}
 
 local_identities = {}
 for map_key, source in map_sources.items():
@@ -723,32 +707,25 @@ for map_key, source in map_sources.items():
 
 for map_key in maps:
     resource_path, relative, vanilla = maps[map_key]
-    base_options = {
-        "start_with_automap": False,
-        **{key: False for key in map_physical_option_keys(map_key)},
-    }
-    entities = room_root / f"{map_key}-base.entities"
     target = staged / f"{Path(resource_path).stem}/maps/{relative}"
+    plan = state_plans[map_key]
+    if not plan.compile_base:
+        if not target.is_file():
+            raise SystemExit(f"Canonical staged base is missing: {map_key}/{target}")
+        continue
+    entities = room_root / f"{map_key}-base.entities"
     target.parent.mkdir(parents=True, exist_ok=True)
     compile_cached_state(
-        map_key, vanilla, base_options, local_identities[map_key], entities, target
+        map_key, vanilla, plan.base_options, local_identities[map_key], entities, target
     )
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
 payload_files = {}
 map_records = {}
 for map_key, (resource_path, relative, vanilla) in maps.items():
-    local_physical_keys = map_physical_option_keys(map_key)
-    state_policy = "cartesian" if map_key in automap_maps else "off_only"
-    option_keys = sorted(
-        (("start_with_automap",) + local_physical_keys)
-        if state_policy == "cartesian"
-        else local_physical_keys
-    )
+    plan = state_plans[map_key]
     target_member = f"{Path(resource_path).stem}/maps/{relative}"
     states = []
-    state_values = product((False, True), repeat=len(option_keys))
-    for values in state_values:
-        options = dict(zip(option_keys, values))
+    for options in plan.states:
         if not any(options.values()):
             states.append({
                 "options": options,
@@ -757,7 +734,7 @@ for map_key, (resource_path, relative, vanilla) in maps.items():
                 "sha256": base_members[target_member],
             })
             continue
-        state_labels = (["automap"] if options.get("start_with_automap", False) else []) + [
+        state_labels = [
             key.removeprefix("randomize_")
             for key in map_physical_option_keys(map_key)
             if options[key]
@@ -775,11 +752,11 @@ for map_key, (resource_path, relative, vanilla) in maps.items():
             "sha256": hashlib.sha256(packed.read_bytes()).hexdigest(),
         })
     map_records[map_key] = {
-        "option_keys": option_keys,
+        "option_keys": list(plan.option_keys),
         "target_member": target_member,
         "states": states,
     }
-    map_records[map_key]["state_policy"] = state_policy
+    map_records[map_key]["state_policy"] = plan.state_policy
 payload_manifest = {
     "schema_version": 1,
     "model": "dependent_map_payloads",
@@ -936,7 +913,7 @@ write_release_manifest(
 )
 PY
 
-if [[ "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
+if [[ "$DEEP_AUDIT" == "1" && "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
     if grep -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
         echo "Rejected stat-write bootstrap entered the normal build: $generated_map" >&2
@@ -1006,11 +983,13 @@ PACKAGED_CLIENT_SHA256="$(sha256sum "$OUTPUT_DIR/client/ap_client.exe" | awk '{p
 FRESH_CLIENT_SHA256="$(sha256sum "$CLIENT_BUILD_DIR/ap_client.exe" | awk '{print $1}')"
 [[ "$PACKAGED_CLIENT_SHA256" == "$FRESH_CLIENT_SHA256" ]] || { echo "Packaged ap_client.exe is not the fresh build" >&2; exit 1; }
 
-python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
-    --asset-root "$REPO_ROOT/packaging/mod_assets" \
-    --mod-root "$MOD_STAGING_DIR" \
-    --generated-maps "$GENERATED_MAPS_DIR" \
-    --source-map-root "$REPO_ROOT/vanillamaps"
+if [[ "$DEEP_AUDIT" == "1" ]]; then
+    python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
+        --asset-root "$REPO_ROOT/packaging/mod_assets" \
+        --mod-root "$MOD_STAGING_DIR" \
+        --generated-maps "$GENERATED_MAPS_DIR" \
+        --source-map-root "$REPO_ROOT/vanillamaps"
+fi
 
 if [[ -e "$OUTPUT_DIR/DoomEternalArchipelagoBeta.zip" ]]; then
     echo "Obsolete universal mod ZIP exists in public release root" >&2
@@ -1053,6 +1032,28 @@ fi
 EXTRACTED_AUDIT_DIR="$TEMP_DIR/extracted-final"
 mkdir -p "$EXTRACTED_AUDIT_DIR"
 unzip -q "$OUTPUT_DIR/$PTB_ZIP_NAME" -d "$EXTRACTED_AUDIT_DIR"
+PYTHONPATH="$REPO_ROOT" python3 - "$EXTRACTED_AUDIT_DIR" "$LAUNCHER_EXECUTABLE" <<'PY'
+import sys
+import zipfile
+from pathlib import Path
+
+from tools.release.release_manifest import load_release_manifest
+
+root = Path(sys.argv[1])
+required = (
+    root / sys.argv[2],
+    root / "client" / "ap_client.exe",
+    root / "client" / "save_death_probe.exe",
+    root / "doometernal.apworld",
+)
+if any(not path.is_file() for path in required):
+    raise SystemExit("final artifact required public member is missing")
+with zipfile.ZipFile(root / "doometernal.apworld") as archive:
+    if archive.testzip() is not None:
+        raise SystemExit("final artifact APWorld member is corrupt")
+load_release_manifest(root / "RELEASE_MANIFEST.json", package_root=root)
+PY
+if [[ "$DEEP_AUDIT" == "1" ]]; then
 python3 - \
     "$EXTRACTED_AUDIT_DIR/client/data/items.json" \
     "$REPO_ROOT/data/items.json" <<'PY'
@@ -1073,6 +1074,7 @@ assert not any(
     for value in items.values()
 )
 PY
+fi
 MOD_AUDIT_DIR="$TEMP_DIR/extracted-mod"
 mkdir -p "$MOD_AUDIT_DIR"
 MOD_AUDIT_ZIP="$TEMP_DIR/assembled-room-mod.zip"
@@ -1102,6 +1104,7 @@ for member, content in assembled.items():
     target.write_bytes(content)
 write_deterministic_zip(assembled, archive)
 PY
+if [[ "$DEEP_AUDIT" == "1" ]]; then
 python3 "$REPO_ROOT/tools/validation/audit_resource_packages.py" \
     --asset-root "$REPO_ROOT/packaging/mod_assets" \
     --mod-root "$MOD_AUDIT_DIR" \
@@ -1168,6 +1171,7 @@ python3 "$REPO_ROOT/tools/validation/audit_packaged_transition_bridge.py" \
     "$TEMP_DIR/challenge_location_registry.json" \
     "$EXTRACTED_AUDIT_DIR/RELEASE_MANIFEST.json" \
     "$EXTRACTED_AUDIT_DIR/doometernal.apworld"
+fi
 mapfile -t PACKAGE_FILES < <(unzip -Z1 "$OUTPUT_DIR/$PTB_ZIP_NAME" | grep -v '/$' | LC_ALL=C sort)
 PACKAGE_ROOTS=()
 for package_file in "${PACKAGE_FILES[@]}"; do

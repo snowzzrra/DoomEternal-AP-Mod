@@ -135,11 +135,13 @@ supervised bridge. Do not run two bridge clients for one profile.
 Beta.4 campaign contract: `28` Sentinel Battery checks and `13` Battery
 consumers.
 
-### Start With Automap
+### Automap
 
-**Start With Automap** adds exactly one **Reveal Automap Progression
-Items** to starting inventory. Each mission's native Automap station moves to its
-deterministic start position and reveals markers through the shared AP contact graph.
+Automap progression items use ordinary AP inventory behavior. Native Automap
+presentation and marker cleanup remain part of map content.
+
+**Reveal AP Locations on Automap** is a slot setting that controls starting
+ownership of the AP progression-item reveal capability.
 
 ### Traps
 

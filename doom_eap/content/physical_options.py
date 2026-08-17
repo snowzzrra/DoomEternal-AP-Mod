@@ -14,7 +14,6 @@ PHYSICAL_OPTION_KEYS = (
 ROOM_OPTION_KEYS = (
     "death_link",
     "death_link_mode",
-    "start_with_automap",
 )
 DEATH_LINK_MODES = frozenset({"soft", "hardcore"})
 
@@ -76,14 +75,10 @@ def project_room_config(options: Mapping[str, Any]) -> dict[str, Any]:
             + ", ".join(sorted(DEATH_LINK_MODES))
         )
 
-    start_with_automap = options.get("start_with_automap", False)
-    if not isinstance(start_with_automap, bool):
-        raise ValueError("room option start_with_automap must be boolean")
     return {
         "schema_version": 1,
         "death_link": death_link,
         "death_link_mode": death_link_mode,
-        "start_with_automap": start_with_automap,
     }
 
 
@@ -101,10 +96,6 @@ def project_map_config(config: Mapping[str, Any], options: Mapping[str, Any]) ->
     result = deepcopy(dict(config))
     map_key = result.get("map_key")
     values = normalize_physical_options(options)
-    start_with_automap = options.get("start_with_automap", False)
-    if not isinstance(start_with_automap, bool):
-        raise ValueError("room option start_with_automap must be boolean")
-    result["start_with_automap"] = start_with_automap
     for key, spec in PHYSICAL_OPTIONS.items():
         if values[key] or spec["map_key"] != map_key:
             continue

@@ -7,6 +7,7 @@ import json
 import os
 import zipfile
 from collections.abc import Mapping
+from dataclasses import dataclass
 from itertools import product
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -18,6 +19,46 @@ ROOM_PAYLOAD_RESOURCE_NAME = "room_payloads.zip"
 ROOM_PAYLOAD_MANIFEST_NAME = "room_payload_manifest.json"
 ROOM_PAYLOAD_SCHEMA_VERSION = 1
 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+@dataclass(frozen=True)
+class MapLocalStatePlan:
+    map_key: str
+    option_keys: tuple[str, ...]
+    state_policy: str
+    compile_base: bool
+    states: tuple[dict[str, bool], ...]
+
+    @property
+    def base_options(self) -> dict[str, bool]:
+        return {key: False for key in map_physical_option_keys(self.map_key)}
+
+    @property
+    def replacement_states(self) -> tuple[dict[str, bool], ...]:
+        return tuple(state for state in self.states if any(state.values()))
+
+
+def plan_map_local_states(
+    map_keys: tuple[str, ...],
+) -> tuple[MapLocalStatePlan, ...]:
+    """Plan finite 0.4.x map-local states without compiling map content."""
+    plans = []
+    for map_key in map_keys:
+        physical_keys = map_physical_option_keys(map_key)
+        state_policy = "cartesian" if physical_keys else "off_only"
+        option_keys = tuple(sorted(physical_keys))
+        states = tuple(
+            dict(zip(option_keys, values))
+            for values in product((False, True), repeat=len(option_keys))
+        )
+        plans.append(MapLocalStatePlan(
+            map_key=map_key,
+            option_keys=option_keys,
+            state_policy=state_policy,
+            compile_base=bool(physical_keys),
+            states=states,
+        ))
+    return tuple(plans)
 
 
 def canonical_json(value: Any) -> bytes:
@@ -96,7 +137,7 @@ def validate_room_payload_manifest(
     physical_option_keys = {
         "randomize_chainsaw", "randomize_dash", "randomize_first_battery",
     }
-    map_option_keys = physical_option_keys | {"start_with_automap"}
+    map_option_keys = physical_option_keys
     maps = document.get("maps")
     if not isinstance(maps, Mapping) or not maps:
         raise ValueError("room payload manifest maps are missing")
@@ -121,9 +162,7 @@ def validate_room_payload_manifest(
         seen_targets.add(target_member)
         state_policy = record.get("state_policy", "cartesian")
         if state_policy == "cartesian":
-            expected_option_keys = sorted(
-                ("start_with_automap",) + map_physical_option_keys(map_key)
-            )
+            expected_option_keys = sorted(map_physical_option_keys(map_key))
         elif state_policy == "off_only":
             expected_option_keys = list(map_physical_option_keys(map_key))
         else:
