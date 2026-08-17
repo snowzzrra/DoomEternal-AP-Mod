@@ -11,7 +11,7 @@ name: DOOM Eternal AP Cross-Platform Build
       apworld_ref:
         description: 'Git ref or commit SHA for Archipelago / APWorld'
         required: true
-        default: 'main'
+        default: 'doom_eternal'
         type: string
       version_label:
         description: 'Release version label (e.g. v0.4.0-beta.4)'
@@ -141,7 +141,8 @@ jobs:
       - name: Install MinGW, Clang, and WIDL toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 widl clang
+          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 wine64-tools clang
+          command -v widl
 
       - name: Build and Validate Native Client
         run: |
@@ -382,8 +383,8 @@ jobs:
         run: |
           cd DoomEAP-build-handoff
           sha256sum -c SHA256SUMS.txt
-          test -x linux/DoomEternalArchipelagoLauncher
           chmod +x linux/DoomEternalArchipelagoLauncher
+          test -x linux/DoomEternalArchipelagoLauncher
           echo "Handoff bundle validated successfully."
 
       - name: Upload Cross-Platform Build Handoff Artifact
