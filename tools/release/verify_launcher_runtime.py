@@ -70,6 +70,16 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
         except ImportError as e:
             raise RuntimeError(f"Missing required third-party dependency: {dep} ({e})") from e
 
+    import ssl
+    import certifi
+    ca_path = Path(certifi.where())
+    if not ca_path.is_file():
+        raise RuntimeError(f"certifi CA bundle does not exist at {ca_path}")
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=str(ca_path))
+    if ctx.verify_mode != ssl.CERT_REQUIRED or not ctx.check_hostname:
+        raise RuntimeError("SSL context failed to enforce CERT_REQUIRED and check_hostname")
+    print(f"  [OK] certifi CA bundle verified ({ca_path.stat().st_size} bytes) -> {ca_path}")
+
     # 2. Verify Stub Path Precedence
     print("--> Checking standalone runtime stub precedence...")
     stub_checks = [

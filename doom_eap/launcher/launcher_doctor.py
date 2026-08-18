@@ -205,14 +205,30 @@ def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
     return useful[0][2]
 
 
-def _log_freshness(stat_result: os.stat_result) -> tuple[str, str]:
+def _log_freshness(
+    stat_result: os.stat_result,
+    session_start: float | None = None,
+) -> tuple[str, str]:
     now = time.time()
-    age_seconds = max(0.0, now - stat_result.st_mtime)
     iso_time = datetime.datetime.fromtimestamp(
         stat_result.st_mtime, tz=datetime.timezone.utc
     ).isoformat()
-    if age_seconds < 86400 * 2:
+    mtime = stat_result.st_mtime
+
+    if session_start is not None:
+        if mtime >= (session_start - 10.0):
+            return "active_session", iso_time
+        age_before_session = max(0.0, session_start - mtime)
+        if age_before_session < 86400 * 2:
+            return "recent_previous", iso_time
+        age_days = int(age_before_session // 86400)
+        return f"historical_stale ({age_days} days old)", iso_time
+
+    age_seconds = max(0.0, now - mtime)
+    if age_seconds < 300:
         return "active_session", iso_time
+    if age_seconds < 86400 * 2:
+        return "recent_previous", iso_time
     age_days = int(age_seconds // 86400)
     return f"historical_stale ({age_days} days old)", iso_time
 
@@ -221,6 +237,7 @@ def _support_log_tails(
     config: Mapping[str, object] | None,
     paths: object | None,
     application_dir: Path | None = None,
+    session_start: float | None = None,
 ) -> tuple[dict[str, str], dict[str, dict[str, object]]]:
     tails: dict[str, str] = {}
     provenance: dict[str, dict[str, object]] = {}
@@ -233,7 +250,7 @@ def _support_log_tails(
             continue
         try:
             stat_res = selected.stat()
-            freshness, iso_time = _log_freshness(stat_res)
+            freshness, iso_time = _log_freshness(stat_res, session_start=session_start)
             provenance[archive_name] = {
                 "source_path": _safe_path(selected),
                 "size_bytes": stat_res.st_size,
@@ -256,13 +273,19 @@ def write_support_bundle(
     config: Mapping[str, object] | None = None,
     paths: object | None = None,
     application_dir: Path | None = None,
+    session_start: float | None = None,
+    last_setup_failure: Mapping[str, object] | None = None,
 ) -> Path:
     """Write bounded diagnostics and redacted logs with freshness metadata."""
     destination = destination.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    tails, provenance = _support_log_tails(config, paths, application_dir)
+    tails, provenance = _support_log_tails(
+        config, paths, application_dir, session_start=session_start
+    )
     payload = sanitize_support_bundle(report.document())
     payload["log_provenance"] = sanitize_support_value(provenance)
+    if last_setup_failure is not None:
+        payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
     safe_logs = "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)[-20000:]
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:

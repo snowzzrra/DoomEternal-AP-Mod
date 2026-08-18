@@ -81,6 +81,8 @@ class LauncherController:
         self._lifecycle_lock = threading.Lock()
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
+        self.last_setup_failure: dict[str, object] | None = None
+        self.session_start_time = time.time()
         self._consent_lock = threading.Lock()
         self._consent_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
         self.workflow = IntegratedLaunchWorkflow(
@@ -248,6 +250,8 @@ class LauncherController:
             config=self.config,
             paths=self.user_paths,
             application_dir=self.client_dir,
+            session_start=self.session_start_time,
+            last_setup_failure=self.last_setup_failure,
         )
         self.emit("support_bundle_ready", path=str(bundle))
         return bundle
@@ -335,6 +339,10 @@ class LauncherController:
             self.events.put({"type": "log", "message": text})
 
     def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
+        if kind == "setup_failed":
+            self.last_setup_failure = dict(payload)
+        elif kind in {"setup_started", "setup_ready"}:
+            self.last_setup_failure = None
         self.emit(kind, **payload)
 
     def _setup_result(self, record: IntegratedSetupRecord) -> None:

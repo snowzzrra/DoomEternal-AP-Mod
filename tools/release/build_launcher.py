@@ -150,6 +150,10 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
+        "--collect-data",
+        "certifi",
+        "--copy-metadata",
+        "certifi",
         str(REPO_ROOT / "doom_eap/launcher/launcher_app.py"),
     ]
     for excluded_module in PYINSTALLER_EXCLUDES:

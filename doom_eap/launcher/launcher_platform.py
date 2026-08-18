@@ -10,6 +10,7 @@ import os
 import re
 import shlex
 import shutil
+import ssl
 import subprocess
 import tarfile
 import tempfile
@@ -27,6 +28,20 @@ REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
+def create_secure_ssl_context(cafile: str | None = None) -> ssl.SSLContext:
+    """Create a secure default SSL context using certifi CA bundle or supplied cafile.
+
+    Certificate and hostname verification are strictly enforced (CERT_REQUIRED).
+    """
+    import certifi
+
+    ca_bundle = cafile or certifi.where()
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_bundle)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    return context
+
+
 @dataclass(frozen=True)
 class LauncherUserPaths:
     """Per-user launcher roots for configuration, state, cache, and logs."""
@@ -34,6 +49,34 @@ class LauncherUserPaths:
     config_dir: Path
     state_dir: Path
     data_dir: Path
+
+
+class DownloadTransport(Protocol):
+    def fetch(self, url: str, destination: Path) -> None: ...
+
+
+class UrlDownloadTransport:
+    """Secure HTTPS download transport with validated SSL context and bounded timeout."""
+
+    def __init__(
+        self,
+        ssl_context: ssl.SSLContext | None = None,
+        timeout: float = 60.0,
+    ):
+        self.ssl_context = ssl_context if ssl_context is not None else create_secure_ssl_context()
+        self.timeout = timeout
+
+    def fetch(self, url: str, destination: Path) -> None:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "DoomEternal-AP-Launcher"},
+        )
+        with urllib.request.urlopen(
+            request,
+            timeout=self.timeout,
+            context=self.ssl_context,
+        ) as response, destination.open("wb") as output:
+            shutil.copyfileobj(response, output)
 
 
 def launcher_user_paths(
@@ -140,16 +183,6 @@ LINUX_MOD_INJECTOR = DependencySpec(
     executable_glob="**/EternalModInjectorShell.sh",
     archive_type="tar.gz",
 )
-
-
-class DownloadTransport(Protocol):
-    def fetch(self, url: str, destination: Path) -> None: ...
-
-
-class UrlDownloadTransport:
-    def fetch(self, url: str, destination: Path) -> None:
-        with urllib.request.urlopen(url, timeout=60) as response, destination.open("wb") as output:
-            shutil.copyfileobj(response, output)
 
 
 @dataclass(frozen=True)
