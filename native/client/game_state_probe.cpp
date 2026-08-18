@@ -9,11 +9,28 @@
 namespace {
 
 constexpr const char* kGameExecutable = "DOOMEternalx64vk.exe";
-constexpr DWORD kExpectedImageSize = 0x742A000;
-constexpr uintptr_t kIsLoadingRva = 0x5471E18;
-constexpr uintptr_t kIsLoading2Rva = 0x440D2A0;
-constexpr uintptr_t kIsInGameRva = 0x6B8DA98;
-constexpr uintptr_t kCutsceneIdRva = 0x540D4C8;
+
+constexpr GameBuildProfile kSupportedBuildProfiles[] = {
+    {
+        /* id */ "Steam pre-2026-08-18",
+        /* sizeOfImage */ 0x742A000,
+        /* peTimestamp */ 0,
+        /* isLoadingRva */ 0x5471E18,
+        /* isLoading2Rva */ 0x440D2A0,
+        /* isInGameRva */ 0x6B8DA98,
+        /* cutsceneIdRva */ 0x540D4C8,
+    },
+    {
+        /* id */ "Steam 2026-08-18",
+        /* sizeOfImage */ 0x7431000,
+        /* peTimestamp */ 0x6A7B9B8C,
+        /* isLoadingRva */ 0x567D490,
+        /* isLoading2Rva */ 0x440F1C0,
+        /* isInGameRva */ 0x6BDA9A8,
+        /* cutsceneIdRva */ 0x5674100,
+    },
+};
+
 constexpr uintptr_t kMapInstanceOffset = 0x50;
 constexpr uintptr_t kPlayerOffset = 0x1AF8;
 constexpr uintptr_t kGameWasPausedOffset = 0x476BC;
@@ -75,6 +92,7 @@ GameStateProbe::GameStateProbe(LogFunction logFunction)
       processId_(0),
       moduleBase_(0),
       moduleSize_(0),
+      activeProfile_(nullptr),
       idGameSystemLocal_(0),
       nextAttachAttempt_(0),
       safeForRpc_(false),
@@ -131,6 +149,72 @@ bool GameStateProbe::FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) co
     }
     CloseHandle(snapshot);
     return found;
+}
+
+bool GameStateProbe::ReadPeHeaders(
+    DWORD& sizeOfImage,
+    DWORD& peTimestamp,
+    DWORD& entryPoint
+) const {
+    sizeOfImage = 0;
+    peTimestamp = 0;
+    entryPoint = 0;
+    if (!process_ || !moduleBase_) {
+        return false;
+    }
+
+    IMAGE_DOS_HEADER dos = {};
+    if (!Read(moduleBase_, dos) || dos.e_magic != IMAGE_DOS_SIGNATURE) {
+        return false;
+    }
+    if (dos.e_lfanew <= 0 || dos.e_lfanew > 0x1000) {
+        return false;
+    }
+
+    const uintptr_t ntHeaderAddress = moduleBase_ + static_cast<uintptr_t>(dos.e_lfanew);
+    DWORD ntSignature = 0;
+    if (!Read(ntHeaderAddress, ntSignature) || ntSignature != IMAGE_NT_SIGNATURE) {
+        return false;
+    }
+
+    IMAGE_FILE_HEADER fileHeader = {};
+    if (!Read(ntHeaderAddress + sizeof(DWORD), fileHeader)) {
+        return false;
+    }
+    if (fileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
+        return false;
+    }
+
+    IMAGE_OPTIONAL_HEADER64 optHeader = {};
+    if (!Read(ntHeaderAddress + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER), optHeader)) {
+        return false;
+    }
+    if (optHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
+        return false;
+    }
+
+    sizeOfImage = optHeader.SizeOfImage;
+    peTimestamp = fileHeader.TimeDateStamp;
+    entryPoint = optHeader.AddressOfEntryPoint;
+    return true;
+}
+
+const GameBuildProfile* GameStateProbe::DetectBuildProfile(
+    DWORD sizeOfImage,
+    DWORD peTimestamp,
+    DWORD entryPoint
+) const {
+    (void)entryPoint;
+    for (const auto& candidate : kSupportedBuildProfiles) {
+        if (candidate.sizeOfImage != sizeOfImage) {
+            continue;
+        }
+        if (candidate.peTimestamp != 0 && candidate.peTimestamp != peTimestamp) {
+            continue;
+        }
+        return &candidate;
+    }
+    return nullptr;
 }
 
 bool GameStateProbe::FindIdGameSystemLocal(uintptr_t& address) const {
@@ -231,14 +315,27 @@ bool GameStateProbe::Attach(DWORD processId) {
         Detach();
         return false;
     }
-    if (moduleSize_ != kExpectedImageSize) {
+
+    DWORD peSizeOfImage = 0;
+    DWORD peTimestamp = 0;
+    DWORD entryPoint = 0;
+    if (!ReadPeHeaders(peSizeOfImage, peTimestamp, entryPoint)) {
+        Report("Memory probe unavailable: unable to read PE headers from game module.");
+        Detach();
+        return false;
+    }
+
+    const DWORD effectiveImageSize = peSizeOfImage ? peSizeOfImage : moduleSize_;
+    activeProfile_ = DetectBuildProfile(effectiveImageSize, peTimestamp, entryPoint);
+    if (!activeProfile_) {
         Report(
-            "Memory probe unavailable: unsupported SizeOfImage "
-            + Hex(moduleSize_) + " (expected " + Hex(kExpectedImageSize) + ")."
+            "Memory probe unavailable: unsupported DOOM Eternal build (SizeOfImage="
+            + Hex(effectiveImageSize) + " TimeDateStamp=" + Hex(peTimestamp) + ")."
         );
         Detach();
         return false;
     }
+
     if (!FindIdGameSystemLocal(idGameSystemLocal_)) {
         Report("Memory probe unavailable: idGameSystemLocal signature was not unique/readable.");
         Detach();
@@ -247,8 +344,9 @@ bool GameStateProbe::Attach(DWORD processId) {
 
     Report(
         "Memory probe attached read-only: pid=" + std::to_string(processId_)
+        + " build=" + std::string(activeProfile_->id)
         + " base=" + Hex(moduleBase_)
-        + " SizeOfImage=" + Hex(moduleSize_)
+        + " SizeOfImage=" + Hex(effectiveImageSize)
         + " idGameSystemLocal=" + Hex(idGameSystemLocal_) + "."
     );
     return true;
@@ -262,6 +360,7 @@ void GameStateProbe::Detach() {
     processId_ = 0;
     moduleBase_ = 0;
     moduleSize_ = 0;
+    activeProfile_ = nullptr;
     idGameSystemLocal_ = 0;
     safeForRpc_ = false;
     mapEntitySafe_ = false;
@@ -276,14 +375,18 @@ bool GameStateProbe::ReadState(
 ) {
     safeForRpc = false;
     mapEntitySafe = false;
+    if (!activeProfile_) {
+        state = "Memory state unavailable: no active build profile.";
+        return false;
+    }
     unsigned char isLoading = 0;
     unsigned char isLoading2 = 0;
     unsigned char isInGame = 0;
     int32_t cutsceneId = 0;
-    if (!Read(moduleBase_ + kIsLoadingRva, isLoading)
-            || !Read(moduleBase_ + kIsLoading2Rva, isLoading2)
-            || !Read(moduleBase_ + kIsInGameRva, isInGame)
-            || !Read(moduleBase_ + kCutsceneIdRva, cutsceneId)) {
+    if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading)
+            || !Read(moduleBase_ + activeProfile_->isLoading2Rva, isLoading2)
+            || !Read(moduleBase_ + activeProfile_->isInGameRva, isInGame)
+            || !Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId)) {
         state = "Memory state unavailable: global state read failed.";
         return false;
     }
@@ -296,6 +399,7 @@ bool GameStateProbe::ReadState(
             + " cutsceneID=" + std::to_string(cutsceneId) + ".";
         return false;
     }
+
 
     uintptr_t mapInstance = 0;
     uintptr_t player = 0;

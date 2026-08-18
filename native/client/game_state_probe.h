@@ -4,6 +4,16 @@
 #include <stdint.h>
 #include <string>
 
+struct GameBuildProfile {
+    const char* id;
+    DWORD sizeOfImage;
+    DWORD peTimestamp;
+    uintptr_t isLoadingRva;
+    uintptr_t isLoading2Rva;
+    uintptr_t isInGameRva;
+    uintptr_t cutsceneIdRva;
+};
+
 class GameStateProbe {
 public:
     using LogFunction = void (*)(const std::string&);
@@ -22,6 +32,8 @@ private:
     void Detach();
     DWORD FindGameProcess() const;
     bool FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) const;
+    bool ReadPeHeaders(DWORD& sizeOfImage, DWORD& peTimestamp, DWORD& entryPoint) const;
+    const GameBuildProfile* DetectBuildProfile(DWORD sizeOfImage, DWORD peTimestamp, DWORD entryPoint) const;
     bool FindIdGameSystemLocal(uintptr_t& address) const;
     bool ReadState(std::string& state, bool& safeForRpc, bool& mapEntitySafe);
     void Report(const std::string& state);
@@ -45,6 +57,7 @@ private:
     DWORD processId_;
     uintptr_t moduleBase_;
     DWORD moduleSize_;
+    const GameBuildProfile* activeProfile_;
     uintptr_t idGameSystemLocal_;
     DWORD nextAttachAttempt_;
     bool safeForRpc_;
