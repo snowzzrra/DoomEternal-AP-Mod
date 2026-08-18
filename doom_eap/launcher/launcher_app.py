@@ -20,14 +20,19 @@ def _run_bridge_worker(arguments: list[str]) -> int:
 
 def _run_self_test(arguments: list[str]) -> int:
     """Non-interactive startup and environment self-test for frozen and source launchers."""
+    import json
+    import shutil
     import tempfile
+
+    mode_package_required = "--package" in arguments or "package" in arguments
+    mode_launcher_only = "--launcher-only" in arguments or "launcher" in arguments
 
     print("--> Executing DOOM Eternal Archipelago Launcher self-test...")
 
-    # 1. Verify third-party core packages & certifi CA bundle
+    # 1. Verify third-party core packages & certifi CA bundle in bundle_directory
     try:
-        import ssl
         import certifi
+        import ssl
 
         ca_bundle = Path(certifi.where())
         if not ca_bundle.is_file():
@@ -40,31 +45,42 @@ def _run_self_test(arguments: list[str]) -> int:
         print(f"  [FAIL] SSL / certifi check failed: {e}", file=sys.stderr)
         return 1
 
-    # 2. Check application directory & packaged options schema
+    # 2. Check bundled resource root (sys._MEIPASS in frozen mode, repo root in source mode)
     try:
-        from doom_eap.launcher.launcher_controller import LauncherController, LauncherState, application_directory
+        from doom_eap.launcher.launcher_controller import (
+            LauncherController,
+            LauncherState,
+            application_directory,
+            bundle_directory,
+        )
 
-        app_dir = application_directory()
-        client_dir = app_dir / "client" if (app_dir / "client").is_dir() else app_dir
-        options_schema_path = client_dir / "data" / "options_schema.json"
-
-        if not options_schema_path.is_file():
-            repo_schema = app_dir / "data" / "options_schema.json"
-            if repo_schema.is_file():
-                options_schema_path = repo_schema
-            else:
-                raise RuntimeError(f"options_schema.json not found at {options_schema_path}")
-        print(f"  [OK] options schema located -> {options_schema_path}")
+        bundle_dir = bundle_directory()
+        bundled_schema = bundle_dir / "data" / "options_schema.json"
+        if not bundled_schema.is_file():
+            raise RuntimeError(
+                f"Bundled options_schema.json missing in bundle root: {bundled_schema} "
+                f"(frozen={getattr(sys, 'frozen', False)})"
+            )
+        schema_data = json.loads(bundled_schema.read_text(encoding="utf-8"))
+        if not isinstance(schema_data, dict):
+            raise RuntimeError("Bundled options_schema.json is not a valid JSON object")
+        print(f"  [OK] Bundled options schema verified -> {bundled_schema} ({bundled_schema.stat().st_size} bytes)")
     except Exception as e:
-        print(f"  [FAIL] Application directory / schema resolution failed: {e}", file=sys.stderr)
+        print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
         return 1
 
-    # 3. Instantiate LauncherController in hermetic environment
+    # 3. Instantiate LauncherController in hermetic fixture using BUNDLED resources
     try:
         with tempfile.TemporaryDirectory(prefix="doomeap_selftest_") as tmp_str:
-            fake_user_state = Path(tmp_str) / "user_state"
-            fake_user_config = Path(tmp_str) / "user_config"
-            fake_user_data = Path(tmp_str) / "user_data"
+            tmp_root = Path(tmp_str)
+            fake_app = tmp_root / "application"
+            fake_client_data = fake_app / "client" / "data"
+            fake_client_data.mkdir(parents=True)
+            shutil.copy2(bundled_schema, fake_client_data / "options_schema.json")
+
+            fake_user_state = tmp_root / "user_state"
+            fake_user_config = tmp_root / "user_config"
+            fake_user_data = tmp_root / "user_data"
             fake_user_state.mkdir(parents=True)
             fake_user_config.mkdir(parents=True)
             fake_user_data.mkdir(parents=True)
@@ -80,12 +96,12 @@ def _run_self_test(arguments: list[str]) -> int:
             try:
                 for k, v in env_override.items():
                     os.environ[k] = v
-                controller = LauncherController(application_dir=app_dir)
+                controller = LauncherController(application_dir=fake_app)
                 if controller.state != LauncherState.IDLE:
                     raise RuntimeError(f"Unexpected initial controller state: {controller.state}")
                 if controller.session_start_time <= 0:
                     raise RuntimeError("Invalid session_start_time in controller")
-                print(f"  [OK] LauncherController constructed successfully (state={controller.state.value})")
+                print(f"  [OK] Hermetic LauncherController constructed from bundled resources (state={controller.state.value})")
             finally:
                 for k, v in old_env.items():
                     if v is None:
@@ -96,14 +112,32 @@ def _run_self_test(arguments: list[str]) -> int:
         print(f"  [FAIL] LauncherController instantiation failed: {e}", file=sys.stderr)
         return 1
 
-    # 4. Optional checks if executed from assembled package
-    package_root = app_dir if (app_dir / "RELEASE_MANIFEST.json").is_file() else app_dir.parent
-    if (package_root / "RELEASE_MANIFEST.json").is_file():
-        print("  [OK] Assembled package detected:")
-        if (package_root / "doometernal.apworld").is_file():
-            print("    [OK] doometernal.apworld present")
-        if (package_root / "client" / "resources" / "room_payload_manifest.json").is_file():
-            print("    [OK] room compiler resources present")
+    # 4. Assembled-package validation (if package present or explicitly requested)
+    app_dir = application_directory()
+    is_assembled = (app_dir / "RELEASE_MANIFEST.json").is_file() or (app_dir / "client" / "data" / "options_schema.json").is_file()
+
+    if mode_package_required and not is_assembled:
+        print(f"  [FAIL] Assembled package validation requested, but RELEASE_MANIFEST.json not found in {app_dir}", file=sys.stderr)
+        return 1
+
+    if is_assembled and not mode_launcher_only:
+        print("  --> Validating assembled package layout...")
+        try:
+            client_dir = app_dir / "client" if (app_dir / "client").is_dir() else app_dir
+            pkg_schema = client_dir / "data" / "options_schema.json"
+            if not pkg_schema.is_file():
+                raise RuntimeError(f"Missing external client options schema at {pkg_schema}")
+            print(f"    [OK] Package client options schema -> {pkg_schema}")
+
+            if (app_dir / "doometernal.apworld").is_file():
+                print(f"    [OK] Package APWorld -> {app_dir / 'doometernal.apworld'}")
+            if (client_dir / "resources" / "room_payload_manifest.json").is_file():
+                print(f"    [OK] Package room resources -> {client_dir / 'resources' / 'room_payload_manifest.json'}")
+            if (client_dir / "ap_client.exe").is_file():
+                print(f"    [OK] Package native client -> {client_dir / 'ap_client.exe'}")
+        except Exception as e:
+            print(f"  [FAIL] Assembled package check failed: {e}", file=sys.stderr)
+            return 1
 
     print("\n[OK] Launcher self-test passed successfully.")
     return 0

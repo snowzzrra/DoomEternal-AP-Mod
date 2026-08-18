@@ -2,8 +2,8 @@
 """Preflight verification for launcher and standalone AP client runtime imports.
 
 Verifies path precedence, stub resolution, third-party dependency availability,
-static name correctness, hermetic LauncherController construction, and non-interactive
-launcher self-test execution without starting the UI or modifying user configuration.
+strict Ruff F821/F822/F823 static name correctness, hermetic LauncherController
+construction from bundled resources, and non-interactive launcher self-test execution.
 """
 
 from __future__ import annotations
@@ -30,25 +30,40 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
 
 
 def check_undefined_names(repo_root: Path) -> None:
-    """Run lightweight static undefined-name checks on launcher and release Python code."""
-    print("--> Checking for undefined names (F821/F822/F823)...")
+    """Run strict Ruff static undefined-name checks (F821/F822/F823)."""
+    print("--> Checking for undefined names (F821/F822/F823 via Ruff)...")
     target_dirs = [repo_root / "doom_eap", repo_root / "tools/release"]
     ruff_bin = shutil.which("ruff")
-    if ruff_bin:
-        cmd = [ruff_bin, "check", "--select", "F821,F822,F823", *(str(p) for p in target_dirs)]
-        res = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
-        if res.returncode != 0:
-            raise RuntimeError(f"Undefined name check failed:\n{res.stdout}\n{res.stderr}")
-        print("  [OK] Ruff undefined name verification passed (F821, F822, F823)")
+    if not ruff_bin:
+        # Also try invoking via sys.executable -m ruff
+        res_probe = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True)
+        if res_probe.returncode == 0:
+            cmd = [sys.executable, "-m", "ruff", "check", "--select", "F821,F822,F823", *(str(p) for p in target_dirs)]
+        else:
+            raise RuntimeError(
+                "Ruff static analyzer is required for F821/F822/F823 undefined-name verification; "
+                "install requirements-ci.txt"
+            )
     else:
-        # Fallback Python compilation check
-        for target in target_dirs:
-            for py_file in target.rglob("*.py"):
-                if "__pycache__" in py_file.parts:
-                    continue
-                source = py_file.read_text(encoding="utf-8")
-                compile(source, str(py_file), "exec")
-        print("  [OK] Python syntax compilation verified for runtime and release modules")
+        cmd = [ruff_bin, "check", "--select", "F821,F822,F823", *(str(p) for p in target_dirs)]
+
+    res = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
+    if res.returncode != 0:
+        raise RuntimeError(f"Undefined name check failed:\n{res.stdout}\n{res.stderr}")
+    print("  [OK] Ruff undefined name verification passed (F821, F822, F823)")
+
+
+def check_syntax(repo_root: Path) -> None:
+    """Verify syntax compilation for all runtime and release Python files."""
+    print("--> Checking Python syntax compilation...")
+    target_dirs = [repo_root / "doom_eap", repo_root / "tools/release"]
+    for target in target_dirs:
+        for py_file in target.rglob("*.py"):
+            if "__pycache__" in py_file.parts:
+                continue
+            source = py_file.read_text(encoding="utf-8")
+            compile(source, str(py_file), "exec")
+    print("  [OK] Python syntax compilation verified for runtime and release modules")
 
 
 def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> None:
@@ -63,8 +78,9 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
     if not (ap_source / "CommonClient.py").is_file():
         raise RuntimeError(f"Invalid Archipelago source (missing CommonClient.py): {ap_source}")
 
-    # 0. Static Name Correctness Check
+    # 0. Strict Static Undefined Name & Syntax Checks
     check_undefined_names(root)
+    check_syntax(root)
 
     # Configure sys.path in the exact precedence order used by PyInstaller
     ordered_paths = [str(root), str(standalone_runtime), str(ap_source)]
@@ -237,8 +253,16 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
                     )
                 print(f"  [OK] Frozen bridge identity -> sha256={b_sha[:12]}... revision={b_rev}")
 
-            # 7. Hermetic LauncherController Construction
+            # 7. Hermetic LauncherController Construction from explicit fixture
             print("--> Checking hermetic LauncherController construction...")
+            fixture_app = tmp_dir / "fixture_app"
+            fixture_client_data = fixture_app / "client" / "data"
+            fixture_client_data.mkdir(parents=True, exist_ok=True)
+            schema_source = root / "data" / "options_schema.json"
+            if not schema_source.is_file():
+                raise RuntimeError(f"Canonical schema source missing at {schema_source}")
+            shutil.copy2(schema_source, fixture_client_data / "options_schema.json")
+
             fake_user_state = tmp_dir / "user_state"
             fake_user_config = tmp_dir / "user_config"
             fake_user_data = tmp_dir / "user_data"
@@ -253,18 +277,18 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             os.environ["LOCALAPPDATA"] = str(fake_user_state)
 
             from doom_eap.launcher.launcher_controller import LauncherController, LauncherState
-            controller = LauncherController(application_dir=root)
+            controller = LauncherController(application_dir=fixture_app)
             if controller.state != LauncherState.IDLE:
                 raise RuntimeError(f"LauncherController initial state unexpected: {controller.state}")
             if controller.session_start_time <= 0:
                 raise RuntimeError("LauncherController session_start_time was not initialized")
             print(f"  [OK] LauncherController constructed successfully (state={controller.state.value})")
 
-            # 8. Non-interactive Launcher Self-Test
+            # 8. Non-interactive Launcher Self-Test (Launcher-Only Mode)
             print("--> Checking non-interactive launcher self-test mode...")
-            test_exit_code = launcher_mod.main(["--self-test"])
+            test_exit_code = launcher_mod.main(["--self-test", "--launcher-only"])
             if test_exit_code != 0:
-                raise RuntimeError(f"launcher_app.main(['--self-test']) returned non-zero code {test_exit_code}")
+                raise RuntimeError(f"launcher_app.main(['--self-test', '--launcher-only']) returned non-zero code {test_exit_code}")
             print("  [OK] launcher_app --self-test returned code 0")
 
         finally:

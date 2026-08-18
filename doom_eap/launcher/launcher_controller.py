@@ -41,11 +41,18 @@ from doom_eap.content.options_foundation import load_options_schema, save_player
 
 
 def application_directory() -> Path:
-    """Use distribution directory for frozen launcher resources."""
+    """Use distribution directory for external package resources."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     module_dir = Path(__file__).resolve().parent
     return module_dir if (module_dir / "data").is_dir() else Path(__file__).resolve().parents[2]
+
+
+def bundle_directory() -> Path:
+    """Return root directory for bundled resources (sys._MEIPASS in frozen runtime)."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(getattr(sys, "_MEIPASS")).resolve()
+    return application_directory()
 
 
 class LauncherState(str, Enum):

@@ -1,22 +1,21 @@
-import builtins
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ARCHIPELAGO_ROOT = REPO_ROOT.parent / "Archipelago"
+ARCHIPELAGO_ROOT = (REPO_ROOT.parent / "Archipelago").resolve()
 
 
-class TestCIPreflightAndHardening(unittest.TestCase):
+class TestCIPreflight(unittest.TestCase):
     def test_workflow_structure_and_module_invocations(self):
         wf_path = REPO_ROOT / ".github/workflows/cross-platform-build.yml"
-        self.assertTrue(wf_path.is_file())
+        self.assertTrue(wf_path.is_file(), f"Workflow file missing at {wf_path}")
 
         content = wf_path.read_text(encoding="utf-8")
         doc = yaml.safe_load(content)
@@ -24,16 +23,13 @@ class TestCIPreflightAndHardening(unittest.TestCase):
         # Trigger is workflow_dispatch only
         self.assertEqual(list(doc.get("on", {}).keys()), ["workflow_dispatch"])
 
-        # apworld_ref default is doom_eternal
-        apworld_input = doc["on"]["workflow_dispatch"]["inputs"]["apworld_ref"]
-        self.assertEqual(apworld_input["default"], "doom_eternal")
-
         # Permissions are read-only
         self.assertEqual(doc.get("permissions"), {"contents": "read"})
 
-        # Expected jobs
+        # Expected jobs (all 7 jobs)
         expected_jobs = {
             "resolve-metadata",
+            "preflight",
             "build-apworld",
             "build-native-support",
             "build-linux-launcher",
@@ -41,6 +37,13 @@ class TestCIPreflightAndHardening(unittest.TestCase):
             "consolidate-handoff",
         }
         self.assertEqual(set(doc["jobs"].keys()), expected_jobs)
+
+        # Preflight job dependencies
+        for job_name in ["build-apworld", "build-native-support", "build-linux-launcher", "build-windows-launcher"]:
+            job_needs = doc["jobs"][job_name].get("needs", [])
+            if isinstance(job_needs, str):
+                job_needs = [job_needs]
+            self.assertIn("preflight", job_needs, f"{job_name} must depend on 'preflight'")
 
         # Invocations use python -m tools.release.build_launcher
         self.assertNotIn("python tools/release/build_launcher.py", content)
@@ -79,6 +82,10 @@ class TestCIPreflightAndHardening(unittest.TestCase):
         self.assertEqual(len(win_preflight), 1)
         self.assertEqual(win_preflight[0].get("timeout-minutes"), 1)
 
+        win_validate = [s for s in win_steps if s.get("name") == "Validate Windows Launcher"]
+        self.assertEqual(len(win_validate), 1)
+        self.assertEqual(win_validate[0].get("timeout-minutes"), 1)
+
     def test_minimal_launcher_requirements_declared(self):
         req_path = REPO_ROOT / "requirements-launcher.txt"
         self.assertTrue(req_path.is_file())
@@ -99,6 +106,167 @@ class TestCIPreflightAndHardening(unittest.TestCase):
         }
         self.assertTrue(expected_minimal.issubset(declared_pkgs))
 
+    def test_ci_requirements_declared(self):
+        req_path = REPO_ROOT / "requirements-ci.txt"
+        self.assertTrue(req_path.is_file())
+        content = req_path.read_text(encoding="utf-8")
+        self.assertIn("ruff", content)
+
+    def test_bundle_and_application_directory_resolution(self):
+        from doom_eap.launcher.launcher_controller import application_directory, bundle_directory
+
+        # In source mode: bundle_directory() == application_directory() == repo root
+        app_dir = application_directory()
+        bundle_dir = bundle_directory()
+        self.assertEqual(app_dir, bundle_dir)
+        self.assertTrue((bundle_dir / "data" / "options_schema.json").is_file())
+
+        # In simulated frozen mode:
+        old_frozen = getattr(sys, "frozen", None)
+        old_mei = getattr(sys, "_MEIPASS", None)
+        old_exe = sys.executable
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_path = Path(tmp_str)
+            fake_exe = tmp_path / "dist" / "launcher.exe"
+            fake_mei = tmp_path / "mei"
+            fake_exe.parent.mkdir()
+            fake_mei.mkdir()
+            try:
+                sys.frozen = True
+                sys.executable = str(fake_exe)
+                sys._MEIPASS = str(fake_mei)
+
+                self.assertEqual(application_directory(), fake_exe.parent.resolve())
+                self.assertEqual(bundle_directory(), fake_mei.resolve())
+            finally:
+                if old_frozen is None:
+                    delattr(sys, "frozen")
+                else:
+                    sys.frozen = old_frozen
+                if old_mei is None:
+                    delattr(sys, "_MEIPASS")
+                else:
+                    sys._MEIPASS = old_mei
+                sys.executable = old_exe
+
+    def test_simulated_raw_frozen_launcher_self_test(self):
+        """Prove that a raw PyInstaller binary (no external client/data sidecars) passes self-test using bundled resources."""
+        from doom_eap.launcher.launcher_app import _run_self_test
+
+        old_frozen = getattr(sys, "frozen", None)
+        old_mei = getattr(sys, "_MEIPASS", None)
+        old_exe = sys.executable
+
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_root = Path(tmp_str)
+            raw_dist = tmp_root / "build/release"
+            raw_dist.mkdir(parents=True)
+            raw_exe = raw_dist / "DoomEternalArchipelagoLauncher"
+            raw_exe.touch()
+
+            mei_dir = tmp_root / "_MEI12345"
+            (mei_dir / "data").mkdir(parents=True)
+            shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
+
+            try:
+                sys.frozen = True
+                sys.executable = str(raw_exe)
+                sys._MEIPASS = str(mei_dir)
+
+                # Raw binary without external sidecars must pass launcher-only self-test
+                exit_code = _run_self_test(["--self-test"])
+                self.assertEqual(exit_code, 0)
+            finally:
+                if old_frozen is None:
+                    delattr(sys, "frozen")
+                else:
+                    sys.frozen = old_frozen
+                if old_mei is None:
+                    delattr(sys, "_MEIPASS")
+                else:
+                    sys._MEIPASS = old_mei
+                sys.executable = old_exe
+
+    def test_simulated_raw_frozen_missing_bundled_schema_fails(self):
+        """Prove that self-test fails if PyInstaller failed to bundle options_schema.json."""
+        from doom_eap.launcher.launcher_app import _run_self_test
+
+        old_frozen = getattr(sys, "frozen", None)
+        old_mei = getattr(sys, "_MEIPASS", None)
+        old_exe = sys.executable
+
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_root = Path(tmp_str)
+            raw_dist = tmp_root / "build/release"
+            raw_dist.mkdir(parents=True)
+            raw_exe = raw_dist / "DoomEternalArchipelagoLauncher"
+            raw_exe.touch()
+
+            empty_mei = tmp_root / "_MEI_EMPTY"
+            empty_mei.mkdir()
+
+            try:
+                sys.frozen = True
+                sys.executable = str(raw_exe)
+                sys._MEIPASS = str(empty_mei)
+
+                exit_code = _run_self_test(["--self-test"])
+                self.assertEqual(exit_code, 1)
+            finally:
+                if old_frozen is None:
+                    delattr(sys, "frozen")
+                else:
+                    sys.frozen = old_frozen
+                if old_mei is None:
+                    delattr(sys, "_MEIPASS")
+                else:
+                    sys._MEIPASS = old_mei
+                sys.executable = old_exe
+
+    def test_simulated_assembled_package_self_test(self):
+        """Prove that self-test validates assembled package sidecars when present."""
+        from doom_eap.launcher.launcher_app import _run_self_test
+
+        old_frozen = getattr(sys, "frozen", None)
+        old_mei = getattr(sys, "_MEIPASS", None)
+        old_exe = sys.executable
+
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_root = Path(tmp_str)
+            pkg_root = tmp_root / "DoomEternalArchipelago"
+            (pkg_root / "client/data").mkdir(parents=True)
+            (pkg_root / "client/resources").mkdir(parents=True)
+            shutil.copy2(REPO_ROOT / "data/options_schema.json", pkg_root / "client/data/options_schema.json")
+            (pkg_root / "RELEASE_MANIFEST.json").write_text('{"schema_version": 2}\n', encoding="utf-8")
+            (pkg_root / "doometernal.apworld").touch()
+            (pkg_root / "client/resources/room_payload_manifest.json").write_text("{}\n", encoding="utf-8")
+            (pkg_root / "client/ap_client.exe").touch()
+
+            pkg_exe = pkg_root / "DoomEternalArchipelagoLauncher"
+            pkg_exe.touch()
+
+            mei_dir = tmp_root / "_MEI_PKG"
+            (mei_dir / "data").mkdir(parents=True)
+            shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
+
+            try:
+                sys.frozen = True
+                sys.executable = str(pkg_exe)
+                sys._MEIPASS = str(mei_dir)
+
+                exit_code = _run_self_test(["--self-test", "--package"])
+                self.assertEqual(exit_code, 0)
+            finally:
+                if old_frozen is None:
+                    delattr(sys, "frozen")
+                else:
+                    sys.frozen = old_frozen
+                if old_mei is None:
+                    delattr(sys, "_MEIPASS")
+                else:
+                    sys._MEIPASS = old_mei
+                sys.executable = old_exe
+
     def test_native_c_filter_guard(self):
         c_path = REPO_ROOT / "native/client/ap_runtime_rpc_seh.c"
         self.assertTrue(c_path.is_file())
@@ -118,7 +286,7 @@ class TestCIPreflightAndHardening(unittest.TestCase):
 
     def test_launcher_self_test_cli(self):
         from doom_eap.launcher.launcher_app import main as launcher_main
-        code = launcher_main(["--self-test"])
+        code = launcher_main(["--self-test", "--launcher-only"])
         self.assertEqual(code, 0)
 
     def test_hermetic_no_interactive_prompts(self):

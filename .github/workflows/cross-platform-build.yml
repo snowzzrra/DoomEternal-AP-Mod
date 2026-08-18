@@ -61,9 +61,52 @@ jobs:
           echo "APWorld Ref: ${{ inputs.apworld_ref }} -> $APWORLD_SHA"
           echo "Version: ${{ inputs.version_label }}"
 
+  preflight:
+    name: Preflight & Static Analysis
+    needs: resolve-metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MOD repository
+        uses: actions/checkout@v4
+        with:
+          repository: snowzzrra/DoomEternal-AP-Mod
+          ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
+
+      - name: Checkout APWorld repository
+        uses: actions/checkout@v4
+        with:
+          repository: snowzzrra/DoomEternal-AP-World
+          ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
+          path: Archipelago
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-launcher.txt
+          python -m pip install -r requirements-ci.txt
+
+      - name: Static Undefined Name Check (F821/F822/F823)
+        run: |
+          python -m ruff check --select F821,F822,F823 doom_eap tools/release
+
+      - name: Standalone Runtime Import Preflight
+        timeout-minutes: 1
+        run: |
+          python -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
+
+      - name: Aggregate CI Preflight
+        run: |
+          python -m tools.release.ci_preflight --archipelago-source Archipelago --repo-root .
+
   build-apworld:
     name: Package APWorld
-    needs: resolve-metadata
+    needs: [resolve-metadata, preflight]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout APWorld repository
@@ -87,7 +130,7 @@ jobs:
 
           world_dir = Path("worlds/doometernal")
           if not (world_dir / "__init__.py").is_file():
-              raise RuntimeError(f"worlds/doometernal/__init__.py not found in {Path.cwd()}")
+            raise RuntimeError(f"worlds/doometernal/__init__.py not found in {Path.cwd()}")
 
           out_dir = Path("build/artifacts")
           out_dir.mkdir(parents=True, exist_ok=True)
@@ -96,21 +139,21 @@ jobs:
           forbidden = {".git", "__pycache__", ".pytest_cache", ".serena", "test", "tests", ".cache"}
           files_to_add = []
           for root, dirs, files in os.walk(world_dir):
-              dirs[:] = sorted([d for d in dirs if d not in forbidden])
-              for f in sorted(files):
-                  if f.endswith((".pyc", ".pyo")) or f.startswith("."):
-                      continue
-                  full_path = Path(root) / f
-                  rel_path = full_path.relative_to(world_dir.parent).as_posix()
-                  files_to_add.append((rel_path, full_path))
+            dirs[:] = sorted([d for d in dirs if d not in forbidden])
+            for f in sorted(files):
+              if f.endswith((".pyc", ".pyo")) or f.startswith("."):
+                continue
+              full_path = Path(root) / f
+              rel_path = full_path.relative_to(world_dir.parent).as_posix()
+              files_to_add.append((rel_path, full_path))
 
           with zipfile.ZipFile(out_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-              for arcname, full_path in files_to_add:
-                  zinfo = zipfile.ZipInfo(arcname)
-                  zinfo.date_time = (2026, 1, 1, 0, 0, 0)
-                  zinfo.external_attr = (0o644 | stat.S_IFREG) << 16
-                  zinfo.compress_type = zipfile.ZIP_DEFLATED
-                  zf.writestr(zinfo, full_path.read_bytes())
+            for arcname, full_path in files_to_add:
+              zinfo = zipfile.ZipInfo(arcname)
+              zinfo.date_time = (2026, 1, 1, 0, 0, 0)
+              zinfo.external_attr = (0o644 | stat.S_IFREG) << 16
+              zinfo.compress_type = zipfile.ZIP_DEFLATED
+              zf.writestr(zinfo, full_path.read_bytes())
 
           print(f"APWorld created: {out_zip} ({out_zip.stat().st_size} bytes, {len(files_to_add)} files)")
           PY
@@ -124,7 +167,7 @@ jobs:
 
   build-native-support:
     name: Build Native Client (x86_64-w64-mingw32)
-    needs: resolve-metadata
+    needs: [resolve-metadata, preflight]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
@@ -188,7 +231,7 @@ jobs:
 
   build-linux-launcher:
     name: Build Linux Standalone Launcher
-    needs: resolve-metadata
+    needs: [resolve-metadata, preflight]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
@@ -251,7 +294,7 @@ jobs:
 
   build-windows-launcher:
     name: Build Windows Standalone Launcher
-    needs: resolve-metadata
+    needs: [resolve-metadata, preflight]
     runs-on: windows-latest
     steps:
       - name: Checkout MOD repository
@@ -293,6 +336,7 @@ jobs:
 
       - name: Validate Windows Launcher
         shell: bash
+        timeout-minutes: 1
         run: |
           test -f build/release/DoomEternalArchipelagoLauncher.exe
           test "$(dd if=build/release/DoomEternalArchipelagoLauncher.exe bs=2 count=1 2>/dev/null)" = "MZ"
@@ -365,34 +409,34 @@ jobs:
           ap_client = handoff_dir / "shared/client/ap_client.exe"
 
           for f in [lin_launcher, win_launcher, apworld, ap_client]:
-              if not f.is_file():
-                  raise RuntimeError(f"Missing required handoff file: {f}")
+            if not f.is_file():
+              raise RuntimeError(f"Missing required handoff file: {f}")
 
           def sha256(p: Path) -> str:
-              h = hashlib.sha256()
-              with p.open("rb") as fp:
-                  while chunk := fp.read(65536):
-                      h.update(chunk)
-              return h.hexdigest()
+            h = hashlib.sha256()
+            with p.open("rb") as fp:
+              while chunk := fp.read(65536):
+                h.update(chunk)
+            return h.hexdigest()
 
           files_record = []
           sums_lines = []
           for root, _, files in os.walk(handoff_dir):
-              for f in sorted(files):
-                  if f in {"BUILD-MANIFEST.json", "SHA256SUMS.txt"}:
-                      continue
-                  p = Path(root) / f
-                  rel = p.relative_to(handoff_dir).as_posix()
-                  digest = sha256(p)
-                  size = p.stat().st_size
-                  role = "launcher" if "Launcher" in f else ("apworld" if f.endswith(".apworld") else "native-client")
-                  files_record.append({
-                      "path": rel,
-                      "sha256": digest,
-                      "size": size,
-                      "role": role,
-                  })
-                  sums_lines.append(f"{digest}  {rel}")
+            for f in sorted(files):
+              if f in {"BUILD-MANIFEST.json", "SHA256SUMS.txt"}:
+                continue
+              p = Path(root) / f
+              rel = p.relative_to(handoff_dir).as_posix()
+              digest = sha256(p)
+              size = p.stat().st_size
+              role = "launcher" if "Launcher" in f else ("apworld" if f.endswith(".apworld") else "native-client")
+              files_record.append({
+                  "path": rel,
+                  "sha256": digest,
+                  "size": size,
+                  "role": role,
+              })
+              sums_lines.append(f"{digest}  {rel}")
 
           manifest = {
               "schema_version": 1,
