@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .launcher_platform import (
+    PrerequisiteStatus,
     detect_doom_processes,
     probe_meathook,
     redact_secrets,
@@ -28,14 +29,14 @@ class Diagnostic:
     key: str
     status: str
     message: str
-    details: dict[str, object] | None = None
+    details: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
 class RepairAction:
     """Small, previewable repair limited to launcher-owned state."""
 
-    key: str
+    action_id: str
     title: str
     changes: tuple[str, ...]
     requires_confirmation: bool = False
@@ -49,7 +50,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid", "missing"} for item in self.diagnostics)
+        return all(item.status not in {"error", "invalid", "missing", "incompatible"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {"version": self.version, "ok": self.ok, "diagnostics": [asdict(item) for item in self.diagnostics]}
@@ -310,23 +311,49 @@ class LauncherDoctor:
 
     def repair_actions(self) -> tuple[RepairAction, ...]:
         """Offer actions only when launcher receipt proves ownership."""
+        actions: list[RepairAction] = []
+        game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+        if game_root:
+            try:
+                root = validate_game_root(Path(str(game_root)))
+                meathook_probe = probe_meathook(root)
+                if meathook_probe.status == PrerequisiteStatus.MISSING:
+                    actions.append(RepairAction(
+                        "install_game_link", "Install verified Game Link runtime",
+                        ("Download official Meathook v7.2 and install to DOOM Eternal folder",),
+                        False,
+                        "Downloads verified XINPUT1_3.dll from GitHub release.",
+                    ))
+                elif meathook_probe.status in {PrerequisiteStatus.INCOMPATIBLE, PrerequisiteStatus.INVALID}:
+                    actions.append(RepairAction(
+                        "repair_game_link", "Repair Game Link runtime",
+                        (
+                            "Back up existing XINPUT1_3.dll to repair-backups",
+                            "Install verified Meathook v7.2 runtime library",
+                        ),
+                        True,
+                        "Backs up foreign/unverified XINPUT1_3.dll before replacing.",
+                    ))
+            except Exception:
+                pass
+
         state_dir = self._state_dir()
         if state_dir is None:
-            return ()
+            return tuple(actions)
         receipt_path = state_dir / "launcher_setup.json"
         if not receipt_path.is_file():
-            return (RepairAction(
+            actions.append(RepairAction(
                 "reinstall_room_mod", "Install room mod",
                 ("Build and install mod for connected room.",), True,
                 "Installer keeps file backups and verifies installed hash.",
-            ),)
+            ))
+            return tuple(actions)
         try:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             if not isinstance(receipt, dict):
                 raise ValueError("record must be an object")
             staged = Path(str(receipt["staged_mod"])).resolve()
             digest = str(receipt["staged_sha256"])
-            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
             root = Path(str(game_root)).expanduser().resolve()
             if root.name.casefold() == "base":
                 root = root.parent
@@ -334,25 +361,28 @@ class LauncherDoctor:
             if not owned_location:
                 raise ValueError("recorded package is outside configured Mods folder")
             if not staged.is_file():
-                return (RepairAction(
+                actions.append(RepairAction(
                     "reinstall_room_mod", "Reinstall missing room mod",
                     (f"Create launcher-owned package: {staged.name}",), True,
                     "Installer keeps file backups and verifies installed hash.",
-                ),)
+                ))
+                return tuple(actions)
             actual = hashlib.sha256(staged.read_bytes()).hexdigest()
             if actual != digest:
-                return (RepairAction(
+                actions.append(RepairAction(
                     "reinstall_room_mod", "Reinstall changed room mod",
                     (f"Replace launcher-owned package: {staged.name}", f"SHA-256: {actual} → {digest}"), True,
                     "Installer keeps file backups and verifies installed hash.",
-                ),)
+                ))
+                return tuple(actions)
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
-            return (RepairAction(
+            actions.append(RepairAction(
                 "archive_stale_install_record", "Archive stale install record",
                 (f"Move launcher record to repair backup: {receipt_path.name}",), False,
                 f"Restore {receipt_path.name} from repair backup. ({error})",
-            ),)
-        return ()
+            ))
+            return tuple(actions)
+        return tuple(actions)
 
     def repair_preview(self) -> tuple[RepairAction, ...]:
         return self.repair_actions()

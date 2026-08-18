@@ -9,13 +9,13 @@ or external modding tools.
 Game and runtime prerequisites:
 
 - DOOM Eternal (Steam installation);
-- [Meathook](https://github.com/flavorfulGecko5/Meathook) (`XINPUT1_3.dll` placed in the DOOM Eternal installation root directory);
+- [Meathook](https://github.com/brongo/m3337ho0o0ok) v7.2 (`XINPUT1_3.dll` in the DOOM Eternal installation root directory, acquired and verified automatically by the launcher);
 - `doometernal.apworld`;
 - `DoomEternalArchipelagoLauncher` on Linux or
   `DoomEternalArchipelagoLauncher.exe` on Windows;
 - the bundled `client/` support runtime and verified mod templates.
 
-Use one supported external installer:
+Supported external mod injectors:
 
 - **Windows:** [EternalModManager](https://github.com/brunoanc/EternalModManager)
   4.2.3;
@@ -23,9 +23,8 @@ Use one supported external installer:
   [EternalModInjectorShell](https://github.com/leveste/EternalBasher)
   6.66-rev3.12.
 
-Launcher requests consent before acquiring pinned dependencies and verifies
-SHA-256. An official verified artifact may be supplied instead. Do not run an
-artifact after verification failure.
+Launcher requests consent before acquiring pinned dependencies (Meathook v7.2 and the platform mod injector) and verifies
+SHA-256 before installation. An official verified artifact may be supplied instead.
 
 ## Install APWorld
 
@@ -79,11 +78,12 @@ from the server.
 After room connection reports that setup is required, select the explicit
 **Prepare and install** action. Launcher then:
 
-1. validates room identity and options;
-2. builds the room-specific mod package;
-3. stages the package in DOOM Eternal's mod directory;
-4. invokes the platform external tool;
-5. reports installation state and any manual action required.
+1. acquires, verifies, and installs the verified Meathook v7.2 Game Link runtime;
+2. validates room identity and options;
+3. builds the room-specific mod package;
+4. stages the package in DOOM Eternal's mod directory;
+5. invokes the platform external tool;
+6. reports installation state and any manual action required.
 
 Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
 explicitly through Steam after setup.
@@ -176,6 +176,7 @@ before sharing.
 
 ## Troubleshooting
 
+- **Game Link / Meathook missing or incompatible:** launcher automatically downloads and verifies the official Meathook v7.2 runtime library. For manual setup, download `XINPUT1_3.dll` from the official Meathook v7.2 release and place it in the DOOM Eternal root directory.
 - **Client runtime not found:** keep bundled client files with release launcher.
 - **Room package mismatch:** run explicit Prepare and install for current room;
   do not reuse another room's package.

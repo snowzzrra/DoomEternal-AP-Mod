@@ -684,7 +684,8 @@ class LauncherUI(QMainWindow):
             "update_required": ("UPDATE MOD", "This room needs its matching mod before playing.", "UPDATE MOD", True, "ACTION NEEDED"),
             "installing": ("INSTALLING MOD", "Preparing this room for play.", "INSTALLING...", False, "WORKING"),
             "updating": ("UPDATING MOD", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
-            "game_link_needed": ("GAME LINK SETUP NEEDED", "Meathook (XINPUT1_3.dll) is not installed in your DOOM Eternal folder. Install Meathook before playing.", "CHECK SETUP", True, "ACTION NEEDED"),
+            "game_link_needed": ("GAME LINK SETUP NEEDED", "Installs the verified Meathook v7.2 runtime required by DOOM Eternal Archipelago.", "SET UP GAME LINK", True, "ACTION NEEDED"),
+            "game_link_update_needed": ("GAME LINK UPDATE NEEDED", "A different XINPUT1_3.dll is installed. DOOM Eternal Archipelago requires the verified Meathook v7.2 runtime.", "REPAIR GAME LINK", True, "ACTION NEEDED"),
             "ready": ("READY TO PLAY", "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.", "", False, "READY"),
             "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
         }
@@ -708,7 +709,25 @@ class LauncherUI(QMainWindow):
         elif self._setup_state == "failed":
             self._prepare(force=True)
         elif self._setup_state == "game_link_needed":
-            self._show_page(4)
+            self._prepare(force=True)
+        elif self._setup_state == "game_link_update_needed":
+            confirm = QMessageBox.question(
+                self,
+                "Repair Game Link",
+                "A different XINPUT1_3.dll is installed in your DOOM Eternal folder.\n\n"
+                "Repair Game Link will back up the existing XINPUT1_3.dll to the launcher state folder "
+                "and replace it with the verified Meathook v7.2 runtime.\n\n"
+                "Do you want to proceed with repair?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if confirm == QMessageBox.StandardButton.Yes:
+                try:
+                    self.controller.install_game_link(force_repair=True)
+                    self._prepare(force=True)
+                except Exception as error:
+                    self._append_log(f"Game Link repair error: {error}")
+                    self._set_setup_state("failed", f"Game Link repair failed: {error}")
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -842,23 +861,23 @@ class LauncherUI(QMainWindow):
         self._resolved_consent_requests.add(request_id)
         name = str(event.get("name") or "Required dependency")
         version = str(event.get("version") or "unspecified version")
+        purpose = str(event.get("purpose") or ("Game Link runtime" if name == "Meathook" else "Mod installation"))
+        source = str(event.get("source") or ("GitHub / brongo" if name == "Meathook" else "GitHub"))
         details = [
-            f"{name} ({version}) is required to finish room setup.",
+            f"{name} ({version}) is required: {purpose}.",
+            f"Source: {source}",
             "This download is verified against its published SHA-256 before use.",
-            "Review source and checksum before accepting.",
         ]
-        if event.get("url"):
-            details.append(f"Source: {event['url']}")
         if event.get("sha256"):
             details.append(f"SHA-256: {event['sha256']}")
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Dependency download approval")
         dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText("Room setup needs your approval")
+        dialog.setText(f"Approve {name} download")
         dialog.setInformativeText("\n\n".join(details))
         accept = dialog.addButton("Download and verify", QMessageBox.ButtonRole.AcceptRole)
-        dialog.addButton("Cancel setup", QMessageBox.ButtonRole.RejectRole)
+        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         accepted = False
         try:
             dialog.exec()
@@ -868,7 +887,7 @@ class LauncherUI(QMainWindow):
         finally:
             self.controller.resolve_consent(request_id, accepted)
         if not accepted:
-            self._set_setup_state("failed", "Dependency download declined. Retry setup when ready.")
+            self._set_setup_state("failed", f"{name} download declined. Retry setup when ready.")
 
     def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit) -> None:
         layout.addWidget(self._label(label, "eyebrow"), row, 0)
@@ -1158,16 +1177,20 @@ class LauncherUI(QMainWindow):
         game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
         root = Path(str(game_root)).expanduser().resolve() if game_root else None
         meathook = probe_meathook(root)
-        if self._setup_state == "game_link_needed":
+        if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
             if meathook.ok:
                 self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._set_setup_state("ready")
             else:
                 self._set_status("rpc", "needs setup", self.COLORS["warn"])
+                target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                if self._setup_state != target_state:
+                    self._set_setup_state(target_state, meathook.message)
                 return
         elif self._setup_state == "ready" and not meathook.ok:
             self._set_status("rpc", "needs setup", self.COLORS["warn"])
-            self._set_setup_state("game_link_needed", meathook.message)
+            target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+            self._set_setup_state(target_state, meathook.message)
             return
 
         try:
@@ -1209,6 +1232,7 @@ class LauncherUI(QMainWindow):
             "item": ("ITEM RECEIVED", self.COLORS["good"]), "location": ("CHECK COMPLETE", self.COLORS["ap"]),
             "deathlink": ("DEATHLINK", self.COLORS["warn"]),
             "archipelago": ("ARCHIPELAGO", self.COLORS["doom_hot"]),
+            "game_link_installed": ("GAME LINK", self.COLORS["good"]),
         }
         segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
         fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Status", "state"), ("Reason", "reason"), ("Message", "message"))
@@ -1278,6 +1302,9 @@ class LauncherUI(QMainWindow):
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True; self._set_connection_controls(False)
             self._set_status("room", "connecting", self.COLORS["ap"])
+        elif kind == "game_link_installed":
+            self._set_status("rpc", "waiting", self.COLORS["ap"])
+            self._append_log(f"Game Link runtime verified and installed: {event.get('path')}")
         elif kind == "room_install_state":
             option = str(event.get("steam_launch_option", ""))
             if option:
@@ -1290,7 +1317,11 @@ class LauncherUI(QMainWindow):
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    self._set_setup_state("game_link_needed", readiness_reason)
+                    game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
+                    root = Path(str(game_root)).expanduser().resolve() if game_root else None
+                    meathook = probe_meathook(root)
+                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    self._set_setup_state(target_state, readiness_reason)
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                     self._show_page(2)
@@ -1324,7 +1355,8 @@ class LauncherUI(QMainWindow):
                 if not meathook.ok:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    self._set_setup_state("game_link_needed", meathook.message)
+                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    self._set_setup_state(target_state, meathook.message)
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                     self._show_page(2)

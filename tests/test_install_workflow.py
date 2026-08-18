@@ -1,8 +1,10 @@
 import hashlib
+import io
 import json
 import os
 import shutil
 import ssl
+import tarfile
 import tempfile
 import time
 import unittest
@@ -12,7 +14,13 @@ from unittest.mock import MagicMock, patch
 
 import certifi
 
-from doom_eap.launcher.launcher_core import LaunchWorkflow, ModCompiler, RoomSnapshot, release_identity
+from doom_eap.launcher.launcher_core import (
+    LaunchWorkflow,
+    ModCompiler,
+    RoomCompiler,
+    RoomSnapshot,
+    release_identity,
+)
 from doom_eap.launcher.launcher_doctor import (
     Diagnostic,
     DoctorReport,
@@ -27,6 +35,7 @@ from doom_eap.launcher.launcher_platform import (
     PrerequisiteStatus,
     UrlDownloadTransport,
     create_secure_ssl_context,
+    install_meathook,
     probe_meathook,
     probe_runtime_prerequisites,
 )
@@ -141,6 +150,40 @@ class TestDependencyAcquisition(unittest.TestCase):
                 manager.acquire(bad_spec, consent=lambda _s: True, local_artifact=archive)
             self.assertIn("SHA-256 mismatch", str(ctx.exception))
 
+    def test_dependency_manager_direct_file_support(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            root = Path(tmp_str) / "deps"
+            file_artifact = Path(tmp_str) / "sample.dll"
+            file_content = b"sample_dll_bytes_12345"
+            file_artifact.write_bytes(file_content)
+            file_sha = hashlib.sha256(file_content).hexdigest()
+
+            spec = DependencySpec(
+                name="DirectFileTool",
+                version="2.0",
+                url="https://example.com/sample.dll",
+                sha256=file_sha,
+                executable_glob="sample.dll",
+                archive_type="file",
+            )
+
+            manager = DependencyManager(root)
+            installed = manager.acquire(spec, consent=lambda _s: True, local_artifact=file_artifact)
+            self.assertEqual(installed.name, "DirectFileTool")
+            self.assertEqual(installed.version, "2.0")
+            self.assertEqual(installed.artifact_sha256, file_sha)
+            self.assertTrue(Path(installed.executable).is_file())
+            self.assertEqual(Path(installed.executable).read_bytes(), file_content)
+
+            # Idempotent re-acquisition from cache
+            reinstalled = manager.acquire(spec, consent=lambda _s: False)
+            self.assertEqual(reinstalled.executable, installed.executable)
+
+            # Corrupted cache entry rejection
+            Path(installed.executable).write_bytes(b"corrupted_bytes")
+            with self.assertRaises(PermissionError):
+                manager.acquire(spec, consent=lambda _s: False)
+
 
 class TestSupportLogFreshnessAndFailureSurfacing(unittest.TestCase):
     def test_log_freshness_classification(self):
@@ -196,13 +239,14 @@ class TestSupportLogFreshnessAndFailureSurfacing(unittest.TestCase):
 
 
 class TestMeathookPrerequisiteGate(unittest.TestCase):
-    def _create_mock_game_root(self, path: Path, with_meathook: bool = False, meathook_bytes: bytes = b"valid_dll_content") -> Path:
+    def _create_mock_game_root(self, path: Path, with_meathook: bool = False, meathook_bytes: bytes | None = None) -> Path:
         path.mkdir(parents=True, exist_ok=True)
         (path / "DOOMEternalx64vk.exe").write_bytes(b"exe")
         (path / "base").mkdir(parents=True, exist_ok=True)
         (path / "Mods").mkdir(parents=True, exist_ok=True)
         if with_meathook:
-            (path / "XINPUT1_3.dll").write_bytes(meathook_bytes)
+            bytes_to_write = meathook_bytes if meathook_bytes is not None else b"mock_meathook_bytes"
+            (path / "XINPUT1_3.dll").write_bytes(bytes_to_write)
         return path
 
     def _create_mock_room_resources(self, client_dir: Path) -> None:
@@ -212,6 +256,10 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
             zf.writestr("base.txt", "base")
         with zipfile.ZipFile(resources / "room_payloads.zip", "w") as zf:
             zf.writestr("payload.txt", "payload")
+        (resources / "room_payload_manifest.json").write_text(
+            json.dumps({"schema_version": 1, "payload_format": "zip", "maps": {}}),
+            encoding="utf-8",
+        )
         (client_dir / "bridge_client.py").write_text("# bridge client stub\n", encoding="utf-8")
         data_dir = client_dir / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -224,24 +272,34 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_str:
             root = Path(tmp_str)
-            # Missing XINPUT1_3.dll
-            check = probe_meathook(root)
-            self.assertEqual(check.status, PrerequisiteStatus.MISSING)
-            self.assertFalse(check.ok)
+            # 1. Missing XINPUT1_3.dll
+            check_missing = probe_meathook(root)
+            self.assertEqual(check_missing.status, PrerequisiteStatus.MISSING)
+            self.assertFalse(check_missing.ok)
 
-            # 0-byte XINPUT1_3.dll
+            # 2. 0-byte XINPUT1_3.dll
             dll = root / "XINPUT1_3.dll"
             dll.write_bytes(b"")
             check_empty = probe_meathook(root)
             self.assertEqual(check_empty.status, PrerequisiteStatus.INVALID)
             self.assertFalse(check_empty.ok)
 
-            # Valid XINPUT1_3.dll
-            dll.write_bytes(b"pe_header_meathook_library_data")
-            check_valid = probe_meathook(root)
-            self.assertEqual(check_valid.status, PrerequisiteStatus.OK)
-            self.assertTrue(check_valid.ok)
-            self.assertEqual(check_valid.details["status"], "present_unverified")
+            # 3. Different hash XINPUT1_3.dll -> INCOMPATIBLE
+            dll.write_bytes(b"random_other_xinput_content")
+            check_incompatible = probe_meathook(root)
+            self.assertEqual(check_incompatible.status, PrerequisiteStatus.INCOMPATIBLE)
+            self.assertFalse(check_incompatible.ok)
+            self.assertEqual(check_incompatible.details["status"], "incompatible")
+
+            # 4. Verified official hash Meathook v7.2 -> OK
+            mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", hashlib.sha256(b"mock_v72_dll").hexdigest(), "XINPUT1_3.dll", "file")
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec):
+                dll.write_bytes(b"mock_v72_dll")
+                check_valid = probe_meathook(root)
+                self.assertEqual(check_valid.status, PrerequisiteStatus.OK)
+                self.assertTrue(check_valid.ok)
+                self.assertEqual(check_valid.details["status"], "compatible")
+                self.assertEqual(check_valid.details["identity"], "verified")
 
     def test_probe_runtime_prerequisites_gate(self):
         with tempfile.TemporaryDirectory() as tmp_str:
@@ -254,13 +312,178 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
             self.assertFalse(prereqs.ok)
             self.assertEqual(prereqs.meathook.status, PrerequisiteStatus.MISSING)
 
-            # Add Meathook -> ok
-            (game_root / "XINPUT1_3.dll").write_bytes(b"meathook_data")
-            prereqs_ok = probe_runtime_prerequisites(game_root, app_dir)
-            self.assertTrue(prereqs_ok.ok)
-            self.assertEqual(prereqs_ok.meathook.status, PrerequisiteStatus.OK)
+            # Incompatible Meathook -> not ok
+            (game_root / "XINPUT1_3.dll").write_bytes(b"incompatible_dll")
+            prereqs_bad = probe_runtime_prerequisites(game_root, app_dir)
+            self.assertFalse(prereqs_bad.ok)
+            self.assertEqual(prereqs_bad.meathook.status, PrerequisiteStatus.INCOMPATIBLE)
 
-    def test_execute_fails_closed_without_meathook_and_causes_zero_mutation(self):
+            # Verified Meathook -> ok
+            mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", hashlib.sha256(b"official_dll").hexdigest(), "XINPUT1_3.dll", "file")
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec):
+                (game_root / "XINPUT1_3.dll").write_bytes(b"official_dll")
+                prereqs_ok = probe_runtime_prerequisites(game_root, app_dir)
+                self.assertTrue(prereqs_ok.ok)
+                self.assertEqual(prereqs_ok.meathook.status, PrerequisiteStatus.OK)
+
+    def test_install_meathook_lifecycle_and_repair_backup(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            base = Path(tmp_str)
+            game_root = self._create_mock_game_root(base / "doom", with_meathook=False)
+            state_dir = base / "state"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            dep_manager = DependencyManager(state_dir / "dependencies")
+
+            fake_v72_bytes = b"verified_meathook_v72_binary_payload"
+            fake_v72_sha = hashlib.sha256(fake_v72_bytes).hexdigest()
+            local_meathook_artifact = base / "official_XINPUT1_3.dll"
+            local_meathook_artifact.write_bytes(fake_v72_bytes)
+
+            mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", fake_v72_sha, "XINPUT1_3.dll", "file")
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec):
+                # 1. Missing -> Install
+                result_install = install_meathook(
+                    game_root,
+                    dep_manager,
+                    state_dir=state_dir,
+                    consent=lambda _s: True,
+                    local_artifact=local_meathook_artifact,
+                )
+                self.assertEqual(result_install.state, "installed")
+                self.assertEqual(result_install.ownership, "launcher_installed")
+                self.assertEqual(result_install.sha256, fake_v72_sha)
+                self.assertTrue((game_root / "XINPUT1_3.dll").is_file())
+                self.assertEqual((game_root / "XINPUT1_3.dll").read_bytes(), fake_v72_bytes)
+
+                # 2. Matching -> Idempotent verified no-op
+                mtime_before = (game_root / "XINPUT1_3.dll").stat().st_mtime_ns
+                result_verified = install_meathook(
+                    game_root,
+                    dep_manager,
+                    state_dir=state_dir,
+                    consent=lambda _s: False,
+                )
+                self.assertEqual(result_verified.state, "verified")
+                self.assertEqual(result_verified.ownership, "preexisting_verified")
+                self.assertEqual((game_root / "XINPUT1_3.dll").stat().st_mtime_ns, mtime_before)
+
+                # 3. Foreign / Incompatible DLL -> needs_repair without force_repair
+                (game_root / "XINPUT1_3.dll").write_bytes(b"foreign_old_mod_dll")
+                foreign_sha = hashlib.sha256(b"foreign_old_mod_dll").hexdigest()
+                result_check = install_meathook(
+                    game_root,
+                    dep_manager,
+                    state_dir=state_dir,
+                    consent=lambda _s: False,
+                    force_repair=False,
+                )
+                self.assertEqual(result_check.state, "needs_repair")
+                self.assertEqual(result_check.ownership, "unverified_foreign")
+                self.assertEqual(result_check.sha256, foreign_sha)
+                # Unchanged
+                self.assertEqual((game_root / "XINPUT1_3.dll").read_bytes(), b"foreign_old_mod_dll")
+
+                # 4. Force repair -> Back up foreign DLL and replace with verified v7.2
+                result_repair = install_meathook(
+                    game_root,
+                    dep_manager,
+                    state_dir=state_dir,
+                    consent=lambda _s: True,
+                    local_artifact=local_meathook_artifact,
+                    force_repair=True,
+                )
+                self.assertEqual(result_repair.state, "repaired")
+                self.assertEqual(result_repair.ownership, "launcher_replaced")
+                self.assertEqual(result_repair.sha256, fake_v72_sha)
+                self.assertEqual((game_root / "XINPUT1_3.dll").read_bytes(), fake_v72_bytes)
+                self.assertTrue(Path(result_repair.backup_path).is_file())
+                self.assertEqual(Path(result_repair.backup_path).read_bytes(), b"foreign_old_mod_dll")
+
+                # Backup metadata check
+                meta_path = Path(result_repair.backup_path).parent / "metadata.json"
+                self.assertTrue(meta_path.is_file())
+                metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+                self.assertEqual(metadata["sha256"], foreign_sha)
+                self.assertEqual(metadata["replacement_version"], "7.2")
+
+    def test_one_click_workflow_executes_meathook_before_room_mod_and_injector(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            base_dir = Path(tmp_str)
+            game_root = self._create_mock_game_root(base_dir / "doom", with_meathook=False)
+            app_dir = base_dir / "app"
+            state_dir = base_dir / "state"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            self._create_mock_room_resources(app_dir)
+
+            fake_v72_bytes = b"meathook_v72_payload"
+            fake_v72_sha = hashlib.sha256(fake_v72_bytes).hexdigest()
+            local_meathook = base_dir / "mock_meathook.dll"
+            local_meathook.write_bytes(fake_v72_bytes)
+
+            # Also provide dummy linux mod injector dependency
+            inj_archive = base_dir / "injector.tar.gz"
+            with tarfile.open(inj_archive, "w:gz") as tar:
+                tar_info = tarfile.TarInfo("EternalModInjectorShell.sh")
+                tar_info.size = len(b"#!/bin/sh\nexit 0\n")
+                tar.addfile(tar_info, io.BytesIO(b"#!/bin/sh\nexit 0\n"))
+            inj_sha = hashlib.sha256(inj_archive.read_bytes()).hexdigest()
+            mock_inj_spec = DependencySpec("EternalModInjectorShell", "6.66-rev3.12", "https://example.com/inj.tar.gz", inj_sha, "**/EternalModInjectorShell.sh", "tar.gz")
+
+            config_path = state_dir / "config.json"
+            config_path.write_text(json.dumps({
+                "game_root": str(game_root),
+                "doom_base_dir": str(game_root / "base"),
+                "meathook_dll": str(local_meathook),
+                "eternal_basher_archive": str(inj_archive),
+            }), encoding="utf-8")
+
+            events_recorded: list[tuple[str, dict[str, object]]] = []
+            workflow = IntegratedLaunchWorkflow(
+                app_dir,
+                state_dir,
+                config_path,
+                platform_name="linux",
+                event_sink=lambda kind, payload: events_recorded.append((kind, payload)),
+                consent=lambda _s: True,
+            )
+
+            mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", fake_v72_sha, "XINPUT1_3.dll", "file")
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec), \
+                 patch("doom_eap.launcher.launcher_integration.MEATHOOK", mock_spec), \
+                 patch("doom_eap.launcher.launcher_platform.LINUX_MOD_INJECTOR", mock_inj_spec), \
+                 patch("doom_eap.launcher.launcher_integration.LINUX_MOD_INJECTOR", mock_inj_spec), \
+                 patch("doom_eap.launcher.launcher_platform.LinuxModManagerAdapter.activate") as mock_activate:
+                from doom_eap.launcher.launcher_platform import AdapterResult
+                mock_activate.return_value = AdapterResult(state="applied", message="ok", command=["mock"])
+
+                fake_generated = base_dir / "generated.zip"
+                manifest = LaunchWorkflow().manifest_for(_snapshot())
+                with zipfile.ZipFile(fake_generated, "w") as zf:
+                    zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+
+                with patch.object(RoomCompiler, "__init__", return_value=None), \
+                     patch.object(RoomCompiler, "build", return_value=fake_generated):
+                    record = workflow.execute(_snapshot())
+                    self.assertEqual(record.adapter_state, "applied")
+
+                    # Verify exact ordering: game_link_installed before room mod compilation / staging
+                    event_names = [e[0] for e in events_recorded]
+                    self.assertIn("game_link_installed", event_names)
+                    self.assertIn("mod_building", event_names)
+                    self.assertIn("mod_staged", event_names)
+                    self.assertIn("injector_started", event_names)
+
+                    gl_idx = event_names.index("game_link_installed")
+                    build_idx = event_names.index("mod_building")
+                    staged_idx = event_names.index("mod_staged")
+                    self.assertLess(gl_idx, build_idx)
+                    self.assertLess(build_idx, staged_idx)
+
+                    # Verify Meathook DLL is physically present and verified
+                    self.assertTrue((game_root / "XINPUT1_3.dll").is_file())
+                    self.assertEqual((game_root / "XINPUT1_3.dll").read_bytes(), fake_v72_bytes)
+
+    def test_declined_consent_stops_workflow_with_zero_mutation(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             base_dir = Path(tmp_str)
             game_root = self._create_mock_game_root(base_dir / "doom", with_meathook=False)
@@ -275,107 +498,85 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
                 "doom_base_dir": str(game_root / "base"),
             }), encoding="utf-8")
 
-            # Stage a previous mod (Room A)
-            prev_mod = game_root / "Mods" / "DOOMEternalArchipelago_roomA.zip"
-            prev_mod.write_bytes(b"previous_room_mod_content")
-            receipt_path = state_dir / "launcher_setup.json"
-            receipt_path.write_text(json.dumps({
-                "manifest_hash": "hash_room_A",
-                "staged_mod": str(prev_mod),
-                "staged_sha256": hashlib.sha256(b"previous_room_mod_content").hexdigest(),
-                "adapter_state": "applied",
-            }), encoding="utf-8")
-
-            prev_mod_mtime = prev_mod.stat().st_mtime_ns
-            receipt_mtime = receipt_path.stat().st_mtime_ns
-
             workflow = IntegratedLaunchWorkflow(
                 app_dir,
                 state_dir,
                 config_path,
                 platform_name="linux",
+                consent=lambda _spec: False,  # User declines consent
             )
 
             with self.assertRaises(RuntimeError) as ctx:
                 workflow.execute(_snapshot())
 
-            self.assertIn("Meathook runtime is not installed", str(ctx.exception))
+            self.assertIn("Game Link download was not approved", str(ctx.exception))
+            # Assert zero mutations
+            self.assertFalse((game_root / "XINPUT1_3.dll").exists())
+            self.assertEqual(list((game_root / "Mods").glob("*.zip")), [])
 
-            # Zero-mutation assertion: previous mod untouched, receipt untouched, no new mod in Mods
-            self.assertTrue(prev_mod.is_file())
-            self.assertEqual(prev_mod.read_bytes(), b"previous_room_mod_content")
-            self.assertEqual(prev_mod.stat().st_mtime_ns, prev_mod_mtime)
-            self.assertEqual(receipt_path.stat().st_mtime_ns, receipt_mtime)
 
-            mod_files = list((game_root / "Mods").glob("*.zip"))
-            self.assertEqual(len(mod_files), 1)
-            self.assertEqual(mod_files[0], prev_mod)
+class TestDoctorAndPreLaunchGate(unittest.TestCase):
+    def _create_mock_game_root(self, path: Path, with_meathook: bool = False, meathook_bytes: bytes | None = None) -> Path:
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "DOOMEternalx64vk.exe").write_bytes(b"exe")
+        (path / "base").mkdir(parents=True, exist_ok=True)
+        (path / "Mods").mkdir(parents=True, exist_ok=True)
+        if with_meathook:
+            bytes_to_write = meathook_bytes if meathook_bytes is not None else b"mock_meathook_bytes"
+            (path / "XINPUT1_3.dll").write_bytes(bytes_to_write)
+        return path
 
-    def test_install_state_vs_play_readiness_separation(self):
-        with tempfile.TemporaryDirectory() as tmp_str:
-            base_dir = Path(tmp_str)
-            game_root = self._create_mock_game_root(base_dir / "doom", with_meathook=True)
-            app_dir = base_dir / "app"
-            state_dir = base_dir / "state"
-            state_dir.mkdir(parents=True, exist_ok=True)
-            self._create_mock_room_resources(app_dir)
+    def _create_mock_room_resources(self, client_dir: Path) -> None:
+        resources = client_dir / "resources"
+        resources.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(resources / "base_mod.zip", "w") as zf:
+            zf.writestr("base.txt", "base")
+        with zipfile.ZipFile(resources / "room_payloads.zip", "w") as zf:
+            zf.writestr("payload.txt", "payload")
+        (resources / "room_payload_manifest.json").write_text(
+            json.dumps({"schema_version": 1, "payload_format": "zip", "maps": {}}),
+            encoding="utf-8",
+        )
+        (client_dir / "bridge_client.py").write_text("# bridge client stub\n", encoding="utf-8")
+        data_dir = client_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        schema_src = Path(__file__).parents[1] / "data" / "options_schema.json"
+        if schema_src.is_file():
+            shutil.copy(schema_src, data_dir / "options_schema.json")
 
-            config_path = state_dir / "config.json"
-            config_path.write_text(json.dumps({
-                "game_root": str(game_root),
-                "doom_base_dir": str(game_root / "base"),
-            }), encoding="utf-8")
-
-            snapshot = _snapshot()
-            manifest = LaunchWorkflow().manifest_for(snapshot)
-
-            # Build and stage valid room mod matching manifest
-            staged = game_root / "Mods" / "DOOMEternalArchipelago_active.zip"
-            with zipfile.ZipFile(staged, "w") as zf:
-                zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
-
-            staged_sha = hashlib.sha256(staged.read_bytes()).hexdigest()
-            receipt_path = state_dir / "launcher_setup.json"
-            receipt_path.write_text(json.dumps({
-                "manifest_hash": manifest.manifest_hash,
-                "staged_mod": str(staged),
-                "staged_sha256": staged_sha,
-                "adapter_state": "applied",
-            }), encoding="utf-8")
-
-            workflow = IntegratedLaunchWorkflow(app_dir, state_dir, config_path, platform_name="linux")
-
-            # 1. When Meathook is present -> already_installed, readiness=ready
-            state_with_dll = workflow.install_state(snapshot)
-            self.assertEqual(state_with_dll.state, "already_installed")
-            self.assertEqual(state_with_dll.readiness, "ready")
-
-            # 2. When Meathook is removed -> already_installed (package intact), but readiness=blocked
-            (game_root / "XINPUT1_3.dll").unlink()
-            state_without_dll = workflow.install_state(snapshot)
-            self.assertEqual(state_without_dll.state, "already_installed")
-            self.assertEqual(state_without_dll.readiness, "blocked")
-            self.assertIn("Meathook", state_without_dll.readiness_reason)
-
-    def test_doctor_report_fails_closed_when_meathook_is_missing(self):
+    def test_doctor_report_fails_closed_when_meathook_is_missing_or_incompatible(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             game_root = self._create_mock_game_root(Path(tmp_str) / "doom", with_meathook=False)
             doctor = LauncherDoctor(config={"game_root": str(game_root)})
 
-            # 1. Missing Meathook -> report.ok is False
+            # 1. Missing Meathook -> report.ok is False, repair action offered
             report_missing = doctor.run()
             self.assertFalse(report_missing.ok)
             meathook_diag = next(d for d in report_missing.diagnostics if d.key == "meathook")
             self.assertEqual(meathook_diag.status, "missing")
+            actions = doctor.repair_actions()
+            self.assertTrue(any(a.action_id == "install_game_link" for a in actions))
 
-            # 2. Add Meathook -> report.ok is True
-            (game_root / "XINPUT1_3.dll").write_bytes(b"meathook_library")
-            report_present = doctor.run()
-            self.assertTrue(report_present.ok)
-            meathook_diag_ok = next(d for d in report_present.diagnostics if d.key == "meathook")
-            self.assertEqual(meathook_diag_ok.status, "ok")
+            # 2. Incompatible Meathook -> report.ok is False, repair action offered
+            (game_root / "XINPUT1_3.dll").write_bytes(b"foreign_dll")
+            report_incompat = doctor.run()
+            self.assertFalse(report_incompat.ok)
+            meathook_diag_inc = next(d for d in report_incompat.diagnostics if d.key == "meathook")
+            self.assertEqual(meathook_diag_inc.status, "incompatible")
+            actions_inc = doctor.repair_actions()
+            self.assertTrue(any(a.action_id == "repair_game_link" for a in actions_inc))
 
-    def test_pre_launch_gate_blocks_launch_when_meathook_missing(self):
+            # 3. Add Verified Meathook -> report.ok is True
+            mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", hashlib.sha256(b"official_dll").hexdigest(), "XINPUT1_3.dll", "file")
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec):
+                (game_root / "XINPUT1_3.dll").write_bytes(b"official_dll")
+                report_present = doctor.run()
+                self.assertTrue(report_present.ok)
+                meathook_diag_ok = next(d for d in report_present.diagnostics if d.key == "meathook")
+                self.assertEqual(meathook_diag_ok.status, "ok")
+                self.assertEqual(meathook_diag_ok.details["identity"], "verified")
+
+    def test_pre_launch_gate_blocks_launch_when_meathook_missing_or_incompatible(self):
         import doom_eap.launcher.launcher_controller as lc
 
         with tempfile.TemporaryDirectory() as tmp_str:
@@ -390,15 +591,23 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
                 # Blocked launch without Meathook
                 with self.assertRaises(RuntimeError) as ctx:
                     controller.launch_game()
-                self.assertIn("Meathook runtime is not installed", str(ctx.exception))
+                self.assertIn("Game Link runtime is not installed", str(ctx.exception))
 
-                # Allowed launch once Meathook is present
-                (game_root / "XINPUT1_3.dll").write_bytes(b"meathook_dll")
-                with patch.object(lc, "launch_doom_via_steam") as mock_launch:
-                    mock_launch.return_value = "steam://rungameid/782330"
-                    url = controller.launch_game()
-                    self.assertEqual(url, "steam://rungameid/782330")
-                    mock_launch.assert_called_once()
+                # Blocked launch with incompatible Meathook
+                (game_root / "XINPUT1_3.dll").write_bytes(b"bad_dll")
+                with self.assertRaises(RuntimeError) as ctx:
+                    controller.launch_game()
+                self.assertIn("does not match supported Meathook v7.2", str(ctx.exception))
+
+                # Allowed launch once Meathook is verified
+                mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", hashlib.sha256(b"good_dll").hexdigest(), "XINPUT1_3.dll", "file")
+                with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec):
+                    (game_root / "XINPUT1_3.dll").write_bytes(b"good_dll")
+                    with patch.object(lc, "launch_doom_via_steam") as mock_launch:
+                        mock_launch.return_value = "steam://rungameid/782330"
+                        url = controller.launch_game()
+                        self.assertEqual(url, "steam://rungameid/782330")
+                        mock_launch.assert_called_once()
             finally:
                 controller.close()
 

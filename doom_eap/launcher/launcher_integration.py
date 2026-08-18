@@ -17,9 +17,11 @@ from .launcher_platform import (
     WINDOWS_MOD_MANAGER,
     AdapterResult,
     DependencyManager,
+    GameLinkResult,
     LinuxModManagerAdapter,
     SteamLaunchOptionsManager,
     WindowsModManagerAdapter,
+    install_meathook,
     probe_runtime_prerequisites,
     stage_room_mod,
 )
@@ -266,9 +268,79 @@ class IntegratedLaunchWorkflow:
             return result, plan.proposed, plan.diff
         raise RuntimeError(f"unsupported platform: {self.platform_name}")
 
+    def ensure_game_link(
+        self,
+        game_root: Path,
+        *,
+        local_artifact: Path | None = None,
+        force_repair: bool = False,
+    ) -> GameLinkResult:
+        dep_manager = DependencyManager(self.state_dir / "dependencies")
+        result = install_meathook(
+            game_root,
+            dep_manager,
+            state_dir=self.state_dir,
+            consent=self.consent,
+            local_artifact=local_artifact,
+            force_repair=force_repair,
+        )
+        if result.state in {"installed", "repaired"}:
+            self._emit(
+                "game_link_installed",
+                state=result.state,
+                path=result.path,
+                sha256=result.sha256,
+                ownership=result.ownership,
+                backup_path=result.backup_path,
+            )
+        return result
+
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
         config = self._config()
         game_root = self._game_root(config)
+
+        # 1. Ensure Game Link / Meathook dependency before any room mod operations
+        local_key = "meathook_dll"
+        local_val = config.get(local_key)
+        local_artifact = Path(str(local_val)).expanduser() if local_val else None
+        try:
+            game_link = self.ensure_game_link(
+                game_root,
+                local_artifact=local_artifact,
+                force_repair=False,
+            )
+            if game_link.state == "needs_repair":
+                self._emit(
+                    "prerequisite_missing",
+                    key="meathook",
+                    message=game_link.message,
+                    details={"path": game_link.path, "sha256": game_link.sha256, "status": "incompatible"},
+                )
+                raise RuntimeError(
+                    "Installed Game Link runtime does not match supported Meathook v7.2. "
+                    "Repair Game Link before preparing the room mod."
+                )
+        except PermissionError:
+            self._emit(
+                "prerequisite_missing",
+                key="meathook",
+                message="Game Link installation was not approved.",
+                details={"status": "missing"},
+            )
+            raise RuntimeError(
+                "Game Link download was not approved. Approve the download to finish setup."
+            )
+        except Exception as error:
+            if not isinstance(error, (RuntimeError, PermissionError)):
+                self._emit(
+                    "prerequisite_missing",
+                    key="meathook",
+                    message=str(error),
+                    details={"status": "error"},
+                )
+            raise
+
+        # 2. Probe mandatory runtime prerequisites
         prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
         if not prereqs.ok:
             meathook = prereqs.meathook

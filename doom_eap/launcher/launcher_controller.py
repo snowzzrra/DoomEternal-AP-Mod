@@ -28,6 +28,7 @@ from .launcher_integration import (
 )
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_platform import (
+    GameLinkResult,
     SteamInstallationLocator,
     detect_doom_processes,
     launch_doom_via_steam,
@@ -206,6 +207,31 @@ class LauncherController:
         self.emit("steam_launch_requested", url=url)
         return url
 
+    def install_game_link(self, force_repair: bool = False) -> GameLinkResult:
+        """Acquire, verify, and install supported Game Link runtime library."""
+        game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+        if not game_root:
+            raise RuntimeError("DOOM Eternal installation is not configured.")
+        root = validate_game_root(Path(str(game_root)))
+        local_key = "meathook_dll"
+        local_value = self.config.get(local_key)
+        local_artifact = Path(str(local_value)).expanduser() if local_value else None
+        result = self.workflow.ensure_game_link(
+            root,
+            local_artifact=local_artifact,
+            force_repair=force_repair,
+        )
+        self.emit(
+            "game_link_status",
+            state=result.state,
+            message=result.message,
+            path=result.path,
+            sha256=result.sha256,
+            ownership=result.ownership,
+            backup_path=result.backup_path,
+        )
+        return result
+
     def probe_handshake(self) -> dict[str, object]:
         base = self.config.get("doom_base_dir")
         if not base:
@@ -372,6 +398,8 @@ class LauncherController:
         answer: list[bool] = []
         with self._consent_lock:
             self._consent_requests[request_id] = (wait, answer)
+        purpose = "Game Link runtime library" if spec.name == "Meathook" else "Mod installation tool"
+        source = "GitHub / brongo" if spec.name == "Meathook" else "GitHub"
         self.emit(
             "dependency_consent_required",
             request_id=request_id,
@@ -379,6 +407,8 @@ class LauncherController:
             version=spec.version,
             url=spec.url,
             sha256=spec.sha256,
+            purpose=purpose,
+            source=source,
         )
         wait.wait(timeout=300.0)
         with self._consent_lock:
