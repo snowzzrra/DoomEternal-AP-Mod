@@ -102,6 +102,23 @@ def _run_self_test(arguments: list[str]) -> int:
                 if controller.session_start_time <= 0:
                     raise RuntimeError("Invalid session_start_time in controller")
                 print(f"  [OK] Hermetic LauncherController constructed from bundled resources (state={controller.state.value})")
+
+                # Hermetic UI construction smoke test (executes __init__, _build, _session_page, etc.)
+                from PySide6.QtWidgets import QApplication
+                from doom_eap.launcher.launcher_ui import LauncherUI
+
+                os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+                app = QApplication.instance()
+                if app is None:
+                    app = QApplication(["launcher_selftest", "-platform", "offscreen"])
+                ui = LauncherUI(controller)
+                if ui.pages.count() < 5:
+                    raise RuntimeError(f"Expected at least 5 UI pages, found {ui.pages.count()}")
+                ui.timer.stop()
+                ui.close()
+                ui.deleteLater()
+                app.processEvents()
+                print(f"  [OK] Hermetic LauncherUI constructed and verified (pages={ui.pages.count()}, offscreen)")
             finally:
                 for k, v in old_env.items():
                     if v is None:
@@ -109,7 +126,7 @@ def _run_self_test(arguments: list[str]) -> int:
                     else:
                         os.environ[k] = v
     except Exception as e:
-        print(f"  [FAIL] LauncherController instantiation failed: {e}", file=sys.stderr)
+        print(f"  [FAIL] LauncherController / LauncherUI instantiation failed: {e}", file=sys.stderr)
         return 1
 
     # 4. Assembled-package validation (if package present or explicitly requested)

@@ -500,7 +500,11 @@ class LauncherUI(QMainWindow):
         setup_buttons.addWidget(self.session_manual_complete_action)
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
-        setup_layout.addLayout(setup_buttons, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        setup_layout.addLayout(setup_buttons)
+        setup_layout.setAlignment(
+            setup_buttons,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
         outer.addWidget(self.session_setup)
         header = QHBoxLayout()
         header.addWidget(self._label("SESSION", "title"))
@@ -1486,8 +1490,9 @@ class LauncherUI(QMainWindow):
         sanitized = redact_secrets(text).replace("\r", " ").strip()
         if not sanitized:
             return
-        self.log.appendPlainText(sanitized)
-        if hasattr(self, "session_log"):
+        if hasattr(self, "log") and self.log is not None:
+            self.log.appendPlainText(sanitized)
+        if hasattr(self, "session_log") and self.session_log is not None:
             self.session_log.appendPlainText(sanitized)
 
     def _append_session_event(self, event: dict[str, object]) -> None:
