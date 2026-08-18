@@ -333,13 +333,14 @@ Repair/Fix, and a sanitized support report.
 
 - The Archipelago project and contributors for the multiworld framework,
   protocol, server, and `CommonClient`.
-- tastyfresh (from the Doom 2016+ Modding Discord server) for the original 
+- tastyfresh (from the AP After Dark Discord server) for the original
   large check list for project setup.
-- Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct 
+- Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct
   technical guidance, map/runtime research and the [Windows Mod Injector](https://gamebanana.com/tools/7475).
 - alby (from the Doom 2016+ Modding Discord server) for technical help, runtime
   investigation, and safe-native-behavior
   guidance.
+- KaitoKid (from the AP After Dark Discord server) for the very detailed logic guidance.
 - chrispy for creating
   [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation this
   project builds on.
@@ -348,13 +349,18 @@ Repair/Fix, and a sanitized support report.
   and `idFileDeCompressor`.
 - FlavorfulGecko5 and the EntitySlayer contributors for
   [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
-- leveste for [Eternal Mod Injector Shell](hhttps://github.com/leveste/EternalBasher/).
+- leveste for [Eternal Mod Injector Shell](https://github.com/leveste/EternalBasher/).
 - The DOOM Modding community for EternalModInjector, wiki material, and
   general knowledge that made the map patches possible.
-- Meta (from the AP After Dark Discord server) for the Archipelago Logo model.
-- FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago 
+- Meta (from the AP After Dark Discord server) for the Archipelago Logo model
+  and overall very useful help.
+- FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
   logo used by the AP client.
 
 ## 6. License
 
 This project is distributed under the [MIT License](docs/LICENSE).
+
+Every dependency is **external only**. Meathook and the injectors are downloaded at
+install, and are not packaged inside this repository. They are owned exclusively
+by their creators credited above.

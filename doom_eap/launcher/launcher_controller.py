@@ -34,6 +34,7 @@ from .launcher_platform import (
     launch_doom_via_steam,
     launcher_user_paths,
     migrate_legacy_launcher_data,
+    probe_meathook,
     probe_runtime_prerequisites,
     read_handshake_probe,
     redact_secrets,
@@ -112,6 +113,85 @@ class LauncherController:
             self._setup_result,
         )
         self._native_health_reader: NativeHealthReader | None = None
+        self._native_client_process: subprocess.Popen | None = None
+
+    def _native_client_running(self) -> bool:
+        with self._lifecycle_lock:
+            if self._native_client_process is None:
+                return False
+            poll = self._native_client_process.poll()
+            if poll is not None:
+                exit_code = poll
+                self._native_client_process = None
+                self.emit("native_client_exited", returncode=exit_code)
+                return False
+            return True
+
+    def _ensure_native_client(self, *, platform: str | None = None) -> bool:
+        target_platform = platform if platform is not None else os.name
+        if target_platform != "nt":
+            return False
+        with self._lifecycle_lock:
+            if not self.connected_room:
+                return False
+            if self._native_client_process is not None:
+                if self._native_client_process.poll() is None:
+                    return True
+                exit_code = self._native_client_process.poll()
+                self._native_client_process = None
+                self.emit("native_client_exited", returncode=exit_code)
+
+            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            if not game_root:
+                return False
+            try:
+                root = validate_game_root(Path(str(game_root)))
+            except Exception:
+                return False
+
+            client_exe = self.client_dir / "ap_client.exe"
+            if not client_exe.is_file():
+                self._record_diagnostic(f"native client executable missing at {client_exe}")
+                return False
+
+            meathook = probe_meathook(root)
+            if not meathook.ok:
+                return False
+
+            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            command = [str(client_exe), str(root)]
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            try:
+                self._native_client_process = subprocess.Popen(
+                    command,
+                    cwd=str(root),
+                    creationflags=creationflags,
+                )
+                self.emit("native_client_started", path=str(client_exe), game_root=str(root))
+                return True
+            except Exception as error:
+                self._native_client_process = None
+                self.emit("native_client_start_failed", message=str(error))
+                return False
+
+    def _stop_native_client(self) -> None:
+        with self._lifecycle_lock:
+            process = self._native_client_process
+            self._native_client_process = None
+        if process is None:
+            return
+        if process.poll() is not None:
+            return
+        try:
+            process.terminate()
+            try:
+                process.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1.0)
+        except Exception:
+            pass
+        self.emit("native_client_stopped")
 
     def _load_config(self) -> dict[str, object]:
         if self.config_path.is_file():
@@ -206,6 +286,7 @@ class LauncherController:
         if not prereqs.ok:
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
+        self._ensure_native_client()
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
         return url
@@ -352,6 +433,7 @@ class LauncherController:
                     self.state = LauncherState.FAILED
                     self.connected_room = False
                     stop_failed_worker = supervisor.running
+                self._stop_native_client()
             elif kind in {"client_stopping", "disconnected"}:
                 if (
                     self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING}
@@ -361,6 +443,7 @@ class LauncherController:
             elif kind == "worker_stopped":
                 self.supervisor = None
                 emit_event = False
+                self._stop_native_client()
                 if self._pending_connect is not None:
                     pending = self._pending_connect
                     self._pending_connect = None
@@ -391,6 +474,8 @@ class LauncherController:
         elif kind in {"setup_started", "setup_ready"}:
             self.last_setup_failure = None
         self.emit(kind, **payload)
+        if kind == "setup_ready" and payload.get("adapter_state") == "applied":
+            self._ensure_native_client()
 
     def _setup_result(self, record: IntegratedSetupRecord) -> None:
         self.last_setup = record
@@ -476,6 +561,7 @@ class LauncherController:
             message=record.adapter_message,
             steam_launch_option=record.steam_launch_option,
         )
+        self._ensure_native_client()
         return True
 
     def _entrypoint(self) -> Path:
@@ -567,7 +653,8 @@ class LauncherController:
         self._start_supervisor(connection)
 
     def process_event(self, event: dict[str, object]) -> None:
-        if event.get("type") == "connected":
+        event_type = event.get("type")
+        if event_type == "connected":
             self.connected_room = True
             self.setup.observe(event)
             try:
@@ -585,6 +672,8 @@ class LauncherController:
                     readiness=state.readiness,
                     readiness_reason=state.readiness_reason,
                 )
+                if state.state == "already_installed" and state.readiness != "blocked":
+                    self._ensure_native_client()
             except Exception as error:
                 self.emit(
                     "room_install_state",
@@ -593,6 +682,9 @@ class LauncherController:
                     readiness="blocked",
                     readiness_reason=str(error),
                 )
+        elif event_type == "setup_ready":
+            if event.get("adapter_state") == "applied":
+                self._ensure_native_client()
 
     def send_command(self, text: str) -> None:
         if not text.strip():
@@ -602,6 +694,7 @@ class LauncherController:
         self.supervisor.send_command(text)
 
     def disconnect(self) -> None:
+        self._stop_native_client()
         supervisor: BridgeSupervisor | None
         with self._lifecycle_lock:
             if self.state is LauncherState.DISCONNECTING:
@@ -666,4 +759,5 @@ class LauncherController:
         raise RuntimeError("no supported terminal emulator found for interactive injector")
 
     def close(self) -> None:
+        self._stop_native_client()
         self.disconnect()

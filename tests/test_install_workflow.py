@@ -14,6 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import certifi
 
+import doom_eap.launcher.launcher_controller as launcher_controller_mod
+from doom_eap.launcher.launcher_controller import LauncherController
 from doom_eap.launcher.launcher_core import (
     LaunchWorkflow,
     ModCompiler,
@@ -1103,6 +1105,203 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
                 # Doctor now reports OK
                 report_after = doctor.run()
                 self.assertTrue(report_after.ok)
+
+
+class TestWindowsNativeClientLifecycle(unittest.TestCase):
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory(prefix="doomeap_native_client_test_")
+        self.tmp = Path(self.tmp_dir.name)
+        self.app_dir = self.tmp / "app"
+        self.client_dir = self.app_dir / "client"
+        self.client_data = self.client_dir / "data"
+        self.client_data.mkdir(parents=True, exist_ok=True)
+        schema_src = Path(__file__).resolve().parents[1] / "data" / "options_schema.json"
+        if schema_src.is_file():
+            shutil.copy2(schema_src, self.client_data / "options_schema.json")
+        self.client_exe = self.client_dir / "ap_client.exe"
+        self.client_exe.write_bytes(b"MZ_FAKE_CLIENT")
+
+        self.game_root = self.tmp / "Program Files (x86)" / "Steam" / "steamapps" / "common" / "DOOMEternal"
+        (self.game_root / "base").mkdir(parents=True, exist_ok=True)
+        (self.game_root / "DOOMEternalx64vk.exe").write_bytes(b"MZ_FAKE_DOOM")
+        mh_bytes = b"MZ_FAKE_MEATHOOK"
+        mh_hash = hashlib.sha256(mh_bytes).hexdigest()
+        (self.game_root / "XINPUT1_3.dll").write_bytes(mh_bytes)
+        self.spec_meathook = DependencySpec(
+            "Meathook", "7.2", "https://example.com/mh", mh_hash, "XINPUT1_3.dll", "file"
+        )
+        self.meathook_patcher = patch("doom_eap.launcher.launcher_platform.MEATHOOK", self.spec_meathook)
+        self.meathook_patcher.start()
+
+        self.saves_dir = self.tmp / "saves" / "id Software" / "DOOMEternal" / "base"
+        self.saves_dir.mkdir(parents=True, exist_ok=True)
+
+        self.state_dir = self.tmp / "user_state"
+        self.config_dir = self.tmp / "user_config"
+        self.data_dir = self.tmp / "user_data"
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        self.env_override = {
+            "XDG_CONFIG_HOME": str(self.config_dir),
+            "XDG_STATE_HOME": str(self.state_dir),
+            "XDG_DATA_HOME": str(self.data_dir),
+            "APPDATA": str(self.config_dir),
+            "LOCALAPPDATA": str(self.state_dir),
+        }
+        self.old_env = {k: os.environ.get(k) for k in self.env_override}
+        for k, v in self.env_override.items():
+            os.environ[k] = v
+
+        self.controller = LauncherController(application_dir=self.app_dir)
+        self.controller.config = {
+            "game_root": str(self.game_root),
+            "doom_base_dir": str(self.game_root / "base"),
+            "save_games_dir": str(self.saves_dir),
+        }
+
+    def tearDown(self):
+        self.meathook_patcher.stop()
+        for k, v in self.old_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self.tmp_dir.cleanup()
+
+    def test_windows_native_client_correct_command_and_cwd(self):
+        self.controller.connected_room = True
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+
+        with patch("subprocess.Popen", return_value=fake_process) as mock_popen:
+            started = self.controller._ensure_native_client(platform="nt")
+            self.assertTrue(started)
+            mock_popen.assert_called_once_with(
+                [str(self.client_exe), str(self.game_root.resolve())],
+                cwd=str(self.game_root.resolve()),
+                creationflags=0x08000000,
+            )
+
+    def test_windows_native_client_idempotency(self):
+        self.controller.connected_room = True
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+
+        with patch("subprocess.Popen", return_value=fake_process) as mock_popen:
+            self.assertTrue(self.controller._ensure_native_client(platform="nt"))
+            self.assertTrue(self.controller._ensure_native_client(platform="nt"))
+            self.assertEqual(mock_popen.call_count, 1)
+
+    def test_windows_native_client_restart_after_exit(self):
+        self.controller.connected_room = True
+        fake_process_1 = MagicMock()
+        fake_process_1.poll.return_value = None
+        fake_process_2 = MagicMock()
+        fake_process_2.poll.return_value = None
+
+        with patch("subprocess.Popen", side_effect=[fake_process_1, fake_process_2]) as mock_popen:
+            self.assertTrue(self.controller._ensure_native_client(platform="nt"))
+            self.assertEqual(mock_popen.call_count, 1)
+
+            # Process exits unexpectedly with code 1
+            fake_process_1.poll.return_value = 1
+            self.assertFalse(self.controller._native_client_running())
+
+            # Next ensure restarts client
+            self.assertTrue(self.controller._ensure_native_client(platform="nt"))
+            self.assertEqual(mock_popen.call_count, 2)
+
+    def test_windows_native_client_started_on_setup_ready(self):
+        self.controller.connected_room = True
+        with patch.object(self.controller, "_ensure_native_client") as mock_ensure:
+            self.controller._setup_event("setup_ready", {"adapter_state": "applied"})
+            mock_ensure.assert_called_once()
+
+    def test_windows_native_client_started_on_already_installed_room(self):
+        fake_snapshot = _snapshot()
+        fake_state = MagicMock(
+            state="already_installed",
+            readiness="ready",
+            manifest_hash="h123",
+            staged_mod="m123",
+            steam_launch_option="",
+            reason="",
+            readiness_reason="",
+        )
+        with patch.object(self.controller.workflow, "install_state", return_value=fake_state), \
+             patch("doom_eap.launcher.launcher_core.RoomSnapshot.from_event", return_value=fake_snapshot), \
+             patch.object(self.controller, "_ensure_native_client") as mock_ensure:
+            self.controller.process_event({"type": "connected"})
+            mock_ensure.assert_called_once()
+
+    def test_windows_native_client_ensured_before_game_launch(self):
+        order = []
+        fake_prereqs = MagicMock(ok=True)
+        with patch.object(self.controller, "_ensure_native_client", side_effect=lambda: order.append("ensure_client")), \
+             patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \
+             patch.object(launcher_controller_mod, "probe_runtime_prerequisites", return_value=fake_prereqs), \
+             patch.object(launcher_controller_mod, "launch_doom_via_steam", side_effect=lambda: order.append("launch_steam") or "steam://rungameid/782330"):
+            self.controller.launch_game()
+            self.assertEqual(order, ["ensure_client", "launch_steam"])
+
+    def test_windows_native_client_not_started_on_unready_or_failed_states(self):
+        # 1. Disconnected
+        self.controller.connected_room = False
+        with patch("subprocess.Popen") as mock_popen:
+            self.assertFalse(self.controller._ensure_native_client(platform="nt"))
+            mock_popen.assert_not_called()
+
+        # 2. Missing Meathook
+        self.controller.connected_room = True
+        with patch.object(launcher_controller_mod, "probe_meathook", return_value=MagicMock(ok=False)), \
+             patch("subprocess.Popen") as mock_popen:
+            self.assertFalse(self.controller._ensure_native_client(platform="nt"))
+            mock_popen.assert_not_called()
+
+        # 3. Setup ready with manual_action_required (not applied)
+        with patch.object(self.controller, "_ensure_native_client") as mock_ensure:
+            self.controller._setup_event("setup_ready", {"adapter_state": "manual_action_required"})
+            mock_ensure.assert_not_called()
+
+    def test_windows_native_client_stopped_on_disconnect_and_close(self):
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+        self.controller._native_client_process = fake_process
+
+        self.controller.disconnect()
+        fake_process.terminate.assert_called_once()
+        self.assertIsNone(self.controller._native_client_process)
+
+        # Re-attach and test close
+        fake_process_2 = MagicMock()
+        fake_process_2.poll.return_value = None
+        self.controller._native_client_process = fake_process_2
+
+        self.controller.close()
+        fake_process_2.terminate.assert_called_once()
+        self.assertIsNone(self.controller._native_client_process)
+
+    def test_linux_native_client_unchanged(self):
+        self.controller.connected_room = True
+        with patch("subprocess.Popen") as mock_popen:
+            started = self.controller._ensure_native_client(platform="posix")
+            self.assertFalse(started)
+            mock_popen.assert_not_called()
+
+    def test_no_manual_ap_client_contract_in_ui_and_docs(self):
+        ui_path = Path(__file__).resolve().parents[1] / "doom_eap" / "launcher" / "launcher_ui.py"
+        install_doc_path = Path(__file__).resolve().parents[1] / "docs" / "INSTALL.md"
+        ui_text = ui_path.read_text(encoding="utf-8")
+        install_text = install_doc_path.read_text(encoding="utf-8")
+
+        # Confirm no UI instruction or docs require manual execution of ap_client.exe
+        for text in [ui_text, install_text]:
+            self.assertNotIn("Run ap_client.exe", text)
+            self.assertNotIn("Open ap_client.exe", text)
+            self.assertNotIn("Start ap_client.exe", text)
+            self.assertNotIn("Launch ap_client.exe manually", text)
 
 
 if __name__ == "__main__":
