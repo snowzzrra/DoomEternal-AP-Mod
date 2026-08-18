@@ -10,11 +10,15 @@ import os
 import re
 import shlex
 import shutil
+import http.client
+import socket
 import ssl
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import webbrowser
 import zipfile
@@ -23,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Protocol
+from typing import Any, Protocol
 
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
@@ -57,28 +61,62 @@ class DownloadTransport(Protocol):
     def fetch(self, url: str, destination: Path) -> None: ...
 
 
+def is_transient_download_error(exc: Exception) -> bool:
+    """Classify transient transport errors safe for bounded retry."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in {429, 500, 502, 503, 504}
+    if isinstance(exc, urllib.error.URLError):
+        reason = exc.reason
+        if isinstance(reason, ssl.SSLError):
+            return False
+        if isinstance(reason, (socket.gaierror, socket.timeout, TimeoutError, ConnectionResetError, ConnectionRefusedError, OSError)):
+            return True
+        return False
+    if isinstance(exc, (socket.timeout, TimeoutError, ConnectionResetError, http.client.RemoteDisconnected)):
+        return True
+    return False
+
+
 class UrlDownloadTransport:
-    """Secure HTTPS download transport with validated SSL context and bounded timeout."""
+    """Secure HTTPS download transport with validated SSL context, bounded timeout, and transient retry."""
 
     def __init__(
         self,
         ssl_context: ssl.SSLContext | None = None,
         timeout: float = 60.0,
+        max_retries: int = 2,
+        backoff_base: float = 0.5,
     ):
         self.ssl_context = ssl_context if ssl_context is not None else create_secure_ssl_context()
         self.timeout = timeout
+        self.max_retries = max(0, max_retries)
+        self.backoff_base = max(0.0, backoff_base)
 
     def fetch(self, url: str, destination: Path) -> None:
-        request = urllib.request.Request(
-            url,
-            headers={"User-Agent": "DoomEternal-AP-Launcher"},
-        )
-        with urllib.request.urlopen(
-            request,
-            timeout=self.timeout,
-            context=self.ssl_context,
-        ) as response, destination.open("wb") as output:
-            shutil.copyfileobj(response, output)
+        total_attempts = self.max_retries + 1
+        for attempt in range(1, total_attempts + 1):
+            try:
+                request = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "DoomEternal-AP-Launcher"},
+                )
+                with urllib.request.urlopen(
+                    request,
+                    timeout=self.timeout,
+                    context=self.ssl_context,
+                ) as response, destination.open("wb") as output:
+                    shutil.copyfileobj(response, output)
+                return
+            except Exception as error:
+                if destination.exists():
+                    try:
+                        destination.unlink()
+                    except OSError:
+                        pass
+                if attempt < total_attempts and is_transient_download_error(error):
+                    time.sleep(self.backoff_base * (2 ** (attempt - 1)))
+                    continue
+                raise
 
 
 def launcher_user_paths(
@@ -186,10 +224,11 @@ class RuntimePrerequisiteReport:
     @property
     def ok(self) -> bool:
         """All mandatory beta.4 runtime prerequisites must be satisfied."""
+        mandatory_keys = {"game", "meathook", "client_runtime"}
         return all(
             check.ok
             for check in self.checks
-            if check.key in {"game", "meathook", "client_runtime"}
+            if check.key in mandatory_keys
         )
 
     def get(self, key: str) -> PrerequisiteCheck | None:
@@ -647,7 +686,7 @@ class DependencyManager:
                 and receipt.artifact_sha256 == spec.sha256
                 and executable.is_file()
                 and executable.is_relative_to(destination)
-                and self._sha256(executable) == spec.sha256
+                and (spec.archive_type != "file" or self._sha256(executable) == spec.sha256)
             ):
                 return receipt
         except Exception:
@@ -817,20 +856,70 @@ def stage_room_mod(
 
 
 class WindowsModManagerAdapter:
-    """EternalModManager has no public CLI; stage mod and request smallest manual action."""
+    """Launch EternalModManager, track process lifetime, and request post-close player confirmation."""
 
-    def __init__(self, dependency: InstalledDependency, opener: Callable[[Sequence[str]], object] | None = None):
+    def __init__(
+        self,
+        dependency: InstalledDependency,
+        *,
+        opener: Callable[[Sequence[str]], Any] | None = None,
+        confirmer: Callable[[], bool] | None = None,
+        event_sink: Callable[..., None] | None = None,
+    ):
         self.dependency = dependency
         self.opener = opener or (lambda command: subprocess.Popen(command))
+        self.confirmer = confirmer or (lambda: False)
+        self.event_sink = event_sink
 
     def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
         staged = _stage_mod(mod_zip, game_root)
         command = (self.dependency.executable, str(game_root))
-        self.opener(command)
+        if self.event_sink is not None:
+            self.event_sink(
+                "manager_started",
+                command=list(command),
+                staged_mod=staged.name,
+                message=(
+                    f"EternalModManager has been opened. Your Archipelago room mod ({staged.name}) "
+                    "is in the Mods folder. In EternalModManager, select the mod, run the injector, "
+                    "and close EternalModManager when done."
+                ),
+            )
+        try:
+            process = self.opener(command)
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Could not launch EternalModManager: {error}",
+                command=command,
+            )
+
+        try:
+            if hasattr(process, "wait"):
+                process.wait()
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Error waiting for EternalModManager to close: {error}",
+                command=command,
+            )
+
+        if self.event_sink is not None:
+            self.event_sink("manager_closed", command=list(command))
+
+        confirmed = self.confirmer()
+        if confirmed:
+            return AdapterResult(
+                state="applied",
+                message="Mod installed successfully. Start DOOM Eternal through the launcher.",
+                command=command,
+                returncode=0,
+            )
         return AdapterResult(
-            state="manual_action_required",
-            message=f"Select {staged.name}, then press Run Injector in EternalModManager.",
+            state="failed",
+            message="Mod installation was not confirmed in EternalModManager.",
             command=command,
+            returncode=1,
         )
 
 

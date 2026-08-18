@@ -28,6 +28,7 @@ from .launcher_platform import (
 
 EventSink = Callable[[str, dict[str, object]], None]
 ConsentCallback = Callable[[object], bool]
+ConfirmationCallback = Callable[[], bool]
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class IntegratedLaunchWorkflow:
         platform_name: str | None = None,
         event_sink: EventSink | None = None,
         consent: ConsentCallback | None = None,
+        confirmation: ConfirmationCallback | None = None,
     ):
         self.base_workflow = LaunchWorkflow()
         self.application_dir = application_dir
@@ -75,6 +77,7 @@ class IntegratedLaunchWorkflow:
         self.platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
         self.event_sink = event_sink or (lambda _kind, _payload: None)
         self.consent = consent or (lambda _spec: False)
+        self.confirmation = confirmation or (lambda: False)
 
     def _emit(self, kind: str, **payload: object) -> None:
         self.event_sink(kind, payload)
@@ -179,7 +182,7 @@ class IntegratedLaunchWorkflow:
                 raise ValueError("package manifest hash does not match current room")
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
             return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, f"installed package validation failed: {error}")
-        if adapter_state != "applied" and not (adapter_state == "manual_action_required" and windows_confirmed):
+        if adapter_state != "applied":
             return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
 
         # Room package is verified installed. Now check live runtime prerequisites.
@@ -204,17 +207,7 @@ class IntegratedLaunchWorkflow:
         return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option, readiness="ready")
 
     def mark_windows_installation(self, succeeded: bool) -> None:
-        if not succeeded:
-            return
-        receipt_path = self.state_dir / "launcher_setup.json"
-        if not receipt_path.is_file():
-            return
-        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-        payload["adapter_state"] = "applied"
-        payload["windows_installation_confirmed"] = True
-        temporary = receipt_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, receipt_path)
+        return
 
     def _adapter(
         self,
@@ -228,7 +221,7 @@ class IntegratedLaunchWorkflow:
             if self.platform_name == "windows"
             else "eternal_basher_archive"
         )
-        local_value = config.get(local_key)
+        local_value = config.get(local_key) or (config.get("eternal_mod_manager_zip") if self.platform_name == "windows" else None)
         local_artifact = Path(str(local_value)).expanduser() if local_value else None
         if self.platform_name == "windows":
             try:
@@ -236,13 +229,19 @@ class IntegratedLaunchWorkflow:
             except PermissionError:
                 return (
                     AdapterResult(
-                        state="manual_action_required",
-                        message="The mod is ready. Approve the manager download, then try again.",
+                        state="failed",
+                        message="EternalModManager download was not approved. Try setup again when ready.",
                     ),
                     "",
                     "",
                 )
-            return WindowsModManagerAdapter(dependency).activate(game_root, staged), "", ""
+            adapter = WindowsModManagerAdapter(
+                dependency,
+                confirmer=self.confirmation,
+                event_sink=self._emit,
+            )
+            result = adapter.activate(game_root, staged)
+            return result, "", ""
         if self.platform_name == "linux":
             plan = self._steam_plan(config)
             try:
@@ -497,6 +496,8 @@ class RoomSetupCoordinator:
                         snapshot,
                         str(event.get("endpoint") or ""),
                     )
+                if record.adapter_state != "applied":
+                    raise RuntimeError(record.adapter_message or "Mod setup was not applied.")
                 with self._state_lock:
                     self._completed.add(key)
                 self.result_sink(record)

@@ -50,7 +50,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid", "missing", "incompatible"} for item in self.diagnostics)
+        return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {"version": self.version, "ok": self.ok, "diagnostics": [asdict(item) for item in self.diagnostics]}
@@ -340,13 +340,15 @@ class LauncherDoctor:
         state_dir = self._state_dir()
         if state_dir is None:
             return tuple(actions)
+
+        root: Path | None = None
+        if game_root:
+            root = Path(str(game_root)).expanduser().resolve()
+            if root.name.casefold() == "base":
+                root = root.parent
+
         receipt_path = state_dir / "launcher_setup.json"
         if not receipt_path.is_file():
-            actions.append(RepairAction(
-                "reinstall_room_mod", "Install room mod",
-                ("Build and install mod for connected room.",), True,
-                "Installer keeps file backups and verifies installed hash.",
-            ))
             return tuple(actions)
         try:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -354,12 +356,11 @@ class LauncherDoctor:
                 raise ValueError("record must be an object")
             staged = Path(str(receipt["staged_mod"])).resolve()
             digest = str(receipt["staged_sha256"])
-            root = Path(str(game_root)).expanduser().resolve()
-            if root.name.casefold() == "base":
-                root = root.parent
-            owned_location = staged.parent == root / "Mods"
-            if not owned_location:
-                raise ValueError("recorded package is outside configured Mods folder")
+            adapter_state = str(receipt.get("adapter_state", ""))
+            if root is not None:
+                owned_location = staged.parent == root / "Mods"
+                if not owned_location:
+                    raise ValueError("recorded package is outside configured Mods folder")
             if not staged.is_file():
                 actions.append(RepairAction(
                     "reinstall_room_mod", "Reinstall missing room mod",
@@ -373,6 +374,13 @@ class LauncherDoctor:
                     "reinstall_room_mod", "Reinstall changed room mod",
                     (f"Replace launcher-owned package: {staged.name}", f"SHA-256: {actual} → {digest}"), True,
                     "Installer keeps file backups and verifies installed hash.",
+                ))
+                return tuple(actions)
+            if adapter_state != "applied":
+                actions.append(RepairAction(
+                    "reinstall_room_mod", "Apply room mod setup",
+                    ("Run room mod setup and confirm installation.",), True,
+                    "Applies room mod into game.",
                 ))
                 return tuple(actions)
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
@@ -440,8 +448,25 @@ class LauncherDoctor:
             meathook_probe.message,
             meathook_probe.details,
         ))
+
         checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": list(detect_doom_processes())}))
         checks.append(Diagnostic("config", "ok", "launcher configuration loaded", {"keys": sorted(self.config)}))
+
+        state_dir = self._state_dir()
+        receipt_path = (state_dir / "launcher_setup.json") if state_dir else None
+        if receipt_path and receipt_path.is_file():
+            try:
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                adapter_state = str(receipt.get("adapter_state", ""))
+                if adapter_state == "applied":
+                    checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state}))
+                else:
+                    checks.append(Diagnostic("mod_injection", "failed", f"Mod installation has not been applied (state: {adapter_state or 'unknown'})", {"adapter_state": adapter_state}))
+            except Exception:
+                checks.append(Diagnostic("mod_injection", "invalid", "Could not parse launcher setup record"))
+        else:
+            checks.append(Diagnostic("mod_injection", "ok", "No active room installation record"))
+
         actions = self.repair_actions()
         if actions:
             checks.append(Diagnostic(

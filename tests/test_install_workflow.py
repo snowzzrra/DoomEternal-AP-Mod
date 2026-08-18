@@ -28,14 +28,18 @@ from doom_eap.launcher.launcher_doctor import (
     _log_freshness,
     write_support_bundle,
 )
-from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
+from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
 from doom_eap.launcher.launcher_platform import (
+    WINDOWS_MOD_MANAGER,
     DependencyManager,
     DependencySpec,
+    InstalledDependency,
     PrerequisiteStatus,
     UrlDownloadTransport,
+    WindowsModManagerAdapter,
     create_secure_ssl_context,
     install_meathook,
+    is_transient_download_error,
     probe_meathook,
     probe_runtime_prerequisites,
 )
@@ -449,7 +453,6 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
 
             mock_spec = DependencySpec("Meathook", "7.2", "https://example.com/meathook", fake_v72_sha, "XINPUT1_3.dll", "file")
             with patch("doom_eap.launcher.launcher_platform.MEATHOOK", mock_spec), \
-                 patch("doom_eap.launcher.launcher_integration.MEATHOOK", mock_spec), \
                  patch("doom_eap.launcher.launcher_platform.LINUX_MOD_INJECTOR", mock_inj_spec), \
                  patch("doom_eap.launcher.launcher_integration.LINUX_MOD_INJECTOR", mock_inj_spec), \
                  patch("doom_eap.launcher.launcher_platform.LinuxModManagerAdapter.activate") as mock_activate:
@@ -610,6 +613,338 @@ class TestDoctorAndPreLaunchGate(unittest.TestCase):
                         mock_launch.assert_called_once()
             finally:
                 controller.close()
+
+
+class TestUrlDownloadTransportRetries(unittest.TestCase):
+    def test_transient_error_retries_and_succeeds(self):
+        import urllib.error
+        transport = UrlDownloadTransport(max_retries=2, backoff_base=0.01)
+        mock_response = MagicMock()
+        mock_response.__enter__.return_value = io.BytesIO(b"payload_data")
+        mock_response.__exit__.return_value = False
+
+        with patch("urllib.request.urlopen") as mock_urlopen, tempfile.TemporaryDirectory() as tmp_str:
+            dest = Path(tmp_str) / "file.zip"
+            mock_urlopen.side_effect = [
+                urllib.error.HTTPError("https://example.com", 503, "Service Unavailable", {}, None),
+                mock_response,
+            ]
+            transport.fetch("https://example.com/file.zip", dest)
+            self.assertTrue(dest.is_file())
+            self.assertEqual(dest.read_bytes(), b"payload_data")
+            self.assertEqual(mock_urlopen.call_count, 2)
+
+    def test_non_transient_error_fails_immediately(self):
+        import urllib.error
+        transport = UrlDownloadTransport(max_retries=2, backoff_base=0.01)
+        with patch("urllib.request.urlopen") as mock_urlopen, tempfile.TemporaryDirectory() as tmp_str:
+            dest = Path(tmp_str) / "file.zip"
+            mock_urlopen.side_effect = urllib.error.HTTPError("https://example.com", 404, "Not Found", {}, None)
+            with self.assertRaises(urllib.error.HTTPError):
+                transport.fetch("https://example.com/file.zip", dest)
+            self.assertEqual(mock_urlopen.call_count, 1)
+
+    def test_transient_download_error_classification(self):
+        import socket
+        import urllib.error
+        self.assertTrue(is_transient_download_error(urllib.error.HTTPError("url", 503, "msg", {}, None)))
+        self.assertTrue(is_transient_download_error(urllib.error.HTTPError("url", 429, "msg", {}, None)))
+        self.assertTrue(is_transient_download_error(urllib.error.URLError(socket.gaierror("dns"))))
+        self.assertFalse(is_transient_download_error(urllib.error.HTTPError("url", 404, "msg", {}, None)))
+        self.assertFalse(is_transient_download_error(urllib.error.URLError(ssl.SSLError("cert"))))
+
+    def test_windows_specs(self):
+        self.assertEqual(WINDOWS_MOD_MANAGER.name, "EternalModManager")
+        self.assertEqual(WINDOWS_MOD_MANAGER.version, "4.2.3")
+        self.assertEqual(WINDOWS_MOD_MANAGER.archive_type, "zip")
+        self.assertEqual(
+            WINDOWS_MOD_MANAGER.sha256,
+            "5701f30683b06a74fcbd9b56891f60fa5a80ca9019337141aa9908356f766b59",
+        )
+        self.assertIn("github.com/brunoanc/EternalModManager", WINDOWS_MOD_MANAGER.url)
+        self.assertNotIn("gamebanana", WINDOWS_MOD_MANAGER.url)
+
+
+class TestWindowsModManagerAdapter(unittest.TestCase):
+    def test_adapter_launches_manager_waits_for_exit_and_requests_confirmation_yes(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = tmp / "doom"
+            game_root.mkdir()
+            (game_root / "Mods").mkdir()
+            mod_zip = tmp / "DoomEternalArchipelago-123.zip"
+            with zipfile.ZipFile(mod_zip, "w") as zf:
+                zf.writestr("test.txt", "mod")
+
+            dep_root = tmp / "dep"
+            dep_root.mkdir()
+            exe_file = dep_root / "EternalModManager.exe"
+            exe_file.write_bytes(b"manager_exe")
+
+            dep = InstalledDependency(
+                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
+            )
+
+            call_log: list[str] = []
+            events: list[tuple[str, dict[str, object]]] = []
+
+            class FakeProcess:
+                def wait(self):
+                    call_log.append("process_wait")
+                    return 0
+
+            def mock_opener(cmd):
+                call_log.append(f"opened:{cmd[0]}")
+                return FakeProcess()
+
+            def mock_confirmer():
+                call_log.append("confirmer_called")
+                return True
+
+            def mock_event_sink(kind, **payload):
+                events.append((kind, payload))
+
+            adapter = WindowsModManagerAdapter(
+                dep,
+                opener=mock_opener,
+                confirmer=mock_confirmer,
+                event_sink=mock_event_sink,
+            )
+
+            result = adapter.activate(game_root, mod_zip)
+
+            self.assertEqual(result.state, "applied")
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(
+                call_log,
+                [f"opened:{exe_file}", "process_wait", "confirmer_called"],
+            )
+            event_names = [e[0] for e in events]
+            self.assertEqual(event_names, ["manager_started", "manager_closed"])
+            self.assertTrue((game_root / "Mods" / "DoomEternalArchipelago-123.zip").is_file())
+
+    def test_adapter_confirmation_no_results_in_failed_state(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = tmp / "doom"
+            game_root.mkdir()
+            (game_root / "Mods").mkdir()
+            mod_zip = tmp / "mod.zip"
+            with zipfile.ZipFile(mod_zip, "w") as zf:
+                zf.writestr("test.txt", "mod")
+
+            dep_root = tmp / "dep"
+            dep_root.mkdir()
+            exe_file = dep_root / "EternalModManager.exe"
+            exe_file.write_bytes(b"manager_exe")
+
+            dep = InstalledDependency(
+                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
+            )
+
+            class FakeProcess:
+                def wait(self):
+                    return 0
+
+            adapter = WindowsModManagerAdapter(
+                dep,
+                opener=lambda cmd: FakeProcess(),
+                confirmer=lambda: False,
+            )
+
+            result = adapter.activate(game_root, mod_zip)
+            self.assertEqual(result.state, "failed")
+            self.assertEqual(result.returncode, 1)
+
+    def test_adapter_handles_opener_or_wait_failure(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = tmp / "doom"
+            game_root.mkdir()
+            (game_root / "Mods").mkdir()
+            mod_zip = tmp / "mod.zip"
+            with zipfile.ZipFile(mod_zip, "w") as zf:
+                zf.writestr("test.txt", "mod")
+
+            dep_root = tmp / "dep"
+            dep_root.mkdir()
+            exe_file = dep_root / "EternalModManager.exe"
+            exe_file.write_bytes(b"manager_exe")
+
+            dep = InstalledDependency(
+                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
+            )
+
+            # Opener error
+            adapter_opener_err = WindowsModManagerAdapter(
+                dep,
+                opener=MagicMock(side_effect=OSError("Access denied")),
+                confirmer=lambda: True,
+            )
+            res_open_err = adapter_opener_err.activate(game_root, mod_zip)
+            self.assertEqual(res_open_err.state, "failed")
+            self.assertIn("Could not launch EternalModManager", res_open_err.message)
+
+            # Wait error
+            class BrokenProcess:
+                def wait(self):
+                    raise RuntimeError("Process vanished")
+
+            adapter_wait_err = WindowsModManagerAdapter(
+                dep,
+                opener=lambda cmd: BrokenProcess(),
+                confirmer=lambda: True,
+            )
+            res_wait_err = adapter_wait_err.activate(game_root, mod_zip)
+            self.assertEqual(res_wait_err.state, "failed")
+            self.assertIn("Error waiting for EternalModManager", res_wait_err.message)
+
+
+class TestWindowsEndToEndAndDoctor(unittest.TestCase):
+    def _create_mock_game_root(self, path: Path) -> Path:
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "DOOMEternalx64vk.exe").write_bytes(b"exe")
+        (path / "base").mkdir(parents=True, exist_ok=True)
+        (path / "Mods").mkdir(parents=True, exist_ok=True)
+        (path / "XINPUT1_3.dll").write_bytes(b"mock_meathook")
+        return path
+
+    def _create_mock_room_resources(self, client_dir: Path) -> None:
+        resources = client_dir / "resources"
+        resources.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(resources / "base_mod.zip", "w") as zf:
+            zf.writestr("base.txt", "base")
+        with zipfile.ZipFile(resources / "room_payloads.zip", "w") as zf:
+            zf.writestr("payload.txt", "payload")
+        (resources / "room_payload_manifest.json").write_text(
+            json.dumps({"schema_version": 1, "payload_format": "zip", "maps": {}}),
+            encoding="utf-8",
+        )
+        (client_dir / "bridge_client.py").write_text("# bridge client stub\n", encoding="utf-8")
+        data_dir = client_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        schema_src = Path(__file__).parents[1] / "data" / "options_schema.json"
+        if schema_src.is_file():
+            shutil.copy(schema_src, data_dir / "options_schema.json")
+
+    def _create_mock_manager_zip(self, destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(destination, "w") as zf:
+            zf.writestr("EternalModManager.exe", "manager_binary")
+        return destination
+
+    def test_windows_workflow_and_coordinator_with_confirmation_yes(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            app_dir = tmp / "app"
+            state_dir = tmp / "state"
+            game_root = self._create_mock_game_root(tmp / "doom")
+            self._create_mock_room_resources(app_dir)
+
+            manager_zip = tmp / "manager.zip"
+            self._create_mock_manager_zip(manager_zip)
+            manager_sha = hashlib.sha256(manager_zip.read_bytes()).hexdigest()
+            spec_manager = DependencySpec(
+                "EternalModManager", "4.2.3", "https://example.com/emm", manager_sha, "**/EternalModManager.exe", "zip"
+            )
+
+            meathook_sha = hashlib.sha256(b"mock_meathook").hexdigest()
+            spec_meathook = DependencySpec(
+                "Meathook", "7.2", "https://example.com/mh", meathook_sha, "XINPUT1_3.dll", "file"
+            )
+
+            config_path = state_dir / "launcher_config.json"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(
+                json.dumps({
+                    "game_root": str(game_root),
+                    "doom_base_dir": str(game_root / "base"),
+                    "eternal_mod_manager_archive": str(manager_zip),
+                }),
+                encoding="utf-8",
+            )
+
+            emitted_events: list[str] = []
+
+            def sink(kind: str, payload: dict[str, object]) -> None:
+                emitted_events.append(kind)
+
+            workflow = IntegratedLaunchWorkflow(
+                app_dir,
+                state_dir,
+                config_path,
+                platform_name="windows",
+                event_sink=sink,
+                consent=lambda _s: True,
+                confirmation=lambda: True,
+            )
+
+            fake_generated = tmp / "generated.zip"
+            manifest = LaunchWorkflow().manifest_for(_snapshot())
+            with zipfile.ZipFile(fake_generated, "w") as zf:
+                zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+
+            class FakeProcess:
+                def wait(self):
+                    return 0
+
+            with patch("doom_eap.launcher.launcher_platform.WINDOWS_MOD_MANAGER", spec_manager), \
+                 patch("doom_eap.launcher.launcher_integration.WINDOWS_MOD_MANAGER", spec_manager), \
+                 patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook), \
+                 patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "build", return_value=fake_generated), \
+                 patch("subprocess.Popen", return_value=FakeProcess()):
+                record = workflow.execute(_snapshot())
+                state = workflow.install_state(_snapshot())
+
+            self.assertEqual(record.adapter_state, "applied")
+            self.assertIn("room_validated", emitted_events)
+            self.assertIn("mod_building", emitted_events)
+            self.assertIn("runtime_config_ready", emitted_events)
+            self.assertIn("mod_staged", emitted_events)
+            self.assertIn("manager_started", emitted_events)
+            self.assertIn("manager_closed", emitted_events)
+
+            self.assertEqual(state.state, "already_installed")
+            self.assertEqual(state.readiness, "ready")
+
+    def test_doctor_fails_closed_if_mod_staged_but_installation_unconfirmed(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = self._create_mock_game_root(tmp / "doom")
+            state_dir = tmp / "state"
+            state_dir.mkdir(parents=True, exist_ok=True)
+
+            meathook_sha = hashlib.sha256(b"mock_meathook").hexdigest()
+            spec_meathook = DependencySpec(
+                "Meathook", "7.2", "https://example.com/mh", meathook_sha, "XINPUT1_3.dll", "file"
+            )
+
+            receipt_path = state_dir / "launcher_setup.json"
+            staged_zip = game_root / "Mods" / "mod.zip"
+            with zipfile.ZipFile(staged_zip, "w") as zf:
+                zf.writestr("test.txt", "mod")
+            staged_sha = hashlib.sha256(staged_zip.read_bytes()).hexdigest()
+
+            receipt_path.write_text(
+                json.dumps({
+                    "manifest_hash": "manifest123",
+                    "staged_mod": str(staged_zip),
+                    "staged_sha256": staged_sha,
+                    "adapter_state": "failed",
+                }),
+                encoding="utf-8",
+            )
+
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook):
+                doctor = LauncherDoctor(
+                    config={"game_root": str(game_root)},
+                    paths=MagicMock(state_dir=state_dir, config_dir=tmp, data_dir=tmp),
+                )
+                report = doctor.run()
+                self.assertFalse(report.ok)
+                mod_inj_diag = next(d for d in report.diagnostics if d.key == "mod_injection")
+                self.assertEqual(mod_inj_diag.status, "failed")
 
 
 if __name__ == "__main__":

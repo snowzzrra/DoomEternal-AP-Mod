@@ -96,12 +96,15 @@ class LauncherController:
         self.session_start_time = time.time()
         self._consent_lock = threading.Lock()
         self._consent_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
+        self._confirmation_lock = threading.Lock()
+        self._confirmation_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
         self.workflow = IntegratedLaunchWorkflow(
             self.client_dir,
             self.state_dir,
             self.config_path,
             event_sink=self._setup_event,
             consent=self._request_consent,
+            confirmation=self._request_installation_confirmation,
         )
         self.setup = RoomSetupCoordinator(
             self.workflow,
@@ -398,8 +401,15 @@ class LauncherController:
         answer: list[bool] = []
         with self._consent_lock:
             self._consent_requests[request_id] = (wait, answer)
-        purpose = "Game Link runtime library" if spec.name == "Meathook" else "Mod installation tool"
-        source = "GitHub / brongo" if spec.name == "Meathook" else "GitHub"
+        if spec.name == "Meathook":
+            purpose = "Game Link runtime library"
+            source = "GitHub / brongo"
+        elif spec.name == "EternalModManager":
+            purpose = "Windows mod manager"
+            source = "GitHub / brunoanc"
+        else:
+            purpose = "Mod installation tool"
+            source = "GitHub"
         self.emit(
             "dependency_consent_required",
             request_id=request_id,
@@ -422,6 +432,31 @@ class LauncherController:
             return
         wait, answer = pending
         answer.append(bool(accepted))
+        wait.set()
+
+    def _request_installation_confirmation(self) -> bool:
+        request_id = uuid.uuid4().hex
+        wait = threading.Event()
+        answer: list[bool] = []
+        with self._confirmation_lock:
+            self._confirmation_requests[request_id] = (wait, answer)
+        self.emit(
+            "installation_confirmation_required",
+            request_id=request_id,
+            message="Did the mod installation complete successfully in EternalModManager?",
+        )
+        wait.wait(timeout=300.0)
+        with self._confirmation_lock:
+            self._confirmation_requests.pop(request_id, None)
+        return bool(answer and answer[0])
+
+    def resolve_installation_confirmation(self, request_id: str, confirmed: bool) -> None:
+        with self._confirmation_lock:
+            pending = self._confirmation_requests.get(request_id)
+        if pending is None:
+            return
+        wait, answer = pending
+        answer.append(bool(confirmed))
         wait.set()
 
     def _entrypoint(self) -> Path:
@@ -610,13 +645,6 @@ class LauncherController:
                 subprocess.Popen([executable, flag, *command], cwd=working_directory)
                 return
         raise RuntimeError("no supported terminal emulator found for interactive injector")
-
-    def confirm_windows_installation(self, succeeded: bool) -> None:
-        """Record user confirmation after EternalModManager completes its manual step."""
-        if self.last_setup is None or self.last_setup.adapter_state != "manual_action_required":
-            raise RuntimeError("there is no pending EternalModManager confirmation")
-        self.workflow.mark_windows_installation(succeeded)
-        self.emit("windows_installation_confirmed", succeeded=succeeded)
 
     def close(self) -> None:
         self.disconnect()

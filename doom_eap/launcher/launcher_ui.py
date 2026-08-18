@@ -847,12 +847,6 @@ class LauncherUI(QMainWindow):
     def _reinstall(self) -> None:
         self._run_setup_action()
 
-    def _confirm_windows(self, succeeded: bool) -> None:
-        try:
-            self.controller.confirm_windows_installation(succeeded)
-        except Exception as error:
-            self._append_log(f"Installation confirmation error: {error}")
-
     def _request_dependency_consent(self, event: dict[str, object]) -> None:
         request_id = str(event.get("request_id", ""))
         if not request_id or request_id in self._resolved_consent_requests:
@@ -1365,23 +1359,37 @@ class LauncherUI(QMainWindow):
                 self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
             else:
                 self._set_setup_state("failed", str(event.get("message", "Try setup again.")))
-        elif kind == "manual_action_required":
-            message = str(event.get("message", "Finish the game manager step."))
-            self._set_setup_state("installing", message)
-            complete = QMessageBox.question(
+        elif kind == "manager_started":
+            message = str(event.get("message", "Complete installation in EternalModManager."))
+            self._set_setup_state("installing", "Complete installation in EternalModManager, then close it.")
+            self._append_log(message)
+        elif kind == "manager_closed":
+            self._append_log("EternalModManager closed.")
+        elif kind == "installation_confirmation_required":
+            request_id = str(event.get("request_id", ""))
+            message = str(event.get("message", "Did the mod installation complete successfully in EternalModManager?"))
+            reply = QMessageBox.question(
                 self,
                 "Confirm mod installation",
-                f"{message}\n\nDid EternalModManager finish installing this room mod?",
-            ) == QMessageBox.StandardButton.Yes
-            self._confirm_windows(complete)
-        elif kind == "windows_installation_confirmed":
-            if bool(event.get("succeeded")):
-                self._set_status("mod", "ready", self.COLORS["good"])
-                self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
-                self._show_page(2)
-                self._set_setup_state("ready")
+                f"{message}\n\nSelect YES if EternalModManager applied the mod without errors.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            confirmed = (reply == QMessageBox.StandardButton.Yes)
+            self.controller.resolve_installation_confirmation(request_id, confirmed)
+        elif kind == "injector_finished":
+            state = str(event.get("state", ""))
+            returncode = event.get("returncode")
+            stdout = str(event.get("stdout", ""))
+            stderr = str(event.get("stderr", ""))
+            if state == "applied":
+                self._append_log("Mod injector completed successfully.")
             else:
-                self._set_setup_state("failed", "Finish installation, then retry this room mod.")
+                self._append_log(f"Mod injector finished with state: {state} (code: {returncode})")
+                if stdout:
+                    self._append_log(f"Injector stdout: {stdout[-500:]}")
+                if stderr:
+                    self._append_log(f"Injector stderr: {stderr[-500:]}")
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")

@@ -83,7 +83,7 @@ After room connection reports that setup is required, select the explicit
 3. builds the room-specific mod package;
 4. stages the package in DOOM Eternal's mod directory;
 5. invokes the platform external tool;
-6. reports installation state and any manual action required.
+6. reports installation state.
 
 Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
 explicitly through Steam after setup.
@@ -92,14 +92,11 @@ explicitly through Steam after setup.
 
 1. Approve verified EternalModManager 4.2.3 acquisition or provide an official
    verified local artifact.
-2. Launcher stages the generated mod and opens EternalModManager.
-3. In EternalModManager, select the generated DOOM Eternal Archipelago mod.
-4. Press **Run Injector**.
-5. Return to launcher and confirm whether installation succeeded.
-6. Start DOOM Eternal through Steam.
-
-EternalModManager performs the injection through its interactive window. The
-launcher reports success after the workflow confirms completion.
+2. Launcher stages the generated mod into `Mods/` and opens EternalModManager.
+3. In EternalModManager, select the DOOM Eternal Archipelago room mod, run the
+   injector, and close EternalModManager when finished.
+4. In the launcher, confirm whether mod installation completed successfully.
+5. Start DOOM Eternal through Steam.
 
 ### Linux / Steam / Proton
 
