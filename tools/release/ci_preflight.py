@@ -92,10 +92,17 @@ def check_workflow_contract(repo_root: Path) -> None:
     if apworld_default != "doom_eternal":
         raise RuntimeError(f"Expected apworld_ref default to be 'doom_eternal', got {apworld_default!r}")
 
+    # Check frozen self-test presence before upload
+    if "DoomEternalArchipelagoLauncher --self-test" not in raw_text:
+        raise RuntimeError("Workflow missing 'DoomEternalArchipelagoLauncher --self-test' gate in Linux build job")
+    if "DoomEternalArchipelagoLauncher.exe --self-test" not in raw_text:
+        raise RuntimeError("Workflow missing 'DoomEternalArchipelagoLauncher.exe --self-test' gate in Windows build job")
+
     print("  [OK] Workflow trigger is workflow_dispatch only")
     print("  [OK] Workflow permissions are contents: read")
     print("  [OK] All 6 expected jobs present")
     print("  [OK] Module invocation python -m tools.release.build_launcher verified")
+    print("  [OK] Frozen binary self-test gates verified for Linux and Windows")
 
 
 def check_runtime_imports(repo_root: Path, archipelago_source: Path) -> None:

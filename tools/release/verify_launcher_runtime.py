@@ -2,8 +2,8 @@
 """Preflight verification for launcher and standalone AP client runtime imports.
 
 Verifies path precedence, stub resolution, third-party dependency availability,
-and bridge client importability without building, starting the UI, or invoking
-interactive setup prompts.
+static name correctness, hermetic LauncherController construction, and non-interactive
+launcher self-test execution without starting the UI or modifying user configuration.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ import argparse
 import importlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -27,6 +29,28 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
         return False
 
 
+def check_undefined_names(repo_root: Path) -> None:
+    """Run lightweight static undefined-name checks on launcher and release Python code."""
+    print("--> Checking for undefined names (F821/F822/F823)...")
+    target_dirs = [repo_root / "doom_eap", repo_root / "tools/release"]
+    ruff_bin = shutil.which("ruff")
+    if ruff_bin:
+        cmd = [ruff_bin, "check", "--select", "F821,F822,F823", *(str(p) for p in target_dirs)]
+        res = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
+        if res.returncode != 0:
+            raise RuntimeError(f"Undefined name check failed:\n{res.stdout}\n{res.stderr}")
+        print("  [OK] Ruff undefined name verification passed (F821, F822, F823)")
+    else:
+        # Fallback Python compilation check
+        for target in target_dirs:
+            for py_file in target.rglob("*.py"):
+                if "__pycache__" in py_file.parts:
+                    continue
+                source = py_file.read_text(encoding="utf-8")
+                compile(source, str(py_file), "exec")
+        print("  [OK] Python syntax compilation verified for runtime and release modules")
+
+
 def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> None:
     root = (repo_root or REPO_ROOT).resolve()
     ap_source = archipelago_source.resolve()
@@ -39,6 +63,9 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
     if not (ap_source / "CommonClient.py").is_file():
         raise RuntimeError(f"Invalid Archipelago source (missing CommonClient.py): {ap_source}")
 
+    # 0. Static Name Correctness Check
+    check_undefined_names(root)
+
     # Configure sys.path in the exact precedence order used by PyInstaller
     ordered_paths = [str(root), str(standalone_runtime), str(ap_source)]
     remaining_paths = [p for p in sys.path if p not in ordered_paths]
@@ -48,6 +75,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
     for mod in [
         "ModuleUpdate", "MultiServer", "worlds", "Utils", "NetUtils", "CommonClient",
         "doom_eap", "doom_eap.runtime.bridge_client", "doom_eap.launcher.launcher_app",
+        "doom_eap.launcher.launcher_controller",
     ]:
         sys.modules.pop(mod, None)
 
@@ -120,7 +148,10 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
 
     # 4. Hermetic Bridge Client Verification
     print("--> Checking DOOM Eternal bridge client importability (hermetic setup)...")
-    env_keys = ("DOOM_AP_CONFIG_FILE", "DOOM_AP_APPLICATION_DIR", "ARCHIPELAGO_SOURCE")
+    env_keys = (
+        "DOOM_AP_CONFIG_FILE", "DOOM_AP_APPLICATION_DIR", "ARCHIPELAGO_SOURCE",
+        "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "APPDATA", "LOCALAPPDATA",
+    )
     orig_env = {k: os.environ.get(k) for k in env_keys}
 
     with tempfile.TemporaryDirectory(prefix="doomeap_preflight_hermetic_") as tmp_dir_str:
@@ -206,6 +237,36 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
                     )
                 print(f"  [OK] Frozen bridge identity -> sha256={b_sha[:12]}... revision={b_rev}")
 
+            # 7. Hermetic LauncherController Construction
+            print("--> Checking hermetic LauncherController construction...")
+            fake_user_state = tmp_dir / "user_state"
+            fake_user_config = tmp_dir / "user_config"
+            fake_user_data = tmp_dir / "user_data"
+            fake_user_state.mkdir(parents=True, exist_ok=True)
+            fake_user_config.mkdir(parents=True, exist_ok=True)
+            fake_user_data.mkdir(parents=True, exist_ok=True)
+
+            os.environ["XDG_CONFIG_HOME"] = str(fake_user_config)
+            os.environ["XDG_STATE_HOME"] = str(fake_user_state)
+            os.environ["XDG_DATA_HOME"] = str(fake_user_data)
+            os.environ["APPDATA"] = str(fake_user_config)
+            os.environ["LOCALAPPDATA"] = str(fake_user_state)
+
+            from doom_eap.launcher.launcher_controller import LauncherController, LauncherState
+            controller = LauncherController(application_dir=root)
+            if controller.state != LauncherState.IDLE:
+                raise RuntimeError(f"LauncherController initial state unexpected: {controller.state}")
+            if controller.session_start_time <= 0:
+                raise RuntimeError("LauncherController session_start_time was not initialized")
+            print(f"  [OK] LauncherController constructed successfully (state={controller.state.value})")
+
+            # 8. Non-interactive Launcher Self-Test
+            print("--> Checking non-interactive launcher self-test mode...")
+            test_exit_code = launcher_mod.main(["--self-test"])
+            if test_exit_code != 0:
+                raise RuntimeError(f"launcher_app.main(['--self-test']) returned non-zero code {test_exit_code}")
+            print("  [OK] launcher_app --self-test returned code 0")
+
         finally:
             # Restore environment
             for k, v in orig_env.items():
@@ -213,8 +274,9 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-            # Clear bridge module so caller does not retain temporary paths
+            # Clear bridge and launcher modules so caller does not retain temporary paths
             sys.modules.pop("doom_eap.runtime.bridge_client", None)
+            sys.modules.pop("doom_eap.launcher.launcher_controller", None)
 
     print("\nStandalone runtime preflight verification: ALL CHECKS PASSED.")
 

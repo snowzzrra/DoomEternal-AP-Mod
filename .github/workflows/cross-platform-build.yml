@@ -237,6 +237,8 @@ jobs:
           test -f build/release/DoomEternalArchipelagoLauncher
           test -x build/release/DoomEternalArchipelagoLauncher
           test "$(dd if=build/release/DoomEternalArchipelagoLauncher bs=4 count=1 2>/dev/null)" = $'\x7fELF'
+          echo "--> Running frozen Linux launcher self-test..."
+          timeout 30s build/release/DoomEternalArchipelagoLauncher --self-test
           mkdir -p build/artifacts/linux
           cp build/release/DoomEternalArchipelagoLauncher build/artifacts/linux/
 
@@ -294,6 +296,8 @@ jobs:
         run: |
           test -f build/release/DoomEternalArchipelagoLauncher.exe
           test "$(dd if=build/release/DoomEternalArchipelagoLauncher.exe bs=2 count=1 2>/dev/null)" = "MZ"
+          echo "--> Running frozen Windows launcher self-test..."
+          build/release/DoomEternalArchipelagoLauncher.exe --self-test
           mkdir -p build/artifacts/windows
           cp build/release/DoomEternalArchipelagoLauncher.exe build/artifacts/windows/
 

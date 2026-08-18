@@ -51,6 +51,10 @@ class TestCIPreflightAndHardening(unittest.TestCase):
         # Launcher jobs run verify_launcher_runtime before PyInstaller
         self.assertIn("tools.release.verify_launcher_runtime", content)
 
+        # Launcher jobs run frozen --self-test before artifact upload
+        self.assertIn("DoomEternalArchipelagoLauncher --self-test", content)
+        self.assertIn("DoomEternalArchipelagoLauncher.exe --self-test", content)
+
         # Native job installs wine64-tools and runs linkability preflight
         self.assertIn("wine64-tools", content)
         self.assertIn("Native Toolchain & Linkability Preflight", content)
@@ -111,6 +115,11 @@ class TestCIPreflightAndHardening(unittest.TestCase):
     def test_verify_launcher_runtime_passes_hermetically(self):
         from tools.release.verify_launcher_runtime import verify_runtime
         verify_runtime(ARCHIPELAGO_ROOT, REPO_ROOT)
+
+    def test_launcher_self_test_cli(self):
+        from doom_eap.launcher.launcher_app import main as launcher_main
+        code = launcher_main(["--self-test"])
+        self.assertEqual(code, 0)
 
     def test_hermetic_no_interactive_prompts(self):
         """Prove that verify_runtime invokes zero interactive prompts (GUI or CLI)."""
