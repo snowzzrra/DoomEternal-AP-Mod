@@ -276,8 +276,9 @@ class LauncherController:
     def is_game_running(self) -> bool:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
 
-    def launch_game(self) -> str:
+    def launch_game(self, *, platform: str | None = None) -> str:
         """Launch through Steam URL handler after validating live runtime prerequisites."""
+        target_platform = platform if platform is not None else os.name
         game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
         if not game_root:
             raise RuntimeError("DOOM Eternal installation is not configured.")
@@ -286,7 +287,9 @@ class LauncherController:
         if not prereqs.ok:
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
-        self._ensure_native_client()
+        if target_platform == "nt":
+            if not self._ensure_native_client(platform=target_platform):
+                raise RuntimeError("Could not start Doom Eternal Archipelago client runtime (ap_client.exe).")
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
         return url
@@ -412,6 +415,7 @@ class LauncherController:
         pending: dict[str, str] | None = None
         emit_event = True
         intentional_disconnect = False
+        stop_native = False
         with self._lifecycle_lock:
             if supervisor is not self.supervisor:
                 return
@@ -433,7 +437,7 @@ class LauncherController:
                     self.state = LauncherState.FAILED
                     self.connected_room = False
                     stop_failed_worker = supervisor.running
-                self._stop_native_client()
+                stop_native = True
             elif kind in {"client_stopping", "disconnected"}:
                 if (
                     self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING}
@@ -443,7 +447,7 @@ class LauncherController:
             elif kind == "worker_stopped":
                 self.supervisor = None
                 emit_event = False
-                self._stop_native_client()
+                stop_native = True
                 if self._pending_connect is not None:
                     pending = self._pending_connect
                     self._pending_connect = None
@@ -453,6 +457,8 @@ class LauncherController:
                     intentional_disconnect = True
                 elif self.state is not LauncherState.FAILED:
                     self.state = LauncherState.FAILED
+        if stop_native:
+            self._stop_native_client()
         if emit_event:
             self._record_event(event)
             self.events.put(event)

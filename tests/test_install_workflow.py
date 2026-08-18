@@ -6,6 +6,7 @@ import shutil
 import ssl
 import tarfile
 import tempfile
+import threading
 import time
 import unittest
 import zipfile
@@ -1236,15 +1237,77 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             self.controller.process_event({"type": "connected"})
             mock_ensure.assert_called_once()
 
-    def test_windows_native_client_ensured_before_game_launch(self):
+    def test_windows_launch_game_ensures_native_client_then_launches_steam(self):
         order = []
         fake_prereqs = MagicMock(ok=True)
-        with patch.object(self.controller, "_ensure_native_client", side_effect=lambda: order.append("ensure_client")), \
+        with patch.object(self.controller, "_ensure_native_client", side_effect=lambda **kw: order.append("ensure_client") or True), \
              patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \
              patch.object(launcher_controller_mod, "probe_runtime_prerequisites", return_value=fake_prereqs), \
-             patch.object(launcher_controller_mod, "launch_doom_via_steam", side_effect=lambda: order.append("launch_steam") or "steam://rungameid/782330"):
-            self.controller.launch_game()
+             patch.object(launcher_controller_mod, "launch_doom_via_steam", side_effect=lambda: order.append("launch_steam") or "steam://rungameid/782330") as mock_steam:
+            url = self.controller.launch_game(platform="nt")
             self.assertEqual(order, ["ensure_client", "launch_steam"])
+            self.assertEqual(url, "steam://rungameid/782330")
+            mock_steam.assert_called_once()
+
+    def test_windows_launch_game_fails_closed_when_ensure_fails(self):
+        fake_prereqs = MagicMock(ok=True)
+        with patch.object(self.controller, "_ensure_native_client", return_value=False), \
+             patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \
+             patch.object(launcher_controller_mod, "probe_runtime_prerequisites", return_value=fake_prereqs), \
+             patch.object(launcher_controller_mod, "launch_doom_via_steam") as mock_steam:
+            with self.assertRaises(RuntimeError) as ctx:
+                self.controller.launch_game(platform="nt")
+            self.assertIn("Could not start Doom Eternal Archipelago client runtime", str(ctx.exception))
+            mock_steam.assert_not_called()
+
+    def test_linux_launch_game_preserves_linux_behavior(self):
+        fake_prereqs = MagicMock(ok=True)
+        with patch.object(self.controller, "_ensure_native_client", return_value=False) as mock_ensure, \
+             patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \
+             patch.object(launcher_controller_mod, "probe_runtime_prerequisites", return_value=fake_prereqs), \
+             patch.object(launcher_controller_mod, "launch_doom_via_steam", return_value="steam://rungameid/782330") as mock_steam:
+            url = self.controller.launch_game(platform="posix")
+            self.assertEqual(url, "steam://rungameid/782330")
+            mock_steam.assert_called_once()
+            mock_ensure.assert_not_called()
+
+    def test_worker_error_path_stops_native_client_without_deadlock(self):
+        fake_supervisor = MagicMock()
+        fake_supervisor.running = False
+        self.controller.supervisor = fake_supervisor
+
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+        self.controller._native_client_process = fake_process
+
+        def worker_call():
+            self.controller._worker_event(fake_supervisor, {"type": "error", "message": "server error"})
+
+        thread = threading.Thread(target=worker_call)
+        thread.start()
+        thread.join(timeout=2.0)
+        self.assertFalse(thread.is_alive(), "Worker error handling deadlocked on _lifecycle_lock")
+        fake_process.terminate.assert_called_once()
+        self.assertIsNone(self.controller._native_client_process)
+        self.assertEqual(self.controller.state, launcher_controller_mod.LauncherState.FAILED)
+
+    def test_worker_stopped_path_stops_native_client_without_deadlock(self):
+        fake_supervisor = MagicMock()
+        self.controller.supervisor = fake_supervisor
+
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+        self.controller._native_client_process = fake_process
+
+        def worker_call():
+            self.controller._worker_event(fake_supervisor, {"type": "worker_stopped"})
+
+        thread = threading.Thread(target=worker_call)
+        thread.start()
+        thread.join(timeout=2.0)
+        self.assertFalse(thread.is_alive(), "Worker stopped handling deadlocked on _lifecycle_lock")
+        fake_process.terminate.assert_called_once()
+        self.assertIsNone(self.controller._native_client_process)
 
     def test_windows_native_client_not_started_on_unready_or_failed_states(self):
         # 1. Disconnected
