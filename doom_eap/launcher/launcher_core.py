@@ -269,6 +269,16 @@ class RoomCompiler:
 
     def __init__(self, base_resource: Path, payload_resource: Path, payload_manifest: Path):
         from tools.release.room_payloads import load_room_payload_manifest
+        missing = [
+            str(p)
+            for p in (base_resource, payload_resource, payload_manifest)
+            if not p.is_file()
+        ]
+        if missing:
+            raise FileNotFoundError(
+                "Release package is incomplete or corrupted. "
+                "Re-extract the full DOOM Eternal Archipelago package."
+            )
         self.base_resource = base_resource
         self.payload_resource = payload_resource
         self.payload_manifest = load_room_payload_manifest(payload_manifest)
