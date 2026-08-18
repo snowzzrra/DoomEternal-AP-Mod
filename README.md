@@ -336,7 +336,7 @@ Repair/Fix, and a sanitized support report.
 - tastyfresh (from the Doom 2016+ Modding Discord server) for the original 
   large check list for project setup.
 - Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct 
-  technical guidance and map/runtime research.
+  technical guidance, map/runtime research and the [Windows Mod Injector](https://gamebanana.com/tools/7475).
 - alby (from the Doom 2016+ Modding Discord server) for technical help, runtime
   investigation, and safe-native-behavior
   guidance.
@@ -348,6 +348,7 @@ Repair/Fix, and a sanitized support report.
   and `idFileDeCompressor`.
 - FlavorfulGecko5 and the EntitySlayer contributors for
   [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
+- leveste for [Eternal Mod Injector Shell](hhttps://github.com/leveste/EternalBasher/).
 - The DOOM Modding community for EternalModInjector, wiki material, and
   general knowledge that made the map patches possible.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model.
