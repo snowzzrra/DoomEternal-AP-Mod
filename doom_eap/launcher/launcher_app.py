@@ -104,10 +104,11 @@ def _run_self_test(arguments: list[str]) -> int:
                 print(f"  [OK] Hermetic LauncherController constructed from bundled resources (state={controller.state.value})")
 
                 # Hermetic UI construction smoke test (executes __init__, _build, _session_page, etc.)
+                os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
                 from PySide6.QtWidgets import QApplication
                 from doom_eap.launcher.launcher_ui import LauncherUI
 
-                os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
                 app = QApplication.instance()
                 if app is None:
                     app = QApplication(["launcher_selftest", "-platform", "offscreen"])

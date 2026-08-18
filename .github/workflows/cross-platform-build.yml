@@ -85,6 +85,11 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Install Qt Runtime Libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -252,6 +257,11 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+
+      - name: Install Qt Runtime Libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1
 
       - name: Install Linux Launcher Dependencies
         run: |
