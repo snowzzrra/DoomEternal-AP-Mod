@@ -12,14 +12,10 @@ Performs deterministic, zero-compilation, zero-build validation of:
 from __future__ import annotations
 
 import argparse
-import importlib
-import json
-import os
-import shutil
-import subprocess
 import sys
-import yaml
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -174,6 +170,9 @@ def check_workflow_contract(repo_root: Path) -> None:
 
 
 def check_runtime_imports(repo_root: Path, archipelago_source: Path) -> None:
+    repo_str = str(repo_root.resolve())
+    if repo_str not in sys.path:
+        sys.path.insert(0, repo_str)
     from tools.release.verify_launcher_runtime import verify_runtime
     verify_runtime(archipelago_source, repo_root)
 

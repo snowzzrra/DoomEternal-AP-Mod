@@ -6,8 +6,10 @@ or external modding tools.
 
 ## Requirements
 
-Release package must contain:
+Game and runtime prerequisites:
 
+- DOOM Eternal (Steam installation);
+- [Meathook](https://github.com/flavorfulGecko5/Meathook) (`XINPUT1_3.dll` placed in the DOOM Eternal installation root directory);
 - `doometernal.apworld`;
 - `DoomEternalArchipelagoLauncher` on Linux or
   `DoomEternalArchipelagoLauncher.exe` on Windows;

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import deque
 import hashlib
 import json
 import os
@@ -13,9 +12,12 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
+
+from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
 from .launcher_core import LaunchWorkflow
 from .launcher_doctor import DoctorReport, LauncherDoctor, write_support_bundle
@@ -31,13 +33,13 @@ from .launcher_platform import (
     launch_doom_via_steam,
     launcher_user_paths,
     migrate_legacy_launcher_data,
-    redact_secrets,
+    probe_runtime_prerequisites,
     read_handshake_probe,
+    redact_secrets,
     validate_game_root,
     validate_save_directory,
 )
 from .launcher_supervisor import BridgeSupervisor
-from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
 
 def application_directory() -> Path:
@@ -191,7 +193,15 @@ class LauncherController:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
 
     def launch_game(self) -> str:
-        """Launch through Steam URL handler."""
+        """Launch through Steam URL handler after validating live runtime prerequisites."""
+        game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+        if not game_root:
+            raise RuntimeError("DOOM Eternal installation is not configured.")
+        root = validate_game_root(Path(str(game_root)))
+        prereqs = probe_runtime_prerequisites(root, self.client_dir, self.config)
+        if not prereqs.ok:
+            failed = [c.message for c in prereqs.checks if not c.ok]
+            raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
         return url
@@ -488,12 +498,16 @@ class LauncherController:
                     staged_mod=state.staged_mod,
                     steam_launch_option=state.steam_launch_option,
                     reason=state.reason,
+                    readiness=state.readiness,
+                    readiness_reason=state.readiness_reason,
                 )
             except Exception as error:
                 self.emit(
                     "room_install_state",
                     state="install_needed",
                     reason=f"could not verify installed room mod: {error}",
+                    readiness="blocked",
+                    readiness_reason=str(error),
                 )
 
     def send_command(self, text: str) -> None:

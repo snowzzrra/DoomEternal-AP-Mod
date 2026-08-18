@@ -115,6 +115,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             raise RuntimeError(f"Missing required third-party dependency: {dep} ({e})") from e
 
     import ssl
+
     import certifi
     ca_path = Path(certifi.where())
     if not ca_path.is_file():
@@ -230,7 +231,6 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
 
             # 5. Verify Launcher App Module
             print("--> Checking DOOM Eternal launcher app importability...")
-            sys.modules.pop("doom_eap.launcher.launcher_app", None)
             launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
             print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
 
@@ -241,7 +241,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
                 frozen_dir = Path(frozen_dir_str)
                 missing_module = frozen_dir / "_MEI99999/doom_eap/runtime/bridge_client.py"
                 missing_app = frozen_dir / "app"
-                b_file, b_sha, b_rev = resolve_bridge_identity(
+                _b_file, b_sha, b_rev = resolve_bridge_identity(
                     application_dir=missing_app,
                     repo_root=root,
                     module_file=missing_module,

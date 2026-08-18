@@ -15,10 +15,10 @@ from pathlib import Path
 
 from .launcher_platform import (
     detect_doom_processes,
+    probe_meathook,
     redact_secrets,
     validate_game_root,
 )
-
 
 SUPPORT_LOG_TAIL_BYTES = 256 * 1024
 
@@ -49,7 +49,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid"} for item in self.diagnostics)
+        return all(item.status not in {"error", "invalid", "missing"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {"version": self.version, "ok": self.ok, "diagnostics": [asdict(item) for item in self.diagnostics]}
@@ -389,6 +389,7 @@ class LauncherDoctor:
         platform_name = "windows" if os.name == "nt" else "linux"
         checks.append(Diagnostic("platform", "ok", platform_name))
         game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+        root: Path | None = None
         if game_root:
             try:
                 root = validate_game_root(Path(str(game_root)))
@@ -401,6 +402,14 @@ class LauncherDoctor:
             if isinstance(game_discovery, dict):
                 details = {"discovery": game_discovery}
             checks.append(Diagnostic("game", "missing", "DOOM Eternal installation is not configured", details))
+
+        meathook_probe = probe_meathook(root)
+        checks.append(Diagnostic(
+            "meathook",
+            meathook_probe.status.value,
+            meathook_probe.message,
+            meathook_probe.details,
+        ))
         checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": list(detect_doom_processes())}))
         checks.append(Diagnostic("config", "ok", "launcher configuration loaded", {"keys": sorted(self.config)}))
         actions = self.repair_actions()

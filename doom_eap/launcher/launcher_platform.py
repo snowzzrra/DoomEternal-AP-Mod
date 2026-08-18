@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import difflib
 import csv
+import difflib
 import hashlib
 import json
 import os
@@ -12,13 +12,14 @@ import shlex
 import shutil
 import ssl
 import subprocess
+import sys
 import tarfile
 import tempfile
 import urllib.request
 import webbrowser
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Protocol
@@ -154,6 +155,190 @@ def validate_save_directory(path: Path) -> Path:
     if not root.is_dir():
         raise ValueError(f"invalid DOOM Eternal save directory: {root}")
     return root
+
+
+class PrerequisiteStatus(str, Enum):
+    OK = "ok"
+    MISSING = "missing"
+    INVALID = "invalid"
+    NEEDS_USER_ACTION = "needs_user_action"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class PrerequisiteCheck:
+    key: str
+    status: PrerequisiteStatus
+    message: str
+    details: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def ok(self) -> bool:
+        return self.status == PrerequisiteStatus.OK
+
+
+@dataclass(frozen=True)
+class RuntimePrerequisiteReport:
+    checks: tuple[PrerequisiteCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """All mandatory beta.4 runtime prerequisites must be satisfied."""
+        return all(
+            check.ok
+            for check in self.checks
+            if check.key in {"game", "meathook", "client_runtime"}
+        )
+
+    def get(self, key: str) -> PrerequisiteCheck | None:
+        for check in self.checks:
+            if check.key == key:
+                return check
+        return None
+
+    @property
+    def meathook(self) -> PrerequisiteCheck | None:
+        return self.get("meathook")
+
+    @property
+    def game(self) -> PrerequisiteCheck | None:
+        return self.get("game")
+
+
+def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
+    """Probe the canonical Game Link / Meathook runtime library in DOOM Eternal root."""
+    if game_root is None:
+        return PrerequisiteCheck(
+            key="meathook",
+            status=PrerequisiteStatus.MISSING,
+            message="DOOM Eternal folder is not configured.",
+            details={"expected_path": "", "present": False, "status": "missing"},
+        )
+    try:
+        root = game_root.expanduser().resolve()
+        if root.name.casefold() == "base":
+            root = root.parent
+        dll_path = root / "XINPUT1_3.dll"
+    except (OSError, ValueError) as error:
+        return PrerequisiteCheck(
+            key="meathook",
+            status=PrerequisiteStatus.INVALID,
+            message=f"Invalid DOOM Eternal folder path: {error}",
+            details={"expected_path": "", "present": False, "status": "invalid"},
+        )
+
+    if not dll_path.is_file():
+        return PrerequisiteCheck(
+            key="meathook",
+            status=PrerequisiteStatus.MISSING,
+            message="Meathook runtime is not installed. Place XINPUT1_3.dll in the DOOM Eternal installation folder.",
+            details={"expected_path": str(dll_path), "present": False, "status": "missing"},
+        )
+
+    try:
+        size = dll_path.stat().st_size
+    except OSError as error:
+        return PrerequisiteCheck(
+            key="meathook",
+            status=PrerequisiteStatus.INVALID,
+            message=f"Could not read XINPUT1_3.dll: {error}",
+            details={"expected_path": str(dll_path), "present": True, "status": "invalid"},
+        )
+
+    if size <= 0:
+        return PrerequisiteCheck(
+            key="meathook",
+            status=PrerequisiteStatus.INVALID,
+            message="XINPUT1_3.dll is empty (0 bytes). Replace it with the official Meathook runtime library.",
+            details={"expected_path": str(dll_path), "present": True, "size_bytes": 0, "status": "invalid"},
+        )
+
+    return PrerequisiteCheck(
+        key="meathook",
+        status=PrerequisiteStatus.OK,
+        message="Meathook runtime found",
+        details={
+            "expected_path": str(dll_path),
+            "present": True,
+            "size_bytes": size,
+            "status": "present_unverified",
+        },
+    )
+
+
+def probe_runtime_prerequisites(
+    game_root: Path | None,
+    client_dir: Path | None = None,
+    config: Mapping[str, object] | None = None,
+) -> RuntimePrerequisiteReport:
+    """Probe all mandatory and advisory beta.4 runtime prerequisites."""
+    checks: list[PrerequisiteCheck] = []
+
+    # 1. Game installation check
+    if game_root is None:
+        checks.append(PrerequisiteCheck(
+            key="game",
+            status=PrerequisiteStatus.MISSING,
+            message="DOOM Eternal installation is not configured",
+            details={},
+        ))
+    else:
+        try:
+            validated_root = validate_game_root(game_root)
+            checks.append(PrerequisiteCheck(
+                key="game",
+                status=PrerequisiteStatus.OK,
+                message="DOOM Eternal installation validated",
+                details={"path": str(validated_root)},
+            ))
+        except ValueError as error:
+            checks.append(PrerequisiteCheck(
+                key="game",
+                status=PrerequisiteStatus.INVALID,
+                message=str(error),
+                details={"path": str(game_root)},
+            ))
+
+    # 2. Meathook check
+    checks.append(probe_meathook(game_root))
+
+    # 3. Client runtime check
+    if client_dir is not None:
+        packaged_bridge = client_dir / "bridge_client.py"
+        if packaged_bridge.is_file() or getattr(sys, "frozen", False):
+            checks.append(PrerequisiteCheck(
+                key="client_runtime",
+                status=PrerequisiteStatus.OK,
+                message="Bundled client runtime validated",
+                details={"path": str(client_dir)},
+            ))
+        else:
+            checks.append(PrerequisiteCheck(
+                key="client_runtime",
+                status=PrerequisiteStatus.MISSING,
+                message=f"Client runtime bridge is missing: {packaged_bridge}",
+                details={"expected_path": str(packaged_bridge)},
+            ))
+
+    # 4. Linux Steam Launch Options override check
+    if os.name != "nt" and config is not None:
+        launch_opts = str(config.get("steam_launch_options") or "")
+        if REQUIRED_DLL_OVERRIDE in launch_opts:
+            checks.append(PrerequisiteCheck(
+                key="linux_steam_override",
+                status=PrerequisiteStatus.OK,
+                message="Steam launch option configured with XINPUT1_3 override",
+                details={"configured": True},
+            ))
+        else:
+            checks.append(PrerequisiteCheck(
+                key="linux_steam_override",
+                status=PrerequisiteStatus.NEEDS_USER_ACTION,
+                message=f'Set Steam launch option: WINEDLLOVERRIDES="{REQUIRED_DLL_OVERRIDE}" %command%',
+                details={"required_override": REQUIRED_DLL_OVERRIDE, "configured": False},
+            ))
+
+    return RuntimePrerequisiteReport(tuple(checks))
 
 
 @dataclass(frozen=True)

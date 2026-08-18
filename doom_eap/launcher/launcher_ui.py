@@ -12,15 +12,39 @@ from typing import cast
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFileDialog, QDialog, QFrame, QGridLayout, QInputDialog,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QSlider,
+    QSpinBox,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
-from .launcher_controller import LauncherController
-from .launcher_platform import redact_secrets
 from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
+
+from .launcher_controller import LauncherController
+from .launcher_platform import (
+    probe_meathook,
+    redact_secrets,
+)
 
 
 class NamedRangeControl(QWidget):
@@ -660,6 +684,7 @@ class LauncherUI(QMainWindow):
             "update_required": ("UPDATE MOD", "This room needs its matching mod before playing.", "UPDATE MOD", True, "ACTION NEEDED"),
             "installing": ("INSTALLING MOD", "Preparing this room for play.", "INSTALLING...", False, "WORKING"),
             "updating": ("UPDATING MOD", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
+            "game_link_needed": ("GAME LINK SETUP NEEDED", "Meathook (XINPUT1_3.dll) is not installed in your DOOM Eternal folder. Install Meathook before playing.", "CHECK SETUP", True, "ACTION NEEDED"),
             "ready": ("READY TO PLAY", "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.", "", False, "READY"),
             "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
         }
@@ -682,6 +707,8 @@ class LauncherUI(QMainWindow):
             self._prepare()
         elif self._setup_state == "failed":
             self._prepare(force=True)
+        elif self._setup_state == "game_link_needed":
+            self._show_page(4)
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -1128,6 +1155,21 @@ class LauncherUI(QMainWindow):
         self._refresh_native_health()
 
     def _refresh_native_health(self) -> None:
+        game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
+        root = Path(str(game_root)).expanduser().resolve() if game_root else None
+        meathook = probe_meathook(root)
+        if self._setup_state == "game_link_needed":
+            if meathook.ok:
+                self._set_status("rpc", "waiting", self.COLORS["ap"])
+                self._set_setup_state("ready")
+            else:
+                self._set_status("rpc", "needs setup", self.COLORS["warn"])
+                return
+        elif self._setup_state == "ready" and not meathook.ok:
+            self._set_status("rpc", "needs setup", self.COLORS["warn"])
+            self._set_setup_state("game_link_needed", meathook.message)
+            return
+
         try:
             health = self.controller.native_health()
             state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
@@ -1241,11 +1283,18 @@ class LauncherUI(QMainWindow):
             if option:
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             state, reason = str(event.get("state", "")), str(event.get("reason", ""))
+            readiness = str(event.get("readiness", "ready"))
+            readiness_reason = str(event.get("readiness_reason", ""))
             if state == "already_installed":
                 self.drift.hide()
-                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
-                self._show_page(2)
-                self._set_setup_state("ready")
+                if readiness == "blocked":
+                    self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
+                    self._show_page(2)
+                    self._set_setup_state("game_link_needed", readiness_reason)
+                else:
+                    self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                    self._show_page(2)
+                    self._set_setup_state("ready")
             else:
                 drift = state == "update_required" or "another room" in reason
                 self.drift.setText("ROOM UPDATE - " + (reason or "This room needs its matching mod.")); self.drift.setVisible(drift)
@@ -1269,9 +1318,17 @@ class LauncherUI(QMainWindow):
             if option:
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
-                self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
-                self._show_page(2)
-                self._set_setup_state("ready")
+                game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
+                root = Path(str(game_root)).expanduser().resolve() if game_root else None
+                meathook = probe_meathook(root)
+                if not meathook.ok:
+                    self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
+                    self._show_page(2)
+                    self._set_setup_state("game_link_needed", meathook.message)
+                else:
+                    self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
+                    self._show_page(2)
+                    self._set_setup_state("ready")
             elif state == "manual_action_required":
                 self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
             else:

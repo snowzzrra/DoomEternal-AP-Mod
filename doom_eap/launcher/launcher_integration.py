@@ -20,6 +20,7 @@ from .launcher_platform import (
     LinuxModManagerAdapter,
     SteamLaunchOptionsManager,
     WindowsModManagerAdapter,
+    probe_runtime_prerequisites,
     stage_room_mod,
 )
 
@@ -48,6 +49,8 @@ class InstallState:
     staged_mod: str = ""
     steam_launch_option: str = ""
     reason: str = ""
+    readiness: str = "ready"
+    readiness_reason: str = ""
 
 
 class IntegratedLaunchWorkflow:
@@ -176,7 +179,27 @@ class IntegratedLaunchWorkflow:
             return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, f"installed package validation failed: {error}")
         if adapter_state != "applied" and not (adapter_state == "manual_action_required" and windows_confirmed):
             return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
-        return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option)
+
+        # Room package is verified installed. Now check live runtime prerequisites.
+        try:
+            config = self._config()
+            game_root = self._game_root(config)
+            prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
+            if not prereqs.ok:
+                meathook = prereqs.meathook
+                reason = meathook.message if meathook and not meathook.ok else "Runtime prerequisites not met"
+                return InstallState(
+                    "already_installed",
+                    manifest.manifest_hash,
+                    str(staged),
+                    steam_option,
+                    readiness="blocked",
+                    readiness_reason=reason,
+                )
+        except Exception:
+            pass
+
+        return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option, readiness="ready")
 
     def mark_windows_installation(self, succeeded: bool) -> None:
         if not succeeded:
@@ -244,6 +267,25 @@ class IntegratedLaunchWorkflow:
         raise RuntimeError(f"unsupported platform: {self.platform_name}")
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        config = self._config()
+        game_root = self._game_root(config)
+        prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
+        if not prereqs.ok:
+            meathook = prereqs.meathook
+            if meathook and not meathook.ok:
+                self._emit(
+                    "prerequisite_missing",
+                    key="meathook",
+                    message=meathook.message,
+                    details=meathook.details,
+                )
+                raise RuntimeError(
+                    "Meathook runtime is not installed (<DOOM root>/XINPUT1_3.dll). "
+                    "Install Meathook before preparing the room mod."
+                )
+            failed = [c.message for c in prereqs.checks if not c.ok]
+            raise RuntimeError(f"Runtime prerequisites not met: {'; '.join(failed)}")
+
         manifest = self.base_workflow.manifest_for(snapshot)
         self._emit(
             "room_validated",
@@ -265,8 +307,6 @@ class IntegratedLaunchWorkflow:
             manifest,
             self.state_dir / "generated_mods",
         )
-        config = self._config()
-        game_root = self._game_root(config)
         runtime_config = self.base_workflow.write_client_config(
             self.application_dir,
             endpoint=endpoint or str(config.get("server_address") or ""),
