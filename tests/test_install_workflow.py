@@ -28,20 +28,22 @@ from doom_eap.launcher.launcher_doctor import (
     _log_freshness,
     write_support_bundle,
 )
-from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
+from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
 from doom_eap.launcher.launcher_platform import (
-    WINDOWS_MOD_MANAGER,
+    WINDOWS_INJECTOR_REQUIRED_MEMBERS,
+    WINDOWS_MOD_INJECTOR,
     DependencyManager,
     DependencySpec,
     InstalledDependency,
     PrerequisiteStatus,
     UrlDownloadTransport,
-    WindowsModManagerAdapter,
+    WindowsModInjectorAdapter,
     create_secure_ssl_context,
     install_meathook,
     is_transient_download_error,
     probe_meathook,
     probe_runtime_prerequisites,
+    stage_windows_injector_toolchain,
 )
 
 
@@ -654,19 +656,147 @@ class TestUrlDownloadTransportRetries(unittest.TestCase):
         self.assertFalse(is_transient_download_error(urllib.error.URLError(ssl.SSLError("cert"))))
 
     def test_windows_specs(self):
-        self.assertEqual(WINDOWS_MOD_MANAGER.name, "EternalModManager")
-        self.assertEqual(WINDOWS_MOD_MANAGER.version, "4.2.3")
-        self.assertEqual(WINDOWS_MOD_MANAGER.archive_type, "zip")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.name, "EternalModInjector")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.version, "2026-08-18")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.archive_type, "zip")
         self.assertEqual(
-            WINDOWS_MOD_MANAGER.sha256,
-            "5701f30683b06a74fcbd9b56891f60fa5a80ca9019337141aa9908356f766b59",
+            WINDOWS_MOD_INJECTOR.sha256,
+            "94d2e04783800e983222f90b8eb304d02fc216e43c3a71f39cd324f5f1970a84",
         )
-        self.assertIn("github.com/brunoanc/EternalModManager", WINDOWS_MOD_MANAGER.url)
-        self.assertNotIn("gamebanana", WINDOWS_MOD_MANAGER.url)
+        self.assertEqual(WINDOWS_MOD_INJECTOR.url, "https://gamebanana.com/dl/1788872")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.executable_glob, "**/EternalModInjector.bat")
+        self.assertEqual(len(WINDOWS_INJECTOR_REQUIRED_MEMBERS), 14)
+        self.assertIn("EternalModInjector.bat", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
+        self.assertIn("EternalModManager.exe", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
+        self.assertIn("base/BlangParser.dll", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
+        self.assertIn("base/DEternal_loadMods.exe", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
 
 
-class TestWindowsModManagerAdapter(unittest.TestCase):
-    def test_adapter_launches_manager_waits_for_exit_and_requests_confirmation_yes(self):
+class TestWindowsToolchainStaging(unittest.TestCase):
+    def _create_mock_dep_root(self, root: Path) -> InstalledDependency:
+        root.mkdir(parents=True, exist_ok=True)
+        for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+            member_path = root / member
+            member_path.parent.mkdir(parents=True, exist_ok=True)
+            member_path.write_bytes(f"content_of_{member}".encode("utf-8"))
+        bat_path = root / "EternalModInjector.bat"
+        return InstalledDependency(
+            "EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(root), str(bat_path)
+        )
+
+    def test_staging_on_clean_game_root(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            dep_root = tmp / "dep"
+            dep = self._create_mock_dep_root(dep_root)
+            game_root = tmp / "game"
+            game_root.mkdir()
+            state_dir = tmp / "state"
+
+            bat = stage_windows_injector_toolchain(dep, game_root, state_dir=state_dir)
+            self.assertTrue(bat.is_file())
+            self.assertTrue((game_root / "EternalModInjector.bat").is_file())
+            self.assertTrue((game_root / "EternalModManager.exe").is_file())
+            self.assertTrue((game_root / "base" / "DEternal_loadMods.exe").is_file())
+            self.assertTrue((game_root / "Mods").is_dir())
+
+            settings = game_root / "EternalModInjector Settings.txt"
+            self.assertTrue(settings.is_file())
+            content = settings.read_text(encoding="utf-8")
+            self.assertIn(":AUTO_LAUNCH_GAME=0", content)
+            self.assertIn(":AUTO_UPDATE=0", content)
+            self.assertNotIn(":HAS_READ_FIRST_TIME=1", content)
+
+    def test_staging_preserves_identical_files_and_backs_up_differing_files(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            dep_root = tmp / "dep"
+            dep = self._create_mock_dep_root(dep_root)
+            game_root = tmp / "game"
+            game_root.mkdir()
+            state_dir = tmp / "state"
+
+            # Pre-create one identical file and one differing file
+            (game_root / "base").mkdir(parents=True, exist_ok=True)
+            (game_root / "EternalModInjector.bat").write_bytes(b"content_of_EternalModInjector.bat")  # identical
+            differing_file = game_root / "base" / "DEternal_loadMods.exe"
+            differing_file.write_bytes(b"old_different_loader_bytes")
+
+            stage_windows_injector_toolchain(dep, game_root, state_dir=state_dir)
+
+            # Check differing file was replaced with verified member
+            self.assertEqual(differing_file.read_bytes(), b"content_of_base/DEternal_loadMods.exe")
+
+            # Check backup directory was created for differing file
+            backup_root = state_dir / "repair-backups" / "windows-injector"
+            self.assertTrue(backup_root.is_dir())
+            backup_dirs = list(backup_root.glob("*"))
+            self.assertEqual(len(backup_dirs), 1)
+            backed_up = backup_dirs[0] / "base" / "DEternal_loadMods.exe"
+            self.assertTrue(backed_up.is_file())
+            self.assertEqual(backed_up.read_bytes(), b"old_different_loader_bytes")
+
+    def test_staging_preserves_existing_settings_and_mods(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            dep_root = tmp / "dep"
+            dep = self._create_mock_dep_root(dep_root)
+            game_root = tmp / "game"
+            game_root.mkdir()
+            mods_dir = game_root / "Mods"
+            mods_dir.mkdir()
+            custom_player_mod = mods_dir / "my_custom_skin.zip"
+            custom_player_mod.write_bytes(b"custom_skin")
+
+            settings_file = game_root / "EternalModInjector Settings.txt"
+            settings_file.write_text(
+                ":ASSET_VERSION=2025-01-01\n:AUTO_LAUNCH_GAME=1\n:CUSTOM_OPTION=true\n",
+                encoding="utf-8",
+            )
+
+            stage_windows_injector_toolchain(dep, game_root)
+
+            # Mods folder untouched
+            self.assertTrue(custom_player_mod.is_file())
+            self.assertEqual(custom_player_mod.read_bytes(), b"custom_skin")
+
+            # Settings preserved
+            content = settings_file.read_text(encoding="utf-8")
+            self.assertIn(":ASSET_VERSION=2025-01-01", content)
+            self.assertIn(":AUTO_LAUNCH_GAME=0", content)
+            self.assertIn(":AUTO_UPDATE=0", content)
+            self.assertIn(":CUSTOM_OPTION=true", content)
+
+    def test_staging_missing_required_members_raises_error(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            dep_root = tmp / "dep_corrupted"
+            dep_root.mkdir()
+            (dep_root / "EternalModInjector.bat").write_bytes(b"batch")
+            # Missing other 13 files
+            dep = InstalledDependency(
+                "EternalModInjector", "2026-08-18", "sha", "url", str(dep_root), str(dep_root / "EternalModInjector.bat")
+            )
+            game_root = tmp / "game"
+            game_root.mkdir()
+            with self.assertRaises(RuntimeError) as ctx:
+                stage_windows_injector_toolchain(dep, game_root)
+            self.assertIn("missing", str(ctx.exception).casefold())
+
+
+class TestWindowsModInjectorAdapter(unittest.TestCase):
+    def _create_mock_dep_root(self, root: Path) -> InstalledDependency:
+        root.mkdir(parents=True, exist_ok=True)
+        for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+            member_path = root / member
+            member_path.parent.mkdir(parents=True, exist_ok=True)
+            member_path.write_bytes(f"content_of_{member}".encode("utf-8"))
+        bat_path = root / "EternalModInjector.bat"
+        return InstalledDependency(
+            "EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(root), str(bat_path)
+        )
+
+    def test_adapter_launches_batch_waits_for_exit_and_requests_confirmation_yes(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
             game_root = tmp / "doom"
@@ -677,24 +807,21 @@ class TestWindowsModManagerAdapter(unittest.TestCase):
                 zf.writestr("test.txt", "mod")
 
             dep_root = tmp / "dep"
-            dep_root.mkdir()
-            exe_file = dep_root / "EternalModManager.exe"
-            exe_file.write_bytes(b"manager_exe")
-
-            dep = InstalledDependency(
-                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
-            )
+            dep = self._create_mock_dep_root(dep_root)
 
             call_log: list[str] = []
             events: list[tuple[str, dict[str, object]]] = []
 
             class FakeProcess:
+                def __init__(self):
+                    self.returncode = 0
+
                 def wait(self):
                     call_log.append("process_wait")
                     return 0
 
-            def mock_opener(cmd):
-                call_log.append(f"opened:{cmd[0]}")
+            def mock_opener(cmd, cwd):
+                call_log.append(f"opened:{Path(cmd[3]).name} in {cwd}")
                 return FakeProcess()
 
             def mock_confirmer():
@@ -704,8 +831,9 @@ class TestWindowsModManagerAdapter(unittest.TestCase):
             def mock_event_sink(kind, **payload):
                 events.append((kind, payload))
 
-            adapter = WindowsModManagerAdapter(
+            adapter = WindowsModInjectorAdapter(
                 dep,
+                state_dir=tmp / "state",
                 opener=mock_opener,
                 confirmer=mock_confirmer,
                 event_sink=mock_event_sink,
@@ -717,13 +845,14 @@ class TestWindowsModManagerAdapter(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertEqual(
                 call_log,
-                [f"opened:{exe_file}", "process_wait", "confirmer_called"],
+                [f"opened:EternalModInjector.bat in {game_root}", "process_wait", "confirmer_called"],
             )
             event_names = [e[0] for e in events]
-            self.assertEqual(event_names, ["manager_started", "manager_closed"])
+            self.assertEqual(event_names, ["injector_started", "injector_closed"])
             self.assertTrue((game_root / "Mods" / "DoomEternalArchipelago-123.zip").is_file())
+            self.assertEqual(result.details.get("installation_mode"), "windows_injector_assisted")
 
-    def test_adapter_confirmation_no_results_in_failed_state(self):
+    def test_adapter_confirmation_no_results_in_manual_install_required(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
             game_root = tmp / "doom"
@@ -734,29 +863,29 @@ class TestWindowsModManagerAdapter(unittest.TestCase):
                 zf.writestr("test.txt", "mod")
 
             dep_root = tmp / "dep"
-            dep_root.mkdir()
-            exe_file = dep_root / "EternalModManager.exe"
-            exe_file.write_bytes(b"manager_exe")
+            dep = self._create_mock_dep_root(dep_root)
 
-            dep = InstalledDependency(
-                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
-            )
+            events: list[str] = []
 
             class FakeProcess:
+                returncode = 0
+
                 def wait(self):
                     return 0
 
-            adapter = WindowsModManagerAdapter(
+            adapter = WindowsModInjectorAdapter(
                 dep,
-                opener=lambda cmd: FakeProcess(),
+                state_dir=tmp / "state",
+                opener=lambda cmd, cwd: FakeProcess(),
                 confirmer=lambda: False,
+                event_sink=lambda kind, **payload: events.append(kind),
             )
 
             result = adapter.activate(game_root, mod_zip)
-            self.assertEqual(result.state, "failed")
-            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.state, "manual_install_required")
+            self.assertIn("installation_declined", events)
 
-    def test_adapter_handles_opener_or_wait_failure(self):
+    def test_adapter_handles_nonzero_exit_code_and_opener_failure(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
             game_root = tmp / "doom"
@@ -767,37 +896,35 @@ class TestWindowsModManagerAdapter(unittest.TestCase):
                 zf.writestr("test.txt", "mod")
 
             dep_root = tmp / "dep"
-            dep_root.mkdir()
-            exe_file = dep_root / "EternalModManager.exe"
-            exe_file.write_bytes(b"manager_exe")
+            dep = self._create_mock_dep_root(dep_root)
 
-            dep = InstalledDependency(
-                "EternalModManager", "4.2.3", "sha", "url", str(dep_root), str(exe_file)
+            # Nonzero exit code
+            class FailedProcess:
+                returncode = 2
+
+                def wait(self):
+                    return 2
+
+            adapter_nonzero = WindowsModInjectorAdapter(
+                dep,
+                state_dir=tmp / "state",
+                opener=lambda cmd, cwd: FailedProcess(),
+                confirmer=lambda: True,
             )
+            res_nonzero = adapter_nonzero.activate(game_root, mod_zip)
+            self.assertEqual(res_nonzero.state, "manual_install_required")
+            self.assertEqual(res_nonzero.returncode, 2)
 
             # Opener error
-            adapter_opener_err = WindowsModManagerAdapter(
+            adapter_opener_err = WindowsModInjectorAdapter(
                 dep,
+                state_dir=tmp / "state",
                 opener=MagicMock(side_effect=OSError("Access denied")),
                 confirmer=lambda: True,
             )
             res_open_err = adapter_opener_err.activate(game_root, mod_zip)
-            self.assertEqual(res_open_err.state, "failed")
-            self.assertIn("Could not launch EternalModManager", res_open_err.message)
-
-            # Wait error
-            class BrokenProcess:
-                def wait(self):
-                    raise RuntimeError("Process vanished")
-
-            adapter_wait_err = WindowsModManagerAdapter(
-                dep,
-                opener=lambda cmd: BrokenProcess(),
-                confirmer=lambda: True,
-            )
-            res_wait_err = adapter_wait_err.activate(game_root, mod_zip)
-            self.assertEqual(res_wait_err.state, "failed")
-            self.assertIn("Error waiting for EternalModManager", res_wait_err.message)
+            self.assertEqual(res_open_err.state, "manual_install_required")
+            self.assertIn("Could not launch", res_open_err.message)
 
 
 class TestWindowsEndToEndAndDoctor(unittest.TestCase):
@@ -827,10 +954,11 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
         if schema_src.is_file():
             shutil.copy(schema_src, data_dir / "options_schema.json")
 
-    def _create_mock_manager_zip(self, destination: Path) -> Path:
+    def _create_mock_injector_zip(self, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(destination, "w") as zf:
-            zf.writestr("EternalModManager.exe", "manager_binary")
+            for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+                zf.writestr(member, f"content_{member}")
         return destination
 
     def test_windows_workflow_and_coordinator_with_confirmation_yes(self):
@@ -841,11 +969,11 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
             game_root = self._create_mock_game_root(tmp / "doom")
             self._create_mock_room_resources(app_dir)
 
-            manager_zip = tmp / "manager.zip"
-            self._create_mock_manager_zip(manager_zip)
-            manager_sha = hashlib.sha256(manager_zip.read_bytes()).hexdigest()
-            spec_manager = DependencySpec(
-                "EternalModManager", "4.2.3", "https://example.com/emm", manager_sha, "**/EternalModManager.exe", "zip"
+            injector_zip = tmp / "injector.zip"
+            self._create_mock_injector_zip(injector_zip)
+            injector_sha = hashlib.sha256(injector_zip.read_bytes()).hexdigest()
+            spec_injector = DependencySpec(
+                "EternalModInjector", "2026-08-18", "https://example.com/emi", injector_sha, "**/EternalModInjector.bat", "zip"
             )
 
             meathook_sha = hashlib.sha256(b"mock_meathook").hexdigest()
@@ -859,7 +987,7 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
                 json.dumps({
                     "game_root": str(game_root),
                     "doom_base_dir": str(game_root / "base"),
-                    "eternal_mod_manager_archive": str(manager_zip),
+                    "eternal_mod_injector_archive": str(injector_zip),
                 }),
                 encoding="utf-8",
             )
@@ -885,11 +1013,13 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
                 zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
 
             class FakeProcess:
+                returncode = 0
+
                 def wait(self):
                     return 0
 
-            with patch("doom_eap.launcher.launcher_platform.WINDOWS_MOD_MANAGER", spec_manager), \
-                 patch("doom_eap.launcher.launcher_integration.WINDOWS_MOD_MANAGER", spec_manager), \
+            with patch("doom_eap.launcher.launcher_platform.WINDOWS_MOD_INJECTOR", spec_injector), \
+                 patch("doom_eap.launcher.launcher_integration.WINDOWS_MOD_INJECTOR", spec_injector), \
                  patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook), \
                  patch.object(RoomCompiler, "__init__", return_value=None), \
                  patch.object(RoomCompiler, "build", return_value=fake_generated), \
@@ -902,49 +1032,77 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
             self.assertIn("mod_building", emitted_events)
             self.assertIn("runtime_config_ready", emitted_events)
             self.assertIn("mod_staged", emitted_events)
-            self.assertIn("manager_started", emitted_events)
-            self.assertIn("manager_closed", emitted_events)
+            self.assertIn("injector_started", emitted_events)
+            self.assertIn("injector_closed", emitted_events)
 
             self.assertEqual(state.state, "already_installed")
             self.assertEqual(state.readiness, "ready")
 
-    def test_doctor_fails_closed_if_mod_staged_but_installation_unconfirmed(self):
+    def test_manual_fallback_completion_and_doctor_flow(self):
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
-            game_root = self._create_mock_game_root(tmp / "doom")
+            app_dir = tmp / "app"
             state_dir = tmp / "state"
-            state_dir.mkdir(parents=True, exist_ok=True)
+            game_root = self._create_mock_game_root(tmp / "doom")
+            self._create_mock_room_resources(app_dir)
 
             meathook_sha = hashlib.sha256(b"mock_meathook").hexdigest()
             spec_meathook = DependencySpec(
                 "Meathook", "7.2", "https://example.com/mh", meathook_sha, "XINPUT1_3.dll", "file"
             )
 
-            receipt_path = state_dir / "launcher_setup.json"
-            staged_zip = game_root / "Mods" / "mod.zip"
-            with zipfile.ZipFile(staged_zip, "w") as zf:
-                zf.writestr("test.txt", "mod")
-            staged_sha = hashlib.sha256(staged_zip.read_bytes()).hexdigest()
-
-            receipt_path.write_text(
+            config_path = state_dir / "launcher_config.json"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(
                 json.dumps({
-                    "manifest_hash": "manifest123",
-                    "staged_mod": str(staged_zip),
-                    "staged_sha256": staged_sha,
-                    "adapter_state": "failed",
+                    "game_root": str(game_root),
+                    "doom_base_dir": str(game_root / "base"),
                 }),
                 encoding="utf-8",
             )
 
-            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook):
+            workflow = IntegratedLaunchWorkflow(
+                app_dir,
+                state_dir,
+                config_path,
+                platform_name="windows",
+                consent=lambda _s: False,  # Declines download
+            )
+
+            fake_generated = tmp / "generated.zip"
+            manifest = LaunchWorkflow().manifest_for(_snapshot())
+            with zipfile.ZipFile(fake_generated, "w") as zf:
+                zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+
+            with patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook), \
+                 patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "build", return_value=fake_generated):
+                record = workflow.execute(_snapshot())
+
+                self.assertEqual(record.adapter_state, "manual_install_required")
+                state_before = workflow.install_state(_snapshot())
+                self.assertEqual(state_before.state, "install_needed")
+
+                # Doctor fails closed before confirmation
                 doctor = LauncherDoctor(
                     config={"game_root": str(game_root)},
                     paths=MagicMock(state_dir=state_dir, config_dir=tmp, data_dir=tmp),
                 )
-                report = doctor.run()
-                self.assertFalse(report.ok)
-                mod_inj_diag = next(d for d in report.diagnostics if d.key == "mod_injection")
-                self.assertEqual(mod_inj_diag.status, "failed")
+                report_before = doctor.run()
+                self.assertFalse(report_before.ok)
+
+                # Player follows manual guide and clicks "I completed manual installation"
+                manual_record = workflow.confirm_manual_installation(_snapshot())
+                self.assertEqual(manual_record.adapter_state, "applied")
+                self.assertEqual(manual_record.installation_mode, "manual_fallback")
+
+                state_after = workflow.install_state(_snapshot())
+                self.assertEqual(state_after.state, "already_installed")
+                self.assertEqual(state_after.readiness, "ready")
+
+                # Doctor now reports OK
+                report_after = doctor.run()
+                self.assertTrue(report_after.ok)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
-from .launcher_core import LaunchWorkflow
+from .launcher_core import LaunchWorkflow, RoomSnapshot
 from .launcher_doctor import DoctorReport, LauncherDoctor, write_support_bundle
 from .launcher_integration import (
     IntegratedLaunchWorkflow,
@@ -404,9 +404,9 @@ class LauncherController:
         if spec.name == "Meathook":
             purpose = "Game Link runtime library"
             source = "GitHub / brongo"
-        elif spec.name == "EternalModManager":
-            purpose = "Windows mod manager"
-            source = "GitHub / brunoanc"
+        elif spec.name == "EternalModInjector":
+            purpose = "Windows mod installation tools"
+            source = "GameBanana / DOOM 2016+ Modding Community"
         else:
             purpose = "Mod installation tool"
             source = "GitHub"
@@ -443,7 +443,7 @@ class LauncherController:
         self.emit(
             "installation_confirmation_required",
             request_id=request_id,
-            message="Did the mod installation complete successfully in EternalModManager?",
+            message="Did the mod installation complete successfully in EternalModInjector?",
         )
         wait.wait(timeout=300.0)
         with self._confirmation_lock:
@@ -458,6 +458,25 @@ class LauncherController:
         wait, answer = pending
         answer.append(bool(confirmed))
         wait.set()
+
+    def confirm_manual_installation(self) -> bool:
+        """Confirm manual mod installation from the manual fallback state."""
+        with self._lifecycle_lock:
+            last_event = dict(self.setup._last_event) if self.setup._last_event else None
+        if not last_event:
+            raise RuntimeError("No connected room session is available.")
+        snapshot = RoomSnapshot.from_event(last_event)
+        record = self.workflow.confirm_manual_installation(snapshot, str(last_event.get("endpoint") or ""))
+        self.last_setup = record
+        self.emit(
+            "setup_ready",
+            manifest_hash=record.manifest_hash,
+            randomize_dash=record.randomize_dash,
+            adapter_state=record.adapter_state,
+            message=record.adapter_message,
+            steam_launch_option=record.steam_launch_option,
+        )
+        return True
 
     def _entrypoint(self) -> Path:
         if getattr(sys, "frozen", False):

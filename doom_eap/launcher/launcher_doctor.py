@@ -458,14 +458,22 @@ class LauncherDoctor:
             try:
                 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
                 adapter_state = str(receipt.get("adapter_state", ""))
+                mode = str(receipt.get("installation_mode", ""))
                 if adapter_state == "applied":
-                    checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state}))
+                    checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
+                    checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                elif adapter_state == "manual_install_required":
+                    checks.append(Diagnostic("mod_injection", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"adapter_state": adapter_state, "installation_mode": mode}))
+                    checks.append(Diagnostic("windows_mod_installer", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"installation_mode": mode, "adapter_state": adapter_state}))
                 else:
-                    checks.append(Diagnostic("mod_injection", "failed", f"Mod installation has not been applied (state: {adapter_state or 'unknown'})", {"adapter_state": adapter_state}))
+                    checks.append(Diagnostic("mod_injection", "failed", f"Mod installation has not been applied (state: {adapter_state or 'unknown'})", {"adapter_state": adapter_state, "installation_mode": mode}))
+                    checks.append(Diagnostic("windows_mod_installer", "failed", f"Windows mod installer is not ready (state: {adapter_state or 'unknown'})", {"installation_mode": mode, "adapter_state": adapter_state}))
             except Exception:
                 checks.append(Diagnostic("mod_injection", "invalid", "Could not parse launcher setup record"))
+                checks.append(Diagnostic("windows_mod_installer", "invalid", "Could not parse launcher setup record"))
         else:
             checks.append(Diagnostic("mod_injection", "ok", "No active room installation record"))
+            checks.append(Diagnostic("windows_mod_installer", "ok", "No active room installation record"))
 
         actions = self.repair_actions()
         if actions:

@@ -463,14 +463,35 @@ class DependencySpec:
     archive_type: str
 
 
-WINDOWS_MOD_MANAGER = DependencySpec(
-    name="EternalModManager",
-    version="4.2.3",
-    url=("https://github.com/brunoanc/EternalModManager/releases/download/v4.2.3/EternalModManager-4.2.3-win64.zip"),
-    sha256="5701f30683b06a74fcbd9b56891f60fa5a80ca9019337141aa9908356f766b59",
-    executable_glob="**/EternalModManager.exe",
+WINDOWS_INJECTOR_REQUIRED_MEMBERS: tuple[str, ...] = (
+    "EternalModInjector.bat",
+    "EternalModManager.exe",
+    "base/BlangParser.dll",
+    "base/DEternal_loadMods.exe",
+    "base/DEternal_patchManifest.exe",
+    "base/EternalPatcher.def",
+    "base/EternalPatcher.exe",
+    "base/EternalPatcher.exe.config",
+    "base/Newtonsoft.Json.dll",
+    "base/idRehash.exe",
+    "base/opusdec.exe",
+    "base/opusenc.exe",
+    "base/rs_data",
+    "base/zlib64.dll",
+)
+
+
+WINDOWS_MOD_INJECTOR = DependencySpec(
+    name="EternalModInjector",
+    version="2026-08-18",
+    url="https://gamebanana.com/dl/1788872",
+    sha256="94d2e04783800e983222f90b8eb304d02fc216e43c3a71f39cd324f5f1970a84",
+    executable_glob="**/EternalModInjector.bat",
     archive_type="zip",
 )
+
+# Compatibility alias
+WINDOWS_MOD_MANAGER = WINDOWS_MOD_INJECTOR
 
 LINUX_MOD_INJECTOR = DependencySpec(
     name="EternalModInjectorShell",
@@ -761,6 +782,7 @@ class AdapterResult:
     stdout: str = ""
     stderr: str = ""
     returncode: int | None = None
+    details: dict[str, object] = field(default_factory=dict)
 
 
 def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
@@ -855,57 +877,209 @@ def stage_room_mod(
     return staged
 
 
-class WindowsModManagerAdapter:
-    """Launch EternalModManager, track process lifetime, and request post-close player confirmation."""
+def configure_windows_injector_settings(game_root: Path) -> Path:
+    """Configure EternalModInjector Settings.txt to prevent automatic game launch while preserving existing settings."""
+    settings_file = game_root / "EternalModInjector Settings.txt"
+    if not settings_file.is_file():
+        settings_file.write_text(
+            "\n".join((
+                ":ASSET_VERSION=2026-04-03",
+                ":AUTO_LAUNCH_GAME=0",
+                ":AUTO_UPDATE=0",
+                "",
+            )),
+            encoding="utf-8",
+        )
+        return settings_file
+
+    lines = settings_file.read_text(encoding="utf-8", errors="replace").splitlines()
+    has_auto_launch = False
+    has_auto_update = False
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(":AUTO_LAUNCH_GAME="):
+            new_lines.append(":AUTO_LAUNCH_GAME=0")
+            has_auto_launch = True
+        elif stripped.startswith(":AUTO_UPDATE="):
+            new_lines.append(":AUTO_UPDATE=0")
+            has_auto_update = True
+        else:
+            new_lines.append(line)
+
+    if not has_auto_launch:
+        new_lines.append(":AUTO_LAUNCH_GAME=0")
+    if not has_auto_update:
+        new_lines.append(":AUTO_UPDATE=0")
+
+    settings_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return settings_file
+
+
+def stage_windows_injector_toolchain(
+    dependency: InstalledDependency,
+    game_root: Path,
+    *,
+    state_dir: Path | None = None,
+) -> Path:
+    """Safely install and verify the complete Windows EternalModInjector toolchain into game root."""
+    dep_root = Path(dependency.root)
+
+    missing_members = [
+        member for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS
+        if not (dep_root / member).is_file()
+    ]
+    if missing_members:
+        raise RuntimeError(
+            f"Windows mod injector package is corrupted or incomplete: missing {len(missing_members)} file(s): {', '.join(missing_members)}"
+        )
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_root = (state_dir / "repair-backups" / "windows-injector" / timestamp) if state_dir else None
+    backed_up_records: list[dict[str, str]] = []
+
+    for rel_path in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+        src = dep_root / rel_path
+        dest = game_root / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        src_bytes = src.read_bytes()
+        src_sha = hashlib.sha256(src_bytes).hexdigest()
+
+        if dest.is_file():
+            dest_bytes = dest.read_bytes()
+            dest_sha = hashlib.sha256(dest_bytes).hexdigest()
+            if dest_sha == src_sha:
+                continue
+            if backup_root is not None:
+                backup_file = backup_root / rel_path
+                backup_file.parent.mkdir(parents=True, exist_ok=True)
+                backup_file.write_bytes(dest_bytes)
+                backed_up_records.append({
+                    "path": str(dest),
+                    "original_sha256": dest_sha,
+                    "replacement_version": WINDOWS_MOD_INJECTOR.version,
+                    "replacement_sha256": src_sha,
+                })
+
+        incoming = dest.with_name(f".{dest.name}.incoming")
+        try:
+            incoming.write_bytes(src_bytes)
+            if hashlib.sha256(incoming.read_bytes()).hexdigest() != src_sha:
+                raise RuntimeError(f"staging validation failed for {rel_path}")
+            os.replace(incoming, dest)
+        finally:
+            if incoming.exists():
+                try:
+                    incoming.unlink()
+                except OSError:
+                    pass
+
+    (game_root / "Mods").mkdir(parents=True, exist_ok=True)
+    configure_windows_injector_settings(game_root)
+
+    if backup_root is not None and backed_up_records:
+        meta = {
+            "timestamp": datetime.now().isoformat(),
+            "replacement_version": WINDOWS_MOD_INJECTOR.version,
+            "backed_up_files": backed_up_records,
+        }
+        (backup_root / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+
+    batch_path = game_root / "EternalModInjector.bat"
+    if not batch_path.is_file():
+        raise RuntimeError("EternalModInjector.bat is missing after staging into game root.")
+    return batch_path
+
+
+class WindowsModInjectorAdapter:
+    """Stage verified EternalModInjector toolchain, launch visible batch console, track process lifetime, and request player confirmation."""
 
     def __init__(
         self,
         dependency: InstalledDependency,
         *,
-        opener: Callable[[Sequence[str]], Any] | None = None,
+        state_dir: Path | None = None,
+        opener: Callable[[Sequence[str], Path], Any] | None = None,
         confirmer: Callable[[], bool] | None = None,
         event_sink: Callable[..., None] | None = None,
     ):
         self.dependency = dependency
-        self.opener = opener or (lambda command: subprocess.Popen(command))
+        self.state_dir = state_dir
+        self.opener = opener or self._default_opener
         self.confirmer = confirmer or (lambda: False)
         self.event_sink = event_sink
 
+    @staticmethod
+    def _default_opener(command: Sequence[str], cwd: Path) -> subprocess.Popen:
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+        return subprocess.Popen(command, cwd=cwd, creationflags=flags)
+
     def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
         staged = _stage_mod(mod_zip, game_root)
-        command = (self.dependency.executable, str(game_root))
+        try:
+            batch_executable = stage_windows_injector_toolchain(
+                self.dependency,
+                game_root,
+                state_dir=self.state_dir,
+            )
+        except Exception as error:
+            return AdapterResult(
+                state="manual_install_required",
+                message=f"Could not stage Windows injector toolchain: {error}. Follow manual installation in INSTALL.md.",
+                details={"installation_mode": "manual_install_required", "staging_error": str(error)},
+            )
+
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        command = (comspec, "/d", "/c", str(batch_executable))
+
         if self.event_sink is not None:
             self.event_sink(
-                "manager_started",
+                "injector_started",
                 command=list(command),
                 staged_mod=staged.name,
                 message=(
-                    f"EternalModManager has been opened. Your Archipelago room mod ({staged.name}) "
-                    "is in the Mods folder. In EternalModManager, select the mod, run the injector, "
-                    "and close EternalModManager when done."
+                    "EternalModInjector is open in a separate command window.\n\n"
+                    "Follow the prompts in that window. Do not close this launcher.\n"
+                    "When the installer is finished, close the command window. Doom Eternal Archipelago will continue automatically."
                 ),
             )
+
         try:
-            process = self.opener(command)
+            process = self.opener(command, game_root)
         except Exception as error:
             return AdapterResult(
-                state="failed",
-                message=f"Could not launch EternalModManager: {error}",
+                state="manual_install_required",
+                message=f"Could not launch EternalModInjector.bat: {error}. Follow manual installation in INSTALL.md.",
                 command=command,
+                details={"installation_mode": "manual_install_required", "launch_error": str(error)},
             )
 
         try:
             if hasattr(process, "wait"):
                 process.wait()
+            returncode = getattr(process, "returncode", 0)
         except Exception as error:
             return AdapterResult(
-                state="failed",
-                message=f"Error waiting for EternalModManager to close: {error}",
+                state="manual_install_required",
+                message=f"Error waiting for EternalModInjector.bat: {error}. Follow manual installation in INSTALL.md.",
                 command=command,
+                details={"installation_mode": "manual_install_required", "wait_error": str(error)},
             )
 
         if self.event_sink is not None:
-            self.event_sink("manager_closed", command=list(command))
+            self.event_sink("injector_closed", command=list(command), returncode=returncode)
+
+        if returncode != 0:
+            return AdapterResult(
+                state="manual_install_required",
+                message=f"EternalModInjector exited with code {returncode}. Follow manual installation steps in INSTALL.md.",
+                command=command,
+                returncode=returncode,
+                details={
+                    "installation_mode": "windows_injector_assisted",
+                    "batch_returncode": returncode,
+                },
+            )
 
         confirmed = self.confirmer()
         if confirmed:
@@ -914,13 +1088,29 @@ class WindowsModManagerAdapter:
                 message="Mod installed successfully. Start DOOM Eternal through the launcher.",
                 command=command,
                 returncode=0,
+                details={
+                    "installation_mode": "windows_injector_assisted",
+                    "user_confirmed": True,
+                },
             )
+
+        if self.event_sink is not None:
+            self.event_sink("installation_declined", command=list(command))
+
         return AdapterResult(
-            state="failed",
-            message="Mod installation was not confirmed in EternalModManager.",
+            state="manual_install_required",
+            message="Mod installation was not confirmed in EternalModInjector. Follow manual installation steps in INSTALL.md.",
             command=command,
             returncode=1,
+            details={
+                "installation_mode": "windows_injector_assisted",
+                "user_confirmed": False,
+            },
         )
+
+
+# Compatibility alias
+WindowsModManagerAdapter = WindowsModInjectorAdapter
 
 
 class LinuxModManagerAdapter:

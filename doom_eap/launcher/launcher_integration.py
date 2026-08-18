@@ -14,13 +14,13 @@ from pathlib import Path
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot
 from .launcher_platform import (
     LINUX_MOD_INJECTOR,
-    WINDOWS_MOD_MANAGER,
+    WINDOWS_MOD_INJECTOR,
     AdapterResult,
     DependencyManager,
     GameLinkResult,
     LinuxModManagerAdapter,
     SteamLaunchOptionsManager,
-    WindowsModManagerAdapter,
+    WindowsModInjectorAdapter,
     install_meathook,
     probe_runtime_prerequisites,
     stage_room_mod,
@@ -43,6 +43,8 @@ class IntegratedSetupRecord:
     adapter_command: tuple[str, ...] = ()
     steam_launch_option: str = ""
     steam_launch_option_diff: str = ""
+    installation_mode: str = "automatic"
+    user_confirmed: bool = False
 
 
 @dataclass(frozen=True)
@@ -216,27 +218,30 @@ class IntegratedLaunchWorkflow:
         staged: Path,
     ) -> tuple[AdapterResult, str, str]:
         manager = DependencyManager(self.state_dir / "dependencies")
-        local_key = (
-            "eternal_mod_manager_archive"
-            if self.platform_name == "windows"
-            else "eternal_basher_archive"
-        )
-        local_value = config.get(local_key) or (config.get("eternal_mod_manager_zip") if self.platform_name == "windows" else None)
-        local_artifact = Path(str(local_value)).expanduser() if local_value else None
         if self.platform_name == "windows":
+            local_key = "eternal_mod_injector_archive"
+            local_value = (
+                config.get(local_key)
+                or config.get("eternal_mod_injector_zip")
+                or config.get("eternal_mod_manager_archive")
+                or config.get("eternal_mod_manager_zip")
+            )
+            local_artifact = Path(str(local_value)).expanduser() if local_value else None
             try:
-                dependency = self._acquire(manager, WINDOWS_MOD_MANAGER, local_artifact)
-            except PermissionError:
+                dependency = self._acquire(manager, WINDOWS_MOD_INJECTOR, local_artifact)
+            except Exception as error:
                 return (
                     AdapterResult(
-                        state="failed",
-                        message="EternalModManager download was not approved. Try setup again when ready.",
+                        state="manual_install_required",
+                        message=f"Automatic EternalModInjector setup could not be completed ({error}). Follow the Windows Manual Mod Installer section in INSTALL.md.",
+                        details={"installation_mode": "manual_install_required", "error": str(error)},
                     ),
                     "",
                     "",
                 )
-            adapter = WindowsModManagerAdapter(
+            adapter = WindowsModInjectorAdapter(
                 dependency,
+                state_dir=self.state_dir,
                 confirmer=self.confirmation,
                 event_sink=self._emit,
             )
@@ -244,6 +249,8 @@ class IntegratedLaunchWorkflow:
             return result, "", ""
         if self.platform_name == "linux":
             plan = self._steam_plan(config)
+            local_value = config.get("eternal_basher_archive")
+            local_artifact = Path(str(local_value)).expanduser() if local_value else None
             try:
                 dependency = self._acquire(manager, LINUX_MOD_INJECTOR, local_artifact)
             except PermissionError:
@@ -397,6 +404,8 @@ class IntegratedLaunchWorkflow:
         )
         self._emit("mod_staged", path=str(staged), manifest_hash=manifest.manifest_hash)
         adapter, steam_option, steam_diff = self._adapter(config, game_root, staged)
+        installation_mode = str(adapter.details.get("installation_mode", "automatic") if adapter.details else "automatic")
+        user_confirmed = bool(adapter.details.get("user_confirmed", False) if adapter.details else False)
         record = IntegratedSetupRecord(
             manifest_hash=manifest.manifest_hash,
             randomize_dash=manifest.options["randomize_dash"],
@@ -408,6 +417,8 @@ class IntegratedLaunchWorkflow:
             adapter_command=adapter.command,
             steam_launch_option=steam_option,
             steam_launch_option_diff=steam_diff,
+            installation_mode=installation_mode,
+            user_confirmed=user_confirmed,
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != record.staged_sha256:
@@ -432,12 +443,83 @@ class IntegratedLaunchWorkflow:
             encoding="utf-8",
         )
         os.replace(temporary, receipt_path)
-        if adapter.state == "manual_action_required":
+        if adapter.state == "manual_install_required":
             self._emit(
-                "manual_action_required",
+                "manual_install_required",
                 message=adapter.message,
-                command=list(adapter.command),
+                guide_section="Windows Manual Mod Installer",
+                guide_url="https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
             )
+        return record
+
+    def confirm_manual_installation(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        """Record manual mod installation completion after player verifies external injector run."""
+        config = self._config()
+        game_root = self._game_root(config)
+        manifest = self.base_workflow.manifest_for(snapshot)
+        receipt_path = self.state_dir / "launcher_setup.json"
+        staged_mod_path: Path | None = None
+        if receipt_path.is_file():
+            try:
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                candidate = Path(str(receipt.get("staged_mod", "")))
+                if candidate.is_file():
+                    with zipfile.ZipFile(candidate) as pkg:
+                        cand_manifest = json.loads(pkg.read("seed_manifest.json"))
+                        if cand_manifest.get("manifest_hash") == manifest.manifest_hash:
+                            staged_mod_path = candidate
+            except Exception:
+                pass
+
+        if staged_mod_path is None:
+            mods_dir = game_root / "Mods"
+            if mods_dir.is_dir():
+                for candidate in sorted(mods_dir.glob("*.zip")):
+                    try:
+                        with zipfile.ZipFile(candidate) as pkg:
+                            cand_manifest = json.loads(pkg.read("seed_manifest.json"))
+                            if cand_manifest.get("manifest_hash") == manifest.manifest_hash:
+                                staged_mod_path = candidate
+                                break
+                    except Exception:
+                        continue
+
+        if staged_mod_path is None:
+            raise RuntimeError("Current room mod is missing from DOOM Eternal Mods folder. Run setup again.")
+
+        staged_sha256 = hashlib.sha256(staged_mod_path.read_bytes()).hexdigest()
+        steam_plan = self._steam_plan(config) if self.platform_name == "linux" else None
+        steam_option = steam_plan.proposed if steam_plan else ""
+        steam_diff = steam_plan.diff if steam_plan else ""
+
+        record = IntegratedSetupRecord(
+            manifest_hash=manifest.manifest_hash,
+            randomize_dash=manifest.options["randomize_dash"],
+            generated_mod=str(staged_mod_path.resolve()),
+            staged_mod=str(staged_mod_path.resolve()),
+            staged_sha256=staged_sha256,
+            adapter_state="applied",
+            adapter_message="Manual mod installation confirmed by user.",
+            adapter_command=(),
+            steam_launch_option=steam_option,
+            steam_launch_option_diff=steam_diff,
+            installation_mode="manual_fallback",
+            user_confirmed=True,
+        )
+
+        payload = {
+            **asdict(record),
+            "endpoint": endpoint,
+            "seed_name": manifest.seed_name,
+            "team": manifest.team,
+            "slot": manifest.slot,
+        }
+        temporary = receipt_path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, receipt_path)
         return record
 
 
@@ -496,6 +578,18 @@ class RoomSetupCoordinator:
                         snapshot,
                         str(event.get("endpoint") or ""),
                     )
+                if record.adapter_state == "manual_install_required":
+                    self.result_sink(record)
+                    self.event_sink(
+                        "manual_install_required",
+                        {
+                            "manifest_hash": record.manifest_hash,
+                            "message": record.adapter_message,
+                            "guide_section": "Windows Manual Mod Installer",
+                            "guide_url": "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
+                        },
+                    )
+                    return
                 if record.adapter_state != "applied":
                     raise RuntimeError(record.adapter_message or "Mod setup was not applied.")
                 with self._state_lock:

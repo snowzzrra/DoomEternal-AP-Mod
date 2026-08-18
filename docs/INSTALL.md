@@ -17,8 +17,7 @@ Game and runtime prerequisites:
 
 Supported external mod injectors:
 
-- **Windows:** [EternalModManager](https://github.com/brunoanc/EternalModManager)
-  4.2.3;
+- **Windows:** [EternalModInjector](https://gamebanana.com/tools/7475) (Community mod injector toolchain);
 - **Linux/Proton:**
   [EternalModInjectorShell](https://github.com/leveste/EternalBasher)
   6.66-rev3.12.
@@ -86,17 +85,61 @@ After room connection reports that setup is required, select the explicit
 6. reports installation state.
 
 Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
-explicitly through Steam after setup.
+explicit through Steam after setup.
 
 ### Windows
 
-1. Approve verified EternalModManager 4.2.3 acquisition or provide an official
+1. Approve verified EternalModInjector acquisition or provide an official
    verified local artifact.
-2. Launcher stages the generated mod into `Mods/` and opens EternalModManager.
-3. In EternalModManager, select the DOOM Eternal Archipelago room mod, run the
-   injector, and close EternalModManager when finished.
+2. Launcher stages the generated mod into `Mods/`, stages the injector toolchain
+   into the DOOM Eternal root folder, and opens `EternalModInjector.bat` in a
+   visible command window.
+3. Follow all prompts in the command window. Close the command window when
+   installation completes.
 4. In the launcher, confirm whether mod installation completed successfully.
-5. Start DOOM Eternal through Steam.
+5. If automatic tool acquisition is unavailable or declined, follow the
+   [Windows Manual Mod Installer](#windows-manual-mod-installer) guide.
+6. Start DOOM Eternal through Steam.
+
+## Windows Manual Mod Installer
+
+If automatic installation is unavailable, install the mod loader manually:
+
+1. Close DOOM Eternal if it is running.
+2. Open the EternalModInjector Windows page:
+   [https://gamebanana.com/tools/7475](https://gamebanana.com/tools/7475)
+3. Download the current Windows EternalModInjector archive (`eternalmodinjector_19e3b.zip`).
+4. Extract the contents of the archive directly into your DOOM Eternal installation folder.
+   The resulting files in your DOOM Eternal installation folder must include:
+   - `EternalModInjector.bat`
+   - `EternalModManager.exe`
+   - `base/BlangParser.dll`
+   - `base/DEternal_loadMods.exe`
+   - `base/DEternal_patchManifest.exe`
+   - `base/EternalPatcher.def`
+   - `base/EternalPatcher.exe`
+   - `base/EternalPatcher.exe.config`
+   - `base/Newtonsoft.Json.dll`
+   - `base/idRehash.exe`
+   - `base/opusdec.exe`
+   - `base/opusenc.exe`
+   - `base/rs_data`
+   - `base/zlib64.dll`
+   - `Mods/`
+
+   Do not place the EternalModInjector ZIP file inside `Mods/`. The archive contents merge directly into the DOOM Eternal root folder.
+5. The Doom Eternal Archipelago launcher automatically places the current Archipelago room mod into `<DOOM root>/Mods/`.
+6. Ensure `EternalModInjector Settings.txt` in the DOOM Eternal folder contains:
+   ```text
+   :AUTO_LAUNCH_GAME=0
+   ```
+   so Doom Eternal Archipelago manages game startup.
+7. Run `EternalModInjector.bat`.
+8. Follow all prompts in the command window. On the first run, the tool displays informational pages and prompts.
+9. Allow the installer to finish and close the command window when prompted.
+10. Return to the Doom Eternal Archipelago launcher.
+11. Select **I completed manual installation** and confirm completion.
+12. Start DOOM Eternal through Steam.
 
 ### Linux / Steam / Proton
 
@@ -179,8 +222,7 @@ before sharing.
   do not reuse another room's package.
 - **Hash mismatch:** discard artifact and retry verified acquisition or provide a
   verified official artifact.
-- **Windows manual action required:** finish **Run Injector** in
-  EternalModManager, then confirm result in launcher.
+- **Windows manual mod installation:** follow the [Windows Manual Mod Installer](#windows-manual-mod-installer) section to extract `EternalModInjector` into the DOOM Eternal folder, set `:AUTO_LAUNCH_GAME=0` in `EternalModInjector Settings.txt`, run `EternalModInjector.bat`, and confirm installation in the launcher.
 - **Linux injector failure:** review interactive tool output and exit status,
   then retry setup.
 - **Bridge cannot reach game:** verify mod installation, one bridge instance,

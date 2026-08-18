@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import queue
 import re
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import cast
@@ -484,10 +485,22 @@ class LauncherUI(QMainWindow):
         setup_copy.addWidget(self.session_setup_title)
         setup_copy.addWidget(self.session_setup_detail)
         setup_layout.addLayout(setup_copy, 1)
+        setup_buttons = QHBoxLayout()
+        self.session_manual_complete_action = QPushButton("I COMPLETED MANUAL INSTALLATION")
+        self.session_manual_complete_action.setObjectName("secondary")
+        self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
+        self.session_manual_complete_action.setVisible(False)
+        self.session_manual_retry_action = QPushButton("TRY AGAIN")
+        self.session_manual_retry_action.setObjectName("secondary")
+        self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
+        self.session_manual_retry_action.setVisible(False)
         self.session_setup_action = QPushButton("INSTALL MOD")
         self.session_setup_action.setObjectName("primary")
         self.session_setup_action.clicked.connect(self._run_setup_action)
-        setup_layout.addWidget(self.session_setup_action, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        setup_buttons.addWidget(self.session_manual_complete_action)
+        setup_buttons.addWidget(self.session_manual_retry_action)
+        setup_buttons.addWidget(self.session_setup_action)
+        setup_layout.addLayout(setup_buttons, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         outer.addWidget(self.session_setup)
         header = QHBoxLayout()
         header.addWidget(self._label("SESSION", "title"))
@@ -686,6 +699,7 @@ class LauncherUI(QMainWindow):
             "updating": ("UPDATING MOD", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
             "game_link_needed": ("GAME LINK SETUP NEEDED", "Installs the verified Meathook v7.2 runtime required by DOOM Eternal Archipelago.", "SET UP GAME LINK", True, "ACTION NEEDED"),
             "game_link_update_needed": ("GAME LINK UPDATE NEEDED", "A different XINPUT1_3.dll is installed. DOOM Eternal Archipelago requires the verified Meathook v7.2 runtime.", "REPAIR GAME LINK", True, "ACTION NEEDED"),
+            "manual_install_required": ("WINDOWS MOD INSTALLER NEEDS MANUAL SETUP", "The automatic EternalModInjector setup could not be completed. You can install it manually using the Windows Manual Mod Installer section in INSTALL.md.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
             "ready": ("READY TO PLAY", "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.", "", False, "READY"),
             "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
         }
@@ -697,6 +711,8 @@ class LauncherUI(QMainWindow):
         self.session_setup_action.setText(action)
         self.session_setup_action.setEnabled(enabled)
         self.session_setup_action.setVisible(state != "ready")
+        self.session_manual_complete_action.setVisible(state == "manual_install_required")
+        self.session_manual_retry_action.setVisible(state == "manual_install_required")
         self.reinstall_button.setText(action)
         self.reinstall_button.setEnabled(enabled)
         self.reinstall_button.setVisible(state != "ready")
@@ -710,6 +726,8 @@ class LauncherUI(QMainWindow):
             self._prepare(force=True)
         elif self._setup_state == "game_link_needed":
             self._prepare(force=True)
+        elif self._setup_state == "manual_install_required":
+            self._open_manual_install_guide()
         elif self._setup_state == "game_link_update_needed":
             confirm = QMessageBox.question(
                 self,
@@ -728,6 +746,50 @@ class LauncherUI(QMainWindow):
                 except Exception as error:
                     self._append_log(f"Game Link repair error: {error}")
                     self._set_setup_state("failed", f"Game Link repair failed: {error}")
+
+    def _open_manual_install_guide(self) -> None:
+        """Open the Windows Manual Mod Installer section in INSTALL.md."""
+        manual_url = "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer"
+        local_candidates = [
+            self.controller.client_dir.parent / "docs" / "INSTALL.md",
+            self.controller.client_dir / "docs" / "INSTALL.md",
+            self.controller.client_dir / "INSTALL.md",
+            self.controller.application_dir / "docs" / "INSTALL.md",
+            self.controller.application_dir / "INSTALL.md",
+        ]
+        opened = False
+        for candidate in local_candidates:
+            if candidate.is_file():
+                try:
+                    webbrowser.open(candidate.resolve().as_uri())
+                    opened = True
+                    break
+                except Exception:
+                    pass
+        if not opened:
+            try:
+                webbrowser.open(manual_url)
+            except Exception as error:
+                self._append_log(f"Could not open browser: {error}")
+        self._append_log("Opened manual installation guide (INSTALL.md → Windows Manual Mod Installer).")
+
+    def _confirm_manual_installation(self) -> None:
+        """Prompt user confirmation for manual mod installation completion."""
+        reply = QMessageBox.question(
+            self,
+            "Confirm Manual Installation",
+            "Did EternalModInjector complete successfully?\n\n"
+            "Select YES if the room mod has been injected into DOOM Eternal.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.controller.confirm_manual_installation()
+                self._append_log("Manual mod installation confirmed.")
+            except Exception as error:
+                self._append_log(f"Manual installation confirmation error: {error}")
+                QMessageBox.warning(self, "Manual Installation Error", str(error))
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -788,7 +850,7 @@ class LauncherUI(QMainWindow):
         self._connect()
 
     def _primary_action(self) -> None:
-        if self._setup_state in {"install_needed", "update_required", "failed", "ready"}:
+        if self._setup_state in {"install_needed", "update_required", "failed", "ready", "manual_install_required"}:
             self._run_setup_action()
             return
         text = self.hero_action.text()
@@ -1359,24 +1421,37 @@ class LauncherUI(QMainWindow):
                 self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
             else:
                 self._set_setup_state("failed", str(event.get("message", "Try setup again.")))
-        elif kind == "manager_started":
-            message = str(event.get("message", "Complete installation in EternalModManager."))
-            self._set_setup_state("installing", "Complete installation in EternalModManager, then close it.")
+        elif kind in {"manager_started", "injector_started"}:
+            message = str(event.get("message", "Complete installation in EternalModInjector."))
+            self._set_setup_state("installing", "Complete installation in EternalModInjector, then close it.")
             self._append_log(message)
-        elif kind == "manager_closed":
-            self._append_log("EternalModManager closed.")
+        elif kind in {"manager_closed", "injector_closed"}:
+            returncode = event.get("returncode")
+            if returncode is not None:
+                self._append_log(f"EternalModInjector closed (code: {returncode}).")
+            else:
+                self._append_log("EternalModInjector closed.")
         elif kind == "installation_confirmation_required":
             request_id = str(event.get("request_id", ""))
-            message = str(event.get("message", "Did the mod installation complete successfully in EternalModManager?"))
+            message = str(event.get("message", "Did the mod installation complete successfully in EternalModInjector?"))
             reply = QMessageBox.question(
                 self,
                 "Confirm mod installation",
-                f"{message}\n\nSelect YES if EternalModManager applied the mod without errors.",
+                f"{message}\n\nSelect YES if EternalModInjector applied the mod without errors.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
             )
             confirmed = (reply == QMessageBox.StandardButton.Yes)
             self.controller.resolve_installation_confirmation(request_id, confirmed)
+        elif kind == "installation_declined":
+            self._set_status("mod", "failed", self.COLORS["warn"])
+            self._set_setup_state("manual_install_required", "Mod installation was not confirmed in EternalModInjector. Follow the manual install guide.")
+            self._append_log("Mod installation was not confirmed. Directing to Windows Manual Mod Installer.")
+        elif kind == "manual_install_required":
+            message = str(event.get("message", "Manual mod installation required."))
+            self._set_status("mod", "failed", self.COLORS["warn"])
+            self._set_setup_state("manual_install_required", message)
+            self._append_log(message)
         elif kind == "injector_finished":
             state = str(event.get("state", ""))
             returncode = event.get("returncode")
