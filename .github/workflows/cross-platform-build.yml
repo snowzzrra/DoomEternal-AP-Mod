@@ -253,21 +253,12 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install Launcher Dependencies
+      - name: Install Linux Launcher Dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
-      - name: Launcher CLI Preflight
-        run: |
-          python3 -m tools.release.build_launcher --help
-
-      - name: Standalone Runtime Import Preflight
-        timeout-minutes: 1
-        run: |
-          python3 -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
-
-      - name: Build Linux Launcher
+      - name: Build Linux Frozen Launcher
         run: |
           mkdir -p build/release
           python3 -m tools.release.build_launcher \
@@ -275,7 +266,7 @@ jobs:
             --archipelago-source Archipelago \
             --name DoomEternalArchipelagoLauncher
 
-      - name: Validate Linux Launcher
+      - name: Validate Linux Frozen Launcher
         run: |
           test -f build/release/DoomEternalArchipelagoLauncher
           test -x build/release/DoomEternalArchipelagoLauncher
@@ -316,25 +307,16 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install Launcher Dependencies
+      - name: Install Windows Launcher Dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
-      - name: Launcher CLI Preflight
-        run: |
-          python -m tools.release.build_launcher --help
-
-      - name: Standalone Runtime Import Preflight
-        timeout-minutes: 1
-        run: |
-          python -m tools.release.verify_launcher_runtime --archipelago-source Archipelago
-
-      - name: Build Windows Launcher
+      - name: Build Windows Frozen Launcher
         run: |
           python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
 
-      - name: Validate Windows Launcher
+      - name: Validate Windows Frozen Launcher
         shell: bash
         timeout-minutes: 1
         run: |

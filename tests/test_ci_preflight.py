@@ -51,8 +51,14 @@ class TestCIPreflight(unittest.TestCase):
         self.assertIn("python3 -m tools.release.build_launcher", content)
         self.assertIn("python -m tools.release.build_launcher", content)
 
-        # Launcher jobs run verify_launcher_runtime before PyInstaller
-        self.assertIn("tools.release.verify_launcher_runtime", content)
+        # Single-owner preflight invariant: verify_launcher_runtime is called exactly once, in preflight
+        verify_invocations = [
+            job_name
+            for job_name, job_def in doc["jobs"].items()
+            for step in job_def.get("steps", [])
+            if "verify_launcher_runtime" in step.get("run", "")
+        ]
+        self.assertEqual(verify_invocations, ["preflight"], "verify_launcher_runtime must be owned exclusively by jobs.preflight")
 
         # Launcher jobs run frozen --self-test before artifact upload
         self.assertIn("DoomEternalArchipelagoLauncher --self-test", content)
@@ -70,19 +76,15 @@ class TestCIPreflight(unittest.TestCase):
         self.assertNotEqual(test_idx, -1)
         self.assertLess(chmod_idx, test_idx, "chmod +x must precede test -x in consolidate-handoff")
 
-        # Timeouts configured on preflight steps
-        linux_steps = doc["jobs"]["build-linux-launcher"]["steps"]
+        # Timeout configured on preflight and Windows validate
+        preflight_steps = doc["jobs"]["preflight"]["steps"]
         win_steps = doc["jobs"]["build-windows-launcher"]["steps"]
 
-        linux_preflight = [s for s in linux_steps if s.get("name") == "Standalone Runtime Import Preflight"]
-        self.assertEqual(len(linux_preflight), 1)
-        self.assertEqual(linux_preflight[0].get("timeout-minutes"), 1)
+        preflight_step = [s for s in preflight_steps if s.get("name") == "Standalone Runtime Import Preflight"]
+        self.assertEqual(len(preflight_step), 1)
+        self.assertEqual(preflight_step[0].get("timeout-minutes"), 1)
 
-        win_preflight = [s for s in win_steps if s.get("name") == "Standalone Runtime Import Preflight"]
-        self.assertEqual(len(win_preflight), 1)
-        self.assertEqual(win_preflight[0].get("timeout-minutes"), 1)
-
-        win_validate = [s for s in win_steps if s.get("name") == "Validate Windows Launcher"]
+        win_validate = [s for s in win_steps if "Validate Windows" in s.get("name", "")]
         self.assertEqual(len(win_validate), 1)
         self.assertEqual(win_validate[0].get("timeout-minutes"), 1)
 
