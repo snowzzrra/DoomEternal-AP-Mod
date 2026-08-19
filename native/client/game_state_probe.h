@@ -39,17 +39,28 @@ private:
     void Report(const std::string& state);
 
     template <typename T>
-    bool Read(uintptr_t address, T& value) const {
+    bool Read(uintptr_t address, T& value, DWORD* outWinErr = nullptr) const {
         SIZE_T bytesRead = 0;
-        return process_ != nullptr
-            && ReadProcessMemory(
-                process_,
-                reinterpret_cast<const void*>(address),
-                &value,
-                sizeof(value),
-                &bytesRead
-            )
-            && bytesRead == sizeof(value);
+        if (!process_) {
+            if (outWinErr) {
+                *outWinErr = ERROR_INVALID_HANDLE;
+            }
+            return false;
+        }
+        const BOOL success = ReadProcessMemory(
+            process_,
+            reinterpret_cast<const void*>(address),
+            &value,
+            sizeof(value),
+            &bytesRead
+        );
+        if (!success || bytesRead != sizeof(value)) {
+            if (outWinErr) {
+                *outWinErr = GetLastError();
+            }
+            return false;
+        }
+        return true;
     }
 
     LogFunction log_;
@@ -65,5 +76,6 @@ private:
     bool gameplayLoaded_;
     bool loading_;
     unsigned int consecutiveReadFailures_;
+    bool recoveringFromReadFailure_;
     std::string lastReport_;
 };

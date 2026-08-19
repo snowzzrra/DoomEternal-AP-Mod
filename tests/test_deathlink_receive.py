@@ -136,3 +136,26 @@ def test_only_one_command_is_ever_in_flight():
     for now in (1.1, 1.5, 2.0, 3.0):
         assert advance(receiver, spool, now).detail == "awaiting_delivery"
     assert spool.dispatches == 1
+
+
+def test_dispatch_failure_fails_safe_without_retry():
+    receiver = DeathLinkReceiver()
+    receiver.receive("one", 0.0)
+    result = receiver.advance(
+        now=1.0,
+        safe_gameplay=True,
+        dispatch=lambda: False,
+        command_in_flight=lambda: False,
+    )
+    assert result.state is ReceiveState.FAILED
+    assert result.detail == "rpc_not_accepted"
+    assert receiver.active is None
+
+
+def test_legacy_mode_string_normalizes_to_single_burst():
+    receiver = DeathLinkReceiver(mode="hardcore")
+    assert receiver.mode == "soft"
+    assert receiver.max_attempts == 1
+    receiver.configure_mode("hardcore")
+    assert receiver.mode == "soft"
+    assert receiver.max_attempts == 1

@@ -236,3 +236,33 @@ async def test_reconnect_overlap_silent_and_new_tail_delivered():
 
     assert calls == [(3, 11)]
     assert context.items_processed == 4
+
+
+def test_set_rpc_execution_enable_and_disable_lifecycle(tmp_path, monkeypatch):
+    gate_file = tmp_path / "ap_rpc_enabled"
+    monkeypatch.setattr(bridge, "RPC_GATE_PATH", str(gate_file))
+
+    assert not bridge.rpc_execution_enabled()
+    assert bridge.set_rpc_execution(True)
+    assert bridge.rpc_execution_enabled()
+    assert gate_file.is_file()
+
+    assert bridge.set_rpc_execution(False)
+    assert not bridge.rpc_execution_enabled()
+    assert not gate_file.exists()
+
+
+def test_set_rpc_execution_permanent_disable_failure_raises(tmp_path, monkeypatch):
+    import pytest
+
+    gate_file = tmp_path / "ap_rpc_enabled"
+    gate_file.write_text("enabled\n", encoding="utf-8")
+    monkeypatch.setattr(bridge, "RPC_GATE_PATH", str(gate_file))
+
+    def failing_remove(path):
+        raise PermissionError("Access is denied")
+
+    monkeypatch.setattr(bridge.os, "remove", failing_remove)
+
+    with pytest.raises(PermissionError):
+        bridge.set_rpc_execution(False)

@@ -21,11 +21,8 @@ class ReceiveState(str, Enum):
     RECEIVED = "RECEIVED"
     WAITING_FOR_SAFE_GAMEPLAY = "WAITING_FOR_SAFE_GAMEPLAY"
     COMMAND_IN_FLIGHT = "COMMAND_IN_FLIGHT"
-    AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
-    WAITING_FOR_RETRY = "WAITING_FOR_RETRY"
     APPLIED = "APPLIED"
     RESOLVED = "RESOLVED"
-    CONFIRMED = "RESOLVED"
     EXPIRED = "EXPIRED"
     FAILED = "FAILED"
 
@@ -36,7 +33,6 @@ class ReceivedDeathLink:
     state: ReceiveState
     total_deadline: float
     next_attempt_at: float
-    confirmation_deadline: float | None = None
     attempts: int = 0
     deliveries: int = 0
     safe_pauses: int = 0
@@ -233,8 +229,6 @@ class DeathLinkReceiver:
         except Exception as error:
             return self._finish(ReceiveState.FAILED, f"dispatch_error:{type(error).__name__}", now=now)
         if not accepted:
-            event.state = ReceiveState.WAITING_FOR_RETRY
-            event.next_attempt_at = now + self.retry_interval
             return self._finish(ReceiveState.FAILED, "rpc_not_accepted", now=now)
         event.attempts += 1
         event.state = ReceiveState.COMMAND_IN_FLIGHT

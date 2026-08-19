@@ -159,7 +159,7 @@ DEATHLINK_RECEIVE_TIMEOUT = 20.0
 DEATHLINK_CONFIRM_TIMEOUT = 8.0
 DEATHLINK_TOTAL_TIMEOUT = 60.0
 DEATHLINK_LATE_SUPPRESSION_GRACE = 15.0
-DEATHLINK_MAX_ATTEMPTS = 3
+DEATHLINK_MAX_ATTEMPTS = 1
 DEATHLINK_MESSAGES = (
     "{player} didn't rip and tear enough.",
     "{player} was sent back to the Fortress.",
@@ -2522,7 +2522,7 @@ def discard_queued_coalesced_command(coalesce_key, state_key=None):
     )
 
 
-def set_rpc_execution(enabled):
+def set_rpc_execution(enabled: bool) -> bool:
     if enabled:
         temporary_path = f"{RPC_GATE_PATH}.{uuid.uuid4().hex}.tmp"
         try:
@@ -2533,7 +2533,7 @@ def set_rpc_execution(enabled):
             for attempt in range(5):
                 try:
                     os.replace(temporary_path, RPC_GATE_PATH)
-                    break
+                    return True
                 except (PermissionError, OSError):
                     if attempt == 4:
                         raise
@@ -2544,17 +2544,21 @@ def set_rpc_execution(enabled):
                     os.remove(temporary_path)
                 except OSError:
                     pass
+        return True
     else:
         for attempt in range(5):
             try:
                 os.remove(RPC_GATE_PATH)
-                break
+                return True
             except FileNotFoundError:
-                break
+                return True
             except (PermissionError, OSError):
                 if attempt == 4:
-                    pass
+                    if os.path.exists(RPC_GATE_PATH):
+                        raise
+                    return True
                 time.sleep(0.01 * (attempt + 1))
+        return not os.path.exists(RPC_GATE_PATH)
 
 def rpc_execution_enabled():
     return os.path.isfile(RPC_GATE_PATH)
@@ -2657,16 +2661,24 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
     def _cmd_doom_rpc_on(self):
         """Arm RPC commands; the native memory gate still enforces safe gameplay."""
-        set_rpc_execution(True)
-        self.output(
-            "RPC execution armed manually. The native memory gate opens only "
-            "during safe gameplay."
-        )
+        try:
+            set_rpc_execution(True)
+            self.output(
+                "RPC execution armed manually. The native memory gate opens only "
+                "during safe gameplay."
+            )
+        except Exception as error:
+            logger.error("[RPC] Failed to arm RPC execution: %s", error)
+            self.output(f"Failed to arm RPC execution: {error}")
 
     def _cmd_doom_rpc_off(self):
         """Disarm all RPC commands until explicitly or automatically re-armed."""
-        set_rpc_execution(False)
-        self.output("RPC execution paused. Queued commands will be preserved.")
+        try:
+            set_rpc_execution(False)
+            self.output("RPC execution paused. Queued commands will be preserved.")
+        except Exception as error:
+            logger.error("[RPC] Failed to pause RPC execution: %s", error)
+            self.output(f"Failed to pause RPC execution: {error}")
 
     def _cmd_doom_items_reset(self, confirmation: str = ""):
         """Reset exactly-once item history for the connected seed."""
@@ -6794,7 +6806,10 @@ async def amain(launch_args=None):
 
     ctx = DoomEternalContext(args.connect, args.password)
     ctx.auth = args.name
-    set_rpc_execution(False)
+    try:
+        set_rpc_execution(False)
+    except Exception as error:
+        logger.warning("[RPC] Initial RPC gate disarm failed: %s", error)
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 

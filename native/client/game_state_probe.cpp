@@ -99,7 +99,8 @@ GameStateProbe::GameStateProbe(LogFunction logFunction)
       mapEntitySafe_(false),
       gameplayLoaded_(false),
       loading_(false),
-      consecutiveReadFailures_(0) {}
+      consecutiveReadFailures_(0),
+      recoveringFromReadFailure_(false) {}
 
 GameStateProbe::~GameStateProbe() {
     Detach();
@@ -369,6 +370,7 @@ void GameStateProbe::Detach() {
     mapEntitySafe_ = false;
     gameplayLoaded_ = false;
     loading_ = false;
+    consecutiveReadFailures_ = 0;
 }
 
 bool GameStateProbe::ReadState(
@@ -385,19 +387,20 @@ bool GameStateProbe::ReadState(
     unsigned char isLoading = 0;
     unsigned char isInGame = 0;
     int32_t cutsceneId = 0;
-    if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading)) {
+    DWORD winErr = 0;
+    if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading, &winErr)) {
         state = "Memory state unavailable: global read failed field=isLoading winerr="
-            + std::to_string(GetLastError()) + ".";
+            + std::to_string(winErr) + ".";
         return false;
     }
-    if (!Read(moduleBase_ + activeProfile_->isInGameRva, isInGame)) {
+    if (!Read(moduleBase_ + activeProfile_->isInGameRva, isInGame, &winErr)) {
         state = "Memory state unavailable: global read failed field=isInGame winerr="
-            + std::to_string(GetLastError()) + ".";
+            + std::to_string(winErr) + ".";
         return false;
     }
-    if (!Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId)) {
+    if (!Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId, &winErr)) {
         state = "Memory state unavailable: global read failed field=cutsceneID winerr="
-            + std::to_string(GetLastError()) + ".";
+            + std::to_string(winErr) + ".";
         return false;
     }
     if (isLoading > 1 || isInGame > 1
@@ -524,6 +527,7 @@ void GameStateProbe::Poll() {
 
     if (WaitForSingleObject(process_, 0) == WAIT_OBJECT_0) {
         Detach();
+        recoveringFromReadFailure_ = false;
         Report("Memory probe unavailable: game process exited.");
         return;
     }
@@ -533,23 +537,23 @@ void GameStateProbe::Poll() {
     bool mapEntitySafe = false;
     if (!ReadState(state, safeForRpc, mapEntitySafe)) {
         ++consecutiveReadFailures_;
+        recoveringFromReadFailure_ = true;
         gameplayLoaded_ = false;
         mapEntitySafe_ = false;
         safeForRpc_ = false;
         loading_ = false;
-        safeForRpc_ = false;
-        mapEntitySafe_ = false;
         Report(state);
         if (consecutiveReadFailures_ >= 3) {
             Report("Memory probe read failure threshold reached; reattaching.");
             Detach();
-            nextAttachAttempt_ = 0;
+            nextAttachAttempt_ = GetTickCount() + kAttachRetryMs;
         }
         return;
     }
 
-    if (consecutiveReadFailures_ > 0) {
+    if (recoveringFromReadFailure_) {
         Report("Memory probe recovered.");
+        recoveringFromReadFailure_ = false;
         consecutiveReadFailures_ = 0;
     }
 

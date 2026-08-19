@@ -217,8 +217,9 @@ up owned content, applies confirmed actions, and validates installed files.
   placed.
 - **Fast Travel** activates the mission's native Fast Travel unlock during a
   replay whose Mission Complete state was already checked at load start.
-- **DeathLink Soft** dispatches each received death event once, then normal
-  respawn/checkpoint flow continues. **Hardcore** keeps the same event pending until death is detected.
+- **DeathLink** dispatches a single lethal burst (two immediate hits) to the Slayer
+  during safe gameplay; native Extra Life and Saving Throw protections are preserved.
+  Hardcore tracking is deferred to Sentinel Core.
 - **Marker cleanup** reconciles server-confirmed locations with their map and
   Automap presentation across reloads and revisits.
 
@@ -291,7 +292,7 @@ Repair/Fix, and a sanitized support report.
 - Starting Weapon Choice, Random, and configurable starting inventory.
 - Hard, Soft, and Combat logic profiles.
 - Physical Chainsaw, Dash, and first Sentinel Battery options.
-- Start With Automap, mission replay Fast Travel and Soft/Hardcore DeathLink.
+- Start With Automap, mission replay Fast Travel and single-burst DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
 ### 0.5.x Beta — The Ancient Gods
