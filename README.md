@@ -217,7 +217,7 @@ up owned content, applies confirmed actions, and validates installed files.
   placed.
 - **Fast Travel** activates the mission's native Fast Travel unlock during a
   replay whose Mission Complete state was already checked at load start.
-- **DeathLink** dispatches a single lethal burst (two immediate hits) to the Slayer
+- **DeathLink** applies a short two-hit lethal burst to the Slayer
   during safe gameplay; native Extra Life and Saving Throw protections are preserved.
   Hardcore tracking is deferred to Sentinel Core.
 - **Marker cleanup** reconciles server-confirmed locations with their map and

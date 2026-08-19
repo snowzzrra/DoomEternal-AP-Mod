@@ -198,7 +198,7 @@ Fast Travel means that whenever the player has completed a level, it will always
 
 ### DeathLink
 
-When enabled, a received DeathLink executes a single lethal burst (two immediate hits) during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops. Hardcore tracking is deferred to Sentinel Core.
+When enabled, a received DeathLink applies a short two-hit lethal burst during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops. Hardcore tracking is deferred to Sentinel Core.
 
 ## Setup checks and support
 

@@ -2435,6 +2435,44 @@ def parse_active_map_marker(path, mtime_ns):
     }
 
 
+def cleanup_active_map_marker_file(path):
+    """Remove a consumed or stale active-map condump file."""
+    if not path:
+        return False
+    basename = os.path.basename(path)
+    if not re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
+        return False
+    try:
+        os.remove(path)
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError as error:
+        logger.warning(
+            f"[MAP] Could not remove active map marker {basename}: {error}"
+        )
+        return False
+
+
+def cleanup_active_map_markers(preserve_path=None):
+    """Remove consumed or stale active-map condump files to prevent progressive suffixed names."""
+    pattern = os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt")
+    for path in glob.glob(pattern):
+        if preserve_path and os.path.abspath(path) == os.path.abspath(preserve_path):
+            continue
+        basename = os.path.basename(path)
+        if not re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
+            continue
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                content = f.read(256)
+            if "AP_ACTIVE_MAP_V1" not in content and "echo AP_ACTIVE_MAP_V1" not in content:
+                continue
+        except OSError:
+            continue
+        cleanup_active_map_marker_file(path)
+
+
 def discover_telemetry_markers():
     """Discover all suffixed telemetry marker files in INV_DUMP_DIR, ordered by mtime."""
     pattern = os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt")
@@ -3594,6 +3632,8 @@ class DoomEternalContext(CommonContext):
             lease.observe_gameplay_loaded(newest_mtime)
         self.accept_map_identity(marker_data, evidence_epoch)
         self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+        for _, marker_path in markers:
+            cleanup_active_map_marker_file(marker_path)
         return True
 
     def advance_known_map_materialization(self, evidence):
@@ -5552,7 +5592,7 @@ class DoomEternalContext(CommonContext):
                 and self.has_authoritative_save_proof()
             ),
             dispatch=lambda: send_command(
-                "ai_ScriptCmdEnt ap_deathlink activate; ai_ScriptCmdEnt ap_deathlink activate",
+                "ai_ScriptCmdEnt ap_deathlink activate",
                 coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
                 state_key=self.state_key,
             ),
@@ -5577,14 +5617,28 @@ class DoomEternalContext(CommonContext):
         event_id = (result.event_id or "unknown")[:12]
         active = self.deathlink_receiver.active
         if result.detail == "dispatched":
+            hit_num = active.attempts if active else 1
             logger.info(
-                "[DeathLink] %s lethal burst queued; one command in flight.",
+                "[DeathLink] %s hit %d queued; command in flight.",
+                event_id,
+                hit_num,
+            )
+        elif result.detail == "burst_wait":
+            logger.info(
+                "[DeathLink] %s hit 1 delivered; waiting ~500ms before second hit.",
                 event_id,
             )
         elif result.state is ReceiveState.APPLIED:
             logger.info(
-                "[DeathLink] %s lethal burst applied; event complete.",
+                "[DeathLink] %s lethal burst complete (%s).",
                 event_id,
+                result.detail,
+            )
+        elif result.state is ReceiveState.RESOLVED:
+            logger.info(
+                "[DeathLink] %s lethal burst resolved (%s).",
+                event_id,
+                result.detail,
             )
         elif result.state in {ReceiveState.EXPIRED, ReceiveState.FAILED}:
             discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY)
@@ -6050,7 +6104,11 @@ class DoomEternalContext(CommonContext):
         if not self.death_link_enabled:
             return
         receive_result = self.deathlink_receiver.confirm_local_death(time.monotonic())
-        if receive_result.detail in {"echo_suppressed", "late_echo_suppressed"}:
+        if receive_result.detail in {
+            "echo_suppressed",
+            "late_echo_suppressed",
+            "second_hit_cancelled_player_dead",
+        }:
             discard_queued_coalesced_command(
                 DEATHLINK_KILL_COALESCE_KEY, self.state_key
             )
@@ -6578,7 +6636,8 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_locations()
             await self.check_mission_challenge_locations()
             await self.check_campaign_goal()
-            await asyncio.sleep(1.0)
+            sleep_duration = 0.05 if self.deathlink_receiver.active is not None else 1.0
+            await asyncio.sleep(sleep_duration)
 
     async def flush_check_event_files(self):
         get_key = getattr(self, "get_ap_state_key", None)
@@ -6810,6 +6869,8 @@ async def amain(launch_args=None):
         set_rpc_execution(False)
     except Exception as error:
         logger.warning("[RPC] Initial RPC gate disarm failed: %s", error)
+    cleanup_active_map_markers()
+    cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 

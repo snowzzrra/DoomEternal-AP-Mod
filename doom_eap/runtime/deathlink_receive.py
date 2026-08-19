@@ -21,6 +21,7 @@ class ReceiveState(str, Enum):
     RECEIVED = "RECEIVED"
     WAITING_FOR_SAFE_GAMEPLAY = "WAITING_FOR_SAFE_GAMEPLAY"
     COMMAND_IN_FLIGHT = "COMMAND_IN_FLIGHT"
+    BURST_IN_FLIGHT = "BURST_IN_FLIGHT"
     APPLIED = "APPLIED"
     RESOLVED = "RESOLVED"
     EXPIRED = "EXPIRED"
@@ -64,7 +65,7 @@ class DeathLinkInstrumentation:
 
 
 class DeathLinkReceiver:
-    """Bounded logical events with one observable spool command in flight."""
+    """Bounded logical events with two-hit burst and temporal window."""
 
     def __init__(
         self,
@@ -72,24 +73,26 @@ class DeathLinkReceiver:
         wait_timeout: float = 20.0,
         confirm_timeout: float = 10.0,
         retry_interval: float = 2.0,
+        burst_interval: float = 0.5,
         total_timeout: float = 60.0,
         late_suppression_grace: float = 15.0,
-        max_attempts: int = 3,
+        max_attempts: int = 2,
+        max_burst_hits: int = 2,
         max_queue: int = 4,
         mode: str = "soft",
     ):
-        limits = (wait_timeout, confirm_timeout, retry_interval, total_timeout, late_suppression_grace)
-        if any(value <= 0 for value in limits) or max_attempts < 1 or max_queue < 1:
+        limits = (wait_timeout, confirm_timeout, retry_interval, burst_interval, total_timeout, late_suppression_grace)
+        if any(value <= 0 for value in limits) or max_attempts < 1 or max_burst_hits < 1 or max_queue < 1:
             raise ValueError("invalid DeathLink receiver limits")
         self.wait_timeout = wait_timeout
         self.confirm_timeout = confirm_timeout
         self.retry_interval = retry_interval
+        self.burst_interval = burst_interval
         self.total_timeout = total_timeout
         self.late_suppression_grace = late_suppression_grace
-        if max_attempts < 1:
-            raise ValueError("invalid DeathLink receiver limits")
         self.mode = "soft"
-        self.max_attempts: int | None = 1
+        self.max_burst_hits = max_burst_hits
+        self.max_attempts: int | None = max_burst_hits
         self.max_queue = max_queue
         self._queue: deque[ReceivedDeathLink] = deque()
         self._recent: dict[str, float] = {}
@@ -128,7 +131,7 @@ class DeathLinkReceiver:
     def configure_mode(self, mode: str) -> None:
         """Tolerate legacy mode strings while enforcing single-burst delivery."""
         self.mode = self._validate_mode(mode)
-        self.max_attempts = 1
+        self.max_attempts = self.max_burst_hits
 
     def _result(
         self,
@@ -202,12 +205,46 @@ class DeathLinkReceiver:
             if in_flight:
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
             event.deliveries += 1
+            if event.attempts < self.max_burst_hits:
+                event.state = ReceiveState.BURST_IN_FLIGHT
+                event.next_attempt_at = now + self.burst_interval
+                return self._result(event.event_id, event.state, "burst_wait", now)
             return self._finish(
                 ReceiveState.APPLIED,
                 "accepted",
                 now=now,
                 allow_late_suppression=True,
             )
+
+        if event.state is ReceiveState.BURST_IN_FLIGHT:
+            if in_flight:
+                event.state = ReceiveState.COMMAND_IN_FLIGHT
+                return self._result(event.event_id, event.state, "awaiting_delivery", now)
+            if now < event.next_attempt_at:
+                return self._result(event.event_id, event.state, "burst_wait", now)
+            if not safe_gameplay:
+                # Environment unsafe at scheduled second-hit time; drop second hit fail-safe
+                return self._finish(
+                    ReceiveState.APPLIED,
+                    "second_hit_cancelled_unsafe",
+                    now=now,
+                    allow_late_suppression=True,
+                )
+            try:
+                accepted = dispatch()
+            except Exception as error:
+                return self._finish(ReceiveState.FAILED, f"dispatch_error:{type(error).__name__}", now=now)
+            if not accepted:
+                return self._finish(
+                    ReceiveState.APPLIED,
+                    "second_hit_not_accepted",
+                    now=now,
+                    allow_late_suppression=True,
+                )
+            event.attempts += 1
+            event.state = ReceiveState.COMMAND_IN_FLIGHT
+            self._suppression_event_id = event.event_id
+            return self._result(event.event_id, event.state, "dispatched", now)
 
         if in_flight:
             if event.attempts:
@@ -238,7 +275,10 @@ class DeathLinkReceiver:
     def confirm_local_death(self, now: float) -> ReceiveResult:
         event = self.active
         if event is not None and self._suppression_event_id == event.event_id and event.attempts:
-            return self._finish(ReceiveState.RESOLVED, "echo_suppressed", now=now)
+            detail = "echo_suppressed"
+            if event.state is ReceiveState.BURST_IN_FLIGHT:
+                detail = "second_hit_cancelled_player_dead"
+            return self._finish(ReceiveState.RESOLVED, detail, now=now)
         if self._late_suppression is not None:
             event_id, deadline = self._late_suppression
             self._late_suppression = None

@@ -97,6 +97,28 @@ def _context(items=(), *, processed=0, ready=True):
     context.delivery_item_name = lambda item_id: f"item-{item_id}"
     context._record_processed_receipt = lambda item: None
     context.observe_received_item_history = lambda: SimpleNamespace(duplicates=())
+    context.fast_travel_submitted = set()
+    context.fast_travel_eligibility_snapshot = None
+    context.fast_travel_epoch_state = None
+    context.fast_travel_last_transition = None
+    context.cached_map_identity = None
+    context.pending_map_identity = None
+    context.pending_level_ready = {}
+    context.completed_level_ready_epochs = set()
+    context.last_accepted_marker_mtime = 0
+    context.last_accepted_map_evidence_epoch = None
+    context.last_marker_reject_reason = None
+    context.active_save_proof_authoritative = False
+    context.active_save_proof_slot = None
+    context.active_save_proof_evidence_epoch = None
+    context.active_save_proof_load_epoch = None
+    context.runtime_observers_frozen = False
+    context.invalidate_map_identity = bridge.DoomEternalContext.invalidate_map_identity.__get__(context)
+    context.invalidate_active_save_proof = bridge.DoomEternalContext.invalidate_active_save_proof.__get__(context)
+    context.snapshot_fast_travel_eligibility = bridge.DoomEternalContext.snapshot_fast_travel_eligibility.__get__(context)
+    context.accept_map_identity = bridge.DoomEternalContext.accept_map_identity.__get__(context)
+    context.advance_known_map_materialization = bridge.DoomEternalContext.advance_known_map_materialization.__get__(context)
+    context.ingest_visible_runtime_lifecycle = bridge.DoomEternalContext.ingest_visible_runtime_lifecycle.__get__(context)
     bridge.received_item_classification = lambda *_args, **_kwargs: {}
     return context
 
@@ -266,3 +288,61 @@ def test_set_rpc_execution_permanent_disable_failure_raises(tmp_path, monkeypatc
 
     with pytest.raises(PermissionError):
         bridge.set_rpc_execution(False)
+
+
+def test_active_map_marker_lifecycle_and_cleanup(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "INV_DUMP_DIR", str(tmp_path))
+
+    # Create canonical marker and suffixed marker
+    marker_content = (
+        "AP_ACTIVE_MAP_V1 map_key=e1m1_intro runtime_map=game/sp/e1m1_intro/e1m1_intro "
+        "marker=AP_MAP_START_E1M1_INTRO\n"
+    )
+    canonical = tmp_path / "ap_active_map_e1m1_intro.txt"
+    suffixed = tmp_path / "ap_active_map_e1m1_intro_0.txt"
+    unrelated = tmp_path / "sintaxe.txt"
+
+    canonical.write_text(marker_content, encoding="utf-8")
+    suffixed.write_text(marker_content, encoding="utf-8")
+    unrelated.write_text("important user debug probe\n", encoding="utf-8")
+
+    markers = bridge.discover_active_map_markers()
+    assert len(markers) == 2
+
+    ctx = _context([])
+    ctx.last_accepted_marker_mtime = 0
+    accepted = ctx.ingest_visible_runtime_lifecycle()
+    assert accepted is True
+    assert ctx.cached_map_identity["map_key"] == "e1m1_intro"
+    assert ctx.current_map_name == "game/sp/e1m1_intro/e1m1_intro"
+
+    # Consumed marker files are removed from disk
+    assert not canonical.exists()
+    assert not suffixed.exists()
+
+    # Unrelated user file is strictly preserved
+    assert unrelated.is_file()
+    assert unrelated.read_text(encoding="utf-8") == "important user debug probe\n"
+
+    # In-memory authority remains held
+    assert ctx.cached_map_identity["map_key"] == "e1m1_intro"
+
+
+def test_cleanup_active_map_markers_delete_failure_does_not_crash(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "INV_DUMP_DIR", str(tmp_path))
+
+    marker_content = (
+        "AP_ACTIVE_MAP_V1 map_key=e1m1_intro runtime_map=game/sp/e1m1_intro/e1m1_intro "
+        "marker=AP_MAP_START_E1M1_INTRO\n"
+    )
+    marker = tmp_path / "ap_active_map_e1m1_intro.txt"
+    marker.write_text(marker_content, encoding="utf-8")
+
+    def failing_remove(path):
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(bridge.os, "remove", failing_remove)
+
+    # Should not raise
+    bridge.cleanup_active_map_markers()
+    assert marker.is_file()

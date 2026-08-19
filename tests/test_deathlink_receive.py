@@ -28,112 +28,153 @@ def advance(receiver, spool, now, *, safe=True):
     )
 
 
-def test_soft_command_delivery_is_terminal_application():
-    receiver = DeathLinkReceiver()
+def test_two_hit_burst_full_lifecycle():
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
-    assert advance(receiver, spool, 1.0).state is ReceiveState.COMMAND_IN_FLIGHT
+
+    # Hit 1 dispatched
+    res1 = advance(receiver, spool, 1.0)
+    assert res1.state is ReceiveState.COMMAND_IN_FLIGHT
+    assert res1.detail == "dispatched"
+    assert spool.dispatches == 1
+
+    # Hit 1 delivered -> enters BURST_IN_FLIGHT waiting 0.5s
     spool.delivered()
-    result = advance(receiver, spool, 2.0)
-    assert result.state is ReceiveState.APPLIED
-    assert result.detail == "accepted"
+    res2 = advance(receiver, spool, 1.1)
+    assert res2.state is ReceiveState.BURST_IN_FLIGHT
+    assert res2.detail == "burst_wait"
+
+    # Still waiting (only 0.3s elapsed)
+    res3 = advance(receiver, spool, 1.4)
+    assert res3.state is ReceiveState.BURST_IN_FLIGHT
+    assert res3.detail == "burst_wait"
+    assert spool.dispatches == 1
+
+    # 0.5s elapsed -> Hit 2 dispatched
+    res4 = advance(receiver, spool, 1.6)
+    assert res4.state is ReceiveState.COMMAND_IN_FLIGHT
+    assert res4.detail == "dispatched"
+    assert spool.dispatches == 2
+
+    # Hit 2 delivered -> burst complete
+    spool.delivered()
+    res5 = advance(receiver, spool, 1.7)
+    assert res5.state is ReceiveState.APPLIED
+    assert res5.detail == "accepted"
     assert receiver.active is None
 
 
-def test_default_soft_mode_dispatches_once_without_death_telemetry():
-    receiver = DeathLinkReceiver(confirm_timeout=1.0, retry_interval=1.0)
+def test_first_hit_death_cancels_second_hit():
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
 
-    assert advance(receiver, spool, 1.0).detail == "dispatched"
+    # Hit 1 dispatched and delivered
+    advance(receiver, spool, 1.0)
     spool.delivered()
-    result = advance(receiver, spool, 2.0)
+    advance(receiver, spool, 1.1)
 
-    assert result.state is ReceiveState.APPLIED
-    assert result.detail == "accepted"
+    # Player confirmed dead before 500ms elapses
+    res = receiver.confirm_local_death(1.3)
+    assert res.state is ReceiveState.RESOLVED
+    assert res.detail == "second_hit_cancelled_player_dead"
+    assert receiver.active is None
+
+    # Subsequent ticks do not send Hit 2
+    res2 = advance(receiver, spool, 1.6)
+    assert res2.state is None
+    assert res2.detail == "idle"
     assert spool.dispatches == 1
 
 
-def test_single_burst_applied_and_echo_suppressed_without_retry():
-    receiver = DeathLinkReceiver(
-        confirm_timeout=3.0,
-        retry_interval=2.0,
-    )
+def test_unsafe_gameplay_drops_second_hit_failsafe():
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
+
+    # Hit 1 dispatched and delivered
     advance(receiver, spool, 1.0)
     spool.delivered()
-    result = advance(receiver, spool, 2.0)
-    assert result.state is ReceiveState.APPLIED
-    assert result.detail == "accepted"
-    assert receiver.confirm_local_death(2.5).detail == "late_echo_suppressed"
-    assert receiver.confirm_local_death(2.6).detail == "not_linked"
+    advance(receiver, spool, 1.1)
+
+    # At 500ms deadline, environment is unsafe (e.g. paused/loading/menu)
+    res = advance(receiver, spool, 1.6, safe=False)
+    assert res.state is ReceiveState.APPLIED
+    assert res.detail == "second_hit_cancelled_unsafe"
+    assert receiver.active is None
+    assert spool.dispatches == 1
+
+
+def test_second_hit_dispatch_failure_failsafe():
+    receiver = DeathLinkReceiver(burst_interval=0.5)
+    spool = FakeSpool()
+    receiver.receive("one", 0.0)
+
+    advance(receiver, spool, 1.0)
+    spool.delivered()
+    advance(receiver, spool, 1.1)
+
+    res = receiver.advance(
+        now=1.6,
+        safe_gameplay=True,
+        dispatch=lambda: False,
+        command_in_flight=lambda: False,
+    )
+    assert res.state is ReceiveState.APPLIED
+    assert res.detail == "second_hit_not_accepted"
+    assert receiver.active is None
     assert spool.dispatches == 1
 
 
 def test_duplicate_and_reconnect_identity_do_not_requeue():
-    receiver = DeathLinkReceiver()
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     assert receiver.receive("one", 0.0).detail == "queued"
     assert receiver.receive("one", 0.5).detail == "duplicate"
     advance(receiver, spool, 1.0)
     spool.delivered()
-    advance(receiver, spool, 2.0)
-    receiver.confirm_local_death(2.5)
+    advance(receiver, spool, 1.1)
+    receiver.confirm_local_death(1.2)
     assert receiver.receive("one", 3.0).detail == "duplicate"
     assert receiver.active is None
 
 
 def test_local_death_after_confirmation_is_not_suppressed():
-    receiver = DeathLinkReceiver()
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
     spool.delivered()
-    assert receiver.confirm_local_death(2.1).detail == "echo_suppressed"
+    advance(receiver, spool, 1.1)
+    assert receiver.confirm_local_death(1.2).detail == "second_hit_cancelled_player_dead"
     assert receiver.confirm_local_death(3.0).detail == "not_linked"
 
 
-def test_timeout_is_bounded_and_allows_future_event():
+def test_late_death_after_burst_is_suppressed_once_within_grace():
     receiver = DeathLinkReceiver(
-        confirm_timeout=2.0,
-        retry_interval=1.0,
-        total_timeout=8.0,
-    )
-    spool = FakeSpool()
-    receiver.receive("one", 0.0)
-    advance(receiver, spool, 1.0)
-    spool.delivered()
-    result = advance(receiver, spool, 2.0)
-    assert result.state is ReceiveState.APPLIED
-    assert result.detail == "accepted"
-    assert receiver.active is None
-    assert receiver.receive("two", 8.0).detail == "queued"
-
-
-def test_late_death_after_timeout_is_suppressed_once_within_grace():
-    receiver = DeathLinkReceiver(
-        confirm_timeout=1.0,
-        retry_interval=1.0,
+        burst_interval=0.5,
         total_timeout=4.0,
         late_suppression_grace=2.0,
-        max_attempts=1,
     )
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 0.5)
     spool.delivered()
-    assert advance(receiver, spool, 1.0).state is ReceiveState.APPLIED
-    assert receiver.confirm_local_death(3.0).detail == "late_echo_suppressed"
-    assert receiver.confirm_local_death(3.1).detail == "not_linked"
+    advance(receiver, spool, 0.6)
+    advance(receiver, spool, 1.1)
+    spool.delivered()
+    assert advance(receiver, spool, 1.2).state is ReceiveState.APPLIED
+    assert receiver.confirm_local_death(2.0).detail == "late_echo_suppressed"
+    assert receiver.confirm_local_death(2.1).detail == "not_linked"
 
 
 def test_only_one_command_is_ever_in_flight():
-    receiver = DeathLinkReceiver(confirm_timeout=2.0, retry_interval=1.0)
+    receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
-    for now in (1.1, 1.5, 2.0, 3.0):
+    for now in (1.1, 1.2, 1.3):
         assert advance(receiver, spool, now).detail == "awaiting_delivery"
     assert spool.dispatches == 1
 
@@ -155,7 +196,9 @@ def test_dispatch_failure_fails_safe_without_retry():
 def test_legacy_mode_string_normalizes_to_single_burst():
     receiver = DeathLinkReceiver(mode="hardcore")
     assert receiver.mode == "soft"
-    assert receiver.max_attempts == 1
+    assert receiver.max_burst_hits == 2
+    assert receiver.max_attempts == 2
     receiver.configure_mode("hardcore")
     assert receiver.mode == "soft"
-    assert receiver.max_attempts == 1
+    assert receiver.max_burst_hits == 2
+    assert receiver.max_attempts == 2
