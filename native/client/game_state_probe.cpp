@@ -15,8 +15,8 @@ constexpr GameBuildProfile kSupportedBuildProfiles[] = {
         /* id */ "Steam pre-2026-08-18",
         /* sizeOfImage */ 0x742A000,
         /* peTimestamp */ 0,
+        /* entryPoint */ 0,
         /* isLoadingRva */ 0x5471E18,
-        /* isLoading2Rva */ 0x440D2A0,
         /* isInGameRva */ 0x6B8DA98,
         /* cutsceneIdRva */ 0x540D4C8,
     },
@@ -24,8 +24,8 @@ constexpr GameBuildProfile kSupportedBuildProfiles[] = {
         /* id */ "Steam 2026-08-18",
         /* sizeOfImage */ 0x7431000,
         /* peTimestamp */ 0x6A7B9B8C,
+        /* entryPoint */ 0x286CAA8,
         /* isLoadingRva */ 0x567D490,
-        /* isLoading2Rva */ 0x440F1C0,
         /* isInGameRva */ 0x6BDA9A8,
         /* cutsceneIdRva */ 0x5674100,
     },
@@ -204,12 +204,14 @@ const GameBuildProfile* GameStateProbe::DetectBuildProfile(
     DWORD peTimestamp,
     DWORD entryPoint
 ) const {
-    (void)entryPoint;
     for (const auto& candidate : kSupportedBuildProfiles) {
         if (candidate.sizeOfImage != sizeOfImage) {
             continue;
         }
         if (candidate.peTimestamp != 0 && candidate.peTimestamp != peTimestamp) {
+            continue;
+        }
+        if (candidate.entryPoint != 0 && candidate.entryPoint != entryPoint) {
             continue;
         }
         return &candidate;
@@ -380,21 +382,18 @@ bool GameStateProbe::ReadState(
         return false;
     }
     unsigned char isLoading = 0;
-    unsigned char isLoading2 = 0;
     unsigned char isInGame = 0;
     int32_t cutsceneId = 0;
     if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading)
-            || !Read(moduleBase_ + activeProfile_->isLoading2Rva, isLoading2)
             || !Read(moduleBase_ + activeProfile_->isInGameRva, isInGame)
             || !Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId)) {
         state = "Memory state unavailable: global state read failed.";
         return false;
     }
-    if (isLoading > 1 || isLoading2 > 2 || isInGame > 1
+    if (isLoading > 1 || isInGame > 1
             || cutsceneId < 0 || cutsceneId > 100000) {
         state = "Memory state unavailable: unexpected global value"
             " isLoading=" + std::to_string(isLoading)
-            + " isLoading2=" + std::to_string(isLoading2)
             + " isInGame=" + std::to_string(isInGame)
             + " cutsceneID=" + std::to_string(cutsceneId) + ".";
         return false;
@@ -434,12 +433,10 @@ bool GameStateProbe::ReadState(
     const bool cutsceneActive = cutsceneId > 1;
     const bool gameplayLoaded = playerAvailable
         && !isLoading
-        && isLoading2 == 0
         && isInGame;
-    loading_ = isLoading || isLoading2 != 0;
+    loading_ = isLoading != 0;
     const bool safeCandidate = playerAvailable
         && !isLoading
-        && isLoading2 == 0
         && isInGame
         && !cutsceneActive
         && !gameWasPaused
@@ -448,7 +445,6 @@ bool GameStateProbe::ReadState(
     safeForRpc = safeCandidate;
     mapEntitySafe = mapEntitySafe
         && !isLoading
-        && isLoading2 == 0
         && isInGame
         && !cutsceneActive;
     gameplayLoaded_ = gameplayLoaded;
@@ -460,7 +456,6 @@ bool GameStateProbe::ReadState(
         + " map_entity_safe="
         + (mapEntitySafe ? "YES" : "NO")
         + " isLoading=" + BoolText(isLoading)
-        + " isLoading2=" + std::to_string(isLoading2)
         + " isInGame=" + BoolText(isInGame)
         + " cutsceneID=" + std::to_string(cutsceneId)
         + " cutscene_active=" + (cutsceneActive ? "1" : "0")

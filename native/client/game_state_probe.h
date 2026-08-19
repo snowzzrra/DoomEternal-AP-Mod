@@ -8,8 +8,8 @@ struct GameBuildProfile {
     const char* id;
     DWORD sizeOfImage;
     DWORD peTimestamp;
+    DWORD entryPoint;
     uintptr_t isLoadingRva;
-    uintptr_t isLoading2Rva;
     uintptr_t isInGameRva;
     uintptr_t cutsceneIdRva;
 };

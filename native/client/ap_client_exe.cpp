@@ -689,7 +689,7 @@ void LogStartupHeader(
         "Other DOOM processes detected: "
         + std::to_string(CountProcessesNamed("DOOMEternalx64vk.exe"))
     );
-    LogDebug("Offset profile: steam-6.66-rev-3.1");
+    LogDebug("Offset profile: dynamic-build-profiles");
     LogDebug(
         "RPC_ENTITY_CONTRACT_REVISION: "
         + std::to_string(kRpcEntityContractRevision)
