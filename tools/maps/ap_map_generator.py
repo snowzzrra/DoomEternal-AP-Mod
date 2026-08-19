@@ -1795,14 +1795,16 @@ def generate_system_command_entities(map_key="", runtime_map=""):
         )
     return f"""entity {{
 	entityDef ap_deathlink {{
-		class = "idTarget_Command";
+		class = "idTarget_Damage";
 		expandInheritance = false;
 		poolCount = 0;
 		poolGranularity = 2;
 		networkReplicated = false;
 		disableAIPooling = false;
 		edit = {{
-			commandText = "kill";
+			damageDecl = "damage/triggerhurt/triggerhurt1000_instagib";
+			radiusDamage = 0.0;
+			damageActivator = true;
 		}}
 	}}
 }}

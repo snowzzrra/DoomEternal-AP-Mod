@@ -9,12 +9,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
     from PySide6.QtWidgets import QApplication
+    from doom_eap.launcher.launcher_ui import LauncherUI
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
+    LauncherUI = None
 
 from doom_eap.launcher.launcher_controller import LauncherController, bundle_directory
-from doom_eap.launcher.launcher_ui import LauncherUI
 
 
 @unittest.skipUnless(HAS_PYSIDE6, "PySide6 is required for launcher UI tests")
@@ -114,6 +115,38 @@ class TestLauncherUIConstruction(unittest.TestCase):
             ui.close()
             ui.deleteLater()
             self.app.processEvents()
+
+    def test_launcher_ui_windows_hides_steam_launch_option(self):
+        from unittest.mock import patch
+        with patch("os.name", "nt"):
+            ui = LauncherUI(self.controller)
+            try:
+                self.assertTrue(ui.launch_option.isHidden())
+                self.assertTrue(ui.launch_option_label.isHidden())
+                self.assertTrue(ui.copy_launch_option_button.isHidden())
+                ui._set_setup_state("ready")
+                self.assertIn("Start DOOM Eternal normally", ui.session_setup_detail.text())
+            finally:
+                ui.timer.stop()
+                ui.close()
+                ui.deleteLater()
+                self.app.processEvents()
+
+    def test_launcher_ui_linux_shows_steam_launch_option(self):
+        from unittest.mock import patch
+        with patch("os.name", "posix"):
+            ui = LauncherUI(self.controller)
+            try:
+                self.assertFalse(ui.launch_option.isHidden())
+                self.assertFalse(ui.launch_option_label.isHidden())
+                self.assertFalse(ui.copy_launch_option_button.isHidden())
+                ui._set_setup_state("ready")
+                self.assertIn("Copy the Steam launch option", ui.session_setup_detail.text())
+            finally:
+                ui.timer.stop()
+                ui.close()
+                ui.deleteLater()
+                self.app.processEvents()
 
 
 if __name__ == "__main__":

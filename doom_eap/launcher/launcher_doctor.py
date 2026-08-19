@@ -42,6 +42,10 @@ class RepairAction:
     requires_confirmation: bool = False
     rollback: str = ""
 
+    @property
+    def key(self) -> str:
+        return self.action_id
+
 
 @dataclass(frozen=True)
 class DoctorReport:

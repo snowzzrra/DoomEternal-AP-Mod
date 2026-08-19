@@ -92,8 +92,8 @@ class DeathLinkReceiver:
         self.late_suppression_grace = late_suppression_grace
         if max_attempts < 1:
             raise ValueError("invalid DeathLink receiver limits")
-        self.mode = self._validate_mode(mode)
-        self.max_attempts: int | None = 1 if self.mode == "soft" else None
+        self.mode = "soft"
+        self.max_attempts: int | None = 1
         self.max_queue = max_queue
         self._queue: deque[ReceivedDeathLink] = deque()
         self._recent: dict[str, float] = {}
@@ -103,9 +103,8 @@ class DeathLinkReceiver:
 
     @staticmethod
     def _validate_mode(mode: str) -> str:
-        if mode not in {"soft", "hardcore"}:
-            raise ValueError("DeathLink mode must be soft or hardcore")
-        return mode
+        # Legacy slot compatibility; normalized to single-burst delivery
+        return "soft"
 
     @property
     def instrumentation(self) -> tuple[DeathLinkInstrumentation, ...]:
@@ -131,10 +130,9 @@ class DeathLinkReceiver:
         )
 
     def configure_mode(self, mode: str) -> None:
-        """Apply slot mode before accepting events; pending work is unchanged."""
+        """Tolerate legacy mode strings while enforcing single-burst delivery."""
         self.mode = self._validate_mode(mode)
-        # Hardcore keeps same event eligible for retry until total deadline.
-        self.max_attempts = 1 if self.mode == "soft" else None
+        self.max_attempts = 1
 
     def _result(
         self,
@@ -208,26 +206,12 @@ class DeathLinkReceiver:
             if in_flight:
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
             event.deliveries += 1
-            if self.mode == "soft":
-                return self._finish(
-                    ReceiveState.APPLIED,
-                    "accepted",
-                    now=now,
-                    allow_late_suppression=True,
-                )
-            event.state = ReceiveState.AWAITING_CONFIRMATION
-            event.confirmation_deadline = now + self.confirm_timeout
-            self._suppression_event_id = event.event_id
-            return self._result(event.event_id, event.state, "delivered", now)
-
-        if event.state is ReceiveState.AWAITING_CONFIRMATION:
-            if event.confirmation_deadline is not None and now < event.confirmation_deadline:
-                return self._result(event.event_id, event.state, "awaiting_confirmation", now)
-            if self.max_attempts is not None and event.attempts >= self.max_attempts:
-                return self._finish(ReceiveState.FAILED, "attempt_limit", now=now, allow_late_suppression=True)
-            event.state = ReceiveState.WAITING_FOR_RETRY
-            event.next_attempt_at = now + self.retry_interval
-            return self._result(event.event_id, event.state, "retry_scheduled", now)
+            return self._finish(
+                ReceiveState.APPLIED,
+                "accepted",
+                now=now,
+                allow_late_suppression=True,
+            )
 
         if in_flight:
             if event.attempts:
@@ -251,9 +235,7 @@ class DeathLinkReceiver:
         if not accepted:
             event.state = ReceiveState.WAITING_FOR_RETRY
             event.next_attempt_at = now + self.retry_interval
-            if self.mode == "soft":
-                return self._finish(ReceiveState.FAILED, "rpc_not_accepted", now=now)
-            return self._result(event.event_id, event.state, "rpc_not_accepted", now)
+            return self._finish(ReceiveState.FAILED, "rpc_not_accepted", now=now)
         event.attempts += 1
         event.state = ReceiveState.COMMAND_IN_FLIGHT
         self._suppression_event_id = event.event_id

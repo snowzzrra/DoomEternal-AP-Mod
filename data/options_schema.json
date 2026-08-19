@@ -154,27 +154,6 @@
     {
       "choices": [
         {
-          "key": "soft",
-          "label": "Soft",
-          "value": 0
-        },
-        {
-          "key": "hardcore",
-          "label": "Hardcore",
-          "value": 1
-        }
-      ],
-      "default": "soft",
-      "description": "Select DeathLink behavior for this slot. Soft is the safe default and dispatches each received DeathLink once; Hardcore retries until confirmed.",
-      "display_name": "DeathLink Mode",
-      "group": "Game Options",
-      "key": "death_link_mode",
-      "source_class": "DeathLinkMode",
-      "ui_type": "choice"
-    },
-    {
-      "choices": [
-        {
           "key": "random_weapon",
           "label": "Random",
           "value": 0
@@ -338,5 +317,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "05d004839a349cf73bf0a827e8ac8091c1ce029b9d8d5f2eb49cc93e3311d043"
+  "source_sha256": "0f7526d15154ca0f81ff5393f18a75707d158dc96f1f70e80f7af4f06990a5a1"
 }

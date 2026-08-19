@@ -98,7 +98,8 @@ GameStateProbe::GameStateProbe(LogFunction logFunction)
       safeForRpc_(false),
       mapEntitySafe_(false),
       gameplayLoaded_(false),
-      loading_(false) {}
+      loading_(false),
+      consecutiveReadFailures_(0) {}
 
 GameStateProbe::~GameStateProbe() {
     Detach();
@@ -384,10 +385,19 @@ bool GameStateProbe::ReadState(
     unsigned char isLoading = 0;
     unsigned char isInGame = 0;
     int32_t cutsceneId = 0;
-    if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading)
-            || !Read(moduleBase_ + activeProfile_->isInGameRva, isInGame)
-            || !Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId)) {
-        state = "Memory state unavailable: global state read failed.";
+    if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading)) {
+        state = "Memory state unavailable: global read failed field=isLoading winerr="
+            + std::to_string(GetLastError()) + ".";
+        return false;
+    }
+    if (!Read(moduleBase_ + activeProfile_->isInGameRva, isInGame)) {
+        state = "Memory state unavailable: global read failed field=isInGame winerr="
+            + std::to_string(GetLastError()) + ".";
+        return false;
+    }
+    if (!Read(moduleBase_ + activeProfile_->cutsceneIdRva, cutsceneId)) {
+        state = "Memory state unavailable: global read failed field=cutsceneID winerr="
+            + std::to_string(GetLastError()) + ".";
         return false;
     }
     if (isLoading > 1 || isInGame > 1
@@ -522,10 +532,27 @@ void GameStateProbe::Poll() {
     bool safeForRpc = false;
     bool mapEntitySafe = false;
     if (!ReadState(state, safeForRpc, mapEntitySafe)) {
+        ++consecutiveReadFailures_;
         gameplayLoaded_ = false;
         mapEntitySafe_ = false;
+        safeForRpc_ = false;
         loading_ = false;
+        safeForRpc_ = false;
+        mapEntitySafe_ = false;
+        Report(state);
+        if (consecutiveReadFailures_ >= 3) {
+            Report("Memory probe read failure threshold reached; reattaching.");
+            Detach();
+            nextAttachAttempt_ = 0;
+        }
+        return;
     }
+
+    if (consecutiveReadFailures_ > 0) {
+        Report("Memory probe recovered.");
+        consecutiveReadFailures_ = 0;
+    }
+
     safeForRpc_ = safeForRpc;
     mapEntitySafe_ = mapEntitySafe;
     Report(state);

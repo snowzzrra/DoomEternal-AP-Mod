@@ -2525,16 +2525,36 @@ def discard_queued_coalesced_command(coalesce_key, state_key=None):
 def set_rpc_execution(enabled):
     if enabled:
         temporary_path = f"{RPC_GATE_PATH}.{uuid.uuid4().hex}.tmp"
-        with open(temporary_path, "w", encoding="utf-8") as f:
-            f.write("enabled\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temporary_path, RPC_GATE_PATH)
-    else:
         try:
-            os.remove(RPC_GATE_PATH)
-        except FileNotFoundError:
-            pass
+            with open(temporary_path, "w", encoding="utf-8") as f:
+                f.write("enabled\n")
+                f.flush()
+                os.fsync(f.fileno())
+            for attempt in range(5):
+                try:
+                    os.replace(temporary_path, RPC_GATE_PATH)
+                    break
+                except (PermissionError, OSError):
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.01 * (attempt + 1))
+        finally:
+            if os.path.exists(temporary_path):
+                try:
+                    os.remove(temporary_path)
+                except OSError:
+                    pass
+    else:
+        for attempt in range(5):
+            try:
+                os.remove(RPC_GATE_PATH)
+                break
+            except FileNotFoundError:
+                break
+            except (PermissionError, OSError):
+                if attempt == 4:
+                    pass
+                time.sleep(0.01 * (attempt + 1))
 
 def rpc_execution_enabled():
     return os.path.isfile(RPC_GATE_PATH)
@@ -3105,20 +3125,13 @@ class DoomEternalContext(CommonContext):
                 slot_data = {}
             configured_mode = slot_data.get("death_link_mode", DEFAULT_DEATH_LINK_MODE)
             if configured_mode not in {"soft", "hardcore"}:
-                logger.warning(
-                    "[DeathLink] Invalid death_link_mode=%r; using %s.",
-                    configured_mode,
-                    DEFAULT_DEATH_LINK_MODE,
-                )
                 configured_mode = DEFAULT_DEATH_LINK_MODE
-            self.death_link_mode = configured_mode
+            self.death_link_mode = "soft"
             self.deathlink_receiver.configure_mode(self.death_link_mode)
             self.death_link_enabled = bool(slot_data.get("death_link", False))
             logger.info(
-                "[DeathLink] mode=%s enabled=%s receive_policy=%s",
-                self.death_link_mode,
+                "[DeathLink] enabled=%s receive_policy=single_burst",
                 self.death_link_enabled,
-                "single_dispatch" if self.death_link_mode == "soft" else "retry_until_confirmed",
             )
             materialized = {}
             configured = slot_data.get("starting_inventory", {})
@@ -3396,9 +3409,7 @@ class DoomEternalContext(CommonContext):
                         packet_received_ns=packet_received_ns,
                     )
                     if not spooled:
-                        item_name = getattr(self, "item_names", {}).get(
-                            item_id, f"Item_{item_id}"
-                        )
+                        item_name = self.delivery_item_name(item_id)
                         logger.error(
                             "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d "
                             "item_name=%s description=%s",
@@ -3413,9 +3424,7 @@ class DoomEternalContext(CommonContext):
                         }
                         break
                 except Exception as error:
-                    item_name = getattr(self, "item_names", {}).get(
-                        item_id, f"Item_{item_id}"
-                    )
+                    item_name = self.delivery_item_name(item_id)
                     tb = traceback.format_exc()
                     logger.error(
                         "[To Game] ITEM_DELIVERY_BLOCKED index=%d item_id=%d "
@@ -5531,7 +5540,7 @@ class DoomEternalContext(CommonContext):
                 and self.has_authoritative_save_proof()
             ),
             dispatch=lambda: send_command(
-                "ai_ScriptCmdEnt ap_deathlink activate",
+                "ai_ScriptCmdEnt ap_deathlink activate; ai_ScriptCmdEnt ap_deathlink activate",
                 coalesce_key=DEATHLINK_KILL_COALESCE_KEY,
                 state_key=self.state_key,
             ),
@@ -5557,19 +5566,12 @@ class DoomEternalContext(CommonContext):
         active = self.deathlink_receiver.active
         if result.detail == "dispatched":
             logger.info(
-                "[DeathLink] %s attempt %d queued; one command in flight.",
+                "[DeathLink] %s lethal burst queued; one command in flight.",
                 event_id,
-                active.attempts if active else 0,
             )
-        elif result.detail == "delivered":
+        elif result.state is ReceiveState.APPLIED:
             logger.info(
-                "[DeathLink] %s attempt %d delivered; awaiting death telemetry.",
-                event_id,
-                active.attempts if active else 0,
-            )
-        elif result.detail == "retry_scheduled":
-            logger.warning(
-                "[DeathLink] %s delivered command was not lethal; retry scheduled.",
+                "[DeathLink] %s lethal burst applied; event complete.",
                 event_id,
             )
         elif result.state in {ReceiveState.EXPIRED, ReceiveState.FAILED}:

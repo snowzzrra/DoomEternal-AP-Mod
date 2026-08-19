@@ -64,5 +64,6 @@ private:
     bool mapEntitySafe_;
     bool gameplayLoaded_;
     bool loading_;
+    unsigned int consecutiveReadFailures_;
     std::string lastReport_;
 };

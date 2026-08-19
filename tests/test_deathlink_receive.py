@@ -54,25 +54,21 @@ def test_default_soft_mode_dispatches_once_without_death_telemetry():
     assert spool.dispatches == 1
 
 
-def test_first_attempt_can_fail_then_retry_confirms_exactly_once():
+def test_single_burst_applied_and_echo_suppressed_without_retry():
     receiver = DeathLinkReceiver(
         confirm_timeout=3.0,
         retry_interval=2.0,
-        mode="hardcore",
     )
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)
     spool.delivered()
-    advance(receiver, spool, 2.0)
-    assert advance(receiver, spool, 5.0).detail == "retry_scheduled"
-    assert advance(receiver, spool, 6.0).detail == "retry_interval"
-    assert advance(receiver, spool, 7.0).detail == "dispatched"
-    spool.delivered()
-    assert advance(receiver, spool, 8.0).detail == "delivered"
-    assert receiver.confirm_local_death(8.5).state is ReceiveState.RESOLVED
-    assert receiver.confirm_local_death(8.6).detail == "not_linked"
-    assert spool.dispatches == 2
+    result = advance(receiver, spool, 2.0)
+    assert result.state is ReceiveState.APPLIED
+    assert result.detail == "accepted"
+    assert receiver.confirm_local_death(2.5).detail == "late_echo_suppressed"
+    assert receiver.confirm_local_death(2.6).detail == "not_linked"
+    assert spool.dispatches == 1
 
 
 def test_duplicate_and_reconnect_identity_do_not_requeue():
@@ -133,7 +129,7 @@ def test_late_death_after_timeout_is_suppressed_once_within_grace():
 
 
 def test_only_one_command_is_ever_in_flight():
-    receiver = DeathLinkReceiver(confirm_timeout=2.0, retry_interval=1.0, mode="hardcore")
+    receiver = DeathLinkReceiver(confirm_timeout=2.0, retry_interval=1.0)
     spool = FakeSpool()
     receiver.receive("one", 0.0)
     advance(receiver, spool, 1.0)

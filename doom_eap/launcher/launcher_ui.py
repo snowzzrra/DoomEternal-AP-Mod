@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import os
 import queue
 import re
 import webbrowser
@@ -450,13 +451,19 @@ class LauncherUI(QMainWindow):
         self.drift.setObjectName("warning")
         self.drift.hide()
         layout.addWidget(self.drift)
+        self.launch_option_label = self._label("STEAM LAUNCH OPTION", "eyebrow")
         self.launch_option = QLineEdit("Available after setup.")
         self.launch_option.setReadOnly(True)
-        layout.addWidget(self._label("STEAM LAUNCH OPTION", "eyebrow"))
-        layout.addWidget(self.launch_option)
-        copy = QPushButton("COPY OPTION")
-        copy.clicked.connect(self._copy_launch_option)
-        layout.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.copy_launch_option_button = QPushButton("COPY OPTION")
+        self.copy_launch_option_button.clicked.connect(self._copy_launch_option)
+        if os.name != "nt":
+            layout.addWidget(self.launch_option_label)
+            layout.addWidget(self.launch_option)
+            layout.addWidget(self.copy_launch_option_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        else:
+            self.launch_option_label.hide()
+            self.launch_option.hide()
+            self.copy_launch_option_button.hide()
         controls = QHBoxLayout()
         self.stop_button = QPushButton("DISCONNECT")
         self.stop_button.clicked.connect(self._disconnect)
@@ -704,7 +711,13 @@ class LauncherUI(QMainWindow):
             "game_link_needed": ("GAME LINK SETUP NEEDED", "Installs the verified Meathook v7.2 runtime required by DOOM Eternal Archipelago.", "SET UP GAME LINK", True, "ACTION NEEDED"),
             "game_link_update_needed": ("GAME LINK UPDATE NEEDED", "A different XINPUT1_3.dll is installed. DOOM Eternal Archipelago requires the verified Meathook v7.2 runtime.", "REPAIR GAME LINK", True, "ACTION NEEDED"),
             "manual_install_required": ("WINDOWS MOD INSTALLER NEEDS MANUAL SETUP", "The automatic EternalModInjector setup could not be completed. You can install it manually using the Windows Manual Mod Installer section in INSTALL.md.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
-            "ready": ("READY TO PLAY", "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.", "", False, "READY"),
+            "ready": (
+                "READY TO PLAY",
+                "Start DOOM Eternal normally and keep this launcher open." if os.name == "nt" else "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.",
+                "",
+                False,
+                "READY",
+            ),
             "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
