@@ -25,9 +25,9 @@ constexpr GameBuildProfile kSupportedBuildProfiles[] = {
         /* sizeOfImage */ 0x7431000,
         /* peTimestamp */ 0x6A7B9B8C,
         /* entryPoint */ 0x286CAA8,
-        /* isLoadingRva */ 0x567D490,
-        /* isInGameRva */ 0x6BDA9A8,
-        /* cutsceneIdRva */ 0x5674100,
+        /* isLoadingRva */ 0x5477298,
+        /* isInGameRva */ 0x6B92F18,
+        /* cutsceneIdRva */ 0x5412948,
     },
 };
 
