@@ -2,7 +2,7 @@
     "schema_version": 1,
     "item_mapping_revision": 5,
     "source": "Archipelago/worlds/doometernal/items.py",
-    "source_sha256": "ccc4f7ba10b7eaf20266d4aebe476b5c8d4a2e1982d0b5a0441145c707b0fdc6",
+    "source_sha256": "98d843adbf817f7ec55b70e3d2a25bbd2c8f1972d0d3898379037b9872468f3a",
     "items": {
         "7770000": {
             "name": "Heavy Cannon",
@@ -106,27 +106,27 @@
         },
         "7770025": {
             "name": "Full Heal",
-            "classification": 2
+            "classification": 0
         },
         "7770026": {
             "name": "Full Armor",
-            "classification": 2
+            "classification": 0
         },
         "7770027": {
             "name": "Fuel",
-            "classification": 2
+            "classification": 0
         },
         "7770028": {
             "name": "BFG Ammo",
-            "classification": 2
+            "classification": 0
         },
         "7770029": {
             "name": "Soulsphere",
-            "classification": 2
+            "classification": 0
         },
         "7770030": {
             "name": "Berserk",
-            "classification": 2
+            "classification": 0
         },
         "7770031": {
             "name": "Small Health",
@@ -166,7 +166,7 @@
         },
         "7770040": {
             "name": "One Extra Life",
-            "classification": 0
+            "classification": 2
         },
         "7770041": {
             "name": "Armor Shard",

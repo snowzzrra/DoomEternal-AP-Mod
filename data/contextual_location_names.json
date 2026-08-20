@@ -130,19 +130,19 @@
     },
     {
       "location_id": 7770086,
-      "current_name": "Fortress of Doom - Sentinel Crystal 1",
+      "current_name": "Fortress of Doom - Sentinel Crystal - Bridge Story Pickup",
       "contextual_name": "Fortress of Doom - Sentinel Crystal - Bridge Story Pickup",
       "map": "Fortress of Doom"
     },
     {
       "location_id": 7770087,
-      "current_name": "Fortress of Doom - Sentinel Crystal 2",
+      "current_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower East",
       "contextual_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower East",
       "map": "Fortress of Doom"
     },
     {
       "location_id": 7770088,
-      "current_name": "Fortress of Doom - Sentinel Crystal 3",
+      "current_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower West",
       "contextual_name": "Fortress of Doom - Sentinel Crystal - Battery Room Lower West",
       "map": "Fortress of Doom"
     },
@@ -490,25 +490,25 @@
     },
     {
       "location_id": 7770249,
-      "current_name": "ARC Complex - Dr. Elena Richardson Log 1",
+      "current_name": "ARC Complex - Dr. Elena Richardson Log - IDKFA Stairwell Console",
       "contextual_name": "ARC Complex - Dr. Elena Richardson Log - IDKFA Stairwell Console",
       "map": "ARC Complex"
     },
     {
       "location_id": 7770250,
-      "current_name": "ARC Complex - Dr. Elena Richardson Log 2",
+      "current_name": "ARC Complex - Dr. Elena Richardson Log - Voice-Terminal Climb Console",
       "contextual_name": "ARC Complex - Dr. Elena Richardson Log - Voice-Terminal Climb Console",
       "map": "ARC Complex"
     },
     {
       "location_id": 7770251,
-      "current_name": "ARC Complex - Dr. Elena Richardson Log 3",
+      "current_name": "ARC Complex - Dr. Elena Richardson Log - Garage Side-Room Console",
       "contextual_name": "ARC Complex - Dr. Elena Richardson Log - Garage Side-Room Console",
       "map": "ARC Complex"
     },
     {
       "location_id": 7770252,
-      "current_name": "ARC Complex - Dr. Elena Richardson Log 4",
+      "current_name": "ARC Complex - Dr. Elena Richardson Log - ARC Building Entrance Console",
       "contextual_name": "ARC Complex - Dr. Elena Richardson Log - ARC Building Entrance Console",
       "map": "ARC Complex"
     },

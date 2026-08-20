@@ -179,8 +179,11 @@ class LauncherUI(QMainWindow):
         self._resolved_consent_requests: set[str] = set()
         self._native_health_presentation: tuple[str, str] | None = None
         self._session_log_limit = 400
+        self._chat_pending_text: str | None = None
+        self._hints_state = "disconnected"
         self._configure_style()
         self._build()
+        self._set_hints_state("disconnected")
         self._set_setup_state("disconnected")
         self._load_icon()
         self._install_shortcuts()
@@ -517,7 +520,7 @@ class LauncherUI(QMainWindow):
         header.addWidget(self._label("SESSION", "title"))
         header.addStretch(1)
         self.session_nav_buttons: list[QPushButton] = []
-        for text, page in (("ACTIVITY", 0), ("LOG", 1), ("ROOM", 2)):
+        for text, page in (("ACTIVITY", 0), ("HINTS", 1), ("LOG", 2), ("ROOM", 3)):
             button = QPushButton(text)
             button.setObjectName("sessionNav")
             button.setCheckable(True)
@@ -528,10 +531,12 @@ class LauncherUI(QMainWindow):
         outer.addLayout(header)
         self.session_stack = QStackedWidget()
         self.session_stack.addWidget(self._activity_card())
+        self.session_stack.addWidget(self._hints_card())
         self.session_stack.addWidget(self._session_log_page())
         self.session_stack.addWidget(self._session_card())
         self.session_stack.currentChanged.connect(self._sync_session_tabs)
         outer.addWidget(self.session_stack, 1)
+        outer.addWidget(self._chat_bar())
         self._sync_session_tabs(0)
         return body
 
@@ -564,6 +569,43 @@ class LauncherUI(QMainWindow):
         self.activity.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.activity.setMinimumHeight(320)
         layout.addWidget(self.activity)
+        return card
+
+    def _hints_card(self) -> QFrame:
+        card = self._card()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 20)
+        layout.addWidget(self._label("HINTS", "section"))
+        layout.addWidget(self._label("Hints reported by Archipelago for this slot.", "muted"))
+        self.hints_empty = self._label("Hints unavailable while disconnected.", "muted")
+        layout.addWidget(self.hints_empty)
+        self.hints = QTableWidget(0, 5)
+        self.hints.setHorizontalHeaderLabels(["STATUS", "ITEM", "LOCATION", "FOR", "IN WORLD"])
+        self.hints.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.hints.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.hints.setAlternatingRowColors(True)
+        self.hints.verticalHeader().hide()
+        self.hints.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        for column in range(1, 5):
+            self.hints.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.hints, 1)
+        return card
+
+    def _chat_bar(self) -> QFrame:
+        card = self._card()
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+        layout.addWidget(self._label("AP CHAT", "eyebrow"))
+        self.command_input = QLineEdit()
+        self.command_input.setPlaceholderText("Send chat or server command text")
+        self.command_input.setEnabled(False)
+        self.command_input.returnPressed.connect(self._send_command)
+        layout.addWidget(self.command_input, 1)
+        self.command_send = QPushButton("SEND")
+        self.command_send.setEnabled(False)
+        self.command_send.clicked.connect(self._send_command)
+        layout.addWidget(self.command_send)
         return card
 
     def _create_page(self) -> QScrollArea:
@@ -1033,13 +1075,60 @@ class LauncherUI(QMainWindow):
 
     def _send_command(self) -> None:
         text = self.command_input.text()
+        if not text.strip() or self._chat_pending_text is not None:
+            return
         try:
-            self.controller.send_command(text)
+            self.controller.send_chat(text)
         except Exception as error:
             self._append_log(f"Command error: {error}")
             return
-        self.command_input.clear()
-        self._activity_event({"type": "command_sent", "message": text})
+        self._chat_pending_text = text
+        self._set_chat_enabled(False)
+
+    def _set_chat_enabled(self, enabled: bool) -> None:
+        ready = enabled and self._chat_pending_text is None
+        self.command_input.setEnabled(ready)
+        self.command_send.setEnabled(ready)
+
+    def _render_hints(self, event: dict[str, object]) -> None:
+        records = event.get("hints")
+        if not isinstance(records, list):
+            return
+        deduped: dict[tuple[object, ...], dict[str, object]] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            key = tuple(record.get(field) for field in (
+                "receiving_player", "finding_player", "location", "item", "entrance",
+            ))
+            deduped[key] = record
+        self.hints.setRowCount(0)
+        for row, record in enumerate(deduped.values()):
+            self.hints.insertRow(row)
+            values = (
+                str(record.get("status_name", "HINT_UNSPECIFIED")).replace("HINT_", "").replace("_", " "),
+                str(record.get("item_name", "Unknown item")),
+                str(record.get("location_name", "Unknown location")),
+                str(record.get("receiving_player_name", record.get("receiving_player", "?"))),
+                str(record.get("finding_player_name", record.get("finding_player", "?"))),
+            )
+            for column, value in enumerate(values):
+                self.hints.setItem(row, column, QTableWidgetItem(value))
+        self._hints_state = "loaded"
+        self.hints_empty.setText("No hints yet." if not deduped else "")
+        self.hints_empty.setVisible(not deduped)
+        self.hints.setVisible(bool(deduped))
+
+    def _set_hints_state(self, state: str) -> None:
+        self._hints_state = state
+        self.hints.setRowCount(0)
+        self.hints.setVisible(False)
+        labels = {
+            "loading": "Loading hints…",
+            "disconnected": "Hints unavailable while disconnected.",
+        }
+        self.hints_empty.setText(labels[state])
+        self.hints_empty.setVisible(True)
 
     @staticmethod
     def _format_markdown(text: object) -> str:
@@ -1372,6 +1461,22 @@ class LauncherUI(QMainWindow):
             self._set_status("room", "connected", self.COLORS["good"])
             self._set_status("mod", "checking", self.COLORS["ap"])
             self._set_setup_state("checking")
+            self._set_chat_enabled(True)
+            self._set_hints_state("loading")
+        elif kind == "hints_loading":
+            self._set_hints_state("loading")
+        elif kind == "hints":
+            self._render_hints(event)
+        elif kind == "chat_sent":
+            if self._chat_pending_text == event.get("text"):
+                self.command_input.clear()
+                self._chat_pending_text = None
+                self._set_chat_enabled(self._room_connected)
+            self._activity_event({"type": "command_sent", "message": event.get("text", "")})
+        elif kind == "chat_send_failed":
+            self._append_log("Command error: " + str(event.get("message", "Could not send message.")))
+            self._chat_pending_text = None
+            self._set_chat_enabled(self._room_connected)
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True; self._set_connection_controls(False)
             self._set_status("room", "connecting", self.COLORS["ap"])
@@ -1484,6 +1589,7 @@ class LauncherUI(QMainWindow):
                     self._append_log(f"Injector stderr: {stderr[-500:]}")
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
+            self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")
             self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
             for key in self.statuses:
                 self._set_status(key, "waiting", self.COLORS["muted"])

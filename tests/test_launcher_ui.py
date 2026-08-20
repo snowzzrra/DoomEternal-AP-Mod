@@ -86,6 +86,8 @@ class TestLauncherUIConstruction(unittest.TestCase):
             self.assertTrue(hasattr(ui, "session_setup_action"))
             self.assertTrue(hasattr(ui, "session_manual_complete_action"))
             self.assertTrue(hasattr(ui, "session_manual_retry_action"))
+            self.assertTrue(hasattr(ui, "command_input"))
+            self.assertFalse(ui.command_input.isEnabled())
 
             # Exercise session setup state transitions
             ui._set_setup_state("manual_install_required", "Manual setup required.")
@@ -102,10 +104,37 @@ class TestLauncherUIConstruction(unittest.TestCase):
             self.assertTrue(ui.session_setup_action.isHidden())
 
             # Switch session sub-tabs
-            for tab_index in (0, 1, 2):
+            for tab_index in (0, 1, 2, 3):
                 ui._show_session_tab(tab_index)
                 self.assertEqual(ui.session_stack.currentIndex(), tab_index)
                 self.app.processEvents()
+
+            ui._handle_event({"type": "connected", "team": 0, "slot": 1, "slot_data": {}})
+            self.assertTrue(ui.command_input.isEnabled())
+            self.assertEqual(ui._hints_state, "loading")
+            self.assertEqual(ui.hints_empty.text(), "Loading hints…")
+            ui._render_hints({"hints": [
+                {
+                    "receiving_player": 1, "finding_player": 2, "location": 100,
+                    "item": 200, "entrance": "", "status_name": "HINT_PRIORITY",
+                    "item_name": "Super Shotgun", "location_name": "Cultist Base",
+                    "receiving_player_name": "Doom Slayer", "finding_player_name": "Other",
+                },
+                {
+                    "receiving_player": 1, "finding_player": 2, "location": 100,
+                    "item": 200, "entrance": "", "status_name": "HINT_FOUND",
+                    "item_name": "Super Shotgun", "location_name": "Cultist Base",
+                    "receiving_player_name": "Doom Slayer", "finding_player_name": "Other",
+                },
+            ]})
+            self.assertEqual(ui.hints.rowCount(), 1)
+            self.assertEqual(ui.hints.item(0, 0).text(), "FOUND")
+            ui._render_hints({"hints": []})
+            self.assertEqual(ui._hints_state, "loaded")
+            self.assertEqual(ui.hints_empty.text(), "No hints yet.")
+            ui._handle_event({"type": "disconnected"})
+            self.assertEqual(ui._hints_state, "disconnected")
+            self.assertEqual(ui.hints_empty.text(), "Hints unavailable while disconnected.")
 
             # Exercise log appending and event formatting
             ui._append_log("Test diagnostic log line")
@@ -147,6 +176,29 @@ class TestLauncherUIConstruction(unittest.TestCase):
                 ui.close()
                 ui.deleteLater()
                 self.app.processEvents()
+
+    def test_chat_sends_exact_text_and_clears_after_bridge_confirmation(self):
+        ui = LauncherUI(self.controller)
+        try:
+            self.controller.send_chat = MagicMock()
+            ui._room_connected = True
+            ui._set_chat_enabled(True)
+            ui.command_input.setText("  !hint Super Shotgun  ")
+            ui._send_command()
+            self.controller.send_chat.assert_called_once_with("  !hint Super Shotgun  ")
+            self.assertEqual(ui.command_input.text(), "  !hint Super Shotgun  ")
+            self.assertFalse(ui.command_input.isEnabled())
+            ui._handle_event({"type": "chat_sent", "text": "  !hint Super Shotgun  "})
+            self.assertEqual(ui.command_input.text(), "")
+            self.assertTrue(ui.command_input.isEnabled())
+            ui.command_input.setText("   ")
+            ui._send_command()
+            self.controller.send_chat.assert_called_once()
+        finally:
+            ui.timer.stop()
+            ui.close()
+            ui.deleteLater()
+            self.app.processEvents()
 
 
 if __name__ == "__main__":

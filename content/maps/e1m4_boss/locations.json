@@ -71,20 +71,8 @@
     "catwalk_platform_progress_argent_cell_1_1530710120": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": [
-        "catwalk_platform_destructible_interact_argent_cell_1_1530710120"
-      ],
-      "drop_targets": [],
-      "safe_target_graph": {
-        "catwalk_platform_destructible_interact_argent_cell_1_1530710120": []
-      },
-      "forbidden_target_terms": [
-        "currency",
-        "give",
-        "grant",
-        "inventory",
-        "perk"
-      ]
+      "preserve_targets": [],
+      "drop_targets": []
     },
     "wing_b_pickup_collectible_albums_album_03_1": {
       "native_entity_contract": {
@@ -98,7 +86,8 @@
           "useableComponentDecl = \"propitem/collectible/albums/album_03\";",
           "stat = \"STAT_COLLECTIBLE_ALBUM_FOUND\";"
         ]
-      }
+      },
+      "duplicate_policy": "native_only"
     }
   },
   "schema_version": 1,
@@ -109,7 +98,7 @@
     "7770146": "Doom Hunter Base - Doom Hunter Base Codex",
     "7770147": "Doom Hunter Base - Doom Hunter Codex",
     "7770148": "Doom Hunter Base - Sentinel Battery - First Combat Room Vent",
-    "7770149": "Doom Hunter Base - Praetor Suit Token - Red-Key Laser Side Room",
+    "7770149": "Doom Hunter Base - Praetor Suit Token - Train Dock Upper Area",
     "7770150": "Doom Hunter Base - Extra Life - Coffin-Wall Platform",
     "7770151": "Doom Hunter Base - Sentinel Battery - Above the Coffin-Wall Platform",
     "7770152": "Doom Hunter Base - Sentinel Crystal - Coffin-Wall Platform",

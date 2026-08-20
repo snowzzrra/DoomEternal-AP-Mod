@@ -52,20 +52,8 @@
     "pickups_progress_argent_cell_1_693519488_e3m2_b": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": [
-        "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b"
-      ],
-      "drop_targets": [],
-      "safe_target_graph": {
-        "pickups_destructible_interact_argent_cell_1_693519488_e3m2_b": []
-      },
-      "forbidden_target_terms": [
-        "currency",
-        "give",
-        "grant",
-        "inventory",
-        "perk"
-      ]
+      "preserve_targets": [],
+      "drop_targets": []
     }
   },
   "remove_entities": [],

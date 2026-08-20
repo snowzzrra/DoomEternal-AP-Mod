@@ -1024,6 +1024,9 @@
   "connection_conditions": {
     "Fortress of Doom - Second Visit -> Cultist Base - Grotto of Penance": {
       "soft_capabilities": ["requires_first_battery"]
+    },
+    "Urdak - Abyss of Sanctuary -> Urdak - Dimensional Lacerator": {
+      "soft_capabilities": ["requires_dash"]
     }
   },
   "assignments": {

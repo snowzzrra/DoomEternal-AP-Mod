@@ -692,12 +692,15 @@ class LauncherController:
             if event.get("adapter_state") == "applied":
                 self._ensure_native_client()
 
-    def send_command(self, text: str) -> None:
+    def send_chat(self, text: str) -> None:
         if not text.strip():
             return
-        if self.supervisor is None:
+        with self._lifecycle_lock:
+            connected = self.connected_room
+            supervisor = self.supervisor
+        if not connected or supervisor is None:
             raise RuntimeError("not connected")
-        self.supervisor.send_command(text)
+        supervisor.send_chat(text)
 
     def disconnect(self) -> None:
         self._stop_native_client()

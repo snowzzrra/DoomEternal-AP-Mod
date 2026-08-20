@@ -1,9 +1,11 @@
 import asyncio
 import enum
 import importlib
+import io
 import sys
 from collections import deque, namedtuple
 from functools import wraps
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 NetworkItem = namedtuple("NetworkItem", "item location player flags")
@@ -34,6 +36,14 @@ def _bridge_module():
         common.server_loop = lambda *_args, **_kwargs: None
         net = ModuleType("NetUtils")
         net.ClientStatus = SimpleNamespace(CLIENT_GOAL=30)
+        net.HintStatus = enum.IntEnum(
+            "HintStatus",
+            {"HINT_UNSPECIFIED": 0, "HINT_NO_PRIORITY": 10, "HINT_AVOID": 20, "HINT_PRIORITY": 30, "HINT_FOUND": 40},
+        )
+        net.Hint = namedtuple(
+            "Hint", "receiving_player finding_player location item found entrance item_flags status",
+            defaults=("", 0, net.HintStatus.HINT_UNSPECIFIED),
+        )
         net.JSONMessagePart = dict
         net.JSONTypes = enum.Enum(
             "JSONTypes",
@@ -64,6 +74,51 @@ def _run_async(function):
         return asyncio.run(function(*args, **kwargs))
 
     return wrapper
+
+
+@_run_async
+async def test_launcher_control_forwards_supervisor_chat_frame(monkeypatch, tmp_path):
+    from doom_eap.launcher.launcher_supervisor import BridgeSupervisor
+
+    class Stdin:
+        def __init__(self):
+            self.writes = []
+
+        def write(self, text):
+            self.writes.append(text)
+
+        def flush(self):
+            pass
+
+    class Process:
+        def __init__(self):
+            self.stdin = Stdin()
+
+        def poll(self):
+            return None
+
+    supervisor = BridgeSupervisor(
+        entrypoint=tmp_path / "bridge.py",
+        application_dir=tmp_path,
+        config_path=tmp_path / "config.json",
+        profile_id="test-launcher-control",
+        event_sink=lambda _event: None,
+        log_sink=lambda _line: None,
+    )
+    supervisor._process = Process()
+    text = "  !hint Super Shotgun  "
+    supervisor.send_chat(text)
+
+    context = SimpleNamespace(
+        exit_event=asyncio.Event(),
+        send_launcher_chat=__import__("unittest.mock", fromlist=["AsyncMock"]).AsyncMock(),
+    )
+    monkeypatch.setattr(bridge.sys, "stdin", io.StringIO("".join(supervisor._process.stdin.writes)))
+
+    await bridge.launcher_control_loop(context)
+
+    context.send_launcher_chat.assert_awaited_once_with(text)
+    assert context.exit_event.is_set()
 
 
 def _context(items=(), *, processed=0, ready=True):
@@ -346,3 +401,204 @@ def test_cleanup_active_map_markers_delete_failure_does_not_crash(tmp_path, monk
     # Should not raise
     bridge.cleanup_active_map_markers()
     assert marker.is_file()
+
+
+@_run_async
+async def test_launcher_chat_uses_commonclient_say_payload():
+    context = object.__new__(bridge.DoomEternalContext)
+    context.server = SimpleNamespace(socket=SimpleNamespace(open=True, closed=False))
+    context.on_user_say = lambda text: text
+    sent = []
+
+    async def send_msgs(payload):
+        sent.append(payload)
+
+    context.send_msgs = send_msgs
+    await context.send_launcher_chat("  !hint Super Shotgun  ")
+    assert sent == [[{"cmd": "Say", "text": "  !hint Super Shotgun  "}]]
+
+
+def _hint_context(*, team=1, slot=2, seed="test-seed"):
+    context = object.__new__(bridge.DoomEternalContext)
+    context.team = team
+    context.slot = slot
+    context.room_seed_name = seed
+    context.stored_data = {}
+    context.stored_data_notification_keys = set()
+    context.player_names = {2: "Doom Slayer", 3: "Other Player"}
+    context.item_names = SimpleNamespace(lookup_in_slot=lambda item, player: f"Item {item} for {player}")
+    context.location_names = SimpleNamespace(lookup_in_slot=lambda location, player: f"Location {location} in {player}")
+    return context
+
+
+def _local_archipelago_packet_handler():
+    """Load local CommonClient handler without disturbing bridge import fixture."""
+    archipelago_root = Path(__file__).resolve().parents[2] / "Archipelago"
+    saved_fake_modules = {}
+    for name in ("CommonClient", "Utils", "NetUtils"):
+        module = sys.modules.get(name)
+        if module is not None and not getattr(module, "__file__", None):
+            saved_fake_modules[name] = module
+            del sys.modules[name]
+    saved_module_update = sys.modules.pop("ModuleUpdate", None)
+    module_update = ModuleType("ModuleUpdate")
+    module_update.update = lambda: None
+    sys.modules["ModuleUpdate"] = module_update
+    colorama = sys.modules.get("colorama")
+    saved_colorama_fix = getattr(colorama, "just_fix_windows_console", None)
+    if colorama is not None and saved_colorama_fix is None:
+        colorama.just_fix_windows_console = lambda: None
+    sys.path.insert(0, str(archipelago_root))
+    try:
+        return importlib.import_module("CommonClient").process_server_cmd
+    finally:
+        sys.path.remove(str(archipelago_root))
+        if colorama is not None:
+            if saved_colorama_fix is None:
+                del colorama.just_fix_windows_console
+            else:
+                colorama.just_fix_windows_console = saved_colorama_fix
+        if saved_module_update is None:
+            del sys.modules["ModuleUpdate"]
+        else:
+            sys.modules["ModuleUpdate"] = saved_module_update
+        sys.modules.update(saved_fake_modules)
+
+
+@_run_async
+async def test_launcher_hints_follow_canonical_storage_package_order(monkeypatch):
+    context = _hint_context()
+    key = "_read_hints_1_2"
+    emitted = []
+    sent = []
+    monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
+    context.state_key = None
+    context.initialize_item_state = lambda: None
+    context.deathlink_receiver = SimpleNamespace(configure_mode=lambda _mode: None)
+    context.onboard_bootstrap = lambda _reason: None
+    context.reconcile_checked_automap_cleanup = lambda _reason: None
+    context.reconcile_fast_travel_unlock = lambda _reason: None
+    context._item_delivery_wakeup = False
+    context.items_processed = 0
+    context.items_received = []
+    context.auth = "Doom Slayer"
+    context.game = "Doom Eternal"
+    context.slot_info = {}
+    context.locations_checked = set()
+    context.locations_scouted = set()
+    context.finished_game = False
+    context.server_address = "ws://localhost:38281"
+    context.ui = None
+    context.consume_players_package = lambda _players: None
+
+    async def noop(*_args):
+        pass
+
+    async def send_msgs(payload):
+        sent.extend(payload)
+
+    context.update_death_link = noop
+    context.check_mission_challenge_locations = noop
+    context.send_msgs = send_msgs
+    monkeypatch.setattr(bridge.asyncio, "create_task", lambda coroutine: coroutine.close())
+
+    process_server_cmd = _local_archipelago_packet_handler()
+    await process_server_cmd(context, {
+        "cmd": "Connected",
+        "team": 1,
+        "slot": 2,
+        "slot_data": {},
+        "missing_locations": [],
+        "checked_locations": [],
+        "players": [],
+        "slot_info": {},
+    })
+    expected_keys = [
+        key,
+        "_read_item_name_groups_Doom Eternal",
+        "_read_location_name_groups_Doom Eternal",
+    ]
+    assert context.team == 1
+    assert context.slot == 2
+    assert [message["cmd"] for message in sent] == ["Get", "SetNotify"]
+    assert sent[0]["keys"] == sent[1]["keys"]
+    assert set(sent[0]["keys"]) == set(expected_keys)
+    assert [event_type for event_type, _payload in emitted] == ["connected"]
+
+    two_rows = [
+        {
+            "class": "Hint",
+            "receiving_player": 2,
+            "finding_player": 3,
+            "location": 100,
+            "item": 200,
+            "found": False,
+            "entrance": "",
+            "item_flags": 0,
+            "status": 0,
+        },
+        {
+            "class": "Hint",
+            "receiving_player": 2,
+            "finding_player": 3,
+            "location": 101,
+            "item": 201,
+            "found": False,
+            "entrance": "",
+            "item_flags": 0,
+            "status": 30,
+        },
+    ]
+    await process_server_cmd(context, {"cmd": "Retrieved", "keys": {key: two_rows}})
+    three_rows = [
+        {**two_rows[0], "found": True, "status": 40},
+        *two_rows[1:],
+        {
+            "class": "Hint",
+            "receiving_player": 2,
+            "finding_player": 3,
+            "location": 102,
+            "item": 202,
+            "found": False,
+            "entrance": "",
+            "item_flags": 0,
+            "status": 0,
+        },
+    ]
+    await process_server_cmd(context, {"cmd": "SetReply", "key": key, "value": three_rows})
+
+    hints = [payload["hints"] for event_type, payload in emitted if event_type == "hints"]
+    assert [len(snapshot) for snapshot in hints] == [2, 3]
+    assert hints[0][0]["item_name"] == "Item 200 for 2"
+    assert hints[0][0]["status_name"] == "HINT_UNSPECIFIED"
+    assert hints[1][0]["found"] is True
+    assert hints[1][0]["status_name"] == "HINT_FOUND"
+
+
+def test_launcher_hints_keep_valid_protocol_records_when_names_are_unknown(monkeypatch):
+    context = _hint_context()
+    context.item_names = SimpleNamespace(lookup_in_slot=lambda *_args: (_ for _ in ()).throw(LookupError()))
+    context.location_names = SimpleNamespace(lookup_in_slot=lambda *_args: (_ for _ in ()).throw(LookupError()))
+    context.stored_data["_read_hints_1_2"] = [(2, 3, 100, 200, False, "", 0, 30)]
+    emitted = []
+    monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
+
+    context._emit_launcher_hints()
+
+    hint = emitted[0][1]["hints"][0]
+    assert hint["item_name"] == "Unknown item (200)"
+    assert hint["location_name"] == "Unknown location (100)"
+
+
+def test_launcher_hints_report_malformed_nonempty_payload(monkeypatch, caplog):
+    context = _hint_context()
+    context.stored_data["_read_hints_1_2"] = [(2, 3, 100, 200, False), (2, 3), "bad row"]
+    emitted = []
+    monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
+
+    context._emit_launcher_hints()
+
+    assert len(emitted[0][1]["hints"]) == 1
+    assert "HINTS_DATA_REJECTED" in caplog.text
+    assert "source_type=list" in caplog.text
+    assert "rejected=2" in caplog.text

@@ -59,20 +59,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Use one local visual cleanup activation path"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Regenerated after Sentinel Crystal carrier and target-policy projection correction"
     }
   ],
   "asset_package_contract_sha256": "efe91a6baec0f505c14d1a552ea0c1e38ec0627355c2c08beac9ff6906959c70",
-  "byte_sha256": "ced763020eca162b06d55b0faa967a5a46bc592828e282b11f2dbfd2e64c6347",
+  "byte_sha256": "7e29c36844d1d11e31561bafbf0811b94f9c2746f4da452ae2ba69e6acb18e27",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17066993,
-    "classes": 13748,
-    "entity_count": 13786,
-    "layers": 6997,
-    "targets": 11383,
-    "transforms": 30262,
-    "unique_entity_names": 13749
+    "byte_size": 17096922,
+    "classes": 13774,
+    "entity_count": 13812,
+    "layers": 7007,
+    "targets": 11410,
+    "transforms": 30259,
+    "unique_entity_names": 13775
   },
   "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
   "map_key": "e2m3_core",
@@ -109,6 +113,6 @@
   "publisher_contract_sha256": "5b68333007af515c681165cecb856f15f1ff792282c1e229911eb52faa82bb23",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "9e20200597acdf504372e8108d41ef06c7303e09e74ca4a39d103458e1033f4a",
-  "semantic_sha256": "ad50f853c6c7ab7c2cde59f3025b026b7ae611f05c4545bad13d567c3e224c34"
+  "scripted_contract_sha256": "292c89855344215df7fee2052953041ff63e8500fbe3a37b09a85428b660e71f",
+  "semantic_sha256": "fdc2adc85d1092ba9b23c2da45ab76e4d16b5aaf1078786257f95de4a97061cd"
 }

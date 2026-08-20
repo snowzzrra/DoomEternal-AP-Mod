@@ -55,20 +55,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Use one local visual cleanup activation path"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Regenerated after Sentinel Crystal carrier and target-policy projection correction"
     }
   ],
   "asset_package_contract_sha256": "1301a39fcd94c697ef77009b823431bbb7eab9eaddf9db57e860d5a6071e367f",
-  "byte_sha256": "58d09b226fc51fdd306eefe4d8260d87caca6526b349cc04b10d2c6ba70d30c5",
+  "byte_sha256": "ad7652f071abf46144ba73af7dc9803760030a2b84438afcc27b3d7ee23ae86a",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
-    "bind_parents": 706,
-    "byte_size": 10661838,
-    "classes": 9143,
-    "entity_count": 9145,
-    "layers": 2355,
-    "targets": 11951,
-    "transforms": 19057,
-    "unique_entity_names": 9144
+    "bind_parents": 707,
+    "byte_size": 10686081,
+    "classes": 9159,
+    "entity_count": 9161,
+    "layers": 2357,
+    "targets": 11964,
+    "transforms": 19051,
+    "unique_entity_names": 9160
   },
   "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
   "map_key": "e1m4_boss",
@@ -98,6 +102,6 @@
     7770162
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "dc0c5401512c54369ec4de732d92a156a6882285453cef13a5660d31dc073273",
-  "semantic_sha256": "202b94ab904137cbc9b169753ca6e6560408aef37f571f9c9172bfab018b8748"
+  "scripted_contract_sha256": "7882606eae7a2d0c9f5eae37954a5167db9ae007443ef5940448b6bc63084eb8",
+  "semantic_sha256": "1827e7363dcb1865fb9275f9dbebec224b6bb41a1c1b37a561d0095bbbd36e61"
 }

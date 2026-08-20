@@ -126,17 +126,35 @@
     "progress_argent_cell_1_1072112848": {
       "gate_relay": "target_relay_argent_cell_useable",
       "independent_ap_trigger": true,
-      "remove_original": true
+      "remove_original": true,
+      "preserve_targets": [
+        "target_objective_complete_argent_cell"
+      ],
+      "drop_targets": [],
+      "safe_target_graph": {
+        "target_objective_complete_argent_cell": []
+      },
+      "forbidden_target_terms": [
+        "currency",
+        "give",
+        "grant",
+        "inventory",
+        "perk"
+      ]
     },
     "progress_argent_cell_1_750400652": {
       "gate_relay": "target_relay_argent_cell_useable",
       "independent_ap_trigger": true,
-      "remove_original": true
+      "remove_original": true,
+      "preserve_targets": [],
+      "drop_targets": []
     },
     "progress_argent_cell_1_2075197287": {
       "gate_relay": "target_relay_argent_cell_useable",
       "independent_ap_trigger": true,
-      "remove_original": true
+      "remove_original": true,
+      "preserve_targets": [],
+      "drop_targets": []
     },
     "progress_praetor_point_hub_1": {
       "independent_ap_trigger": true,

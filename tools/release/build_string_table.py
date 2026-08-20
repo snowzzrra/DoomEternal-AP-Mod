@@ -8,9 +8,19 @@ import json
 import re
 from pathlib import Path
 
-from tools.maps.notification_formatting import notification_key, notification_text
+from tools.maps.notification_formatting import (
+    ITEM_NOTIFICATION_HEADER_KEY,
+    ITEM_NOTIFICATION_TITLE,
+    LOCATION_NOTIFICATION_HEADER_KEY,
+    LOCATION_NOTIFICATION_TITLE,
+    location_notification_text,
+    notification_key,
+    notification_text,
+)
 
-HEADER_KEY_PATTERN = re.compile(r'header\s*=\s*"(#str_ap_notify_item_\d+(?:_\d+)?)";')
+ITEM_KEY_PATTERN = re.compile(
+    r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item_\d+(?:_\d+)?))";'
+)
 LOCATION_KEY_PATTERN = re.compile(
     r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
 )
@@ -25,7 +35,7 @@ def referenced_notification_keys(maps_dir: Path) -> set[str]:
         key
         for path in map_paths
         for key in (
-            HEADER_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
+            ITEM_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
             + LOCATION_KEY_PATTERN.findall(path.read_text(encoding="utf-8"))
         )
     }
@@ -90,6 +100,16 @@ def build_string_table(
     location_keys = {
         key for key in referenced_keys if key.startswith("#str_ap_location_")
     }
+    if ITEM_NOTIFICATION_HEADER_KEY in referenced_keys:
+        try:
+            entries.append((
+                ITEM_NOTIFICATION_HEADER_KEY,
+                ITEM_NOTIFICATION_TITLE[output_path.stem],
+            ))
+        except KeyError as error:
+            raise ValueError(
+                f"unsupported notification locale: {output_path.stem}"
+            ) from error
     if location_keys:
         default_location_names = (
             Path(__file__).resolve().parents[2]
@@ -115,12 +135,11 @@ def build_string_table(
         if location_identity.get("schema_version") != 1:
             raise ValueError("unsupported location-name schema")
         location_names = location_identity.get("locations", {})
-        sent_text = {
-            "english": "AP Location Sent",
-            "portuguese": "Localização AP enviada",
-        }
         try:
-            entries.append(("#str_ap_location_sent", sent_text[output_path.stem]))
+            entries.append((
+                LOCATION_NOTIFICATION_HEADER_KEY,
+                LOCATION_NOTIFICATION_TITLE[output_path.stem],
+            ))
         except KeyError as error:
             raise ValueError(
                 f"unsupported notification locale: {output_path.stem}"
@@ -133,7 +152,7 @@ def build_string_table(
                 raise ValueError(
                     f"location {location_id} has no canonical notification name"
                 ) from error
-            entries.append((key, f"AP: {location_name}"))
+            entries.append((key, location_notification_text(location_name)))
 
     serialized_entries = string_entries(entries)
     defined_keys = {entry["name"] for entry in serialized_entries}

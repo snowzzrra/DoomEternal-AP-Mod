@@ -31,7 +31,7 @@
   },
   "location_feedback": {
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ARACHNOTRON_1": {
-      "policy": "vanilla_only"
+      "policy": "ap_only"
     },
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_CACODEMON_1": {
       "policy": "vanilla_only"

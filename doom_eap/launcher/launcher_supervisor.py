@@ -197,6 +197,16 @@ class BridgeSupervisor:
             process.stdin.write(text.rstrip("\r\n") + "\n")
             process.stdin.flush()
 
+    def send_chat(self, text: str) -> None:
+        """Send raw launcher chat through bridge control channel."""
+        process = self._process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise RuntimeError("bridge worker is not running")
+        control = json.dumps({"type": "say", "text": text}, separators=(",", ":"))
+        with self._write_lock:
+            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.flush()
+
     def _watch_process(self) -> None:
         process = self._process
         if process is None:

@@ -78,7 +78,9 @@
           "activateTargetsOnEndInteraction = true;",
           "item[0] = \"echoes_target_relay_kiosk_1\";"
         ]
-      }
+      },
+      "ap_touch_only": true,
+      "no_auto_visual": true
     },
     "echoes_interact_use_panel_lore_kiosk_console_2": {
       "native_entity_contract": {
@@ -92,7 +94,9 @@
           "activateTargetsOnEndInteraction = true;",
           "item[0] = \"echoes_target_relay_kiosk_2\";"
         ]
-      }
+      },
+      "ap_touch_only": true,
+      "no_auto_visual": true
     },
     "echoes_interact_use_panel_lore_kiosk_console_3": {
       "native_entity_contract": {
@@ -106,7 +110,9 @@
           "activateTargetsOnEndInteraction = true;",
           "item[0] = \"echoes_target_relay_kiosk_3\";"
         ]
-      }
+      },
+      "ap_touch_only": true,
+      "no_auto_visual": true
     },
     "echoes_interact_use_panel_lore_kiosk_console_4": {
       "native_entity_contract": {
@@ -120,25 +126,15 @@
           "activateTargetsOnEndInteraction = true;",
           "item[0] = \"echoes_target_relay_kiosk_4\";"
         ]
-      }
+      },
+      "ap_touch_only": true,
+      "no_auto_visual": true
     },
     "pickups_progress_argent_cell_1_1763022446": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": [
-        "pickups_destructible_interact_argent_cell_1_1763022446"
-      ],
-      "drop_targets": [],
-      "safe_target_graph": {
-        "pickups_destructible_interact_argent_cell_1_1763022446": []
-      },
-      "forbidden_target_terms": [
-        "currency",
-        "give",
-        "grant",
-        "inventory",
-        "perk"
-      ]
+      "preserve_targets": [],
+      "drop_targets": []
     }
   },
   "secret_encounters": [

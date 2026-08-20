@@ -75,19 +75,16 @@
     "game_progress_argent_cell_1_498834914": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "preserve_targets": [
-        "game_destructible_interact_argent_cell_1_498834914"
-      ],
-      "drop_targets": [],
-      "safe_target_graph": {
-        "game_destructible_interact_argent_cell_1_498834914": []
-      },
-      "forbidden_target_terms": [
-        "currency",
-        "give",
-        "grant",
-        "inventory",
-        "perk"
+      "preserve_targets": [],
+      "drop_targets": []
+    },
+    "pickups_pickup_collectible_toys_mancubus_goo_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "independent_size": [
+        5.0,
+        5.0,
+        5.0
       ]
     },
     "pickups_pickup_keycard_slayer_key_1": {

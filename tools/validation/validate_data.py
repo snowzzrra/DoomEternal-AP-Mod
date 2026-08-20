@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import re
 import sys
@@ -49,6 +50,7 @@ from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 APWORLD = ROOT.parent / "Archipelago" / "worlds" / "doometernal"
+ITEM_CLASSIFICATION_SOURCE = "Archipelago/worlds/doometernal/items.py"
 MAP_SOURCES_PATH = ROOT / "data" / "map_sources.json"
 AUTOMAP_FAMILY_REGISTRY_PATH = ROOT / "data" / "automap_family_registry.json"
 BATTERY_LOCATIONS = {
@@ -95,6 +97,44 @@ def extract_namedtuple_table(path: Path, variable: str) -> dict[str, int]:
                 rows = ast.literal_eval(node.value)
                 return {name: code for name, code, _ in rows if code is not None}
     raise RuntimeError(f"Could not find {variable} in {path}")
+
+
+def extract_item_classifications(path: Path) -> dict[int, int]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    classification_bits = {
+        "filler": 0,
+        "progression": 1,
+        "useful": 2,
+        "trap": 4,
+    }
+
+    def classification_value(node: ast.AST) -> int:
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "ItemClassification"
+            and node.attr in classification_bits
+        ):
+            return classification_bits[node.attr]
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            return classification_value(node.left) | classification_value(node.right)
+        raise ValueError("APWorld item has unsupported classification expression")
+
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "item_data_table"
+            and isinstance(node.value, ast.Dict)
+        ):
+            continue
+        result: dict[int, int] = {}
+        for value in node.value.values:
+            code = ast.literal_eval(value.args[0])
+            if code is not None:
+                result[code] = classification_value(value.args[1])
+        return result
+    raise RuntimeError("Could not find item_data_table in APWorld")
 
 
 def extract_frozenset_constant(path: Path, variable: str) -> set[int]:
@@ -665,13 +705,18 @@ def main(argv: list[str] | None = None) -> int:
     item_ids = extract_namedtuple_table(APWORLD / "items.py", "item_data_table")
     location_ids = extract_namedtuple_table(APWORLD / "locations.py", "location_data_table")
     try:
-        classification_identity = load_item_classification_identity(
-            ROOT / "data" / "item_classifications.json"
-        )
-        if read_json(
-            ROOT / "data" / "item_classifications.json"
-        ).get("item_mapping_revision") != 5:
+        classification_path = ROOT / "data" / "item_classifications.json"
+        classification_document = read_json(classification_path)
+        classification_identity = load_item_classification_identity(classification_path)
+        if classification_document.get("item_mapping_revision") != 5:
             errors.append("Packaged item classification revision drifted")
+        if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
+            errors.append(
+                "Packaged item classifications have an unauthenticated source path"
+            )
+        expected_source_sha256 = hashlib.sha256((APWORLD / "items.py").read_bytes()).hexdigest()
+        if classification_document.get("source_sha256") != expected_source_sha256:
+            errors.append("Packaged item classifications have a stale source SHA-256")
         packaged_item_names = {
             entry["name"]: item_id
             for item_id, entry in classification_identity.items()
@@ -680,7 +725,14 @@ def main(argv: list[str] | None = None) -> int:
             errors.append(
                 "Packaged item classifications diverge from APWorld item IDs/names"
             )
-    except (OSError, ValueError) as exc:
+        expected_classifications = extract_item_classifications(APWORLD / "items.py")
+        packaged_classifications = {
+            item_id: entry["classification"]
+            for item_id, entry in classification_identity.items()
+        }
+        if packaged_classifications != expected_classifications:
+            errors.append("Packaged item classifications diverge from APWorld classifications")
+    except (OSError, SyntaxError, ValueError, RuntimeError) as exc:
         errors.append(f"Packaged item classifications invalid: {exc}")
     try:
         location_identity = read_json(ROOT / "data" / "location_names.json")

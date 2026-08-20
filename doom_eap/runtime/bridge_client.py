@@ -507,7 +507,7 @@ from CommonClient import (  # noqa: E402
     gui_enabled,
     server_loop,
 )
-from NetUtils import ClientStatus, JSONMessagePart, JSONTypes  # noqa: E402
+from NetUtils import ClientStatus, Hint, HintStatus, JSONMessagePart, JSONTypes  # noqa: E402
 
 if "doom_base_dir" in config and "save_games_dir" in config:
     try:
@@ -3074,6 +3074,118 @@ class DoomEternalContext(CommonContext):
         except Exception:
             logger.exception("[Bridge] Archipelago PrintJSON event formatting failed")
 
+    async def send_launcher_chat(self, text: str) -> None:
+        """Send launcher text through CommonClient's canonical Say path."""
+        if not self.server or not self.server.socket.open or self.server.socket.closed:
+            raise RuntimeError("Archipelago connection is unavailable")
+        accepted = self.on_user_say(text)
+        if accepted is None:
+            raise RuntimeError("Archipelago rejected message")
+        await self.send_msgs([{"cmd": "Say", "text": accepted}])
+
+    def _launcher_hints_key(self):
+        if (
+            not isinstance(self.team, int)
+            or isinstance(self.team, bool)
+            or not isinstance(self.slot, int)
+            or isinstance(self.slot, bool)
+        ):
+            return None
+        return f"_read_hints_{self.team}_{self.slot}"
+
+    def _emit_launcher_hints(self, update_kind="DATA_RECEIVED") -> None:
+        key = self._launcher_hints_key()
+        if key is None:
+            return
+        source = self.stored_data.get(key, [])
+        records = []
+        rejected = 0
+        row_arities = []
+        if isinstance(source, (list, tuple)):
+            for raw in source:
+                if isinstance(raw, dict):
+                    hint_fields = (
+                        "receiving_player",
+                        "finding_player",
+                        "location",
+                        "item",
+                        "found",
+                        "entrance",
+                        "item_flags",
+                        "status",
+                    )
+                    required_keys = set(hint_fields) | {"class"}
+                    if (
+                        raw.get("class") != "Hint"
+                        or set(raw) != required_keys
+                        or not all(isinstance(raw[field], int) and not isinstance(raw[field], bool)
+                                   for field in hint_fields[:4] + hint_fields[6:])
+                        or not isinstance(raw["found"], bool)
+                        or not isinstance(raw["entrance"], str)
+                    ):
+                        rejected += 1
+                        row_arities.append(type(raw).__name__)
+                        continue
+                    try:
+                        hint = Hint(*(raw[field] for field in hint_fields))
+                    except (TypeError, ValueError):
+                        rejected += 1
+                        row_arities.append(type(raw).__name__)
+                        continue
+                elif not isinstance(raw, (list, tuple)) or not 5 <= len(raw) <= 8:
+                    rejected += 1
+                    row_arities.append(len(raw) if isinstance(raw, (list, tuple)) else type(raw).__name__)
+                    continue
+                else:
+                    try:
+                        hint = Hint(*raw)
+                    except (TypeError, ValueError):
+                        rejected += 1
+                        row_arities.append(len(raw))
+                        continue
+                try:
+                    status = HintStatus(hint.status)
+                    status_value, status_name = int(status), status.name
+                except (TypeError, ValueError):
+                    status_value, status_name = int(HintStatus.HINT_UNSPECIFIED), "HINT_UNSPECIFIED"
+                try:
+                    item_name = self.item_names.lookup_in_slot(hint.item, hint.receiving_player)
+                except (KeyError, LookupError, AttributeError):
+                    item_name = f"Unknown item ({hint.item})"
+                try:
+                    location_name = self.location_names.lookup_in_slot(hint.location, hint.finding_player)
+                except (KeyError, LookupError, AttributeError):
+                    location_name = f"Unknown location ({hint.location})"
+                records.append({
+                    "receiving_player": hint.receiving_player,
+                    "receiving_player_name": self.player_names.get(hint.receiving_player, str(hint.receiving_player)),
+                    "finding_player": hint.finding_player,
+                    "finding_player_name": self.player_names.get(hint.finding_player, str(hint.finding_player)),
+                    "location": hint.location,
+                    "location_name": location_name,
+                    "item": hint.item,
+                    "item_name": item_name,
+                    "found": hint.found,
+                    "entrance": hint.entrance,
+                    "item_flags": hint.item_flags,
+                    "status": status_value,
+                    "status_name": status_name,
+                })
+        elif source is not None:
+            rejected = 1
+            row_arities.append(type(source).__name__)
+        if rejected:
+            logger.warning(
+                "HINTS_DATA_REJECTED key=%s source_type=%s source_count=%s rejected=%d row_arities=%s",
+                key,
+                type(source).__name__,
+                len(source) if isinstance(source, (list, tuple)) else "n/a",
+                rejected,
+                row_arities,
+            )
+        logger.info("HINTS_%s key=%s records=%d", update_kind, key, len(records))
+        emit_launcher_event("hints", hints=records)
+
     def reset_queue_session_authority(self, reason):
         self._queue_session_authoritative = False
         invalidate_queue_session_namespace(reason)
@@ -3228,6 +3340,12 @@ class DoomEternalContext(CommonContext):
                 missing_locations=sorted(args.get("missing_locations", [])),
                 checked_locations=sorted(args.get("checked_locations", [])),
             )
+        elif cmd in {"Retrieved", "SetReply"}:
+            key = self._launcher_hints_key()
+            if (cmd == "Retrieved" and key in args.get("keys", {})) or (
+                cmd == "SetReply" and args.get("key") == key
+            ):
+                self._emit_launcher_hints("DATA_RECEIVED" if cmd == "Retrieved" else "UPDATED")
         elif cmd == "ConnectionRefused":
             self.reset_queue_session_authority("connection_refused")
             self._report_launcher_connection_failure(
@@ -6855,6 +6973,49 @@ class DoomEternalContext(CommonContext):
 
     
 
+async def launcher_control_loop(ctx):
+    """Receive launcher IPC without invoking CommonClient's console parser."""
+    while not ctx.exit_event.is_set():
+        try:
+            raw_line = await asyncio.to_thread(sys.stdin.readline)
+        except asyncio.CancelledError:
+            raise
+        except (OSError, ValueError) as error:
+            logger.warning("[Launcher] Control input closed: %s", error)
+            ctx.exit_event.set()
+            return
+
+        if raw_line == "":
+            ctx.exit_event.set()
+            return
+
+        line = raw_line.rstrip("\r\n")
+        if line == "/exit":
+            ctx.exit_event.set()
+            return
+        if not line.startswith("AP_CONTROL "):
+            continue
+
+        try:
+            control = json.loads(line[len("AP_CONTROL "):])
+        except json.JSONDecodeError:
+            emit_launcher_event("chat_send_failed", message="Invalid launcher control message")
+            continue
+        if not isinstance(control, dict) or control.get("type") != "say":
+            continue
+
+        text = control.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        try:
+            await ctx.send_launcher_chat(text)
+        except Exception as error:
+            logger.warning("[Launcher] Chat send failed: %s", error)
+            emit_launcher_event("chat_send_failed", message=str(error))
+        else:
+            emit_launcher_event("chat_sent", text=text)
+
+
 async def amain(launch_args=None):
     start_bridge_logger()
     Utils.init_logging("DoomEternalClient")
@@ -6908,7 +7069,7 @@ async def amain(launch_args=None):
 
     if gui_enabled:
         raise RuntimeError("DOOM Eternal bridge worker requires --nogui")
-    ctx.run_cli()
+    ctx.input_task = asyncio.create_task(launcher_control_loop(ctx), name="Launcher control")
 
     await ctx.exit_event.wait()
     emit_launcher_event("client_stopping")

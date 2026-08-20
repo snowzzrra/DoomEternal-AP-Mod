@@ -23,7 +23,12 @@ from doom_eap.runtime.item_reconciliation import (
     SUPPORTED_RECEIPT_FEEDBACK,
     load_policy_registry,
 )
-from tools.maps.notification_formatting import notification_key
+from tools.maps.notification_formatting import (
+    ITEM_NOTIFICATION_HEADER_KEY,
+    LOCATION_NOTIFICATION_HEADER_KEY,
+    location_notification_key,
+    notification_key,
+)
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
@@ -164,6 +169,32 @@ def remove_property_blocks(content, property_name):
         pos = i
     result.append(content[pos:])
     return ''.join(result)
+
+
+SECRET_PRESENTATION_FIELDS = (
+    "notificationType", "notificationHudEventID", "notificationEndHudEventID",
+    "notificationSound", "notificationTime", "rootWidget", "icon", "header",
+    "subtext", "showCVar", "priority", "doNotShowDuplicate", "showDuringCombat",
+)
+
+
+def suppress_vanilla_secret_found_ui(content):
+    """Strip Secret Found presentation fields while retaining target/state edges."""
+    blocks = content.split("entity {")
+    updated = [blocks[0]]
+    for block in blocks[1:]:
+        if not re.search(r"SECRET_FOUND|secret_encounter_found|PLAYER_NOTIFICATION_SECRET_FOUND", block):
+            updated.append("entity {" + block)
+            continue
+        for field in SECRET_PRESENTATION_FIELDS:
+            block = re.sub(
+                rf'\s*{re.escape(field)}\s*=\s*(?:"[^"]*"|true|false|-?\d+(?:\.\d+)?);',
+                "",
+                block,
+                flags=re.IGNORECASE,
+            )
+        updated.append("entity {" + block)
+    return "".join(updated)
 
 
 def retain_single_stat_increase(content, property_name, stat_name):
@@ -398,12 +429,16 @@ TARGET_POLICY_CONSUMERS = {
     "preserve_original_visual": "generate_map original-owner branch",
     "native_entity_contract": "apply_native_entity_contract",
     "checkpoint_cleanup": "apply_checkpoint_cleanup_contract",
+    "ap_touch_only": "native_entity_contract touch-only policy",
+    "duplicate_policy": "native_entity_contract duplicate policy",
 }
 
 NATIVE_ENTITY_CONTRACT_KEYS = {
     "remove_block", "original_targets", "required_snippets",
     "set_properties", "retain_pickup_stat",
 }
+
+DUPLICATE_POLICIES = {"native_only"}
 
 CHECKPOINT_CLEANUP_CONTRACT_KEYS = {
     "source_entity", "source_sha256", "event_index", "event_def",
@@ -515,6 +550,28 @@ def validate_target_policies(config_entities, target_policies, content):
                 f"Target policy has unsupported key(s) for {entity_name}: "
                 + ", ".join(unknown)
             )
+        if policy.get("ap_touch_only"):
+            if "native_entity_contract" not in policy:
+                raise ValueError(
+                    f"ap_touch_only requires native_entity_contract: {entity_name}"
+                )
+            if policy.get("independent_ap_trigger"):
+                raise ValueError(
+                    f"ap_touch_only cannot use independent_ap_trigger: {entity_name}"
+                )
+            if not policy.get("no_auto_visual"):
+                raise ValueError(
+                    f"ap_touch_only requires no_auto_visual: {entity_name}"
+                )
+        duplicate_policy = policy.get("duplicate_policy")
+        if duplicate_policy not in (None, *DUPLICATE_POLICIES):
+            raise ValueError(
+                f"Unsupported duplicate policy for {entity_name}: {duplicate_policy}"
+            )
+        if duplicate_policy == "native_only" and "native_entity_contract" not in policy:
+            raise ValueError(
+                f"native_only duplicate policy requires native_entity_contract: {entity_name}"
+            )
         independent_only = {
             "remove_original", "independent_entity_name", "independent_position",
             "independent_size", "independent_targets", "independent_visual",
@@ -522,8 +579,13 @@ def validate_target_policies(config_entities, target_policies, content):
         }
         unused_independent = sorted(
             set(policy) & independent_only
-            if not policy.get("independent_ap_trigger") else ()
+            if not policy.get("independent_ap_trigger")
+            else ()
         )
+        if policy.get("ap_touch_only"):
+            unused_independent = [
+                key for key in unused_independent if key != "no_auto_visual"
+            ]
         if unused_independent:
             raise ValueError(
                 f"Target policy has unused independent-trigger field(s) for {entity_name}: "
@@ -542,6 +604,7 @@ def validate_target_policies(config_entities, target_policies, content):
         if bounds is None:
             raise ValueError(f"Target policy source entity not found: {entity_name}")
         source_block = content[bounds[0]:bounds[1]]
+        validate_sentinel_crystal_policy(entity_name, policy, source_block)
         source_targets = extract_target_names(source_block)
         for key in ("drop_targets", "preserve_targets"):
             if key not in policy:
@@ -660,10 +723,14 @@ def is_sentinel_crystal_source(block):
 
 
 SENTINEL_CRYSTAL_TOP_MODEL = "art/kit/sentinel/prop/argent_cell_top.lwo"
+SENTINEL_CRYSTAL_BRIDGE_OWNER = "progress_argent_cell_1_1072112848"
+SENTINEL_CRYSTAL_OBJECTIVE_TARGET = "target_objective_complete_argent_cell"
+SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS = [
+    "currency", "give", "grant", "inventory", "perk",
+]
 SENTINEL_CRYSTAL_OWNER_MARKERS = (
     'inherit = "progress/argent_cell";',
     'class = "idInteractable_WorldCache";',
-    'automapPropertiesDecl = "argent_cell";',
     'model = "md6def/objects/interact/argent_cell/argent_cell.md6";',
     'animWebDecl = "animweb/interact/argent_cell/argent_cell_interact";',
     'interactionGraph = "interactables/progress";',
@@ -684,6 +751,17 @@ def is_sentinel_crystal_top(block):
         )
         == [SENTINEL_CRYSTAL_TOP_MODEL]
     )
+
+
+def remove_sentinel_crystal_automap_carrier(block):
+    """Keep crystal state owner while removing retired presentation carriers."""
+    for property_name in ("automapPropertiesDecl", "fxDecl", "thinkComponentDecl"):
+        block = re.sub(
+            rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);',
+            "",
+            block,
+        )
+    return block
 
 
 def _entity_name_from_block(block):
@@ -811,6 +889,54 @@ def assert_sentinel_crystal_owner_intact(block, entity_name):
         )
 
 
+def validate_sentinel_crystal_policy(entity_name, policy, source_block):
+    """Fail closed on Sentinel Crystal target ownership and story graph."""
+    if not is_sentinel_crystal_source(source_block):
+        return
+    if not policy.get("independent_ap_trigger") or not policy.get("remove_original"):
+        raise ValueError(
+            f"Sentinel Crystal requires independent AP removal: {entity_name}"
+        )
+    if "independent_size" in policy:
+        raise ValueError(
+            f"Sentinel Crystal cannot define independent_size: {entity_name}"
+        )
+    if policy.get("drop_targets", []) != []:
+        raise ValueError(
+            f"Sentinel Crystal drop_targets must be empty: {entity_name}"
+        )
+    preserve_targets = policy.get("preserve_targets")
+    if entity_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+        if preserve_targets != [SENTINEL_CRYSTAL_OBJECTIVE_TARGET]:
+            raise ValueError(
+                "Bridge Sentinel Crystal must preserve only objective target: "
+                f"{entity_name}"
+            )
+        if policy.get("safe_target_graph") != {
+            SENTINEL_CRYSTAL_OBJECTIVE_TARGET: []
+        }:
+            raise ValueError(
+                "Bridge Sentinel Crystal objective graph is not exact: "
+                f"{entity_name}"
+            )
+        if policy.get("forbidden_target_terms") != SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
+            raise ValueError(
+                "Bridge Sentinel Crystal forbidden target terms are not exact: "
+                f"{entity_name}"
+            )
+        return
+    if preserve_targets != []:
+        raise ValueError(
+            "Only bridge Sentinel Crystal may preserve a target: "
+            f"{entity_name}"
+        )
+    if "safe_target_graph" in policy or "forbidden_target_terms" in policy:
+        raise ValueError(
+            "Non-bridge Sentinel Crystal cannot define preserved story graph: "
+            f"{entity_name}"
+        )
+
+
 def assert_sentinel_crystal_transform(content, pairs):
     """Keep native crystal owners while proving only paired tops disappeared."""
     for source_name, top_name in pairs.items():
@@ -822,6 +948,17 @@ def assert_sentinel_crystal_transform(content, pairs):
         if top_name in source_block:
             raise ValueError(
                 f"Sentinel Crystal owner retains removed top reference: {source_name}"
+            )
+        expected_owner_targets = (
+            [SENTINEL_CRYSTAL_OBJECTIVE_TARGET]
+            if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER
+            else []
+        )
+        if extract_target_names(source_block) != expected_owner_targets:
+            raise ValueError(
+                "Sentinel Crystal owner target graph drift: "
+                f"{source_name} expected {expected_owner_targets}, got "
+                f"{extract_target_names(source_block)}"
             )
         if content.count(f"entityDef {top_name} {{") != 0:
             raise ValueError(f"Sentinel Crystal top was not removed: {top_name}")
@@ -1279,7 +1416,7 @@ def build_universal_physical_policy(
 
 def resolved_automap_visual_policy(location_id, policy):
     """Resolve packaged presentation names from generator visual policy."""
-    if policy.get("no_auto_visual"):
+    if policy.get("no_auto_visual") or policy.get("duplicate_policy") == "native_only":
         return {"classification": "no_visual", "policy": "no_auto_visual"}
     visual = policy.get("independent_visual")
     if visual is None:
@@ -1486,8 +1623,8 @@ def generate_pickup_notification(location_id):
         "location_notification_codex",
         f"{LOCATION_NOTIFICATION_PREFIX}{location_id}",
         {
-            "header_key": "#str_ap_location_sent",
-            "subtext_key": f"#str_ap_location_{location_id}",
+            "header_key": LOCATION_NOTIFICATION_HEADER_KEY,
+            "subtext_key": location_notification_key(location_id),
         },
     )
 
@@ -1512,7 +1649,7 @@ def location_feedback_policy(location_feedback, ap_check_id):
     return policy
 
 
-def generate_item_notification(item_id, header_key, classification, stage=None, slot=None):
+def generate_item_notification(item_id, subtext_key, classification, stage=None, slot=None):
     """Generate the one classification-selected received-item notification."""
     style = notification_style_for_item(item_id, classification)
     entity_name = notification_entity_name(
@@ -1521,7 +1658,10 @@ def generate_item_notification(item_id, header_key, classification, stage=None, 
     return build_primitive(
         f"item_notification_{style}",
         entity_name,
-        {"header_key": header_key},
+        {
+            "header_key": ITEM_NOTIFICATION_HEADER_KEY,
+            "subtext_key": subtext_key,
+        },
     )
 
 
@@ -1759,17 +1899,17 @@ def generate_rpc_command_entities(
             if isinstance(command_value, dict) and command_value.get("type") == "progressive_perk":
                 perks = command_value.get("perks", [])
                 for stage in range(len(perks)):
-                    header_key = notification_key(item_id_int, command_value, stage=stage)
+                    subtext_key = notification_key(item_id_int, command_value, stage=stage)
                     for slot in ("a", "b"):
                         blocks.append(generate_item_notification(
-                            item_id_int, header_key, classification,
+                            item_id_int, subtext_key, classification,
                             stage=stage, slot=slot,
                         ))
             else:
-                header_key = notification_key(item_id_int, command_value)
+                subtext_key = notification_key(item_id_int, command_value)
                 for slot in ("a", "b"):
                     blocks.append(generate_item_notification(
-                        item_id_int, header_key, classification, slot=slot
+                        item_id_int, subtext_key, classification, slot=slot
                     ))
 
     generated = "".join(blocks)
@@ -1989,7 +2129,7 @@ def generate_map(
     manifest_data = {}
 
     source_metadata = validate_source_file(input_file, output_file)
-    content = source_metadata["content"]
+    content = suppress_vanilla_secret_found_ui(source_metadata["content"])
     for contract in level_config.get("inline_currency_removals", []):
         content = remove_inline_currency_transaction(content, contract)
     validate_target_policies(config_entities, target_policies, content)
@@ -2061,6 +2201,16 @@ def generate_map(
     blocks = content.split("entity {")
     sentinel_crystal_pairs = find_sentinel_crystal_pairs(blocks[1:])
     sentinel_crystal_top_names = set(sentinel_crystal_pairs.values())
+    missing_crystal_checks = sorted(
+        f"AP_CHECK_{source_name.upper()}"
+        for source_name in sentinel_crystal_pairs
+        if f"AP_CHECK_{source_name.upper()}" not in config_entities
+    )
+    if missing_crystal_checks:
+        raise ValueError(
+            "Every discovered Sentinel Crystal requires an AP check: "
+            + ", ".join(missing_crystal_checks)
+        )
     new_blocks = [blocks[0]]
 
     modified_count = 0
@@ -2098,6 +2248,19 @@ def generate_map(
                     target_policy = build_universal_physical_policy(
                         ap_check_id, location_id, block, default_visual_model
                     )
+                elif is_sentinel_crystal_source(block) and not target_policy.get(
+                    "independent_ap_trigger"
+                ):
+                    generic = build_universal_physical_policy(
+                        ap_check_id, location_id, block, default_visual_model
+                    )
+                    generic.update(target_policy)
+                    target_policy = generic
+                if is_sentinel_crystal_source(block):
+                    target_policy.setdefault("independent_ap_trigger", True)
+                    target_policy.setdefault("remove_original", True)
+                    if entity_name != SENTINEL_CRYSTAL_BRIDGE_OWNER:
+                        target_policy["preserve_targets"] = []
                 visual = target_policy.get("independent_visual")
                 if visual:
                     asset_key = visual.get("asset") or default_visual_asset
@@ -2114,6 +2277,8 @@ def generate_map(
                             visual["_model_override"] = visual_asset["model"]
                         else:
                             visual["model"] = visual_asset["model"]
+                if target_policy.get("duplicate_policy") == "native_only":
+                    target_policy["no_auto_visual"] = True
                 if (
                     "native_entity_contract" in target_policy
                     and not target_policy.get("no_auto_visual")
@@ -2251,6 +2416,18 @@ def generate_map(
                             "targets",
                             sentinel_top_name,
                         )
+                        preserve_targets = target_policy.get("preserve_targets")
+                        if preserve_targets is not None:
+                            preserve_set = set(preserve_targets)
+                            native = replace_targets_block(
+                                native,
+                                [
+                                    target
+                                    for target in extract_target_names(native)
+                                    if target in preserve_set
+                                ],
+                            )
+                        native = remove_sentinel_crystal_automap_carrier(native)
                         assert_sentinel_crystal_owner_intact(native, entity_name)
                         new_blocks.append(
                             "entity {" + native

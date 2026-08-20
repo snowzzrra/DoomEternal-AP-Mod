@@ -1,4 +1,4 @@
-"""Canonical notification keys and text for received Archipelago items."""
+"""Canonical notification keys and text for Archipelago receipts."""
 
 from __future__ import annotations
 
@@ -7,6 +7,17 @@ from typing import Any
 
 _AP_COLOR_CODE = re.compile(r"(?:\{[^{}]*\}|\^[0-9A-Fa-f])")
 _CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
+ITEM_NOTIFICATION_HEADER_KEY = "#str_ap_item_received"
+LOCATION_NOTIFICATION_HEADER_KEY = "#str_ap_location_sent"
+
+ITEM_NOTIFICATION_TITLE = {
+    "english": "AP ITEM RECEIVED",
+    "portuguese": "ITEM AP RECEBIDO",
+}
+LOCATION_NOTIFICATION_TITLE = {
+    "english": "AP LOCATION SENT",
+    "portuguese": "LOCALIZAÇÃO AP ENVIADA",
+}
 
 
 def _sanitized_name(item_name: str) -> str:
@@ -46,15 +57,30 @@ def notification_text(
     *,
     stage: int | None = None,
 ) -> str:
-    del item_id
+    # Validate item identity and style metadata even though subtitle text is
+    # intentionally independent of progressive/currency presentation details.
+    notification_key(item_id, definition, stage=stage)
     name = _sanitized_name(item_name)
     progressive_count = _progressive_stage_count(definition, stage)
     if progressive_count is not None:
-        name = f"{name} ({stage + 1}/{progressive_count})"
+        if stage is None:
+            raise ValueError("progressive notification stage is required")
     elif isinstance(definition, dict) and definition.get("type") == "currency":
         count = definition.get("count", 1)
         if not isinstance(count, int) or count <= 0:
             raise ValueError("currency notification count must be positive")
-        if count > 1:
-            name = f"{name} x{count}"
-    return f"AP: {name}"
+    return name
+
+
+def location_notification_key(location_id: int) -> str:
+    """Return canonical string-table key for one AP location receipt."""
+    if not isinstance(location_id, int) or location_id <= 0:
+        raise ValueError(f"invalid AP location id: {location_id!r}")
+    return f"#str_ap_location_{location_id}"
+
+
+def location_notification_text(location_name: str) -> str:
+    """Return canonical AP location receipt text."""
+    if not isinstance(location_name, str) or not location_name.strip():
+        raise ValueError("AP location name cannot be empty")
+    return location_name.strip()
