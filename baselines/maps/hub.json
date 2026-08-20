@@ -83,14 +83,18 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Accept Bridge Sentinel Crystal continuation relay target"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "major receipt single-line format"
     }
   ],
   "asset_package_contract_sha256": "ce785644bbfc80f99443669dd8499eeb7ec9f36167985e18b8339867220f39ba",
-  "byte_sha256": "373d0a42b56e7cd81ff5df8f8f7ab4494077693b2b7412b73c6d29fe3223b6d0",
+  "byte_sha256": "235d40f7fa459867640789e10bc6f516d2ad06b009da06f447da062aaa650dbc",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 143,
-    "byte_size": 4320360,
+    "byte_size": 4313760,
     "classes": 4165,
     "entity_count": 4167,
     "layers": 162,
@@ -125,5 +129,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "cb9ac214d5d79b2f9a6f1ac32d1b7a3935d5e87bfe06ef9ff102b8479ac84a42",
-  "semantic_sha256": "503f184322582856bbc093549a0f02dfe0f207aa8ae9e2530a04412b588888e4"
+  "semantic_sha256": "8586feaf9fd3e28a7dbdfb7c9c7790d1b151062f96ae009d34044a672461b345"
 }

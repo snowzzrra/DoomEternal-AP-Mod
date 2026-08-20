@@ -27,6 +27,7 @@ from tools.maps.notification_formatting import (
     ITEM_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_HEADER_KEY,
     location_notification_key,
+    major_notification_key_from_item_key,
     notification_key,
 )
 AP_PICKUP_HITBOX_SIZE = 6
@@ -1805,14 +1806,16 @@ def generate_item_notification(item_id, subtext_key, classification, stage=None,
     entity_name = notification_entity_name(
         item_id, classification, stage=stage, slot=slot
     )
-    return build_primitive(
-        f"item_notification_{style}",
-        entity_name,
-        {
+    if style == "major":
+        parameters = {
+            "header_key": major_notification_key_from_item_key(subtext_key),
+        }
+    else:
+        parameters = {
             "header_key": ITEM_NOTIFICATION_HEADER_KEY,
             "subtext_key": subtext_key,
-        },
-    )
+        }
+    return build_primitive(f"item_notification_{style}", entity_name, parameters)
 
 
 def inject_secret_encounter_completion(

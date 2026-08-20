@@ -55,14 +55,18 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Accept intentional global target/secret to target/relay idTarget_Count count=1 transform"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "major receipt single-line format"
     }
   ],
   "asset_package_contract_sha256": "39237e28326cdda5cc0b39b946495e49d28e08d7c1341ccee36d5e59784d53c8",
-  "byte_sha256": "a34e31083ed602f13121b082dc3efe86f91fdce8c5038a048e83ee6dd799695f",
+  "byte_sha256": "bf42b118d36875165e5fc47aab101430dfe1c11d5ffe61f639bab16c77fcc8ba",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 271,
-    "byte_size": 14422292,
+    "byte_size": 14415692,
     "classes": 13374,
     "entity_count": 13377,
     "layers": 2110,
@@ -108,5 +112,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "719ac741fa7d8e02c15c4d4bcbcba587612051325b5fffc101f66a215a889e5b",
-  "semantic_sha256": "f4c5e06f4540defe1e6827835f190ecb6e68fc5fbcd04073c664f55d3071be6f"
+  "semantic_sha256": "f38946c98ba2a66332b495c533944ab65bb17c67f392c24116693ee99ecb49db"
 }

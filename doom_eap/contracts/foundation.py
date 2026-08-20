@@ -85,7 +85,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         "item_notification_major": {
             "family": "ap_item_notify_major", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "native HUD notification/AP checks", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
-            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "priority", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound", "showCVar"], "forbidden_fields": ["notificationEndHudEventID", "currencyList", "gameStat"]},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "priority", "doNotShowDuplicate", "rootWidget", "icon", "header", "notificationSound", "showCVar"], "forbidden_fields": ["notificationEndHudEventID", "subtext", "currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
         },
         "item_notification_filler": {
@@ -326,10 +326,9 @@ def build_primitive(
 }}
 '''
     elif primitive_id == "item_notification_major":
-        if not isinstance(parameters, dict) or set(parameters) != {"header_key", "subtext_key"}:
-            raise ValueError("item_notification_major requires header_key and subtext_key")
+        if not isinstance(parameters, dict) or set(parameters) != {"header_key"}:
+            raise ValueError("item_notification_major requires header_key")
         header_key = parameters["header_key"]
-        subtext_key = parameters["subtext_key"]
         block = f'''{header}
 \t\tedit = {{
 \t\t\tflags = {{
@@ -344,7 +343,6 @@ def build_primitive(
 \t\t\trootWidget = "tier3centered";
 \t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
 \t\t\theader = "{header_key}";
-\t\t\tsubtext = "{subtext_key}";
 \t\t\tnotificationSound = "play_secret_encounter_found";
 \t\t\tshowCVar = "g_setting_notification_major";
 \t\t}}

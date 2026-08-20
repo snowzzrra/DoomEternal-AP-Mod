@@ -14,12 +14,14 @@ from tools.maps.notification_formatting import (
     LOCATION_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_TITLE,
     location_notification_text,
+    major_notification_key,
+    major_notification_text,
     notification_key,
     notification_text,
 )
 
 ITEM_KEY_PATTERN = re.compile(
-    r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item_\d+(?:_\d+)?))";'
+    r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item(?:_received)?_\d+(?:_\d+)?))";'
 )
 LOCATION_KEY_PATTERN = re.compile(
     r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
@@ -94,6 +96,18 @@ def build_string_table(
                     key,
                     notification_text(
                         item_id, definition, item_name, stage=stage
+                    ),
+                ))
+            major_key = major_notification_key(item_id, definition, stage=stage)
+            if major_key in referenced_keys:
+                entries.append((
+                    major_key,
+                    major_notification_text(
+                        item_id,
+                        definition,
+                        item_name,
+                        stage=stage,
+                        locale=output_path.stem,
                     ),
                 ))
 

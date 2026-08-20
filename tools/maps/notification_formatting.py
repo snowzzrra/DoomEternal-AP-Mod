@@ -8,11 +8,16 @@ from typing import Any
 _AP_COLOR_CODE = re.compile(r"(?:\{[^{}]*\}|\^[0-9A-Fa-f])")
 _CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
 ITEM_NOTIFICATION_HEADER_KEY = "#str_ap_item_received"
+MAJOR_NOTIFICATION_KEY_PREFIX = "#str_ap_notify_item_received_"
 LOCATION_NOTIFICATION_HEADER_KEY = "#str_ap_location_sent"
 
 ITEM_NOTIFICATION_TITLE = {
     "english": "AP ITEM RECEIVED",
     "portuguese": "ITEM AP RECEBIDO",
+}
+MAJOR_NOTIFICATION_SUFFIX = {
+    "english": "RECEIVED",
+    "portuguese": "RECEBIDO",
 }
 LOCATION_NOTIFICATION_TITLE = {
     "english": "AP LOCATION SENT",
@@ -50,6 +55,24 @@ def notification_key(item_id: int, definition: Any, *, stage: int | None = None)
     return f"#str_ap_notify_item_{item_id}_{stage}"
 
 
+def major_notification_key(item_id: int, definition: Any, *, stage: int | None = None) -> str:
+    """Return item-specific major header key, including progressive stage."""
+    return major_notification_key_from_item_key(
+        notification_key(item_id, definition, stage=stage)
+    )
+
+
+def major_notification_key_from_item_key(item_key: str) -> str:
+    """Convert filler subtitle key to distinct major receipt header key."""
+    prefix = "#str_ap_notify_item_"
+    if not isinstance(item_key, str) or not item_key.startswith(prefix):
+        raise ValueError(f"invalid item notification key: {item_key!r}")
+    suffix = item_key[len(prefix):]
+    if not re.fullmatch(r"\d+(?:_\d+)?", suffix):
+        raise ValueError(f"invalid item notification key suffix: {item_key!r}")
+    return f"{MAJOR_NOTIFICATION_KEY_PREFIX}{suffix}"
+
+
 def notification_text(
     item_id: int,
     definition: Any,
@@ -70,6 +93,23 @@ def notification_text(
         if not isinstance(count, int) or count <= 0:
             raise ValueError("currency notification count must be positive")
     return name
+
+
+def major_notification_text(
+    item_id: int,
+    definition: Any,
+    item_name: str,
+    *,
+    stage: int | None = None,
+    locale: str = "english",
+) -> str:
+    """Return localized major receipt text: ``<ITEM> RECEIVED``."""
+    notification_text(item_id, definition, item_name, stage=stage)
+    try:
+        suffix = MAJOR_NOTIFICATION_SUFFIX[locale]
+    except KeyError as error:
+        raise ValueError(f"unsupported notification locale: {locale}") from error
+    return f"{_sanitized_name(item_name)} {suffix}"
 
 
 def location_notification_key(location_id: int) -> str:

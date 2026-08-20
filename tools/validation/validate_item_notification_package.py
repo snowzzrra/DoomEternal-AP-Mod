@@ -17,6 +17,7 @@ from tools.maps.notification_formatting import (
     ITEM_NOTIFICATION_TITLE,
     LOCATION_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_TITLE,
+    major_notification_key_from_item_key,
 )
 from tools.release.release_manifest import load_release_manifest
 
@@ -25,8 +26,8 @@ RECEIPT_RE = re.compile(r"entityDef\s+ap_rpc_item_[^\s{]+")
 NOTIFICATION_RE = re.compile(
     r"entityDef ap_notify_item_((?:major|filler)_\d+(?:_\d+)?_[ab]) \{"
 )
-HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_(?:item_received|notify_item_\d+(?:_\d+)?))";')
-ITEM_KEY_RE = re.compile(r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item_\d+(?:_\d+)?))";')
+HEADER_RE = re.compile(r'header\s*=\s*"(#str_ap_(?:item_received|notify_item(?:_received)?_\d+(?:_\d+)?))";')
+ITEM_KEY_RE = re.compile(r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item(?:_received)?_\d+(?:_\d+)?))";')
 LOCATION_NOTIFICATION_RE = re.compile(
     r"entityDef ap_notify_location_(\d+) \{"
 )
@@ -68,6 +69,17 @@ CODEX_NOTIFICATION_FIELDS = (
 )
 
 
+def expected_item_key(suffix: str) -> str:
+    style, rpc_suffix = suffix.split("_", 1)
+    rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
+    filler_key = f"#str_ap_notify_item_{rpc_suffix}"
+    return (
+        major_notification_key_from_item_key(filler_key)
+        if style == "major"
+        else filler_key
+    )
+
+
 def validate_item_notification_contract(
     notification: str, suffix: str, classification: int
 ) -> None:
@@ -86,7 +98,14 @@ def validate_item_notification_contract(
     if any(field not in notification for field in required_fields):
         raise AssertionError(f"item notification HUD contract is incomplete: {suffix}")
     expected_subtext = f"#str_ap_notify_item_{rpc_suffix}"
-    if (
+    if style == "major":
+        expected_header = expected_item_key(suffix)
+        if f'header = "{expected_header}";' not in notification:
+            raise AssertionError(f"major item notification header is incomplete: {suffix}")
+        subtext_match = re.search(r'subtext\s*=\s*"([^"]*)";', notification)
+        if subtext_match and subtext_match.group(1):
+            raise AssertionError(f"major item notification has non-empty subtext: {suffix}")
+    elif (
         f'header = "{ITEM_NOTIFICATION_HEADER_KEY}";' not in notification
         or f'subtext = "{expected_subtext}";' not in notification
     ):
@@ -266,12 +285,15 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         for suffix in notifications
     ):
         raise AssertionError("native-only item has notification entities")
-    expected_headers = {ITEM_NOTIFICATION_HEADER_KEY}
+    expected_headers = {ITEM_NOTIFICATION_HEADER_KEY} | {
+        expected_item_key(suffix)
+        for suffix in notifications
+        if suffix.startswith("major_")
+    }
     if headers != expected_headers:
         raise AssertionError("enabled notifier headers diverge from notification entities")
     expected_item_keys = expected_headers | {
-        f"#str_ap_notify_item_{suffix.split('_', 1)[1].rsplit('_', 1)[0]}"
-        for suffix in notifications
+        expected_item_key(suffix) for suffix in notifications
     }
     if item_keys != expected_item_keys:
         raise AssertionError("item notification title/subtitle keys diverge")
