@@ -71,20 +71,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Regenerated after Sentinel Crystal carrier and target-policy projection correction"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept intentional global target/secret to target/relay idTarget_Count count=1 transform"
     }
   ],
   "asset_package_contract_sha256": "1f1478e688520d20aa566cb3cf90b28faa19c3504d9f583caf4e89e41bd2940c",
-  "byte_sha256": "c1ed24734d6fa707b93d3d263440f74674ed25097c10a53ff83c6082559c60a4",
+  "byte_sha256": "5697ef1c725c9c7d0d0e993fad94aa4e0bbac7eb93bc0f9ee0fb6544a71baaf8",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 12011403,
-    "classes": 12197,
-    "entity_count": 12199,
-    "layers": 1667,
-    "targets": 7594,
-    "transforms": 23372,
-    "unique_entity_names": 12198
+    "byte_size": 11994469,
+    "classes": 12196,
+    "entity_count": 12198,
+    "layers": 1666,
+    "targets": 7591,
+    "transforms": 23368,
+    "unique_entity_names": 12197
   },
   "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
   "map_key": "e3m1_slayer",
@@ -130,5 +134,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "674e4f40d6e7e3538b883851ca023b007e2861859059a31b589f254246f68015",
-  "semantic_sha256": "e7d25b2efb2bfda2140e019ec000ccb6fc03568c957f7f1f436cd63c2aeaf000"
+  "semantic_sha256": "b95b9f58ca6137777845b7c53b4fa5073de017ad5d35b5f07af6eb073ab033f2"
 }

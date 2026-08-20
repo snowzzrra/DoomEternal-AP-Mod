@@ -85,7 +85,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         "item_notification_major": {
             "family": "ap_item_notify_major", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "native HUD notification/AP checks", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
-            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
+            "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "priority", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound", "showCVar"], "forbidden_fields": ["notificationEndHudEventID", "currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
         },
         "item_notification_filler": {
@@ -335,19 +335,18 @@ def build_primitive(
 \t\t\tflags = {{
 \t\t\t\tnoFlood = false;
 \t\t\t}}
-\t\t\tnotificationType = "HUD_NOTIFY_CODEX_RECIEVED";
-\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";
-\t\t\tnotificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";
+\t\t\tnotificationType = "HUD_NOTIFY_SECRET_FOUND";
+\t\t\tnotificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";
 \t\t\tpriority = 4;
 \t\t\tdoNotShowDuplicate = false;
 \t\t\tshowDuringCombat = true;
 \t\t\tnotificationTime = 2400;
-\t\t\trootWidget = "compact_notification";
-\t\t\ticon = "art/ui/icons/notifications/demons";
+\t\t\trootWidget = "tier3centered";
+\t\t\ticon = "art/ui/dossier/icons/ico_secrets_off";
 \t\t\theader = "{header_key}";
 \t\t\tsubtext = "{subtext_key}";
-\t\t\tnotificationSound = "play_hud_lower";
-\t\t\tshowCVar = "g_setting_notification_minor";
+\t\t\tnotificationSound = "play_secret_encounter_found";
+\t\t\tshowCVar = "g_setting_notification_major";
 \t\t}}
 \t}}
 }}

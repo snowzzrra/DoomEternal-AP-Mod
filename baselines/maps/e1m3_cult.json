@@ -55,20 +55,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Regenerated after Sentinel Crystal carrier and target-policy projection correction"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept intentional global target/secret to target/relay idTarget_Count count=1 transform"
     }
   ],
   "asset_package_contract_sha256": "f0186074dd8a2fdcc54cc5bdf4bafd0b4106051af1f9132d04b1655d7c8dc3ee",
-  "byte_sha256": "37e9fd7308a7a3a32a97ed9b5f652cc5a10583527a33278c74df6e33d1ea2bca",
+  "byte_sha256": "950f24c9393afcf57a26807f87c173ced4de2419d9ba0f335d275a71a8e00d6a",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20118457,
-    "classes": 18323,
-    "entity_count": 18323,
+    "byte_size": 20101277,
+    "classes": 18322,
+    "entity_count": 18322,
     "layers": 4816,
-    "targets": 10778,
-    "transforms": 37093,
-    "unique_entity_names": 18323
+    "targets": 10775,
+    "transforms": 37089,
+    "unique_entity_names": 18322
   },
   "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
   "map_key": "e1m3_cult",
@@ -104,5 +108,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "252fb8b42ac723371624d9b3b8af345eed7a3b4f2720490f01ab7dd1613e707a"
+  "semantic_sha256": "8b64ff7b24e5790e9dd80e78e93b0147a7f343d62753fc2df5712ed7fa0e6f09"
 }

@@ -177,24 +177,110 @@ SECRET_PRESENTATION_FIELDS = (
     "subtext", "showCVar", "priority", "doNotShowDuplicate", "showDuringCombat",
 )
 
+SECRET_INHERIT_RE = re.compile(
+    r'(?i)(\binherit[ \t]*=[ \t]*)"target/secret"([ \t]*;)'
+)
+SECRET_CLASS_RE = re.compile(
+    r'(?i)(\bclass[ \t]*=[ \t]*)"idTarget_Secret"([ \t]*;)'
+)
+SECRET_IDENTITY_HINT_RE = re.compile(
+    r'(?i)\b(?:inherit|class)[ \t]*=[^\r\n;]*'
+    r'(?:target/secret|idTarget_Secret)'
+)
+ACTIVE_SECRET_INHERIT_RE = re.compile(
+    r'(?im)\binherit[ \t]*=[ \t]*"target/secret"'
+)
+ACTIVE_SECRET_CLASS_RE = re.compile(
+    r'(?im)\bclass[ \t]*=[ \t]*"idTarget_Secret"'
+)
+EXPAND_INHERITANCE_FALSE_RE = re.compile(
+    r'(?i)\bexpandInheritance[ \t]*=[ \t]*false[ \t]*;'
+)
+COUNT_ASSIGNMENT_RE = re.compile(
+    r'(?i)\bcount[ \t]*=[ \t]*([^;\r\n]+)[ \t]*;'
+)
+EDIT_OPEN_RE = re.compile(
+    r'(?im)^(?P<indent>[ \t]*)edit[ \t]*=[ \t]*\{[ \t]*(?P<newline>\r?\n)'
+)
+
 
 def suppress_vanilla_secret_found_ui(content):
-    """Strip Secret Found presentation fields while retaining target/state edges."""
+    """Replace inherited Secret targets with local non-popup relay semantics.
+
+    ``target/secret`` owns player notification dispatch through the global
+    ``idPlayer.notificationManager`` definition.  ``target/relay`` with the
+    locally evidenced ``idTarget_Count`` class retains ordinary target
+    activation while avoiding that inherited player-facing behavior.  Only
+    declaration identity changes; source/target edges and existing edit state
+    remain byte-for-byte unchanged, with required relay ``count = 1`` added.
+    Unknown Secret declaration shapes fail closed.
+    """
     blocks = content.split("entity {")
     updated = [blocks[0]]
     for block in blocks[1:]:
-        if not re.search(r"SECRET_FOUND|secret_encounter_found|PLAYER_NOTIFICATION_SECRET_FOUND", block):
+        if not SECRET_IDENTITY_HINT_RE.search(block):
             updated.append("entity {" + block)
             continue
-        for field in SECRET_PRESENTATION_FIELDS:
-            block = re.sub(
-                rf'\s*{re.escape(field)}\s*=\s*(?:"[^"]*"|true|false|-?\d+(?:\.\d+)?);',
-                "",
-                block,
-                flags=re.IGNORECASE,
+
+        inherit_matches = list(SECRET_INHERIT_RE.finditer(block))
+        class_matches = list(SECRET_CLASS_RE.finditer(block))
+        if len(inherit_matches) != 1 or len(class_matches) != 1:
+            raise ValueError(
+                "Unexpected Secret target declaration: malformed, mismatched, "
+                "or duplicate identity"
+            )
+        if len(EXPAND_INHERITANCE_FALSE_RE.findall(block)) != 1:
+            raise ValueError(
+                "Unexpected Secret target declaration: expandInheritance must be false"
+            )
+        if any(
+            re.search(rf'\b{re.escape(field)}\s*=', block, flags=re.IGNORECASE)
+            for field in SECRET_PRESENTATION_FIELDS
+        ):
+            raise ValueError(
+                "Unexpected Secret target declaration: inline presentation fields"
+            )
+        if COUNT_ASSIGNMENT_RE.search(block):
+            raise ValueError(
+                "Unexpected Secret target declaration: count already present"
+            )
+        edit_matches = list(EDIT_OPEN_RE.finditer(block))
+        if len(edit_matches) != 1:
+            raise ValueError(
+                "Unexpected Secret target declaration: edit block is not unique"
+            )
+
+        block = SECRET_INHERIT_RE.sub(
+            lambda match: (
+                f'{match.group(1)}"target/relay"{match.group(2)}'
+            ),
+            block,
+            count=1,
+        )
+        block = SECRET_CLASS_RE.sub(
+            lambda match: (
+                f'{match.group(1)}"idTarget_Count"{match.group(2)}'
+            ),
+            block,
+            count=1,
+        )
+        block = EDIT_OPEN_RE.sub(
+            lambda match: (
+                f'{match.group(0)}{match.group("indent")}\tcount = 1;'
+                f'{match.group("newline")}'
+            ),
+            block,
+            count=1,
+        )
+        if len(COUNT_ASSIGNMENT_RE.findall(block)) != 1:
+            raise ValueError(
+                "Secret target suppression failed to add exactly one count"
             )
         updated.append("entity {" + block)
-    return "".join(updated)
+    result = "".join(updated)
+    if ACTIVE_SECRET_INHERIT_RE.search(result) or ACTIVE_SECRET_CLASS_RE.search(result):
+        raise ValueError("Secret target suppression left active vanilla identity")
+    return result
 
 
 def retain_single_stat_increase(content, property_name, stat_name):
@@ -725,16 +811,21 @@ def is_sentinel_crystal_source(block):
 SENTINEL_CRYSTAL_TOP_MODEL = "art/kit/sentinel/prop/argent_cell_top.lwo"
 SENTINEL_CRYSTAL_BRIDGE_OWNER = "progress_argent_cell_1_1072112848"
 SENTINEL_CRYSTAL_OBJECTIVE_TARGET = "target_objective_complete_argent_cell"
+SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET = "target_relay_argent_cell_used"
 SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS = [
     "currency", "give", "grant", "inventory", "perk",
 ]
-SENTINEL_CRYSTAL_OWNER_MARKERS = (
+SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS = (
     'inherit = "progress/argent_cell";',
     'class = "idInteractable_WorldCache";',
     'model = "md6def/objects/interact/argent_cell/argent_cell.md6";',
-    'animWebDecl = "animweb/interact/argent_cell/argent_cell_interact";',
-    'interactionGraph = "interactables/progress";',
-    'markForGameUsed = true;',
+    "animWebDecl =",
+    "interactionGraph =",
+    "markForGameUsed = true;",
+    "useableComponentDecl =",
+    "triggerDef =",
+    "upgrade",
+    "reward",
 )
 
 
@@ -751,17 +842,6 @@ def is_sentinel_crystal_top(block):
         )
         == [SENTINEL_CRYSTAL_TOP_MODEL]
     )
-
-
-def remove_sentinel_crystal_automap_carrier(block):
-    """Keep crystal state owner while removing retired presentation carriers."""
-    for property_name in ("automapPropertiesDecl", "fxDecl", "thinkComponentDecl"):
-        block = re.sub(
-            rf'\s*{property_name}\s*=\s*(?:"[^"]*"|[^;]+);',
-            "",
-            block,
-        )
-    return block
 
 
 def _entity_name_from_block(block):
@@ -829,66 +909,6 @@ def find_sentinel_crystal_pairs(blocks):
     return pairs
 
 
-def remove_exact_list_reference(block, property_name, target_name):
-    """Remove one dangling owner reference and renumber remaining list items."""
-    property_match = re.search(
-        rf'\b{re.escape(property_name)}\s*=\s*\{{', block
-    )
-    if property_match is None:
-        raise ValueError(
-            f"Sentinel Crystal owner reference list missing: {property_name}"
-        )
-    property_end = find_matching_brace(block, property_match.end() - 1)
-    property_block = block[property_match.start():property_end]
-    item_pattern = re.compile(
-        r'(?m)^([ \t]*)item\[\d+\](\s*=\s*"([^"]+)";)[ \t]*(?:\n|$)'
-    )
-    item_matches = list(item_pattern.finditer(property_block))
-    matching = [
-        match for match in item_matches if match.group(3) == target_name
-    ]
-    if len(matching) != 1:
-        raise ValueError(
-            "Sentinel Crystal owner reference drift for "
-            f"{target_name}: found {len(matching)}"
-        )
-
-    updated_property = property_block
-    removed_index = item_matches.index(matching[0])
-    for index, match in reversed(list(enumerate(item_matches))):
-        if match.group(3) == target_name:
-            updated_property = (
-                updated_property[:match.start()]
-                + updated_property[match.end():]
-            )
-        else:
-            replacement_index = index - (1 if index > removed_index else 0)
-            updated_property = (
-                updated_property[:match.start()]
-                + f"{match.group(1)}item[{replacement_index}]"
-                + match.group(2)
-                + updated_property[match.end():]
-            )
-    updated_property, replacements = re.subn(
-        r'(\bnum\s*=\s*)\d+;',
-        rf'\g<1>{len(item_matches) - 1};',
-        updated_property,
-        count=1,
-    )
-    if replacements != 1:
-        raise ValueError("Sentinel Crystal owner reference count is missing")
-    return block[:property_match.start()] + updated_property + block[property_end:]
-
-
-def assert_sentinel_crystal_owner_intact(block, entity_name):
-    missing = [marker for marker in SENTINEL_CRYSTAL_OWNER_MARKERS if marker not in block]
-    if missing:
-        raise ValueError(
-            f"Sentinel Crystal functional owner drift for {entity_name}: "
-            + ", ".join(missing)
-        )
-
-
 def validate_sentinel_crystal_policy(entity_name, policy, source_block):
     """Fail closed on Sentinel Crystal target ownership and story graph."""
     if not is_sentinel_crystal_source(source_block):
@@ -907,16 +927,31 @@ def validate_sentinel_crystal_policy(entity_name, policy, source_block):
         )
     preserve_targets = policy.get("preserve_targets")
     if entity_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
-        if preserve_targets != [SENTINEL_CRYSTAL_OBJECTIVE_TARGET]:
+        expected_preserve_targets = [
+            SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+            SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+        ]
+        if preserve_targets != expected_preserve_targets:
             raise ValueError(
-                "Bridge Sentinel Crystal must preserve only objective target: "
+                "Bridge Sentinel Crystal must preserve objective and continuation "
+                "targets: "
                 f"{entity_name}"
             )
         if policy.get("safe_target_graph") != {
-            SENTINEL_CRYSTAL_OBJECTIVE_TARGET: []
+            SENTINEL_CRYSTAL_OBJECTIVE_TARGET: [],
+            SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET: [],
         }:
             raise ValueError(
                 "Bridge Sentinel Crystal objective graph is not exact: "
+                f"{entity_name}"
+            )
+        if policy.get("independent_targets") != [
+            f"AP_CHECK_{entity_name.upper()}",
+            SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+            SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+        ]:
+            raise ValueError(
+                "Bridge Sentinel Crystal AP target sequence is not exact: "
                 f"{entity_name}"
             )
         if policy.get("forbidden_target_terms") != SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
@@ -937,29 +972,22 @@ def validate_sentinel_crystal_policy(entity_name, policy, source_block):
         )
 
 
-def assert_sentinel_crystal_transform(content, pairs):
-    """Keep native crystal owners while proving only paired tops disappeared."""
+def assert_sentinel_crystal_transform(
+    content, pairs, location_ids=None, check_ids=None
+):
+    """Fail closed when Sentinel Crystal output retains vanilla ownership."""
+    location_ids = location_ids or {}
+    check_ids = check_ids or {}
     for source_name, top_name in pairs.items():
-        source_bounds = find_entity_block_bounds(content, source_name)
-        if source_bounds is None:
-            raise ValueError(f"Sentinel Crystal functional owner missing: {source_name}")
-        source_block = content[source_bounds[0]:source_bounds[1]]
-        assert_sentinel_crystal_owner_intact(source_block, source_name)
-        if top_name in source_block:
-            raise ValueError(
-                f"Sentinel Crystal owner retains removed top reference: {source_name}"
-            )
-        expected_owner_targets = (
-            [SENTINEL_CRYSTAL_OBJECTIVE_TARGET]
-            if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER
-            else []
-        )
-        if extract_target_names(source_block) != expected_owner_targets:
-            raise ValueError(
-                "Sentinel Crystal owner target graph drift: "
-                f"{source_name} expected {expected_owner_targets}, got "
-                f"{extract_target_names(source_block)}"
-            )
+        if find_entity_block_bounds(content, source_name) is not None:
+            raise ValueError(f"Sentinel Crystal source was emitted: {source_name}")
+        for block in content.split("entity {")[1:]:
+            if source_name in extract_target_names(block):
+                referrer = _entity_name_from_block(block) or "<unnamed>"
+                raise ValueError(
+                    "Sentinel Crystal source has generated target reference: "
+                    f"{source_name} <- {referrer}"
+                )
         if content.count(f"entityDef {top_name} {{") != 0:
             raise ValueError(f"Sentinel Crystal top was not removed: {top_name}")
         if SENTINEL_CRYSTAL_TOP_MODEL in content:
@@ -970,17 +998,123 @@ def assert_sentinel_crystal_transform(content, pairs):
         trigger_bounds = find_entity_block_bounds(content, trigger_name)
         if trigger_bounds is None:
             raise ValueError(f"Sentinel Crystal AP trigger missing: {trigger_name}")
+        if content.count(f"entityDef {trigger_name} {{") != 1:
+            raise ValueError(f"Sentinel Crystal AP trigger is not unique: {trigger_name}")
         trigger_block = content[trigger_bounds[0]:trigger_bounds[1]]
         trigger_targets = extract_target_names(trigger_block)
-        if top_name in trigger_targets:
-            raise ValueError(
-                f"Sentinel Crystal AP trigger retains removed top: {trigger_name}"
+        ap_check = check_ids.get(source_name, f"AP_CHECK_{source_name.upper()}")
+        expected_trigger_targets = [ap_check]
+        if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+            expected_trigger_targets.extend(
+                (
+                    SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+                    SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+                )
             )
-        ap_check = f"AP_CHECK_{source_name.upper()}"
-        if ap_check not in trigger_targets:
+        if trigger_targets != expected_trigger_targets:
             raise ValueError(
-                f"Sentinel Crystal AP trigger lost AP check: {trigger_name}"
+                f"Sentinel Crystal AP trigger target drift: {trigger_name}; "
+                f"expected {expected_trigger_targets}, got {trigger_targets}"
             )
+        if any(
+            term.lower() in target.lower()
+            for target in trigger_targets
+            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
+        ):
+            raise ValueError(f"Sentinel Crystal AP trigger has forbidden target: {trigger_name}")
+        trigger_markers = [
+            marker for marker in SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS
+            if marker.lower() in trigger_block.lower()
+        ]
+        if trigger_markers:
+            raise ValueError(
+                f"Sentinel Crystal AP trigger retains vanilla markers: {trigger_name}; "
+                + ", ".join(trigger_markers)
+            )
+
+        if content.count(f"entityDef {ap_check} {{") != 1:
+            raise ValueError(f"Sentinel Crystal AP check relay is not unique: {ap_check}")
+        ap_check_bounds = find_entity_block_bounds(content, ap_check)
+        if ap_check_bounds is None:
+            raise ValueError(f"Sentinel Crystal AP check relay missing: {ap_check}")
+        ap_check_block = content[ap_check_bounds[0]:ap_check_bounds[1]]
+        ap_check_targets = extract_target_names(ap_check_block)
+        if any(
+            term.lower() in target.lower()
+            for target in ap_check_targets
+            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
+        ):
+            raise ValueError(f"Sentinel Crystal AP check has forbidden target: {ap_check}")
+
+        visual_matches = re.findall(r'entityDef (ap_location_visual_\d+) \{', content)
+        location_id = location_ids.get(ap_check)
+        if location_id is not None:
+            matching_visuals = [f"ap_location_visual_{location_id}"]
+        elif len(visual_matches) == 1:
+            matching_visuals = visual_matches
+        else:
+            matching_visuals = []
+        if len(matching_visuals) != 1:
+            raise ValueError(
+                f"Sentinel Crystal AP visual is not unique: {source_name}"
+            )
+        if content.count(f"entityDef {matching_visuals[0]} {{") != 1:
+            raise ValueError(
+                f"Sentinel Crystal AP visual is not unique: {matching_visuals[0]}"
+            )
+        visual_bounds = find_entity_block_bounds(content, matching_visuals[0])
+        if visual_bounds is None:
+            raise ValueError(f"Sentinel Crystal AP visual missing: {matching_visuals[0]}")
+        visual_block = content[visual_bounds[0]:visual_bounds[1]]
+        forbidden_markers = [
+            marker for marker in SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS
+            if marker.lower() in visual_block.lower()
+        ]
+        if forbidden_markers:
+            raise ValueError(
+                f"Sentinel Crystal AP visual retains vanilla markers: {source_name}; "
+                + ", ".join(forbidden_markers)
+            )
+
+        if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+            objective_bounds = find_entity_block_bounds(
+                content, SENTINEL_CRYSTAL_OBJECTIVE_TARGET
+            )
+            if objective_bounds is None:
+                raise ValueError(
+                    "Bridge Sentinel Crystal objective target is missing"
+                )
+            objective_block = content[objective_bounds[0]:objective_bounds[1]]
+            if extract_target_names(objective_block) != []:
+                raise ValueError(
+                    "Bridge Sentinel Crystal objective target has native targets"
+                )
+            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
+                if term.lower() in objective_block.lower():
+                    raise ValueError(
+                        "Bridge Sentinel Crystal objective target has forbidden "
+                        f"reward term: {term}"
+                    )
+            continuation_bounds = find_entity_block_bounds(
+                content, SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET
+            )
+            if continuation_bounds is None:
+                raise ValueError(
+                    "Bridge Sentinel Crystal continuation target is missing"
+                )
+            continuation_block = content[
+                continuation_bounds[0]:continuation_bounds[1]
+            ]
+            if extract_target_names(continuation_block) != []:
+                raise ValueError(
+                    "Bridge Sentinel Crystal continuation target has native targets"
+                )
+            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
+                if term.lower() in continuation_block.lower():
+                    raise ValueError(
+                        "Bridge Sentinel Crystal continuation target has forbidden "
+                        f"reward term: {term}"
+                    )
 
 
 def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
@@ -1303,6 +1437,22 @@ def extract_target_names(block):
     if not match:
         return []
     return re.findall(r'item\[\d+\]\s*=\s*"([^"]+)";', match.group(1))
+
+
+def remove_sentinel_crystal_source_references(content, source_names):
+    """Remove target edges to Sentinel owners omitted from generated output."""
+    removed_names = set(source_names)
+    blocks = content.split("entity {")
+    rewritten = [blocks[0]]
+    for block in blocks[1:]:
+        target_names = extract_target_names(block)
+        retained_targets = [
+            target for target in target_names if target not in removed_names
+        ]
+        if retained_targets != target_names:
+            block = replace_targets_block(block, retained_targets)
+        rewritten.append("entity {" + block)
+    return "".join(rewritten)
 
 
 def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
@@ -2127,6 +2277,7 @@ def generate_map(
         declared_checks,
     )
     manifest_data = {}
+    sentinel_check_ids = {}
 
     source_metadata = validate_source_file(input_file, output_file)
     content = suppress_vanilla_secret_found_ui(source_metadata["content"])
@@ -2135,7 +2286,14 @@ def generate_map(
     validate_target_policies(config_entities, target_policies, content)
     for entity_name, policy in target_policies.items():
         gate_relay = policy.get("gate_relay")
-        if gate_relay:
+        source_bounds = find_entity_block_bounds(content, entity_name)
+        sentinel_source = (
+            source_bounds is not None
+            and is_sentinel_crystal_source(
+                content[source_bounds[0]:source_bounds[1]]
+            )
+        )
+        if gate_relay and not sentinel_source:
             content = append_target_to_named_entity(content, gate_relay, entity_name)
     assert_no_weapon_mastery_token_currency(content, f"Registered vanilla map {map_key}")
 
@@ -2340,14 +2498,32 @@ def generate_map(
                     continue
 
                 if target_policy.get("independent_ap_trigger"):
+                    sentinel_source = is_sentinel_crystal_source(block)
                     sentinel_top_name = sentinel_crystal_pairs.get(entity_name)
-                    if sentinel_top_name:
+                    if sentinel_source:
+                        sentinel_check_ids[entity_name] = ap_check_id
+                        target_policy["preserve_targets"] = []
+                        if entity_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+                            target_policy["independent_targets"] = [
+                                ap_check_id,
+                                SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+                                SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+                            ]
+                        else:
+                            target_policy["independent_targets"] = [ap_check_id]
+                    elif sentinel_top_name:
                         target_policy["preserve_targets"] = [
                             target
                             for target in target_policy.get("preserve_targets", [])
                             if target != sentinel_top_name
                         ]
-                    if target_policy.get("remove_original", False) or (not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual")):
+                    if not sentinel_source and (
+                        target_policy.get("remove_original", False)
+                        or (
+                            not target_policy.get("independent_visual")
+                            and not target_policy.get("no_auto_visual")
+                        )
+                    ):
                         target_policy["independent_targets"] = build_independent_targets(
                             block, ap_check_id, target_policy
                         )
@@ -2362,15 +2538,16 @@ def generate_map(
                             target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])
                     if target_policy.get("independent_visual"):
                         cleanup = target_policy["independent_visual"].get("cleanup_entity")
-                        if cleanup and cleanup not in target_policy.setdefault(
+                        if cleanup and not sentinel_source and cleanup not in target_policy.setdefault(
                             "independent_targets", [ap_check_id]
                         ):
                             target_policy["independent_targets"].append(cleanup)
-                        target_policy["completion_targets"] = [
-                            target
-                            for target in target_policy.get("completion_targets", [])
-                            if target != cleanup
-                        ]
+                        if not sentinel_source:
+                            target_policy["completion_targets"] = [
+                                target
+                                for target in target_policy.get("completion_targets", [])
+                                if target != cleanup
+                            ]
                     visual_policy = target_policy.get("independent_visual")
                     if visual_policy:
                         visual_policy.setdefault(
@@ -2404,34 +2581,6 @@ def generate_map(
                                     ),
                                 )
                             )
-                    elif is_sentinel_crystal_source(block):
-                        sentinel_top_name = sentinel_crystal_pairs[entity_name]
-                        native = remove_exact_list_reference(
-                            block,
-                            "stateActivateList",
-                            sentinel_top_name,
-                        )
-                        native = remove_exact_list_reference(
-                            native,
-                            "targets",
-                            sentinel_top_name,
-                        )
-                        preserve_targets = target_policy.get("preserve_targets")
-                        if preserve_targets is not None:
-                            preserve_set = set(preserve_targets)
-                            native = replace_targets_block(
-                                native,
-                                [
-                                    target
-                                    for target in extract_target_names(native)
-                                    if target in preserve_set
-                                ],
-                            )
-                        native = remove_sentinel_crystal_automap_carrier(native)
-                        assert_sentinel_crystal_owner_intact(native, entity_name)
-                        new_blocks.append(
-                            "entity {" + native
-                        )
                     new_blocks.append(
                         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
                     )
@@ -2464,8 +2613,16 @@ def generate_map(
 
         new_blocks.append("entity {" + block)
 
-    map_content = "".join(new_blocks)
-    assert_sentinel_crystal_transform(map_content, sentinel_crystal_pairs)
+    map_content = remove_sentinel_crystal_source_references(
+        "".join(new_blocks),
+        sentinel_crystal_pairs,
+    )
+    assert_sentinel_crystal_transform(
+        map_content,
+        sentinel_crystal_pairs,
+        manifest_data,
+        sentinel_check_ids,
+    )
     secret_blocks = []
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]

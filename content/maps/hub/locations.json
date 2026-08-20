@@ -128,11 +128,18 @@
       "independent_ap_trigger": true,
       "remove_original": true,
       "preserve_targets": [
-        "target_objective_complete_argent_cell"
+        "target_objective_complete_argent_cell",
+        "target_relay_argent_cell_used"
+      ],
+      "independent_targets": [
+        "AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848",
+        "target_objective_complete_argent_cell",
+        "target_relay_argent_cell_used"
       ],
       "drop_targets": [],
       "safe_target_graph": {
-        "target_objective_complete_argent_cell": []
+        "target_objective_complete_argent_cell": [],
+        "target_relay_argent_cell_used": []
       },
       "forbidden_target_terms": [
         "currency",

@@ -38,6 +38,91 @@ STRING_TABLES = (
     Path("gameresources_patch1/EternalMod/strings/portuguese.json"),
 )
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+MAJOR_NOTIFICATION_FIELDS = (
+    'class = "idTarget_Notification";',
+    'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
+    'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
+    'priority = 4;',
+    'doNotShowDuplicate = false;',
+    'showDuringCombat = true;',
+    'notificationTime = 2400;',
+    'rootWidget = "tier3centered";',
+    'icon = "art/ui/dossier/icons/ico_secrets_off";',
+    'notificationSound = "play_secret_encounter_found";',
+    'showCVar = "g_setting_notification_major";',
+    'noFlood = false;',
+)
+CODEX_NOTIFICATION_FIELDS = (
+    'class = "idTarget_Notification";',
+    'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
+    'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
+    'notificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";',
+    'priority = 5;',
+    'doNotShowDuplicate = false;',
+    'rootWidget = "compact_notification";',
+    'icon = "art/ui/icons/notifications/demons";',
+    'notificationSound = "play_hud_lower";',
+    'showCVar = "g_setting_notification_minor";',
+    'noFlood = false;',
+)
+
+
+def validate_item_notification_contract(
+    notification: str, suffix: str, classification: int
+) -> None:
+    style, rpc_suffix = suffix.split("_", 1)
+    rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
+    item_id = int(rpc_suffix.split("_", 1)[0])
+    expected_style = notification_style_for_item(item_id, classification)
+    if style != expected_style:
+        raise AssertionError(
+            f"item notification style diverges from classification: {suffix}"
+        )
+
+    required_fields = (
+        MAJOR_NOTIFICATION_FIELDS if style == "major" else CODEX_NOTIFICATION_FIELDS
+    )
+    if any(field not in notification for field in required_fields):
+        raise AssertionError(f"item notification HUD contract is incomplete: {suffix}")
+    expected_subtext = f"#str_ap_notify_item_{rpc_suffix}"
+    if (
+        f'header = "{ITEM_NOTIFICATION_HEADER_KEY}";' not in notification
+        or f'subtext = "{expected_subtext}";' not in notification
+    ):
+        raise AssertionError(
+            f"item notification title/subtitle contract is incomplete: {suffix}"
+        )
+
+    forbidden_contract = (
+        (
+            'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
+            'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
+            'notificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";',
+            'rootWidget = "compact_notification";',
+            'icon = "art/ui/icons/notifications/demons";',
+            'notificationSound = "play_hud_lower";',
+            'showCVar = "g_setting_notification_minor";',
+        )
+        if style == "major"
+        else (
+            'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
+            'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
+            'rootWidget = "tier3centered";',
+            'icon = "art/ui/dossier/icons/ico_secrets_off";',
+            'notificationSound = "play_secret_encounter_found";',
+            'showCVar = "g_setting_notification_major";',
+        )
+    )
+    if any(field in notification for field in forbidden_contract):
+        raise AssertionError(f"item notification mixes HUD contracts: {suffix}")
+    if any(field in notification for field in (
+        'noFlood = true;', 'triggerOnce = true;', 'removeAfterActivation = true;',
+        'disableAfterActivation = true;', 'startOff = true;',
+    )):
+        raise AssertionError(f"item notification is not reactivatable: {suffix}")
+
+
 def entity_block(content: str, entity_name: str) -> str:
     marker = f"entityDef {entity_name} {{"
     start = content.find(marker)
@@ -209,31 +294,11 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         if values.get(LOCATION_NOTIFICATION_HEADER_KEY) != LOCATION_NOTIFICATION_TITLE[locale]:
             raise AssertionError("location notification title is not canonical")
 
-    major_fields = (
-        'class = "idTarget_Notification";',
-        'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
-        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
-        'notificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";',
-        'doNotShowDuplicate = false;',
-        'rootWidget = "compact_notification";',
-        'icon = "art/ui/icons/notifications/demons";',
-        'notificationSound = "play_hud_lower";',
-        'noFlood = false;',
-    )
-    codex_fields = (
-        'class = "idTarget_Notification";',
-        'notificationType = "HUD_NOTIFY_CODEX_RECIEVED";',
-        'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX";',
-        'notificationEndHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_CODEX_END";',
-        'rootWidget = "compact_notification";',
-        'notificationSound = "play_hud_lower";',
-        'noFlood = false;',
-    )
     for suffix in notifications:
         notification = entity_block(content, f"ap_notify_item_{suffix}")
         if 'inherit = ' in notification:
             raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
-        style, rpc_suffix = suffix.split("_", 1)
+        _, rpc_suffix = suffix.split("_", 1)
         rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
         item_id = int(rpc_suffix.split("_", 1)[0])
         classification = notification_classifications.get(item_id)
@@ -241,49 +306,11 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             raise AssertionError(
                 f"item notification has no production classification: {suffix}"
             )
-        expected_style = notification_style_for_item(
-            item_id,
-            (
-                classification["classification"]
-                if isinstance(classification, dict)
-                else classification
-            ),
+        validate_item_notification_contract(
+            notification,
+            suffix,
+            classification["classification"] if isinstance(classification, dict) else classification,
         )
-        if style != expected_style:
-            raise AssertionError(
-                f"item notification style diverges from classification: {suffix}"
-            )
-        required_fields = major_fields if style == "major" else codex_fields
-        if any(field not in notification for field in required_fields):
-            raise AssertionError(f"item notification HUD contract is incomplete: {suffix}")
-        expected_subtext = f"#str_ap_notify_item_{rpc_suffix}"
-        if (
-            f'header = "{ITEM_NOTIFICATION_HEADER_KEY}";' not in notification
-            or f'subtext = "{expected_subtext}";' not in notification
-        ):
-            raise AssertionError(f"item notification title/subtitle contract is incomplete: {suffix}")
-        forbidden_contract = (
-            (
-                'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
-                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
-                'rootWidget = "tier3centered";',
-                'notificationSound = "play_secret_encounter_found";',
-            )
-            if style == "major"
-            else (
-                'notificationType = "HUD_NOTIFY_SECRET_FOUND";',
-                'notificationHudEventID = "HUD_EVENT_PLAYER_NOTIFICATION_SECRET_FOUND";',
-                'rootWidget = "tier3centered";',
-                'notificationSound = "play_secret_encounter_found";',
-            )
-        )
-        if any(field in notification for field in forbidden_contract):
-            raise AssertionError(f"item notification mixes HUD contracts: {suffix}")
-        if any(field in notification for field in (
-            'noFlood = true;', 'triggerOnce = true;', 'removeAfterActivation = true;',
-            'disableAfterActivation = true;', 'startOff = true;',
-        )):
-            raise AssertionError(f"item notification is not reactivatable: {suffix}")
         entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
 
     for style in ("major", "filler"):
@@ -299,7 +326,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         notification = entity_block(
             content, f"ap_notify_location_{location_id}"
         )
-        if any(field not in notification for field in codex_fields):
+        if any(field not in notification for field in CODEX_NOTIFICATION_FIELDS):
             raise AssertionError(
                 f"location notification is not Codex: {location_id}"
             )

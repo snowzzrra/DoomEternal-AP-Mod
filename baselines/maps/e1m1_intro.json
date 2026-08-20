@@ -51,14 +51,18 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Regenerated after Sentinel Crystal carrier and target-policy projection correction"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept intentional global target/secret to target/relay idTarget_Count count=1 transform"
     }
   ],
   "asset_package_contract_sha256": "5a150841d01b6714748a785e83921beae8c74894cceb1c0e01bc5b61e6474722",
-  "byte_sha256": "2583d0ffa1bdb04a1b34ed08065c40d403e848d1a67b9ad4b65dbea898f04bfb",
+  "byte_sha256": "720acd42860d78f8d998667af357fa7893b5d040489e32a0e047d430e1ebb768",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 40,
-    "byte_size": 11995960,
+    "byte_size": 11982837,
     "classes": 10438,
     "entity_count": 10440,
     "layers": 5412,
@@ -96,5 +100,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "aa10ef45e3d0f3d4cb3b9859afacad3139fe29d8eec6787c4cbb383900e946da",
-  "semantic_sha256": "028599f9bb612198e743c296d8b738d8614024df8db8452690cbbf46b61dd5b8"
+  "semantic_sha256": "9e21c7da69ace3a73555d638d2d8556b3291819cc5db270089e1f91f3bd577cd"
 }
