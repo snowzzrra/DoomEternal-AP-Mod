@@ -495,9 +495,9 @@ WINDOWS_MOD_MANAGER = WINDOWS_MOD_INJECTOR
 
 LINUX_MOD_INJECTOR = DependencySpec(
     name="EternalModInjectorShell",
-    version="6.66-rev3.12",
-    url=("https://github.com/leveste/EternalBasher/releases/download/v6.66-rev3.12/EternalModInjectorShell.tar.gz"),
-    sha256="f9f33f701244b9b274fcff4062cf7cfc33d233b33ec0872a38ae01225aee116c",
+    version="6.66-rev3.13",
+    url=("https://github.com/leveste/EternalBasher/releases/download/v6.66-rev3.13/EternalModInjectorShell.tar.gz"),
+    sha256="79874b20834ba3e0a8e94c67cab5f7f80af7c57e53035c4ec5075f7f28174935",
     executable_glob="**/EternalModInjectorShell.sh",
     archive_type="tar.gz",
 )
@@ -1014,29 +1014,12 @@ class WindowsModInjectorAdapter:
         flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
         return subprocess.Popen(command, cwd=cwd, creationflags=flags)
 
-    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        staged = _stage_mod(mod_zip, game_root)
-        try:
-            batch_executable = stage_windows_injector_toolchain(
-                self.dependency,
-                game_root,
-                state_dir=self.state_dir,
-            )
-        except Exception as error:
-            return AdapterResult(
-                state="manual_install_required",
-                message=f"Could not stage Windows injector toolchain: {error}. Follow manual installation in INSTALL.md.",
-                details={"installation_mode": "manual_install_required", "staging_error": str(error)},
-            )
-
-        comspec = os.environ.get("COMSPEC", "cmd.exe")
-        command = (comspec, "/d", "/c", str(batch_executable))
-
+    def _run_process(self, game_root: Path, command: tuple[str, ...], staged_mod: str = "") -> AdapterResult:
         if self.event_sink is not None:
             self.event_sink(
                 "injector_started",
                 command=list(command),
-                staged_mod=staged.name,
+                staged_mod=staged_mod,
                 message=(
                     "EternalModInjector is open in a separate command window.\n\n"
                     "Follow the prompts in that window. Do not close this launcher.\n"
@@ -1048,10 +1031,10 @@ class WindowsModInjectorAdapter:
             process = self.opener(command, game_root)
         except Exception as error:
             return AdapterResult(
-                state="manual_install_required",
-                message=f"Could not launch EternalModInjector.bat: {error}. Follow manual installation in INSTALL.md.",
+                state="failed",
+                message=f"Could not launch EternalModInjector.bat: {error}.",
                 command=command,
-                details={"installation_mode": "manual_install_required", "launch_error": str(error)},
+                details={"launch_error": str(error)},
             )
 
         try:
@@ -1060,24 +1043,109 @@ class WindowsModInjectorAdapter:
             returncode = getattr(process, "returncode", 0)
         except Exception as error:
             return AdapterResult(
-                state="manual_install_required",
-                message=f"Error waiting for EternalModInjector.bat: {error}. Follow manual installation in INSTALL.md.",
+                state="failed",
+                message=f"Error waiting for EternalModInjector.bat: {error}.",
                 command=command,
-                details={"installation_mode": "manual_install_required", "wait_error": str(error)},
+                details={"wait_error": str(error)},
             )
 
         if self.event_sink is not None:
             self.event_sink("injector_closed", command=list(command), returncode=returncode)
 
-        if returncode != 0:
+        return AdapterResult(
+            state="applied" if returncode == 0 else "failed",
+            message=(
+                "EternalModInjector completed successfully."
+                if returncode == 0
+                else f"EternalModInjector exited with code {returncode}."
+            ),
+            command=command,
+            returncode=returncode,
+        )
+
+    def run(
+        self,
+        game_root: Path,
+        *,
+        staged_mod: str = "",
+        operation: str = "install",
+        uninstall_confirmation: Callable[[], bool] | None = None,
+    ) -> AdapterResult:
+        try:
+            batch_executable = stage_windows_injector_toolchain(
+                self.dependency,
+                game_root,
+                state_dir=self.state_dir,
+            )
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Could not stage Windows injector toolchain: {error}.",
+                details={"staging_error": str(error)},
+            )
+
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        command = (comspec, "/d", "/c", str(batch_executable))
+        result = self._run_process(game_root, command, staged_mod)
+        if operation != "uninstall" or result.state != "applied":
+            return result
+
+        confirmed = False
+        confirmation_error = ""
+        try:
+            confirmed = uninstall_confirmation is not None and bool(uninstall_confirmation())
+        except Exception as error:
+            confirmation_error = str(error)
+        if self.event_sink is not None:
+            self.event_sink(
+                "injector_post_run_confirmation",
+                operation=operation,
+                confirmed=confirmed,
+                message=confirmation_error or "uninstall confirmation received",
+            )
+        details = {
+            **result.details,
+            "operation": operation,
+            "post_run_confirmed": confirmed,
+        }
+        if confirmation_error:
+            details["post_run_error"] = confirmation_error
+        if not confirmed:
+            return AdapterResult(
+                state="failed",
+                message=(
+                    "EternalModInjector exited successfully, but uninstall post-run confirmation failed."
+                    + (f" {confirmation_error}" if confirmation_error else "")
+                ),
+                command=result.command,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                returncode=result.returncode,
+                details=details,
+            )
+        return AdapterResult(
+            state=result.state,
+            message="EternalModInjector uninstall cleanup confirmed.",
+            command=result.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+            details=details,
+        )
+
+    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
+        staged = _stage_mod(mod_zip, game_root)
+        result = self.run(game_root, staged_mod=staged.name)
+        if result.state != "applied":
             return AdapterResult(
                 state="manual_install_required",
-                message=f"EternalModInjector exited with code {returncode}. Follow manual installation steps in INSTALL.md.",
-                command=command,
-                returncode=returncode,
+                message=f"{result.message} Follow manual installation steps in INSTALL.md.",
+                command=result.command,
+                returncode=result.returncode,
                 details={
                     "installation_mode": "windows_injector_assisted",
-                    "batch_returncode": returncode,
+                    **result.details,
+                    **({"batch_returncode": result.returncode} if result.returncode is not None else {}),
                 },
             )
 
@@ -1086,7 +1154,7 @@ class WindowsModInjectorAdapter:
             return AdapterResult(
                 state="applied",
                 message="Mod installed successfully. Start DOOM Eternal through the launcher.",
-                command=command,
+                command=result.command,
                 returncode=0,
                 details={
                     "installation_mode": "windows_injector_assisted",
@@ -1095,12 +1163,12 @@ class WindowsModInjectorAdapter:
             )
 
         if self.event_sink is not None:
-            self.event_sink("installation_declined", command=list(command))
+            self.event_sink("installation_declined", command=list(result.command))
 
         return AdapterResult(
             state="manual_install_required",
             message="Mod installation was not confirmed in EternalModInjector. Follow manual installation steps in INSTALL.md.",
-            command=command,
+            command=result.command,
             returncode=1,
             details={
                 "installation_mode": "windows_injector_assisted",
@@ -1167,8 +1235,7 @@ class LinuxModManagerAdapter:
             encoding="utf-8",
         )
 
-    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        _stage_mod(mod_zip, game_root)
+    def run(self, game_root: Path) -> AdapterResult:
         executable = self._prepare_tools(game_root)
         self._configure_first_run(game_root)
         environment = os.environ.copy()
@@ -1205,6 +1272,10 @@ class LinuxModManagerAdapter:
             stderr=completed.stderr,
             returncode=completed.returncode,
         )
+
+    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
+        _stage_mod(mod_zip, game_root)
+        return self.run(game_root)
 
 
 @dataclass(frozen=True)

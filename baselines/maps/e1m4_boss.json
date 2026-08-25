@@ -67,19 +67,27 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "major receipt single-line format"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept DHB trigger bound at vanilla 1.29999995"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Neutralize canonical Base plasma rifle pickup"
     }
   ],
   "asset_package_contract_sha256": "1301a39fcd94c697ef77009b823431bbb7eab9eaddf9db57e860d5a6071e367f",
-  "byte_sha256": "c8c558753099257ce41f6beb26cb9024ef465ff96f85a4bad573d6c5e4f0008c",
+  "byte_sha256": "245e46a8e17f2789c00ddbae01b5a0850827ec3f791eb2f47cb642e311fb2e3d",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 707,
-    "byte_size": 10662799,
+    "byte_size": 10662235,
     "classes": 9158,
     "entity_count": 9160,
     "layers": 2357,
     "targets": 11961,
-    "transforms": 19047,
+    "transforms": 19045,
     "unique_entity_names": 9159
   },
   "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
@@ -110,6 +118,6 @@
     7770162
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "7882606eae7a2d0c9f5eae37954a5167db9ae007443ef5940448b6bc63084eb8",
-  "semantic_sha256": "148f9abddcc27e4ad0320f49bd4f757d430a7bbbdf3c56c585c14bd5fb229ea5"
+  "scripted_contract_sha256": "dc36c2ddc5194ed8e52b9a0df77424c8eb0a46a89768563b05a3d39c41ebd97e",
+  "semantic_sha256": "f8f3bc51da5941c1d9aed3413d653a0b5969251b5c193fd5a3566414272dbed8"
 }

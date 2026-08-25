@@ -34,6 +34,7 @@ static const char* kQueueSessionNamespacePath = "base\\ap_queue\\active_session_
 static const char* kMaterializationLeasePath = "base\\ap_queue\\active_materialization_lease";
 static const char* kMaterializationLeaseHeader = "AP_MATERIALIZATION_LEASE_V1";
 static const char* kExecutionClassHeader = "AP_EXECUTION_CLASS_V1";
+static const char* kDiagnosticCondumpHeader = "AP_DIAGNOSTIC_CONDUMP_V1";
 static const char* kMapEntityOperationHeader = "AP_MAP_ENTITY_OPERATION_V1";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
@@ -49,6 +50,7 @@ static const DWORD kGoalMonitorPollMs = 1000;
 static const DWORD kRpcStallWarnMs = 15000;
 static const DWORD kQueueNoiseSummaryMs = 12000;
 static const DWORD kDeliveredRemovalRetryMs = 1000;
+static const unsigned int kDiagnosticRetryLimit = 3;
 static const std::array<const char*, 0> kValidatedXinputSha256 = {};
 
 std::string CanonicalMapName(std::string name) {
@@ -85,6 +87,7 @@ struct CommandJob {
     std::optional<std::string> materializationLease;
     CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
     MapEntityOperation mapEntityOperation = MapEntityOperation::None;
+    bool diagnosticCondump = false;
 };
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;
@@ -1402,7 +1405,8 @@ bool ReadCommandFile(
     std::string& command,
     std::optional<std::string>* materializationLease = nullptr,
     CommandExecutionClass* executionClass = nullptr,
-    MapEntityOperation* mapEntityOperation = nullptr
+    MapEntityOperation* mapEntityOperation = nullptr,
+    bool* diagnosticCondump = nullptr
 ) {
     FILE* file = fopen(path.c_str(), "rb");
     if (!file) return false;
@@ -1414,16 +1418,19 @@ bool ReadCommandFile(
     if (materializationLease) materializationLease->reset();
     if (executionClass) *executionClass = CommandExecutionClass::PlayerRuntime;
     if (mapEntityOperation) *mapEntityOperation = MapEntityOperation::None;
+    if (diagnosticCondump) *diagnosticCondump = false;
 
     bool sawExecutionClass = false;
     bool sawMaterializationLease = false;
     bool sawMapEntityOperation = false;
+    bool sawDiagnosticCondump = false;
     CommandExecutionClass parsedExecutionClass = CommandExecutionClass::PlayerRuntime;
     MapEntityOperation parsedMapEntityOperation = MapEntityOperation::None;
     size_t payloadOffset = 0;
     const std::string leasePrefix = std::string(kMaterializationLeaseHeader) + " ";
     const std::string executionPrefix = std::string(kExecutionClassHeader) + " ";
     const std::string operationPrefix = std::string(kMapEntityOperationHeader) + " ";
+    const std::string diagnosticPrefix = std::string(kDiagnosticCondumpHeader) + " ";
     while (payloadOffset < contents.size()) {
         const size_t lineEnd = contents.find('\n', payloadOffset);
         const std::string line = TrimLine(contents.substr(
@@ -1468,6 +1475,11 @@ bool ReadCommandFile(
             }
             if (materializationLease) *materializationLease = lease;
             sawMaterializationLease = true;
+        } else if (line.rfind(std::string(kDiagnosticCondumpHeader), 0) == 0) {
+            if (sawDiagnosticCondump || line != diagnosticPrefix + "AP_SUPPORT_FILE.txt") {
+                return false;
+            }
+            sawDiagnosticCondump = true;
         } else {
             if (line.rfind("AP_", 0) == 0) {
                 return false;
@@ -1482,6 +1494,12 @@ bool ReadCommandFile(
     }
 
     command = TrimLine(contents.substr(payloadOffset));
+    if (sawDiagnosticCondump && command != "condump AP_SUPPORT_FILE.txt") {
+        return false;
+    }
+    if (sawDiagnosticCondump && (sawExecutionClass || sawMapEntityOperation || sawMaterializationLease)) {
+        return false;
+    }
     if (parsedExecutionClass == CommandExecutionClass::MapEntitySafe
             && parsedMapEntityOperation == MapEntityOperation::None) {
         return false;
@@ -1492,6 +1510,7 @@ bool ReadCommandFile(
     }
     if (executionClass) *executionClass = parsedExecutionClass;
     if (mapEntityOperation) *mapEntityOperation = parsedMapEntityOperation;
+    if (diagnosticCondump) *diagnosticCondump = sawDiagnosticCondump;
     return !command.empty();
 }
 
@@ -1728,12 +1747,14 @@ void ImportSpoolFiles(
         std::optional<std::string> materializationLease;
         CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
         MapEntityOperation mapEntityOperation = MapEntityOperation::None;
+        bool diagnosticCondump = false;
         if (ReadCommandFile(
                 processingPath,
                 command,
                 &materializationLease,
                 &executionClass,
-                &mapEntityOperation
+                &mapEntityOperation,
+                &diagnosticCondump
         )) {
             if (executionClass == CommandExecutionClass::MapEntitySafe
                     && !MapEntityOperationMatchesCommand(mapEntityOperation, command)) {
@@ -1768,6 +1789,7 @@ void ImportSpoolFiles(
                 materializationLease,
                 executionClass,
                 mapEntityOperation,
+                diagnosticCondump,
             });
             LogDebug(
                 "QUEUE_IMPORT command_id=" + commandId
@@ -1810,6 +1832,11 @@ bool CommandExecutionGateOpen(
     bool rpcTransportReady,
     const GameStateProbe& gameStateProbe
 ) {
+    if (job.diagnosticCondump) {
+        // Support condump bypasses gameplay/RPC safety gates, but still needs
+        // live native transport, which is only healthy while game is open.
+        return rpcTransportReady;
+    }
     if (!rpcArmed || !rpcTransportReady) return false;
     if (IsMapEntitySafeJob(job)) {
         return gameStateProbe.IsMapEntitySafe()
@@ -1939,6 +1966,14 @@ bool ExecuteCommand(const CommandJob& job) {
     const std::string& command = job.command;
     LogDebug("RPC_EXECUTE command_id=" + commandId + DeliveryContextFields());
     if (g_ApRpc) g_ApRpc->SetCurrentCommandId(commandId);
+
+    if (job.diagnosticCondump) {
+        if (command != "condump AP_SUPPORT_FILE.txt") {
+            LogDebug("RPC_DIAGNOSTIC_CONDUMP_REJECT command_id=" + commandId + " reason=payload");
+            return false;
+        }
+        LogDebug("RPC_DIAGNOSTIC_CONDUMP command_id=" + commandId + " file=AP_SUPPORT_FILE.txt");
+    }
 
     if (command.rfind("#DUMP_ENTITIES", 0) == 0) {
         const size_t bufferSize = 128 * 1024 * 1024;
@@ -2130,7 +2165,10 @@ int main(int argc, char** argv) {
 
         const DWORD now = GetTickCount();
         bool rpcArmed = IsRpcExecutionEnabled();
-        if (!queue.empty() && !rpcArmed) {
+        const bool normalCommandPending = std::any_of(
+            queue.begin(), queue.end(), [](const CommandJob& job) { return !job.diagnosticCondump; }
+        );
+        if (normalCommandPending && !rpcArmed) {
             if (ArmRpcExecution()) {
                 rpcArmed = true;
                 LogDebug("RPC command execution auto-armed because commands are pending.");
@@ -2202,13 +2240,25 @@ int main(int argc, char** argv) {
 
         bool dispatchNextImmediately = false;
         if (!queue.empty()
-                && rpcArmed
                 && rpcTransportReady
                 && g_ApRpc->Ready()) {
-            CommandJob& job = queue.front();
+            size_t dispatchIndex = 0;
+            if (!frontGateOpen) {
+                for (size_t index = 1; index < queue.size(); ++index) {
+                    if (queue[index].diagnosticCondump) {
+                        dispatchIndex = index;
+                        break;
+                    }
+                }
+            }
+            CommandJob& job = queue[dispatchIndex];
+            if (!rpcArmed && !job.diagnosticCondump) {
+                Sleep(50);
+                continue;
+            }
             const std::string commandId = CommandIdFromPath(job.path);
             const bool normalReceipt = IsNormalReceiptCommandId(commandId);
-            const bool dispatchReady = normalReceipt
+            const bool dispatchReady = normalReceipt || job.diagnosticCondump
                 ? ReceiptDispatchReady(now, job.nextAttemptTick)
                 : now - lastExecution >= kCommandSpacingMs;
             if (!dispatchReady) {
@@ -2220,7 +2270,7 @@ int main(int argc, char** argv) {
                     "QUEUE_CANCELLED command_id=" + commandId + DeliveryContextFields()
                 );
                 knownCommandIds.erase(commandId);
-                queue.pop_front();
+                queue.erase(queue.begin() + dispatchIndex);
                 continue;
             }
             if (job.receiptNamespace.has_value()) {
@@ -2237,7 +2287,7 @@ int main(int argc, char** argv) {
                     // Leave .processing in place. EnsureQueueDirectory owns recovery;
                     // bridge owns only .cmd and may quarantine foreign receipts.
                     knownCommandIds.erase(commandId);
-                    queue.pop_front();
+                    queue.erase(queue.begin() + dispatchIndex);
                     continue;
                 }
             }
@@ -2250,13 +2300,14 @@ int main(int argc, char** argv) {
                 );
                 DeleteFileA(job.path.c_str());
                 knownCommandIds.erase(commandId);
-                queue.pop_front();
+                queue.erase(queue.begin() + dispatchIndex);
                 continue;
             }
             if (!CommandExecutionGateOpen(job, rpcArmed, rpcTransportReady, gameStateProbe)) {
                 Sleep(50);
                 continue;
             }
+            const bool diagnosticJob = job.diagnosticCondump;
             const DWORD dispatchTick = GetTickCount();
             if (normalReceipt) {
                 LogDebug(
@@ -2287,6 +2338,12 @@ int main(int argc, char** argv) {
                         );
                     }
                     dispatchNextImmediately = true;
+                } else if (diagnosticJob) {
+                    LogDebug(
+                        "RPC_DIAGNOSTIC_CONDUMP_RESULT command_id=" + commandId
+                        + " result=command_consumed_unverified"
+                        + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
+                    );
                 } else {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
@@ -2305,7 +2362,7 @@ int main(int argc, char** argv) {
                 } else {
                     knownCommandIds.erase(commandId);
                 }
-                queue.pop_front();
+                queue.erase(queue.begin() + dispatchIndex);
             } else {
                 if (normalReceipt) {
                     ++job.retryAttempt;
@@ -2322,6 +2379,25 @@ int main(int argc, char** argv) {
                         + "/" + std::to_string(g_ApRpc->LastTransportStatus())
                         + DeliveryContextFields()
                     );
+                } else if (diagnosticJob) {
+                    ++job.retryAttempt;
+                    if (job.retryAttempt >= kDiagnosticRetryLimit) {
+                        QuarantineFailedJob(job);
+                        LogDebug(
+                            "RPC_DIAGNOSTIC_CONDUMP_QUARANTINED command_id=" + commandId
+                            + " attempts=" + std::to_string(job.retryAttempt)
+                        );
+                        knownCommandIds.erase(commandId);
+                        queue.erase(queue.begin() + dispatchIndex);
+                    } else {
+                        job.nextAttemptTick = GetTickCount() + ReceiptRetryDelayMs(job.retryAttempt);
+                        LogDebug(
+                            "RPC_DIAGNOSTIC_CONDUMP_RETRY command_id=" + commandId
+                            + " attempt=" + std::to_string(job.retryAttempt)
+                            + " reason=" + RpcCallResultName(g_ApRpc->LastResult())
+                            + "/" + std::to_string(g_ApRpc->LastTransportStatus())
+                        );
+                    }
                 } else {
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
@@ -2333,7 +2409,9 @@ int main(int argc, char** argv) {
                     DeleteFileA(kRpcGatePath);
                 }
             }
-            lastExecution = GetTickCount();
+            if (!diagnosticJob) {
+                lastExecution = GetTickCount();
+            }
         }
 
         if (dispatchNextImmediately) {

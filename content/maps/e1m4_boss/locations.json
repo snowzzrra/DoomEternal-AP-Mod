@@ -57,6 +57,9 @@
       "policy": "vanilla_only"
     }
   },
+  "neutralize_pickups": [
+    "pickups_pickup_weapon_plasma_rifle_1"
+  ],
   "target_policies": {
     "train_dock_traversal_platform_pickup_extra_life_extra_life_1_1_e1m4": {
       "independent_ap_trigger": true,
@@ -73,6 +76,32 @@
       "remove_original": true,
       "preserve_targets": [],
       "drop_targets": []
+    },
+    "pickups_progress_sentinel_battery_1_e1m4": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "independent_position": [
+        -1.49e-08,
+        -86.1999893,
+        -20.5549965
+      ],
+      "independent_size": [
+        1.29999995,
+        1.29999995,
+        1.29999995
+      ],
+      "preserve_targets": [],
+      "drop_targets": [],
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"progress/sentinel_battery\";",
+          "class = \"idProp2\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "useableComponentDecl = \"propitem/batteries/sentinel_battery\";",
+          "triggerDef = \"trigger/props/pickup_large\";"
+        ]
+      }
     },
     "wing_b_pickup_collectible_albums_album_03_1": {
       "native_entity_contract": {

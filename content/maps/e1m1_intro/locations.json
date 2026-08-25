@@ -41,6 +41,11 @@
       "policy": "vanilla_only"
     }
   },
+  "target_removals": {
+    "barge_pickup_weapon_chainsaw_1": [
+      "tutorial_target_relay_chainsaw_picked_up"
+    ]
+  },
   "schema_version": 1,
   "names": {
     "7770001": "Hell on Earth - Chainsaw",

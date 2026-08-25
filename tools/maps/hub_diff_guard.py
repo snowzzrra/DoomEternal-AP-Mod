@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from tools.maps.ap_map_generator import (
     find_entity_block_bounds,
     find_matching_brace,
     generate_map,
+    remove_property_blocks,
 )
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -18,6 +20,11 @@ OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 77
 NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172)) | {7770253, 7770254, 7770255}
 EXPECTED_CHANGED = {
     "target_relay_pickup_ballista",
+}
+EXPECTED_STATE_STATS_REMOVED = {
+    "interact_hub_2_battery_station_1",
+    "interact_hub_2_battery_station_2",
+    "interact_hub_2_battery_station_3",
 }
 EXPECTED_REMOVED = {
     "sentinel_battery_room_progress_praetor_token_1",
@@ -30,6 +37,31 @@ EXPECTED_REMOVED = {
     "pickup_weapon_gauss_rifle_hub_1",
     "progress_cheats_fully_upgraded_progression_wheel_final",
     "target_give_item_ballista",
+    "func_animated_1",
+    "func_animated_2",
+    "func_animated_3",
+}
+EXPECTED_VISUAL_CHILD_REMOVALS = {
+    "func_animated_1": {
+        "model": "md6def/objects/doomslayer_armor/doomslayer_armor_set11.md6",
+        "bind_parent": "doom_sentinel_armor_anchor",
+        "preserve_entity": "doom_sentinel_armor_anchor",
+    },
+    "func_animated_2": {
+        "model": "md6def/customization/characters/humans/male/set19/base/doom_marine_3p_set19.md6",
+        "bind_parent": "doom_4_armor_anchor",
+        "preserve_entity": "doom_4_armor_anchor",
+    },
+    "func_animated_3": {
+        "model": "md6def/objects/doomslayer_armor/doomslayer_armor_set3.md6",
+        "bind_parent": "doom_1_armor_anchor",
+        "preserve_entity": "doom_1_armor_anchor",
+    },
+}
+PRESERVED_HUB_ANCHORS = {
+    "doom_sentinel_armor_anchor",
+    "doom_4_armor_anchor",
+    "doom_1_armor_anchor",
 }
 
 
@@ -55,6 +87,34 @@ def _blocks(text: str) -> dict[str, str]:
         position = end
 
 
+def _assert_visual_child_removals(source_text: str, generated_text: str) -> None:
+    for child_name, expected in EXPECTED_VISUAL_CHILD_REMOVALS.items():
+        source_bounds = find_entity_block_bounds(source_text, child_name)
+        if source_bounds is None:
+            raise ValueError(f"Hub visual child source entity is missing: {child_name}")
+        source_block = source_text[source_bounds[0]:source_bounds[1]]
+        models = re.findall(r'\bmodel\s*=\s*"([^"]+)";', source_block)
+        bind_parents = re.findall(r'\bbindParent\s*=\s*"([^"]+)";', source_block)
+        if models != [expected["model"]] or bind_parents != [expected["bind_parent"]]:
+            raise ValueError(
+                f"Hub visual child source signature drifted: {child_name}; "
+                f"models={models}, bind_parents={bind_parents}"
+            )
+        if generated_text.count(f"entityDef {child_name} {{") != 0:
+            raise ValueError(f"Hub visual child remains in generated map: {child_name}")
+
+    for anchor_name in PRESERVED_HUB_ANCHORS:
+        source_bounds = find_entity_block_bounds(source_text, anchor_name)
+        generated_bounds = find_entity_block_bounds(generated_text, anchor_name)
+        if source_bounds is None or generated_bounds is None:
+            raise ValueError(f"Hub armor anchor missing after visual removal: {anchor_name}")
+        if (
+            source_text[source_bounds[0]:source_bounds[1]]
+            != generated_text[generated_bounds[0]:generated_bounds[1]]
+        ):
+            raise ValueError(f"Hub armor anchor changed during visual removal: {anchor_name}")
+
+
 def assert_hub_diff_classified() -> dict:
     config_path = ROOT / "content/maps/hub/locations.json"
     current = json.loads(config_path.read_text(encoding="utf-8"))
@@ -69,6 +129,7 @@ def assert_hub_diff_classified() -> dict:
     }
     old.pop("target_removals", None)
     old.pop("remove_entities", None)
+    old.pop("visual_child_removals", None)
 
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
@@ -93,6 +154,21 @@ def assert_hub_diff_classified() -> dict:
         )
         generated_text = new_map.read_text(encoding="utf-8")
         source_text = (ROOT / "vanillamaps/hub.map").read_text(encoding="utf-8")
+        configured_visual_removals = {
+            entry["entity"]: entry
+            for entry in current.get("visual_child_removals", [])
+        }
+        if set(configured_visual_removals) != set(EXPECTED_VISUAL_CHILD_REMOVALS):
+            raise ValueError("Hub visual child removal configuration is not exact")
+        for child_name, expected in EXPECTED_VISUAL_CHILD_REMOVALS.items():
+            configured = configured_visual_removals[child_name]
+            if (
+                configured.get("model") != expected["model"]
+                or configured.get("bind_parent") != expected["bind_parent"]
+                or configured.get("preserve_entity") != expected["preserve_entity"]
+            ):
+                raise ValueError(f"Hub visual child removal configuration drifted: {child_name}")
+        _assert_visual_child_removals(source_text, generated_text)
         goal_owner = "trigger_transition_to_e2m3"
         generated_bounds = find_entity_block_bounds(generated_text, goal_owner)
         source_bounds = find_entity_block_bounds(source_text, goal_owner)
@@ -111,11 +187,20 @@ def assert_hub_diff_classified() -> dict:
     changed = {name for name in before.keys() & after if before[name] != after[name]}
     removed = set(before) - set(after)
     added = set(after) - set(before)
-    if changed != EXPECTED_CHANGED or removed != EXPECTED_REMOVED:
+    unexpected_changed = changed - EXPECTED_CHANGED - EXPECTED_STATE_STATS_REMOVED
+    missing_state_stats_changes = EXPECTED_STATE_STATS_REMOVED - changed
+    if unexpected_changed or missing_state_stats_changes or removed != EXPECTED_REMOVED:
         raise ValueError(
             f"Unclassified Hub original-entity diff: changed={sorted(changed)}, "
+            f"unexpected_changed={sorted(unexpected_changed)}, "
+            f"missing_state_stats_changes={sorted(missing_state_stats_changes)}, "
             f"removed={sorted(removed)}"
         )
+    for name in EXPECTED_STATE_STATS_REMOVED:
+        if remove_property_blocks(before[name], "stateStats") != after[name]:
+            raise ValueError(
+                f"Unclassified Hub station drift: {name} differs beyond stateStats removal"
+            )
     ap_checks = {
         declaration for declaration, location_id in current["entities"].items()
         if location_id in NEW_HUB_LOCATION_IDS

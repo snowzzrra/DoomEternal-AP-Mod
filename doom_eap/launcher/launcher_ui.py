@@ -194,12 +194,12 @@ class LauncherUI(QMainWindow):
 
     def _configure_style(self) -> None:
         self.setStyleSheet(f"""
-            QWidget {{ background:{self.COLORS['ink']}; color:{self.COLORS['text']}; font-family:'Segoe UI','Aptos','Noto Sans',sans-serif; font-size:10.5pt; }}
+            QWidget {{ background:{self.COLORS['ink']}; color:{self.COLORS['text']}; font-family:'Noto Sans','Segoe UI','Aptos',sans-serif; font-size:10.5pt; }}
             QLabel {{ background:transparent; }} QMainWindow {{ background:{self.COLORS['ink']}; }}
             QFrame#shell {{ background:#0d151a; border-right:1px solid {self.COLORS['line']}; }}
             QFrame#topbar {{ background:#0d151a; border-bottom:1px solid {self.COLORS['line']}; }}
             QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16242b,stop:.55 #111b21,stop:1 #0d151a); border:1px solid #45606b; border-left:4px solid {self.COLORS['doom']}; }}
-            QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; }}
+            QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; border-radius:2px; }}
             QWidget#statusItem {{ background:transparent; border:0; }}
             QLabel#statusIndicator {{ color:#64737a; font-size:12pt; }}
             QWidget#statusItem[statusTone="good"] QLabel#statusIndicator {{ color:{self.COLORS['good']}; }}
@@ -209,19 +209,21 @@ class LauncherUI(QMainWindow):
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
             QLabel#eyebrow {{ color:{self.COLORS['ap']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
             QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:23pt; font-weight:800; }}
-            QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; }}
+            QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; letter-spacing:.4px; }}
             QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
             QLabel#stateName {{ color:{self.COLORS['muted']}; font-size:9pt; font-weight:800; }}
             QLabel#warning {{ color:{self.COLORS['warn']}; background:#292419; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
-            QLineEdit,QSpinBox {{ background:#0c1419; color:{self.COLORS['text']}; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
+            QLineEdit,QSpinBox {{ background:#0c1419; color:{self.COLORS['text']}; border:1px solid #526871; padding:7px 9px; min-height:20px; selection-background-color:{self.COLORS['ap']}; selection-color:#081014; }}
             QComboBox {{ background:#0c1419; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
             QComboBox QAbstractItemView {{ background:#101a20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
-            QLineEdit:focus,QSpinBox:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['ap']}; }}
+            QLineEdit:focus,QSpinBox:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['ap']}; outline:0; }}
             QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:9px 13px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
             QPushButton:hover {{ background:#243740; border-color:{self.COLORS['ap']}; }}
+            QPushButton:pressed {{ background:#0d151a; border-color:{self.COLORS['doom_hot']}; padding:10px 12px 8px 14px; }}
             QPushButton#primary {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; color:#102012; }}
             QPushButton#primary:hover {{ background:#b2e77a; }}
+            QPushButton#primary:pressed {{ background:#7eaf50; color:#071008; }}
             QPushButton#nav {{ text-align:left; background:transparent; border:0; border-left:3px solid transparent; color:{self.COLORS['muted']}; padding:10px 10px; }}
             QPushButton#nav:checked,QPushButton#nav:hover {{ background:#17242b; color:{self.COLORS['text']}; border-left-color:{self.COLORS['doom']}; }}
             QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:6px 10px; color:{self.COLORS['muted']}; }}
@@ -352,7 +354,7 @@ class LauncherUI(QMainWindow):
         self.status_strip = strip
         self.status_items: list[QWidget] = []
         self.statuses: dict[str, tuple[QWidget, QLabel, QLabel, QLabel]] = {}
-        for index, (key, title) in enumerate((("room", "CONNECTION"), ("mod", "MOD"), ("game", "GAME"), ("rpc", "GAME LINK"))):
+        for index, (key, title) in enumerate((("room", "CONNECTION"), ("mod", "ROOM PACKAGE"), ("game", "GAME INSTALLATION"), ("rpc", "GAME INTEGRATION"))):
             item = QWidget()
             item.setObjectName("statusItem")
             item.setProperty("statusTone", "muted")
@@ -440,7 +442,7 @@ class LauncherUI(QMainWindow):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
         layout.setSpacing(9)
-        layout.addWidget(self._label("ROOM", "section"))
+        layout.addWidget(self._label("ROOM PACKAGE", "section"))
         self.room_summary = self._label("No room connected.", "muted")
         self.room_summary.setWordWrap(True)
         layout.addWidget(self.room_summary)
@@ -471,7 +473,7 @@ class LauncherUI(QMainWindow):
         self.stop_button = QPushButton("DISCONNECT")
         self.stop_button.clicked.connect(self._disconnect)
         self.stop_button.setEnabled(False)
-        self.reinstall_button = QPushButton("INSTALL MOD")
+        self.reinstall_button = QPushButton("INSTALL ROOM PACKAGE")
         self.reinstall_button.clicked.connect(self._reinstall)
         self.reinstall_button.setEnabled(False)
         controls.addWidget(self.stop_button)
@@ -480,18 +482,41 @@ class LauncherUI(QMainWindow):
         layout.addLayout(controls)
         return card
 
+    def _player_card(self) -> QFrame:
+        """Compact factual room identity, kept ahead of supporting session views."""
+        card = self._card()
+        layout = QGridLayout(card)
+        layout.setContentsMargins(20, 15, 20, 15)
+        layout.setHorizontalSpacing(20)
+        layout.setVerticalSpacing(4)
+        layout.addWidget(self._label("PLAYER", "section"), 0, 0, 1, 3)
+        self.player_connection = self._label("Connection: Not connected", "muted")
+        self.player_team = self._label("Team: —", "muted")
+        self.player_slot = self._label("Slot: —", "muted")
+        self.player_inventory = self._label("Inventory: Connect to resync", "muted")
+        self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
+        self.resync_inventory_button.setEnabled(False)
+        self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
+        layout.addWidget(self.player_connection, 1, 0)
+        layout.addWidget(self.player_team, 1, 1)
+        layout.addWidget(self.player_slot, 1, 2)
+        layout.addWidget(self.player_inventory, 2, 0, 1, 2)
+        layout.addWidget(self.resync_inventory_button, 2, 2)
+        return card
+
     def _session_page(self) -> QWidget:
         body = QWidget()
         outer = QVBoxLayout(body)
         outer.setContentsMargins(28, 24, 28, 30)
         outer.setSpacing(14)
+        outer.addWidget(self._player_card())
         outer.addWidget(self._status_strip())
         self.session_setup = self._card("hero")
         setup_layout = QHBoxLayout(self.session_setup)
         setup_layout.setContentsMargins(20, 16, 20, 16)
         setup_copy = QVBoxLayout()
-        self.session_setup_title = self._label("ROOM MOD", "section")
-        self.session_setup_detail = self._label("Connect to a room to check its mod.", "muted")
+        self.session_setup_title = self._label("ROOM PACKAGE", "section")
+        self.session_setup_detail = self._label("Connect to a room to check its package.", "muted")
         setup_copy.addWidget(self.session_setup_title)
         setup_copy.addWidget(self.session_setup_detail)
         setup_layout.addLayout(setup_copy, 1)
@@ -504,7 +529,7 @@ class LauncherUI(QMainWindow):
         self.session_manual_retry_action.setObjectName("secondary")
         self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
         self.session_manual_retry_action.setVisible(False)
-        self.session_setup_action = QPushButton("INSTALL MOD")
+        self.session_setup_action = QPushButton("INSTALL ROOM PACKAGE")
         self.session_setup_action.setObjectName("primary")
         self.session_setup_action.clicked.connect(self._run_setup_action)
         setup_buttons.addWidget(self.session_manual_complete_action)
@@ -684,6 +709,11 @@ class LauncherUI(QMainWindow):
                 button.setObjectName("primary")
             button.clicked.connect(callback)
             buttons.addWidget(button)
+        self.uninstall_button = QPushButton("UNINSTALL MOD")
+        self.uninstall_button.setObjectName("secondary")
+        self.uninstall_button.setEnabled(False)
+        self.uninstall_button.clicked.connect(self._uninstall_room_package)
+        buttons.addWidget(self.uninstall_button)
         buttons.addStretch(1)
         card_layout.addLayout(buttons)
         layout.addWidget(card)
@@ -744,23 +774,23 @@ class LauncherUI(QMainWindow):
 
     def _set_setup_state(self, state: str, detail: str = "") -> None:
         presentations = {
-            "disconnected": ("ROOM MOD", "Connect to a room to check its mod.", "INSTALL MOD", False, "READY"),
-            "checking": ("CHECKING MOD", "Checking this room's mod before play.", "CHECKING...", False, "CONNECTED"),
-            "install_needed": ("INSTALL MOD", "Install this room's mod before playing.", "INSTALL MOD", True, "ACTION NEEDED"),
-            "update_required": ("UPDATE MOD", "This room needs its matching mod before playing.", "UPDATE MOD", True, "ACTION NEEDED"),
-            "installing": ("INSTALLING MOD", "Preparing this room for play.", "INSTALLING...", False, "WORKING"),
-            "updating": ("UPDATING MOD", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
-            "game_link_needed": ("GAME LINK SETUP NEEDED", "Installs the verified Meathook v7.2 runtime required by DOOM Eternal Archipelago.", "SET UP GAME LINK", True, "ACTION NEEDED"),
-            "game_link_update_needed": ("GAME LINK UPDATE NEEDED", "A different XINPUT1_3.dll is installed. DOOM Eternal Archipelago requires the verified Meathook v7.2 runtime.", "REPAIR GAME LINK", True, "ACTION NEEDED"),
-            "manual_install_required": ("WINDOWS MOD INSTALLER NEEDS MANUAL SETUP", "The automatic EternalModInjector setup could not be completed. You can install it manually using the Windows Manual Mod Installer section in INSTALL.md.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
+            "disconnected": ("ROOM PACKAGE", "Connect to a room to check its package.", "", False, "READY"),
+            "checking": ("CHECKING ROOM PACKAGE", "Checking this room's package before play.", "CHECKING...", False, "CONNECTED"),
+            "install_needed": ("INSTALL ROOM PACKAGE", "Install this room's package before playing.", "INSTALL ROOM PACKAGE", True, "ACTION NEEDED"),
+            "update_required": ("UPDATE ROOM PACKAGE", "This room needs its matching package before playing.", "UPDATE ROOM PACKAGE", True, "ACTION NEEDED"),
+            "installing": ("INSTALLING ROOM PACKAGE", "Preparing this room for play.", "INSTALLING...", False, "WORKING"),
+            "updating": ("UPDATING ROOM PACKAGE", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
+            "game_link_needed": ("GAME INTEGRATION SETUP NEEDED", "Set up game integration required by DOOM Eternal Archipelago.", "PREPARE", True, "ACTION NEEDED"),
+            "game_link_update_needed": ("GAME INTEGRATION NEEDS REPAIR", "Game integration needs repair before play.", "REPAIR", True, "ACTION NEEDED"),
+            "manual_install_required": ("WINDOWS PACKAGE INSTALL NEEDS MANUAL SETUP", "Automatic room package setup could not be completed. Use the Windows Manual Mod Installer guide to continue.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
             "ready": (
-                "READY TO PLAY",
+                "SETUP READY",
                 "Start DOOM Eternal normally and keep this launcher open." if os.name == "nt" else "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.",
-                "",
-                False,
+                "OPEN SESSION",
+                True,
                 "READY",
             ),
-            "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Try again.", "RETRY SETUP", True, "ACTION NEEDED"),
+            "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Review Help or repair setup.", "REPAIR", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
@@ -769,20 +799,20 @@ class LauncherUI(QMainWindow):
         self.session_setup_detail.setText(copy)
         self.session_setup_action.setText(action)
         self.session_setup_action.setEnabled(enabled)
-        self.session_setup_action.setVisible(state != "ready")
+        self.session_setup_action.setVisible(state not in {"ready", "disconnected"})
         self.session_manual_complete_action.setVisible(state == "manual_install_required")
         self.session_manual_retry_action.setVisible(state == "manual_install_required")
         self.reinstall_button.setText(action)
         self.reinstall_button.setEnabled(enabled)
-        self.reinstall_button.setVisible(state != "ready")
+        self.reinstall_button.setVisible(state not in {"ready", "disconnected"})
         self._set_home(title, copy, action, top_state, enabled=enabled)
-        self.hero_action.setVisible(state != "ready")
+        self.hero_action.setVisible(state != "disconnected")
 
     def _run_setup_action(self) -> None:
         if self._setup_state in {"install_needed", "update_required"}:
             self._prepare()
         elif self._setup_state == "failed":
-            self._prepare(force=True)
+            self._show_page(4)
         elif self._setup_state == "game_link_needed":
             self._prepare(force=True)
         elif self._setup_state == "manual_install_required":
@@ -790,10 +820,10 @@ class LauncherUI(QMainWindow):
         elif self._setup_state == "game_link_update_needed":
             confirm = QMessageBox.question(
                 self,
-                "Repair Game Link",
+                "Repair game integration",
                 "A different XINPUT1_3.dll is installed in your DOOM Eternal folder.\n\n"
-                "Repair Game Link will back up the existing XINPUT1_3.dll to the launcher state folder "
-                "and replace it with the verified Meathook v7.2 runtime.\n\n"
+                "Repair game integration will back up its current game file to the launcher state folder "
+                "and replace it with the verified version.\n\n"
                 "Do you want to proceed with repair?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
@@ -803,8 +833,8 @@ class LauncherUI(QMainWindow):
                     self.controller.install_game_link(force_repair=True)
                     self._prepare(force=True)
                 except Exception as error:
-                    self._append_log(f"Game Link repair error: {error}")
-                    self._set_setup_state("failed", f"Game Link repair failed: {error}")
+                    self._append_log(f"Game integration repair error: {error}")
+                    self._set_setup_state("failed", f"Game integration repair failed: {error}")
 
     def _open_manual_install_guide(self) -> None:
         """Open the Windows Manual Mod Installer section in INSTALL.md."""
@@ -909,7 +939,10 @@ class LauncherUI(QMainWindow):
         self._connect()
 
     def _primary_action(self) -> None:
-        if self._setup_state in {"install_needed", "update_required", "failed", "ready", "manual_install_required"}:
+        if self._setup_state == "ready":
+            self._show_page(2)
+            return
+        if self._setup_state in {"install_needed", "update_required", "failed", "manual_install_required"}:
             self._run_setup_action()
             return
         text = self.hero_action.text()
@@ -946,6 +979,41 @@ class LauncherUI(QMainWindow):
         except Exception as error:
             self._append_log(f"Stop error: {error}")
 
+    def _uninstall_room_package(self) -> None:
+        if not self._room_connected:
+            return
+        confirmation = QMessageBox.question(
+            self,
+            "Uninstall room package",
+            "Remove DoomEAP room mod from DOOM Eternal?\n\nOther mods and Game integration will be kept.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmation != QMessageBox.StandardButton.Yes:
+            return
+        self.uninstall_button.setEnabled(False)
+        self.doctor_status.setText("UNINSTALL REQUESTED")
+        self.doctor_evidence.setText("Waiting to queue room package removal.")
+        try:
+            self.controller.uninstall_setup()
+        except Exception:
+            self.uninstall_button.setEnabled(self._room_connected)
+            self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
+            self.doctor_evidence.setText("Room package could not be removed. Close the game and try again.")
+            self._append_log("Room package uninstall failed.")
+
+    def _request_inventory_resync(self) -> None:
+        if not self._room_connected:
+            return
+        self.resync_inventory_button.setEnabled(False)
+        self.player_inventory.setText("Inventory: Resync requested")
+        try:
+            self.controller.request_inventory_resync()
+        except Exception as error:
+            self.resync_inventory_button.setEnabled(True)
+            self.player_inventory.setText("Inventory: Resync unavailable")
+            self._append_log(f"Inventory resync request failed: {error}")
+
     def _prepare(self, *, force: bool = False) -> None:
         if not self._room_connected:
             self._append_log("Connect to a room before preparing its mod.")
@@ -953,7 +1021,7 @@ class LauncherUI(QMainWindow):
         if self._setup_state in {"installing", "updating"}:
             self._append_log("Room mod setup is already active.")
             return
-        if QMessageBox.question(self, "Confirm room mod", "Prepare and install mod bound to this room?") != QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, "Confirm room package", "Prepare and install package bound to this room?") != QMessageBox.StandardButton.Yes:
             return
         try:
             started = self.controller.reinstall_setup() if force else self.controller.prepare_setup()
@@ -975,21 +1043,19 @@ class LauncherUI(QMainWindow):
             return
         self._resolved_consent_requests.add(request_id)
         name = str(event.get("name") or "Required dependency")
-        version = str(event.get("version") or "unspecified version")
-        purpose = str(event.get("purpose") or ("Game Link runtime" if name == "Meathook" else "Mod installation"))
+        display_name = "Game integration" if name == "Meathook" else "Room package installation tool"
+        purpose = str(event.get("purpose") or ("Connect the game to this room" if name == "Meathook" else "Install this room package"))
         source = str(event.get("source") or ("GitHub / brongo" if name == "Meathook" else "GitHub"))
         details = [
-            f"{name} ({version}) is required: {purpose}.",
+            f"{display_name} is required: {purpose}.",
             f"Source: {source}",
-            "This download is verified against its published SHA-256 before use.",
+            "This download is verified before use.",
         ]
-        if event.get("sha256"):
-            details.append(f"SHA-256: {event['sha256']}")
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Dependency download approval")
         dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText(f"Approve {name} download")
+        dialog.setText(f"Approve {display_name} download")
         dialog.setInformativeText("\n\n".join(details))
         accept = dialog.addButton("Download and verify", QMessageBox.ButtonRole.AcceptRole)
         dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
@@ -1002,7 +1068,7 @@ class LauncherUI(QMainWindow):
         finally:
             self.controller.resolve_consent(request_id, accepted)
         if not accepted:
-            self._set_setup_state("failed", f"{name} download declined. Retry setup when ready.")
+            self._set_setup_state("failed", f"{display_name} download declined. Retry setup when ready.")
 
     def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit) -> None:
         layout.addWidget(self._label(label, "eyebrow"), row, 0)
@@ -1038,6 +1104,11 @@ class LauncherUI(QMainWindow):
             event.get("slot_name") or event.get("player_name") or self.controller.config.get("slot"),
             f"Slot {slot}",
         )
+        self.player_connection.setText("Connection: Connected")
+        self.player_team.setText(f"Team: {team}")
+        self.player_slot.setText(f"Slot: {slot} · {player}")
+        self.player_inventory.setText("Inventory: Ready")
+        self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
         self.room_summary.setText(f"Server: {endpoint}\nPlayer: {player}\nSeed: {seed} | Team {team}, Slot {slot}")
         slot_data = event.get("slot_data")
         if not isinstance(slot_data, dict):
@@ -1275,6 +1346,39 @@ class LauncherUI(QMainWindow):
             QApplication.clipboard().setText(value)
             self._append_log("Steam launch option copied.")
 
+    def _show_setup_complete(self) -> None:
+        """Confirm a new room package install without offering game launch control."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Setup Complete")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(440)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(26, 24, 26, 22)
+        layout.setSpacing(12)
+        layout.addWidget(self._label("SETUP COMPLETE", "title"))
+        layout.addWidget(self._label(
+            'Your Archipelago room is ready.\n\n'
+            'Start DOOM Eternal normally from Steam.\n\n'
+            'Do not use the "Play DOOM Eternal with mods" option.\n\n'
+            "For the intended experience, disable tutorials\n"
+            "in DOOM Eternal's game settings.\n\n"
+            "Keep this launcher open while playing."
+        ))
+        if os.name != "nt" and self.launch_option.text() and not self.launch_option.text().startswith("Available"):
+            layout.addWidget(self._label("STEAM LAUNCH OPTION", "eyebrow"))
+            option = QLineEdit(self.launch_option.text())
+            option.setReadOnly(True)
+            layout.addWidget(option)
+            copy = QPushButton("COPY OPTION")
+            copy.clicked.connect(lambda: QApplication.clipboard().setText(option.text()))
+            layout.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
+        close = QPushButton("CLOSE")
+        close.setObjectName("primary")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
+        close.setFocus(Qt.FocusReason.OtherFocusReason)
+        dialog.exec()
+
     def _run_doctor(self) -> None:
         try:
             self._render_doctor_report(self.controller.run_doctor().document())
@@ -1455,9 +1559,54 @@ class LauncherUI(QMainWindow):
         if kind == "log":
             self._append_log(str(event.get("message", "")))
             return
+        if kind == "inventory_resync":
+            status = str(event.get("status", ""))
+            presentation = {
+                "queued": ("Inventory: Restoration queued for game", True),
+                "noop": ("Inventory: Already current", True),
+                "error": ("Inventory: Resync unavailable", True),
+            }.get(status)
+            if presentation:
+                detail, enabled = presentation
+                self.player_inventory.setText(detail)
+                self.resync_inventory_button.setEnabled(enabled and self._room_connected)
+            return
+        if kind == "uninstall_queued":
+            self.uninstall_button.setEnabled(False)
+            self.doctor_status.setText("UNINSTALL QUEUED")
+            self.doctor_evidence.setText("Room package removal is queued.")
+            return
+        if kind == "uninstall_started":
+            self.uninstall_button.setEnabled(False)
+            self.doctor_status.setText("REMOVING ROOM PACKAGE")
+            self.doctor_evidence.setText("Removing DoomEAP room mod from DOOM Eternal.")
+            return
+        if kind == "uninstall_progress":
+            self.uninstall_button.setEnabled(False)
+            self.doctor_status.setText("REMOVING ROOM PACKAGE")
+            self.doctor_evidence.setText("Room package removal is in progress. Keep the launcher open.")
+            return
+        if kind == "injector_post_run_confirmation":
+            self.uninstall_button.setEnabled(False)
+            self.doctor_status.setText("CHECKING ROOM PACKAGE")
+            self.doctor_evidence.setText("Checking that room package removal completed.")
+            return
+        if kind == "uninstall_complete":
+            self.uninstall_button.setEnabled(False)
+            self.doctor_status.setText("ROOM PACKAGE UNINSTALLED")
+            self.doctor_evidence.setText("DoomEAP room mod is not installed. Other mods and Game integration were kept.")
+            self._set_status("mod", "not installed", self.COLORS["warn"])
+            self._set_setup_state("install_needed", "Room package is not installed. Install it to play.")
+            return
+        if kind in {"uninstall_attention", "uninstall_failed"}:
+            self.uninstall_button.setEnabled(self._room_connected)
+            self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
+            self.doctor_evidence.setText("Room package could not be removed. Close the game and try again.")
+            return
         if kind == "connected":
             self._connection_pending = False; self._room_connected = True
             self._set_connection_controls(False); self._render_room(event)
+            self.uninstall_button.setEnabled(True)
             self._set_status("room", "connected", self.COLORS["good"])
             self._set_status("mod", "checking", self.COLORS["ap"])
             self._set_setup_state("checking")
@@ -1490,8 +1639,14 @@ class LauncherUI(QMainWindow):
             state, reason = str(event.get("state", "")), str(event.get("reason", ""))
             readiness = str(event.get("readiness", "ready"))
             readiness_reason = str(event.get("readiness_reason", ""))
-            if state == "already_installed":
+            if state == "uninstalled":
                 self.drift.hide()
+                self.uninstall_button.setEnabled(False)
+                self._set_status("mod", "not installed", self.COLORS["warn"])
+                self._set_setup_state("install_needed", "Room package is not installed. Install it to play.")
+            elif state == "already_installed":
+                self.drift.hide()
+                self.uninstall_button.setEnabled(self._room_connected)
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
@@ -1499,7 +1654,7 @@ class LauncherUI(QMainWindow):
                     root = Path(str(game_root)).expanduser().resolve() if game_root else None
                     meathook = probe_meathook(root)
                     target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
-                    self._set_setup_state(target_state, readiness_reason)
+                    self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                     self._show_page(2)
@@ -1515,7 +1670,7 @@ class LauncherUI(QMainWindow):
                 )
                 self._set_setup_state(
                     "update_required" if state == "update_required" else "install_needed",
-                    setup_copy if state == "update_required" else "Install this room's mod before playing.",
+                    setup_copy if state == "update_required" else "Install this room's package before playing.",
                 )
         elif kind in {"setup_started", "mod_building", "runtime_config_ready", "mod_staged", "injector_started"}:
             self._set_status("mod", "updating", self.COLORS["ap"])
@@ -1534,7 +1689,7 @@ class LauncherUI(QMainWindow):
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
                     target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
-                    self._set_setup_state(target_state, meathook.message)
+                    self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                     self._show_page(2)
@@ -1543,6 +1698,8 @@ class LauncherUI(QMainWindow):
                 self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
             else:
                 self._set_setup_state("failed", str(event.get("message", "Try setup again.")))
+            if event.get("new_install") is True:
+                self._show_setup_complete()
         elif kind in {"manager_started", "injector_started"}:
             message = str(event.get("message", "Complete installation in EternalModInjector."))
             self._set_setup_state("installing", "Complete installation in EternalModInjector, then close it.")
@@ -1553,6 +1710,24 @@ class LauncherUI(QMainWindow):
                 self._append_log(f"EternalModInjector closed (code: {returncode}).")
             else:
                 self._append_log("EternalModInjector closed.")
+        elif kind == "uninstall_confirmation_required":
+            request_id = str(event.get("request_id", ""))
+            self.uninstall_button.setEnabled(False)
+            reply = QMessageBox.question(
+                self,
+                "Confirm room package removal",
+                "EternalModInjector has finished. Confirm it completed and the DoomEAP room package is absent.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            confirmed = reply == QMessageBox.StandardButton.Yes
+            if confirmed:
+                self.doctor_status.setText("CHECKING ROOM PACKAGE")
+                self.doctor_evidence.setText("Confirming room package removal.")
+            else:
+                self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
+                self.doctor_evidence.setText("Room package removal was not confirmed.")
+            self.controller.resolve_uninstall_confirmation(request_id, confirmed)
         elif kind == "installation_confirmation_required":
             request_id = str(event.get("request_id", ""))
             message = str(event.get("message", "Did the mod installation complete successfully in EternalModInjector?"))
@@ -1590,6 +1765,10 @@ class LauncherUI(QMainWindow):
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")
+            self.uninstall_button.setEnabled(False)
+            self.player_connection.setText("Connection: Not connected")
+            self.player_inventory.setText("Inventory: Connect to resync")
+            self.resync_inventory_button.setEnabled(False)
             self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
             for key in self.statuses:
                 self._set_status(key, "waiting", self.COLORS["muted"])

@@ -493,6 +493,8 @@ def normalize_save_games_dir(path):
 
 
 config = load_config()
+SAVE_GAMES_SELECTION_SOURCE = "unresolved"
+SAVE_GAMES_SELECTION_REASON = "configuration has not been resolved"
 
 AP_SOURCE_PATH = os.environ.get("ARCHIPELAGO_SOURCE")
 if AP_SOURCE_PATH:
@@ -513,6 +515,8 @@ if "doom_base_dir" in config and "save_games_dir" in config:
     try:
         DOOM_BASE_DIR = normalize_doom_base_dir(config["doom_base_dir"])
         SAVE_GAMES_DIR = normalize_save_games_dir(config["save_games_dir"])
+        SAVE_GAMES_SELECTION_SOURCE = "config.save_games_dir"
+        SAVE_GAMES_SELECTION_REASON = "configured path normalized to existing Saved Games base"
     except ValueError as error:
         abort_setup(f"{CONFIG_FILE} has invalid paths: {error}")
     if (
@@ -581,6 +585,8 @@ else:
         lambda p: normalize_save_games_dir(p) if p else None,
         "Could not find the DOOM Eternal save base directory."
     )
+    SAVE_GAMES_SELECTION_SOURCE = "interactive_selection"
+    SAVE_GAMES_SELECTION_REASON = "path selected during client setup"
 
     config["doom_base_dir"] = DOOM_BASE_DIR
     config["save_games_dir"] = SAVE_GAMES_DIR
@@ -714,6 +720,20 @@ def start_bridge_logger(path=None):
 
 
 logger = configure_bridge_logger()
+
+
+def log_effective_runtime_paths():
+    """Record bridge-owned configuration and effective runtime path surfaces."""
+    logger.info("CONFIG_FILE=%s", CONFIG_FILE.resolve())
+    logger.info("DOOM_BASE_DIR=%s", DOOM_BASE_DIR)
+    logger.info("SAVE_GAMES_DIR=%s", SAVE_GAMES_DIR)
+    logger.info("INV_DUMP_DIR=%s", INV_DUMP_DIR)
+    logger.info("STEAM_REMOTE_DIR=%s", STEAM_REMOTE_DIR if STEAM_REMOTE_DIR is not None else "unavailable")
+    logger.info("STEAM_ID3=%s", STEAM_ID3)
+    logger.info("SAVE_GAMES_SELECTION_SOURCE=%s", SAVE_GAMES_SELECTION_SOURCE)
+    logger.info("SAVE_GAMES_SELECTION_REASON=%s", SAVE_GAMES_SELECTION_REASON)
+    logger.info("QUEUE_DIR=%s", QUEUE_DIR)
+    logger.info("RPC_GATE_PATH=%s", RPC_GATE_PATH)
 
 
 def load_client_state():
@@ -2085,6 +2105,7 @@ def send_command(
     materialization_lease=None,
     execution_class=PLAYER_RUNTIME,
     operation=None,
+    diagnostic=False,
 ):
     """Atomically enqueue one command without overwriting another command.
 
@@ -2129,6 +2150,11 @@ def send_command(
             logger.error("[Queue] Refusing command with invalid materialization lease: %r", materialization_lease)
             return False
         payload = f"{EXECUTION_CLASS_HEADER} {execution_class}\n"
+        if diagnostic:
+            if cmd.strip() != "condump AP_SUPPORT_FILE.txt":
+                logger.error("[Support] Refusing non-diagnostic condump payload")
+                return False
+            payload = "AP_DIAGNOSTIC_CONDUMP_V1 AP_SUPPORT_FILE.txt\n"
         if execution_class == MAP_ENTITY_SAFE:
             payload += f"{MAP_ENTITY_OPERATION_HEADER} {operation}\n"
         if materialization_lease is not None:
@@ -2550,6 +2576,17 @@ def request_telemetry_dump():
         f"condump {TELEMETRY_DUMP_PREFIX}.txt",
         coalesce_key="telemetry",
         room_scoped=False,
+    )
+
+
+def request_support_condump():
+    """Queue only bounded support condump operation through diagnostic path."""
+    return send_command(
+        "condump AP_SUPPORT_FILE.txt",
+        coalesce_key="support-condump",
+        arm_rpc=False,
+        room_scoped=False,
+        diagnostic=True,
     )
 
 
@@ -3761,7 +3798,6 @@ class DoomEternalContext(CommonContext):
             not isinstance(cached, dict)
             or evidence is None
             or getattr(evidence, "state", None) != "gameplay"
-            or getattr(evidence, "provisional", False)
         ):
             return False
         evidence_epoch = getattr(evidence, "epoch", None)
@@ -3783,7 +3819,50 @@ class DoomEternalContext(CommonContext):
         if not valid_materialization_epoch(epoch) or epoch == cached.get("gameplay_epoch"):
             return False
 
-        self.invalidate_active_save_proof()
+        lease = getattr(self, "runtime_observation_lease", None)
+        if lease is not None:
+            lease.observe_gameplay_loaded(evidence_mtime)
+        preserve_proven_slot = False
+        if getattr(evidence, "provisional", False):
+            active_slot = getattr(self, "active_save_slot", None)
+            active = primary_save_for_slot(active_slot) if active_slot else None
+            candidates = primary_save_candidates()
+            newest = candidates[0] if candidates else None
+            evidence_slot = getattr(evidence, "slot_directory", None)
+            newer_competing_candidate = bool(
+                newest
+                and active
+                and newest.slot_directory != active.slot_directory
+                and newest.mtime_ns > active.mtime_ns
+            )
+            preserve_proven_slot = bool(
+                active
+                and not newer_competing_candidate
+                and evidence_slot == active_slot
+                and getattr(self, "active_save_proof_authoritative", False)
+                and getattr(self, "active_save_proof_slot", None) == active_slot
+                and not getattr(self, "runtime_observers_frozen", False)
+            )
+            if preserve_proven_slot and active is not None:
+                self.active_save_path = str(active.path)
+                if self.active_save_token != active.mtime_ns:
+                    self.invalidate_save_observation_slot(active.slot_directory)
+                    self.active_save_token = active.mtime_ns
+                self.active_save_proof_slot = active.slot_directory
+                self.active_save_proof_evidence_epoch = evidence_epoch
+                self.active_save_proof_load_epoch = (
+                    getattr(lease, "gameplay_loaded_ns", None) if lease is not None else None
+                )
+                self.runtime_observers_frozen = False
+                logger.info(
+                    "SAVE_PROOF_REBOUND slot=%s load_epoch=%s evidence_epoch=%s "
+                    "reason=provisional_same_slot_no_newer_candidate",
+                    active.slot_directory,
+                    self.active_save_proof_load_epoch,
+                    evidence_epoch,
+                )
+        if not preserve_proven_slot:
+            self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
         self.fast_travel_last_transition = None
@@ -3797,16 +3876,14 @@ class DoomEternalContext(CommonContext):
             "materialization_evidence_epoch": evidence_epoch,
             "secondary_materialization": True,
         }
-        lease = getattr(self, "runtime_observation_lease", None)
-        if lease is not None:
-            lease.observe_gameplay_loaded(evidence_mtime)
         self.accept_map_identity(marker_data, evidence_epoch)
         self.snapshot_fast_travel_eligibility(marker_data=marker_data)
         logger.info(
             "[MAP] MATERIALIZATION_EPOCH_SECONDARY map=%s epoch=%s "
-            "source=native_same_map_load_edge",
+            "source=native_same_map_load_edge evidence_provisional=%s",
             marker_data.get("map_key", "<unknown>"),
             epoch,
+            bool(getattr(evidence, "provisional", False)),
         )
         return True
 
@@ -4079,7 +4156,7 @@ class DoomEternalContext(CommonContext):
             self.invalidate_active_save_proof()
             return fail_proof("menu")
 
-        if evidence and evidence.provisional and marker is None:
+        if evidence and evidence.provisional:
             continued = continue_authoritative_active()
             if continued is not None:
                 self.reconcile_fast_travel_unlock("save_proof")
@@ -4593,7 +4670,7 @@ class DoomEternalContext(CommonContext):
                 return False, f"failed to spool {command.spool_id}; rerun is safe"
         return True, None
 
-    def manual_reconcile_inventory(self):
+    def _manual_reconcile_inventory_unlocked(self):
         """Queue a policy-compiled manual replay without mutating AP receipt state."""
         evidence, error = self._reconciliation_eligibility(require_connection=True)
         if error:
@@ -4628,11 +4705,18 @@ class DoomEternalContext(CommonContext):
         if not plan.commands:
             logger.info("RESYNC_NOOP reason=manual detail=no_commands")
         logger.info(
-            "RESYNC_COMPLETE reason=manual commands=%s status=%s",
+            "RESYNC_QUEUED reason=manual commands=%s status=%s",
             len(plan.commands),
-            "noop" if not plan.commands else "complete",
+            "noop" if not plan.commands else "queued",
         )
         return plan, None
+
+    def manual_reconcile_inventory(self):
+        return self._manual_reconcile_inventory_unlocked()
+
+    async def manual_reconcile_inventory_async(self):
+        async with self._item_delivery_lock:
+            return self._manual_reconcile_inventory_unlocked()
 
     def log_automatic_resync_noop(self, reason, detail, epoch, history_fingerprint):
         """Log changed automatic NOOPs immediately and unchanged ones periodically."""
@@ -5185,14 +5269,29 @@ class DoomEternalContext(CommonContext):
         room_identity = self.get_ap_state_key()
         epoch = self.automap_cleanup_epoch
         if not room_identity:
-            self._automap_cleanup_transition((epoch, "", map_name, ""), "PENDING", "room_identity_unavailable")
+            self._automap_cleanup_transition(
+                (epoch, "", map_name, ""),
+                "PENDING",
+                "room_identity_unavailable",
+                trigger=trigger,
+            )
             return False
         checked = getattr(self, "checked_locations", None)
         if not self.server_checked_locations_ready or not isinstance(checked, (set, frozenset, list, tuple)):
-            self._automap_cleanup_transition((epoch, room_identity, map_name, ""), "PENDING", "checked_locations_unavailable")
+            self._automap_cleanup_transition(
+                (epoch, room_identity, map_name, ""),
+                "PENDING",
+                "checked_locations_unavailable",
+                trigger=trigger,
+            )
             return False
         if not rpc_execution_enabled():
-            self._automap_cleanup_transition((epoch, room_identity, map_name, ""), "PENDING", "rpc_not_ready")
+            self._automap_cleanup_transition(
+                (epoch, room_identity, map_name, ""),
+                "PENDING",
+                "rpc_not_ready",
+                trigger=trigger,
+            )
             return False
         checked = set(checked)
         changed = False
@@ -5206,17 +5305,28 @@ class DoomEternalContext(CommonContext):
             runtime_key = (epoch, *delivery_key)
             if (epoch, location_id) in self.automap_local_cleanup_owned:
                 self._automap_cleanup_transition(
-                    runtime_key, "LOCAL_FLOW_OWNS_EFFECT", trigger
+                    runtime_key,
+                    "LOCAL_FLOW_OWNS_EFFECT",
+                    "local_flow_owns_effect",
+                    trigger=trigger,
                 )
                 continue
             if self.automap_cleanup_submitted.get(delivery_key) == self.automap_cleanup_epoch:
                 self._automap_cleanup_transition(
-                    runtime_key, "COMMAND_QUEUED_UNVERIFIED", trigger
+                    runtime_key,
+                    "COMMAND_QUEUED_UNVERIFIED",
+                    "already_submitted_current_epoch",
+                    trigger=trigger,
                 )
                 continue
             retry = self.automap_cleanup_retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})
             if now < retry["deadline"]:
-                self._automap_cleanup_transition(runtime_key, "RETRY_WAIT", trigger)
+                self._automap_cleanup_transition(
+                    runtime_key,
+                    "RETRY_WAIT",
+                    "queue_retry_backoff",
+                    trigger=trigger,
+                )
                 continue
             command_id = stable_spool_id(
                 "automap-cleanup",
@@ -5241,13 +5351,21 @@ class DoomEternalContext(CommonContext):
                     AUTOMAP_CLEANUP_RETRY_MAX_SECONDS,
                     AUTOMAP_CLEANUP_RETRY_BASE_SECONDS * (2 ** min(retry["attempt"] - 1, 3)),
                 )
-                self._automap_cleanup_transition(runtime_key, "RETRY", "queue_unavailable")
+                self._automap_cleanup_transition(
+                    runtime_key,
+                    "RETRY",
+                    "queue_unavailable",
+                    trigger=trigger,
+                )
                 continue
             self.automap_cleanup_submitted[delivery_key] = self.automap_cleanup_epoch
             self.automap_cleanup_retry.pop(runtime_key, None)
             changed = True
             self._automap_cleanup_transition(
-                runtime_key, "COMMAND_QUEUED_UNVERIFIED", trigger
+                runtime_key,
+                "COMMAND_QUEUED_UNVERIFIED",
+                "spool_enqueued",
+                trigger=trigger,
             )
             logger.info(
                 "[Automap] Checked-state cleanup queued location=%s map=%s "
@@ -5282,18 +5400,26 @@ class DoomEternalContext(CommonContext):
         self._automap_cleanup_transition(
             (epoch, self.get_ap_state_key() or "", marker.get("runtime_map", ""), str(location_id)),
             "LOCAL_FLOW_OWNS_EFFECT",
-            "native_ap_check_event",
+            "local_flow_owns_effect",
+            trigger="native_ap_check_event",
         )
         return True
 
-    def _automap_cleanup_transition(self, delivery_key, status, reason):
+    def _automap_cleanup_transition(self, delivery_key, status, reason, *, trigger=None):
         previous = self.automap_cleanup_status.get(delivery_key)
         if previous == status:
             return
         self.automap_cleanup_status[delivery_key] = status
         logger.info(
-            "[Automap] cleanup transition status=%s previous=%s reason=%s key=%s",
-            status, previous, reason, delivery_key,
+            "[Automap] cleanup lifecycle map=%s epoch=%s location=%s "
+            "trigger=%s status=%s previous=%s spool_skip_reason=%s",
+            delivery_key[2] if len(delivery_key) > 2 else "<unknown>",
+            delivery_key[0] if delivery_key else "<unknown>",
+            delivery_key[3] if len(delivery_key) > 3 else "<unknown>",
+            trigger or "<none>",
+            status,
+            previous,
+            reason if status != "COMMAND_QUEUED_UNVERIFIED" else "<none>",
         )
 
     def bootstrap_actions(self):
@@ -7001,7 +7127,51 @@ async def launcher_control_loop(ctx):
         except json.JSONDecodeError:
             emit_launcher_event("chat_send_failed", message="Invalid launcher control message")
             continue
-        if not isinstance(control, dict) or control.get("type") != "say":
+        if not isinstance(control, dict):
+            continue
+        if control.get("type") == "support_condump":
+            try:
+                queued = await asyncio.to_thread(request_support_condump)
+            except Exception as error:
+                logger.warning("[Support] Diagnostic condump request failed: %s", error)
+                emit_launcher_event("support_condump", status="error", message=str(error))
+            else:
+                status = "queued" if queued else "unavailable"
+                emit_launcher_event("support_condump", status=status)
+            continue
+        if control.get("type") == "inventory_resync":
+            try:
+                plan, error = await ctx.manual_reconcile_inventory_async()
+            except Exception as error:
+                logger.warning("[Resync] Manual inventory resync failed: %s", error)
+                emit_launcher_event(
+                    "inventory_resync",
+                    status="error",
+                    message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+                )
+            else:
+                if error:
+                    emit_launcher_event(
+                        "inventory_resync",
+                        status="error",
+                        message=_bounded_event_text(
+                            str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT
+                        ),
+                    )
+                elif plan is None:
+                    emit_launcher_event(
+                        "inventory_resync",
+                        status="error",
+                        message="manual inventory resync returned no plan",
+                    )
+                else:
+                    emit_launcher_event(
+                        "inventory_resync",
+                        status="noop" if not plan.commands else "queued",
+                        command_count=len(plan.commands),
+                    )
+            continue
+        if control.get("type") != "say":
             continue
 
         text = control.get("text")
@@ -7018,6 +7188,7 @@ async def launcher_control_loop(ctx):
 
 async def amain(launch_args=None):
     start_bridge_logger()
+    log_effective_runtime_paths()
     Utils.init_logging("DoomEternalClient")
     parser = get_base_parser()
     parser.add_argument('--name', default=None, help="Player name no Archipelago")

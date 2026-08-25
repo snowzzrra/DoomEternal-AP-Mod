@@ -87,14 +87,18 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "major receipt single-line format"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept station3/stateStats contract and checked visual projection"
     }
   ],
   "asset_package_contract_sha256": "ce785644bbfc80f99443669dd8499eeb7ec9f36167985e18b8339867220f39ba",
-  "byte_sha256": "235d40f7fa459867640789e10bc6f516d2ad06b009da06f447da062aaa650dbc",
+  "byte_sha256": "4baee9ffa305e7fa776ac6a765ba15b1612423d3072a0ed7007eb3ff67a3a831",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 143,
-    "byte_size": 4313760,
+    "byte_size": 4313271,
     "classes": 4165,
     "entity_count": 4167,
     "layers": 162,
@@ -102,7 +106,7 @@
     "transforms": 8062,
     "unique_entity_names": 4166
   },
-  "manifest_sha256": "aa15ccbd25777a61a6be152a06f5d1d4802fa6061f4038a18c0ede3f70ee6fce",
+  "manifest_sha256": "87b331b1cc1cccf0c19fa40092b682d57116031d6dc6218a692ec261948124fb",
   "map_key": "hub",
   "physical_ap_ids": [
     7770072,
@@ -128,6 +132,6 @@
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "cb9ac214d5d79b2f9a6f1ac32d1b7a3935d5e87bfe06ef9ff102b8479ac84a42",
-  "semantic_sha256": "8586feaf9fd3e28a7dbdfb7c9c7790d1b151062f96ae009d34044a672461b345"
+  "scripted_contract_sha256": "0c6ac92eb33512a0a005912e954856ca373f63dcdef8278a1900770f3ceb0bd5",
+  "semantic_sha256": "d72a787d948dae36b1e472ee865cd998963055b26c9fc2877d176f03d2468b2e"
 }

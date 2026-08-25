@@ -13,6 +13,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
+from .launcher_integration import UNINSTALL_OWNED_STATES
 from .launcher_platform import (
     PrerequisiteStatus,
     detect_doom_processes,
@@ -22,6 +24,16 @@ from .launcher_platform import (
 )
 
 SUPPORT_LOG_TAIL_BYTES = 256 * 1024
+SUPPORT_LOG_MAX_BYTES = 1024 * 1024
+SUPPORT_DIAGNOSTIC_MAX_BYTES = 256 * 1024
+SUPPORT_DIAGNOSTIC_MAX_ITEMS = 24
+_CREDENTIAL_FIELDS = frozenset({
+    "password", "passwd", "passphrase", "authorization", "token", "secret",
+    "access_token", "api_token", "auth_token", "refresh_token", "id_token",
+    "bearer_token", "oauth_token", "oauth_token_secret", "session_token",
+    "client_secret", "consumer_secret", "webhook_secret", "secret_key",
+    "api_key", "private_key", "signing_key",
+})
 
 
 @dataclass(frozen=True)
@@ -54,28 +66,22 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed"} for item in self.diagnostics)
+        return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {"version": self.version, "ok": self.ok, "diagnostics": [asdict(item) for item in self.diagnostics]}
 
 
 def _safe_path(value: object) -> str:
-    text = str(value)
-    home = str(Path.home())
-    if home and text.startswith(home):
-        return "<USER>" + text[len(home):]
-    if os.name == "nt":
-        text = re.sub(r"(?i)^[a-z]:\\Users\\[^\\]+", "<USER>", text)
-    return re.sub(r"/(?:home|Users)/[^/]+", "/<USER>", text)
+    return str(value)
 
 
 def sanitize_support_value(value: object, *, key: str = "") -> object:
     lowered = key.casefold()
-    if any(token in lowered for token in ("password", "passwd", "token", "secret", "authorization")):
+    if lowered in _CREDENTIAL_FIELDS:
         return "[REDACTED]"
     if isinstance(value, Mapping):
-        return {str(name): sanitize_support_value(item, key=str(name)) for name, item in value.items() if "save" not in str(name).casefold()}
+        return {str(name): sanitize_support_value(item, key=str(name)) for name, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [sanitize_support_value(item, key=key) for item in value]
     if isinstance(value, Path) or (isinstance(value, str) and ("path" in lowered or "dir" in lowered or "root" in lowered)):
@@ -178,6 +184,40 @@ def _read_log_tail(path: Path, limit: int = SUPPORT_LOG_TAIL_BYTES) -> str | Non
         return None
 
 
+def _read_support_log(path: Path) -> str | None:
+    """Keep complete bounded session logs, otherwise retain meaningful head and tail."""
+    try:
+        with path.open("rb") as source:
+            source.seek(0, os.SEEK_END)
+            size = source.tell()
+            if size <= 0:
+                return None
+            if size <= SUPPORT_LOG_MAX_BYTES:
+                source.seek(0)
+                payload = source.read(SUPPORT_LOG_MAX_BYTES)
+            else:
+                head_size = SUPPORT_LOG_TAIL_BYTES // 2
+                source.seek(0)
+                head = source.read(head_size)
+                source.seek(max(0, size - head_size))
+                tail = source.read(head_size)
+                payload = head + b"\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
+        text = redact_secrets(_safe_path(payload.decode("utf-8", errors="replace")))
+        return text[: SUPPORT_LOG_MAX_BYTES + 128]
+    except (OSError, UnicodeError):
+        return None
+
+
+def _bound_support_text(text: str) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= SUPPORT_LOG_MAX_BYTES:
+        return text
+    half = SUPPORT_LOG_TAIL_BYTES // 2
+    head = encoded[:half].decode("utf-8", errors="replace")
+    tail = encoded[-half:].decode("utf-8", errors="replace")
+    return head + "\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
+
+
 def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
     useful: list[tuple[int, int, Path]] = []
     for index in range(0, len(candidates), 2):
@@ -264,10 +304,248 @@ def _support_log_tails(
             }
         except OSError:
             pass
-        tail = _read_log_tail(selected)
+        tail = _read_support_log(selected)
         if tail is not None:
             tails[archive_name] = tail
     return tails, provenance
+
+
+def _mtime_document(path: Path) -> dict[str, object]:
+    result: dict[str, object] = {"path": str(path), "exists": False}
+    try:
+        stat_result = path.stat()
+    except (OSError, ValueError, RuntimeError) as error:
+        result["error"] = f"stat failed: {type(error).__name__}: {error}"[:256]
+        return result
+    try:
+        is_file = path.is_file()
+    except (OSError, ValueError, RuntimeError) as error:
+        result["error"] = f"file check failed: {type(error).__name__}: {error}"[:256]
+        return result
+    result.update({
+        "exists": True,
+        "is_file": is_file,
+        "size_bytes": stat_result.st_size,
+        "mtime_ns": stat_result.st_mtime_ns,
+        "modified_iso": datetime.datetime.fromtimestamp(
+            stat_result.st_mtime, tz=datetime.timezone.utc
+        ).isoformat(),
+    })
+    if is_file:
+        try:
+            result["value"] = path.read_text(encoding="utf-8", errors="replace")[:512]
+        except (OSError, ValueError, RuntimeError) as error:
+            result["value"] = "[unreadable]"
+            result["error"] = f"read failed: {type(error).__name__}: {error}"[:256]
+    return result
+
+
+def _marker_files(root: Path, prefix: str) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    try:
+        paths = sorted(root.glob(f"{prefix}*.txt"), key=lambda item: item.name)
+    except (OSError, ValueError, RuntimeError) as error:
+        return [{
+            "path": str(root),
+            "exists": False,
+            "error": f"marker scan failed: {type(error).__name__}: {error}"[:256],
+        }]
+    for path in paths[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]:
+        detail = _mtime_document(path)
+        value = str(detail.get("value", ""))
+        evidence = []
+        for marker in ("AP_ACTIVE_MAP_V1", "AP_CHECK_EVENT_", "AP_TELEMETRY"):
+            if marker in value:
+                evidence.append(marker)
+        detail["marker_evidence"] = evidence
+        entries.append(detail)
+    return entries
+
+
+def _recent_relevant_files(root: Path) -> list[dict[str, object]]:
+    cutoff = time.time() - 300.0
+    entries: list[dict[str, object]] = []
+    try:
+        paths = sorted(root.iterdir(), key=lambda item: item.name)
+    except (OSError, ValueError, RuntimeError):
+        return entries
+    for path in paths:
+        if not path.is_file() or not (
+            path.name.startswith(("ap_", "GAME-AUTOSAVE"))
+            or path.name in {"game.details", "game_duration.dat"}
+        ):
+            continue
+        try:
+            stat_result = path.stat()
+        except OSError:
+            continue
+        if stat_result.st_mtime >= cutoff:
+            entries.append({"name": path.name, "mtime_ns": stat_result.st_mtime_ns})
+        if len(entries) >= SUPPORT_DIAGNOSTIC_MAX_ITEMS:
+            break
+    return entries
+
+
+def _saved_games_candidates(config: Mapping[str, object], root: Path | None) -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    configured = config.get("save_games_dir")
+    if configured:
+        try:
+            selected = Path(str(configured)).expanduser()
+            candidates.extend((selected, selected.parent, selected.parent.parent))
+        except (OSError, TypeError, ValueError):
+            pass
+    candidates.append(Path.home() / "Saved Games" / "id Software" / "DOOMEternal" / "base")
+    if root is not None:
+        for parent in (root, *root.parents):
+            if parent.name.casefold() == "steamapps":
+                candidates.append(
+                    parent.parent / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base"
+                )
+                break
+    return tuple(dict.fromkeys(path.expanduser() for path in candidates))
+
+
+def _saved_games_diagnostics(config: Mapping[str, object], root: Path | None, processes: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    selected_value = config.get("save_games_dir")
+    selected_error: str | None = None
+    try:
+        selected = Path(str(selected_value)).expanduser() if selected_value else None
+    except (OSError, TypeError, ValueError, RuntimeError) as error:
+        selected = None
+        selected_error = f"configured Saved Games path unavailable: {type(error).__name__}: {error}"[:256]
+    candidates = []
+    for path in _saved_games_candidates(config, root)[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]:
+        try:
+            is_dir = path.is_dir()
+        except (OSError, ValueError, RuntimeError):
+            is_dir = False
+        recent = _recent_relevant_files(path) if is_dir else []
+        game_detected = any(
+            str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}
+            for item in processes
+        )
+        candidates.append({
+            "path": str(path),
+            "exists": is_dir,
+            "selected": selected is not None and path == selected,
+            "relationship": "configured" if selected is not None and path == selected else "discovered_candidate",
+            "markers": {
+                "ap_active_map": _marker_files(path, "ap_active_map") if is_dir else [{"path": str(path), "exists": False, "error": "candidate is not an accessible directory"}],
+                "ap_telemetry": _marker_files(path, "ap_telemetry") if is_dir else [{"path": str(path), "exists": False, "error": "candidate is not an accessible directory"}],
+                "ap_event": _marker_files(path, "ap_event") if is_dir else [{"path": str(path), "exists": False, "error": "candidate is not an accessible directory"}],
+            },
+            "recent_writes": recent,
+            "live_game_detected": game_detected,
+            "live_game_writing": bool(recent) and game_detected,
+            "live_game_writing_reason": (
+                "recent AP/save write while DOOM process detected"
+                if recent and game_detected else
+                "no recent relevant write observed" if game_detected else
+                "DOOM process not detected"
+            ),
+        })
+    source = "configured_save_games_dir" if selected_value else "unconfigured"
+    try:
+        selected_exists = selected is not None and selected.is_dir()
+    except (OSError, ValueError, RuntimeError):
+        selected_exists = False
+    if selected_value and selected is not None and selected_exists:
+        reason = "launcher configuration value; selected directory exists"
+    elif selected_value:
+        reason = "launcher configuration value; selected directory is missing"
+    else:
+        reason = "no effective Saved Games path"
+    result: dict[str, object] = {
+        "effective_path": str(selected) if selected else None,
+        "source": source,
+        "reason": reason,
+        "candidates": candidates,
+    }
+    if selected_error:
+        result["selection_error"] = selected_error
+    return result
+
+
+def _queue_diagnostics(base: Path | None) -> dict[str, object]:
+    queue_path = base / "ap_queue" if base is not None else None
+    result: dict[str, object] = {"path": str(queue_path) if queue_path else None, "pending": 0, "processing": 0, "failed": 0, "items": {}}
+    try:
+        queue_available = queue_path is not None and queue_path.is_dir()
+    except (OSError, ValueError, RuntimeError) as error:
+        result["error"] = f"queue path unavailable: {type(error).__name__}: {error}"[:256]
+        return result
+    if queue_path is None or not queue_available:
+        return result
+    items: dict[str, list[str]] = {"pending": [], "processing": [], "failed": []}
+    errors: list[str] = []
+    for suffix, key in ((".cmd", "pending"), (".processing", "processing"), (".failed", "failed")):
+        try:
+            paths = sorted(queue_path.glob(f"*{suffix}"), key=lambda item: item.name)
+        except (OSError, ValueError, RuntimeError) as error:
+            errors.append(f"{suffix} scan failed: {type(error).__name__}: {error}"[:256])
+            continue
+        for path in paths:
+            current = result.get(key, 0)
+            result[key] = (current if isinstance(current, int) else 0) + 1
+            if len(items[key]) < SUPPORT_DIAGNOSTIC_MAX_ITEMS:
+                items[key].append(path.stem)
+    result["items"] = items
+    if errors:
+        result["errors"] = errors
+    return result
+
+
+def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None, paths: object | None, processes: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    base_error: str | None = None
+    try:
+        base = doom_base_dir_from_config(config)
+    except (OSError, TypeError, ValueError, RuntimeError) as error:
+        base = None
+        base_error = f"base path unavailable: {type(error).__name__}: {error}"[:256]
+    save = config.get("save_games_dir")
+    details = {
+        "config_file": str(config_path) if config_path else None,
+        "doom_base_dir": str(base) if base else None,
+        "save_games_dir": str(save) if save else None,
+        "INV_DUMP_DIR": str(save) if save else None,
+        "STEAM_REMOTE_DIR": str(config.get("steam_remote_dir")) if config.get("steam_remote_dir") else None,
+        "STEAM_ID3": config.get("steam_id3"),
+        "path_selection": _saved_games_diagnostics(config, base, processes),
+        "queue": _queue_diagnostics(base),
+        "markers": {},
+        "materialization": {},
+    }
+    if base_error:
+        details["doom_base_dir_error"] = base_error
+    if save:
+        try:
+            marker_root = Path(str(save)).expanduser()
+            details["markers"] = {
+                "ap_active_map": _marker_files(marker_root, "ap_active_map"),
+                "ap_telemetry": _marker_files(marker_root, "ap_telemetry"),
+                "ap_event": _marker_files(marker_root, "ap_event"),
+            }
+        except (OSError, TypeError, ValueError, RuntimeError) as error:
+            details["markers"] = {
+                "error": f"marker path unavailable: {type(error).__name__}: {error}"[:256]
+            }
+    if base is not None:
+        materialization = {
+            "active_materialization_lease": base / "ap_queue/active_materialization_lease",
+            "active_session_namespace": base / "ap_queue/active_session_namespace",
+            "ap_rpc_enabled": base / "ap_rpc_enabled",
+            "ap_gameplay_save.state": base / "ap_gameplay_save.state",
+        }
+        details["materialization"] = {name: _mtime_document(path) for name, path in materialization.items()}
+    try:
+        health_path = base / "ap_rpc_health.state" if base else Path()
+        details["native"] = NativeHealthReader(health_path).read(force=True).document() if base else {"state": "not_ready", "reason": "base_directory_unconfigured"}
+    except Exception as error:
+        details["native"] = {"state": "unavailable", "reason": str(error)}
+    if paths is not None:
+        details["launcher_paths"] = {name: str(getattr(paths, name)) for name in ("config_dir", "state_dir", "data_dir") if getattr(paths, name, None)}
+    return details
 
 
 def write_support_bundle(
@@ -280,6 +558,7 @@ def write_support_bundle(
     application_dir: Path | None = None,
     session_start: float | None = None,
     last_setup_failure: Mapping[str, object] | None = None,
+    support_condump: Mapping[str, object] | None = None,
 ) -> Path:
     """Write bounded diagnostics and redacted logs with freshness metadata."""
     destination = destination.expanduser().resolve()
@@ -291,13 +570,26 @@ def write_support_bundle(
     payload["log_provenance"] = sanitize_support_value(provenance)
     if last_setup_failure is not None:
         payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
-    safe_logs = "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)[-20000:]
+    if support_condump is not None:
+        payload["support_condump"] = sanitize_support_value(dict(support_condump))
+    safe_logs = _bound_support_text(
+        "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)
+    )
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
         archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
         for name, tail in tails.items():
             archive.writestr(name, tail)
+        if support_condump is not None:
+            support_path = support_condump.get("path")
+            if isinstance(support_path, (str, Path)):
+                try:
+                    content = Path(support_path).read_bytes()[:SUPPORT_DIAGNOSTIC_MAX_BYTES]
+                except OSError:
+                    content = None
+                if content is not None:
+                    archive.writestr("AP_SUPPORT_FILE.txt", redact_secrets(content.decode("utf-8", errors="replace")))
     os.replace(temporary, destination)
     return destination
 
@@ -305,9 +597,16 @@ def write_support_bundle(
 class LauncherDoctor:
     VERSION = "beta.4"
 
-    def __init__(self, *, config: Mapping[str, object] | None = None, paths: object | None = None):
+    def __init__(
+        self,
+        *,
+        config: Mapping[str, object] | None = None,
+        paths: object | None = None,
+        config_path: Path | None = None,
+    ):
         self.config = dict(config or {})
         self.paths = paths
+        self.config_path = config_path
 
     def _state_dir(self) -> Path | None:
         value = getattr(self.paths, "state_dir", None)
@@ -365,6 +664,8 @@ class LauncherDoctor:
                 owned_location = staged.parent == root / "Mods"
                 if not owned_location:
                     raise ValueError("recorded package is outside configured Mods folder")
+            if adapter_state in UNINSTALL_OWNED_STATES:
+                return tuple(actions)
             if not staged.is_file():
                 actions.append(RepairAction(
                     "reinstall_room_mod", "Reinstall missing room mod",
@@ -387,7 +688,7 @@ class LauncherDoctor:
                     "Applies room mod into game.",
                 ))
                 return tuple(actions)
-        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             actions.append(RepairAction(
                 "archive_stale_install_record", "Archive stale install record",
                 (f"Move launcher record to repair backup: {receipt_path.name}",), False,
@@ -453,19 +754,38 @@ class LauncherDoctor:
             meathook_probe.details,
         ))
 
-        checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": list(detect_doom_processes())}))
+        processes = list(detect_doom_processes())
+        checks.append(Diagnostic("processes", "ok", "process probe complete", {"items": processes}))
         checks.append(Diagnostic("config", "ok", "launcher configuration loaded", {"keys": sorted(self.config)}))
+        checks.append(Diagnostic(
+            "runtime_paths",
+            "ok",
+            "effective runtime paths and path-selection evidence collected",
+            _runtime_diagnostics(self.config, self.config_path, self.paths, processes),
+        ))
 
         state_dir = self._state_dir()
         receipt_path = (state_dir / "launcher_setup.json") if state_dir else None
+        room_uninstall_state = ""
         if receipt_path and receipt_path.is_file():
             try:
                 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
                 adapter_state = str(receipt.get("adapter_state", ""))
+                room_uninstall_state = adapter_state if adapter_state in UNINSTALL_OWNED_STATES else ""
                 mode = str(receipt.get("installation_mode", ""))
                 if adapter_state == "applied":
                     checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
                     checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                elif adapter_state in UNINSTALL_OWNED_STATES:
+                    details = {"adapter_state": adapter_state, "installation_mode": mode}
+                    if adapter_state == "uninstalled":
+                        status = "not_applicable"
+                        message = "Room mod is intentionally uninstalled"
+                    else:
+                        status = "attention"
+                        message = "Room mod uninstall requires attention; automatic reinstall is disabled"
+                    checks.append(Diagnostic("mod_injection", status, message, details))
+                    checks.append(Diagnostic("windows_mod_installer", status, message, details))
                 elif adapter_state == "manual_install_required":
                     checks.append(Diagnostic("mod_injection", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"adapter_state": adapter_state, "installation_mode": mode}))
                     checks.append(Diagnostic("windows_mod_installer", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"installation_mode": mode, "adapter_state": adapter_state}))
@@ -476,15 +796,30 @@ class LauncherDoctor:
                 checks.append(Diagnostic("mod_injection", "invalid", "Could not parse launcher setup record"))
                 checks.append(Diagnostic("windows_mod_installer", "invalid", "Could not parse launcher setup record"))
         else:
-            checks.append(Diagnostic("mod_injection", "ok", "No active room installation record"))
-            checks.append(Diagnostic("windows_mod_installer", "ok", "No active room installation record"))
+            checks.append(Diagnostic("mod_injection", "not_applicable", "No room package receipt is available"))
+            checks.append(Diagnostic("windows_mod_installer", "not_applicable", "No room package receipt is available"))
 
         actions = self.repair_actions()
-        if actions:
+        room_actions = tuple(
+            action for action in actions
+            if action.action_id in {"archive_stale_install_record", "reinstall_room_mod"}
+        )
+        if room_actions:
             checks.append(Diagnostic(
                 "room_mod", "invalid", "room mod needs repair",
-                {"actions": [asdict(action) for action in actions]},
+                {"actions": [asdict(action) for action in room_actions]},
+            ))
+        elif room_uninstall_state:
+            checks.append(Diagnostic(
+                "room_mod",
+                "not_applicable" if room_uninstall_state == "uninstalled" else "attention",
+                (
+                    "Room package is intentionally uninstalled"
+                    if room_uninstall_state == "uninstalled"
+                    else "Room package uninstall requires attention; automatic reinstall is disabled"
+                ),
+                {"adapter_state": room_uninstall_state},
             ))
         else:
-            checks.append(Diagnostic("room_mod", "ok", "launcher-owned room mod verified"))
+            checks.append(Diagnostic("room_mod", "not_applicable", "Room package verification is unavailable without a receipt"))
         return DoctorReport(self.VERSION, tuple(checks))

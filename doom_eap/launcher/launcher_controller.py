@@ -99,6 +99,8 @@ class LauncherController:
         self._consent_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
         self._confirmation_lock = threading.Lock()
         self._confirmation_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
+        self._uninstall_confirmation_lock = threading.Lock()
+        self._uninstall_confirmation_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
         self.workflow = IntegratedLaunchWorkflow(
             self.client_dir,
             self.state_dir,
@@ -106,6 +108,7 @@ class LauncherController:
             event_sink=self._setup_event,
             consent=self._request_consent,
             confirmation=self._request_installation_confirmation,
+            uninstall_confirmation=self._request_uninstall_confirmation,
         )
         self.setup = RoomSetupCoordinator(
             self.workflow,
@@ -347,16 +350,28 @@ class LauncherController:
         return self.read_native_health(force=force)
 
     def run_doctor(self) -> DoctorReport:
-        report = LauncherDoctor(config=self.config, paths=self.user_paths).run()
+        report = LauncherDoctor(
+            config=self.config,
+            paths=self.user_paths,
+            config_path=self.config_path,
+        ).run()
         self.emit("doctor_report", report=report.document())
         return report
 
     def repair_preview(self):
-        return LauncherDoctor(config=self.config, paths=self.user_paths).repair_preview()
+        return LauncherDoctor(
+            config=self.config,
+            paths=self.user_paths,
+            config_path=self.config_path,
+        ).repair_preview()
 
     def apply_repair(self, action_key: str) -> str:
         """Apply selected Doctor action. Room changes require connected-room setup."""
-        doctor = LauncherDoctor(config=self.config, paths=self.user_paths)
+        doctor = LauncherDoctor(
+            config=self.config,
+            paths=self.user_paths,
+            config_path=self.config_path,
+        )
         actions = {action.key: action for action in doctor.repair_preview()}
         action = actions.get(action_key)
         if action is None:
@@ -370,9 +385,32 @@ class LauncherController:
                 raise RuntimeError("connect to room before reinstalling its mod")
             self.emit("repair_started", action=action_key)
             return "Room mod reinstall started; installed hash will be checked after setup."
+        if action_key in {"install_game_link", "repair_game_link"}:
+            result = self.install_game_link(force_repair=action_key == "repair_game_link")
+            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            root = validate_game_root(Path(str(game_root))) if game_root else None
+            post_probe = probe_meathook(root)
+            if not post_probe.ok:
+                self.emit(
+                    "repair_failed",
+                    action=action_key,
+                    state=result.state,
+                    message=f"post-repair probe failed: {post_probe.message}",
+                )
+                raise RuntimeError(f"Game Link repair was not verified: {post_probe.message}")
+            self.emit(
+                "repair_complete",
+                action=action_key,
+                state="repaired",
+                path=result.path,
+                sha256=result.sha256,
+                probe=post_probe.message,
+            )
+            return f"Game Link runtime repaired and verified: {post_probe.message}"
         raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
+        support_condump = self._request_support_condump()
         diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
         bundle = write_support_bundle(
             destination,
@@ -383,9 +421,88 @@ class LauncherController:
             application_dir=self.client_dir,
             session_start=self.session_start_time,
             last_setup_failure=self.last_setup_failure,
+            support_condump=support_condump,
         )
         self.emit("support_bundle_ready", path=str(bundle))
         return bundle
+
+    def _request_support_condump(self) -> dict[str, object]:
+        """Attempt one diagnostic condump, recording closed-game availability."""
+        requested_at = time.time()
+        if not self.is_game_running():
+            return {
+                "status": "unavailable",
+                "reason": "game_closed",
+                "message": "diagnostic condump unavailable: game not running",
+                "requested_at": requested_at,
+            }
+        supervisor = self.supervisor
+        if supervisor is None or not supervisor.running:
+            return {
+                "status": "unavailable",
+                "reason": "bridge_worker_unavailable",
+                "requested_at": requested_at,
+            }
+        save_value = self.config.get("save_games_dir")
+        if not save_value:
+            return {
+                "status": "unavailable",
+                "reason": "saved_games_path_unconfigured",
+                "requested_at": requested_at,
+            }
+        try:
+            save_dir = Path(str(save_value)).expanduser()
+        except (OSError, TypeError, ValueError, RuntimeError) as error:
+            return {
+                "status": "unavailable",
+                "reason": "saved_games_path_invalid",
+                "message": f"Saved Games path unavailable: {type(error).__name__}: {error}",
+                "requested_at": requested_at,
+            }
+        previous_mtime: dict[Path, float] = {}
+        try:
+            for candidate in [save_dir / "AP_SUPPORT_FILE.txt", *sorted(save_dir.glob("AP_SUPPORT_FILE*.txt"))]:
+                try:
+                    previous_mtime[candidate] = candidate.stat().st_mtime
+                except (OSError, ValueError, RuntimeError):
+                    pass
+        except (OSError, ValueError, RuntimeError):
+            pass
+        try:
+            supervisor.request_support_condump()
+        except Exception as error:
+            return {
+                "status": "unavailable",
+                "reason": "request_failed",
+                "message": str(error),
+                "requested_at": requested_at,
+            }
+
+        deadline = time.monotonic() + 4.0
+        while time.monotonic() < deadline:
+            candidates = [save_dir / "AP_SUPPORT_FILE.txt"]
+            try:
+                candidates.extend(sorted(save_dir.glob("AP_SUPPORT_FILE*.txt")))
+            except (OSError, ValueError, RuntimeError):
+                pass
+            for candidate in candidates:
+                try:
+                    stat = candidate.stat()
+                except (OSError, ValueError, RuntimeError):
+                    continue
+                if stat.st_mtime >= requested_at - 1.0 and stat.st_mtime > previous_mtime.get(candidate, 0.0):
+                    return {
+                        "status": "available",
+                        "path": str(candidate),
+                        "requested_at": requested_at,
+                        "mtime": stat.st_mtime,
+                    }
+            time.sleep(0.1)
+        return {
+            "status": "pending",
+            "reason": "game_diagnostic_condump_not_observed_within_timeout",
+            "requested_at": requested_at,
+        }
 
     def emit(self, kind: str, **payload: object) -> None:
         event = {"type": kind, **payload}
@@ -550,6 +667,32 @@ class LauncherController:
         answer.append(bool(confirmed))
         wait.set()
 
+    def _request_uninstall_confirmation(self) -> bool:
+        request_id = uuid.uuid4().hex
+        wait = threading.Event()
+        answer: list[bool] = []
+        with self._uninstall_confirmation_lock:
+            self._uninstall_confirmation_requests[request_id] = (wait, answer)
+        self.emit(
+            "uninstall_confirmation_required",
+            request_id=request_id,
+            operation="uninstall",
+            message="Did EternalModInjector finish uninstalling this room package successfully?",
+        )
+        wait.wait(timeout=300.0)
+        with self._uninstall_confirmation_lock:
+            self._uninstall_confirmation_requests.pop(request_id, None)
+        return bool(answer and answer[0])
+
+    def resolve_uninstall_confirmation(self, request_id: str, confirmed: bool) -> None:
+        with self._uninstall_confirmation_lock:
+            pending = self._uninstall_confirmation_requests.get(request_id)
+        if pending is None:
+            return
+        wait, answer = pending
+        answer.append(bool(confirmed))
+        wait.set()
+
     def confirm_manual_installation(self) -> bool:
         """Confirm manual mod installation from the manual fallback state."""
         with self._lifecycle_lock:
@@ -566,6 +709,7 @@ class LauncherController:
             adapter_state=record.adapter_state,
             message=record.adapter_message,
             steam_launch_option=record.steam_launch_option,
+            new_install=record.new_install,
         )
         self._ensure_native_client()
         return True
@@ -702,6 +846,21 @@ class LauncherController:
             raise RuntimeError("not connected")
         supervisor.send_chat(text)
 
+    def request_inventory_resync(self) -> None:
+        with self._lifecycle_lock:
+            connected = self.connected_room
+            supervisor = self.supervisor
+        if not connected:
+            raise RuntimeError("not connected")
+        if supervisor is None or not supervisor.running:
+            raise RuntimeError("bridge worker is not running")
+        try:
+            supervisor.request_inventory_resync()
+        except Exception as error:
+            message = str(error).replace("\r", " ").replace("\n", " ")[:512]
+            self.emit("inventory_resync", status="error", message=message)
+            raise
+
     def disconnect(self) -> None:
         self._stop_native_client()
         supervisor: BridgeSupervisor | None
@@ -744,6 +903,23 @@ class LauncherController:
 
     def reinstall_setup(self) -> bool:
         return self.setup.start(force=True)
+
+    def uninstall_setup(self) -> dict[str, object]:
+        """Queue current room package uninstall on serialized setup worker."""
+        with self._lifecycle_lock:
+            last_event = dict(self.setup._last_event) if self.setup._last_event else None
+            connected = self.connected_room
+        if not connected or not last_event:
+            raise RuntimeError("connect to room before uninstalling its mod")
+        if not self.setup.submit_uninstall(last_event):
+            payload = {
+                "state": "attention",
+                "message": "Another room setup or uninstall operation is already active.",
+                "attention": True,
+            }
+            self.emit("uninstall_attention", **payload)
+            return payload
+        return {"state": "queued", "attention": False}
 
     def open_adapter(self) -> None:
         record = self.last_setup

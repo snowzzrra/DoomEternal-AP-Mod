@@ -172,6 +172,72 @@ def remove_property_blocks(content, property_name):
     return ''.join(result)
 
 
+def remove_visual_child_entities(content, removals):
+    """Remove configured visual children only when their vanilla shape is exact."""
+    if not isinstance(removals, list):
+        raise ValueError("visual_child_removals must be a list")
+
+    validated = []
+    seen_entities = set()
+    for removal in removals:
+        required = {"entity", "model", "bind_parent", "preserve_entity"}
+        if not isinstance(removal, dict) or set(removal) != required:
+            raise ValueError(
+                "visual child removal requires exactly entity, model, bind_parent, "
+                "preserve_entity"
+            )
+        entity_name = removal["entity"]
+        model = removal["model"]
+        bind_parent = removal["bind_parent"]
+        preserve_entity = removal["preserve_entity"]
+        if not all(
+            isinstance(value, str) and value
+            for value in (entity_name, model, bind_parent, preserve_entity)
+        ):
+            raise ValueError("visual child removal fields must be non-empty strings")
+        if entity_name in seen_entities:
+            raise ValueError(f"Duplicate visual child removal entity: {entity_name}")
+        seen_entities.add(entity_name)
+        if content.count(f"entityDef {entity_name} {{") != 1:
+            raise ValueError(f"Visual child removal entity is not unique: {entity_name}")
+        bounds = find_entity_block_bounds(content, entity_name)
+        if bounds is None:
+            raise ValueError(f"Visual child removal entity not found: {entity_name}")
+        block = content[bounds[0]:bounds[1]]
+        models = re.findall(r'\bmodel\s*=\s*"([^"]+)";', block)
+        bind_parents = re.findall(r'\bbindParent\s*=\s*"([^"]+)";', block)
+        if models != [model] or bind_parents != [bind_parent]:
+            raise ValueError(
+                f"Visual child removal signature drifted: {entity_name}; "
+                f"models={models}, bind_parents={bind_parents}"
+            )
+        if (
+            'inherit = "func/animated";' not in block
+            or 'class = "idAnimated";' not in block
+            or extract_target_names(block)
+        ):
+            raise ValueError(f"Visual child removal is not a targetless animated child: {entity_name}")
+        if content.count(f"entityDef {preserve_entity} {{") != 1:
+            raise ValueError(
+                f"Visual child removal preserve entity is not unique: {preserve_entity}"
+            )
+        validated.append((entity_name, preserve_entity, bounds))
+
+    for _entity_name, _preserve_entity, bounds in sorted(
+        validated, key=lambda item: item[2][0], reverse=True
+    ):
+        content = content[:bounds[0]] + content[bounds[1]:]
+
+    for entity_name, preserve_entity, _bounds in validated:
+        if content.count(f"entityDef {entity_name} {{") != 0:
+            raise ValueError(f"Visual child removal was not applied: {entity_name}")
+        if content.count(f"entityDef {preserve_entity} {{") != 1:
+            raise ValueError(
+                f"Visual child removal changed preserve entity count: {preserve_entity}"
+            )
+    return content
+
+
 SECRET_PRESENTATION_FIELDS = (
     "notificationType", "notificationHudEventID", "notificationEndHudEventID",
     "notificationSound", "notificationTime", "rootWidget", "icon", "header",
@@ -2268,6 +2334,7 @@ def generate_map(
     neutralize_pickups = level_config.get("neutralize_pickups", [])
     target_removals = level_config.get("target_removals", {})
     remove_entities = level_config.get("remove_entities", [])
+    visual_child_removals = level_config.get("visual_child_removals", [])
     neutralize_entity_references = level_config.get("neutralize_entity_references", [])
     secret_encounters = level_config.get("secret_encounters", [])
     declared_checks = (
@@ -2327,6 +2394,8 @@ def generate_map(
         if bounds is None:
             raise ValueError(f"Configured removal entity not found: {entity_name}")
         content = content[:bounds[0]] + content[bounds[1]:]
+
+    content = remove_visual_child_entities(content, visual_child_removals)
 
     for _entity_name, policy in target_policies.items():
         cleanup = policy.get("checkpoint_cleanup")

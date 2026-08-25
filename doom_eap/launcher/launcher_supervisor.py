@@ -207,6 +207,26 @@ class BridgeSupervisor:
             process.stdin.write(f"AP_CONTROL {control}\n")
             process.stdin.flush()
 
+    def request_support_condump(self) -> None:
+        """Request one bounded AP_SUPPORT_FILE.txt diagnostic condump."""
+        process = self._process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise RuntimeError("bridge worker is not running")
+        control = json.dumps({"type": "support_condump"}, separators=(",", ":"))
+        with self._write_lock:
+            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.flush()
+
+    def request_inventory_resync(self) -> None:
+        """Request one manual inventory reconciliation through bridge control."""
+        process = self._process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise RuntimeError("bridge worker is not running")
+        control = json.dumps({"type": "inventory_resync"}, separators=(",", ":"))
+        with self._write_lock:
+            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.flush()
+
     def _watch_process(self) -> None:
         process = self._process
         if process is None:

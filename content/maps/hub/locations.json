@@ -47,7 +47,7 @@
     "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171,
     "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_1": 7770253,
     "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_2": 7770254,
-    "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_2_BATTERY_STATION_1": 7770255
+    "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_3": 7770255
   },
   "location_feedback": {
     "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": {
@@ -79,6 +79,26 @@
   },
   "remove_entities": [
     "target_give_item_ballista"
+  ],
+  "visual_child_removals": [
+    {
+      "entity": "func_animated_1",
+      "model": "md6def/objects/doomslayer_armor/doomslayer_armor_set11.md6",
+      "bind_parent": "doom_sentinel_armor_anchor",
+      "preserve_entity": "doom_sentinel_armor_anchor"
+    },
+    {
+      "entity": "func_animated_2",
+      "model": "md6def/customization/characters/humans/male/set19/base/doom_marine_3p_set19.md6",
+      "bind_parent": "doom_4_armor_anchor",
+      "preserve_entity": "doom_4_armor_anchor"
+    },
+    {
+      "entity": "func_animated_3",
+      "model": "md6def/objects/doomslayer_armor/doomslayer_armor_set3.md6",
+      "bind_parent": "doom_1_armor_anchor",
+      "preserve_entity": "doom_1_armor_anchor"
+    }
   ],
   "target_policies": {
     "pickup_equipment_flame_belch_1": {
@@ -269,6 +289,7 @@
       ],
       "native_entity_contract": {
         "original_targets": [],
+        "remove_block": "stateStats",
         "required_snippets": [
           "inherit = \"interact/hub/2_battery_station\";",
           "class = \"idInteractable_Obstacle\";",
@@ -288,6 +309,7 @@
       ],
       "native_entity_contract": {
         "original_targets": [],
+        "remove_block": "stateStats",
         "required_snippets": [
           "inherit = \"interact/hub/2_battery_station\";",
           "class = \"idInteractable_Obstacle\";",
@@ -298,7 +320,7 @@
         ]
       }
     },
-    "sentinel_battery_room_interact_hub_2_battery_station_1": {
+    "interact_hub_2_battery_station_3": {
       "independent_ap_trigger": true,
       "independent_position": [
         0.55,
@@ -307,10 +329,12 @@
       ],
       "native_entity_contract": {
         "original_targets": [],
+        "remove_block": "stateStats",
         "required_snippets": [
           "inherit = \"interact/hub/2_battery_station\";",
           "class = \"idInteractable_Obstacle\";",
           "initalState = \"interactables/progress/battery_station/2_battery_required\";",
+          "stat = \"STAT_SLAYER_HUB_MILESTONE_1\";",
           "whenToSave = \"SGT_NORMAL\";",
           "saveType = \"SGS_GAME_DATA\";"
         ]

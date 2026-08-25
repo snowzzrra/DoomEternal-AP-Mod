@@ -286,7 +286,7 @@ Repair/Fix, and a sanitized support report.
 - `0.3.9`: complete base-campaign regression, cleanup, documentation, and
   release stabilization.
 
-### 0.4.0 Beta — Installation, logic, and option architecture — CURRENT
+### 0.4.0 Beta — Installation, logic, and option architecture — DONE
 
 - Room-specific Windows and Linux/Proton launcher workflow.
 - Starting Weapon Choice, Random, and configurable starting inventory.
@@ -295,13 +295,13 @@ Repair/Fix, and a sanitized support report.
 - Start With Automap, mission replay Fast Travel and single-burst DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
-### 0.5.x Beta — The Ancient Gods
+### 0.5.x Beta — The Ancient Gods — CURRENT
 
 - Add The Ancient Gods Part One and Part Two campaigns, including missions,
   regions, locations, items, progression rules, and completion flow.
 - Extend generation, runtime, and validation for DLC-specific mechanics.
 
-### 0.6.x Beta — New AP-Focused DLL + Random Mission Order
+### 0.6.x Beta — Random Mission Order + Sentinel Core
 
 - Create an alternative to meathook to better fit Archipelago needs.
 - Remove all meathook-dependent architecture and work on a new, proprietary, DLL.

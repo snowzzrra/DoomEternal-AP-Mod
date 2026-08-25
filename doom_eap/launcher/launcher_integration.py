@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import threading
+import time
 import zipfile
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -21,7 +23,9 @@ from .launcher_platform import (
     LinuxModManagerAdapter,
     SteamLaunchOptionsManager,
     WindowsModInjectorAdapter,
+    detect_doom_processes,
     install_meathook,
+    probe_meathook,
     probe_runtime_prerequisites,
     stage_room_mod,
 )
@@ -29,6 +33,13 @@ from .launcher_platform import (
 EventSink = Callable[[str, dict[str, object]], None]
 ConsentCallback = Callable[[object], bool]
 ConfirmationCallback = Callable[[], bool]
+
+UNINSTALL_OWNED_STATES = frozenset({
+    "uninstall_in_progress",
+    "uninstall_attention",
+    "uninstall_failed",
+    "uninstalled",
+})
 
 
 @dataclass(frozen=True)
@@ -45,6 +56,7 @@ class IntegratedSetupRecord:
     steam_launch_option_diff: str = ""
     installation_mode: str = "automatic"
     user_confirmed: bool = False
+    new_install: bool = False
 
 
 @dataclass(frozen=True)
@@ -56,6 +68,18 @@ class InstallState:
     reason: str = ""
     readiness: str = "ready"
     readiness_reason: str = ""
+
+
+@dataclass(frozen=True)
+class UninstallResult:
+    state: str
+    manifest_hash: str
+    staged_mod: str
+    quarantine_path: str = ""
+    adapter_state: str = ""
+    injector_state: str = ""
+    message: str = ""
+    attention: bool = False
 
 
 class IntegratedLaunchWorkflow:
@@ -71,6 +95,7 @@ class IntegratedLaunchWorkflow:
         event_sink: EventSink | None = None,
         consent: ConsentCallback | None = None,
         confirmation: ConfirmationCallback | None = None,
+        uninstall_confirmation: ConfirmationCallback | None = None,
     ):
         self.base_workflow = LaunchWorkflow()
         self.application_dir = application_dir
@@ -80,6 +105,7 @@ class IntegratedLaunchWorkflow:
         self.event_sink = event_sink or (lambda _kind, _payload: None)
         self.consent = consent or (lambda _spec: False)
         self.confirmation = confirmation or (lambda: False)
+        self.uninstall_confirmation = uninstall_confirmation or (lambda: False)
 
     def _emit(self, kind: str, **payload: object) -> None:
         self.event_sink(kind, payload)
@@ -171,6 +197,31 @@ class IntegratedLaunchWorkflow:
             steam_option = str(receipt.get("steam_launch_option", ""))
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             return InstallState("install_needed", manifest.manifest_hash, reason=f"invalid install record: {error}")
+        if adapter_state in UNINSTALL_OWNED_STATES:
+            if recorded_manifest != manifest.manifest_hash:
+                return InstallState(
+                    "install_needed",
+                    manifest.manifest_hash,
+                    reason=f"previous room mod has uninstall state {adapter_state}",
+                )
+            if adapter_state != "uninstalled":
+                reason = str(receipt.get("adapter_message") or "Room mod uninstall requires attention.")
+                return InstallState(
+                    adapter_state,
+                    manifest.manifest_hash,
+                    str(staged),
+                    steam_option,
+                    reason=reason,
+                    readiness="blocked",
+                    readiness_reason=reason,
+                )
+            return InstallState(
+                "uninstalled",
+                manifest.manifest_hash,
+                str(staged),
+                steam_option,
+                reason="room mod was intentionally uninstalled",
+            )
         if recorded_manifest != manifest.manifest_hash:
             return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed manifest belongs to another room")
         if not staged.is_file():
@@ -203,8 +254,16 @@ class IntegratedLaunchWorkflow:
                     readiness="blocked",
                     readiness_reason=reason,
                 )
-        except Exception:
-            pass
+        except Exception as error:
+            reason = str(error) or type(error).__name__
+            return InstallState(
+                "already_installed",
+                manifest.manifest_hash,
+                str(staged),
+                steam_option,
+                readiness="blocked",
+                readiness_reason=reason,
+            )
 
         return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option, readiness="ready")
 
@@ -274,6 +333,55 @@ class IntegratedLaunchWorkflow:
             return result, plan.proposed, plan.diff
         raise RuntimeError(f"unsupported platform: {self.platform_name}")
 
+    def _run_injector(
+        self,
+        config: dict[str, object],
+        game_root: Path,
+        *,
+        operation: str = "install",
+        staged_mod: str = "",
+    ) -> tuple[AdapterResult, str, str]:
+        """Run platform injector without coupling operation to package staging."""
+        manager = DependencyManager(self.state_dir / "dependencies")
+        if self.platform_name == "windows":
+            local_value = (
+                config.get("eternal_mod_injector_archive")
+                or config.get("eternal_mod_injector_zip")
+                or config.get("eternal_mod_manager_archive")
+                or config.get("eternal_mod_manager_zip")
+            )
+            local_artifact = Path(str(local_value)).expanduser() if local_value else None
+            dependency = self._acquire(manager, WINDOWS_MOD_INJECTOR, local_artifact)
+            result = WindowsModInjectorAdapter(
+                dependency,
+                state_dir=self.state_dir,
+                confirmer=lambda: True,
+                event_sink=self._emit,
+            ).run(
+                game_root,
+                staged_mod=staged_mod,
+                operation=operation,
+                uninstall_confirmation=(self.uninstall_confirmation if operation == "uninstall" else None),
+            )
+            return result, "", ""
+        if self.platform_name == "linux":
+            plan = self._steam_plan(config)
+            local_value = config.get("eternal_basher_archive")
+            local_artifact = Path(str(local_value)).expanduser() if local_value else None
+            dependency = self._acquire(manager, LINUX_MOD_INJECTOR, local_artifact)
+            self._emit("injector_started", command=[str(dependency.executable)], operation="uninstall")
+            result = LinuxModManagerAdapter(dependency).run(game_root)
+            self._emit(
+                "injector_finished",
+                state=result.state,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                operation="uninstall",
+            )
+            return result, plan.proposed, plan.diff
+        raise RuntimeError(f"unsupported platform: {self.platform_name}")
+
     def ensure_game_link(
         self,
         game_root: Path,
@@ -291,6 +399,16 @@ class IntegratedLaunchWorkflow:
             force_repair=force_repair,
         )
         if result.state in {"installed", "repaired"}:
+            post_probe = probe_meathook(game_root)
+            if not post_probe.ok:
+                return GameLinkResult(
+                    state="failed",
+                    message=f"Game Link runtime installation could not be verified after installation: {post_probe.message}",
+                    path=result.path,
+                    sha256=result.sha256,
+                    ownership=result.ownership,
+                    backup_path=result.backup_path,
+                )
             self._emit(
                 "game_link_installed",
                 state=result.state,
@@ -301,9 +419,52 @@ class IntegratedLaunchWorkflow:
             )
         return result
 
+    def _cached_linux_install(
+        self,
+        snapshot: RoomSnapshot,
+        state: InstallState,
+    ) -> IntegratedSetupRecord | None:
+        """Return receipt-backed room setup when Linux runtime is already ready."""
+        if self.platform_name != "linux":
+            return None
+        if state.state != "already_installed" or state.readiness != "ready":
+            return None
+
+        receipt_path = self.state_dir / "launcher_setup.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        manifest = self.base_workflow.manifest_for(snapshot)
+        raw_command = receipt.get("adapter_command", ())
+        adapter_command = tuple(str(item) for item in raw_command) if isinstance(raw_command, (list, tuple)) else ()
+        return IntegratedSetupRecord(
+            manifest_hash=manifest.manifest_hash,
+            randomize_dash=bool(receipt.get("randomize_dash", manifest.options["randomize_dash"])),
+            generated_mod=str(receipt.get("generated_mod", state.staged_mod)),
+            staged_mod=state.staged_mod,
+            staged_sha256=str(receipt["staged_sha256"]),
+            adapter_state="applied",
+            adapter_message=str(receipt.get("adapter_message", "Mod is already installed for current room.")),
+            adapter_command=adapter_command,
+            steam_launch_option=state.steam_launch_option,
+            steam_launch_option_diff=str(receipt.get("steam_launch_option_diff", "")),
+            installation_mode=str(receipt.get("installation_mode", "automatic")),
+            user_confirmed=bool(receipt.get("user_confirmed", False)),
+            new_install=False,
+        )
+
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
         config = self._config()
         game_root = self._game_root(config)
+        pre_install_state = self.install_state(snapshot)
+        cached = self._cached_linux_install(snapshot, pre_install_state)
+        if cached is not None:
+            runtime_config = self.base_workflow.write_client_config(
+                self.application_dir,
+                endpoint=endpoint or str(config.get("server_address") or ""),
+                manifest_hash=cached.manifest_hash,
+                runtime_config=config,
+            )
+            self._emit("runtime_config_ready", path=str(runtime_config))
+            return cached
 
         # 1. Ensure Game Link / Meathook dependency before any room mod operations
         local_key = "meathook_dll"
@@ -326,6 +487,8 @@ class IntegratedLaunchWorkflow:
                     "Installed Game Link runtime does not match supported Meathook v7.2. "
                     "Repair Game Link before preparing the room mod."
                 )
+            if game_link.state == "failed":
+                raise RuntimeError(game_link.message)
         except PermissionError:
             self._emit(
                 "prerequisite_missing",
@@ -419,6 +582,10 @@ class IntegratedLaunchWorkflow:
             steam_launch_option_diff=steam_diff,
             installation_mode=installation_mode,
             user_confirmed=user_confirmed,
+            new_install=(
+                pre_install_state.state == "install_needed"
+                and adapter.state in {"applied", "manual_install_required"}
+            ),
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != record.staged_sha256:
@@ -452,42 +619,246 @@ class IntegratedLaunchWorkflow:
             )
         return record
 
-    def confirm_manual_installation(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
-        """Record manual mod installation completion after player verifies external injector run."""
+    def uninstall(self, snapshot: RoomSnapshot) -> UninstallResult:
+        """Remove only receipt-proven room package, then run platform injector once."""
+        manifest = self.base_workflow.manifest_for(snapshot)
         config = self._config()
         game_root = self._game_root(config)
+        running = detect_doom_processes()
+        if running:
+            names = ", ".join(str(item.get("name", "unknown")) for item in running)
+            raise RuntimeError(f"Cannot uninstall room mod while game runtime is running: {names}")
+
+        receipt_path = self.state_dir / "launcher_setup.json"
+        try:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict):
+                raise ValueError("receipt must contain an object")
+            if str(receipt.get("adapter_state", "")) != "applied":
+                raise ValueError("receipt does not prove an applied room mod")
+            if str(receipt.get("manifest_hash", "")) != manifest.manifest_hash:
+                raise ValueError("receipt belongs to another room")
+            staged_input = Path(str(receipt["staged_mod"])).expanduser()
+            if staged_input.is_symlink():
+                raise ValueError("receipt package is a symbolic link")
+            staged = staged_input.resolve()
+            mods_dir = (game_root / "Mods").resolve()
+            if staged.parent != mods_dir or staged.suffix.casefold() != ".zip":
+                raise ValueError("receipt package is outside configured game Mods folder")
+            if staged.is_symlink() or not staged.is_file():
+                raise ValueError("receipt package is missing")
+            expected_sha256 = str(receipt["staged_sha256"])
+            actual_sha256 = hashlib.sha256(staged.read_bytes()).hexdigest()
+            if actual_sha256 != expected_sha256:
+                raise ValueError("receipt package hash does not match")
+            with zipfile.ZipFile(staged) as package:
+                package_manifest = json.loads(package.read("seed_manifest.json"))
+            if not isinstance(package_manifest, dict) or package_manifest.get("manifest_hash") != manifest.manifest_hash:
+                raise ValueError("receipt package manifest does not match current room")
+        except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
+            raise RuntimeError(f"Cannot uninstall room mod safely: {error}") from error
+
+        quarantine_dir = self.state_dir / "uninstall-quarantine"
+        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        quarantine = quarantine_dir / f"{staged.name}.{time.time_ns()}.zip"
+
+        receipt.update(
+            {
+                "adapter_state": "uninstall_attention",
+                "adapter_message": "Room mod uninstall is in progress or requires attention.",
+                "installation_mode": "uninstall",
+                "uninstall_quarantine": str(quarantine),
+            }
+        )
+        temporary = receipt_path.with_suffix(".tmp")
+        try:
+            temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, receipt_path)
+        except Exception as error:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+            raise RuntimeError(f"Could not record uninstall attention state: {error}") from error
+
+        def failed_result(message: str, injector_state: str = "", command: tuple[str, ...] = ()) -> UninstallResult:
+            receipt.update(
+                {
+                    "adapter_state": "uninstall_failed",
+                    "adapter_message": message,
+                    "adapter_command": list(command),
+                    "installation_mode": "uninstall",
+                    "uninstall_quarantine": str(quarantine),
+                }
+            )
+            try:
+                temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                os.replace(temporary, receipt_path)
+            except Exception as error:
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
+                message = f"{message} Receipt update failed: {error}"
+            return UninstallResult(
+                state="attention",
+                manifest_hash=manifest.manifest_hash,
+                staged_mod=str(staged),
+                quarantine_path=str(quarantine),
+                adapter_state="uninstall_failed",
+                injector_state=injector_state,
+                message=message,
+                attention=True,
+            )
+
+        self._emit(
+            "uninstall_progress",
+            phase="attention_recorded",
+            manifest_hash=manifest.manifest_hash,
+            staged_mod=str(staged),
+        )
+
+        try:
+            shutil.copy2(staged, quarantine)
+            if hashlib.sha256(quarantine.read_bytes()).hexdigest() != expected_sha256:
+                raise RuntimeError("quarantine package hash does not match receipt")
+            staged.unlink()
+            if staged.exists():
+                raise RuntimeError("verified room package remains after removal")
+        except Exception as error:
+            raise RuntimeError(f"Room package removal was not completed safely: {error}") from error
+        self._emit(
+            "uninstall_progress",
+            phase="package_quarantined",
+            manifest_hash=manifest.manifest_hash,
+            staged_mod=str(staged),
+            quarantine_path=str(quarantine),
+        )
+
+        try:
+            self._emit(
+                "uninstall_progress",
+                phase="injector_started",
+                manifest_hash=manifest.manifest_hash,
+                staged_mod=str(staged),
+            )
+            injector, steam_option, steam_diff = self._run_injector(
+                config,
+                game_root,
+                operation="uninstall",
+                staged_mod=staged.name,
+            )
+        except Exception as error:
+            return failed_result(f"Room package removed, but injector cleanup did not complete: {error}")
+        self._emit(
+            "uninstall_progress",
+            phase="injector_finished",
+            manifest_hash=manifest.manifest_hash,
+            injector_state=injector.state,
+            returncode=injector.returncode,
+        )
+        if injector.state != "applied":
+            return failed_result(
+                f"Room package removed, but injector cleanup failed: {injector.message}",
+                injector.state,
+                injector.command,
+            )
+        try:
+            remaining = []
+            for candidate in sorted((game_root / "Mods").resolve().rglob("*.zip")):
+                if not candidate.is_file():
+                    continue
+                try:
+                    with zipfile.ZipFile(candidate) as package:
+                        candidate_manifest = json.loads(package.read("seed_manifest.json"))
+                except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile):
+                    continue
+                if isinstance(candidate_manifest, dict) and candidate_manifest.get("manifest_hash") == manifest.manifest_hash:
+                    remaining.append(candidate)
+        except OSError as error:
+            return failed_result(
+                f"Injector completed, but room package removal could not be verified: {error}",
+                injector.state,
+                injector.command,
+            )
+        if remaining:
+            locations = ", ".join(str(path) for path in remaining)
+            return failed_result(
+                f"Injector completed, but managed room package remains at: {locations}",
+                injector.state,
+                injector.command,
+            )
+
+        receipt.update(
+            {
+                "adapter_state": "uninstalled",
+                "adapter_message": "Room mod intentionally uninstalled.",
+                "adapter_command": list(injector.command),
+                "installation_mode": "uninstalled",
+                "steam_launch_option": steam_option or str(receipt.get("steam_launch_option", "")),
+                "steam_launch_option_diff": steam_diff or str(receipt.get("steam_launch_option_diff", "")),
+                "uninstall_quarantine": str(quarantine),
+            }
+        )
+        try:
+            temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, receipt_path)
+        except Exception as error:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+            return UninstallResult(
+                state="attention",
+                manifest_hash=manifest.manifest_hash,
+                staged_mod=str(staged),
+                quarantine_path=str(quarantine),
+                adapter_state="uninstall_attention",
+                injector_state=injector.state,
+                message=f"Room package removed and injector completed, but receipt update failed: {error}",
+                attention=True,
+            )
+        return UninstallResult(
+            state="uninstalled",
+            manifest_hash=manifest.manifest_hash,
+            staged_mod=str(staged),
+            quarantine_path=str(quarantine),
+            adapter_state="uninstalled",
+            injector_state=injector.state,
+            message="Room mod intentionally uninstalled.",
+        )
+
+    def confirm_manual_installation(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        """Record manual mod installation completion after player verifies external injector run."""
         manifest = self.base_workflow.manifest_for(snapshot)
         receipt_path = self.state_dir / "launcher_setup.json"
-        staged_mod_path: Path | None = None
-        if receipt_path.is_file():
-            try:
-                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-                candidate = Path(str(receipt.get("staged_mod", "")))
-                if candidate.is_file():
-                    with zipfile.ZipFile(candidate) as pkg:
-                        cand_manifest = json.loads(pkg.read("seed_manifest.json"))
-                        if cand_manifest.get("manifest_hash") == manifest.manifest_hash:
-                            staged_mod_path = candidate
-            except Exception:
-                pass
+        try:
+            receipt_document = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt_document, dict):
+                raise ValueError("receipt must contain an object")
+            if str(receipt_document["manifest_hash"]) != manifest.manifest_hash:
+                raise ValueError("receipt belongs to another room")
+            if str(receipt_document.get("adapter_state", "")) != "manual_install_required":
+                raise ValueError("receipt is not pending manual installation")
+            new_install = receipt_document["new_install"]
+            if not isinstance(new_install, bool):
+                raise ValueError("receipt new_install must be boolean")
+            staged_mod_path = Path(str(receipt_document["staged_mod"])).resolve()
+            expected_sha256 = str(receipt_document["staged_sha256"])
+            if not staged_mod_path.is_file():
+                raise ValueError("recorded room package is missing")
+            staged_sha256 = hashlib.sha256(staged_mod_path.read_bytes()).hexdigest()
+            if staged_sha256 != expected_sha256:
+                raise ValueError("recorded room package hash does not match receipt")
+            with zipfile.ZipFile(staged_mod_path) as package:
+                package_manifest = json.loads(package.read("seed_manifest.json"))
+            if not isinstance(package_manifest, dict) or package_manifest.get("manifest_hash") != manifest.manifest_hash:
+                raise ValueError("room package manifest does not match current room")
+        except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
+            raise RuntimeError(f"Pending manual installation receipt is invalid: {error}") from error
 
-        if staged_mod_path is None:
-            mods_dir = game_root / "Mods"
-            if mods_dir.is_dir():
-                for candidate in sorted(mods_dir.glob("*.zip")):
-                    try:
-                        with zipfile.ZipFile(candidate) as pkg:
-                            cand_manifest = json.loads(pkg.read("seed_manifest.json"))
-                            if cand_manifest.get("manifest_hash") == manifest.manifest_hash:
-                                staged_mod_path = candidate
-                                break
-                    except Exception:
-                        continue
-
-        if staged_mod_path is None:
-            raise RuntimeError("Current room mod is missing from DOOM Eternal Mods folder. Run setup again.")
-
-        staged_sha256 = hashlib.sha256(staged_mod_path.read_bytes()).hexdigest()
+        config = self._config()
+        self._game_root(config)
         steam_plan = self._steam_plan(config) if self.platform_name == "linux" else None
         steam_option = steam_plan.proposed if steam_plan else ""
         steam_diff = steam_plan.diff if steam_plan else ""
@@ -505,6 +876,7 @@ class IntegratedLaunchWorkflow:
             steam_launch_option_diff=steam_diff,
             installation_mode="manual_fallback",
             user_confirmed=True,
+            new_install=new_install,
         )
 
         payload = {
@@ -539,6 +911,7 @@ class RoomSetupCoordinator:
         self._worker_lock = threading.Lock()
         self._active: set[tuple[object, ...]] = set()
         self._completed: set[tuple[object, ...]] = set()
+        self._uninstall_active = False
         self._last_event: dict[str, object] | None = None
 
     def observe(self, event: dict[str, object]) -> bool:
@@ -584,6 +957,7 @@ class RoomSetupCoordinator:
                         "manual_install_required",
                         {
                             "manifest_hash": record.manifest_hash,
+                            "new_install": record.new_install,
                             "message": record.adapter_message,
                             "guide_section": "Windows Manual Mod Installer",
                             "guide_url": "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
@@ -601,6 +975,7 @@ class RoomSetupCoordinator:
                         "manifest_hash": record.manifest_hash,
                         "randomize_dash": record.randomize_dash,
                         "adapter_state": record.adapter_state,
+                        "new_install": record.new_install,
                         "message": record.adapter_message,
                         "steam_launch_option": record.steam_launch_option,
                     },
@@ -629,3 +1004,48 @@ class RoomSetupCoordinator:
         with self._state_lock:
             event = dict(self._last_event) if self._last_event else None
         return self.submit(event, force=True) if event else False
+
+    def submit_uninstall(self, event: dict[str, object]) -> bool:
+        """Run uninstall on coordinator worker, sharing setup serialization lock."""
+        if event.get("type") != "connected":
+            return False
+        with self._state_lock:
+            self._last_event = dict(event)
+            if self._uninstall_active:
+                return False
+            self._uninstall_active = True
+
+        def worker() -> None:
+            try:
+                self.event_sink(
+                    "uninstall_queued",
+                    {},
+                )
+                with self._worker_lock:
+                    snapshot = RoomSnapshot.from_event(event)
+                    manifest = self.workflow.base_workflow.manifest_for(snapshot)
+                    self.event_sink(
+                        "uninstall_started",
+                        {"manifest_hash": manifest.manifest_hash},
+                    )
+                    result = self.workflow.uninstall(snapshot)
+                self.event_sink(
+                    "uninstall_complete" if result.state == "uninstalled" else "uninstall_attention",
+                    {**asdict(result), "manifest_hash": result.manifest_hash},
+                )
+            except Exception as error:
+                self.event_sink(
+                    "uninstall_failed",
+                    {
+                        "state": "attention",
+                        "attention": True,
+                        "error_type": type(error).__name__,
+                        "message": str(error),
+                    },
+                )
+            finally:
+                with self._state_lock:
+                    self._uninstall_active = False
+
+        threading.Thread(target=worker, name="DoomRoomUninstall", daemon=True).start()
+        return True

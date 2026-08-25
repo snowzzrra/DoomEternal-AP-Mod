@@ -59,18 +59,22 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "major receipt single-line format"
+    },
+    {
+      "content_revision": "0.4.0-beta.4",
+      "reason": "Accept deliberate Chainsaw target removal"
     }
   ],
   "asset_package_contract_sha256": "5a150841d01b6714748a785e83921beae8c74894cceb1c0e01bc5b61e6474722",
-  "byte_sha256": "1bf5f480eae0bf746e2a47afa2f6cc779d5e31da9b514429c46be03bd3c2c49b",
+  "byte_sha256": "911c93ff875a3a0b806740090d4d0ded9f35f0c6f63e282e27d41ee09a9f1353",
   "content_revision": "0.4.0-beta.4",
   "generated_entity_metrics": {
     "bind_parents": 40,
-    "byte_size": 11976457,
+    "byte_size": 11976399,
     "classes": 10438,
     "entity_count": 10440,
     "layers": 5412,
-    "targets": 18757,
+    "targets": 18756,
     "transforms": 22242,
     "unique_entity_names": 10439
   },
@@ -103,6 +107,6 @@
     7770122
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "aa10ef45e3d0f3d4cb3b9859afacad3139fe29d8eec6787c4cbb383900e946da",
-  "semantic_sha256": "0523c6ad51cdf5da3a1bb0a49e23db806311f457a1940072e35b00fe6447ec31"
+  "scripted_contract_sha256": "2a83460c80d01bb359735a443306bb6088ed12dbf2e456a90b59b2d602f56da1",
+  "semantic_sha256": "c3672b5ab40ca4f362c031f7fdbfcd860823c6a09820d363b138a957c6d1d03e"
 }
