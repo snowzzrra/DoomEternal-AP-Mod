@@ -13,7 +13,10 @@ from tools.maps.notification_formatting import (
     ITEM_NOTIFICATION_TITLE,
     LOCATION_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_TITLE,
+    PLACEMENT_SENT_KEY_PREFIX,
+    item_receipt_text,
     location_notification_text,
+    location_sent_text,
     major_notification_key,
     major_notification_text,
     notification_key,
@@ -24,7 +27,7 @@ ITEM_KEY_PATTERN = re.compile(
     r'(?:header|subtext)\s*=\s*"(#str_ap_(?:item_received|notify_item(?:_received)?_\d+(?:_\d+)?))";'
 )
 LOCATION_KEY_PATTERN = re.compile(
-    r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
+    r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent(?:_\d+)?|\d+))";'
 )
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -67,6 +70,7 @@ def build_string_table(
     maps_dir: Path,
     output_path: Path,
     location_names_path: Path | None = None,
+    placement_metadata_path: Path | None = None,
 ) -> None:
     items = json.loads(items_path.read_text(encoding="utf-8"))
     policies = json.loads(policies_path.read_text(encoding="utf-8"))
@@ -77,6 +81,37 @@ def build_string_table(
     }
 
     referenced_keys = referenced_notification_keys(maps_dir)
+    placement_names = {}
+    placement_records = {}
+    placement_by_item = {}
+    if placement_metadata_path is not None:
+        metadata = json.loads(placement_metadata_path.read_text(encoding="utf-8"))
+        if isinstance(metadata, dict):
+            metadata = metadata.get("placement_metadata")
+        if not isinstance(metadata, list):
+            raise ValueError("placement metadata must contain a list")
+        required = {
+            "location_id", "location_name", "item_id", "item_name",
+            "recipient_slot", "recipient_name", "classification", "trap", "local",
+        }
+        for record in metadata:
+            if not isinstance(record, dict) or set(record) != required:
+                raise ValueError("placement metadata has invalid fields")
+            location_id = record["location_id"]
+            location_name = record["location_name"]
+            if (
+                not isinstance(location_id, int)
+                or isinstance(location_id, bool)
+                or not isinstance(location_name, str)
+                or not location_name.strip()
+            ):
+                raise ValueError("placement metadata has invalid location identity")
+            if location_id in placement_names:
+                raise ValueError(f"placement metadata duplicates location {location_id}")
+            placement_names[location_id] = location_name.strip()
+            placement_records[location_id] = record
+            item_id = record["item_id"]
+            placement_by_item.setdefault(item_id, []).append(record)
     entries: list[tuple[str, str]] = []
     for raw_item_id, definition in sorted(items.items(), key=lambda entry: int(entry[0])):
         if isinstance(definition, dict) and definition.get("type") == "no_op":
@@ -92,12 +127,21 @@ def build_string_table(
         for stage in stages:
             key = notification_key(item_id, definition, stage=stage)
             if key in referenced_keys:
-                entries.append((
-                    key,
-                    notification_text(
+                records = placement_by_item.get(item_id, [])
+                text = None
+                if stage is None and len(records) == 1:
+                    record = records[0]
+                    text = item_receipt_text(
+                        item_name,
+                        local=bool(record["local"]),
+                        trap=bool(record["trap"]),
+                        recipient_name=str(record["recipient_name"]),
+                    )
+                if text is None:
+                    text = notification_text(
                         item_id, definition, item_name, stage=stage
-                    ),
-                ))
+                    )
+                entries.append((key, text))
             major_key = major_notification_key(item_id, definition, stage=stage)
             if major_key in referenced_keys:
                 entries.append((
@@ -149,23 +193,39 @@ def build_string_table(
         if location_identity.get("schema_version") != 1:
             raise ValueError("unsupported location-name schema")
         location_names = location_identity.get("locations", {})
-        try:
-            entries.append((
-                LOCATION_NOTIFICATION_HEADER_KEY,
-                LOCATION_NOTIFICATION_TITLE[output_path.stem],
-            ))
-        except KeyError as error:
-            raise ValueError(
-                f"unsupported notification locale: {output_path.stem}"
-            ) from error
-        for key in sorted(location_keys - {"#str_ap_location_sent"}):
-            location_id = key.removeprefix("#str_ap_location_")
+        if LOCATION_NOTIFICATION_HEADER_KEY in referenced_keys:
             try:
-                location_name = location_names[location_id]
+                entries.append((
+                    LOCATION_NOTIFICATION_HEADER_KEY,
+                    LOCATION_NOTIFICATION_TITLE[output_path.stem],
+                ))
             except KeyError as error:
                 raise ValueError(
-                    f"location {location_id} has no canonical notification name"
+                    f"unsupported notification locale: {output_path.stem}"
                 ) from error
+        for key in sorted(location_keys):
+            if key == LOCATION_NOTIFICATION_HEADER_KEY:
+                continue
+            if key.startswith(PLACEMENT_SENT_KEY_PREFIX):
+                location_id = int(key.removeprefix(PLACEMENT_SENT_KEY_PREFIX))
+                record = placement_records.get(location_id)
+                if record is None:
+                    raise ValueError(
+                        f"location {location_id} has no placement metadata for "
+                        "its sent presentation"
+                    )
+                entries.append((key, location_sent_text(record)))
+                continue
+            location_id = key.removeprefix("#str_ap_location_")
+            if location_id in placement_names:
+                location_name = placement_names[location_id]
+            else:
+                try:
+                    location_name = location_names[location_id]
+                except KeyError as error:
+                    raise ValueError(
+                        f"location {location_id} has no canonical notification name"
+                    ) from error
             entries.append((key, location_notification_text(location_name)))
 
     serialized_entries = string_entries(entries)
@@ -191,6 +251,7 @@ def main() -> int:
     parser.add_argument("--maps-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--location-names", type=Path)
+    parser.add_argument("--placement-metadata", type=Path)
     args = parser.parse_args()
     build_string_table(
         args.items.resolve(),
@@ -200,6 +261,11 @@ def main() -> int:
         (
             args.location_names.resolve()
             if args.location_names is not None
+            else None
+        ),
+        (
+            args.placement_metadata.resolve()
+            if args.placement_metadata is not None
             else None
         ),
     )

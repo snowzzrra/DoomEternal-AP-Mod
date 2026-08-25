@@ -98,7 +98,7 @@ class TestLauncherUIConstruction(unittest.TestCase):
             ui._set_setup_state("install_needed", "Install needed.")
             self.assertTrue(ui.session_manual_complete_action.isHidden())
             self.assertTrue(ui.session_manual_retry_action.isHidden())
-            self.assertEqual(ui.session_setup_action.text(), "INSTALL MOD")
+            self.assertEqual(ui.session_setup_action.text(), "INSTALL ROOM PACKAGE")
 
             ui._set_setup_state("ready")
             self.assertTrue(ui.session_setup_action.isHidden())
@@ -166,7 +166,8 @@ class TestLauncherUIConstruction(unittest.TestCase):
         with patch("os.name", "posix"):
             ui = LauncherUI(self.controller)
             try:
-                self.assertFalse(ui.launch_option.isHidden())
+                # Full launch option stays hidden; Room card exposes status + COPY only.
+                self.assertTrue(ui.launch_option.isHidden())
                 self.assertFalse(ui.launch_option_label.isHidden())
                 self.assertFalse(ui.copy_launch_option_button.isHidden())
                 ui._set_setup_state("ready")

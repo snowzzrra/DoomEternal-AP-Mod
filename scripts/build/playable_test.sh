@@ -353,6 +353,15 @@ for map_row in "${MAP_ROWS[@]}"; do
         "$MOD_STAGING_DIR/$resource_name/maps/$relative_entities_path"
 done
 
+python3 "$REPO_ROOT/tools/maps/shell_menu_visual.py" \
+    --source "$VANILLA_MAPS_DIR/shell.map" \
+    --output "$MOD_STAGING_DIR/shell/maps/game/shell/shell.entities"
+"$TOOLS_DIR/idFileDeCompressor" --compress \
+    "$MOD_STAGING_DIR/shell/maps/game/shell/shell.entities" \
+    "$MOD_STAGING_DIR/shell/maps/game/shell/shell.entities.compressed"
+mv "$MOD_STAGING_DIR/shell/maps/game/shell/shell.entities.compressed" \
+   "$MOD_STAGING_DIR/shell/maps/game/shell/shell.entities"
+
 python3 "$REPO_ROOT/tools/maps/automap_native_decl_builder.py" \
     --mod-root "$MOD_STAGING_DIR" \
     --audit-output "$TEMP_DIR/automap-native-toy-override.json"
@@ -679,6 +688,7 @@ def compile_cached_state(map_key, vanilla, options, local_identity, entities, pa
         seed_name=f"room-payload-{map_key}-state", team=0, slot=1,
         options=options,
         active_location_ids=compiler.active_location_ids(compile_options),
+        static_precompile=True,
     )
     compiler.compile_map(manifest, vanilla, entities, map_key)
     with tempfile.TemporaryDirectory(prefix=f"room-payload-{map_key}-patch-") as patch_root:

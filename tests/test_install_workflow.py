@@ -53,6 +53,20 @@ from doom_eap.launcher.launcher_platform import (
 def _snapshot() -> RoomSnapshot:
     ids = ModCompiler().active_location_ids(False)
     identity = release_identity()
+    placements = [
+        {
+            "location_id": location_id,
+            "location_name": f"Location {location_id}",
+            "item_id": 1,
+            "item_name": "Nothing",
+            "recipient_slot": 2,
+            "recipient_name": "Self",
+            "classification": 0,
+            "trap": False,
+            "local": True,
+        }
+        for location_id in ids
+    ]
     return RoomSnapshot.from_packets(
         {"seed_name": "install-seed"},
         {
@@ -68,6 +82,7 @@ def _snapshot() -> RoomSnapshot:
             },
             "missing_locations": ids[::2],
             "checked_locations": ids[1::2],
+            "placements": placements,
         },
     )
 

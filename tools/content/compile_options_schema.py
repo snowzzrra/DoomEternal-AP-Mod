@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import inspect
 import json
 import os
 import sys
+from types import ModuleType, SimpleNamespace
 from pathlib import Path
 from typing import Any
 
@@ -25,13 +27,45 @@ def _load_apworld(ap_root: Path):
     sys.path.insert(0, str(ap_root))
     try:
         from Options import Choice, NamedRange, OptionSet, Range, Toggle  # type: ignore[import-not-found]
-        from worlds.doometernal import DoomEternalWorld  # type: ignore[import-not-found]
+        # Load only APWorld option sources. Importing ``worlds.doometernal`` through
+        # Archipelago's package initializer loads every installed world, which makes
+        # this projection depend on unrelated optional worlds and AP core versions.
+        worlds_package = sys.modules.get("worlds")
+        if worlds_package is None:
+            worlds_package = ModuleType("worlds")
+            worlds_package.__path__ = [str(ap_root / "worlds")]  # type: ignore[attr-defined]
+            sys.modules["worlds"] = worlds_package
+        doometernal_package = ModuleType("worlds.doometernal")
+        doometernal_package.__path__ = [str(ap_root / "worlds/doometernal")]  # type: ignore[attr-defined]
+        doometernal_package.__package__ = "worlds.doometernal"
+        doometernal_package.__spec__ = importlib.util.spec_from_file_location(
+            "worlds.doometernal",
+            ap_root / "worlds/doometernal/__init__.py",
+            submodule_search_locations=[str(ap_root / "worlds/doometernal")],
+        )
+        sys.modules["worlds.doometernal"] = doometernal_package
+        module_name = "worlds.doometernal.options"
+        spec = importlib.util.spec_from_file_location(
+            module_name,
+            ap_root / "worlds/doometernal/options.py",
+        )
+        if spec is None or spec.loader is None:
+            raise ValueError("could not load DOOM Eternal option source")
+        options_module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = options_module
+        spec.loader.exec_module(options_module)
+        world = SimpleNamespace(
+            game=json.loads(
+                (ap_root / "worlds/doometernal/archipelago.json").read_text(encoding="utf-8")
+            )["game"],
+            options_dataclass=options_module.DoomEternalOptions,
+        )
     finally:
         try:
             sys.path.remove(str(ap_root))
         except ValueError:
             pass
-    return DoomEternalWorld, Toggle, Choice, OptionSet, Range, NamedRange
+    return world, Toggle, Choice, OptionSet, Range, NamedRange
 
 
 def compile_schema(ap_root: Path) -> dict[str, Any]:

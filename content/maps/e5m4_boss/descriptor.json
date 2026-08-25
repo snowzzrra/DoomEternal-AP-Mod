@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "key": "e5m4_boss",
+  "display_name": "The Dark Lord",
+  "enabled": false,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
+  "source_file": "e5m4_boss.map",
+  "source_sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
+  "source_size": 1309237,
+  "source_owner": "id Software",
+  "generated_output": "e5m4_boss.entities",
+  "runtime_map": "game/sp/e5m4_boss/e5m4_boss",
+  "resource_base": "e5m4_boss",
+  "resource_path": "game/sp/e5m4_boss/e5m4_boss_patch2.resources",
+  "resource_owner": "game/sp/e5m4_boss/e5m4_boss_patch2.resources",
+  "resource_priority": 38,
+  "relative_entities_path": "game/sp/e5m4_boss/e5m4_boss.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "Immora - The Dark Lord",
+        "order": 100
+      }
+    ],
+    "connections": [],
+    "virtual_locations": []
+  },
+  "order": 14
+}

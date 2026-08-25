@@ -1,6 +1,111 @@
 {
     "schema_version": 1,
     "contract_revision": 3,
+    "persistent_ownership": {
+        "reconciliation": {
+            "mode": "additive_owned_ids",
+            "generic_scrubber": false,
+            "reapply_only_owned": true,
+            "transient_resources_replayed": false
+        },
+        "families": {
+            "weapons": {"ownership_primitive": "weapon_item", "replay": "replay_idempotent"},
+            "weapon_mods": {"ownership_primitive": "perk_item", "replay": "replay_idempotent"},
+            "masteries": {"ownership_primitive": "perk_item", "replay": "replay_idempotent"},
+            "runes": {"ownership_primitive": "perk_item", "replay": "replay_idempotent"},
+            "equipment": {"ownership_primitive": "equipment_item", "replay": "replay_idempotent"},
+            "suit_perks": {"ownership_primitive": "perk_item", "replay": "replay_idempotent"},
+            "capacities": {"ownership_primitive": "progressive_perk_item", "replay": "replay_idempotent"},
+            "special_weapon": {"ownership_primitive": "replacement_state", "replay": "special_progressive"}
+        },
+        "items": {
+            "7770083": {
+                "name": "Meat Hook",
+                "family": "weapon_mods",
+                "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook",
+                "requires_owned_item": [7770003],
+                "automatic_weapon_receipt": false,
+                "reconcile": "reapply_if_owned"
+            },
+            "7770084": {
+                "name": "Meat Hook Mastery",
+                "family": "masteries",
+                "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook_mastery",
+                "requires_owned_item": [7770003, 7770083],
+                "automatic_weapon_receipt": false,
+                "reconcile": "reapply_if_owned"
+            }
+        }
+    },
+    "stored_charge_contracts": {
+        "7770024": {
+            "name": "Ammo Refill",
+            "runtime_family": "stored_charge",
+            "runtime_primitive": "ap_stored_charge",
+            "storage_key": "ammo_refill_charge",
+            "receipt_effect": "increment_charge",
+            "receipt_delivery": "no_immediate_ammo",
+            "replay_policy": "never_replay",
+            "start_inventory_eligible": true,
+            "accounting": "received_minus_consumed",
+            "consumption_scope": "room_team_slot",
+            "consumption_replay": "never_replay"
+        }
+    },
+    "special_weapon_state_families": {
+        "progressive_special_weapon": {
+            "item_id": 7770901,
+            "name": "Progressive Special Weapon",
+            "max_quantity": 3,
+            "states": ["none", "crucible", "sentinel_hammer", "sentinel_hammer_upgraded"],
+            "replacement": "each_stage_replaces_prior_state",
+            "selected_representation_only": true,
+            "start_inventory_eligible": true,
+            "replay": "special_progressive"
+        },
+        "progressive_sentinel_hammer": {
+            "item_id": 7770902,
+            "name": "Progressive Sentinel Hammer",
+            "max_quantity": 2,
+            "states": ["none", "sentinel_hammer", "sentinel_hammer_upgraded"],
+            "replacement": "each_stage_replaces_prior_state",
+            "selected_representation_only": true,
+            "start_inventory_eligible": true,
+            "replay": "special_progressive"
+        },
+        "crucible": {
+            "item_id": 7770007,
+            "name": "The Crucible",
+            "max_quantity": 1,
+            "states": ["none", "crucible"],
+            "replacement": "each_stage_replaces_prior_state",
+            "selected_representation_only": true,
+            "start_inventory_eligible": true,
+            "replay": "replay_idempotent"
+        }
+    },
+    "physical_pickup_contracts": {
+        "haste": {
+            "name": "Haste",
+            "native_resource": "statuseffect/overdrive",
+            "native_data": "hasteData",
+            "pickup_sound": "play_haste_pickup",
+            "pickup_delivery": "physical_pickup",
+            "start_inventory_eligible": false,
+            "replay_policy": "never_replay",
+            "powerup_extender_preserved": true
+        },
+        "quad_damage": {
+            "name": "Quad Damage",
+            "native_resource": "statuseffect/onslaught",
+            "native_data": "onslaughtData",
+            "pickup_sound": "play_quad_pickup",
+            "pickup_delivery": "physical_pickup",
+            "start_inventory_eligible": false,
+            "replay_policy": "never_replay",
+            "powerup_extender_preserved": true
+        }
+    },
     "items": {
         "7770025": {
             "name": "Full Heal",

@@ -29,6 +29,7 @@ from tools.maps.notification_formatting import (
     location_notification_key,
     major_notification_key_from_item_key,
     notification_key,
+    placement_sent_key,
 )
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -572,6 +573,7 @@ TARGET_POLICY_CONSUMERS = {
     "gate_relay": "append_target_to_named_entity",
     "independent_entity_name": "generate_independent_pickup_trigger",
     "independent_position": "generate_independent_pickup_trigger",
+    "independent_visual_z_offset": "build_universal_physical_policy",
     "independent_size": "generate_independent_pickup_trigger",
     "independent_targets": "generate_independent_pickup_trigger",
     "independent_visual": "generate_inert_location_visual",
@@ -820,9 +822,11 @@ def validate_target_policies(config_entities, target_policies, content):
                 for token in (
                     "useableComponentDecl =",
                     "currency",
+                    "currencyAmount",
                     "target_relay",
                     "2_battery_required",
                     "triggerDef =",
+                    "transitionName =",
                 )
             ):
                 raise ValueError(
@@ -1593,8 +1597,18 @@ def build_universal_physical_policy(
 
     policy = policy or {}
     configured_position = policy.get("independent_position")
+    visual_z_offset = policy.get("independent_visual_z_offset", 1.5)
+    if (
+        isinstance(visual_z_offset, bool)
+        or not isinstance(visual_z_offset, (int, float))
+    ):
+        raise ValueError("Independent AP visual z offset must be numeric")
     if configured_position is not None:
-        position = [configured_position[0], configured_position[1], configured_position[2] + 1.5]
+        position = [
+            configured_position[0],
+            configured_position[1],
+            configured_position[2] + visual_z_offset,
+        ]
     else:
         position_block = re.search(r'spawnPosition\s*=\s*\{([^}]*)\}', block)
         if not position_block:
@@ -1606,7 +1620,11 @@ def build_universal_physical_policy(
                     rf'\b{axis}\s*=\s*([-+0-9.eE]+);', position_block.group(1)
                 )
                 coordinates.append(float(match.group(1)) if match else 0.0)
-            position = [coordinates[0], coordinates[1], coordinates[2] + 1.5]
+            position = [
+                coordinates[0],
+                coordinates[1],
+                coordinates[2] + visual_z_offset,
+            ]
 
     independent_targets = [ap_check_id, cleanup_name]
 
@@ -1835,15 +1853,57 @@ def generate_check_event(location_id):
 """
 
 
-def generate_pickup_notification(location_id):
+def generate_pickup_notification(location_id, placement=None):
+    if placement is not None:
+        normalize_placement_metadata([placement])
+        header_key = placement_sent_key(location_id)
+    else:
+        header_key = LOCATION_NOTIFICATION_HEADER_KEY
     return build_primitive(
         "location_notification_codex",
         f"{LOCATION_NOTIFICATION_PREFIX}{location_id}",
         {
-            "header_key": LOCATION_NOTIFICATION_HEADER_KEY,
+            "header_key": header_key,
             "subtext_key": location_notification_key(location_id),
         },
     )
+
+
+PLACEMENT_FIELDS = {
+    "location_id", "location_name", "item_id", "item_name",
+    "recipient_slot", "recipient_name", "classification", "trap", "local",
+}
+
+
+def normalize_placement_metadata(placement_metadata):
+    """Validate immutable scout output before it can affect generated sources."""
+    if placement_metadata is None:
+        return None
+    if not isinstance(placement_metadata, (list, tuple)):
+        raise ValueError("placement_metadata must be a list")
+    records = []
+    seen = set()
+    for value in placement_metadata:
+        if not isinstance(value, dict) or set(value) != PLACEMENT_FIELDS:
+            raise ValueError("placement metadata has invalid fields")
+        location_id = value["location_id"]
+        if not isinstance(location_id, int) or isinstance(location_id, bool) or location_id <= 0:
+            raise ValueError("placement metadata has invalid location_id")
+        if location_id in seen:
+            raise ValueError(f"placement metadata duplicates location {location_id}")
+        seen.add(location_id)
+        for field in ("location_name", "item_name", "recipient_name"):
+            if not isinstance(value[field], str) or not value[field].strip():
+                raise ValueError(f"placement metadata {field} must be non-empty")
+        for field in ("item_id", "recipient_slot", "classification"):
+            if not isinstance(value[field], int) or isinstance(value[field], bool):
+                raise ValueError(f"placement metadata {field} must be an integer")
+        if not isinstance(value["trap"], bool) or not isinstance(value["local"], bool):
+            raise ValueError("placement metadata trap/local must be boolean")
+        if value["trap"] != bool(value["classification"] & 0b00100):
+            raise ValueError(f"placement metadata trap mismatch at {location_id}")
+        records.append(dict(value))
+    return sorted(records, key=lambda value: value["location_id"])
 
 
 def location_feedback_policy(location_feedback, ap_check_id):
@@ -2286,6 +2346,7 @@ def generate_map(
     item_classifications=None,
     receipt_feedback=None,
     enable_notifications=True,
+    placement_metadata=None,
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
@@ -2341,6 +2402,22 @@ def generate_map(
         *config_entities,
         *(entry["ap_check"] for entry in secret_encounters),
     )
+    placement_metadata = normalize_placement_metadata(placement_metadata)
+    if placement_metadata is not None:
+        placement_by_id = {
+            record["location_id"]: record for record in placement_metadata
+        }
+        declared_location_ids = set(config_entities.values()) | {
+            entry["location_id"] for entry in secret_encounters
+        }
+        missing_placements = sorted(declared_location_ids - set(placement_by_id))
+        if missing_placements:
+            raise ValueError(
+                "placement metadata is incomplete for generated map: "
+                + ", ".join(str(value) for value in missing_placements)
+            )
+    else:
+        placement_by_id = {}
     location_feedback = load_explicit_location_feedback(
         level_config.get("map_key"),
         level_config.get("location_feedback", {}),
@@ -2563,7 +2640,7 @@ def generate_map(
                         new_blocks.append(visual)
                     if include_ap_feedback:
                         new_blocks.append(
-                            generate_pickup_notification(location_id)
+                            generate_pickup_notification(location_id, placement_by_id.get(location_id))
                         )
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
@@ -2675,7 +2752,7 @@ def generate_map(
                     ))
                     if include_ap_feedback:
                         new_blocks.append(
-                            generate_pickup_notification(location_id)
+                            generate_pickup_notification(location_id, placement_by_id.get(location_id))
                         )
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
@@ -2744,7 +2821,9 @@ def generate_map(
             )
         )
         if include_ap_feedback:
-            secret_blocks.append(generate_pickup_notification(location_id))
+            secret_blocks.append(
+                generate_pickup_notification(location_id, placement_by_id.get(location_id))
+            )
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
 
@@ -2782,6 +2861,12 @@ def generate_map(
     os.makedirs(os.path.dirname(manifest_file), exist_ok=True)
     with open(manifest_file, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=4)
+    if placement_metadata is not None:
+        placement_path = Path(manifest_file).with_suffix(".placements.json")
+        placement_path.write_text(
+            json.dumps(placement_metadata, indent=4, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     print(f"Successfully generated {modified_count} GLOBAL AP Targets using idTrigger mutation!")
     print(f"Manifest saved to {manifest_file}")

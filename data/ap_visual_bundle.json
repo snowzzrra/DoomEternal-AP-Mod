@@ -64,7 +64,8 @@
   },
   "runtime_references": [
     "e2m4_boss",
-    "e3m4_boss"
+    "e3m4_boss",
+    "shell"
   ],
   "forbidden_geometry": "art/pickups/question_mark_a.lwo",
   "forbidden_streamdb_payload": "art/pickups/question_mark_a_id#3385987379760210816.lwo"

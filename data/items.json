@@ -16,6 +16,8 @@
     "7770900": "give weapon/player/shotgun",
     "7770008": "give weapon/player/unmaykr",
     "7770009": "give weapon/player/hammer",
+    "7770901": {"type": "progressive_perk", "perks": ["weapon/player/crucible", "weapon/player/hammer", "weapon/player/hammer"]},
+    "7770902": {"type": "progressive_perk", "perks": ["weapon/player/hammer", "weapon/player/hammer"]},
     "7770010": "give weapon/player/chainsaw",
     "7770011": [
         "give equipmentlauncher/equipmentlauncherleft",
@@ -60,7 +62,7 @@
     },
     "7770022": "g_giveExtraLives 1",
     "7770023": "g_giveExtraLives 3",
-    "7770024": "give ammo",
+    "7770024": {"type": "no_op", "description": "Ammo Refill stored charge; consumed through AP stored-data use path"},
     "7770025": "give health",
     "7770026": "give armor",
     "7770027": "give ammo/sharedammopool/fuel 1",

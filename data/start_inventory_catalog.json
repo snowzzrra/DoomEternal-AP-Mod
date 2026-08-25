@@ -11,6 +11,10 @@
       "label": "Ammo from Barrels"
     },
     {
+      "name": "Ammo Refill",
+      "label": "Ammo Refill"
+    },
+    {
       "name": "Arbalest",
       "label": "Arbalest"
     },
@@ -223,6 +227,14 @@
       "label": "Progressive Health Upgrade"
     },
     {
+      "name": "Progressive Sentinel Hammer",
+      "label": "Progressive Sentinel Hammer"
+    },
+    {
+      "name": "Progressive Special Weapon",
+      "label": "Progressive Special Weapon"
+    },
+    {
       "name": "Punch and Reave",
       "label": "Punch and Reave"
     },
@@ -297,6 +309,10 @@
     {
       "name": "Super Shotgun",
       "label": "Super Shotgun"
+    },
+    {
+      "name": "The Crucible",
+      "label": "The Crucible"
     }
   ]
 }

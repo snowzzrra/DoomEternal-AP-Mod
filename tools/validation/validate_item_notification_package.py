@@ -32,7 +32,7 @@ LOCATION_NOTIFICATION_RE = re.compile(
     r"entityDef ap_notify_location_(\d+) \{"
 )
 LOCATION_STRING_RE = re.compile(
-    r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent|\d+))";'
+    r'(?:header|subtext)\s*=\s*"(#str_ap_location_(?:sent(?:_\d+)?|\d+))";'
 )
 STRING_TABLES = (
     Path("gameresources_patch1/EternalMod/strings/english.json"),
@@ -297,7 +297,10 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     }
     if item_keys != expected_item_keys:
         raise AssertionError("item notification title/subtitle keys diverge")
-    if not location_notifications or "#str_ap_location_sent" not in location_strings:
+    if not location_notifications or not any(
+        key == "#str_ap_location_sent" or key.startswith("#str_ap_location_sent_")
+        for key in location_strings
+    ):
         raise AssertionError("package lacks Codex location feedback")
     if not all(path.is_file() for path in table_paths):
         raise AssertionError("enabled notifier build lacks English or Portuguese strings")
@@ -313,7 +316,10 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     for values, locale in zip(locale_values, ("english", "portuguese")):
         if values.get(ITEM_NOTIFICATION_HEADER_KEY) != ITEM_NOTIFICATION_TITLE[locale]:
             raise AssertionError("item notification title is not canonical")
-        if values.get(LOCATION_NOTIFICATION_HEADER_KEY) != LOCATION_NOTIFICATION_TITLE[locale]:
+        if (
+            LOCATION_NOTIFICATION_HEADER_KEY in values
+            and values.get(LOCATION_NOTIFICATION_HEADER_KEY) != LOCATION_NOTIFICATION_TITLE[locale]
+        ):
             raise AssertionError("location notification title is not canonical")
 
     for suffix in notifications:

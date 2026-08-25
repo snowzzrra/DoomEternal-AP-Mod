@@ -142,6 +142,7 @@ def _context(items=(), *, processed=0, ready=True):
     context.slot = 1
     context.team = 0
     context.slot_info = {}
+    context.locations_info = {}
     context.slot_concerns_self = lambda player: player == context.slot
     context.current_map_name = None
     context.active_save_slot = None
@@ -428,6 +429,7 @@ def _hint_context(*, team=1, slot=2, seed="test-seed"):
     context.player_names = {2: "Doom Slayer", 3: "Other Player"}
     context.item_names = SimpleNamespace(lookup_in_slot=lambda item, player: f"Item {item} for {player}")
     context.location_names = SimpleNamespace(lookup_in_slot=lambda location, player: f"Location {location} in {player}")
+    context.locations_info = {}
     return context
 
 

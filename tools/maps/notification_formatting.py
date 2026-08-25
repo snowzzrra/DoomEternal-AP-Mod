@@ -124,3 +124,54 @@ def location_notification_text(location_name: str) -> str:
     if not isinstance(location_name, str) or not location_name.strip():
         raise ValueError("AP location name cannot be empty")
     return location_name.strip()
+
+
+PLACEMENT_SENT_KEY_PREFIX = "#str_ap_location_sent_"
+
+
+def placement_sent_key(location_id: int) -> str:
+    """Return placement-aware string-table key for one AP location receipt."""
+    if not isinstance(location_id, int) or location_id <= 0:
+        raise ValueError(f"invalid AP location id: {location_id!r}")
+    return f"{PLACEMENT_SENT_KEY_PREFIX}{location_id}"
+
+
+def _placement_identity(placement: Any) -> tuple[str, str, bool, bool]:
+    if not isinstance(placement, dict):
+        raise ValueError("placement presentation requires a placement record")
+    item_name = _sanitized_name(str(placement.get("item_name", "")))
+    recipient_name = _sanitized_name(str(placement.get("recipient_name", "")))
+    return item_name, recipient_name, bool(placement.get("local")), bool(placement.get("trap"))
+
+
+def location_sent_text(placement: Any) -> str:
+    """Return the placement-aware ``AP LOCATION SENT`` header text.
+
+    Local checks report ``FOUND YOUR <ITEM>``; remote and trap checks report
+    ``SENT <ITEM> TO <RECIPIENT>``.
+    """
+    item_name, recipient_name, local, trap = _placement_identity(placement)
+    if local and not trap:
+        return f"FOUND YOUR {item_name.upper()}"
+    return f"SENT {item_name.upper()} TO {recipient_name.upper()}"
+
+
+def item_receipt_text(
+    item_name: str,
+    *,
+    local: bool,
+    trap: bool,
+    recipient_name: str,
+) -> str:
+    """Return the placement-aware received-item subtitle text.
+
+    Traps never reveal their recipient; local items read ``YOUR <ITEM>``;
+    remote items read ``<ITEM> FOR <RECIPIENT>``.
+    """
+    item = _sanitized_name(item_name)
+    if trap:
+        return "A TRAP FOR SOMEONE"
+    if local:
+        return f"YOUR {item.upper()}"
+    recipient = _sanitized_name(recipient_name)
+    return f"{item.upper()} FOR {recipient.upper()}"

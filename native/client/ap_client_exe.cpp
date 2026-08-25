@@ -2071,6 +2071,11 @@ int main(int argc, char** argv) {
     std::unordered_set<std::string> heldReceiptLogs;
     const std::unordered_set<std::string> noActiveCommandIds;
     EnsureQueueDirectory(recoveredSources, heldReceiptLogs, std::nullopt, noActiveCommandIds);
+    HANDLE queueChangeNotification = FindFirstChangeNotificationA(
+        kQueueDirectory,
+        FALSE,
+        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE
+    );
     DeleteFileA(kRpcGatePath);
     const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
     const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
@@ -2418,7 +2423,16 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        Sleep(50);
+        if (queueChangeNotification == INVALID_HANDLE_VALUE) {
+            Sleep(50);
+            continue;
+        }
+        const DWORD queueWait = WaitForSingleObject(queueChangeNotification, 50);
+        if (queueWait == WAIT_OBJECT_0
+                && !FindNextChangeNotification(queueChangeNotification)) {
+            CloseHandle(queueChangeNotification);
+            queueChangeNotification = INVALID_HANDLE_VALUE;
+        }
     }
 
     ReleaseMutex(singleInstance);

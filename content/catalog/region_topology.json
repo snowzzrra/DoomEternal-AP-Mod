@@ -522,6 +522,12 @@
       "mission_key": "e3m4_boss",
       "order": 99,
       "terminal": true
+    },
+    {
+      "name": "Immora - The Dark Lord",
+      "mission_key": "e5m4_boss",
+      "order": 100,
+      "terminal": true
     }
   ],
   "connections": [
@@ -1019,9 +1025,17 @@
       "Final Sin - Mall Hotel",
       "Final Sin - South Station",
       ""
+    ],
+    [
+      "Final Sin - South Station",
+      "Immora - The Dark Lord",
+      "The Dark Lord"
     ]
   ],
   "connection_conditions": {
+    "Final Sin - South Station -> Immora - The Dark Lord": {
+      "soft_capabilities": ["requires_dlc_content"]
+    },
     "Fortress of Doom - Second Visit -> Cultist Base - Grotto of Penance": {
       "soft_capabilities": ["requires_first_battery"]
     },
@@ -1140,7 +1154,8 @@
       7770171,
       7770253,
       7770254,
-      7770255
+      7770255,
+      7770418
     ],
     "Cultist Base - Grotto of Penance": [
       7770058,
@@ -1564,6 +1579,9 @@
     "Final Sin - Mall Hotel": [],
     "Final Sin - South Station": [
       7770414
+    ],
+    "Immora - The Dark Lord": [
+      7770419
     ]
   }
 }

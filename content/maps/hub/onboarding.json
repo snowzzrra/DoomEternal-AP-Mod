@@ -430,5 +430,68 @@
         }
       ]
     }
-  ]
+  ],
+  "current_config_facts": {
+    "battery_station_neutralization": [
+      {
+        "entity": "interact_hub_2_battery_station_1",
+        "ap_id": 7770253,
+        "native_targets": [],
+        "ap_target": "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_1",
+        "native_stat": "STAT_SLAYER_HUB_MILESTONE_3",
+        "native_reward_chain": "MILSTONE_3",
+        "native_reward": "Praetor",
+        "native_visual_set": "set19",
+        "removed_native_property": "stateStats"
+      },
+      {
+        "entity": "interact_hub_2_battery_station_2",
+        "ap_id": 7770254,
+        "native_targets": [],
+        "ap_target": "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_2",
+        "native_stat": "STAT_SLAYER_HUB_MILESTONE_2",
+        "native_reward_chain": "MILSTONE_2",
+        "native_reward": "Sentinel",
+        "native_visual_set": "set11",
+        "removed_native_property": "stateStats"
+      },
+      {
+        "entity": "interact_hub_2_battery_station_3",
+        "ap_id": 7770255,
+        "native_targets": [],
+        "ap_target": "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_3",
+        "native_stat": "STAT_SLAYER_HUB_MILESTONE_1",
+        "native_reward_chain": "MILSTONE_1",
+        "native_reward": "Classic",
+        "native_visual_set": "set3",
+        "removed_native_property": "stateStats"
+      }
+    ],
+    "unmaykr_case_acquisition": {
+      "entity": "sentinel_battery_room_interact_hub_unmaykr_case_1_1829410956",
+      "ap_id": 7770418,
+      "ap_name": "Fortress of Doom - Unmaykr Acquired",
+      "ap_target": "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_UNMAYKR_CASE_1_1829410956",
+      "policy": "ap_touch_only",
+      "native_targets": [
+        "sentinel_battery_room_interact_hub_unmaykr_fx_1_1829410956",
+        "sentinel_battery_room_interact_hub_unmaykr_fx_2_1829410956",
+        "sentinel_battery_room_interact_hub_unmaykr_fx_3_1829410956",
+        "sentinel_battery_room_interact_hub_unmaykr_fx_4_1829410956",
+        "sentinel_battery_room_interact_hub_unmaykr_fx_5_1829410956",
+        "sentinel_battery_room_interact_hub_unmaykr_fx_6_1829410956"
+      ],
+      "acquisition_state": "interactables/progress/unmaykr_case/unnmaykr_acquired",
+      "acquisition_transition": "unmaykr_unlocked_To_unnmaykr_acquired",
+      "hidden_mesh_on_acquire": "unmaykr_weapon",
+      "physical_collectible": "collectibles_weapons_unmaykr_1",
+      "preserved_native_behavior": [
+        "case state machine and shard-currency requirements",
+        "six FX interactable targets",
+        "physical Unmaykr collectible entity and model"
+      ],
+      "runtime_verification": "pending"
+    },
+    "ap_visual_vertical_offset": -1.5
+  }
 }

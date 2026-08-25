@@ -47,7 +47,8 @@
     "AP_CHECK_PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL": 7770171,
     "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_1": 7770253,
     "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_2": 7770254,
-    "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_3": 7770255
+    "AP_CHECK_INTERACT_HUB_2_BATTERY_STATION_3": 7770255,
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_UNMAYKR_CASE_1_1829410956": 7770418
   },
   "location_feedback": {
     "AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1": {
@@ -63,6 +64,9 @@
       "policy": "ap_only"
     },
     "AP_CHECK_PROGRESS_PRAETOR_TOKEN_4": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_SENTINEL_BATTERY_ROOM_INTERACT_HUB_UNMAYKR_CASE_1_1829410956": {
       "policy": "ap_only"
     },
     "AP_CHECK_PROGRESS_CHEATS_ALL_MASTERED_RUNES_1": {
@@ -287,6 +291,7 @@
         58.45,
         -11.3
       ],
+      "independent_visual_z_offset": -1.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
@@ -307,6 +312,7 @@
         85.9,
         -4.0
       ],
+      "independent_visual_z_offset": -1.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
@@ -327,6 +333,7 @@
         -115.57,
         6.34
       ],
+      "independent_visual_z_offset": -1.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
@@ -337,6 +344,30 @@
           "stat = \"STAT_SLAYER_HUB_MILESTONE_1\";",
           "whenToSave = \"SGT_NORMAL\";",
           "saveType = \"SGS_GAME_DATA\";"
+        ]
+      }
+    },
+    "sentinel_battery_room_interact_hub_unmaykr_case_1_1829410956": {
+      "ap_touch_only": true,
+      "no_auto_visual": true,
+      "native_entity_contract": {
+        "original_targets": [
+          "sentinel_battery_room_interact_hub_unmaykr_fx_1_1829410956",
+          "sentinel_battery_room_interact_hub_unmaykr_fx_2_1829410956",
+          "sentinel_battery_room_interact_hub_unmaykr_fx_3_1829410956",
+          "sentinel_battery_room_interact_hub_unmaykr_fx_4_1829410956",
+          "sentinel_battery_room_interact_hub_unmaykr_fx_5_1829410956",
+          "sentinel_battery_room_interact_hub_unmaykr_fx_6_1829410956"
+        ],
+        "required_snippets": [
+          "inherit = \"interact/hub/unmaykr_case\";",
+          "class = \"idInteractable_Obstacle\";",
+          "initalState = \"interactables/progress/unmaykr_case/unmaykr_idle\";",
+          "stateName = \"interactables/progress/unmaykr_case/unnmaykr_acquired\";",
+          "transitionName = \"unmaykr_unlocked_To_unnmaykr_acquired\";",
+          "item[0] = \"unmaykr_weapon\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "requirementType = \"RT_USER_CURRENCY\";"
         ]
       }
     }
@@ -361,6 +392,7 @@
     "7770171": "Fortress of Doom - Fully Upgraded Suit Cheat Code",
     "7770253": "Fortress of Doom - Praetor Suit",
     "7770254": "Fortress of Doom - Sentinel Armor",
-    "7770255": "Fortress of Doom - Classic Marine Suit"
+    "7770255": "Fortress of Doom - Classic Marine Suit",
+    "7770418": "Fortress of Doom - Unmaykr Acquired"
   }
 }

@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
+    QKeySequenceEdit,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -47,6 +48,45 @@ from .launcher_platform import (
     probe_meathook,
     redact_secrets,
 )
+
+
+class AmmoRefillKeyControl(QWidget):
+    """Single keyboard chord capture with explicit reset controls."""
+
+    changed = Signal(str)
+
+    def __init__(self, value: str = "F9"):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(7)
+        self.editor = QKeySequenceEdit(QKeySequence(value))
+        self.editor.setMaximumSequenceLength(1)
+        self.editor.setClearButtonEnabled(True)
+        self.editor.setToolTip("Press one key or supported modifier chord. Modifier-only shortcuts are rejected.")
+        self.editor.editingFinished.connect(self._emit_value)
+        clear = QPushButton("CLEAR")
+        clear.clicked.connect(self._clear)
+        reset = QPushButton("RESET")
+        reset.clicked.connect(lambda: self.set_value("F9", emit=True))
+        layout.addWidget(self.editor, 1)
+        layout.addWidget(clear)
+        layout.addWidget(reset)
+
+    def value(self) -> str:
+        return self.editor.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
+
+    def set_value(self, value: str, *, emit: bool = False) -> None:
+        self.editor.setKeySequence(QKeySequence(value))
+        if emit:
+            self._emit_value()
+
+    def _emit_value(self) -> None:
+        self.changed.emit(self.value())
+
+    def _clear(self) -> None:
+        self.editor.clear()
+        self._emit_value()
 
 
 class NamedRangeControl(QWidget):
@@ -130,11 +170,22 @@ class OptionSetControl(QWidget):
         grid.setVerticalSpacing(5)
         default = option.get("default", [])
         selected = set(default) if isinstance(default, list) else set()
+        tooltips = {
+            "Acquire the Unmaykr": "Physically claim the Unmaykr in the Fortress of Doom.",
+            "Complete All Enabled Missions": "Finish every mission included in this room: 13 Base Campaign missions or all 19 Full Saga missions.",
+            "Complete All Slayer Gates": "Complete every Slayer Gate included in the room.",
+            "Complete All Escalation Encounters": "Complete both waves of every TAG2 Escalation Encounter.",
+            "Complete All Secret Encounters": "Complete every Secret Encounter included in the room.",
+            "Complete All Mission Challenges": "Complete every Mission Challenge included in the room.",
+            "Complete All Weapon Mastery Challenges": "Complete every enabled Weapon Mastery Challenge.",
+        }
         for index, choice in enumerate(cast(list[object], option.get("choices", []))):
             if not isinstance(choice, dict):
                 continue
             key = choice.get("key")
             check = QCheckBox(str(choice.get("label", key)))
+            check.setObjectName("requirementOption")
+            check.setToolTip(tooltips.get(str(key), ""))
             check.setChecked(key in selected)
             grid.addWidget(check, index // 2, index % 2)
             self.checks.append((key, check))
@@ -157,10 +208,10 @@ class LauncherUI(QMainWindow):
     """Controller-backed, keyboard-first launcher shell."""
 
     COLORS = {
-        "ink": "#0a1014", "panel": "#111a20", "panel2": "#18252d",
-        "line": "#38505b", "text": "#eef4f3", "muted": "#9cacb1",
-        "doom": "#e8782f", "doom_hot": "#ff9c4a", "ap": "#42c7c8",
-        "good": "#9acd63", "warn": "#f0bd58", "bad": "#ef6262",
+        "ink": "#080b0d", "panel": "#111619", "panel2": "#171e22",
+        "line": "#3b4549", "text": "#f1f3ef", "muted": "#9ba3a3",
+        "doom": "#e86f1c", "doom_hot": "#ff8a2b", "ap": "#43bfc7",
+        "good": "#a8d52a", "warn": "#f2c230", "bad": "#df3f3f",
     }
 
     def __init__(self, controller: LauncherController):
@@ -171,7 +222,9 @@ class LauncherUI(QMainWindow):
         self.setMinimumSize(760, 600)
         self.option_controls: dict[str, QWidget] = {}
         self.option_defaults: dict[str, object] = {}
+        self.option_rows: dict[str, QWidget] = {}
         self.start_inventory_catalog: list[dict[str, str]] = []
+        self._syncing_create_dependencies = False
         self.room_event: dict[str, object] = {}
         self._room_connected = False
         self._connection_pending = False
@@ -181,6 +234,7 @@ class LauncherUI(QMainWindow):
         self._session_log_limit = 400
         self._chat_pending_text: str | None = None
         self._hints_state = "disconnected"
+        self._warning_state: dict[str, bool] = {}
         self._configure_style()
         self._build()
         self._set_hints_state("disconnected")
@@ -198,42 +252,53 @@ class LauncherUI(QMainWindow):
             QLabel {{ background:transparent; }} QMainWindow {{ background:{self.COLORS['ink']}; }}
             QFrame#shell {{ background:#0d151a; border-right:1px solid {self.COLORS['line']}; }}
             QFrame#topbar {{ background:#0d151a; border-bottom:1px solid {self.COLORS['line']}; }}
-            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16242b,stop:.55 #111b21,stop:1 #0d151a); border:1px solid #45606b; border-left:4px solid {self.COLORS['doom']}; }}
+            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #242017,stop:.46 #15191b,stop:1 #0b0e10); border:1px solid #5a4b38; border-left:4px solid {self.COLORS['doom']}; }}
             QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; border-radius:2px; }}
-            QWidget#statusItem {{ background:transparent; border:0; }}
+            QWidget#statusItem {{ background:#0c151a; border:1px solid #30444d; border-radius:11px; }}
             QLabel#statusIndicator {{ color:#64737a; font-size:12pt; }}
             QWidget#statusItem[statusTone="good"] QLabel#statusIndicator {{ color:{self.COLORS['good']}; }}
             QWidget#statusItem[statusTone="active"] QLabel#statusIndicator {{ color:{self.COLORS['ap']}; }}
             QWidget#statusItem[statusTone="warn"] QLabel#statusIndicator {{ color:{self.COLORS['warn']}; }}
             QWidget#statusItem[statusTone="bad"] QLabel#statusIndicator {{ color:{self.COLORS['bad']}; }}
+            QFrame#actionStrip {{ background:#252015; border:1px solid #6e5427; border-left:3px solid {self.COLORS['warn']}; }}
+            QFrame#actionStrip[actionTone="ready"] {{ background:#14231b; border-color:#3d6245; border-left-color:{self.COLORS['good']}; }}
+            QFrame#actionStrip[actionTone="working"] {{ background:#10252a; border-color:#32636a; border-left-color:{self.COLORS['ap']}; }}
+            QFrame#effectiveConfig {{ background:#121614; border:1px solid #566044; border-left:4px solid {self.COLORS['good']}; }}
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
-            QLabel#eyebrow {{ color:{self.COLORS['ap']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
+            QLabel#eyebrow {{ color:{self.COLORS['doom_hot']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
             QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:23pt; font-weight:800; }}
             QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; letter-spacing:.4px; }}
             QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
             QLabel#stateName {{ color:{self.COLORS['muted']}; font-size:9pt; font-weight:800; }}
             QLabel#warning {{ color:{self.COLORS['warn']}; background:#292419; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
-            QLineEdit,QSpinBox {{ background:#0c1419; color:{self.COLORS['text']}; border:1px solid #526871; padding:7px 9px; min-height:20px; selection-background-color:{self.COLORS['ap']}; selection-color:#081014; }}
+            QLineEdit,QSpinBox,QKeySequenceEdit {{ background:#0c1113; color:{self.COLORS['text']}; border:1px solid #596164; padding:7px 9px; min-height:20px; selection-background-color:{self.COLORS['doom']}; selection-color:#fff; }}
             QComboBox {{ background:#0c1419; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
             QComboBox QAbstractItemView {{ background:#101a20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
-            QLineEdit:focus,QSpinBox:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['ap']}; outline:0; }}
+            QLineEdit:focus,QSpinBox:focus,QKeySequenceEdit:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['doom_hot']}; outline:0; }}
             QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:9px 13px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
-            QPushButton:hover {{ background:#243740; border-color:{self.COLORS['ap']}; }}
+            QPushButton:hover {{ background:#2d302b; border-color:{self.COLORS['doom_hot']}; }}
             QPushButton:pressed {{ background:#0d151a; border-color:{self.COLORS['doom_hot']}; padding:10px 12px 8px 14px; }}
             QPushButton#primary {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; color:#102012; }}
             QPushButton#primary:hover {{ background:#b2e77a; }}
             QPushButton#primary:pressed {{ background:#7eaf50; color:#071008; }}
+            QPushButton#danger {{ background:#522226; border-color:#b9494e; color:#fff1f1; }}
+            QPushButton#danger:hover {{ background:#743037; border-color:#ff7676; }}
             QPushButton#nav {{ text-align:left; background:transparent; border:0; border-left:3px solid transparent; color:{self.COLORS['muted']}; padding:10px 10px; }}
             QPushButton#nav:checked,QPushButton#nav:hover {{ background:#17242b; color:{self.COLORS['text']}; border-left-color:{self.COLORS['doom']}; }}
-            QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:6px 10px; color:{self.COLORS['muted']}; }}
-            QPushButton#sessionNav:checked,QPushButton#sessionNav:hover {{ color:{self.COLORS['text']}; border-color:{self.COLORS['doom']}; background:#1d2d34; }}
+            QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:10px 16px; color:{self.COLORS['muted']}; font-size:11pt; }}
+            QPushButton#sessionNav:checked {{ color:#19110b; border-color:{self.COLORS['doom_hot']}; background:{self.COLORS['doom_hot']}; }}
+            QPushButton#sessionNav:hover {{ color:{self.COLORS['text']}; border-color:{self.COLORS['doom']}; background:#1d2d34; }}
             QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
             QPlainTextEdit,QTableWidget {{ background:#0b1217; color:{self.COLORS['text']}; border:1px solid {self.COLORS['line']}; }}
             QTableWidget {{ gridline-color:#25363e; alternate-background-color:#111c22; }}
             QHeaderView::section {{ background:#16242b; color:{self.COLORS['muted']}; border:0; padding:6px; font-weight:800; }}
             QCheckBox {{ spacing:8px; }} QCheckBox::indicator {{ width:17px; height:17px; border:1px solid #6b7f86; background:#0c1419; }}
             QCheckBox::indicator:checked {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; }}
+            QCheckBox#requirementOption {{ background:#0d1214; border:1px solid #343d40; padding:10px 12px; }}
+            QCheckBox#requirementOption:hover {{ border-color:{self.COLORS['doom_hot']}; background:#1b1b17; }}
+            QLabel#connectionBadge {{ background:#22272a; border:1px solid #596164; padding:6px 12px; font-weight:800; }}
+            QLabel#connectionBadge[connected="true"] {{ color:{self.COLORS['good']}; border-color:#758f25; background:#18200f; }}
         """)
 
     @staticmethod
@@ -359,7 +424,7 @@ class LauncherUI(QMainWindow):
             item.setObjectName("statusItem")
             item.setProperty("statusTone", "muted")
             item_layout = QHBoxLayout(item)
-            item_layout.setContentsMargins(4, 2, 4, 2)
+            item_layout.setContentsMargins(9, 6, 9, 6)
             item_layout.setSpacing(6)
             indicator = self._label("○", "statusIndicator")
             name = self._label(title, "stateName")
@@ -413,6 +478,10 @@ class LauncherUI(QMainWindow):
         self.saves_root = QLineEdit(str(self.controller.config.get("save_games_dir", "")))
         self.server = QLineEdit(str(self.controller.config.get("server_address", "")))
         self.slot = QLineEdit(str(self.controller.config.get("slot", "")))
+        self.ammo_refill_keybind = AmmoRefillKeyControl(
+            str(self.controller.config.get("ammo_refill_keybind", "F9"))
+        )
+        self.ammo_refill_keybind.changed.connect(self._save_ammo_refill_keybind)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.detected_paths = self._label("Checking for DOOM Eternal…", "muted")
@@ -430,10 +499,11 @@ class LauncherUI(QMainWindow):
         self._entry_row(layout, 6, "SERVER", self.server)
         self._entry_row(layout, 7, "PLAYER", self.slot)
         self._entry_row(layout, 8, "PASSWORD", self.password)
+        self._entry_row(layout, 9, "AMMO REFILL KEY", self.ammo_refill_keybind)
         self.join_button = QPushButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, 9, 1, 1, 2)
+        layout.addWidget(self.join_button, 10, 1, 1, 2)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -456,65 +526,69 @@ class LauncherUI(QMainWindow):
         self.drift.setObjectName("warning")
         self.drift.hide()
         layout.addWidget(self.drift)
-        self.launch_option_label = self._label("STEAM LAUNCH OPTION", "eyebrow")
+        self.launch_option_label = self._label("CONFIGURED FOR THIS SYSTEM", "eyebrow")
         self.launch_option = QLineEdit("Available after setup.")
         self.launch_option.setReadOnly(True)
-        self.copy_launch_option_button = QPushButton("COPY OPTION")
+        self.launch_option.hide()
+        self.copy_launch_option_button = QPushButton("COPY")
         self.copy_launch_option_button.clicked.connect(self._copy_launch_option)
         if os.name != "nt":
             layout.addWidget(self.launch_option_label)
-            layout.addWidget(self.launch_option)
             layout.addWidget(self.copy_launch_option_button, alignment=Qt.AlignmentFlag.AlignLeft)
         else:
             self.launch_option_label.hide()
             self.launch_option.hide()
             self.copy_launch_option_button.hide()
-        controls = QHBoxLayout()
-        self.stop_button = QPushButton("DISCONNECT")
-        self.stop_button.clicked.connect(self._disconnect)
-        self.stop_button.setEnabled(False)
-        self.reinstall_button = QPushButton("INSTALL ROOM PACKAGE")
-        self.reinstall_button.clicked.connect(self._reinstall)
-        self.reinstall_button.setEnabled(False)
-        controls.addWidget(self.stop_button)
-        controls.addWidget(self.reinstall_button)
-        controls.addStretch(1)
-        layout.addLayout(controls)
         return card
 
-    def _player_card(self) -> QFrame:
-        """Compact factual room identity, kept ahead of supporting session views."""
-        card = self._card()
-        layout = QGridLayout(card)
-        layout.setContentsMargins(20, 15, 20, 15)
-        layout.setHorizontalSpacing(20)
-        layout.setVerticalSpacing(4)
-        layout.addWidget(self._label("PLAYER", "section"), 0, 0, 1, 3)
-        self.player_connection = self._label("Connection: Not connected", "muted")
-        self.player_team = self._label("Team: —", "muted")
-        self.player_slot = self._label("Slot: —", "muted")
-        self.player_inventory = self._label("Inventory: Connect to resync", "muted")
+    def _session_hero(self) -> QFrame:
+        """Session identity, readiness, and room actions in one primary surface."""
+        card = self._card("hero")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(13)
+        identity = QGridLayout()
+        identity.setHorizontalSpacing(20)
+        identity.setVerticalSpacing(4)
+        identity.addWidget(self._label("CURRENT SESSION", "eyebrow"), 0, 0, 1, 3)
+        self.session_player_name = self._label("NO ROOM CONNECTED", "title")
+        identity.addWidget(self.session_player_name, 1, 0, 1, 2)
+        self.connection_badge = self._label("OFFLINE", "connectionBadge")
+        self.connection_badge.setProperty("connected", False)
+        identity.addWidget(self.connection_badge, 1, 2, alignment=Qt.AlignmentFlag.AlignRight)
+        self.player_team = self._label("Team —", "muted")
+        self.player_slot = self._label("Slot —", "muted")
+        self.player_inventory = self._label("Connect to restore inventory", "muted")
+        self.player_ammo_refills = self._label(f"AMMO REFILLS — · {self.ammo_refill_keybind.value()}", "muted")
         self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
         self.resync_inventory_button.setEnabled(False)
         self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
-        layout.addWidget(self.player_connection, 1, 0)
-        layout.addWidget(self.player_team, 1, 1)
-        layout.addWidget(self.player_slot, 1, 2)
-        layout.addWidget(self.player_inventory, 2, 0, 1, 2)
-        layout.addWidget(self.resync_inventory_button, 2, 2)
-        return card
-
-    def _session_page(self) -> QWidget:
-        body = QWidget()
-        outer = QVBoxLayout(body)
-        outer.setContentsMargins(28, 24, 28, 30)
-        outer.setSpacing(14)
-        outer.addWidget(self._player_card())
-        outer.addWidget(self._status_strip())
-        self.session_setup = self._card("hero")
+        identity.addWidget(self.player_team, 2, 0)
+        identity.addWidget(self.player_slot, 2, 1)
+        identity.addWidget(self.player_ammo_refills, 2, 2)
+        identity.addWidget(self.player_inventory, 3, 0, 1, 3)
+        layout.addLayout(identity)
+        layout.addWidget(self._status_strip())
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        actions.addWidget(self.resync_inventory_button)
+        self.session_uninstall_button = QPushButton("UNINSTALL MOD")
+        self.session_uninstall_button.clicked.connect(self._uninstall_room_package)
+        self.session_uninstall_button.setEnabled(False)
+        actions.addWidget(self.session_uninstall_button)
+        actions.addStretch(1)
+        self.stop_button = QPushButton("DISCONNECT")
+        self.stop_button.setObjectName("danger")
+        self.stop_button.clicked.connect(self._disconnect)
+        self.stop_button.setEnabled(False)
+        actions.addWidget(self.stop_button)
+        layout.addLayout(actions)
+        self.session_setup = self._card("actionStrip")
+        self.session_setup.setProperty("actionTone", "warning")
         setup_layout = QHBoxLayout(self.session_setup)
-        setup_layout.setContentsMargins(20, 16, 20, 16)
+        setup_layout.setContentsMargins(15, 12, 15, 12)
         setup_copy = QVBoxLayout()
+        setup_copy.setSpacing(2)
         self.session_setup_title = self._label("ROOM PACKAGE", "section")
         self.session_setup_detail = self._label("Connect to a room to check its package.", "muted")
         setup_copy.addWidget(self.session_setup_title)
@@ -522,27 +596,29 @@ class LauncherUI(QMainWindow):
         setup_layout.addLayout(setup_copy, 1)
         setup_buttons = QHBoxLayout()
         self.session_manual_complete_action = QPushButton("I COMPLETED MANUAL INSTALLATION")
-        self.session_manual_complete_action.setObjectName("secondary")
         self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
         self.session_manual_complete_action.setVisible(False)
         self.session_manual_retry_action = QPushButton("TRY AGAIN")
-        self.session_manual_retry_action.setObjectName("secondary")
         self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
         self.session_manual_retry_action.setVisible(False)
         self.session_setup_action = QPushButton("INSTALL ROOM PACKAGE")
         self.session_setup_action.setObjectName("primary")
         self.session_setup_action.clicked.connect(self._run_setup_action)
+        self.reinstall_button = self.session_setup_action
         setup_buttons.addWidget(self.session_manual_complete_action)
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
         setup_layout.addLayout(setup_buttons)
-        setup_layout.setAlignment(
-            setup_buttons,
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-        )
-        outer.addWidget(self.session_setup)
+        layout.addWidget(self.session_setup)
+        return card
+
+    def _session_page(self) -> QWidget:
+        body = QWidget()
+        outer = QVBoxLayout(body)
+        outer.setContentsMargins(28, 24, 28, 30)
+        outer.setSpacing(14)
+        outer.addWidget(self._session_hero())
         header = QHBoxLayout()
-        header.addWidget(self._label("SESSION", "title"))
         header.addStretch(1)
         self.session_nav_buttons: list[QPushButton] = []
         for text, page in (("ACTIVITY", 0), ("HINTS", 1), ("LOG", 2), ("ROOM", 3)):
@@ -652,19 +728,40 @@ class LauncherUI(QMainWindow):
         self.player_name.setPlaceholderText("Player name")
         player_layout.addWidget(self.player_name)
         layout.addWidget(player)
-        layout.addWidget(self._start_inventory_widget())
-        groups: dict[str, list[dict[str, object]]] = {}
-        for option in cast(list[dict[str, object]], self.controller.options_schema["options"]):
-            groups.setdefault(str(option.get("group") or "OPTIONS"), []).append(option)
-        for group, options in groups.items():
+        layout.addWidget(self._effective_config_widget())
+        options_by_key = {
+            str(option["key"]): option
+            for option in cast(list[dict[str, object]], self.controller.options_schema["options"])
+        }
+        groups = (
+            ("GOAL & CAMPAIGN", ("goal", "use_dlc_content", "dlc_logic_timing", "additional_victory_requirements")),
+            ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
+            ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "randomize_first_battery", "include_weapon_mastery_challenges", "praetor_suit_upgrades_in_pool")),
+            ("COMBAT & QoL", ("reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
+            ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link")),
+        )
+        for group, keys in groups:
             card = self._card()
             group_layout = QVBoxLayout(card)
             group_layout.setContentsMargins(20, 18, 20, 20)
             group_layout.setSpacing(9)
-            group_layout.addWidget(self._label(group.upper(), "section"))
-            for option in options:
-                group_layout.addWidget(self._option_widget(option))
+            group_layout.addWidget(self._label(group, "section"))
+            if group == "STARTING LOADOUT":
+                group_layout.addWidget(self._start_inventory_widget())
+            for key in keys:
+                option = options_by_key.get(key)
+                if option is not None:
+                    group_layout.addWidget(self._option_widget(option))
+                if key == "additional_victory_requirements":
+                    self.select_all_side_content = QPushButton("SELECT ALL SIDE CONTENT")
+                    self.select_all_side_content.setToolTip(
+                        "Selects Slayer Gates, Escalation Encounters, Secret Encounters, and Acquire the Unmaykr."
+                    )
+                    self.select_all_side_content.clicked.connect(lambda: self._set_all_side_content(True))
+                    group_layout.addWidget(self.select_all_side_content)
             layout.addWidget(card)
+        self._wire_create_dependencies()
+        self._refresh_create_dependencies()
         actions = QHBoxLayout()
         reset = QPushButton("RESET DEFAULTS")
         reset.clicked.connect(self._reset_options)
@@ -677,6 +774,172 @@ class LauncherUI(QMainWindow):
         layout.addLayout(actions)
         layout.addStretch(1)
         return self._scroll(body)
+
+    def _effective_config_widget(self) -> QFrame:
+        card = self._card("effectiveConfig")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(3)
+        layout.addWidget(self._label("EFFECTIVE CONFIGURATION", "eyebrow"), 0, 0, 1, 3)
+        self.effective_config_values: dict[str, QLabel] = {}
+        cells = (("goal", "GOAL"), ("campaign", "CAMPAIGN"), ("dlc", "DLC LOGIC"), ("special", "SPECIAL WEAPON"), ("starting", "STARTING WEAPON"), ("victory", "VICTORY"))
+        for index, (key, label) in enumerate(cells):
+            cell = QWidget()
+            cell_layout = QVBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 5, 10, 5)
+            cell_layout.setSpacing(2)
+            cell_layout.addWidget(self._label(label, "stateName"))
+            value = self._label("—")
+            value.setStyleSheet("font-weight:800;")
+            cell_layout.addWidget(value)
+            self.effective_config_values[key] = value
+            layout.addWidget(cell, 1 + index // 3, index % 3)
+        return card
+
+    def _wire_create_dependencies(self) -> None:
+        for key in ("use_dlc_content", "enhanced_melee_damage"):
+            control = self.option_controls.get(key)
+            if isinstance(control, QCheckBox):
+                cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
+        for key in ("goal", "special_weapon"):
+            control = self.option_controls.get(key)
+            if isinstance(control, QComboBox):
+                cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
+        requirements = self.option_controls.get("additional_victory_requirements")
+        if isinstance(requirements, OptionSetControl):
+            for _, check in requirements.checks:
+                check.toggled.connect(self._refresh_create_dependencies)
+        for key in ("randomize_dash", "randomize_chainsaw"):
+            control = self.option_controls.get(key)
+            if isinstance(control, QCheckBox):
+                checkbox = cast(QCheckBox, control)
+                self._warning_state[key] = checkbox.isChecked()
+                checkbox.toggled.connect(lambda checked, option_key=key: self._confirm_randomization(option_key, checked))
+
+    def _choice_value(self, key: str) -> object:
+        control = self.option_controls.get(key)
+        if isinstance(control, QCheckBox):
+            return cast(QCheckBox, control).isChecked()
+        if isinstance(control, QComboBox):
+            return cast(QComboBox, control).currentData()
+        return None
+
+    def _set_choice_enabled(self, key: str, value: str, enabled: bool) -> None:
+        control = self.option_controls.get(key)
+        if not isinstance(control, QComboBox):
+            return
+        combo = cast(QComboBox, control)
+        index = combo.findData(value)
+        if index < 0:
+            return
+        item = combo.model().item(index)
+        if item is not None:
+            item.setEnabled(enabled)
+
+    def _set_all_side_content(self, checked: bool) -> None:
+        if self._syncing_create_dependencies:
+            return
+        control = self.option_controls.get("additional_victory_requirements")
+        if not isinstance(control, OptionSetControl):
+            return
+        side_content = {
+            "Complete All Slayer Gates",
+            "Complete All Escalation Encounters",
+            "Complete All Secret Encounters",
+            "Acquire the Unmaykr",
+        }
+        for value, check in control.checks:
+            if value in side_content:
+                check.setChecked(checked)
+
+    def _refresh_create_dependencies(self) -> None:
+        if self._syncing_create_dependencies:
+            return
+        self._syncing_create_dependencies = True
+        try:
+            dlc_enabled = self._choice_value("use_dlc_content") is True
+            special_weapon = self.option_controls.get("special_weapon")
+            special_row = self.option_rows.get("special_weapon")
+            dlc_timing_row = self.option_rows.get("dlc_logic_timing")
+            self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_enabled)
+            self._set_choice_enabled("goal", "complete_the_full_saga", dlc_enabled)
+            if not dlc_enabled:
+                if self._choice_value("goal") in {"kill_the_dark_lord", "complete_the_full_saga"}:
+                    goal_control = self.option_controls.get("goal")
+                    if isinstance(goal_control, QComboBox):
+                        goal = cast(QComboBox, goal_control)
+                        goal.setCurrentIndex(max(0, goal.findData("acquire_the_unmaykr")))
+                if isinstance(special_weapon, QComboBox):
+                    special = cast(QComboBox, special_weapon)
+                    special.setCurrentIndex(max(0, special.findData("the_crucible")))
+            if special_row is not None:
+                special_row.setVisible(dlc_enabled)
+            if dlc_timing_row is not None:
+                dlc_timing_row.setVisible(dlc_enabled)
+            self._refresh_inventory_picker(dlc_enabled)
+            requirements = self.option_controls.get("additional_victory_requirements")
+            if isinstance(requirements, OptionSetControl):
+                side_content = {
+                    "Complete All Slayer Gates",
+                    "Complete All Escalation Encounters",
+                    "Complete All Secret Encounters",
+                    "Acquire the Unmaykr",
+                }
+                selected = set(requirements.value())
+                all_selected = side_content.issubset(selected)
+                self.select_all_side_content.setText("SIDE CONTENT SELECTED" if all_selected else "SELECT ALL SIDE CONTENT")
+                self.select_all_side_content.setEnabled(not all_selected)
+            goal_label = self._selected_label("goal")
+            special_label = "The Crucible" if not dlc_enabled else self._selected_label("special_weapon")
+            requirement_count = len(requirements.value()) if isinstance(requirements, OptionSetControl) else 0
+            values = {
+                "goal": goal_label,
+                "campaign": "Full Saga · 19 missions" if dlc_enabled else "Base Campaign · 13 missions",
+                "dlc": self._selected_label("dlc_logic_timing") if dlc_enabled else "Base Campaign only",
+                "special": special_label,
+                "starting": self._selected_label("starting_weapon"),
+                "victory": "Goal only" if not requirement_count else f"Goal + {requirement_count} optional objectives",
+            }
+            for key, value in values.items():
+                self.effective_config_values[key].setText(value)
+        finally:
+            self._syncing_create_dependencies = False
+
+    def _selected_label(self, key: str) -> str:
+        control = self.option_controls.get(key)
+        return cast(QComboBox, control).currentText() if isinstance(control, QComboBox) else "—"
+
+    def _confirm_randomization(self, key: str, checked: bool) -> None:
+        previous = self._warning_state.get(key, False)
+        self._warning_state[key] = checked
+        if not checked or previous:
+            return
+        if key == "randomize_dash":
+            title = "Randomize Dash"
+            message = (
+                "Randomizing Dash can make some routes significantly harder and may require advanced "
+                "movement or unintended techniques depending on your seed.\n\nContinue?"
+            )
+        else:
+            title = "Randomize Chainsaw"
+            message = (
+                "This is actual Hell on Earth.\n\nAmmo economy becomes much harsher, and some encounters "
+                "can be significantly more difficult before Chainsaw is found. Enhanced Melee Damage may "
+                "make early combat more forgiving.\n\nContinue?"
+            )
+        answer = QMessageBox.question(
+            self, title, message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            control = self.option_controls.get(key)
+            if isinstance(control, QCheckBox):
+                checkbox = cast(QCheckBox, control)
+                checkbox.blockSignals(True)
+                checkbox.setChecked(False)
+                checkbox.blockSignals(False)
+            self._warning_state[key] = False
 
     def _doctor_page(self) -> QScrollArea:
         body = QWidget()
@@ -735,6 +998,21 @@ class LauncherUI(QMainWindow):
             shortcut.activated.connect(lambda target=page: self._show_page(target))
         primary = QShortcut(QKeySequence("Ctrl+Return"), self)
         primary.activated.connect(self._primary_action)
+        self._ammo_refill_shortcut = QShortcut(
+            QKeySequence(self.ammo_refill_keybind.value()), self
+        )
+        self._ammo_refill_shortcut.activated.connect(self.controller.request_ammo_refill)
+
+    def _save_ammo_refill_keybind(self, captured: str = "") -> None:
+        value = captured.strip()
+        try:
+            self.controller.set_ammo_refill_keybind(value)
+        except ValueError as error:
+            self.ammo_refill_keybind.set_value("F9")
+            self._append_log(f"Ammo Refill keybind rejected: {error}")
+            return
+        self._ammo_refill_shortcut.setKey(QKeySequence(value))
+        self.player_ammo_refills.setText(f"AMMO REFILLS — · {value or 'UNBOUND'}")
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)
@@ -795,6 +1073,10 @@ class LauncherUI(QMainWindow):
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
         copy = detail or fallback
+        tone = "ready" if state == "ready" else "working" if state in {"checking", "installing", "updating"} else "warning"
+        self.session_setup.setProperty("actionTone", tone)
+        self.session_setup.style().unpolish(self.session_setup)
+        self.session_setup.style().polish(self.session_setup)
         self.session_setup_title.setText(title)
         self.session_setup_detail.setText(copy)
         self.session_setup_action.setText(action)
@@ -973,6 +1255,14 @@ class LauncherUI(QMainWindow):
         self.change_paths.setText("HIDE FOLDERS" if show else "CHOOSE GAME FOLDER")
 
     def _disconnect(self) -> None:
+        if QMessageBox.question(
+            self,
+            "Disconnect session",
+            "Disconnect from this room?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
         try:
             self.controller.disconnect()
             self.stop_button.setEnabled(False)
@@ -1043,19 +1333,20 @@ class LauncherUI(QMainWindow):
             return
         self._resolved_consent_requests.add(request_id)
         name = str(event.get("name") or "Required dependency")
-        display_name = "Game integration" if name == "Meathook" else "Room package installation tool"
-        purpose = str(event.get("purpose") or ("Connect the game to this room" if name == "Meathook" else "Install this room package"))
-        source = str(event.get("source") or ("GitHub / brongo" if name == "Meathook" else "GitHub"))
+        version = str(event.get("version") or "unspecified version")
+        purpose = str(event.get("purpose") or "Complete room setup")
+        source = str(event.get("source") or event.get("url") or "Upstream source not supplied")
         details = [
-            f"{display_name} is required: {purpose}.",
-            f"Source: {source}",
+            f"Dependency: {name} {version}",
+            f"Required to: {purpose}.",
+            f"Upstream: {source}",
             "This download is verified before use.",
         ]
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Dependency download approval")
         dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText(f"Approve {display_name} download")
+        dialog.setText(f"Approve {name} download")
         dialog.setInformativeText("\n\n".join(details))
         accept = dialog.addButton("Download and verify", QMessageBox.ButtonRole.AcceptRole)
         dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
@@ -1068,9 +1359,9 @@ class LauncherUI(QMainWindow):
         finally:
             self.controller.resolve_consent(request_id, accepted)
         if not accepted:
-            self._set_setup_state("failed", f"{display_name} download declined. Retry setup when ready.")
+            self._set_setup_state("failed", f"{name} download declined. Retry setup when ready.")
 
-    def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit) -> None:
+    def _entry_row(self, layout: QGridLayout, row: int, label: str, field: QWidget) -> None:
         layout.addWidget(self._label(label, "eyebrow"), row, 0)
         layout.addWidget(field, row, 1, 1, 2)
 
@@ -1104,12 +1395,19 @@ class LauncherUI(QMainWindow):
             event.get("slot_name") or event.get("player_name") or self.controller.config.get("slot"),
             f"Slot {slot}",
         )
-        self.player_connection.setText("Connection: Connected")
-        self.player_team.setText(f"Team: {team}")
-        self.player_slot.setText(f"Slot: {slot} · {player}")
-        self.player_inventory.setText("Inventory: Ready")
+        self.session_player_name.setText(player)
+        self.connection_badge.setText("CONNECTED")
+        self.connection_badge.setProperty("connected", True)
+        self.connection_badge.style().unpolish(self.connection_badge)
+        self.connection_badge.style().polish(self.connection_badge)
+        self.player_team.setText(f"Team {team}")
+        self.player_slot.setText(f"Slot {slot} · {player}")
+        self.player_inventory.setText("Inventory ready")
+        ammo_count = event.get("ammo_refills_available", "—")
+        self.player_ammo_refills.setText(f"AMMO REFILLS {ammo_count} · {self.ammo_refill_keybind.value()}")
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
-        self.room_summary.setText(f"Server: {endpoint}\nPlayer: {player}\nSeed: {seed} | Team {team}, Slot {slot}")
+        self.session_uninstall_button.setEnabled(self._room_connected)
+        self.room_summary.setText(f"Seed: {seed}\nServer: {endpoint}\nPlayer: {player} · Team {team} · Slot {slot}")
         slot_data = event.get("slot_data")
         if not isinstance(slot_data, dict):
             self.room_options.setText("This room did not send a settings summary.")
@@ -1118,12 +1416,28 @@ class LauncherUI(QMainWindow):
         core = [(key, value) for key, value in sorted(slot_data.items()) if key in {
             "randomize_dash", "reveal_ap_locations_on_automap", "death_link", "death_link_mode"
         }]
-        lines = [f"{str(key).replace('_', ' ').title()}: {value}" for key, value in core]
+        lines = [f"{self._option_label(key)}: {self._option_value_text(value)}" for key, value in core]
         if traps:
-            lines.append("Traps: " + ", ".join(f"{str(key).replace('_', ' ').title()} {value}%" if isinstance(value, int) and "percentage" in str(key) else f"{str(key).replace('_', ' ').title()}: {value}" for key, value in traps))
+            lines.append("Traps: " + ", ".join(f"{self._option_label(key)} {value}%" if isinstance(value, int) and "percentage" in str(key) else f"{self._option_label(key)}: {self._option_value_text(value)}" for key, value in traps))
         else:
             lines.append("Traps: not set for this room")
         self.room_options.setText(" | ".join(lines))
+
+    def _option_label(self, key: object) -> str:
+        name = str(key)
+        schema = getattr(self.controller, "options_schema", None)
+        if isinstance(schema, dict):
+            for option in schema.get("options", []) or []:
+                if isinstance(option, dict) and option.get("key") == name:
+                    label = str(option.get("display_name") or "").strip()
+                    if label:
+                        return label
+        return name.replace("_", " ").title()
+
+    def _option_value_text(self, value: object) -> str:
+        if isinstance(value, bool):
+            return "On" if value else "Off"
+        return str(value)
 
     def _view_room_options(self) -> None:
         dialog = QDialog(self)
@@ -1135,7 +1449,10 @@ class LauncherUI(QMainWindow):
         options.setReadOnly(True)
         slot_data = self.room_event.get("slot_data", {})
         if isinstance(slot_data, dict):
-            options.setPlainText("\n".join(f"{str(key).replace('_', ' ').title()}: {value}" for key, value in sorted(slot_data.items())) or "No settings supplied.")
+            options.setPlainText("\n".join(
+                f"{self._option_label(key)}: {self._option_value_text(value)}"
+                for key, value in sorted(slot_data.items(), key=lambda item: str(item[0]))
+            ) or "No settings supplied.")
         else:
             options.setPlainText("No settings supplied.")
         layout.addWidget(options)
@@ -1237,6 +1554,7 @@ class LauncherUI(QMainWindow):
             control = NamedRangeControl(option)
         control.setMinimumWidth(200)
         self.option_controls[key] = control
+        self.option_rows[key] = row
         layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
         return row
 
@@ -1254,20 +1572,18 @@ class LauncherUI(QMainWindow):
         controls = QHBoxLayout()
         self.inventory_picker = QComboBox()
         self.inventory_picker.setMinimumContentsLength(24)
-        for item in self.start_inventory_catalog:
-            self.inventory_picker.addItem(item["label"], item["name"])
         self.inventory_quantity = QSpinBox()
         self.inventory_quantity.setRange(1, 9999)
-        add = QPushButton("ADD")
-        add.setObjectName("primary")
-        add.clicked.connect(self._add_inventory)
+        self.inventory_add_button = QPushButton("ADD")
+        self.inventory_add_button.setObjectName("primary")
+        self.inventory_add_button.clicked.connect(self._add_inventory)
         enabled = bool(self.start_inventory_catalog)
         self.inventory_picker.setEnabled(enabled)
         self.inventory_quantity.setEnabled(enabled)
-        add.setEnabled(enabled)
+        self.inventory_add_button.setEnabled(enabled)
         controls.addWidget(self.inventory_picker, 1)
         controls.addWidget(self.inventory_quantity)
-        controls.addWidget(add)
+        controls.addWidget(self.inventory_add_button)
         layout.addLayout(controls)
         self.inventory = QTableWidget(0, 2)
         self.inventory.setHorizontalHeaderLabels(["ITEM", "QTY"])
@@ -1281,6 +1597,40 @@ class LauncherUI(QMainWindow):
         remove.clicked.connect(lambda: self.inventory.removeRow(self.inventory.currentRow()) if self.inventory.currentRow() >= 0 else None)
         layout.addWidget(remove, alignment=Qt.AlignmentFlag.AlignRight)
         return card
+
+    def _refresh_inventory_picker(self, dlc_enabled: bool) -> None:
+        selected_special = "the_crucible" if not dlc_enabled else str(self._choice_value("special_weapon"))
+        special_items = {
+            "progressive_special_weapon": {"Progressive Special Weapon"},
+            "progressive_sentinel_hammer": {"Progressive Sentinel Hammer"},
+            "the_crucible": {"The Crucible"},
+        }
+        allowed_special = special_items.get(selected_special, {"The Crucible"})
+        unavailable = {"Berserk", "Haste", "Quad Damage"}
+        if not dlc_enabled:
+            unavailable.update({"Break Blast", "Desperate Punch", "Take Back"})
+        allowed = [
+            item for item in self.start_inventory_catalog
+            if item["name"] not in unavailable
+            and (item["name"] not in {"Progressive Special Weapon", "Progressive Sentinel Hammer", "The Crucible"}
+                 or item["name"] in allowed_special)
+        ]
+        current = self.inventory_picker.currentData()
+        self.inventory_picker.blockSignals(True)
+        self.inventory_picker.clear()
+        for item in allowed:
+            self.inventory_picker.addItem(item["label"], item["name"])
+        self.inventory_picker.setCurrentIndex(max(0, self.inventory_picker.findData(current)))
+        self.inventory_picker.blockSignals(False)
+        enabled = bool(allowed)
+        self.inventory_picker.setEnabled(enabled)
+        self.inventory_quantity.setEnabled(enabled)
+        self.inventory_add_button.setEnabled(enabled)
+        allowed_names = {item["name"] for item in allowed}
+        for row in reversed(range(self.inventory.rowCount())):
+            item = self.inventory.item(row, 0)
+            if item is not None and str(item.data(Qt.ItemDataRole.UserRole)) not in allowed_names:
+                self.inventory.removeRow(row)
 
     def _add_inventory(self) -> None:
         name = self.inventory_picker.currentData()
@@ -1321,6 +1671,7 @@ class LauncherUI(QMainWindow):
             elif isinstance(control, QSpinBox): control.setValue(cast(int, value))
             elif isinstance(control, (NamedRangeControl, OptionSetControl)): control.setValue(value)
         self.inventory.setRowCount(0)
+        self._refresh_create_dependencies()
 
     def _save_player_options(self) -> None:
         try:
@@ -1344,7 +1695,13 @@ class LauncherUI(QMainWindow):
         value = self.launch_option.text()
         if value and not value.startswith("Available"):
             QApplication.clipboard().setText(value)
+            if QApplication.clipboard().text() != value:
+                self.copy_launch_option_button.setText("COPY FAILED")
+                self._append_log("Steam launch option could not be verified on clipboard.")
+                return
             self._append_log("Steam launch option copied.")
+            self.copy_launch_option_button.setText("COPIED")
+            QTimer.singleShot(1800, lambda: self.copy_launch_option_button.setText("COPY"))
 
     def _show_setup_complete(self) -> None:
         """Confirm a new room package install without offering game launch control."""
@@ -1499,6 +1856,7 @@ class LauncherUI(QMainWindow):
             "deathlink": ("DEATHLINK", self.COLORS["warn"]),
             "archipelago": ("ARCHIPELAGO", self.COLORS["doom_hot"]),
             "game_link_installed": ("GAME LINK", self.COLORS["good"]),
+            "ammo_refill": ("AMMO REFILL", self.COLORS["doom_hot"]),
         }
         segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
         fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Status", "state"), ("Reason", "reason"), ("Message", "message"))
@@ -1570,6 +1928,14 @@ class LauncherUI(QMainWindow):
                 detail, enabled = presentation
                 self.player_inventory.setText(detail)
                 self.resync_inventory_button.setEnabled(enabled and self._room_connected)
+            return
+        if kind == "ammo_refill":
+            available = event.get("available")
+            if isinstance(available, int):
+                self.player_ammo_refills.setText(f"AMMO REFILLS {available} · {self.ammo_refill_keybind.value()}")
+            self._append_log(
+                f"Ammo Refill: {event.get('message') or event.get('status') or 'session update'}"
+            )
             return
         if kind == "uninstall_queued":
             self.uninstall_button.setEnabled(False)
@@ -1766,9 +2132,17 @@ class LauncherUI(QMainWindow):
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")
             self.uninstall_button.setEnabled(False)
-            self.player_connection.setText("Connection: Not connected")
-            self.player_inventory.setText("Inventory: Connect to resync")
+            self.connection_badge.setText("OFFLINE")
+            self.connection_badge.setProperty("connected", False)
+            self.connection_badge.style().unpolish(self.connection_badge)
+            self.connection_badge.style().polish(self.connection_badge)
+            self.session_player_name.setText("NO ROOM CONNECTED")
+            self.player_team.setText("Team —")
+            self.player_slot.setText("Slot —")
+            self.player_inventory.setText("Connect to restore inventory")
+            self.player_ammo_refills.setText(f"AMMO REFILLS — · {self.ammo_refill_keybind.value()}")
             self.resync_inventory_button.setEnabled(False)
+            self.session_uninstall_button.setEnabled(False)
             self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
             for key in self.statuses:
                 self._set_status(key, "waiting", self.COLORS["muted"])

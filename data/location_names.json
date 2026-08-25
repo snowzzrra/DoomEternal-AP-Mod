@@ -31,7 +31,7 @@
     "7770030": "Exultia - At Doom's Gate Vinyl Record",
     "7770031": "Exultia - Arachnotron Toy",
     "7770032": "Exultia - Cacodemon Toy",
-    "7770034": "Exultia - Hidden Plasma Rifle",
+    "7770034": "Exultia - Plasma Rifle",
     "7770035": "Exultia - Sentinel Crystal - Purple-Goo Cave after the Third Celestial Core",
     "7770036": "Exultia - Exultia Codex Entry",
     "7770037": "Exultia - The Wolf Codex Entry",
@@ -49,7 +49,7 @@
     "7770049": "Cultist Base - Into Sandy's City Vinyl Record",
     "7770050": "Cultist Base - Gargoyle Toy",
     "7770051": "Cultist Base - Soldier (Blaster) Toy",
-    "7770052": "Cultist Base - Extra Life - Hanging Cage",
+    "7770052": "Cultist Base - Extra Life - Dopefish 1",
     "7770053": "Cultist Base - Extra Life - Dopefish 2",
     "7770054": "Cultist Base - Extra Life - Dopefish 3",
     "7770056": "Cultist Base - Rocket Launcher",
@@ -368,7 +368,9 @@
     "7770414": "Final Sin - Mission Complete",
     "7770415": "Final Sin - Extra Life - Second Building Lower Vent",
     "7770416": "Final Sin - Extra Life - Twin-Elevator Vent",
-    "7770417": "Final Sin - Extra Life - Fourth-Arena Gore Room"
+    "7770417": "Final Sin - Extra Life - Fourth-Arena Gore Room",
+    "7770418": "Fortress of Doom - Unmaykr Acquired",
+    "7770419": "The Dark Lord - Defeated"
   },
   "schema_version": 1,
   "source": "content/maps/*/locations.json + runtime.json"

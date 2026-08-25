@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -42,6 +43,10 @@ from .launcher_platform import (
     validate_save_directory,
 )
 from .launcher_supervisor import BridgeSupervisor
+
+
+AMMO_REFILL_KEYBIND_CONFIG = "ammo_refill_keybind"
+DEFAULT_AMMO_REFILL_KEYBIND = "F9"
 
 
 def application_directory() -> Path:
@@ -84,6 +89,10 @@ class LauncherController:
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
+        configured_keybind = self.config.get(AMMO_REFILL_KEYBIND_CONFIG)
+        if not isinstance(configured_keybind, str) or not configured_keybind.strip():
+            self.config[AMMO_REFILL_KEYBIND_CONFIG] = DEFAULT_AMMO_REFILL_KEYBIND
+            self._persist_config()
         self.options_schema = load_options_schema(
             self.client_dir / "data" / "options_schema.json"
         )
@@ -429,20 +438,34 @@ class LauncherController:
     def _request_support_condump(self) -> dict[str, object]:
         """Attempt one diagnostic condump, recording closed-game availability."""
         requested_at = time.time()
-        if not self.is_game_running():
+        supervisor = self.supervisor
+        supervisor_available = supervisor is not None and supervisor.running
+        native_health = self.read_native_health(force=True)
+        native_stopped = native_health.get("native_state") == "stopped"
+        if native_stopped:
             return {
                 "status": "unavailable",
                 "reason": "game_closed",
                 "message": "diagnostic condump unavailable: game not running",
                 "requested_at": requested_at,
             }
-        supervisor = self.supervisor
-        if supervisor is None or not supervisor.running:
+        # Fresh native readiness is authoritative under Proton; avoid making
+        # bounded diagnostics wait on a host-side executable-name probe.
+        game_running = bool(native_health.get("ready")) if supervisor_available else self.is_game_running()
+        if not game_running:
+            return {
+                "status": "unavailable",
+                "reason": "game_closed",
+                "message": "diagnostic condump unavailable: game not running",
+                "requested_at": requested_at,
+            }
+        if not supervisor_available:
             return {
                 "status": "unavailable",
                 "reason": "bridge_worker_unavailable",
                 "requested_at": requested_at,
             }
+        assert supervisor is not None
         save_value = self.config.get("save_games_dir")
         if not save_value:
             return {
@@ -845,6 +868,41 @@ class LauncherController:
         if not connected or supervisor is None:
             raise RuntimeError("not connected")
         supervisor.send_chat(text)
+
+    def set_ammo_refill_keybind(self, keybind: str) -> None:
+        value = str(keybind).strip().replace("Control+", "Ctrl+")
+        if not value:
+            self.save_config({AMMO_REFILL_KEYBIND_CONFIG: ""})
+            return
+        if "\n" in value or "\r" in value or len(value) > 32:
+            raise ValueError("Ammo Refill keybind must contain one key")
+        parts = value.split("+")
+        modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
+        if any(not part for part in parts) or parts[-1] in modifiers:
+            raise ValueError("Ammo Refill keybind cannot contain only modifiers")
+        if any(part not in modifiers for part in parts[:-1]):
+            raise ValueError("Ammo Refill keybind must be one representable keyboard chord")
+        key = parts[-1]
+        if not re.fullmatch(r"(?:F(?:[1-9]|1[0-2])|[A-Z0-9]|Space|Tab|Backspace|Insert|Delete|Home|End|PageUp|PageDown|Up|Down|Left|Right)", key, re.IGNORECASE):
+            raise ValueError("Ammo Refill keybind uses a key unsupported by the DOOM bind bridge")
+        self.save_config({AMMO_REFILL_KEYBIND_CONFIG: value})
+
+    def request_ammo_refill(self) -> None:
+        with self._lifecycle_lock:
+            connected = self.connected_room
+            supervisor = self.supervisor
+        if not connected or supervisor is None or not supervisor.running:
+            self.emit(
+                "ammo_refill",
+                status="blocked",
+                message="Ammo Refill unavailable while disconnected",
+            )
+            return
+        control = json.dumps({"type": "ammo_refill"}, separators=(",", ":"))
+        try:
+            supervisor.send_command(f"AP_CONTROL {control}")
+        except Exception as error:
+            self.emit("ammo_refill", status="error", message=str(error))
 
     def request_inventory_resync(self) -> None:
         with self._lifecycle_lock:

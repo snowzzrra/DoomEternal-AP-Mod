@@ -80,7 +80,7 @@ DEVINV_MAPPING_PATH = Path(__file__).resolve().parents[2] / "data" / "devinv_sta
 DEVINV_MAPPING_SCHEMA_VERSION = 1
 DEVINV_ALLOWED_KINDS = frozenset({
     "ability", "currency", "equipment", "key", "mastery", "progressive",
-    "rune", "suit_perk", "weapon", "weapon_mod",
+    "rune", "special_weapon", "stored_charge", "suit_perk", "weapon", "weapon_mod",
 })
 DEVINV_ALLOWED_FIELDS = frozenset({"item", "perk"})
 DEVINV_ALLOWED_FLAGS = frozenset({"applyAfterLoadout", "equip", "forceStat", "isRune"})
@@ -173,6 +173,49 @@ def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str,
                 or len(tiers) != len(set(tiers))
             ):
                 raise ValueError(f"DevInv progressive mapping {item_id} has invalid ordered tiers")
+        elif kind == "stored_charge":
+            if set(entry) != {"name", "kind", "storage", "start_inventory_eligible"}:
+                raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid fields")
+            if entry["storage"] != "ap_stored_charge" or entry["start_inventory_eligible"] is not True:
+                raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid storage contract")
+        elif kind == "special_weapon":
+            states = entry.get("states")
+            if set(entry) != {"name", "kind", "state_family", "max_quantity", "replacement", "states"}:
+                raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid fields")
+            if (
+                not isinstance(entry["state_family"], str)
+                or entry["replacement"] != "replace_prior_state"
+                or isinstance(entry["max_quantity"], bool)
+                or not isinstance(entry["max_quantity"], int)
+                or entry["max_quantity"] < 1
+                or not isinstance(states, list)
+                or len(states) != entry["max_quantity"]
+            ):
+                raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid states")
+            quantities = []
+            for state in states:
+                if not isinstance(state, dict) or set(state) != {"quantity", "representations"}:
+                    raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed state")
+                quantity = state["quantity"]
+                representations = state["representations"]
+                if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+                    raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid state quantity")
+                quantities.append(quantity)
+                if not isinstance(representations, list) or not representations:
+                    raise ValueError(f"DevInv special-weapon mapping {item_id} has empty state")
+                for representation in representations:
+                    if not isinstance(representation, dict):
+                        raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed representation")
+                    allowed = {"field", "path", "flags", "dedupe"}
+                    if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation fields")
+                    if not isinstance(representation.get("path"), str) or not representation["path"]:
+                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation path")
+                    flags = representation.get("flags", [])
+                    if not isinstance(flags, list) or any(flag not in DEVINV_ALLOWED_FLAGS for flag in flags):
+                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation flags")
+            if quantities != list(range(1, entry["max_quantity"] + 1)):
+                raise ValueError(f"DevInv special-weapon mapping {item_id} states must be contiguous")
         else:
             representations = entry.get("representations")
             if set(entry) != {"name", "kind", "representations"} or not isinstance(representations, list) or not representations:
@@ -215,6 +258,19 @@ def _materialized_representations(
     entry = _entry_for_name(name, mapping)
     if entry["kind"] == "currency":
         return []
+    if entry["kind"] == "stored_charge":
+        # Stored charges are AP ownership state, not native DevInv inventory.
+        return []
+    if entry["kind"] == "special_weapon":
+        if quantity > entry["max_quantity"]:
+            raise ValueError(
+                f"starting_inventory quantity for {name!r} exceeds {entry['max_quantity']} special-weapon states"
+            )
+        state = entry["states"][quantity - 1]
+        return [
+            (raw["field"], raw["path"], tuple(sorted(raw.get("flags", ()))))
+            for raw in state["representations"]
+        ]
     if entry["kind"] == "progressive":
         tiers = entry["tiers"]
         if quantity > len(tiers):

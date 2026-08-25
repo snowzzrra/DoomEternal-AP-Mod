@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "map_key": "e5m4_boss",
+  "status": "technical_context",
+  "source": "vanillamaps/e5m4_boss.map",
+  "source_sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
+  "owner": "game/sp/e5m4_boss/e5m4_boss_patch2.resources",
+  "reserved_ids": [],
+  "current_config_facts": {
+    "dark_lord_defeat_evidence": {
+      "entity": "stage_3_target_campaign_complete_1",
+      "class": "idTarget_EndOfCampaign",
+      "inherit": "target/campaign_complete",
+      "runtime_map": "game/sp/e5m4_boss/e5m4_boss",
+      "acquisition_edge": "end-of-campaign target fires only when The Dark Lord is defeated and the campaign ends",
+      "fallback_terminal_owner": "stage_3_target_level_transition_1",
+      "fallback_completion_stat": "STAT_DLC2_COMPLETE_E5M4",
+      "boss_entity": "stage_1_ai_boss_darklord_3",
+      "runtime_verification": "pending"
+    }
+  }
+}

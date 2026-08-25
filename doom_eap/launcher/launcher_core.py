@@ -26,16 +26,82 @@ MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
-MANIFEST_SCHEMA_VERSION = 2
-MOD_CONTRACT_REVISION = 1
+MANIFEST_SCHEMA_VERSION = 3
+MOD_CONTRACT_REVISION = 2
+SLOT_DATA_SCHEMA_VERSION = 3
+SLOT_DATA_REVISION = "0.5-B"
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
-    "room_mod_v1",
+    "room_mod_v2",
+    "slot_data_v3",
+    "goal_events_v1",
+    "goal_endpoint_events_v1",
+    "placement_scouts_v1",
     "randomize_dash_v1",
     "starting_inventory_v1",
     "starting_weapon_v1",
+    "special_weapon_progression_v1",
+    "ammo_refill_v1",
     "physical_options_v1",
     "room_options_v1",
+})
+ROOM_SLOT_DEFAULTS: dict[str, Any] = {
+    "use_dlc_content": True,
+    "dlc_logic_timing": "Late Game",
+    "goal": "Acquire the Unmaykr",
+    "goal_endpoint_event": "Internal Goal Endpoint: Acquire the Unmaykr",
+    "additional_victory_requirements": [
+        "Complete All Enabled Missions",
+        "Complete All Escalation Encounters",
+        "Complete All Slayer Gates",
+    ],
+    "special_weapon": "Progressive Special Weapon",
+    "enhanced_melee_damage": False,
+    "randomize_chainsaw": False,
+    "randomize_dash": False,
+    "randomize_first_battery": False,
+    "include_weapon_mastery_challenges": True,
+    REVEAL_AP_LOCATIONS_OPTION_KEY: False,
+    "starting_weapon": "Combat Shotgun",
+    "praetor_suit_upgrades_in_pool": 6,
+    "trap_percentage": 10,
+    "enabled_traps": [
+        "Ammo Drain Trap",
+        "Arachnotron Trap",
+        "Archvile Trap",
+        "BFG Drain Trap",
+        "Baron Trap",
+        "Carcass Trap",
+        "Cueball Trap",
+        "Dread Knight Trap",
+        "Fuel Drain Trap",
+        "Hell Knight Trap",
+        "Imp Trap",
+        "Marauder Trap",
+        "Revenant Trap",
+        "Tyrant Trap",
+    ],
+    "starting_inventory": {},
+}
+GOAL_VALUES = frozenset({
+    "Acquire the Unmaykr",
+    "Kill the Icon of Sin",
+    "Kill the Dark Lord",
+    "Complete the Full Saga",
+})
+VICTORY_REQUIREMENT_VALUES = frozenset({
+    "Complete All Enabled Missions",
+    "Complete All Slayer Gates",
+    "Complete All Escalation Encounters",
+    "Complete All Secret Encounters",
+    "Complete All Mission Challenges",
+    "Complete All Weapon Mastery Challenges",
+    "Acquire the Unmaykr",
+})
+SPECIAL_WEAPON_VALUES = frozenset({
+    "Progressive Special Weapon",
+    "Progressive Sentinel Hammer",
+    "The Crucible",
 })
 CLIENT_CONFIG_FIELDS = frozenset({
     "steam_remote_dir",
@@ -59,6 +125,134 @@ def release_identity() -> dict[str, Any]:
     return json.loads((ROOT / "data" / "content_identity.json").read_text(encoding="utf-8"))
 
 
+def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize current APWorld slot fields while retaining legacy defaults."""
+    slot_data = {
+        key: list(value) if isinstance(value, list) else dict(value) if isinstance(value, dict) else value
+        for key, value in ROOM_SLOT_DEFAULTS.items()
+    }
+    slot_data.update(raw)
+    boolean_keys = (
+        "use_dlc_content",
+        "enhanced_melee_damage",
+        "randomize_chainsaw",
+        "randomize_dash",
+        "randomize_first_battery",
+        "include_weapon_mastery_challenges",
+        REVEAL_AP_LOCATIONS_OPTION_KEY,
+    )
+    for key in boolean_keys:
+        if not isinstance(slot_data[key], bool):
+            raise ValueError(f"Connected.slot_data.{key} must be boolean")
+    if slot_data["dlc_logic_timing"] not in {"Late Game", "From the Beginning"}:
+        raise ValueError("Connected.slot_data.dlc_logic_timing is invalid")
+    if slot_data["goal"] not in GOAL_VALUES:
+        raise ValueError("Connected.slot_data.goal is invalid")
+    requirements = slot_data["additional_victory_requirements"]
+    if not isinstance(requirements, list) or any(
+        not isinstance(value, str) or value not in VICTORY_REQUIREMENT_VALUES
+        for value in requirements
+    ) or len(requirements) != len(set(requirements)):
+        raise ValueError("Connected.slot_data.additional_victory_requirements is invalid")
+    if slot_data["special_weapon"] not in SPECIAL_WEAPON_VALUES:
+        raise ValueError("Connected.slot_data.special_weapon is invalid")
+    for key, minimum, maximum in (
+        ("praetor_suit_upgrades_in_pool", 0, 21),
+        ("trap_percentage", 0, 100),
+    ):
+        value = slot_data[key]
+        if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+            raise ValueError(f"Connected.slot_data.{key} is invalid")
+    traps = slot_data["enabled_traps"]
+    if not isinstance(traps, list) or any(not isinstance(value, str) or not value for value in traps):
+        raise ValueError("Connected.slot_data.enabled_traps is invalid")
+    if len(traps) != len(set(traps)):
+        raise ValueError("Connected.slot_data.enabled_traps contains duplicates")
+    if not isinstance(slot_data["goal_endpoint_event"], str) or not slot_data["goal_endpoint_event"]:
+        raise ValueError("Connected.slot_data.goal_endpoint_event is invalid")
+    if not isinstance(slot_data["starting_weapon"], str) or not slot_data["starting_weapon"]:
+        raise ValueError("Connected.slot_data.starting_weapon is invalid")
+    if not isinstance(slot_data["starting_inventory"], dict):
+        raise ValueError("Connected.slot_data.starting_inventory is invalid")
+    return slot_data
+
+
+@dataclass(frozen=True)
+class PlacementRecord:
+    """Resolved, immutable placement input for deterministic compilation."""
+
+    location_id: int
+    location_name: str
+    item_id: int
+    item_name: str
+    recipient_slot: int
+    recipient_name: str
+    classification: int
+    trap: bool
+    local: bool
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> PlacementRecord:
+        if not isinstance(value, Mapping):
+            raise ValueError("placement must be an object")
+        required = {
+            "location_id", "location_name", "item_id", "item_name",
+            "recipient_slot", "recipient_name", "classification", "trap", "local",
+        }
+        if set(value) != required:
+            raise ValueError(
+                "placement fields must be exactly " + ", ".join(sorted(required))
+            )
+        integer_fields = ("location_id", "item_id", "recipient_slot", "classification")
+        for field in integer_fields:
+            field_value = value[field]
+            if not isinstance(field_value, int) or isinstance(field_value, bool):
+                raise ValueError(f"placement {field} must be an integer")
+        if value["location_id"] <= 0 or value["recipient_slot"] < 1:
+            raise ValueError("placement location_id and recipient_slot must be positive")
+        if value["classification"] < 0:
+            raise ValueError("placement classification must be non-negative")
+        for field in ("location_name", "item_name", "recipient_name"):
+            if not isinstance(value[field], str) or not value[field].strip():
+                raise ValueError(f"placement {field} must be non-empty text")
+        if not isinstance(value["trap"], bool) or not isinstance(value["local"], bool):
+            raise ValueError("placement trap and local must be boolean")
+        expected_trap = bool(value["classification"] & 0b00100)
+        if value["trap"] != expected_trap:
+            raise ValueError("placement trap does not match classification")
+        return cls(**dict(value))
+
+    def document(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _normalize_placements(
+    placements: object, active_location_ids: tuple[int, ...], slot: int
+) -> tuple[PlacementRecord, ...]:
+    if not isinstance(placements, (list, tuple)):
+        raise ValueError("placements must be a list")
+    records = tuple(
+        value if isinstance(value, PlacementRecord) else PlacementRecord.from_mapping(value)
+        for value in placements
+    )
+    ids = [record.location_id for record in records]
+    if len(ids) != len(set(ids)):
+        raise ValueError("placements contain duplicate location IDs")
+    expected = set(active_location_ids)
+    actual = set(ids)
+    if actual != expected:
+        raise ValueError(
+            f"placement set is incomplete or unknown: missing={sorted(expected - actual)}, "
+            f"unknown={sorted(actual - expected)}"
+        )
+    for record in records:
+        if record.local != (record.recipient_slot == slot):
+            raise ValueError(
+                f"placement local flag disagrees with recipient slot at {record.location_id}"
+            )
+    return tuple(sorted(records, key=lambda record: record.location_id))
+
+
 @dataclass(frozen=True)
 class RoomSnapshot:
     seed_name: str
@@ -67,27 +261,23 @@ class RoomSnapshot:
     slot_data: dict[str, Any]
     missing_locations: tuple[int, ...]
     checked_locations: tuple[int, ...]
+    placements: tuple[PlacementRecord, ...]
 
     @classmethod
     def from_packets(cls, room_info: dict[str, Any], connected: dict[str, Any]) -> RoomSnapshot:
         seed_name = room_info.get("seed_name")
         team = connected.get("team")
         slot = connected.get("slot")
-        slot_data = connected.get("slot_data")
+        raw_slot_data = connected.get("slot_data")
         if not isinstance(seed_name, str) or not seed_name:
             raise ValueError("RoomInfo.seed_name is required")
         if not isinstance(team, int) or isinstance(team, bool) or team < 0:
             raise ValueError("Connected.team must be a non-negative integer")
         if not isinstance(slot, int) or isinstance(slot, bool) or slot < 1:
             raise ValueError("Connected.slot must be a positive integer")
-        if not isinstance(slot_data, dict):
+        if not isinstance(raw_slot_data, dict):
             raise ValueError("Connected.slot_data must be an object")
-        if not isinstance(slot_data.get("randomize_dash"), bool):
-            raise ValueError("Connected.slot_data.randomize_dash must be boolean")
-        if not isinstance(slot_data.get(REVEAL_AP_LOCATIONS_OPTION_KEY), bool):
-            raise ValueError(
-                f"Connected.slot_data.{REVEAL_AP_LOCATIONS_OPTION_KEY} must be boolean"
-            )
+        slot_data = _normalize_slot_data(raw_slot_data)
         for key in PHYSICAL_OPTION_KEYS:
             if not isinstance(slot_data.get(key), bool):
                 raise ValueError(f"Connected.slot_data.{key} must be boolean")
@@ -111,13 +301,22 @@ class RoomSnapshot:
                 raise ValueError(f"Connected.{field} contains invalid location ID")
             return tuple(sorted(set(values)))
 
+        missing = locations("missing_locations")
+        checked = locations("checked_locations")
+        if set(missing) & set(checked):
+            raise ValueError("Connected missing_locations and checked_locations overlap")
+        raw_placements = connected.get("placements")
+        active = tuple(sorted(set(missing) | set(checked)))
+        placements = _normalize_placements(raw_placements, active, slot)
+
         return cls(
             seed_name=seed_name,
             team=team,
             slot=slot,
             slot_data=dict(slot_data),
-            missing_locations=locations("missing_locations"),
-            checked_locations=locations("checked_locations"),
+            missing_locations=missing,
+            checked_locations=checked,
+            placements=placements,
         )
 
     @classmethod
@@ -131,6 +330,7 @@ class RoomSnapshot:
                 "slot_data": payload.get("slot_data"),
                 "missing_locations": payload.get("missing_locations"),
                 "checked_locations": payload.get("checked_locations"),
+                "placements": payload.get("placements"),
             },
         )
 
@@ -155,10 +355,22 @@ class SeedManifest:
     required_capabilities: tuple[str, ...]
     options: dict[str, Any]
     active_location_ids: tuple[int, ...]
+    placements: tuple[PlacementRecord, ...]
     manifest_hash: str
+    static_precompile: bool = False
 
     @classmethod
-    def create(cls, *, seed_name: str, team: int, slot: int, options: dict[str, Any], active_location_ids: list[int]) -> SeedManifest:
+    def create(
+        cls,
+        *,
+        seed_name: str,
+        team: int,
+        slot: int,
+        options: dict[str, Any],
+        active_location_ids: list[int],
+        placements: object = (),
+        static_precompile: bool = False,
+    ) -> SeedManifest:
         identity = release_identity()
         normalized_options = {
             key: options[key]
@@ -183,7 +395,23 @@ class SeedManifest:
                     raise ValueError("manifest starting_inventory has invalid name or quantity")
         if "starting_weapon" in normalized_options and normalized_options["starting_weapon"] is not None and not isinstance(normalized_options["starting_weapon"], str):
             raise ValueError("manifest starting_weapon must be string or null")
-        required_capabilities = {"room_mod_v1"}
+        active_ids = tuple(sorted(set(active_location_ids)))
+        if not isinstance(static_precompile, bool):
+            raise ValueError("static_precompile must be boolean")
+        normalized_placements = (
+            ()
+            if static_precompile
+            else _normalize_placements(placements, active_ids, int(slot))
+        )
+        required_capabilities = {
+            "room_mod_v2",
+            "slot_data_v3",
+            "goal_events_v1",
+            "goal_endpoint_events_v1",
+            "placement_scouts_v1",
+            "special_weapon_progression_v1",
+            "ammo_refill_v1",
+        }
         required_capabilities.add("physical_options_v1")
         required_capabilities.add("room_options_v1")
         if normalized_options.get("randomize_dash"):
@@ -206,9 +434,14 @@ class SeedManifest:
             "mod_contract_revision": MOD_CONTRACT_REVISION,
             "required_capabilities": sorted(required_capabilities),
             "options": normalized_options,
-            "active_location_ids": sorted(active_location_ids),
+            "active_location_ids": list(active_ids),
+            "placements": [record.document() for record in normalized_placements],
+            "static_precompile": static_precompile,
         }
-        return cls(**payload, manifest_hash=hashlib.sha256(_canonical(payload)).hexdigest())
+        return cls(
+            **{**payload, "placements": normalized_placements},
+            manifest_hash=hashlib.sha256(_canonical(payload)).hexdigest(),
+        )
 
     def document(self) -> dict[str, Any]:
         return asdict(self)
@@ -220,16 +453,22 @@ class SeedManifest:
         if "bridge_protocol" in slot_data and slot_data["bridge_protocol"] != identity["bridge_protocol_version"]:
             raise ValueError(f"session bridge_protocol is incompatible: {slot_data['bridge_protocol']!r} != {identity['bridge_protocol_version']!r}")
         schema = slot_data.get("manifest_schema_version", 1)
-        contract = slot_data.get("mod_contract_revision", 1)
+        contract = slot_data.get("mod_contract_revision", MOD_CONTRACT_REVISION)
         if not isinstance(schema, int) or schema < 1 or schema > MANIFEST_SCHEMA_VERSION:
             raise ValueError(f"session manifest schema is unsupported: {schema!r}")
-        if not isinstance(contract, int) or contract < 1 or contract > MOD_CONTRACT_REVISION:
+        if contract != MOD_CONTRACT_REVISION:
             raise ValueError(f"session mod contract is unsupported: {contract!r}")
+        slot_data_revision = slot_data.get("slot_data_revision")
+        if slot_data_revision is not None and slot_data_revision != SLOT_DATA_REVISION:
+            raise ValueError(f"session slot data revision is unsupported: {slot_data_revision!r}")
         required = slot_data.get("required_capabilities")
         if required is None:
-            required_capabilities = {"room_mod_v1"}
-            if slot_data.get("randomize_dash"):
-                required_capabilities.add("randomize_dash_v1")
+            required_capabilities = {
+                "room_mod_v2",
+                "placement_scouts_v1",
+                "physical_options_v1",
+                "room_options_v1",
+            }
         elif isinstance(required, list) and all(isinstance(value, str) for value in required):
             required_capabilities = set(required)
         else:
@@ -250,15 +489,33 @@ class SeedManifest:
             team=snapshot.team,
             slot=snapshot.slot,
             options={
+                "use_dlc_content": slot_data["use_dlc_content"],
+                "dlc_logic_timing": slot_data["dlc_logic_timing"],
+                "goal": slot_data["goal"],
+                "goal_endpoint_event": slot_data["goal_endpoint_event"],
+                "additional_victory_requirements": list(
+                    slot_data["additional_victory_requirements"]
+                ),
+                "special_weapon": slot_data["special_weapon"],
+                "enhanced_melee_damage": slot_data["enhanced_melee_damage"],
+                "include_weapon_mastery_challenges": slot_data[
+                    "include_weapon_mastery_challenges"
+                ],
+                "praetor_suit_upgrades_in_pool": slot_data[
+                    "praetor_suit_upgrades_in_pool"
+                ],
+                "trap_percentage": slot_data["trap_percentage"],
+                "enabled_traps": list(slot_data["enabled_traps"]),
                 "randomize_dash": slot_data["randomize_dash"],
                 REVEAL_AP_LOCATIONS_OPTION_KEY: slot_data[REVEAL_AP_LOCATIONS_OPTION_KEY],
                 **{key: slot_data[key] for key in PHYSICAL_OPTION_KEYS},
                 "death_link": slot_data.get("death_link", False),
                 "death_link_mode": slot_data.get("death_link_mode", "soft"),
-                **({"starting_inventory": starting_inventory} if starting_inventory else {}),
-                **({"starting_weapon": slot_data["starting_weapon"]} if "starting_weapon" in slot_data else {}),
+                "starting_inventory": starting_inventory,
+                "starting_weapon": slot_data["starting_weapon"],
             },
             active_location_ids=list(snapshot.active_location_ids),
+            placements=snapshot.placements,
         )
 
 
@@ -266,6 +523,20 @@ class RoomCompiler:
     """Assemble canonical base resources and selected dependent map payloads."""
 
     DEVINV_MAP_KEY = "e1m1_intro"
+    ENHANCED_MELEE_PATH = "gameresources/generated/decls/damage/damage/player/melee_d5_forward.decl"
+    ENHANCED_MELEE_DECL = b'''declType( damage ) {
+    edit = {
+        inherit = "damage/player/directional_melee";
+        damageName = "fists";
+        minDamage = 160;
+        maxDamage = 160;
+        isMelee = true;
+        doom5MeleeTest = {
+            isDoom5Melee = true;
+        }
+    }
+}
+'''
 
     def __init__(self, base_resource: Path, payload_resource: Path, payload_manifest: Path):
         from tools.release.room_payloads import load_room_payload_manifest
@@ -282,6 +553,52 @@ class RoomCompiler:
         self.base_resource = base_resource
         self.payload_resource = payload_resource
         self.payload_manifest = load_room_payload_manifest(payload_manifest)
+
+    def _apply_placement_strings(self, assembled: dict[str, bytes], placements: tuple) -> None:
+        """Merge placement-aware receipt strings into the packaged locale tables."""
+        from collections import defaultdict
+
+        from tools.maps.notification_formatting import item_receipt_text, location_sent_text
+
+        per_item: dict[int, list] = defaultdict(list)
+        for record in placements:
+            per_item[record.item_id].append(record)
+        for locale in ("english", "portuguese"):
+            member = f"gameresources_patch1/EternalMod/strings/{locale}.json"
+            if member not in assembled:
+                continue
+            table = json.loads(assembled[member])
+            entries = table.get("strings")
+            if not isinstance(entries, list):
+                continue
+            by_name = {
+                entry["name"]: entry
+                for entry in entries
+                if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+            }
+            for item_id, records in per_item.items():
+                if len(records) != 1:
+                    continue
+                record = records[0]
+                entry = by_name.get(f"#str_ap_notify_item_{item_id}")
+                if entry is None or not isinstance(entry.get("text"), str):
+                    continue
+                entry["text"] = item_receipt_text(
+                    entry["text"],
+                    local=record.local,
+                    trap=record.trap,
+                    recipient_name=record.recipient_name,
+                )
+            for record in placements:
+                sent_key = f"#str_ap_location_sent_{record.location_id}"
+                by_name[sent_key] = {
+                    "name": sent_key,
+                    "text": location_sent_text(record.document()),
+                }
+            table["strings"] = sorted(by_name.values(), key=lambda entry: entry["name"])
+            assembled[member] = (
+                json.dumps(table, indent=4, ensure_ascii=False) + "\n"
+            ).encode("utf-8")
 
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
@@ -314,6 +631,10 @@ class RoomCompiler:
             "seed_manifest.json": canonical_json(seed_document),
             "seed_receipt.json": canonical_json(receipt),
         })
+        if manifest.options.get("enhanced_melee_damage", False):
+            assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
+        if not manifest.static_precompile and manifest.placements:
+            self._apply_placement_strings(assembled, manifest.placements)
         write_deterministic_zip(assembled, destination)
         with zipfile.ZipFile(destination) as output:
             expected = set(assembled)
@@ -327,6 +648,10 @@ class RoomCompiler:
                 raise ValueError("assembled room receipt validation failed")
             if output.read(devinv_path) != devinv_source.encode("utf-8"):
                 raise ValueError("assembled DevInv validation failed")
+            if (self.ENHANCED_MELEE_PATH in output.namelist()) != bool(
+                manifest.options.get("enhanced_melee_damage", False)
+            ):
+                raise ValueError("assembled Enhanced Melee Damage validation failed")
         return destination
 
 
@@ -483,6 +808,23 @@ class ModCompiler:
         (output_root / "seed_manifest.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+        if not manifest.static_precompile:
+            placement_metadata = [record.document() for record in manifest.placements]
+            (output_root / "placement_metadata.json").write_text(
+                json.dumps(placement_metadata, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            (output_root / "placement_string_inputs.json").write_text(
+                json.dumps(
+                    [
+                        {"key": f"#str_ap_location_{record.location_id}", "text": record.location_name}
+                        for record in manifest.placements
+                    ],
+                    indent=2,
+                    sort_keys=True,
+                ) + "\n",
+                encoding="utf-8",
+            )
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -562,6 +904,11 @@ class ModCompiler:
                     item_id: policy.receipt_feedback
                     for item_id, policy in policies.items()
                 },
+                placement_metadata=(
+                    None
+                    if manifest.static_precompile
+                    else [record.document() for record in manifest.placements]
+                ),
             )
         output_entities.with_suffix(".seed.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",

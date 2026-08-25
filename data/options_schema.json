@@ -107,6 +107,145 @@
       "ui_type": "toggle"
     },
     {
+      "default": true,
+      "description": "Include The Ancient Gods Part One and Part Two. Disable for Base Campaign content only.",
+      "display_name": "Use DLC Content",
+      "group": "Game Options",
+      "key": "use_dlc_content",
+      "source_class": "UseDLCContent",
+      "ui_type": "toggle"
+    },
+    {
+      "choices": [
+        {
+          "key": "late_game",
+          "label": "Late Game",
+          "value": 0
+        },
+        {
+          "key": "from_the_beginning",
+          "label": "From the Beginning",
+          "value": 1
+        }
+      ],
+      "default": "late_game",
+      "description": "Late Game opens DLC when campaign readiness is established. From the Beginning opens all three campaign roots immediately.",
+      "display_name": "dlc_logic_timing",
+      "group": "Game Options",
+      "key": "dlc_logic_timing",
+      "source_class": "DLCLogicTiming",
+      "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "key": "acquire_the_unmaykr",
+          "label": "Acquire the Unmaykr",
+          "value": 0
+        },
+        {
+          "key": "kill_the_icon_of_sin",
+          "label": "Kill the Icon of Sin",
+          "value": 1
+        },
+        {
+          "key": "kill_the_dark_lord",
+          "label": "Kill the Dark Lord",
+          "value": 2
+        },
+        {
+          "key": "complete_the_full_saga",
+          "label": "Complete the Full Saga",
+          "value": 3
+        }
+      ],
+      "default": "acquire_the_unmaykr",
+      "description": "Choose victory: physically acquire the Unmaykr, defeat the Icon of Sin, defeat the Dark Lord, or complete all 19 missions plus those three physical endpoints.",
+      "display_name": "goal",
+      "group": "Game Options",
+      "key": "goal",
+      "source_class": "Goal",
+      "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "key": "Acquire the Unmaykr",
+          "label": "Acquire the Unmaykr"
+        },
+        {
+          "key": "Complete All Enabled Missions",
+          "label": "Complete All Enabled Missions"
+        },
+        {
+          "key": "Complete All Escalation Encounters",
+          "label": "Complete All Escalation Encounters"
+        },
+        {
+          "key": "Complete All Mission Challenges",
+          "label": "Complete All Mission Challenges"
+        },
+        {
+          "key": "Complete All Secret Encounters",
+          "label": "Complete All Secret Encounters"
+        },
+        {
+          "key": "Complete All Slayer Gates",
+          "label": "Complete All Slayer Gates"
+        },
+        {
+          "key": "Complete All Weapon Mastery Challenges",
+          "label": "Complete All Weapon Mastery Challenges"
+        }
+      ],
+      "default": [
+        "Complete All Enabled Missions",
+        "Complete All Escalation Encounters",
+        "Complete All Slayer Gates"
+      ],
+      "description": "Additional content required after selected Goal endpoint.",
+      "display_name": "Additional Victory Requirements",
+      "group": "Game Options",
+      "key": "additional_victory_requirements",
+      "source_class": "AdditionalVictoryRequirements",
+      "ui_type": "option_set"
+    },
+    {
+      "choices": [
+        {
+          "key": "progressive_special_weapon",
+          "label": "Progressive Special Weapon",
+          "value": 0
+        },
+        {
+          "key": "progressive_sentinel_hammer",
+          "label": "Progressive Sentinel Hammer",
+          "value": 1
+        },
+        {
+          "key": "the_crucible",
+          "label": "The Crucible",
+          "value": 2
+        }
+      ],
+      "default": "progressive_special_weapon",
+      "description": "Choose a three-stage Crucible-to-Hammer progression, a two-stage Sentinel Hammer progression, or one standalone Crucible stage.",
+      "display_name": "special_weapon",
+      "group": "Game Options",
+      "key": "special_weapon",
+      "source_class": "SpecialWeapon",
+      "ui_type": "choice"
+    },
+    {
+      "default": false,
+      "description": "Make normal melee stronger while preserving Blood Punch behavior.",
+      "display_name": "Enhanced Melee Damage",
+      "group": "Game Options",
+      "key": "enhanced_melee_damage",
+      "source_class": "EnhancedMeleeDamage",
+      "ui_type": "toggle"
+    },
+    {
       "default": false,
       "description": "Randomize the Chainsaw. If false, the Chainsaw will always be found at its\nvanilla location in Hell on Earth.",
       "display_name": "Randomize Chainsaw",
@@ -144,7 +283,7 @@
     },
     {
       "default": false,
-      "description": "Start with the AP progression-item reveal capability on the Automap.",
+      "description": "Reveal Archipelago item pickups on the Automap.",
       "display_name": "Reveal AP Locations on Automap",
       "group": "Game Options",
       "key": "reveal_ap_locations_on_automap",
@@ -317,5 +456,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "0f7526d15154ca0f81ff5393f18a75707d158dc96f1f70e80f7af4f06990a5a1"
+  "source_sha256": "4315a6d3777253d7575ef55de66192c99ffc6364b7ecbf2d6b47db7caa0cdf37"
 }

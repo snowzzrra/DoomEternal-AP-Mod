@@ -36,6 +36,7 @@ from doom_eap.contracts.foundation import (
     load_primitive_registry,
 )
 from doom_eap.content.item_classification import (
+    ITEM_CLASSIFICATION_TRAP,
     load_item_classification_identity,
     normalize_network_classification,
     notification_style_for_item,
@@ -155,6 +156,23 @@ _CONTENT_IDENTITY = json.loads(
 BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
 TRANSITION_HANDLER = "unified"
 GAME_NAME = _CONTENT_IDENTITY["game"]
+AMMO_REFILL_ITEM_ID = 7770024
+AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
+AMMO_REFILL_STORAGE_PREFIX = "doom_eap"
+# In-game Ammo Refill request channel: the player's DOOM bind for
+# AP_USE_REFILL_CHARGE executes `condump AP_REFILL_REQUEST.txt`, and the bridge
+# consumes that file from SAVE_GAMES_DIR as one refill request.
+AMMO_REFILL_REQUEST_FILENAME = "AP_REFILL_REQUEST.txt"
+
+
+def _doom_location_ids():
+    identity = json.loads(
+        (REPO_ROOT / "data" / "location_names.json").read_text(encoding="utf-8")
+    )
+    locations = identity.get("locations")
+    if not isinstance(locations, dict):
+        raise ValueError("DOOM location-name data is malformed")
+    return {int(location_id) for location_id in locations}
 DEATHLINK_RECEIVE_TIMEOUT = 20.0
 DEATHLINK_CONFIRM_TIMEOUT = 8.0
 DEATHLINK_TOTAL_TIMEOUT = 60.0
@@ -3003,6 +3021,14 @@ class DoomEternalContext(CommonContext):
         self._item_delivery_wakeup = False
         self._item_delivery_waiting_for_state = False
         self._queue_session_authoritative = False
+        self._placement_expected_ids = None
+        self._placement_info = {}
+        self._placement_connected_complete = False
+        self._placement_scout_failed = False
+        self._ammo_storage_key = None
+        self._ammo_server_consumed = None
+        self._ammo_refill_available = None
+        self._ammo_refill_pending = False
         invalidate_queue_session_namespace("bridge_start")
         # Process-local packet timing. Ranges keep ReceivedItems callback work O(1).
         self._packet_received_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
@@ -3298,6 +3324,185 @@ class DoomEternalContext(CommonContext):
         await self.get_username()
         await self.send_connect()
 
+    def _ammo_refill_storage_name(self):
+        if not self.state_key:
+            return None
+        return f"{AMMO_REFILL_STORAGE_PREFIX}:{self.state_key}:ammo_refill_consumed"
+
+    def _ammo_received_count(self):
+        return sum(
+            1 for receipt in self.items_received if receipt.item == AMMO_REFILL_ITEM_ID
+        )
+
+    def _refresh_ammo_refill_charge(self):
+        consumed = self._ammo_server_consumed
+        if not isinstance(consumed, int) or consumed < 0:
+            self._ammo_refill_available = None
+            return None
+        self._ammo_refill_available = max(self._ammo_received_count() - consumed, 0)
+        return self._ammo_refill_available
+
+    def _ammo_refill_runtime_safe(self):
+        server = getattr(self, "server", None)
+        socket = getattr(server, "socket", None)
+        return bool(
+            self._placement_connected_complete
+            and self.item_state_ready
+            and socket is not None
+            and not socket.closed
+            and not self.runtime_observers_frozen
+            and self.active_save_slot
+            and self.has_authoritative_save_proof()
+        )
+
+    def _configure_ammo_refill_storage(self):
+        self._ammo_storage_key = self._ammo_refill_storage_name()
+        self._ammo_server_consumed = None
+        self._ammo_refill_available = None
+        self._ammo_refill_pending = False
+        if self._ammo_storage_key is None:
+            return
+        self.stored_data.pop(self._ammo_storage_key, None)
+        self.stored_data_notification_keys.add(self._ammo_storage_key)
+        asyncio.create_task(self.send_msgs([
+            {"cmd": "Get", "keys": [self._ammo_storage_key]},
+            {"cmd": "SetNotify", "keys": [self._ammo_storage_key]},
+        ]))
+        emit_launcher_event("ammo_refill", status="loading", available=0, message="Ammo Refill storage loading")
+
+    def _consume_ammo_refill_storage(self, value):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            logger.warning("[Ammo Refill] Ignoring invalid server consumed count: %r", value)
+            return
+        if (
+            self._ammo_server_consumed is not None
+            and value < self._ammo_server_consumed
+        ):
+            logger.error(
+                "[Ammo Refill] Refusing non-monotonic server consumed count: %s < %s",
+                value,
+                self._ammo_server_consumed,
+            )
+            return
+        self._ammo_server_consumed = value
+        available = self._refresh_ammo_refill_charge()
+        if self._ammo_refill_pending:
+            self._ammo_refill_pending = False
+        emit_launcher_event(
+            "ammo_refill",
+            status="ready",
+            available=available or 0,
+            consumed=value,
+            message=f"Ammo Refill charges available: {available or 0}",
+        )
+
+    def _queue_ammo_refill_primitive(self):
+        namespace = queue_session_namespace(self.state_key)
+        if namespace is None:
+            return False
+        command_key = f"ammo-refill-{namespace}"
+        try:
+            commands, description = self.item_activation_commands(
+                AMMO_REFILL_PRIMITIVE_ITEM_ID,
+                0,
+                intent=RECONCILIATION_REPAIR,
+                include_notification=False,
+            )
+        except Exception as error:
+            logger.error("[Ammo Refill] Primitive compilation failed: %s", error)
+            return False
+        if not commands or len(commands) != 1:
+            logger.error("[Ammo Refill] Proven refill primitive is unavailable: %s", description)
+            return False
+        return send_command(
+            commands[0],
+            coalesce_key=command_key,
+            already_queued_ok=False,
+            state_key=self.state_key,
+            delivery_fields={
+                "source": "ammo_refill",
+                "item_id": AMMO_REFILL_ITEM_ID,
+                "primitive_item_id": AMMO_REFILL_PRIMITIVE_ITEM_ID,
+                "active_map": self.current_map_name,
+                "slot": self.active_save_slot,
+            },
+        )
+
+    async def request_ammo_refill(self):
+        if not self._ammo_refill_runtime_safe():
+            emit_launcher_event(
+                "ammo_refill",
+                status="blocked",
+                available=self._ammo_refill_available or 0,
+                message="Ammo Refill unavailable outside safe connected gameplay",
+            )
+            return False
+        available = self._refresh_ammo_refill_charge()
+        if not available or self._ammo_refill_pending:
+            emit_launcher_event(
+                "ammo_refill",
+                status="empty" if not available else "busy",
+                available=available or 0,
+                message="No Ammo Refill charge available" if not available else "Ammo Refill already pending",
+            )
+            return False
+        key = self._ammo_storage_key
+        consumed = self._ammo_server_consumed
+        if key is None or consumed is None:
+            emit_launcher_event("ammo_refill", status="loading", available=available, message="Ammo Refill storage is not ready")
+            return False
+        self._ammo_refill_pending = True
+        try:
+            await self.send_msgs([
+                {
+                    "cmd": "Set",
+                    "key": key,
+                    "default": consumed,
+                    "operations": [{"operation": "add", "value": 1}],
+                    "want_reply": True,
+                }
+            ])
+        except Exception as error:
+            self._ammo_refill_pending = False
+            emit_launcher_event("ammo_refill", status="error", available=available, message=str(error))
+            return False
+        self._ammo_server_consumed = consumed + 1
+        self._refresh_ammo_refill_charge()
+        self.persist_session_state()
+        if not self._ammo_refill_runtime_safe() or not self._queue_ammo_refill_primitive():
+            self._ammo_refill_pending = False
+            emit_launcher_event(
+                "ammo_refill",
+                status="consumed_unqueued",
+                available=self._ammo_refill_available or 0,
+                message="Ammo Refill consumed but primitive could not queue",
+            )
+            return False
+        emit_launcher_event(
+            "ammo_refill",
+            status="queued",
+            available=self._ammo_refill_available or 0,
+            consumed=self._ammo_server_consumed,
+            message="Ammo Refill queued",
+        )
+        return True
+
+    def _consume_ammo_refill_request_file(self):
+        """Consume one in-game AP_USE_REFILL_CHARGE condump request."""
+        save_dir = globals().get("SAVE_GAMES_DIR")
+        if not save_dir:
+            return False
+        path = Path(save_dir) / AMMO_REFILL_REQUEST_FILENAME
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return False
+        except OSError as error:
+            logger.warning("[AmmoRefill] request file removal failed: %s", error)
+            return False
+        asyncio.get_running_loop().create_task(self.request_ammo_refill())
+        return True
+
     def on_package(self, cmd: str, args: dict):
         if cmd == "RoomInfo":
             # Durable item state cannot authorize queue work until matching
@@ -3360,24 +3565,43 @@ class DoomEternalContext(CommonContext):
             self._death_link_task = asyncio.create_task(
                 self.update_death_link(self.death_link_enabled)
             )
-            self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
-            self.onboard_bootstrap("on_connect")
-            self.reconcile_checked_automap_cleanup("server_connected")
-            self.reconcile_fast_travel_unlock("connected")
-            asyncio.create_task(self.check_mission_challenge_locations())
-            if self._item_delivery_wakeup:
-                self._schedule_item_delivery("connected")
-            emit_launcher_event(
-                "connected",
-                seed_name=self.room_seed_name,
-                endpoint=str(getattr(self, "server_address", "") or ""),
-                team=args.get("team", self.team),
-                slot=args.get("slot", self.slot),
-                slot_data=args.get("slot_data", {}),
-                missing_locations=sorted(args.get("missing_locations", [])),
-                checked_locations=sorted(args.get("checked_locations", [])),
-            )
+            self.server_checked_locations_ready = False
+            self._placement_connected_complete = False
+            self._placement_scout_failed = False
+            try:
+                missing = self._connected_location_ids(args, "missing_locations")
+                checked = self._connected_location_ids(args, "checked_locations")
+            except ValueError as error:
+                self._fail_placement_scout(str(error))
+                return
+            if missing & checked:
+                self._fail_placement_scout("Connected location sets overlap")
+                return
+            active = missing | checked
+            unknown = sorted(active - _doom_location_ids())
+            if unknown:
+                self._fail_placement_scout(
+                    f"Connected contains unknown DOOM location IDs: {unknown}"
+                )
+                return
+            self._placement_expected_ids = active
+            self._placement_info = {}
+            self.locations_info.clear()
+            self._connected_slot_data = args.get("slot_data", {})
+            if not active:
+                self._try_complete_location_scouts()
+            else:
+                asyncio.create_task(self._scout_active_locations())
+            self._configure_ammo_refill_storage()
+        elif cmd == "LocationInfo":
+            self._consume_location_info(args)
         elif cmd in {"Retrieved", "SetReply"}:
+            ammo_key = self._ammo_storage_key
+            if cmd == "Retrieved" and ammo_key in args.get("keys", {}):
+                value = args["keys"].get(ammo_key)
+                self._consume_ammo_refill_storage(0 if value is None else value)
+            elif cmd == "SetReply" and args.get("key") == ammo_key:
+                self._consume_ammo_refill_storage(args.get("value"))
             key = self._launcher_hints_key()
             if (cmd == "Retrieved" and key in args.get("keys", {})) or (
                 cmd == "SetReply" and args.get("key") == key
@@ -3401,6 +3625,145 @@ class DoomEternalContext(CommonContext):
             ):
                 logger.info("[DeathLink] Server received and echoed the death.")
                 self.confirmed_death_echo = data.get("time")
+
+    @staticmethod
+    def _connected_location_ids(args, field):
+        values = args.get(field)
+        if not isinstance(values, (list, tuple, set, frozenset)):
+            raise ValueError(f"Connected.{field} must be a location list")
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
+            raise ValueError(f"Connected.{field} contains invalid location ID")
+        return set(values)
+
+    def _fail_placement_scout(self, message):
+        if self._placement_scout_failed:
+            return
+        self._placement_scout_failed = True
+        self.server_checked_locations_ready = False
+        logger.error("[Placement] SCOUT_REJECTED %s", message)
+        self._report_launcher_connection_failure(message)
+
+    async def _scout_active_locations(self):
+        try:
+            await self.send_msgs([{
+                "cmd": "LocationScouts",
+                "locations": sorted(self._placement_expected_ids),
+                "create_as_hint": 0,
+            }])
+        except Exception as error:
+            self._fail_placement_scout(f"LocationScouts failed: {error}")
+            return
+        self._try_complete_location_scouts()
+
+    def _consume_location_info(self, args):
+        if self._placement_expected_ids is None or self._placement_scout_failed:
+            return
+        rows = args.get("locations") if isinstance(args, dict) else None
+        if not isinstance(rows, (list, tuple)):
+            self._fail_placement_scout("LocationInfo.locations is not a list")
+            return
+        packet_ids = []
+        for row in rows:
+            if not isinstance(row, (list, tuple)) or len(row) != 4:
+                self._fail_placement_scout("LocationInfo contains malformed placement")
+                return
+            location_id = row[1]
+            if not isinstance(location_id, int) or isinstance(location_id, bool):
+                self._fail_placement_scout("LocationInfo contains invalid location ID")
+                return
+            packet_ids.append(location_id)
+            if location_id not in self._placement_expected_ids:
+                self._fail_placement_scout(
+                    f"LocationInfo contains unknown location ID: {location_id}"
+                )
+                return
+            placement = self.locations_info.get(location_id)
+            if placement is None:
+                self._fail_placement_scout(
+                    f"LocationInfo did not materialize location ID: {location_id}"
+                )
+                return
+            previous = self._placement_info.get(location_id)
+            if previous is not None and tuple(previous) != tuple(row):
+                self._fail_placement_scout(
+                    f"LocationInfo conflicts at location ID: {location_id}"
+                )
+                return
+            self._placement_info[location_id] = tuple(row)
+        if len(packet_ids) != len(set(packet_ids)):
+            self._fail_placement_scout("LocationInfo contains duplicate location IDs")
+            return
+        self._try_complete_location_scouts()
+
+    def _try_complete_location_scouts(self):
+        if self._placement_scout_failed or self._placement_connected_complete:
+            return
+        if set(self._placement_info) != self._placement_expected_ids:
+            return
+        try:
+            placements = self._resolve_placement_records()
+        except Exception as error:
+            self._fail_placement_scout(f"Placement resolution failed: {error}")
+            return
+        self._placement_connected_complete = True
+        self._complete_connected(placements)
+
+    def _resolve_placement_records(self):
+        records = []
+        for location_id in sorted(self._placement_info):
+            network_item = self.locations_info[location_id]
+            recipient_slot = network_item.player
+            slot_info = self.slot_info.get(recipient_slot)
+            if slot_info is None:
+                raise ValueError(f"recipient slot is unknown: {recipient_slot}")
+            location_name = self.location_names.lookup_in_slot(location_id, self.slot)
+            item_name = self.item_names.lookup_in_slot(network_item.item, recipient_slot)
+            if location_name.startswith("Unknown ") or item_name.startswith("Unknown "):
+                raise ValueError(
+                    f"DataPackage lacks name for location {location_id} or item {network_item.item}"
+                )
+            classification = network_item.flags
+            if not isinstance(classification, int) or isinstance(classification, bool):
+                raise ValueError(f"invalid item classification at location {location_id}")
+            if classification < 0:
+                raise ValueError(f"invalid item classification at location {location_id}")
+            local = recipient_slot == self.slot
+            recipient_name = self.player_names.get(recipient_slot, str(recipient_slot))
+            if not isinstance(recipient_name, str) or not recipient_name.strip():
+                raise ValueError(f"recipient name is unavailable: {recipient_slot}")
+            records.append({
+                "location_id": location_id,
+                "location_name": location_name,
+                "item_id": network_item.item,
+                "item_name": item_name,
+                "recipient_slot": recipient_slot,
+                "recipient_name": recipient_name,
+                "classification": classification,
+                "trap": bool(classification & ITEM_CLASSIFICATION_TRAP),
+                "local": local,
+            })
+        return records
+
+    def _complete_connected(self, placements):
+        self.server_checked_locations_ready = True
+        self.onboard_bootstrap("on_connect")
+        self.reconcile_checked_automap_cleanup("server_connected")
+        self.reconcile_fast_travel_unlock("connected")
+        asyncio.create_task(self.check_mission_challenge_locations())
+        if self._item_delivery_wakeup:
+            self._schedule_item_delivery("connected")
+        emit_launcher_event(
+            "connected",
+            seed_name=self.room_seed_name,
+            endpoint=str(getattr(self, "server_address", "") or ""),
+            team=self.team,
+            slot=self.slot,
+            slot_data=getattr(self, "_connected_slot_data", {}),
+            missing_locations=sorted(self.missing_locations),
+            checked_locations=sorted(self.checked_locations),
+            placements=placements,
+            placement_scouts_complete=True,
+        )
 
     def _on_received_items_packet(self, args):
         """Record packet metadata and wake delivery without doing delivery work."""
@@ -3448,6 +3811,7 @@ class DoomEternalContext(CommonContext):
             packet_received_monotonic_ns=packet_received_ns,
         )
         self._schedule_item_delivery("packet")
+        self._refresh_ammo_refill_charge()
 
     def _schedule_item_delivery(self, trigger):
         """Coalesce packet wakeups into one event-loop delivery runner."""
@@ -6880,6 +7244,7 @@ class DoomEternalContext(CommonContext):
             await self.check_weapon_mastery_locations()
             await self.check_mission_challenge_locations()
             await self.check_campaign_goal()
+            self._consume_ammo_refill_request_file()
             sleep_duration = 0.05 if self.deathlink_receiver.active is not None else 1.0
             await asyncio.sleep(sleep_duration)
 
@@ -7170,6 +7535,17 @@ async def launcher_control_loop(ctx):
                         status="noop" if not plan.commands else "queued",
                         command_count=len(plan.commands),
                     )
+            continue
+        if control.get("type") == "ammo_refill":
+            try:
+                await ctx.request_ammo_refill()
+            except Exception as error:
+                logger.warning("[Ammo Refill] Launcher request failed: %s", error)
+                emit_launcher_event(
+                    "ammo_refill",
+                    status="error",
+                    message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+                )
             continue
         if control.get("type") != "say":
             continue

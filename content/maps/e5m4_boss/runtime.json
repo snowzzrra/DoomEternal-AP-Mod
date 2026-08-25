@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "map_key": "e5m4_boss",
+  "locations": [
+    {
+      "name": "The Dark Lord - Defeated",
+      "location_id": 7770419,
+      "strategy": "map_terminal",
+      "mission_key": "e5m4_boss",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e5m4_boss/e5m4_boss",
+        "owner": "stage_3_target_campaign_complete_1",
+        "fallback_terminal_owner": "stage_3_target_level_transition_1"
+      },
+      "order": 100,
+      "category": "mission_complete"
+    }
+  ]
+}

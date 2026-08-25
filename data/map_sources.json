@@ -258,6 +258,25 @@
       "supported_game_revision": "Steam 6.66 Rev 3.1",
       "test_only": false
     },
+    "e5m4_boss": {
+      "display_name": "The Dark Lord",
+      "enabled": false,
+      "generated_output": "e5m4_boss.entities",
+      "level_config": "content/maps/e5m4_boss/locations.json",
+      "manifest": "manifests/e5m4_boss.json",
+      "onboarding_audit": "content/maps/e5m4_boss/onboarding.json",
+      "onboarding_status": "implementation_candidate",
+      "relative_entities_path": "game/sp/e5m4_boss/e5m4_boss.entities",
+      "resource_owner": "game/sp/e5m4_boss/e5m4_boss_patch2.resources",
+      "resource_path": "game/sp/e5m4_boss/e5m4_boss_patch2.resources",
+      "resource_priority": 38,
+      "runtime_map": "game/sp/e5m4_boss/e5m4_boss",
+      "source_file": "e5m4_boss.map",
+      "source_owner": "id Software",
+      "source_sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
+      "supported_game_revision": "Steam 6.66 Rev 3.1",
+      "test_only": false
+    },
     "hub": {
       "display_name": "Fortress/Hub",
       "enabled": true,

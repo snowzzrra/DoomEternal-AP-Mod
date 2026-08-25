@@ -48,6 +48,14 @@
             "name": "Sentinel Hammer",
             "classification": 1
         },
+        "7770901": {
+            "name": "Progressive Special Weapon",
+            "classification": 1
+        },
+        "7770902": {
+            "name": "Progressive Sentinel Hammer",
+            "classification": 1
+        },
         "7770010": {
             "name": "Chainsaw",
             "classification": 1
@@ -102,7 +110,7 @@
         },
         "7770024": {
             "name": "Ammo Refill",
-            "classification": 0
+            "classification": 2
         },
         "7770025": {
             "name": "Full Heal",

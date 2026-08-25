@@ -1578,6 +1578,30 @@ def detect_doom_processes(
     process_list: Sequence[Sequence[str]] | None = None,
 ) -> tuple[dict[str, object], ...]:
     """Return bounded process facts suitable for diagnostics."""
+    supported_names = {
+        "doometernalx64vk.exe": "doometernalx64vk.exe",
+        "doometernalx64vk": "doometernalx64vk",
+        "ap_client.exe": "ap_client.exe",
+        "ap_client": "ap_client",
+    }
+
+    def basename(value: object) -> str:
+        text = str(value).strip().strip("\"'")
+        return text.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+
+    def matching_name(*values: object) -> str | None:
+        for value in values:
+            name = basename(value)
+            if name in supported_names:
+                return supported_names[name]
+            # Proton/Wine command lines can wrap the Windows executable in a
+            # loader command or quote a Windows-style path.
+            for token in re.split(r"[\s\"'`]+", str(value)):
+                name = basename(token)
+                if name in supported_names:
+                    return supported_names[name]
+        return None
+
     rows: list[dict[str, object]] = []
     if process_list is None:
         if os.name == "nt":
@@ -1592,18 +1616,31 @@ def detect_doom_processes(
         else:
             try:
                 completed = subprocess.run(
-                    ["ps", "-eo", "pid=,comm="], capture_output=True, text=True, timeout=3, check=False
+                    ["ps", "-eo", "pid=,comm=,args="],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                    check=False,
                 )
-                process_list = tuple(tuple(line.split(None, 1)) for line in completed.stdout.splitlines() if line.strip())
+                process_list = tuple(
+                    tuple(line.split(None, 2))
+                    for line in completed.stdout.splitlines()
+                    if line.strip()
+                )
             except (OSError, subprocess.SubprocessError):
                 process_list = ()
     for row in process_list:
-        if not row:
+        values = tuple(row)
+        if not values:
             continue
-        name = Path(str(row[-1])).name.casefold()
-        if name not in {"doometernalx64vk.exe", "doometernalx64vk", "ap_client.exe", "ap_client"}:
+        name = matching_name(*values)
+        if name is None:
             continue
-        pid = str(row[0]) if len(row) > 1 else ""
+        # tasklist emits name,pid; ps emits pid,comm,args.
+        value_iterator = iter(values)
+        first_value = next(value_iterator, "")
+        second_value = next(value_iterator, "")
+        pid = str(second_value) if matching_name(first_value) else str(first_value)
         rows.append({"name": name, "pid": pid})
     return tuple(rows)
 

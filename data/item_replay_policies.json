@@ -45,6 +45,14 @@
       "name": "Sentinel Hammer",
       "policy": "replay_idempotent"
     },
+    "7770901": {
+      "name": "Progressive Special Weapon",
+      "policy": "special_progressive"
+    },
+    "7770902": {
+      "name": "Progressive Sentinel Hammer",
+      "policy": "special_progressive"
+    },
     "7770010": {
       "name": "Chainsaw",
       "policy": "replay_idempotent"
