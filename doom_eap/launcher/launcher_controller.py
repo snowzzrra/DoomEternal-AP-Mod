@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import queue
 import re
@@ -18,6 +19,8 @@ from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
 from .launcher_core import LaunchWorkflow, RoomSnapshot
@@ -31,8 +34,13 @@ from .launcher_integration import (
 )
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_platform import (
+    AMMO_HOTKEY_STATE_FILENAME,
+    AMMO_HOTKEY_STATE_HEADER,
+    AMMO_REFILL_BIND_COMMAND,
     GameLinkResult,
     SteamInstallationLocator,
+    cleanup_legacy_doomeap_cfg,
+    cleanup_stale_doom_config_bind,
     detect_doom_processes,
     launch_doom_via_steam,
     launcher_user_paths,
@@ -41,14 +49,50 @@ from .launcher_platform import (
     probe_runtime_prerequisites,
     read_handshake_probe,
     redact_secrets,
+    resolve_doom_config_path,
     validate_game_root,
     validate_save_directory,
+    write_ammo_refill_hotkey_state,
 )
 from .launcher_supervisor import BridgeSupervisor
 
 
 AMMO_REFILL_KEYBIND_CONFIG = "ammo_refill_keybind"
 DEFAULT_AMMO_REFILL_KEYBIND = "F9"
+AMMO_REFILL_SUPPORTED_KEY_TOKENS = frozenset(
+    {
+        *(f"F{number}" for number in range(1, 13)),
+        *(chr(code) for code in range(ord("A"), ord("Z") + 1)),
+        *(str(number) for number in range(10)),
+        "Space",
+        "Tab",
+        "Backspace",
+        "Insert",
+        "Delete",
+        "Home",
+        "End",
+        "PageUp",
+        "PageDown",
+        "Up",
+        "Down",
+        "Left",
+        "Right",
+    }
+)
+
+
+def normalize_ammo_refill_keybind(keybind: str) -> str:
+    """Accept one proven DOOM key token or an unbound value."""
+    value = str(keybind).strip()
+    if not value or value.casefold() == "unbound":
+        return ""
+    if "\n" in value or "\r" in value or "+" in value or len(value) > 32:
+        raise ValueError("Ammo Refill keybind must be one simple key")
+    folded = {token.casefold(): token for token in AMMO_REFILL_SUPPORTED_KEY_TOKENS}
+    canonical = folded.get(value.casefold())
+    if canonical is None:
+        raise ValueError("Ammo Refill keybind uses an unsupported physical key")
+    return canonical
 
 
 def application_directory() -> Path:
@@ -92,8 +136,15 @@ class LauncherController:
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
         configured_keybind = self.config.get(AMMO_REFILL_KEYBIND_CONFIG)
-        if not isinstance(configured_keybind, str) or not configured_keybind.strip():
-            self.config[AMMO_REFILL_KEYBIND_CONFIG] = DEFAULT_AMMO_REFILL_KEYBIND
+        if configured_keybind is None or not isinstance(configured_keybind, str):
+            normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
+        else:
+            try:
+                normalized_keybind = normalize_ammo_refill_keybind(configured_keybind)
+            except ValueError:
+                normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
+        if configured_keybind != normalized_keybind:
+            self.config[AMMO_REFILL_KEYBIND_CONFIG] = normalized_keybind
             self._persist_config()
         self.options_schema = load_options_schema(
             self.client_dir / "data" / "options_schema.json"
@@ -128,7 +179,9 @@ class LauncherController:
             self._setup_result,
         )
         self._native_health_reader: NativeHealthReader | None = None
+        self._last_native_health: dict[str, object] | None = None
         self._native_client_process: subprocess.Popen | None = None
+        self._last_game_running: bool = False
 
     def _native_client_running(self) -> bool:
         with self._lifecycle_lock:
@@ -228,6 +281,47 @@ class LauncherController:
         )
         os.replace(temporary, self.config_path)
 
+    def ensure_ammo_refill_keybind(self, *, force_check: bool = False) -> Path | None:
+        """Write AP-owned Ammo Refill hotkey state and clean stale config binds."""
+        configured_keybind = self.config.get(AMMO_REFILL_KEYBIND_CONFIG, DEFAULT_AMMO_REFILL_KEYBIND)
+        if not isinstance(configured_keybind, str):
+            normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
+        else:
+            try:
+                normalized_keybind = normalize_ammo_refill_keybind(configured_keybind)
+            except ValueError:
+                normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
+
+        base_dir = doom_base_dir_from_config(self.config)
+        if base_dir is not None:
+            cleanup_legacy_doomeap_cfg(base_dir)
+
+        is_running = self.is_game_running()
+        cleanup_stale_doom_config_bind(self.config, is_game_running=is_running)
+
+        state_file = write_ammo_refill_hotkey_state(base_dir, normalized_keybind)
+        logger.info(
+            "AMMO_HOTKEY_CONFIG path=%s token=%s state=%s",
+            state_file,
+            normalized_keybind or "UNBOUND",
+            "loaded" if normalized_keybind else "disabled",
+        )
+        self._record_diagnostic(
+            f"AMMO_HOTKEY_CONFIG path={state_file} token={normalized_keybind or 'UNBOUND'} state={'loaded' if normalized_keybind else 'disabled'}"
+        )
+
+        self.emit(
+            "ammo_refill_keybind_status",
+            state="configured" if normalized_keybind else "unbound",
+            configured_key=normalized_keybind,
+            path=str(state_file) if state_file else None,
+        )
+        return state_file
+
+    def ensure_ammo_refill_config(self) -> Path | None:
+        """Ensure launcher-managed Ammo Refill configuration."""
+        return self.ensure_ammo_refill_keybind()
+
     def save_config(self, updates: dict[str, object]) -> None:
         self.config.update(updates)
         self._persist_config()
@@ -315,6 +409,7 @@ class LauncherController:
         if not game_root:
             raise RuntimeError("DOOM Eternal installation is not configured.")
         root = validate_game_root(Path(str(game_root)))
+        self.ensure_ammo_refill_config()
         local_key = "meathook_dll"
         local_value = self.config.get(local_key)
         local_artifact = Path(str(local_value)).expanduser() if local_value else None
@@ -347,19 +442,84 @@ class LauncherController:
         """Return normalized native AP health without emitting launcher activity."""
         base = doom_base_dir_from_config(self.config)
         if base is None:
-            return {
+            result = {
                 "state": "not_ready",
                 "ready": False,
                 "degraded": False,
                 "reason": "base_directory_unconfigured",
             }
+            return result
         path = base / "ap_rpc_health.state"
         if self._native_health_reader is None or self._native_health_reader.path != path:
             self._native_health_reader = NativeHealthReader(path)
-        return self._native_health_reader.read(force=force).document()
+        result = self._native_health_reader.read(force=force).document()
+        if result.get("native_state") is not None:
+            self._last_native_health = dict(result)
+        return result
 
     def native_health(self, *, force: bool = False) -> dict[str, object]:
         return self.read_native_health(force=force)
+
+    def _live_support_diagnostics(self) -> dict[str, object]:
+        """Expose live ownership/process facts without bridge credentials."""
+        supervisor = self.supervisor
+        if supervisor is None:
+            supervisor_details: dict[str, object] = {
+                "status": "unavailable",
+                "running": False,
+                "reason": "supervisor_not_created",
+            }
+        else:
+            supervisor_details = {
+                "status": supervisor.state.value.lower(),
+                "running": supervisor.running,
+                "last_error": dict(supervisor.last_error) if supervisor.last_error else None,
+            }
+        direct = self.read_native_health(force=True)
+        expected_native_path = None
+        base = doom_base_dir_from_config(self.config)
+        if base is not None:
+            expected_native_path = str(base / "ap_rpc_health.state")
+        last_known = self._last_native_health
+        if (
+            last_known is not None
+            and (
+                expected_native_path is None
+                or str(last_known.get("path", "")) != expected_native_path
+            )
+        ):
+            last_known = None
+        if direct.get("native_state") is not None:
+            native = {
+                "source": "direct",
+                "evidence": "direct",
+                "health": direct,
+                "direct": direct,
+            }
+        elif last_known is not None:
+            native = {
+                "source": "last_known",
+                "evidence": "last_known",
+                "health": dict(last_known),
+                "direct": direct,
+            }
+        else:
+            native = {
+                "source": "unknown",
+                "evidence": "unavailable",
+                "health": direct,
+                "direct": direct,
+            }
+        return {
+            "supervisor": supervisor_details,
+            "native_rpc": native,
+            "config_paths": {
+                "application_dir": str(self.application_dir),
+                "client_dir": str(self.client_dir),
+                "config_file": str(self.config_path),
+                "state_dir": str(self.state_dir),
+            },
+        }
 
     def run_doctor(self) -> DoctorReport:
         report = LauncherDoctor(
@@ -368,6 +528,7 @@ class LauncherController:
             config_path=self.config_path,
             last_setup_failure=self.last_setup_failure,
             last_room_package_issue=self.last_room_package_issue,
+            live_support=self._live_support_diagnostics(),
         ).run()
         self.emit("doctor_report", report=report.document())
         return report
@@ -399,6 +560,7 @@ class LauncherController:
             self.emit("repair_complete", action=action_key, backup=str(backup))
             return str(backup)
         if action_key in {"rebuild_room_package", "update_room_package", "reinstall_room_mod"}:
+            self.ensure_ammo_refill_config()
             if not self.setup.start(force=True):
                 raise RuntimeError("connect to room before rebuilding its room package")
             self.emit("repair_started", action=action_key)
@@ -750,6 +912,7 @@ class LauncherController:
             last_event = dict(self.setup._last_event) if self.setup._last_event else None
         if not last_event:
             raise RuntimeError("No connected room session is available.")
+        self.ensure_ammo_refill_config()
         snapshot = RoomSnapshot.from_event(last_event)
         record = self.workflow.confirm_manual_installation(snapshot, str(last_event.get("endpoint") or ""))
         self.last_setup = record
@@ -839,6 +1002,7 @@ class LauncherController:
                 "save_games_dir": str(saves),
             }
         )
+        self.ensure_ammo_refill_config()
         connection = {
             "endpoint": endpoint.strip(),
             "slot": slot.strip(),
@@ -925,23 +1089,20 @@ class LauncherController:
             raise RuntimeError("not connected")
         supervisor.send_chat(text)
 
+    def poll_game_lifecycle(self) -> None:
+        """Track game process lifecycle and clean stale config bindings on game exit."""
+        current_running = self.is_game_running()
+        if self._last_game_running and not current_running:
+            cleanup_stale_doom_config_bind(self.config, is_game_running=False)
+        self._last_game_running = current_running
+
     def set_ammo_refill_keybind(self, keybind: str) -> None:
-        value = str(keybind).strip().replace("Control+", "Ctrl+")
-        if not value:
-            self.save_config({AMMO_REFILL_KEYBIND_CONFIG: ""})
-            return
-        if "\n" in value or "\r" in value or len(value) > 32:
-            raise ValueError("Ammo Refill keybind must contain one key")
-        parts = value.split("+")
-        modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
-        if any(not part for part in parts) or parts[-1] in modifiers:
-            raise ValueError("Ammo Refill keybind cannot contain only modifiers")
-        if any(part not in modifiers for part in parts[:-1]):
-            raise ValueError("Ammo Refill keybind must be one representable keyboard chord")
-        key = parts[-1]
-        if not re.fullmatch(r"(?:F(?:[1-9]|1[0-2])|[A-Z0-9]|Space|Tab|Backspace|Insert|Delete|Home|End|PageUp|PageDown|Up|Down|Left|Right)", key, re.IGNORECASE):
-            raise ValueError("Ammo Refill keybind uses a key unsupported by the DOOM bind bridge")
-        self.save_config({AMMO_REFILL_KEYBIND_CONFIG: value})
+        try:
+            normalized = normalize_ammo_refill_keybind(keybind)
+        except ValueError:
+            normalized = DEFAULT_AMMO_REFILL_KEYBIND
+        self.save_config({AMMO_REFILL_KEYBIND_CONFIG: normalized})
+        self.ensure_ammo_refill_keybind()
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:
@@ -1012,12 +1173,15 @@ class LauncherController:
         return saved
 
     def retry_setup(self) -> bool:
+        self.ensure_ammo_refill_config()
         return self.setup.start(force=True)
 
     def prepare_setup(self) -> bool:
+        self.ensure_ammo_refill_config()
         return self.setup.start()
 
     def reinstall_setup(self) -> bool:
+        self.ensure_ammo_refill_config()
         return self.setup.start(force=True)
 
     def uninstall_setup(self) -> dict[str, object]:

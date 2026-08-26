@@ -11,8 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QShortcut
+from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSlider,
     QSpinBox,
     QStackedWidget,
@@ -45,28 +46,88 @@ from PySide6.QtWidgets import (
 
 from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
 
-from .launcher_controller import LauncherController
+from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
 from .launcher_platform import (
     probe_meathook,
     redact_secrets,
 )
 
 
+def _simple_physical_key_token(event: QKeyEvent) -> str | None:
+    """Map only documented simple physical keys to canonical launcher tokens."""
+    if event.isAutoRepeat() or event.modifiers() != Qt.KeyboardModifier.NoModifier:
+        return None
+    key = int(event.key())
+    key_a, key_z = int(Qt.Key.Key_A), int(Qt.Key.Key_Z)
+    key_0, key_9 = int(Qt.Key.Key_0), int(Qt.Key.Key_9)
+    key_f1, key_f12 = int(Qt.Key.Key_F1), int(Qt.Key.Key_F12)
+    if key_a <= key <= key_z:
+        return chr(ord("A") + key - key_a)
+    if key_0 <= key <= key_9:
+        return str(key - key_0)
+    if key_f1 <= key <= key_f12:
+        return f"F{key - key_f1 + 1}"
+    return {
+        int(Qt.Key.Key_Space): "Space",
+        int(Qt.Key.Key_Tab): "Tab",
+        int(Qt.Key.Key_Backspace): "Backspace",
+        int(Qt.Key.Key_Insert): "Insert",
+        int(Qt.Key.Key_Delete): "Delete",
+        int(Qt.Key.Key_Home): "Home",
+        int(Qt.Key.Key_End): "End",
+        int(Qt.Key.Key_PageUp): "PageUp",
+        int(Qt.Key.Key_PageDown): "PageDown",
+        int(Qt.Key.Key_Up): "Up",
+        int(Qt.Key.Key_Down): "Down",
+        int(Qt.Key.Key_Left): "Left",
+        int(Qt.Key.Key_Right): "Right",
+    }.get(key)
+
+
+class _AmmoRefillKeyEdit(QLineEdit):
+    captured = Signal(str)
+    rejected = Signal(str)
+
+    def __init__(self, value: str):
+        super().__init__()
+        self.setReadOnly(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.set_value(value)
+
+    def set_value(self, value: str) -> None:
+        self._value = normalize_ammo_refill_keybind(value)
+        self.setText(self._value or "UNBOUND")
+
+    def value(self) -> str:
+        return self._value
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        token = _simple_physical_key_token(event)
+        if token is None:
+            self.rejected.emit("Ammo Refill accepts one supported physical key without modifiers")
+            event.accept()
+            return
+        self._value = token
+        self.setText(token)
+        self.captured.emit(token)
+        event.accept()
+
+
 class AmmoRefillKeyControl(QWidget):
-    """Single keyboard chord capture with explicit reset controls."""
+    """Capture one supported physical key or UNBOUND."""
 
     changed = Signal(str)
+    rejected = Signal(str)
 
     def __init__(self, value: str = "F9"):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(7)
-        self.editor = QKeySequenceEdit(QKeySequence(value))
-        self.editor.setMaximumSequenceLength(1)
-        self.editor.setClearButtonEnabled(True)
-        self.editor.setToolTip("Press one key or supported modifier chord. Modifier-only shortcuts are rejected.")
-        self.editor.editingFinished.connect(self._emit_value)
+        self.editor = _AmmoRefillKeyEdit(value)
+        self.editor.setToolTip("Press one supported physical key. Modifier keys and numpad keys are not supported.")
+        self.editor.captured.connect(self._emit_value)
+        self.editor.rejected.connect(self.rejected)
         clear = QPushButton("CLEAR")
         clear.clicked.connect(self._clear)
         reset = QPushButton("RESET")
@@ -76,10 +137,10 @@ class AmmoRefillKeyControl(QWidget):
         layout.addWidget(reset)
 
     def value(self) -> str:
-        return self.editor.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
+        return self.editor.value()
 
     def set_value(self, value: str, *, emit: bool = False) -> None:
-        self.editor.setKeySequence(QKeySequence(value))
+        self.editor.set_value(value)
         if emit:
             self._emit_value()
 
@@ -87,7 +148,7 @@ class AmmoRefillKeyControl(QWidget):
         self.changed.emit(self.value())
 
     def _clear(self) -> None:
-        self.editor.clear()
+        self.editor.set_value("")
         self._emit_value()
 
 
@@ -281,11 +342,16 @@ class LauncherUI(QMainWindow):
         self._chat_pending_text: str | None = None
         self._hints_state = "disconnected"
         self._warning_state: dict[str, bool] = {}
+        self._ammo_refills_available: int | None = None
         self._configure_style()
         self._build()
+        self._set_connection_badge("OFFLINE", False)
         self._set_hints_state("disconnected")
         self._set_setup_state("disconnected")
         self._load_icon()
+        self._qt_application = QApplication.instance()
+        if self._qt_application is not None:
+            self._qt_application.installEventFilter(self)
         self._install_shortcuts()
         self._discover()
         self.timer = QTimer(self)
@@ -313,6 +379,7 @@ class LauncherUI(QMainWindow):
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
             QLabel#eyebrow {{ color:{self.COLORS['doom_hot']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
             QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:20pt; font-weight:800; }}
+            QLabel#sessionPlayerName {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16.5pt; font-weight:800; line-height:1.05; }}
             QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:12pt; font-weight:800; letter-spacing:.4px; }}
             QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
@@ -348,6 +415,11 @@ class LauncherUI(QMainWindow):
             QCheckBox#requirementOption:disabled {{ color:{self.COLORS['muted']}; }}
             QLabel#connectionBadge {{ background:#22272a; border:1px solid #596164; padding:4px 10px; font-weight:800; color:#c9d1d3; }}
             QLabel#connectionBadge[connected="true"] {{ color:{self.COLORS['good']}; border-color:#758f25; background:#18200f; }}
+            QWidget#ammoRefillIndicator {{ background:#0c1012; border:1px solid #3b4143; border-left:3px solid #6c491f; }}
+            QLabel#ammoRefillTitle {{ color:#c3a17a; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.7px; }}
+            QFrame#ammoRefillSegment {{ background:#1a1e20; border:1px solid #343b3e; min-width:11px; max-width:11px; min-height:7px; max-height:7px; }}
+            QFrame#ammoRefillSegment[active="true"] {{ background:{self.COLORS['doom_hot']}; border-color:#ffc16e; }}
+            QLabel#ammoRefillKey {{ color:#899397; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.5px; }}
         """)
 
     @staticmethod
@@ -492,11 +564,33 @@ class LauncherUI(QMainWindow):
         return strip
 
     def _arrange_status_strip(self) -> None:
-        columns = 2 if self.width() < 1000 else 4
+        available = self.status_strip.contentsRect().width()
+        if available <= 0:
+            QTimer.singleShot(0, self._arrange_status_strip)
+            return
+        required_widths = [self._status_item_width(item) for item in self.status_items]
+        columns = 1
+        for candidate in range(len(self.status_items), 0, -1):
+            column_widths = [0] * candidate
+            for index, width in enumerate(required_widths):
+                column_widths[index % candidate] = max(column_widths[index % candidate], width)
+            if sum(column_widths) + self.status_layout.horizontalSpacing() * (candidate - 1) <= available:
+                columns = candidate
+                break
+        for item, width in zip(self.status_items, required_widths):
+            item.setMinimumWidth(width)
+            self.status_layout.removeWidget(item)
         for index, item in enumerate(self.status_items):
             self.status_layout.addWidget(item, index // columns, index % columns)
         for column in range(4):
             self.status_layout.setColumnStretch(column, 1 if column < columns else 0)
+
+    @staticmethod
+    def _status_item_width(item: QWidget) -> int:
+        layout = cast(QHBoxLayout, item.layout())
+        labels = [child for child in item.findChildren(QLabel) if child.objectName() in {"statusIndicator", "stateName", "stateDetail"}]
+        text_width = sum(QFontMetrics(label.font()).horizontalAdvance(label.text()) for label in labels)
+        return max(item.minimumSizeHint().width(), text_width + layout.contentsMargins().left() + layout.contentsMargins().right() + layout.spacing() * 3 + 12)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -565,15 +659,15 @@ class LauncherUI(QMainWindow):
         layout.setContentsMargins(20, 18, 20, 20)
         layout.setSpacing(9)
         layout.addWidget(self._label("ROOM PACKAGE", "section"))
-        self.room_summary = self._label("No room connected.", "muted")
+        self.room_summary = self._label("No room connected. Join a room to start playing.", "muted", rich=True)
         self.room_summary.setWordWrap(True)
         layout.addWidget(self.room_summary)
         self.room_options = self._label("Room settings appear after connection.", "muted")
         self.room_options.setWordWrap(True)
-        layout.addWidget(self.room_options)
         view_options = QPushButton("VIEW ALL SETTINGS")
         view_options.clicked.connect(self._view_room_options)
-        layout.addWidget(view_options, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.room_options.hide()
+        view_options.hide()
         self.drift = self._label("")
         self.drift.setObjectName("warning")
         self.drift.hide()
@@ -604,28 +698,55 @@ class LauncherUI(QMainWindow):
         copy = QVBoxLayout()
         copy.setSpacing(3)
         copy.addWidget(self._label("CURRENT SESSION", "eyebrow"))
-        self.session_player_name = self._label("NO ROOM CONNECTED", "title")
+        self.session_player_name = self._label("NO ROOM CONNECTED", "sessionPlayerName")
+        self.session_player_name.setWordWrap(True)
         copy.addWidget(self.session_player_name)
         identity.addLayout(copy, 1)
         self.connection_badge = self._label("OFFLINE", "connectionBadge")
         self.connection_badge.setProperty("connected", False)
         identity.addWidget(self.connection_badge, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(identity)
-        meta = QHBoxLayout()
-        meta.setSpacing(16)
+        meta = QGridLayout()
+        meta.setHorizontalSpacing(16)
+        meta.setVerticalSpacing(3)
         self.player_team = self._label("Team —", "muted")
         self.player_slot = self._label("Slot —", "muted")
         self.player_inventory = self._label("Connect to restore inventory", "muted")
-        self.player_ammo_refills = self._label(f"AMMO REFILLS — · {self.ammo_refill_keybind.value()}", "muted")
+        self.player_ammo_refills = QWidget()
+        self.player_ammo_refills.setObjectName("ammoRefillIndicator")
+        self.player_ammo_refills.setMinimumWidth(230)
+        self.player_ammo_refills.setMaximumWidth(260)
+        self.player_ammo_refills.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
+        ammo_layout = QHBoxLayout(self.player_ammo_refills)
+        ammo_layout.setContentsMargins(8, 5, 8, 5)
+        ammo_layout.setSpacing(5)
+        ammo_layout.addWidget(self._label("AMMO REFILL", "ammoRefillTitle"))
+        self.ammo_refill_segments: list[QFrame] = []
+        for _ in range(3):
+            segment = QFrame()
+            segment.setObjectName("ammoRefillSegment")
+            segment.setProperty("active", False)
+            self.ammo_refill_segments.append(segment)
+            ammo_layout.addWidget(segment)
+        self.ammo_refill_key = self._label("", "ammoRefillKey")
+        ammo_layout.addWidget(self.ammo_refill_key)
+        self._set_ammo_refill_indicator(None)
         self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
         self.resync_inventory_button.setEnabled(False)
         self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
-        meta.addWidget(self.player_team)
-        meta.addWidget(self.player_slot)
-        meta.addStretch(1)
-        meta.addWidget(self.player_inventory)
-        meta.addStretch(1)
-        meta.addWidget(self.player_ammo_refills)
+        meta.addWidget(self.player_team, 0, 0)
+        meta.addWidget(self.player_slot, 0, 1)
+        meta.addWidget(self.player_inventory, 1, 0)
+        meta.addWidget(
+            self.player_ammo_refills,
+            1,
+            1,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+        meta.setColumnStretch(0, 1)
+        meta.setColumnStretch(1, 1)
         layout.addLayout(meta)
         layout.addWidget(self._status_strip())
         actions = QHBoxLayout()
@@ -644,7 +765,7 @@ class LauncherUI(QMainWindow):
         layout.addLayout(actions)
         self.session_setup = self._card("actionStrip")
         self.session_setup.setProperty("actionTone", "warning")
-        setup_layout = QHBoxLayout(self.session_setup)
+        setup_layout = QVBoxLayout(self.session_setup)
         setup_layout.setContentsMargins(12, 8, 12, 8)
         setup_layout.setSpacing(10)
         setup_copy = QVBoxLayout()
@@ -653,7 +774,7 @@ class LauncherUI(QMainWindow):
         self.session_setup_detail = self._label("Connect to a room to check its package.", "muted")
         setup_copy.addWidget(self.session_setup_title)
         setup_copy.addWidget(self.session_setup_detail)
-        setup_layout.addLayout(setup_copy, 1)
+        setup_layout.addLayout(setup_copy)
         setup_buttons = QHBoxLayout()
         self.session_manual_complete_action = QPushButton("I COMPLETED MANUAL INSTALLATION")
         self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
@@ -668,6 +789,7 @@ class LauncherUI(QMainWindow):
         setup_buttons.addWidget(self.session_manual_complete_action)
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
+        setup_buttons.addStretch(1)
         setup_layout.addLayout(setup_buttons)
         return card
 
@@ -695,9 +817,8 @@ class LauncherUI(QMainWindow):
         self.session_stack.addWidget(self._activity_card())
         self.session_stack.addWidget(self._hints_card())
         self.session_stack.addWidget(self._session_log_page())
-        self.session_stack.addWidget(self._session_card())
+        self.session_stack.addWidget(self._scroll(self._session_card()))
         self.session_stack.currentChanged.connect(self._sync_session_tabs)
-        self.session_stack.setMinimumHeight(220)
         outer.addWidget(self.session_stack, 1)
         outer.addWidget(self._chat_bar())
         self._sync_session_tabs(0)
@@ -1038,10 +1159,14 @@ class LauncherUI(QMainWindow):
         details_layout = QVBoxLayout(details)
         details_layout.setContentsMargins(20, 18, 20, 20)
         details_layout.addWidget(self._label("TECHNICAL DETAILS", "section"))
+        details_layout.addWidget(self._label(
+            "Diagnostic results and launcher events. Save Support Report includes these redacted details.",
+            "muted",
+        ))
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setFont(QFont("monospace", 10))
-        self.log.setPlaceholderText("Setup details appear here when needed.")
+        self.log.setPlaceholderText("Run Check Setup to collect technical details.")
         details_layout.addWidget(self.log, 1)
         layout.addWidget(details, 1)
         return self._scroll(body)
@@ -1052,21 +1177,50 @@ class LauncherUI(QMainWindow):
             shortcut.activated.connect(lambda target=page: self._show_page(target))
         primary = QShortcut(QKeySequence("Ctrl+Return"), self)
         primary.activated.connect(self._primary_action)
-        self._ammo_refill_shortcut = QShortcut(
-            QKeySequence(self.ammo_refill_keybind.value()), self
-        )
-        self._ammo_refill_shortcut.activated.connect(self.controller.request_ammo_refill)
+
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            event.type() == QEvent.Type.KeyPress
+            and self.isActiveWindow()
+            and watched is not self.ammo_refill_keybind.editor
+            and not self.ammo_refill_keybind.editor.isAncestorOf(watched)
+        ):
+            token = _simple_physical_key_token(event)
+            if token == self.ammo_refill_keybind.value():
+                self.controller.request_ammo_refill()
+                return True
+        return super().eventFilter(watched, event)
 
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
         value = captured.strip()
         try:
             self.controller.set_ammo_refill_keybind(value)
         except ValueError as error:
-            self.ammo_refill_keybind.set_value("F9")
+            self.ammo_refill_keybind.set_value(
+                str(self.controller.config.get("ammo_refill_keybind", "F9"))
+            )
             self._append_log(f"Ammo Refill keybind rejected: {error}")
             return
-        self._ammo_refill_shortcut.setKey(QKeySequence(value))
-        self.player_ammo_refills.setText(f"AMMO REFILLS — · {value or 'UNBOUND'}")
+        self._set_ammo_refill_indicator(self._ammo_refills_available)
+
+    def _set_ammo_refill_indicator(self, value: object) -> None:
+        """Render Ammo Refill availability in three fixed indicator slots."""
+        available = max(0, min(3, value)) if isinstance(value, int) and not isinstance(value, bool) else None
+        self._ammo_refills_available = available
+        keybind = self.ammo_refill_keybind.value() or "UNBOUND"
+        state = "unavailable" if available is None else f"{available} of 3 available"
+        description = f"Ammo Refills: {state}. Configured key: {keybind}."
+        self.player_ammo_refills.setToolTip(description)
+        self.player_ammo_refills.setAccessibleName("Ammo Refill availability")
+        self.player_ammo_refills.setAccessibleDescription(description)
+        self.ammo_refill_key.setText(keybind)
+        self.ammo_refill_key.setToolTip(f"Ammo Refill key: {keybind}")
+        for index, segment in enumerate(self.ammo_refill_segments):
+            segment.setProperty("active", available is not None and index < available)
+            segment.setToolTip(description)
+            style = segment.style()
+            style.unpolish(segment)
+            style.polish(segment)
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)
@@ -1130,6 +1284,7 @@ class LauncherUI(QMainWindow):
         icon = "●" if color == self.COLORS["good"] else "◆" if color == self.COLORS["ap"] else "!" if color in (self.COLORS["warn"], self.COLORS["bad"]) else "○"
         indicator.setText(icon)
         label.setText(detail.upper())
+        QTimer.singleShot(0, self._arrange_status_strip)
         if key == "rpc":
             self._native_health_presentation = None
 
@@ -1138,6 +1293,10 @@ class LauncherUI(QMainWindow):
         self.connection_badge.setProperty("connected", connected)
         self.connection_badge.style().unpolish(self.connection_badge)
         self.connection_badge.style().polish(self.connection_badge)
+        metrics = QFontMetrics(self.connection_badge.font())
+        self.connection_badge.setFixedSize(metrics.horizontalAdvance(text) + 22, metrics.height() + 10)
+        self.connection_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.connection_badge.setWordWrap(False)
 
     def _set_inventory_tile(self, detail: str, color: str) -> None:
         self._set_status("inventory", detail, color)
@@ -1569,25 +1728,46 @@ class LauncherUI(QMainWindow):
         self.player_slot.setText(f"Slot {slot} · {player}")
         self.player_inventory.setText("Inventory ready")
         self._set_inventory_tile("synced", self.COLORS["good"])
-        ammo_count = event.get("ammo_refills_available", "—")
-        self.player_ammo_refills.setText(f"AMMO REFILLS {ammo_count} · {self.ammo_refill_keybind.value()}")
+        self._set_ammo_refill_indicator(event.get("ammo_refills_available"))
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
         self.session_uninstall_button.setEnabled(self._room_connected)
-        self.room_summary.setText(f"Seed: {seed}\nServer: {endpoint}\nPlayer: {player} · Team {team} · Slot {slot}")
-        slot_data = event.get("slot_data")
-        if not isinstance(slot_data, dict):
-            self.room_options.setText("This room did not send a settings summary.")
-            return
-        traps = [(key, value) for key, value in sorted(slot_data.items()) if "trap" in str(key).casefold()]
-        core = [(key, value) for key, value in sorted(slot_data.items()) if key in {
-            "randomize_dash", "reveal_ap_locations_on_automap", "death_link", "death_link_mode"
-        }]
-        lines = [f"{self._option_label(key)}: {self._option_value_text(value)}" for key, value in core]
-        if traps:
-            lines.append("Traps: " + ", ".join(f"{self._option_label(key)} {value}%" if isinstance(value, int) and "percentage" in str(key) else f"{self._option_label(key)}: {self._option_value_text(value)}" for key, value in traps))
-        else:
-            lines.append("Traps: not set for this room")
-        self.room_options.setText(" | ".join(lines))
+        self._clear_drift()
+        raw_slot_data = event.get("slot_data")
+        slot_data: dict[object, object] = raw_slot_data if isinstance(raw_slot_data, dict) else {}
+        goal = self._room_option_value(slot_data, "goal", "Not supplied")
+        dlc_enabled = slot_data.get("use_dlc_content") is True
+        campaign = "Full Saga" if dlc_enabled else "Base Campaign"
+        dlc_logic = self._room_option_value(slot_data, "dlc_logic_timing", "Base Campaign only") if dlc_enabled else "Base Campaign only"
+        fields = (
+            ("Seed", seed),
+            ("Player", f"{player} · Team {team} · Slot {slot}"),
+            ("Server", endpoint),
+            ("Goal", goal),
+            ("Campaign", campaign),
+            ("DLC Logic", dlc_logic),
+        )
+        self.room_summary.setText("<br>".join(
+            f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}"
+            for label, value in fields
+        ))
+
+    def _room_option_value(self, slot_data: dict[object, object], key: str, fallback: str) -> str:
+        if key not in slot_data:
+            return fallback
+        value = slot_data[key]
+        schema = getattr(self.controller, "options_schema", None)
+        if isinstance(schema, dict):
+            for option in schema.get("options", []) or []:
+                if not isinstance(option, dict) or option.get("key") != key:
+                    continue
+                for choice in option.get("choices", []) or []:
+                    if isinstance(choice, dict) and choice.get("key") == value:
+                        return str(choice.get("label", value))
+        return self._option_value_text(value)
+
+    def _clear_drift(self) -> None:
+        self.drift.clear()
+        self.drift.hide()
 
     def _option_label(self, key: object) -> str:
         name = str(key)
@@ -1925,7 +2105,11 @@ class LauncherUI(QMainWindow):
                 if isinstance(item, dict):
                     key = str(item.get("key", "check"))
                     status = str(item.get("status", "unknown"))
-                    technical_lines.append(f"{key}: {status} - {item.get('message', '')}")
+                    message = str(item.get("message", "")).strip()
+                    technical_lines.append(
+                        f"[{status.replace('_', ' ').upper()}] {key.replace('_', ' ')}"
+                        + (f"\n  {message}" if message else "")
+                    )
                     folded = key.casefold()
                     group = (
                         "Saved Games" if "save" in folded or "queue" in folded
@@ -1995,6 +2179,7 @@ class LauncherUI(QMainWindow):
             except queue.Empty: break
             self.controller.process_event(event)
             self._present_event(event)
+        self.controller.poll_game_lifecycle()
         self._refresh_native_health()
 
     def _refresh_native_health(self) -> None:
@@ -2143,10 +2328,18 @@ class LauncherUI(QMainWindow):
         if kind == "ammo_refill":
             available = event.get("available")
             if isinstance(available, int):
-                self.player_ammo_refills.setText(f"AMMO REFILLS {available} · {self.ammo_refill_keybind.value()}")
+                self._set_ammo_refill_indicator(available)
             self._append_log(
                 f"Ammo Refill: {event.get('message') or event.get('status') or 'session update'}"
             )
+            return
+        if kind == "ammo_refill_keybind_status":
+            state = str(event.get("state", ""))
+            key = str(event.get("configured_key", ""))
+            if state == "configured" and key:
+                self._append_log(f"Ammo Refill hotkey configured: {key}")
+            elif state == "unbound" or not key:
+                self._append_log("Ammo Refill hotkey unbound.")
             return
         if kind == "uninstall_queued":
             self.uninstall_button.setEnabled(False)
@@ -2216,12 +2409,12 @@ class LauncherUI(QMainWindow):
             readiness = str(event.get("readiness", "ready"))
             readiness_reason = str(event.get("readiness_reason", ""))
             if state == "uninstalled":
-                self.drift.hide()
+                self._clear_drift()
                 self.uninstall_button.setEnabled(False)
                 self._set_status("mod", "not installed", self.COLORS["warn"])
                 self._set_setup_state("install_needed", "Room package is not installed. Install it to play.")
             elif state == "already_installed":
-                self.drift.hide()
+                self._clear_drift()
                 self.uninstall_button.setEnabled(self._room_connected)
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
@@ -2261,6 +2454,7 @@ class LauncherUI(QMainWindow):
             if option:
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
+                self._clear_drift()
                 game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
                 root = Path(str(game_root)).expanduser().resolve() if game_root else None
                 meathook = probe_meathook(root)
@@ -2356,10 +2550,10 @@ class LauncherUI(QMainWindow):
             self.player_slot.setText("Slot —")
             self.player_inventory.setText("Connect to restore inventory")
             self._set_inventory_tile("waiting", self.COLORS["muted"])
-            self.player_ammo_refills.setText(f"AMMO REFILLS — · {self.ammo_refill_keybind.value()}")
+            self._set_ammo_refill_indicator(None)
             self.resync_inventory_button.setEnabled(False)
             self.session_uninstall_button.setEnabled(False)
-            self.drift.hide(); self.room_summary.setText("No room connected. Join a room to start playing.")
+            self._clear_drift(); self.room_summary.setText("No room connected. Join a room to start playing.")
             for key in self.statuses:
                 self._set_status(key, "waiting", self.COLORS["muted"])
             self._set_setup_state("disconnected")
@@ -2404,6 +2598,8 @@ class LauncherUI(QMainWindow):
         if icon.is_file(): self.setWindowIcon(QIcon(str(icon)))
 
     def closeEvent(self, event) -> None:
+        if self._qt_application is not None:
+            self._qt_application.removeEventFilter(self)
         try: self.controller.close()
         finally: event.accept()
 

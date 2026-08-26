@@ -118,7 +118,7 @@ class ReceivedItemsObservation:
 
     @property
     def historical_authoritative_item_ids(self) -> tuple[int, ...]:
-        """Processed ownership only, with stable duplicate packets removed."""
+        """Processed ownership only, preserving authoritative receipt order."""
         return self._deduplicated_item_ids(self.historical)
 
 
@@ -286,9 +286,72 @@ def _safe_receipt_ids(value: Any) -> list[str]:
         return []
     result: list[str] = []
     for entry in value:
-        if isinstance(entry, str) and entry and entry not in result:
+        if isinstance(entry, str) and entry:
             result.append(entry)
     return result
+
+
+def _safe_item_ids(value: Any) -> list[int]:
+    if not isinstance(value, list):
+        return []
+    return [
+        entry
+        for entry in value
+        if isinstance(entry, int) and not isinstance(entry, bool)
+    ]
+
+
+def validate_receipt_history_prefix(
+    received_items: Iterable[Any],
+    processed_boundary: int,
+    history: Mapping[str, Any] | None,
+) -> tuple[bool, str]:
+    """Validate durable receipt history against current ordered AP receipts.
+
+    A boundary is safe only when its durable ordered prefix agrees with the
+    current ``ReceivedItems`` prefix.  Item IDs are retained separately from
+    packet identities so duplicate IDs remain ordered and distinguishable.
+    """
+    if isinstance(processed_boundary, bool) or not isinstance(processed_boundary, int):
+        return False, "processed boundary must be a non-negative integer"
+    if processed_boundary < 0:
+        return False, "processed boundary must be a non-negative integer"
+    snapshot = tuple(received_items)
+    if processed_boundary > len(snapshot):
+        return False, (
+            f"durable boundary {processed_boundary} exceeds received history "
+            f"length {len(snapshot)}"
+        )
+    if not isinstance(history, Mapping):
+        return True, "no durable receipt prefix recorded"
+
+    expected_item_ids = _safe_item_ids(history.get("receipt_item_ids"))
+    expected_receipt_ids = _safe_receipt_ids(history.get("receipt_ids"))
+    expected_receipt_counts = _safe_receipt_counts(history.get("receipt_counts"))
+    actual_item_ids = tuple(receipt_item_id(item) for item in snapshot[:processed_boundary])
+    actual_receipt_ids = tuple(
+        identity
+        for identity in (receipt_identity(item) for item in snapshot[:processed_boundary])
+        if identity is not None
+    )
+
+    if expected_item_ids:
+        if len(expected_item_ids) != processed_boundary:
+            return False, (
+                "durable receipt item prefix length does not match boundary "
+                f"({len(expected_item_ids)} != {processed_boundary})"
+            )
+        if tuple(expected_item_ids) != actual_item_ids:
+            return False, "durable receipt item prefix differs from ReceivedItems"
+    elif expected_receipt_ids:
+        if len(expected_receipt_ids) != len(actual_receipt_ids):
+            return False, "durable receipt identity prefix is incomplete"
+        if tuple(expected_receipt_ids) != actual_receipt_ids:
+            return False, "durable receipt identity prefix differs from ReceivedItems"
+    elif expected_receipt_counts:
+        if Counter(actual_receipt_ids) != expected_receipt_counts:
+            return False, "durable receipt identity counts differ from ReceivedItems"
+    return True, "compatible"
 
 
 def _safe_receipt_counts(value: Any) -> dict[str, int]:
@@ -357,6 +420,7 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
         receipt_counts = dict(Counter(legacy_receipt_ids))
     history["receipt_counts"] = receipt_counts
     history["receipt_ids"] = legacy_receipt_ids
+    history["receipt_item_ids"] = _safe_item_ids(history.get("receipt_item_ids"))
     owned_ids = history.get("owned_item_ids")
     if not isinstance(owned_ids, list):
         owned_ids = []

@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import zipfile
 from collections.abc import Mapping
@@ -82,6 +85,8 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     ],
     "starting_inventory": {},
 }
+IDFILE_DECOMPRESSOR_NAMES = ("idFileDeCompressor.exe", "idFileDeCompressor")
+LOGGER = logging.getLogger(__name__)
 GOAL_VALUES = frozenset({
     "Acquire the Unmaykr",
     "Kill the Icon of Sin",
@@ -445,6 +450,18 @@ class SeedManifest:
     def document(self) -> dict[str, Any]:
         return asdict(self)
 
+    def require_complete_placements(self) -> tuple[PlacementRecord, ...]:
+        """Return placement records required by room compilation."""
+        if self.static_precompile:
+            return ()
+        if not self.placements:
+            raise ValueError(
+                "real-room compilation requires complete placement mapping"
+            )
+        return _normalize_placements(
+            self.placements, self.active_location_ids, self.slot
+        )
+
     @classmethod
     def from_room(cls, snapshot: RoomSnapshot, known_location_ids: set[int]) -> SeedManifest:
         identity = release_identity()
@@ -600,8 +617,112 @@ class RoomCompiler:
                 json.dumps(table, indent=4, ensure_ascii=False) + "\n"
             ).encode("utf-8")
 
+    @staticmethod
+    def _apply_placement_entities(
+        assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...]
+    ) -> None:
+        """Bind packaged location notifications to their room placements."""
+        import re
+
+        from tools.maps.notification_formatting import placement_sent_key
+
+        candidates: list[Path] = []
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            bundle_root = Path(getattr(sys, "_MEIPASS"))
+            candidates.extend(bundle_root / name for name in IDFILE_DECOMPRESSOR_NAMES)
+        candidates.extend(ROOT / "tools" / name for name in IDFILE_DECOMPRESSOR_NAMES)
+        candidates.extend(
+            Path(__file__).resolve().parents[3] / "Tools" / name
+            for name in IDFILE_DECOMPRESSOR_NAMES
+        )
+        decompressor = next((path for path in candidates if path.is_file()), None)
+        if decompressor is None:
+            raise FileNotFoundError(
+                "Release package is missing project-native idFileDeCompressor"
+            )
+
+        placement_by_id = {record.location_id: record for record in placements}
+        notification_header = re.compile(
+            r'(entityDef\s+ap_notify_location_(\d+)\s*\{.*?'
+            r'header\s*=\s*")#str_ap_location_sent(";)',
+            re.DOTALL,
+        )
+        for member, content in list(assembled.items()):
+            if not member.endswith(".entities"):
+                continue
+
+            with tempfile.TemporaryDirectory(prefix="doom-ap-entities-") as temporary:
+                temporary_dir = Path(temporary)
+                compressed = temporary_dir / "input.entities"
+                decoded = temporary_dir / "decoded.entities"
+                recompressed = temporary_dir / "output.entities"
+                compressed.write_bytes(content)
+                try:
+                    subprocess.run(
+                        [str(decompressor), "--decompress", str(compressed), str(decoded)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                except subprocess.CalledProcessError as error:
+                    detail = (error.stderr or error.stdout or "").strip()[:500]
+                    raise ValueError(
+                        f"could not decompress packaged entities member {member}: {detail}"
+                    ) from error
+                if not decoded.is_file():
+                    raise ValueError(
+                        f"idFileDeCompressor produced no decoded entities member: {member}"
+                    )
+                try:
+                    text = decoded.read_bytes().decode("utf-8")
+                except UnicodeDecodeError as error:
+                    raise ValueError(
+                        f"packaged entities member is not UTF-8 after decompression: {member}"
+                    ) from error
+
+                def replace_header(match: re.Match[str]) -> str:
+                    location_id = int(match.group(2))
+                    if location_id not in placement_by_id:
+                        raise ValueError(
+                            "packaged location notification lacks placement mapping: "
+                            f"{location_id}"
+                        )
+                    return (
+                        match.group(1)
+                        + placement_sent_key(location_id)
+                        + match.group(3)
+                    )
+
+                rewritten = notification_header.sub(replace_header, text).encode("utf-8")
+                decoded.write_bytes(rewritten)
+                try:
+                    subprocess.run(
+                        [str(decompressor), "--compress", str(decoded), str(recompressed)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                except subprocess.CalledProcessError as error:
+                    detail = (error.stderr or error.stdout or "").strip()[:500]
+                    raise ValueError(
+                        f"could not recompress packaged entities member {member}: {detail}"
+                    ) from error
+                if not recompressed.is_file():
+                    raise ValueError(
+                        f"idFileDeCompressor produced no encoded entities member: {member}"
+                    )
+                assembled[member] = recompressed.read_bytes()
+                LOGGER.info(
+                    "ROOM_PACKAGE_MEMBER member=%s compressed_bytes=%d decoded_bytes=%d encoded_bytes=%d",
+                    member[:256],
+                    len(content),
+                    len(rewritten),
+                    len(assembled[member]),
+                )
+
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
+        placements = manifest.require_complete_placements()
         assembled, selected = assemble_room_files(
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
@@ -634,8 +755,9 @@ class RoomCompiler:
         })
         if manifest.options.get("enhanced_melee_damage", False):
             assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
-        if not manifest.static_precompile and manifest.placements:
-            self._apply_placement_strings(assembled, manifest.placements)
+        if not manifest.static_precompile:
+            self._apply_placement_entities(assembled, placements)
+            self._apply_placement_strings(assembled, placements)
         write_deterministic_zip(assembled, destination)
         with zipfile.ZipFile(destination) as output:
             expected = set(assembled)
@@ -886,6 +1008,7 @@ class ModCompiler:
         )
         with tempfile.TemporaryDirectory() as temporary:
             staged = Path(temporary)
+            placements = manifest.require_complete_placements()
             projected = self.project_map_config(manifest, map_key)
             config_path = staged / f"{map_key}.locations.json"
             config_path.write_text(
@@ -908,7 +1031,7 @@ class ModCompiler:
                 placement_metadata=(
                     None
                     if manifest.static_precompile
-                    else [record.document() for record in manifest.placements]
+                    else [record.document() for record in placements]
                 ),
             )
         output_entities.with_suffix(".seed.json").write_text(

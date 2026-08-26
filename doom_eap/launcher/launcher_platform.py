@@ -1902,3 +1902,164 @@ def redact_secrets(text: str, secrets: Sequence[str] = ()) -> str:
         text,
     )
     return text
+
+
+AMMO_REFILL_BIND_COMMAND = "condump AP_REFILL_REQUEST.txt"
+AMMO_HOTKEY_STATE_HEADER = "AP_AMMO_REFILL_HOTKEY_V1"
+AMMO_HOTKEY_STATE_FILENAME = "ammo_refill_hotkey.state"
+
+
+def resolve_doom_config_path(config: Mapping[str, object]) -> Path | None:
+    """Resolve authoritative DOOMEternalConfig.cfg path from configured or discovered save paths."""
+    save_val = config.get("save_games_dir")
+    if save_val:
+        try:
+            p = Path(str(save_val)).expanduser().resolve()
+            cfg = p / "DOOMEternalConfig.cfg"
+            if cfg.is_file():
+                return cfg
+            if p.is_dir():
+                return cfg
+        except (OSError, TypeError, ValueError):
+            pass
+
+    game_root_val = config.get("game_root") or config.get("doom_base_dir")
+    if game_root_val:
+        try:
+            root = Path(str(game_root_val)).expanduser().resolve()
+            for parent in (root, *root.parents):
+                if parent.name.casefold() == "steamapps":
+                    proton_path = (
+                        parent.parent
+                        / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base"
+                    )
+                    cfg = proton_path / "DOOMEternalConfig.cfg"
+                    if cfg.is_file():
+                        return cfg
+                    if proton_path.is_dir():
+                        return cfg
+                    break
+        except (OSError, TypeError, ValueError):
+            pass
+
+    try:
+        win_path = Path.home() / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+        cfg = win_path / "DOOMEternalConfig.cfg"
+        if cfg.is_file():
+            return cfg
+        if win_path.is_dir():
+            return cfg
+    except (OSError, TypeError, ValueError):
+        pass
+
+    if save_val:
+        try:
+            return Path(str(save_val)).expanduser().resolve() / "DOOMEternalConfig.cfg"
+        except (OSError, TypeError, ValueError):
+            pass
+    return None
+
+
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    path = path.resolve()
+    temporary = path.with_name(f".{path.name}.doomeap_{os.getpid()}_{hashlib.sha256(content).hexdigest()[:8]}.tmp")
+    try:
+        with open(temporary, "wb") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def write_ammo_refill_hotkey_state(base_dir: Path | None, keybind: str) -> Path | None:
+    """Write AP-owned ammo refill hotkey state file atomically."""
+    if base_dir is None:
+        return None
+    queue_dir = base_dir / "ap_queue"
+    try:
+        queue_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    state_file = queue_dir / AMMO_HOTKEY_STATE_FILENAME
+    token = str(keybind).strip() if str(keybind).strip() else "UNBOUND"
+    content = f"{AMMO_HOTKEY_STATE_HEADER} {token}\n".encode("utf-8")
+    try:
+        _atomic_write_bytes(state_file, content)
+        return state_file
+    except OSError:
+        return None
+
+
+def cleanup_stale_doom_config_bind(config: Mapping[str, object], *, is_game_running: bool = False) -> bool:
+    """Remove only stale DoomEAP-owned condump bind from player's DOOMEternalConfig.cfg when game is closed."""
+    if is_game_running:
+        return False
+    cfg_path = resolve_doom_config_path(config)
+    if cfg_path is None or not cfg_path.is_file():
+        return False
+    try:
+        raw = cfg_path.read_bytes()
+    except OSError:
+        return False
+
+    bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
+    raw_content = raw[len(bom):]
+    try:
+        text = raw_content.decode("utf-8")
+        encoding = "utf-8"
+    except UnicodeDecodeError:
+        try:
+            text = raw_content.decode("latin-1")
+            encoding = "latin-1"
+        except UnicodeDecodeError:
+            return False
+
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines(keepends=False)
+    modified = False
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if (stripped.startswith("bind ") or stripped.startswith("bindSecondary ")) and AMMO_REFILL_BIND_COMMAND in stripped:
+            modified = True
+            continue
+        new_lines.append(line)
+
+    if modified:
+        output_text = newline.join(new_lines) + newline
+        new_bytes = bom + output_text.encode(encoding)
+        try:
+            _atomic_write_bytes(cfg_path, new_bytes)
+            return True
+        except OSError:
+            return False
+    return False
+
+
+def cleanup_legacy_doomeap_cfg(base_dir: Path | None) -> bool:
+    """Remove legacy doomeap.cfg when safely recognized as DoomEAP-owned."""
+    if base_dir is None:
+        return False
+    target = base_dir / "doomeap.cfg"
+    if not target.is_file():
+        return False
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        for line in lines:
+            if line.startswith("//") or line.startswith("#"):
+                continue
+            if line.startswith("unbind "):
+                continue
+            if AMMO_REFILL_BIND_COMMAND in line:
+                continue
+            return False
+        target.unlink()
+        return True
+    except OSError:
+        return False

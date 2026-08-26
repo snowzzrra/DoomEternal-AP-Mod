@@ -26,6 +26,7 @@ public:
     bool IsMapEntitySafe() const;
     bool IsGameplayLoaded() const;
     bool IsLoading() const;
+    DWORD GetProcessId() const { return processId_; }
 
 private:
     bool Attach(DWORD processId);

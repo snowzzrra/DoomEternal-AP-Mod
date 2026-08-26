@@ -23,6 +23,7 @@ from .launcher_platform import (
     LinuxModManagerAdapter,
     SteamLaunchOptionsManager,
     WindowsModInjectorAdapter,
+    cleanup_stale_doom_config_bind,
     detect_doom_processes,
     install_meathook,
     probe_meathook,
@@ -894,6 +895,14 @@ class IntegratedLaunchWorkflow:
                 injector.command,
             )
 
+        try:
+            hotkey_state = game_root / "base" / "ap_queue" / "ammo_refill_hotkey.state"
+            if hotkey_state.is_file():
+                hotkey_state.unlink()
+        except OSError:
+            pass
+        cleanup_stale_doom_config_bind(config, is_game_running=False)
+
         receipt.update(
             {
                 "adapter_state": "uninstalled",
@@ -1035,6 +1044,49 @@ class RoomSetupCoordinator:
             json.dumps(event.get("slot_data", {}), sort_keys=True),
         )
 
+    def _receipt_context(self) -> dict[str, object]:
+        receipt_path = self.workflow.state_dir / "launcher_setup.json"
+        context: dict[str, object] = {"receipt_exists": receipt_path.is_file()}
+        if not receipt_path.is_file():
+            return context
+        try:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict):
+                return context
+            adapter_state = receipt.get("adapter_state")
+            if isinstance(adapter_state, str):
+                context["adapter_state"] = adapter_state
+            staged_mod = receipt.get("staged_mod")
+            if isinstance(staged_mod, str) and staged_mod:
+                context["package_exists"] = Path(staged_mod).is_file()
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+        return context
+
+    def _room_event_context(self, event: dict[str, object]) -> dict[str, object]:
+        context: dict[str, object] = {
+            "seed_name": event.get("seed_name"),
+            "team": event.get("team"),
+            "slot": event.get("slot"),
+            "room_state": event.get("room_state", "connected"),
+        }
+        if "explicit" in event:
+            context["explicit"] = bool(event["explicit"])
+        if event.get("source") is not None:
+            context["source"] = event["source"]
+        context.update(self._receipt_context())
+        return context
+
+    def _emit_room_event(
+        self,
+        kind: str,
+        event: dict[str, object],
+        **payload: object,
+    ) -> None:
+        context = self._room_event_context(event)
+        context.update(payload)
+        self.event_sink(kind, context)
+
     def submit(self, event: dict[str, object], *, force: bool = False) -> bool:
         if event.get("type") != "connected":
             return False
@@ -1046,6 +1098,12 @@ class RoomSetupCoordinator:
             if force:
                 self._completed.discard(key)
             self._active.add(key)
+        self._emit_room_event(
+            "ROOM_INSTALL_ACTION_REQUESTED",
+            event,
+            explicit=bool(event.get("explicit", not force)),
+            source=event.get("source", "coordinator"),
+        )
         self.event_sink("setup_started", {"seed_name": event.get("seed_name")})
 
         def worker() -> None:
@@ -1058,11 +1116,39 @@ class RoomSetupCoordinator:
                             "setup_failed",
                             setup_failure_payload(error, phase="room_snapshot"),
                         )
+                        self._emit_room_event(
+                            "ROOM_INSTALL_RESULT",
+                            event,
+                            result="failure",
+                            state="failed",
+                            error_type=type(error).__name__,
+                            message=str(error),
+                        )
                         return
+                    self._emit_room_event(
+                        "ROOM_INSTALL_PLAN",
+                        event,
+                        plan="compile_stage_inject",
+                        adapter_state=self._receipt_context().get("adapter_state", ""),
+                    )
+                    self._emit_room_event(
+                        "ROOM_INSTALL_TRANSITION",
+                        event,
+                        phase="starting",
+                        state="installing",
+                    )
                     record = self.workflow.execute(
                         snapshot,
                         str(event.get("endpoint") or ""),
                     )
+                self._emit_room_event(
+                    "ROOM_INSTALL_TRANSITION",
+                    event,
+                    phase="finished",
+                    state=record.adapter_state,
+                    adapter_state=record.adapter_state,
+                    manifest_hash=record.manifest_hash,
+                )
                 if record.adapter_state == "manual_install_required":
                     self.result_sink(record)
                     self.event_sink(
@@ -1074,6 +1160,15 @@ class RoomSetupCoordinator:
                             "guide_section": "Windows Manual Mod Installer",
                             "guide_url": "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
                         },
+                    )
+                    self._emit_room_event(
+                        "ROOM_INSTALL_RESULT",
+                        event,
+                        result="attention",
+                        state=record.adapter_state,
+                        adapter_state=record.adapter_state,
+                        manifest_hash=record.manifest_hash,
+                        message=record.adapter_message,
                     )
                     return
                 if record.adapter_state != "applied":
@@ -1092,6 +1187,15 @@ class RoomSetupCoordinator:
                         "steam_launch_option": record.steam_launch_option,
                     },
                 )
+                self._emit_room_event(
+                    "ROOM_INSTALL_RESULT",
+                    event,
+                    result="success",
+                    state=record.adapter_state,
+                    adapter_state=record.adapter_state,
+                    manifest_hash=record.manifest_hash,
+                    new_install=record.new_install,
+                )
             except Exception as error:
                 self.event_sink(
                     "setup_failed",
@@ -1099,6 +1203,14 @@ class RoomSetupCoordinator:
                         error,
                         phase=str(getattr(self.workflow, "_failure_phase", "")),
                     ),
+                )
+                self._emit_room_event(
+                    "ROOM_INSTALL_RESULT",
+                    event,
+                    result="failure",
+                    state="failed",
+                    error_type=type(error).__name__,
+                    message=str(error),
                 )
             finally:
                 with self._state_lock:
@@ -1121,11 +1233,18 @@ class RoomSetupCoordinator:
         """Run uninstall on coordinator worker, sharing setup serialization lock."""
         if event.get("type") != "connected":
             return False
+        key = self._key(event)
         with self._state_lock:
             self._last_event = dict(event)
             if self._uninstall_active:
                 return False
             self._uninstall_active = True
+        self._emit_room_event(
+            "ROOM_UNINSTALL_ACTION_REQUESTED",
+            event,
+            explicit=True,
+            source=event.get("source", "coordinator"),
+        )
 
         def worker() -> None:
             try:
@@ -1136,14 +1255,47 @@ class RoomSetupCoordinator:
                 with self._worker_lock:
                     snapshot = RoomSnapshot.from_event(event)
                     manifest = self.workflow.base_workflow.manifest_for(snapshot)
+                    self._emit_room_event(
+                        "ROOM_UNINSTALL_PLAN",
+                        event,
+                        plan="quarantine_remove_injector_cleanup",
+                        adapter_state=self._receipt_context().get("adapter_state", ""),
+                    )
+                    self._emit_room_event(
+                        "ROOM_UNINSTALL_TRANSITION",
+                        event,
+                        phase="starting",
+                        state="uninstalling",
+                        manifest_hash=manifest.manifest_hash,
+                    )
                     self.event_sink(
                         "uninstall_started",
                         {"manifest_hash": manifest.manifest_hash},
                     )
                     result = self.workflow.uninstall(snapshot)
+                self._emit_room_event(
+                    "ROOM_UNINSTALL_TRANSITION",
+                    event,
+                    phase="finished",
+                    state=result.state,
+                    adapter_state=result.adapter_state,
+                    manifest_hash=result.manifest_hash,
+                )
+                if result.state == "uninstalled":
+                    with self._state_lock:
+                        self._completed.discard(key)
                 self.event_sink(
                     "uninstall_complete" if result.state == "uninstalled" else "uninstall_attention",
                     {**asdict(result), "manifest_hash": result.manifest_hash},
+                )
+                self._emit_room_event(
+                    "ROOM_UNINSTALL_RESULT",
+                    event,
+                    result="success" if result.state == "uninstalled" else "attention",
+                    state=result.state,
+                    adapter_state=result.adapter_state,
+                    manifest_hash=result.manifest_hash,
+                    message=result.message,
                 )
             except Exception as error:
                 self.event_sink(
@@ -1154,6 +1306,14 @@ class RoomSetupCoordinator:
                         "error_type": type(error).__name__,
                         "message": str(error),
                     },
+                )
+                self._emit_room_event(
+                    "ROOM_UNINSTALL_RESULT",
+                    event,
+                    result="failure",
+                    state="attention",
+                    error_type=type(error).__name__,
+                    message=str(error),
                 )
             finally:
                 with self._state_lock:

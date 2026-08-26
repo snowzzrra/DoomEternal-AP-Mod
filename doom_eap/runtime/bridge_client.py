@@ -1,5 +1,7 @@
 import asyncio
 import atexit
+import csv
+import ctypes
 import glob
 import hashlib
 import json
@@ -58,6 +60,7 @@ from doom_eap.runtime.item_reconciliation import (
     observe_received_items,
     receipt_history_fingerprint,
     receipt_identity,
+    validate_receipt_history_prefix,
 )
 from doom_eap.runtime.observer_lifecycle import (
     RuntimeObservationLease,
@@ -98,7 +101,7 @@ APPLICATION_DIR = Path(
 ).resolve()
 CONFIG_FILE = Path(
     os.environ.get("DOOM_AP_CONFIG_FILE", APPLICATION_DIR / "ap_config.json")
-)
+).expanduser().resolve()
 def resolve_bridge_identity(
     application_dir: Path | None = None,
     repo_root: Path | None = None,
@@ -159,10 +162,71 @@ GAME_NAME = _CONTENT_IDENTITY["game"]
 AMMO_REFILL_ITEM_ID = 7770024
 AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
 AMMO_REFILL_STORAGE_PREFIX = "doom_eap"
+AMMO_REFILL_CAPACITY = 3
+AMMO_REFILL_DISCARDED_SUFFIX = "ammo_refill_discarded"
 # In-game Ammo Refill request channel: the player's DOOM bind for
 # AP_USE_REFILL_CHARGE executes `condump AP_REFILL_REQUEST.txt`, and the bridge
 # consumes that file from SAVE_GAMES_DIR as one refill request.
 AMMO_REFILL_REQUEST_FILENAME = "AP_REFILL_REQUEST.txt"
+AMMO_REFILL_REQUEST_RE = re.compile(r"^AP_REFILL_REQUEST(?:_(\d+))?\.txt$")
+
+
+def doom_process_identity():
+    """Return current game PID plus process-start identity when available."""
+    executable = "doometernalx64vk.exe"
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {executable}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=2,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            for row in csv.reader(result.stdout.splitlines()):
+                if len(row) >= 2 and row[0].casefold() == executable:
+                    pid = int(row[1].replace(",", ""))
+                    try:
+                        class _FileTime(ctypes.Structure):
+                            _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+
+                        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                        handle = kernel32.OpenProcess(0x1000, False, pid)
+                        if handle:
+                            created = _FileTime()
+                            exited = _FileTime()
+                            ok = kernel32.GetProcessTimes(
+                                handle,
+                                ctypes.byref(created),
+                                ctypes.byref(exited),
+                                ctypes.byref(_FileTime()),
+                                ctypes.byref(_FileTime()),
+                            )
+                            kernel32.CloseHandle(handle)
+                            if ok:
+                                creation_ticks = (created.high << 32) | created.low
+                                return f"windows:{pid}:{creation_ticks}"
+                    except (AttributeError, OSError):
+                        pass
+                    return f"windows:{pid}"
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        return None
+
+    for process_dir in Path("/proc").glob("[0-9]*"):
+        try:
+            comm = (process_dir / "comm").read_text(encoding="utf-8").strip()
+            executable_path = os.path.basename(os.readlink(process_dir / "exe"))
+            if executable not in {comm.casefold(), executable_path.casefold()}:
+                continue
+            stat = (process_dir / "stat").read_text(encoding="utf-8")
+            fields = stat.rsplit(")", 1)[1].split()
+            start_time = fields[19]
+            return f"linux:{process_dir.name}:{start_time}"
+        except (OSError, IndexError, UnicodeError):
+            continue
+    return None
 
 
 def _doom_location_ids():
@@ -656,7 +720,10 @@ REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
 def discover_client_state_file():
     configured = config.get("client_state_file")
     if configured:
-        return Path(configured)
+        path = Path(configured).expanduser()
+        if not path.is_absolute():
+            path = CONFIG_FILE.parent / path
+        return path.resolve()
     if os.name == "nt":
         root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
     else:
@@ -743,6 +810,7 @@ logger = configure_bridge_logger()
 def log_effective_runtime_paths():
     """Record bridge-owned configuration and effective runtime path surfaces."""
     logger.info("CONFIG_FILE=%s", CONFIG_FILE.resolve())
+    logger.info("CLIENT_STATE_FILE=%s", CLIENT_STATE_FILE.resolve())
     logger.info("DOOM_BASE_DIR=%s", DOOM_BASE_DIR)
     logger.info("SAVE_GAMES_DIR=%s", SAVE_GAMES_DIR)
     logger.info("INV_DUMP_DIR=%s", INV_DUMP_DIR)
@@ -754,21 +822,74 @@ def log_effective_runtime_paths():
     logger.info("RPC_GATE_PATH=%s", RPC_GATE_PATH)
 
 
+def _client_state_metrics(state):
+    sessions = state.get("sessions", {}) if isinstance(state, dict) else {}
+    if not isinstance(sessions, dict):
+        return {"session_count": 0, "processed_count": 0, "receipt_count": 0}
+    processed_count = 0
+    receipt_count = 0
+    for session in sessions.values():
+        if not isinstance(session, dict):
+            continue
+        processed = session.get("processed_items")
+        if isinstance(processed, int) and not isinstance(processed, bool) and processed >= 0:
+            processed_count += processed
+        history = session.get("receipt_history")
+        if isinstance(history, dict):
+            receipt_ids = history.get("receipt_ids")
+            if isinstance(receipt_ids, list):
+                receipt_count += len(receipt_ids)
+    return {
+        "session_count": len(sessions),
+        "processed_count": processed_count,
+        "receipt_count": receipt_count,
+    }
+
+
 def load_client_state():
     empty_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
     if not CLIENT_STATE_FILE.is_file():
+        log_item_event(
+            "ITEM_STATE_LOAD",
+            path=str(CLIENT_STATE_FILE.resolve()),
+            status="missing",
+            boundary_before=0,
+            boundary_after=0,
+            success=True,
+            **_client_state_metrics(empty_state),
+        )
         return empty_state
     try:
         raw_state = json.loads(CLIENT_STATE_FILE.read_text(encoding="utf-8"))
         state, migrated = migrate_client_state(raw_state)
+        metrics = _client_state_metrics(state)
+        log_item_event(
+            "ITEM_STATE_LOAD",
+            path=str(CLIENT_STATE_FILE.resolve()),
+            status="migrated" if migrated else "loaded",
+            version=state.get("version"),
+            boundary_before=0,
+            boundary_after=metrics["processed_count"],
+            success=True,
+            **metrics,
+        )
         if migrated:
+            log_item_event(
+                "ITEM_STATE_MIGRATION",
+                path=str(CLIENT_STATE_FILE.resolve()),
+                reason="state_schema_migration",
+                boundary_before=0,
+                boundary_after=metrics["processed_count"],
+                success=True,
+                **metrics,
+            )
             logger.info(
                 "[State] STATE_MIGRATED from=1 to=%s sessions=%s",
                 CLIENT_STATE_VERSION,
                 len(state["sessions"]),
             )
             try:
-                save_client_state(state)
+                save_client_state(state, reason="state_migration")
             except OSError as error:
                 logger.warning("[State] Could not persist migrated state: %s", error)
         return state
@@ -781,20 +902,68 @@ def load_client_state():
         except OSError:
             pass
         logger.warning(f"[State] Invalid state file quarantined: {error}")
+        log_item_event(
+            "ITEM_STATE_LOAD",
+            path=str(CLIENT_STATE_FILE.resolve()),
+            status="invalid_quarantined",
+            reason=str(error),
+            boundary_before=0,
+            boundary_after=0,
+            success=False,
+            **_client_state_metrics(empty_state),
+        )
         return empty_state
 
 
-def save_client_state(state):
-    CLIENT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temporary = CLIENT_STATE_FILE.with_name(
-        f".{CLIENT_STATE_FILE.name}.{uuid.uuid4().hex}.tmp"
+def save_client_state(state, *, reason="state_update", boundary=None, boundary_before=None):
+    if isinstance(boundary, bool) or not isinstance(boundary, int) or boundary < 0:
+        boundaries = []
+        sessions = state.get("sessions", {}) if isinstance(state, dict) else {}
+        if isinstance(sessions, dict):
+            for session in sessions.values():
+                candidate = session.get("processed_items") if isinstance(session, dict) else None
+                if isinstance(candidate, int) and not isinstance(candidate, bool) and candidate >= 0:
+                    boundaries.append(candidate)
+        boundary = max(boundaries, default=0)
+    if (
+        isinstance(boundary_before, bool)
+        or not isinstance(boundary_before, int)
+        or boundary_before < 0
+    ):
+        boundary_before = boundary
+    metrics = _client_state_metrics(state)
+    try:
+        CLIENT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary = CLIENT_STATE_FILE.with_name(
+            f".{CLIENT_STATE_FILE.name}.{uuid.uuid4().hex}.tmp"
+        )
+        with temporary.open("x", encoding="utf-8", newline="\n") as file:
+            json.dump(state, file, indent=2, sort_keys=True)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, CLIENT_STATE_FILE)
+    except Exception as error:
+        log_item_event(
+            "ITEM_STATE_SAVE",
+            path=str(CLIENT_STATE_FILE.resolve()),
+            reason=reason,
+            boundary_before=boundary_before,
+            boundary_after=boundary,
+            success=False,
+            error=str(error),
+            **metrics,
+        )
+        raise
+    log_item_event(
+        "ITEM_STATE_SAVE",
+        path=str(CLIENT_STATE_FILE.resolve()),
+        reason=reason,
+        boundary_before=boundary_before,
+        boundary_after=boundary,
+        success=True,
+        **metrics,
     )
-    with temporary.open("x", encoding="utf-8", newline="\n") as file:
-        json.dump(state, file, indent=2, sort_keys=True)
-        file.write("\n")
-        file.flush()
-        os.fsync(file.fileno())
-    os.replace(temporary, CLIENT_STATE_FILE)
 
 DOOM_STEAM_APP_ID = "782330"
 
@@ -1911,6 +2080,16 @@ def log_delivery_event(event: str, **fields) -> None:
     logger.info("DELIVERY_EVENT %s", json.dumps(record, sort_keys=True, separators=(",", ":")))
 
 
+def log_item_event(event: str, **fields) -> None:
+    """Emit structured item diagnostics with a stable ITEM_* event name."""
+    if not event.startswith("ITEM_"):
+        event = f"ITEM_{event}"
+    fields.setdefault("bridge_revision", globals().get("BRIDGE_REVISION"))
+    fields.setdefault("protocol_version", globals().get("BRIDGE_PROTOCOL"))
+    fields.setdefault("mapping_revision", globals().get("ITEM_MAPPING_REVISION"))
+    log_delivery_event(event, **fields)
+
+
 def command_spool_exists(command_id, state_key=None, room_scoped=True):
     if room_scoped:
         command_id = room_scoped_command_id(command_id, state_key)
@@ -2341,6 +2520,42 @@ def telemetry_dump_files():
             glob.glob(os.path.join(INV_DUMP_DIR, f"{prefix}*.txt"))
         )
     return sorted(files)
+
+
+def ammo_refill_request_files(directory=None):
+    """Return only DoomEAP refill request files in safe creation order."""
+    root = directory if directory is not None else globals().get("SAVE_GAMES_DIR")
+    if not root:
+        return []
+    candidates = glob.glob(os.path.join(str(root), "AP_REFILL_REQUEST*.txt"))
+    valid_files = []
+    for path in set(candidates):
+        match = AMMO_REFILL_REQUEST_RE.fullmatch(os.path.basename(path))
+        if match is None:
+            continue
+        try:
+            mtime_ns = os.stat(path).st_mtime_ns
+        except OSError:
+            continue
+        suffix = int(match.group(1) or 0)
+        valid_files.append((mtime_ns, suffix, os.path.basename(path), path))
+    valid_files.sort()
+    return [path for _, _, _, path in valid_files]
+
+
+def cleanup_ammo_refill_request_files(directory=None):
+    """Remove only stale DoomEAP Ammo Refill request files."""
+    removed = 0
+    for path in ammo_refill_request_files(directory):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            logger.warning("[Ammo Refill] Could not remove stale request %s: %s", path, error)
+        else:
+            removed += 1
+    return removed
 
 
 def check_event_files():
@@ -3026,9 +3241,17 @@ class DoomEternalContext(CommonContext):
         self._placement_connected_complete = False
         self._placement_scout_failed = False
         self._ammo_storage_key = None
+        self._ammo_discarded_storage_key = None
         self._ammo_server_consumed = None
+        self._ammo_server_discarded = None
         self._ammo_refill_available = None
         self._ammo_refill_pending = False
+        self._ammo_refill_discard_pending_target = None
+        self._ammo_refill_overflow_task = None
+        self._ammo_refill_staged_command_key = None
+        self._ammo_refill_rpc_was_enabled = False
+        self._ammo_refill_request_queue = deque()
+        self._ammo_refill_request_task = None
         invalidate_queue_session_namespace("bridge_start")
         # Process-local packet timing. Ranges keep ReceivedItems callback work O(1).
         self._packet_received_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
@@ -3329,18 +3552,171 @@ class DoomEternalContext(CommonContext):
             return None
         return f"{AMMO_REFILL_STORAGE_PREFIX}:{self.state_key}:ammo_refill_consumed"
 
+    def _ammo_refill_discarded_storage_name(self):
+        if not self.state_key:
+            return None
+        return f"{AMMO_REFILL_STORAGE_PREFIX}:{self.state_key}:{AMMO_REFILL_DISCARDED_SUFFIX}"
+
     def _ammo_received_count(self):
         return sum(
             1 for receipt in self.items_received if receipt.item == AMMO_REFILL_ITEM_ID
         )
 
     def _refresh_ammo_refill_charge(self):
-        consumed = self._ammo_server_consumed
-        if not isinstance(consumed, int) or consumed < 0:
+        consumed = getattr(self, "_ammo_server_consumed", None)
+        discarded = getattr(self, "_ammo_server_discarded", None)
+        pending_discarded = getattr(self, "_ammo_refill_discard_pending_target", None)
+        if not isinstance(consumed, int) or consumed < 0 or not isinstance(discarded, int) or discarded < 0:
             self._ammo_refill_available = None
             return None
-        self._ammo_refill_available = max(self._ammo_received_count() - consumed, 0)
+        effective_discarded = discarded
+        if isinstance(pending_discarded, int):
+            effective_discarded = max(effective_discarded, pending_discarded)
+        raw_available = max(
+            self._ammo_received_count() - consumed - effective_discarded,
+            0,
+        )
+        overflow_target = self._ammo_refill_overflow_target()
+        if (
+            isinstance(pending_discarded, int)
+            or (
+                isinstance(overflow_target, int)
+                and overflow_target > discarded
+            )
+        ):
+            raw_available = min(raw_available, AMMO_REFILL_CAPACITY)
+        self._ammo_refill_available = raw_available
         return self._ammo_refill_available
+
+    def _ammo_refill_balance_payload(self):
+        available = self._refresh_ammo_refill_charge()
+        consumed = getattr(self, "_ammo_server_consumed", None)
+        discarded = getattr(self, "_ammo_server_discarded", None)
+        return {
+            "available": available if isinstance(available, int) else 0,
+            "consumed": consumed if isinstance(consumed, int) else None,
+            "discarded": discarded if isinstance(discarded, int) else None,
+            "received": self._ammo_received_count(),
+            "capacity": AMMO_REFILL_CAPACITY,
+            "authoritative": isinstance(consumed, int) and isinstance(discarded, int),
+        }
+
+    def _emit_ammo_refill_balance(self, status="ready", message=None, source=None):
+        payload = self._ammo_refill_balance_payload()
+        if source is not None:
+            payload["source"] = source
+        if message is not None:
+            payload["message"] = message
+        logger.info(
+            "AMMO_REFILL_BALANCE available=%s received=%s consumed=%s discarded=%s source=%s",
+            payload.get("available"),
+            payload.get("received"),
+            payload.get("consumed"),
+            payload.get("discarded"),
+            source or "unspecified",
+        )
+        emit_launcher_event("ammo_refill", status=status, **payload)
+
+    def _ammo_refill_overflow_target(self):
+        consumed = getattr(self, "_ammo_server_consumed", None)
+        discarded = getattr(self, "_ammo_server_discarded", None)
+        if (
+            not isinstance(consumed, int)
+            or isinstance(consumed, bool)
+            or consumed < 0
+            or not isinstance(discarded, int)
+            or isinstance(discarded, bool)
+            or discarded < 0
+        ):
+            return None
+        return max(discarded, self._ammo_received_count() - consumed - AMMO_REFILL_CAPACITY)
+
+    def _schedule_ammo_refill_overflow_normalization(self, source):
+        if isinstance(self._ammo_refill_discard_pending_target, int):
+            return
+        if self._ammo_refill_overflow_task is not None and not self._ammo_refill_overflow_task.done():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._ammo_refill_overflow_task = loop.create_task(
+            self._normalize_ammo_refill_overflow(source)
+        )
+
+    async def _normalize_ammo_refill_overflow(self, source):
+        try:
+            target = self._ammo_refill_overflow_target()
+            current = self._ammo_server_discarded
+            if not isinstance(target, int) or not isinstance(current, int) or target <= current:
+                return
+            delta = target - current
+            self._ammo_refill_discard_pending_target = target
+            logger.info(
+                "AMMO_REFILL_OVERFLOW received=%s consumed=%s discarded_before=%s "
+                "discarded_increment=%s discarded_target=%s capacity=%s source=%s",
+                self._ammo_received_count(),
+                self._ammo_server_consumed,
+                current,
+                delta,
+                target,
+                AMMO_REFILL_CAPACITY,
+                source,
+            )
+            try:
+                await self.send_msgs([
+                    {
+                        "cmd": "Set",
+                        "key": self._ammo_discarded_storage_key,
+                        "default": current,
+                        "operations": [{"operation": "add", "value": delta}],
+                        "want_reply": True,
+                    }
+                ])
+            except Exception as error:
+                self._ammo_refill_discard_pending_target = None
+                logger.warning("AMMO_REFILL_OVERFLOW retry_required error=%s", error)
+        finally:
+            self._ammo_refill_overflow_task = None
+
+    def _consume_ammo_refill_discarded_storage(self, value):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            logger.warning("[Ammo Refill] Ignoring invalid server discarded count: %r", value)
+            return
+        previous = self._ammo_server_discarded
+        if isinstance(previous, int) and value < previous:
+            logger.error(
+                "[Ammo Refill] Refusing non-monotonic server discarded count: %s < %s",
+                value,
+                previous,
+            )
+            return
+        pending = self._ammo_refill_discard_pending_target
+        if isinstance(pending, int) and value < pending:
+            logger.warning(
+                "[Ammo Refill] Discarded update below pending target: %s < %s",
+                value,
+                pending,
+            )
+            return
+        self._ammo_server_discarded = value
+        self._ammo_refill_discard_pending_target = None
+        self._refresh_ammo_refill_charge()
+        self._emit_ammo_refill_balance(source="discarded_storage_update")
+        self._schedule_ammo_refill_overflow_normalization("discarded_storage_update")
+
+    def _cancel_staged_ammo_refill(self, reason):
+        command_key = self._ammo_refill_staged_command_key
+        if command_key is not None:
+            discard_queued_coalesced_command(command_key, self.state_key)
+            logger.info("[Ammo Refill] Cancelled staged command: %s", reason)
+        self._ammo_refill_staged_command_key = None
+        if self._ammo_refill_rpc_was_enabled:
+            try:
+                set_rpc_execution(True)
+            except Exception as error:
+                logger.error("[Ammo Refill] Could not restore command execution: %s", error)
+        self._ammo_refill_rpc_was_enabled = False
 
     def _ammo_refill_runtime_safe(self):
         server = getattr(self, "server", None)
@@ -3357,22 +3733,40 @@ class DoomEternalContext(CommonContext):
 
     def _configure_ammo_refill_storage(self):
         self._ammo_storage_key = self._ammo_refill_storage_name()
+        self._ammo_discarded_storage_key = self._ammo_refill_discarded_storage_name()
         self._ammo_server_consumed = None
+        self._ammo_server_discarded = None
         self._ammo_refill_available = None
         self._ammo_refill_pending = False
-        if self._ammo_storage_key is None:
+        self._ammo_refill_discard_pending_target = None
+        self._ammo_refill_staged_command_key = None
+        if self._ammo_storage_key is None or self._ammo_discarded_storage_key is None:
             return
         self.stored_data.pop(self._ammo_storage_key, None)
+        self.stored_data.pop(self._ammo_discarded_storage_key, None)
         self.stored_data_notification_keys.add(self._ammo_storage_key)
+        self.stored_data_notification_keys.add(self._ammo_discarded_storage_key)
         asyncio.create_task(self.send_msgs([
-            {"cmd": "Get", "keys": [self._ammo_storage_key]},
-            {"cmd": "SetNotify", "keys": [self._ammo_storage_key]},
+            {"cmd": "Get", "keys": [self._ammo_storage_key, self._ammo_discarded_storage_key]},
+            {"cmd": "SetNotify", "keys": [self._ammo_storage_key, self._ammo_discarded_storage_key]},
         ]))
-        emit_launcher_event("ammo_refill", status="loading", available=0, message="Ammo Refill storage loading")
+        self._emit_ammo_refill_balance(
+            status="loading",
+            source="initial_storage_load",
+            message="Ammo Refill storage loading",
+        )
 
     def _consume_ammo_refill_storage(self, value):
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             logger.warning("[Ammo Refill] Ignoring invalid server consumed count: %r", value)
+            if self._ammo_refill_pending:
+                self._cancel_staged_ammo_refill("invalid storage update")
+                self._ammo_refill_pending = False
+            self._emit_ammo_refill_balance(
+                status="error",
+                source="storage_update",
+                message="Ammo Refill storage returned invalid balance",
+            )
             return
         if (
             self._ammo_server_consumed is not None
@@ -3383,18 +3777,59 @@ class DoomEternalContext(CommonContext):
                 value,
                 self._ammo_server_consumed,
             )
+            if self._ammo_refill_pending:
+                self._cancel_staged_ammo_refill("non-monotonic storage update")
+                self._ammo_refill_pending = False
+            self._emit_ammo_refill_balance(
+                status="error",
+                source="storage_update",
+                message="Ammo Refill storage balance moved backwards",
+            )
             return
+        if self._ammo_refill_pending:
+            prior_consumed = self._ammo_server_consumed
+            if not isinstance(prior_consumed, int):
+                self._cancel_staged_ammo_refill("storage baseline unavailable")
+                self._ammo_refill_pending = False
+                self._emit_ammo_refill_balance(
+                    status="error",
+                    source="storage_update",
+                    message="Ammo Refill storage baseline unavailable",
+                )
+                return
+            expected = prior_consumed + 1
+            if value != expected:
+                self._cancel_staged_ammo_refill("storage update did not apply staged charge")
+                self._ammo_refill_pending = False
+                self._emit_ammo_refill_balance(
+                    status="error",
+                    source="storage_update",
+                    message="Ammo Refill storage update did not apply",
+                )
+                return
         self._ammo_server_consumed = value
         available = self._refresh_ammo_refill_charge()
         if self._ammo_refill_pending:
             self._ammo_refill_pending = False
-        emit_launcher_event(
-            "ammo_refill",
+            self._ammo_refill_staged_command_key = None
+            self._ammo_refill_rpc_was_enabled = False
+            try:
+                if not set_rpc_execution(True):
+                    raise RuntimeError("execution gate refused enable")
+            except Exception as error:
+                logger.error("[Ammo Refill] Could not arm staged command: %s", error)
+                self._emit_ammo_refill_balance(
+                    status="queued",
+                    source="storage_update",
+                    message=f"Ammo Refill queued; execution gate unavailable: {error}",
+                )
+                return
+        self._emit_ammo_refill_balance(
             status="ready",
-            available=available or 0,
-            consumed=value,
+            source="storage_update",
             message=f"Ammo Refill charges available: {available or 0}",
         )
+        self._schedule_ammo_refill_overflow_normalization("storage_update")
 
     def _queue_ammo_refill_primitive(self):
         namespace = queue_session_namespace(self.state_key)
@@ -3414,9 +3849,10 @@ class DoomEternalContext(CommonContext):
         if not commands or len(commands) != 1:
             logger.error("[Ammo Refill] Proven refill primitive is unavailable: %s", description)
             return False
-        return send_command(
+        queued = send_command(
             commands[0],
             coalesce_key=command_key,
+            arm_rpc=False,
             already_queued_ok=False,
             state_key=self.state_key,
             delivery_fields={
@@ -3427,6 +3863,9 @@ class DoomEternalContext(CommonContext):
                 "slot": self.active_save_slot,
             },
         )
+        if queued:
+            self._ammo_refill_staged_command_key = command_key
+        return queued
 
     async def request_ammo_refill(self):
         if not self._ammo_refill_runtime_safe():
@@ -3452,6 +3891,31 @@ class DoomEternalContext(CommonContext):
             emit_launcher_event("ammo_refill", status="loading", available=available, message="Ammo Refill storage is not ready")
             return False
         self._ammo_refill_pending = True
+        self._ammo_refill_rpc_was_enabled = rpc_execution_enabled()
+        if self._ammo_refill_rpc_was_enabled:
+            try:
+                if not set_rpc_execution(False):
+                    raise RuntimeError("could not pause command execution")
+            except Exception as error:
+                self._ammo_refill_pending = False
+                self._ammo_refill_rpc_was_enabled = False
+                emit_launcher_event(
+                    "ammo_refill",
+                    status="error",
+                    **self._ammo_refill_balance_payload(),
+                    message=f"Ammo Refill command staging unavailable: {error}",
+                )
+                return False
+        if not self._queue_ammo_refill_primitive():
+            self._ammo_refill_pending = False
+            self._cancel_staged_ammo_refill("primitive could not queue")
+            emit_launcher_event(
+                "ammo_refill",
+                status="error",
+                **self._ammo_refill_balance_payload(),
+                message="Ammo Refill command could not be staged",
+            )
+            return False
         try:
             await self.send_msgs([
                 {
@@ -3463,44 +3927,60 @@ class DoomEternalContext(CommonContext):
                 }
             ])
         except Exception as error:
-            self._ammo_refill_pending = False
-            emit_launcher_event("ammo_refill", status="error", available=available, message=str(error))
-            return False
-        self._ammo_server_consumed = consumed + 1
-        self._refresh_ammo_refill_charge()
-        self.persist_session_state()
-        if not self._ammo_refill_runtime_safe() or not self._queue_ammo_refill_primitive():
+            self._cancel_staged_ammo_refill("storage update failed")
             self._ammo_refill_pending = False
             emit_launcher_event(
                 "ammo_refill",
-                status="consumed_unqueued",
-                available=self._ammo_refill_available or 0,
-                message="Ammo Refill consumed but primitive could not queue",
+                status="error",
+                **self._ammo_refill_balance_payload(),
+                message=str(error),
             )
             return False
         emit_launcher_event(
             "ammo_refill",
-            status="queued",
-            available=self._ammo_refill_available or 0,
-            consumed=self._ammo_server_consumed,
-            message="Ammo Refill queued",
+            status="pending",
+            **self._ammo_refill_balance_payload(),
+            message="Ammo Refill storage update pending",
         )
         return True
 
-    def _consume_ammo_refill_request_file(self):
-        """Consume one in-game AP_USE_REFILL_CHARGE condump request."""
-        save_dir = globals().get("SAVE_GAMES_DIR")
-        if not save_dir:
-            return False
-        path = Path(save_dir) / AMMO_REFILL_REQUEST_FILENAME
+    async def _run_ammo_refill_request_queue(self):
+        """Process discovered request files serially without replaying files."""
         try:
-            os.remove(path)
-        except FileNotFoundError:
+            while self._ammo_refill_request_queue and not self.exit_event.is_set():
+                while self._ammo_refill_pending and not self.exit_event.is_set():
+                    await asyncio.sleep(0.05)
+                if self.exit_event.is_set():
+                    break
+                self._ammo_refill_request_queue.popleft()
+                await self.request_ammo_refill()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[Ammo Refill] Request queue failed")
+        finally:
+            self._ammo_refill_request_task = None
+
+    def _consume_ammo_refill_request_file(self):
+        """Consume each fresh exact or numeric-suffixed refill request once."""
+        accepted = []
+        for path in ammo_refill_request_files():
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                continue
+            except OSError as error:
+                logger.warning("[Ammo Refill] Request removal failed for %s: %s", path, error)
+                continue
+            accepted.append(path)
+        if not accepted:
             return False
-        except OSError as error:
-            logger.warning("[AmmoRefill] request file removal failed: %s", error)
-            return False
-        asyncio.get_running_loop().create_task(self.request_ammo_refill())
+        self._ammo_refill_request_queue.extend(accepted)
+        task = self._ammo_refill_request_task
+        if task is None or task.done():
+            self._ammo_refill_request_task = asyncio.get_running_loop().create_task(
+                self._run_ammo_refill_request_queue()
+            )
         return True
 
     def on_package(self, cmd: str, args: dict):
@@ -3597,11 +4077,17 @@ class DoomEternalContext(CommonContext):
             self._consume_location_info(args)
         elif cmd in {"Retrieved", "SetReply"}:
             ammo_key = self._ammo_storage_key
+            discarded_key = self._ammo_discarded_storage_key
             if cmd == "Retrieved" and ammo_key in args.get("keys", {}):
                 value = args["keys"].get(ammo_key)
                 self._consume_ammo_refill_storage(0 if value is None else value)
             elif cmd == "SetReply" and args.get("key") == ammo_key:
                 self._consume_ammo_refill_storage(args.get("value"))
+            if cmd == "Retrieved" and discarded_key in args.get("keys", {}):
+                value = args["keys"].get(discarded_key)
+                self._consume_ammo_refill_discarded_storage(0 if value is None else value)
+            elif cmd == "SetReply" and args.get("key") == discarded_key:
+                self._consume_ammo_refill_discarded_storage(args.get("value"))
             key = self._launcher_hints_key()
             if (cmd == "Retrieved" and key in args.get("keys", {})) or (
                 cmd == "SetReply" and args.get("key") == key
@@ -3752,6 +4238,13 @@ class DoomEternalContext(CommonContext):
         asyncio.create_task(self.check_mission_challenge_locations())
         if self._item_delivery_wakeup:
             self._schedule_item_delivery("connected")
+        if hasattr(self, "_ammo_server_consumed"):
+            self._emit_ammo_refill_balance(
+                status="ready" if self._ammo_server_consumed is not None else "loading",
+                source="reconnect",
+                message="Ammo Refill balance recomputed after reconnect",
+            )
+        balance = self._ammo_refill_balance_payload()
         emit_launcher_event(
             "connected",
             seed_name=self.room_seed_name,
@@ -3763,6 +4256,9 @@ class DoomEternalContext(CommonContext):
             checked_locations=sorted(self.checked_locations),
             placements=placements,
             placement_scouts_complete=True,
+            ammo_refills_available=balance["available"],
+            ammo_refills_consumed=balance["consumed"],
+            ammo_refills_authoritative=balance["authoritative"],
         )
 
     def _on_received_items_packet(self, args):
@@ -3803,15 +4299,26 @@ class DoomEternalContext(CommonContext):
                     packet_received_ns,
                 )
             )
-        log_delivery_event(
-            "ITEM_PACKET_RECEIVED",
+        log_item_event(
+            "ITEM_PACKET_OBSERVATION",
             packet_start_index=packet_start_index,
             packet_count=packet_item_count,
             authoritative_count=authoritative_count,
+            boundary_before=getattr(self, "items_processed", 0),
+            boundary_after=getattr(self, "items_processed", 0),
+            received_count=authoritative_count,
+            processed_count=getattr(self, "items_processed", 0),
+            state_key=getattr(self, "state_key", None) or "unresolved",
+            success=packet_accepted,
             packet_received_monotonic_ns=packet_received_ns,
         )
         self._schedule_item_delivery("packet")
-        self._refresh_ammo_refill_charge()
+        self._emit_ammo_refill_balance(
+            status="ready" if self._ammo_server_consumed is not None else "loading",
+            source="received_items",
+            message="Ammo Refill balance updated from received items",
+        )
+        self._schedule_ammo_refill_overflow_normalization("received_items")
 
     def _schedule_item_delivery(self, trigger):
         """Coalesce packet wakeups into one event-loop delivery runner."""
@@ -3848,6 +4355,13 @@ class DoomEternalContext(CommonContext):
         async with self._item_delivery_lock:
             self._item_delivery_wakeup = False
             if not self.item_state_ready:
+                log_item_event(
+                    "ITEM_DELIVERY_BLOCKED",
+                    reason="item_state_not_ready",
+                    trigger=trigger,
+                    boundary=getattr(self, "items_processed", None),
+                    state_key=getattr(self, "state_key", None),
+                )
                 self._item_delivery_waiting_for_state = True
                 self._item_delivery_wakeup = True
                 return False
@@ -3861,6 +4375,17 @@ class DoomEternalContext(CommonContext):
                 }
             except ValueError as exc:
                 logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
+                log_item_event(
+                    "ITEM_DELIVERY_BLOCKED",
+                    reason="history_incompatible",
+                    detail=str(exc),
+                    trigger=trigger,
+                    boundary=getattr(self, "items_processed", None),
+                    received_count=len(self.items_received),
+                    state_key=getattr(self, "state_key", None),
+                    bridge_revision=BRIDGE_REVISION,
+                    mapping_revision=ITEM_MAPPING_REVISION,
+                )
                 return False
 
             batch_count = 0
@@ -3871,11 +4396,16 @@ class DoomEternalContext(CommonContext):
                 packet_received_ns = self._packet_received_timestamp(item_index)
                 duplicate = item_index in duplicate_indices
                 log_delivery_event(
-                    "RECEIPT_CLASSIFIED",
+                    "ITEM_RECEIPT_CLASSIFIED",
                     receipt_index=item_index,
                     item_id=item_id,
+                    receipt_id=receipt_identity(network_item),
                     trigger=trigger,
                     classification="duplicate" if duplicate else "new",
+                    boundary=self.items_processed,
+                    state_key=getattr(self, "state_key", None),
+                    bridge_revision=BRIDGE_REVISION,
+                    mapping_revision=ITEM_MAPPING_REVISION,
                     packet_received_monotonic_ns=packet_received_ns,
                 )
                 if duplicate:
@@ -3887,6 +4417,16 @@ class DoomEternalContext(CommonContext):
                     )
                     self.items_processed += 1
                     self.persist_session_state()
+                    log_item_event(
+                        "ITEM_RECEIPT_ACK",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        receipt_id=receipt_identity(network_item),
+                        outcome="duplicate_no_replay",
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
                     batch_count += 1
                     if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
                         batch_count = 0
@@ -3911,6 +4451,16 @@ class DoomEternalContext(CommonContext):
                     self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
+                    log_item_event(
+                        "ITEM_RECEIPT_ACK",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        receipt_id=receipt_identity(network_item),
+                        outcome="materialized_no_replay",
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
                     batch_count += 1
                     if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
                         batch_count = 0
@@ -3927,9 +4477,14 @@ class DoomEternalContext(CommonContext):
                     "ITEM_RECEIPT",
                     receipt_index=item_index,
                     item_id=item_id,
+                    receipt_id=receipt_identity(network_item),
                     item_name=self.delivery_item_name(item_id)
                     if item_id in ITEM_CLASSIFICATION_IDENTITY else None,
                     trigger=trigger,
+                    boundary=self.items_processed,
+                    history_fingerprint=receipt_history_fingerprint(self.items_received),
+                    state_key=getattr(self, "state_key", None),
+                    mapping_revision=ITEM_MAPPING_REVISION,
                     packet_received_monotonic_ns=packet_received_ns,
                     active_map=self.current_map_name,
                     slot=self.active_save_slot,
@@ -3945,6 +4500,17 @@ class DoomEternalContext(CommonContext):
                         f"Missing item mapping for DOOM Eternal item {item_id}. "
                         "Check the local bridge logs."
                     )
+                    log_item_event(
+                        "ITEM_DELIVERY_BLOCKED",
+                        reason="missing_mapping",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                        bridge_revision=BRIDGE_REVISION,
+                        mapping_revision=ITEM_MAPPING_REVISION,
+                    )
                     break
 
                 definition = ITEM_ID_TO_COMMAND[item_id]
@@ -3953,6 +4519,16 @@ class DoomEternalContext(CommonContext):
                     self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
+                    log_item_event(
+                        "ITEM_RECEIPT_ACK",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        receipt_id=receipt_identity(network_item),
+                        outcome="runtime_only_no_replay",
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
                     batch_count += 1
                     if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
                         batch_count = 0
@@ -3991,6 +4567,17 @@ class DoomEternalContext(CommonContext):
                             "item_name": item_name,
                             "description": description,
                         }
+                        log_item_event(
+                            "ITEM_DELIVERY_BLOCKED",
+                            reason="spool_rejected",
+                            receipt_index=item_index,
+                            item_id=item_id,
+                            item_name=item_name,
+                            detail=description,
+                            boundary=self.items_processed,
+                            trigger=trigger,
+                            state_key=getattr(self, "state_key", None),
+                        )
                         break
                 except Exception as error:
                     item_name = self.delivery_item_name(item_id)
@@ -4009,6 +4596,18 @@ class DoomEternalContext(CommonContext):
                         "exception_message": str(error),
                         "traceback": tb,
                     }
+                    log_item_event(
+                        "ITEM_DELIVERY_BLOCKED",
+                        reason="spool_exception",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        item_name=item_name,
+                        exception_type=type(error).__name__,
+                        detail=str(error),
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
                     break
                 else:
                     self.item_delivery_blocked = False
@@ -4018,6 +4617,18 @@ class DoomEternalContext(CommonContext):
                 self._record_processed_receipt(network_item)
                 self.items_processed += 1
                 self.persist_session_state()
+                log_item_event(
+                    "ITEM_RECEIPT_ACK",
+                    receipt_index=item_index,
+                    item_id=item_id,
+                    receipt_id=receipt_identity(network_item),
+                    outcome="delivered",
+                    boundary=self.items_processed,
+                    trigger=trigger,
+                    state_key=getattr(self, "state_key", None),
+                    bridge_revision=BRIDGE_REVISION,
+                    mapping_revision=ITEM_MAPPING_REVISION,
+                )
                 self.onboard_bootstrap("on_item_received")
 
                 batch_count += 1
@@ -4665,7 +5276,61 @@ class DoomEternalContext(CommonContext):
         team = getattr(self, "team", 0)
         slot = getattr(self, "slot", 0)
         auth = str(self.auth or "unknown_auth")
-        return f"{effective_seed_name}:{team}:{slot}:{auth}:{BRIDGE_REVISION}"
+        # Bridge builds share one durable AP session. Runtime revision belongs
+        # in diagnostics, not receipt-session identity.
+        return f"{effective_seed_name}:{team}:{slot}:{auth}"
+
+    def migrate_revision_bound_session(self, sessions, state_key):
+        """Adopt one pre-stable revision-bound session without trusting it blindly."""
+        candidates = sorted(
+            key for key in sessions
+            if isinstance(key, str)
+            and key.startswith(f"{state_key}:")
+            and isinstance(sessions.get(key), dict)
+        )
+        if not candidates:
+            return None
+
+        selected = candidates[-1]
+        if len(candidates) > 1 and self.items_received:
+            compatible = []
+            for candidate in candidates:
+                session = sessions[candidate]
+                history = session.get("receipt_history")
+                processed = session.get("processed_items", 0)
+                ok, _ = validate_receipt_history_prefix(
+                    self.items_received, processed, history
+                )
+                if ok:
+                    compatible.append(candidate)
+            if len(compatible) == 1:
+                selected = compatible[0]
+            else:
+                log_item_event(
+                    "ITEM_STATE_INCOMPATIBLE",
+                    reason="multiple_revision_sessions",
+                    state_key=state_key,
+                    candidates=candidates,
+                    compatible=compatible,
+                    boundary_before=0,
+                    boundary_after=0,
+                    success=False,
+                    bridge_revision=BRIDGE_REVISION,
+                )
+
+        sessions[state_key] = sessions.pop(selected)
+        log_item_event(
+            "ITEM_STATE_MIGRATION",
+            reason="bridge_revision_removed_from_session_identity",
+            from_state_key=selected,
+            state_key=state_key,
+            boundary_before=sessions[state_key].get("processed_items", 0),
+            boundary_after=sessions[state_key].get("processed_items", 0),
+            session_count=1,
+            success=True,
+            bridge_revision=BRIDGE_REVISION,
+        )
+        return selected
 
     def check_and_update_event_session(self):
         current_key = self.get_ap_state_key()
@@ -4712,6 +5377,7 @@ class DoomEternalContext(CommonContext):
 
     def initialize_item_state(self):
         self.reset_queue_session_authority("initialize_item_state")
+        initialization_boundary_before = getattr(self, "items_processed", 0)
         previous_state_key = self.state_key
         self._item_session_generation = getattr(self, "_item_session_generation", 0) + 1
         self.client_state = load_client_state()
@@ -4734,6 +5400,17 @@ class DoomEternalContext(CommonContext):
             self.items_processed = 0
             self.item_state_ready = False
             self._packet_received_ranges.clear()
+            log_item_event(
+                "ITEM_STATE_SESSION_INIT",
+                state_key="unresolved",
+                state_key_status="unresolved",
+                reason="invalid_slot_identity",
+                boundary_before=initialization_boundary_before,
+                boundary_after=0,
+                received_count=len(self.items_received),
+                processed_count=0,
+                success=False,
+            )
             return
         sessions = self.client_state["sessions"]
         self.state_key, migrated_from = migrate_legacy_session_key(
@@ -4753,8 +5430,38 @@ class DoomEternalContext(CommonContext):
             self.items_processed = 0
             self.item_state_ready = False
             self._packet_received_ranges.clear()
+            log_item_event(
+                "ITEM_STATE_SESSION_INIT",
+                state_key="unresolved",
+                state_key_status="unresolved",
+                reason="session_key_unresolved",
+                boundary_before=initialization_boundary_before,
+                boundary_after=0,
+                received_count=len(self.items_received),
+                processed_count=0,
+                success=False,
+            )
             return
+        if self.state_key not in sessions:
+            self.migrate_revision_bound_session(sessions, self.state_key)
         if migrated_from is not None:
+            migrated_session = sessions.get(self.state_key)
+            migrated_boundary = (
+                migrated_session.get("processed_items", 0)
+                if isinstance(migrated_session, dict)
+                else 0
+            )
+            log_item_event(
+                "ITEM_STATE_MIGRATION",
+                from_state_key=migrated_from,
+                state_key=self.state_key,
+                reason="legacy_session_identity",
+                boundary_before=initialization_boundary_before,
+                boundary_after=migrated_boundary,
+                session_count=len(sessions),
+                processed_count=migrated_boundary,
+                success=True,
+            )
             logger.info(
                 "[State] STATE_MIGRATED from=%s to=%s reason=legacy_session",
                 migrated_from,
@@ -4833,7 +5540,38 @@ class DoomEternalContext(CommonContext):
         if not isinstance(reconciliation.get("delivered"), dict):
             reconciliation["delivered"] = {}
         reconciliation.setdefault("delivered", {})
-        save_client_state(self.client_state)
+        try:
+            save_client_state(
+                self.client_state,
+                reason="item_state_initialize",
+                boundary=self.items_processed,
+                boundary_before=initialization_boundary_before,
+            )
+        except Exception as error:
+            log_item_event(
+                "ITEM_STATE_SESSION_INIT",
+                state_key=self.state_key,
+                state_key_status="resolved",
+                reason="state_save_failed",
+                detail=str(error),
+                boundary_before=initialization_boundary_before,
+                boundary_after=self.items_processed,
+                received_count=len(self.items_received),
+                processed_count=self.items_processed,
+                success=False,
+            )
+            raise
+        log_item_event(
+            "ITEM_STATE_SESSION_INIT",
+            state_key=self.state_key,
+            state_key_status="resolved",
+            reason="initialized",
+            boundary_before=initialization_boundary_before,
+            boundary_after=self.items_processed,
+            received_count=len(self.items_received),
+            processed_count=self.items_processed,
+            success=True,
+        )
         logger.info(
             f"[State] Loaded {self.items_processed} processed items for "
             f"{self.state_key}."
@@ -4866,9 +5604,14 @@ class DoomEternalContext(CommonContext):
         self.session_state.pop("fast_travel_delivered", None)
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
-        save_client_state(self.client_state)
+        save_client_state(
+            self.client_state,
+            reason="session_persist",
+            boundary=self.items_processed,
+        )
 
     def reset_item_state(self):
+        boundary_before = self.items_processed
         self.items_processed = 0
         self.session_state["processed_items"] = 0
         self.session_state["receipt_history"] = {
@@ -4876,6 +5619,7 @@ class DoomEternalContext(CommonContext):
             "highest_observed_index": -1,
             "receipt_ids": [],
             "receipt_counts": {},
+            "receipt_item_ids": [],
             "owned_item_ids": [],
         }
         self.session_state["item_resync"] = {}
@@ -4888,7 +5632,36 @@ class DoomEternalContext(CommonContext):
             "epoch": 1,
             "delivered": {},
         }
-        save_client_state(self.client_state)
+        try:
+            save_client_state(
+                self.client_state,
+                reason="item_state_reset",
+                boundary=self.items_processed,
+                boundary_before=boundary_before,
+            )
+        except Exception as error:
+            log_item_event(
+                "ITEM_STATE_RESET",
+                state_key=getattr(self, "state_key", None),
+                reason="state_save_failed",
+                detail=str(error),
+                boundary_before=boundary_before,
+                boundary_after=self.items_processed,
+                received_count=len(self.items_received),
+                processed_count=self.items_processed,
+                success=False,
+            )
+            raise
+        log_item_event(
+            "ITEM_STATE_RESET",
+            state_key=getattr(self, "state_key", None),
+            reason="explicit_reset",
+            boundary_before=boundary_before,
+            boundary_after=self.items_processed,
+            received_count=len(self.items_received),
+            processed_count=self.items_processed,
+            success=True,
+        )
 
     def received_rune_count(self):
         return sum(item.item in REVISION_ONE_RUNE_IDS for item in self.items_received)
@@ -4917,18 +5690,51 @@ class DoomEternalContext(CommonContext):
         }
 
     def _record_processed_receipt(self, network_item):
+        history = self.session_state.setdefault("receipt_history", {})
+        item_ids = history.setdefault("receipt_item_ids", [])
+        if not isinstance(item_ids, list):
+            item_ids = []
+            history["receipt_item_ids"] = item_ids
+        item_ids.append(network_item.item)
         receipt_id = receipt_identity(network_item)
         if receipt_id is None:
             return
-        history = self.session_state.setdefault("receipt_history", {})
         receipt_counts = history.setdefault("receipt_counts", {})
         if not isinstance(receipt_counts, dict):
             receipt_counts = {}
             history["receipt_counts"] = receipt_counts
         receipt_counts[receipt_id] = receipt_counts.get(receipt_id, 0) + 1
+        receipt_ids = history.setdefault("receipt_ids", [])
+        if not isinstance(receipt_ids, list):
+            receipt_ids = []
+            history["receipt_ids"] = receipt_ids
+        receipt_ids.append(receipt_id)
+
+    def validate_item_history_prefix(self):
+        history = self.session_state.setdefault("receipt_history", {})
+        compatible, detail = validate_receipt_history_prefix(
+            self.items_received,
+            self.items_processed,
+            history,
+        )
+        log_item_event(
+            "ITEM_HISTORY_COMPATIBILITY",
+            status="compatible" if compatible else "incompatible",
+            reason=detail,
+            boundary=self.items_processed,
+            received_count=len(self.items_received),
+            history_fingerprint=receipt_history_fingerprint(self.items_received),
+            state_key=getattr(self, "state_key", None),
+            bridge_revision=BRIDGE_REVISION,
+            mapping_revision=ITEM_MAPPING_REVISION,
+        )
+        if not compatible:
+            raise ValueError(f"received-item history is incompatible: {detail}")
+        return True
 
     def observe_received_item_history(self):
         """Record authoritative ownership summary without delivering effects."""
+        self.validate_item_history_prefix()
         observation = observe_received_items(
             self.items_received,
             self.items_processed,
@@ -4936,15 +5742,30 @@ class DoomEternalContext(CommonContext):
         )
         history = self.session_state.setdefault("receipt_history", {})
         owned_item_ids = sorted(set(observation.receipt_item_ids))
+        ordered_receipt_ids = [
+            receipt_id
+            for receipt_id in (
+                receipt_identity(receipt)
+                for receipt in self.items_received[: self.items_processed]
+            )
+            if receipt_id is not None
+        ]
         changed = (
             history.get("processed_boundary") != self.items_processed
             or history.get("highest_observed_index")
             != observation.highest_observed_index
             or history.get("owned_item_ids") != owned_item_ids
+            or history.get("receipt_item_ids")
+            != list(observation.receipt_item_ids[: self.items_processed])
+            or history.get("receipt_ids") != ordered_receipt_ids
         )
         history["processed_boundary"] = self.items_processed
         history["highest_observed_index"] = observation.highest_observed_index
         history["owned_item_ids"] = owned_item_ids
+        history["receipt_item_ids"] = list(
+            observation.receipt_item_ids[: self.items_processed]
+        )
+        history["receipt_ids"] = ordered_receipt_ids
         if changed:
             self.persist_session_state()
         return observation
@@ -4991,6 +5812,7 @@ class DoomEternalContext(CommonContext):
     def _compile_reconciliation_plan_for_evidence(self, evidence, *, include_manual_replay=False):
         seed = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None)
         identity = f"{seed}-{self.team}-{self.slot}"
+        self.validate_item_history_prefix()
         observation = observe_received_items(
             self.items_received,
             self.items_processed,
@@ -5045,6 +5867,13 @@ class DoomEternalContext(CommonContext):
                 evidence, include_manual_replay=True
             )
         except ValueError as error:
+            log_item_event(
+                "ITEM_RECONCILIATION_BLOCKED",
+                reason="history_incompatible",
+                detail=str(error),
+                boundary=self.items_processed,
+                state_key=getattr(self, "state_key", None),
+            )
             return None, str(error)
 
         logger.info(
@@ -5157,6 +5986,14 @@ class DoomEternalContext(CommonContext):
                 reason=reason,
             )
             self.persist_session_state()
+            log_item_event(
+                "ITEM_RECONCILIATION_BLOCKED",
+                reason="history_incompatible",
+                detail=str(error),
+                boundary=self.items_processed,
+                state_key=getattr(self, "state_key", None),
+                trigger=reason,
+            )
             self.log_automatic_resync_noop(reason, error, evidence.epoch, fingerprint)
             return None, str(error)
 
@@ -5996,7 +6833,11 @@ class DoomEternalContext(CommonContext):
                 return False
             repaired.add(item_index)
             self.session_state["mapping_repair_indices"] = sorted(repaired)
-            save_client_state(self.client_state)
+            save_client_state(
+                self.client_state,
+                reason="mapping_repair_progress",
+                boundary=self.items_processed,
+            )
             logger.info(
                 f"[State] Recovered item affected by an older mapping "
                 f"{network_item.item} at receive index {item_index}: "
@@ -6006,7 +6847,11 @@ class DoomEternalContext(CommonContext):
 
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
-        save_client_state(self.client_state)
+        save_client_state(
+            self.client_state,
+            reason="mapping_revision_update",
+            boundary=self.items_processed,
+        )
         return True
 
     def progressive_stage(self, item_id, item_index):
@@ -6165,12 +7010,20 @@ class DoomEternalContext(CommonContext):
                 return False, description
             group["next_command"] = command_index + 1
             group["total_commands"] = len(commands)
-            save_client_state(self.client_state)
+            save_client_state(
+                self.client_state,
+                reason="item_command_group_progress",
+                boundary=self.items_processed,
+            )
 
         groups.pop(group_key, None)
         if not groups:
             self.session_state.pop("item_command_groups", None)
-        save_client_state(self.client_state)
+        save_client_state(
+            self.client_state,
+            reason="item_command_group_complete",
+            boundary=self.items_processed,
+        )
         return True, description
 
     def on_deathlink(self, data: dict):
@@ -7583,6 +8436,7 @@ async def amain(launch_args=None):
     except Exception as error:
         logger.warning("[RPC] Initial RPC gate disarm failed: %s", error)
     cleanup_active_map_markers()
+    cleanup_ammo_refill_request_files()
     cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())

@@ -25,6 +25,7 @@
 #include "ap_runtime_rpc_client.h"
 #include "ap_rpc_health_state.h"
 #include "rpc_queue_policy.h"
+#include "ammo_hotkey.h"
 
 ApRuntimeRpcClient* g_ApRpc = nullptr;
 std::unique_ptr<ApRuntimeRpcClient> g_ApRpcOwner;
@@ -2138,6 +2139,7 @@ int main(int argc, char** argv) {
     bool lastRpcEnabled = false;
     std::string lastGateReason;
     DWORD lastStallLog = 0;
+    AmmoHotkeyHandler ammoHotkey(LogDebug);
 
     while (true) {
         gameStateProbe.Poll();
@@ -2216,6 +2218,19 @@ int main(int argc, char** argv) {
         }
         DiscardMapEntitySafeJobsWithMismatchedLease(
             queue, knownCommandIds, ActiveMaterializationLease()
+        );
+        ammoHotkey.Poll(
+            gameStateProbe.GetProcessId(),
+            activeNamespace.has_value(),
+            rpcTransportReady,
+            rpcArmed,
+            gameStateProbe.IsSafeForRpc(),
+            [](const std::string& command) {
+                if (!g_ApRpc) return false;
+                return g_ApRpc->ExecuteConsoleCommand(command);
+            },
+            g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : 0,
+            g_ApRpc ? g_ApRpc->LastTransportStatus() : 0
         );
         const bool queueActive = !queue.empty();
         if ((queueActive || queueWasActive)

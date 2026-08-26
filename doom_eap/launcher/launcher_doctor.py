@@ -10,16 +10,19 @@ import re
 import time
 import zipfile
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_integration import UNINSTALL_OWNED_STATES
 from .launcher_platform import (
+    AMMO_HOTKEY_STATE_FILENAME,
+    AMMO_REFILL_BIND_COMMAND,
     PrerequisiteStatus,
     detect_doom_processes,
     probe_meathook,
     redact_secrets,
+    resolve_doom_config_path,
     validate_game_root,
 )
 
@@ -67,6 +70,7 @@ class DoctorReport:
     failure_domain: str = ""
     recovery_action: str = ""
     summary_message: str = ""
+    support_diagnostics: Mapping[str, object] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -82,6 +86,7 @@ class DoctorReport:
             "recovery_action": self.recovery_action,
             "summary_message": self.summary_message,
             "diagnostics": [asdict(item) for item in self.diagnostics],
+            "support_diagnostics": dict(self.support_diagnostics),
         }
 
 
@@ -156,6 +161,12 @@ def _bridge_log_candidates(
 
 def _native_log_candidates(config: Mapping[str, object] | None) -> tuple[Path, ...]:
     config = config or {}
+    configured_path = config.get("native_log_path") or config.get("native_log_file")
+    if configured_path:
+        paths: list[Path] = []
+        for path in _configured_paths(configured_path):
+            paths.extend((path, path.with_name("ap_client.previous.log")))
+        return tuple(dict.fromkeys(paths))
     configured = config.get("game_root") or config.get("doom_base_dir")
     if not configured:
         return ()
@@ -167,6 +178,30 @@ def _native_log_candidates(config: Mapping[str, object] | None) -> tuple[Path, .
         return ()
     base = root / "base"
     return (base / "ap_client.log", base / "ap_client.previous.log")
+
+
+def _launcher_log_candidates(
+    config: Mapping[str, object] | None,
+    paths: object | None,
+    application_dir: Path | None = None,
+) -> tuple[Path, ...]:
+    """Find launcher session logs without manufacturing a path or file."""
+    config = config or {}
+    candidates: list[Path] = []
+    for key in ("launcher_log_path", "launcher_log_file"):
+        for path in _configured_paths(config.get(key)):
+            candidates.extend((path, path.with_name("launcher.previous.log")))
+    directories: list[Path] = []
+    for key in ("launcher_log_dir",):
+        directories.extend(_configured_paths(config.get(key)))
+    for name in ("config_dir", "state_dir", "data_dir"):
+        for root in _configured_paths(getattr(paths, name, None)):
+            directories.extend((root, root / "logs"))
+    if application_dir is not None:
+        directories.append(application_dir / "logs")
+    for directory in directories:
+        candidates.extend((directory / "launcher.log", directory / "launcher.previous.log"))
+    return tuple(dict.fromkeys(candidates))
 
 
 def _read_log_tail(path: Path, limit: int = SUPPORT_LOG_TAIL_BYTES) -> str | None:
@@ -299,27 +334,64 @@ def _support_log_tails(
 ) -> tuple[dict[str, str], dict[str, dict[str, object]]]:
     tails: dict[str, str] = {}
     provenance: dict[str, dict[str, object]] = {}
-    for archive_name, candidates in (
-        ("bridge.log", _bridge_log_candidates(config, paths, application_dir)),
-        ("ap_client.log", _native_log_candidates(config)),
+    for family, candidates in (
+        ("launcher", _launcher_log_candidates(config, paths, application_dir)),
+        ("bridge", _bridge_log_candidates(config, paths, application_dir)),
+        ("native", _native_log_candidates(config)),
     ):
-        selected = _most_recent_log(candidates)
-        if selected is None:
-            continue
-        try:
-            stat_res = selected.stat()
-            freshness, iso_time = _log_freshness(stat_res, session_start=session_start)
-            provenance[archive_name] = {
-                "source_path": _safe_path(selected),
-                "size_bytes": stat_res.st_size,
-                "modified_iso": iso_time,
-                "freshness": freshness,
-            }
-        except OSError:
-            pass
-        tail = _read_support_log(selected)
-        if tail is not None:
-            tails[archive_name] = tail
+        names = {
+            "launcher": ("launcher.log", "launcher.previous.log"),
+            "bridge": ("bridge.log", "bridge.previous.log"),
+            "native": ("ap_client.log", "ap_client.previous.log"),
+        }[family]
+        paired = tuple(candidates[index:index + 2] for index in range(0, len(candidates), 2))
+        for role, archive_name in enumerate(names):
+            selected: Path | None = None
+            attempted: list[str] = []
+            for pair in paired:
+                if role >= len(pair):
+                    continue
+                candidate = pair[role]
+                attempted.append(_safe_path(candidate))
+                try:
+                    if candidate.is_file() and candidate.stat().st_size > 0:
+                        selected = candidate
+                        break
+                except OSError:
+                    continue
+            if selected is None:
+                provenance[archive_name] = {
+                    "status": "unavailable",
+                    "reason": "not_found",
+                    "candidate_paths": attempted,
+                }
+                continue
+            try:
+                stat_res = selected.stat()
+                freshness, iso_time = _log_freshness(stat_res, session_start=session_start)
+                provenance[archive_name] = {
+                    "status": "available",
+                    "source_path": _safe_path(selected),
+                    "size_bytes": stat_res.st_size,
+                    "modified_iso": iso_time,
+                    "freshness": freshness,
+                }
+            except OSError as error:
+                provenance[archive_name] = {
+                    "status": "unavailable",
+                    "reason": f"stat_failed: {type(error).__name__}",
+                    "source_path": _safe_path(selected),
+                }
+                continue
+            content = _read_support_log(selected)
+            if content is None:
+                provenance[archive_name] = {
+                    **provenance[archive_name],
+                    "status": "unavailable",
+                    "reason": "unreadable",
+                }
+            else:
+                tails[archive_name] = content
     return tails, provenance
 
 
@@ -561,6 +633,330 @@ def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None,
     return details
 
 
+def _client_state_path(
+    config: Mapping[str, object], config_path: Path | None = None
+) -> Path:
+    configured = config.get("client_state_file")
+    if configured:
+        path = Path(str(configured)).expanduser()
+        if not path.is_absolute() and config_path is not None:
+            path = config_path.expanduser().resolve().parent / path
+        return path.resolve()
+    if os.name == "nt":
+        root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    else:
+        root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    return root / "doom-eternal-ap" / "client_state.json"
+
+
+def _item_state_summary(
+    config: Mapping[str, object], config_path: Path | None = None
+) -> dict[str, object]:
+    """Read bounded ownership counters; never copy persistent state wholesale."""
+    path = _client_state_path(config, config_path)
+    result: dict[str, object] = {
+        "status": "unavailable",
+        "source": "bridge_client_persistent_state",
+        "path": str(path),
+        "sessions": [],
+        "session_count": 0,
+    }
+    try:
+        if not path.is_file():
+            result["reason"] = "not_found"
+            return result
+        if path.stat().st_size > SUPPORT_DIAGNOSTIC_MAX_BYTES:
+            result["reason"] = "bounded_read_limit_exceeded"
+            return result
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
+        result["reason"] = f"unreadable: {type(error).__name__}"
+        return result
+    if not isinstance(document, dict) or not isinstance(document.get("sessions"), Mapping):
+        result["reason"] = "malformed"
+        return result
+
+    sessions = document["sessions"]
+    summaries: list[dict[str, object]] = []
+    for session_index, raw_key in enumerate(sorted(sessions, key=str)[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]):
+        session = sessions[raw_key]
+        if not isinstance(session, Mapping):
+            continue
+        history = session.get("receipt_history")
+        history = history if isinstance(history, Mapping) else {}
+        counts = history.get("receipt_counts")
+        counts = counts if isinstance(counts, Mapping) else {}
+        owned = history.get("owned_item_ids")
+        owned_count = len(owned) if isinstance(owned, list) else 0
+        processed = session.get("processed_items", 0)
+        highest = history.get("highest_observed_index", -1)
+        summaries.append({
+            "session_index": session_index,
+            "processed_items": processed if isinstance(processed, int) and not isinstance(processed, bool) and processed >= 0 else 0,
+            "highest_observed_index": highest if isinstance(highest, int) and not isinstance(highest, bool) else -1,
+            "receipt_id_count": len(counts),
+            "receipt_count": sum(
+                value for value in counts.values()
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            ),
+            "owned_item_count": owned_count,
+            "item_mapping_revision": session.get("item_mapping_revision", 0)
+            if isinstance(session.get("item_mapping_revision", 0), int)
+            and not isinstance(session.get("item_mapping_revision", 0), bool)
+            else 0,
+            "item_resync": isinstance(session.get("item_resync"), Mapping),
+        })
+    result.update({
+        "status": "available",
+        "version": document.get("version") if isinstance(document.get("version"), int) else None,
+        "session_count": len(sessions),
+        "sessions": summaries,
+        "truncated": len(sessions) > len(summaries),
+    })
+    return result
+
+
+def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
+    path = state_dir / "launcher_setup.json" if state_dir else None
+    result: dict[str, object] = {
+        "status": "unavailable",
+        "source": "launcher_install_receipt",
+        "path": str(path) if path else None,
+    }
+    if path is None:
+        result["reason"] = "state_directory_unconfigured"
+        return result
+    try:
+        if not path.is_file():
+            result["reason"] = "not_found"
+            return result
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
+        result["reason"] = f"unreadable: {type(error).__name__}"
+        return result
+    if not isinstance(document, Mapping):
+        result["reason"] = "malformed"
+        return result
+    for key in (
+        "schema", "manifest_hash", "staged_mod", "staged_sha256",
+        "adapter_state", "installation_mode", "steam_launch_option",
+    ):
+        if key in document:
+            result[key] = document[key]
+    staged = document.get("staged_mod")
+    expected = document.get("staged_sha256")
+    if isinstance(staged, str) and staged and isinstance(expected, str) and expected:
+        staged_path = Path(staged)
+        result["staged_exists"] = staged_path.is_file()
+        if staged_path.is_file():
+            try:
+                actual = hashlib.sha256(staged_path.read_bytes()).hexdigest()
+                result["staged_sha256_actual"] = actual
+                result["hash_match"] = actual == expected
+            except OSError:
+                result["hash_match"] = False
+    result["status"] = "available"
+    return result
+
+
+def _support_game_link_diagnostics(
+    config: Mapping[str, object],
+    config_path: Path | None,
+    paths: object | None,
+    processes: Sequence[Mapping[str, object]],
+    runtime: Mapping[str, object],
+    meathook: Mapping[str, object],
+    *,
+    live: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    game_running = any(
+        str(item.get("name", "")).casefold()
+        in {"doometernalx64vk", "doometernalx64vk.exe"}
+        for item in processes
+    )
+    process = {
+        "status": "running" if game_running else "not_running",
+        "game_detected": game_running,
+        "items": [dict(item) for item in processes[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]],
+    }
+    queue_details = runtime.get("queue")
+    queue_details = queue_details if isinstance(queue_details, Mapping) else {}
+    config_paths: dict[str, object] = {
+        "config_file": str(config_path) if config_path else None,
+        "application_dir": str(getattr(paths, "application_dir", "")) if paths else None,
+        "client_state_file": str(_client_state_path(config, config_path)),
+        "doom_base_dir": runtime.get("doom_base_dir"),
+        "save_games_dir": runtime.get("save_games_dir"),
+        "queue_dir": queue_details.get("path"),
+    }
+    live_paths = live.get("config_paths") if live else None
+    if isinstance(live_paths, Mapping):
+        config_paths.update(dict(live_paths))
+    configured_supervisor = live.get("supervisor") if live else None
+    if isinstance(configured_supervisor, Mapping):
+        supervisor = dict(configured_supervisor)
+        bridge_status = str(supervisor.get("status", "unknown"))
+    else:
+        supervisor = {"status": "unknown", "reason": "live_supervisor_not_provided"}
+        bridge_status = "unknown"
+    bridge = {"status": bridge_status, "supervisor": supervisor}
+
+    direct_native = runtime.get("native")
+    direct_native = dict(direct_native) if isinstance(direct_native, Mapping) else {}
+    native = live.get("native_rpc") if live else None
+    native_rpc = dict(native) if isinstance(native, Mapping) else {
+        "source": "direct" if direct_native.get("native_state") else "unknown",
+        "evidence": "direct" if direct_native.get("native_state") else "unavailable",
+        "health": direct_native,
+    }
+    if isinstance(native_rpc, Mapping):
+        native_rpc.setdefault(
+            "evidence",
+            "direct" if native_rpc.get("source") == "direct" else (
+                "last_known" if native_rpc.get("source") == "last_known" else "unavailable"
+            ),
+        )
+    native_status = str(native_rpc.get("health", {}).get("state", "unknown")) if isinstance(native_rpc.get("health"), Mapping) else "unknown"
+
+    markers = runtime.get("markers")
+    markers = markers if isinstance(markers, Mapping) else {}
+    telemetry_files = sum(
+        1
+        for value in markers.values()
+        if isinstance(value, list)
+        for entry in value
+        if isinstance(entry, Mapping) and entry.get("exists") is True
+    )
+    telemetry = {
+        "status": "available" if telemetry_files else "unavailable",
+        "marker_files": telemetry_files,
+        "reason": "marker_evidence_observed" if telemetry_files else "no_marker_evidence",
+    }
+    materialization = runtime.get("materialization")
+    materialization = materialization if isinstance(materialization, Mapping) else {}
+    gate = materialization.get("ap_rpc_enabled")
+    gate_enabled = isinstance(gate, Mapping) and gate.get("exists") is True
+    safety = {
+        "status": "enabled" if gate_enabled else "blocked",
+        "rpc_gate": gate,
+        "reason": "rpc_gate_present" if gate_enabled else "rpc_gate_unavailable",
+    }
+    telemetry_safety = {
+        "status": "ready" if telemetry["status"] == "available" and safety["status"] == "enabled" else "degraded",
+        "telemetry": telemetry,
+        "safety": safety,
+    }
+    queue = runtime.get("queue")
+    queue = dict(queue) if isinstance(queue, Mapping) else {"status": "unavailable", "reason": "queue_diagnostics_unavailable"}
+    queue_path = queue.get("path")
+    try:
+        queue["status"] = (
+            "available"
+            if isinstance(queue_path, str) and Path(queue_path).is_dir() and not queue.get("errors")
+            else "unavailable"
+        )
+    except (OSError, ValueError, RuntimeError):
+        queue["status"] = "unavailable"
+
+    meathook_status = str(meathook.get("status", "unknown"))
+    issues: list[str] = []
+    if meathook_status not in {"ok", "verified"}:
+        issues.append("game_link_runtime_not_verified")
+    if game_running and bridge_status in {"unavailable", "stopped", "failed", "unknown"}:
+        issues.append("bridge_not_available_for_running_game")
+    if game_running and native_status in {"degraded", "not_ready", "unknown"}:
+        issues.append("native_rpc_not_ready")
+    if telemetry_safety["status"] != "ready" and game_running:
+        issues.append("telemetry_or_safety_evidence_not_ready")
+    if queue.get("failed", 0) or queue.get("errors"):
+        issues.append("queue_has_failed_work")
+    if game_running and queue.get("status") == "unavailable":
+        issues.append("queue_evidence_unavailable")
+    if issues:
+        overall_status = "attention" if "game_link_runtime_not_verified" in issues else "degraded"
+        overall_reason = issues[0]
+    else:
+        overall_status = "ready"
+        overall_reason = "game_link_evidence_consistent"
+
+    base_dir = doom_base_dir_from_config(config)
+    hotkey_file = (base_dir / "ap_queue" / AMMO_HOTKEY_STATE_FILENAME) if base_dir else None
+    hotkey_exists = hotkey_file is not None and hotkey_file.is_file()
+    configured_ammo_key = str(config.get("ammo_refill_keybind", "F9"))
+    parsed_key = "UNBOUND"
+    if hotkey_exists and hotkey_file is not None:
+        try:
+            first_line = hotkey_file.read_text(encoding="utf-8").splitlines()[0].strip()
+            parts = first_line.split()
+            if len(parts) >= 2 and parts[0] == "AP_AMMO_REFILL_HOTKEY_V1":
+                parsed_key = parts[1]
+            elif len(parts) == 1:
+                parsed_key = parts[0]
+        except Exception:
+            pass
+
+    stale_config_bind_present = False
+    cfg_path = resolve_doom_config_path(config)
+    if cfg_path is not None and cfg_path.is_file():
+        try:
+            cfg_text = cfg_path.read_text(encoding="utf-8", errors="replace")
+            stale_config_bind_present = AMMO_REFILL_BIND_COMMAND in cfg_text
+        except Exception:
+            pass
+
+    ammo_hotkey = {
+        "configured_key": configured_ammo_key,
+        "state_file_path": str(hotkey_file) if hotkey_file else None,
+        "state_file_exists": hotkey_exists,
+        "parsed_key": parsed_key,
+        "stale_config_bind_present": stale_config_bind_present,
+    }
+
+    return {
+        "runtime": dict(meathook),
+        "process": process,
+        "bridge": bridge,
+        "supervisor": supervisor,
+        "config_paths": config_paths,
+        "native_rpc": native_rpc,
+        "telemetry_safety": telemetry_safety,
+        "queue": queue,
+        "ammo_hotkey": ammo_hotkey,
+        "overall": {
+            "status": overall_status,
+            "reason": overall_reason,
+            "issues": issues,
+            "derived_from": [
+                "process", "bridge", "native_rpc", "telemetry_safety", "queue", "ammo_hotkey",
+            ],
+        },
+    }
+
+
+def build_support_diagnostics(
+    config: Mapping[str, object],
+    config_path: Path | None,
+    paths: object | None,
+    processes: Sequence[Mapping[str, object]],
+    runtime: Mapping[str, object],
+    meathook: Mapping[str, object],
+    *,
+    live: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    state_value = getattr(paths, "state_dir", None) if paths else None
+    try:
+        state_dir = Path(state_value).expanduser() if state_value else None
+    except (OSError, TypeError, ValueError, RuntimeError):
+        state_dir = None
+    return {
+        "item_state": _item_state_summary(config, config_path),
+        "room_install_receipt": _room_install_receipt_summary(state_dir),
+        "game_link": _support_game_link_diagnostics(
+            config, config_path, paths, processes, runtime, meathook, live=live
+        ),
+    }
+
+
 def write_support_bundle(
     destination: Path,
     report: DoctorReport,
@@ -572,6 +968,7 @@ def write_support_bundle(
     session_start: float | None = None,
     last_setup_failure: Mapping[str, object] | None = None,
     support_condump: Mapping[str, object] | None = None,
+    support_diagnostics: Mapping[str, object] | None = None,
 ) -> Path:
     """Write bounded diagnostics and redacted logs with freshness metadata."""
     destination = destination.expanduser().resolve()
@@ -585,13 +982,34 @@ def write_support_bundle(
         payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
     if support_condump is not None:
         payload["support_condump"] = sanitize_support_value(dict(support_condump))
+    if support_diagnostics is not None:
+        payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     safe_logs = _bound_support_text(
         "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)
     )
+    if safe_logs:
+        if "launcher.log" in tails:
+            provenance["launcher.history.log"] = {
+                "status": "available",
+                "source": "launcher_in_memory_diagnostics",
+                "line_count": len(safe_logs.splitlines()),
+            }
+        else:
+            provenance.setdefault("launcher.log", {})[
+                "in_memory_diagnostics"
+            ] = {
+                "status": "available",
+                "source": "launcher_in_memory_diagnostics",
+                "line_count": len(safe_logs.splitlines()),
+            }
+        payload["log_provenance"] = sanitize_support_value(provenance)
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
-        archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
+        if "launcher.log" not in tails:
+            archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
+        elif safe_logs:
+            archive.writestr("launcher.history.log", safe_logs + "\n")
         for name, tail in tails.items():
             archive.writestr(name, tail)
         if support_condump is not None:
@@ -618,12 +1036,14 @@ class LauncherDoctor:
         config_path: Path | None = None,
         last_setup_failure: Mapping[str, object] | None = None,
         last_room_package_issue: Mapping[str, object] | None = None,
+        live_support: Mapping[str, object] | None = None,
     ):
         self.config = dict(config or {})
         self.paths = paths
         self.config_path = config_path
         self.last_setup_failure = dict(last_setup_failure or {})
         self.last_room_package_issue = dict(last_room_package_issue or {})
+        self.live_support = dict(live_support or {})
 
     def _current_issue(self) -> dict[str, object] | None:
         for issue in (self.last_room_package_issue, self.last_setup_failure):
@@ -802,6 +1222,19 @@ class LauncherDoctor:
             "effective runtime paths and path-selection evidence collected",
             _runtime_diagnostics(self.config, self.config_path, self.paths, processes),
         ))
+        runtime_details = checks[-1].details if isinstance(checks[-1].details, Mapping) else {}
+        support_diagnostics = build_support_diagnostics(
+            self.config,
+            self.config_path,
+            self.paths,
+            processes,
+            runtime_details,
+            {
+                "status": meathook_probe.status.value,
+                **dict(meathook_probe.details),
+            },
+            live=self.live_support,
+        )
 
         state_dir = self._state_dir()
         receipt_path = (state_dir / "launcher_setup.json") if state_dir else None
@@ -891,4 +1324,5 @@ class LauncherDoctor:
             domain,
             recovery_action,
             summary_message,
+            support_diagnostics,
         )
