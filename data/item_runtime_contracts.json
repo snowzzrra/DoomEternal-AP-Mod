@@ -86,7 +86,7 @@
     },
     "physical_pickup_contracts": {
         "haste": {
-            "name": "Haste",
+            "name": "Overdrive",
             "native_resource": "statuseffect/overdrive",
             "native_data": "hasteData",
             "pickup_sound": "play_haste_pickup",
@@ -96,7 +96,7 @@
             "powerup_extender_preserved": true
         },
         "quad_damage": {
-            "name": "Quad Damage",
+            "name": "Onslaught",
             "native_resource": "statuseffect/onslaught",
             "native_data": "onslaughtData",
             "pickup_sound": "play_quad_pickup",
@@ -142,6 +142,24 @@
             "runtime_family": "trap_spawn",
             "runtime_primitive": "target_command",
             "runtime_effect": "chrispy pickup/powerup/berserk",
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770143": {
+            "name": "Overdrive",
+            "runtime_family": "trap_spawn",
+            "runtime_primitive": "target_command",
+            "runtime_effect": "chrispy pickup/powerup/overdrive",
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770144": {
+            "name": "Onslaught",
+            "runtime_family": "trap_spawn",
+            "runtime_primitive": "target_command",
+            "runtime_effect": "chrispy pickup/powerup/onslaught",
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false

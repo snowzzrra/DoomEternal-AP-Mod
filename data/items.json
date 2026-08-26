@@ -248,5 +248,28 @@
         "type": "currency",
         "currency": "CURRENCY_SENTINEL_BATTERY",
         "count": 2
+    },
+    "7770143": "chrispy pickup/powerup/overdrive",
+    "7770144": "chrispy pickup/powerup/onslaught",
+    "7770145": {
+        "type": "no_op",
+        "availability": "unavailable",
+        "description": "Support Rune materialization deferred until 0.5-C",
+        "start_inventory_eligible": false,
+        "requires_dlc": true
+    },
+    "7770146": {
+        "type": "no_op",
+        "availability": "unavailable",
+        "description": "Support Rune materialization deferred until 0.5-C",
+        "start_inventory_eligible": false,
+        "requires_dlc": true
+    },
+    "7770147": {
+        "type": "no_op",
+        "availability": "unavailable",
+        "description": "Support Rune materialization deferred until 0.5-C",
+        "start_inventory_eligible": false,
+        "requires_dlc": true
     }
 }

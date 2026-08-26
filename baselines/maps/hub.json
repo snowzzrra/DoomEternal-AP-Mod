@@ -91,22 +91,26 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Accept station3/stateStats contract and checked visual projection"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.0: add Overdrive and Onslaught item entities"
     }
   ],
   "asset_package_contract_sha256": "ce785644bbfc80f99443669dd8499eeb7ec9f36167985e18b8339867220f39ba",
-  "byte_sha256": "4baee9ffa305e7fa776ac6a765ba15b1612423d3072a0ed7007eb3ff67a3a831",
-  "content_revision": "0.4.0-beta.4",
+  "byte_sha256": "7281be7d1386fc960771a2e174ff0c9dea1b99adef405892770c53bb75a9f708",
+  "content_revision": "0.5.0",
   "generated_entity_metrics": {
-    "bind_parents": 143,
-    "byte_size": 4313271,
-    "classes": 4165,
-    "entity_count": 4167,
+    "bind_parents": 140,
+    "byte_size": 4324264,
+    "classes": 4184,
+    "entity_count": 4186,
     "layers": 162,
-    "targets": 2824,
-    "transforms": 8062,
-    "unique_entity_names": 4166
+    "targets": 2827,
+    "transforms": 8054,
+    "unique_entity_names": 4185
   },
-  "manifest_sha256": "87b331b1cc1cccf0c19fa40092b682d57116031d6dc6218a692ec261948124fb",
+  "manifest_sha256": "eebb418acb722f27f2ff977f174ddd1537ad0b5dc5df42dd929ca0e3b931a323",
   "map_key": "hub",
   "physical_ap_ids": [
     7770072,
@@ -127,11 +131,12 @@
     7770171,
     7770253,
     7770254,
-    7770255
+    7770255,
+    7770418
   ],
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "0c6ac92eb33512a0a005912e954856ca373f63dcdef8278a1900770f3ceb0bd5",
-  "semantic_sha256": "d72a787d948dae36b1e472ee865cd998963055b26c9fc2877d176f03d2468b2e"
+  "scripted_contract_sha256": "920c46bad5c0ef7a2c9bfd94187ff9b89aabc7d8d5aa94eb81d3bad56de3fdd8",
+  "semantic_sha256": "7358553261b7f38b9e715afbd20cb225a5724d4b7a92e0478e63eb6684087bc1"
 }

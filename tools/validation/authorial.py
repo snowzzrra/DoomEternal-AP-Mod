@@ -52,19 +52,19 @@ def check_authorial() -> dict[str, int]:
 
     identity = read_json(ROOT / "data/content_identity.json")
     if set(identity) != set(IDENTITY_FIELDS):
-        raise ValueError("data/content_identity.json fields diverge from beta.4 contract")
+        raise ValueError("data/content_identity.json fields diverge from the 0.5.0 release contract")
     for field, expected_type in IDENTITY_FIELDS.items():
         value = identity[field]
         if not isinstance(value, expected_type) or isinstance(value, bool):
             raise ValueError(f"data/content_identity.json: invalid {field}")
     if identity["game"] != "DOOM Eternal":
         raise ValueError("data/content_identity.json: invalid game identity")
-    if identity["apworld_revision"] != "0.4.0":
+    if identity["apworld_revision"] != "0.5.0":
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
     if identity["content_revision"] != identity["release_version"]:
         raise ValueError("data/content_identity.json: content and release revisions diverge")
-    if identity["release_version"] != "0.4.0-beta.4":
-        raise ValueError("data/content_identity.json: invalid beta release revision")
+    if identity["release_version"] != "0.5.0":
+        raise ValueError("data/content_identity.json: invalid release revision")
 
     campaign_goal = read_json(ROOT / "data/campaign_goal_contract.json")
     if campaign_goal.get("release") != identity["release_version"]:

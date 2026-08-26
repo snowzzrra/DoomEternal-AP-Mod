@@ -58,6 +58,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
             f"CONTENT_REVISION = {string(identity['content_revision'])}",
             f"BRIDGE_PROTOCOL_VERSION = {identity['bridge_protocol_version']!r}",
             f"COMPILER_REVISION = {identity['compiler_revision']!r}",
+            f"SESSION_MOD_CONTRACT_REVISION = {identity['session_mod_contract_revision']!r}",
             "",
             "LOCATION_ROWS = (",
         ]

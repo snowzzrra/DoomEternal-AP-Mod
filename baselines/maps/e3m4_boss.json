@@ -75,20 +75,28 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "major receipt single-line format"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.0: add Overdrive and Onslaught item entities"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5-B: narrow Final Sin vent-entry Extra Life trigger to vanilla-equivalent volume"
     }
   ],
   "asset_package_contract_sha256": "26a2c9a87c5428771c8a71ed2613fc15314e55bece57bd1d369bf03e7fb2df9d",
-  "byte_sha256": "22f9313e36399753c7008ed92cc36d9b40935998ecf88743500aeebf6a79af98",
-  "content_revision": "0.4.0-beta.4",
+  "byte_sha256": "f40527854f07fa42f97c3fb79db55befac47d1009b1acc620447f210d97311bd",
+  "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15301938,
-    "classes": 12954,
-    "entity_count": 12954,
+    "byte_size": 15313151,
+    "classes": 12972,
+    "entity_count": 12972,
     "layers": 1650,
     "targets": 45517,
     "transforms": 26188,
-    "unique_entity_names": 12954
+    "unique_entity_names": 12972
   },
   "manifest_sha256": "8c008d72eea7172e4de492887baf143ba101e755a509395e2a71eb4531df48a4",
   "map_key": "e3m4_boss",
@@ -104,6 +112,6 @@
     7770414
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "e20dc9ad9aef0693b5ab4f6160991e76cd1f0ecc025961eabc15f70e37978f4a",
-  "semantic_sha256": "508c45294f8af97890b6f78d80fa890c09c90438eb7b4743ff5bd2b0dcf2fe9e"
+  "scripted_contract_sha256": "df3956e34ead01236ded5f485c338c6f65497900dbfe5cfb6188c887739fb40f",
+  "semantic_sha256": "2ac0ca2678de737ace08a99d140a1ab7266f160fe9686b02c4966a7959104ea7"
 }

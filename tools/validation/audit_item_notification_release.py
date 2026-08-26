@@ -120,6 +120,7 @@ def _physical_entity_family(spec: dict[str, object], name: str) -> bool:
             "ap_automap_location_",
             "ap_location_visual_",
             "ap_remove_location_visual_",
+            "ap_hide_location_visual_",
             "ap_notify_location_",
             "ap_event_",
         )

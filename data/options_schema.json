@@ -129,8 +129,8 @@
         }
       ],
       "default": "late_game",
-      "description": "Late Game opens DLC when campaign readiness is established. From the Beginning opens all three campaign roots immediately.",
-      "display_name": "dlc_logic_timing",
+      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 UAC Atlantica becomes available once your weapons and abilities are strong enough for TAG1. The World Spear becomes available later, once your loadout is strong enough for TAG2.\n\nFrom the Beginning \u2014 Hell on Earth, UAC Atlantica, and The World Spear are all available as starting paths from the beginning.\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
+      "display_name": "DLC Logic Timing",
       "group": "Game Options",
       "key": "dlc_logic_timing",
       "source_class": "DLCLogicTiming",
@@ -160,8 +160,8 @@
         }
       ],
       "default": "acquire_the_unmaykr",
-      "description": "Choose victory: physically acquire the Unmaykr, defeat the Icon of Sin, defeat the Dark Lord, or complete all 19 missions plus those three physical endpoints.",
-      "display_name": "goal",
+      "description": "Choose the main objective that wins your Archipelago world.\n\nAcquire the Unmaykr \u2014 Complete the six Base Campaign Slayer Gates and claim the Unmaykr from its case in the Fortress of Doom.\n\nKill the Icon of Sin \u2014 Progress through the Base Campaign and defeat the Icon of Sin.\n\nKill the Dark Lord \u2014 Progress through The Ancient Gods Part Two and defeat the Dark Lord.\n\nComplete the Full Saga \u2014 Complete all 19 Base Campaign, TAG1, and TAG2 missions, claim the Unmaykr, defeat the Icon of Sin, and defeat the Dark Lord.",
+      "display_name": "Goal",
       "group": "Game Options",
       "key": "goal",
       "source_class": "Goal",
@@ -203,7 +203,7 @@
         "Complete All Escalation Encounters",
         "Complete All Slayer Gates"
       ],
-      "description": "Additional content required after selected Goal endpoint.",
+      "description": "Choose extra objectives that must also be completed before your Goal counts as victory. Hover an objective to see exactly what it requires.",
       "display_name": "Additional Victory Requirements",
       "group": "Game Options",
       "key": "additional_victory_requirements",
@@ -230,7 +230,7 @@
       ],
       "default": "progressive_special_weapon",
       "description": "Choose a three-stage Crucible-to-Hammer progression, a two-stage Sentinel Hammer progression, or one standalone Crucible stage.",
-      "display_name": "special_weapon",
+      "display_name": "Special Weapon Behavior",
       "group": "Game Options",
       "key": "special_weapon",
       "source_class": "SpecialWeapon",
@@ -238,7 +238,7 @@
     },
     {
       "default": false,
-      "description": "Make normal melee stronger while preserving Blood Punch behavior.",
+      "description": "Increase the damage of normal punches, making melee a more useful close-range fallback.",
       "display_name": "Enhanced Melee Damage",
       "group": "Game Options",
       "key": "enhanced_melee_damage",
@@ -283,7 +283,7 @@
     },
     {
       "default": false,
-      "description": "Reveal Archipelago item pickups on the Automap.",
+      "description": "Show Archipelago pickup locations on the DOOM Eternal Automap, making checks easier to find while exploring or replaying missions.",
       "display_name": "Reveal AP Locations on Automap",
       "group": "Game Options",
       "key": "reveal_ap_locations_on_automap",
@@ -456,5 +456,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "4315a6d3777253d7575ef55de66192c99ffc6364b7ecbf2d6b47db7caa0cdf37"
+  "source_sha256": "a0294b01140789b135f8b2b4a4f912d8d5192a0a0a809e7dd4a8b000e8ed237e"
 }

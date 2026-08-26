@@ -21,6 +21,30 @@
     "default_policy": "ap_only"
   },
   "target_policies": {
+    "pickups_pickup_extra_life_extra_life_1_1_e3m4": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "independent_size": [
+        1.29999995,
+        1.29999995,
+        1.29999995
+      ],
+      "preserve_targets": [],
+      "drop_targets": [],
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"pickup/extra_life/extra_life_1\";",
+          "class = \"idProp2\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "useableComponentDecl = \"sp_extra_life_1\";",
+          "triggerDef = \"trigger/props/pickup_large\";",
+          "x = -462.439972;",
+          "y = -493.519928;",
+          "z = -34.5196762;"
+        ]
+      }
+    },
     "pickups_progress_codex_2_e3m4": {
       "independent_ap_trigger": true,
       "remove_original": true

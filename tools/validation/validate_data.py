@@ -20,6 +20,7 @@ from doom_eap.content.automap_visual_registry import build_authorial_registry, l
 from doom_eap.contracts.challenge_registry import all_location_entries, load_challenge_registry
 from doom_eap.contracts.foundation import (
     compile_all_item_plans,
+    compile_item_delivery_plan,
     load_foundation_contracts,
     load_primitive_registry,
     validate_primitive_registry,
@@ -199,6 +200,73 @@ def validate_start_inventory_catalog() -> list[str]:
     if actual != expected:
         return ["Starting Inventory catalog diverges from canonical DevInv legality"]
     return []
+
+
+def validate_support_rune_foundation(
+    item_ids: dict[str, int], commands: dict[int, object]
+) -> list[str]:
+    errors: list[str] = []
+    expected = {
+        "Break Blast": 7770145,
+        "Desperate Punch": 7770146,
+        "Take Back": 7770147,
+    }
+    for name, item_id in expected.items():
+        if item_ids.get(name) != item_id:
+            errors.append(f"Support Rune identity drifted: {name}={item_ids.get(name)}")
+            continue
+        definition = commands.get(item_id)
+        if definition != {
+            "type": "no_op",
+            "availability": "unavailable",
+            "description": "Support Rune materialization deferred until 0.5-C",
+            "start_inventory_eligible": False,
+            "requires_dlc": True,
+        }:
+            errors.append(f"Support Rune {item_id} must remain an explicit unavailable foundation")
+        try:
+            plan = compile_item_delivery_plan(item_id, commands, receipt=False)
+            if plan.commands:
+                errors.append(f"Unavailable Support Rune {item_id} generated delivery commands")
+        except ValueError as exc:
+            errors.append(f"Unavailable Support Rune {item_id} failed compile probe: {exc}")
+        try:
+            compile_item_delivery_plan(item_id, commands, receipt=True, classification=2)
+        except ValueError:
+            pass
+        else:
+            errors.append(f"Unavailable Support Rune {item_id} accepted receipt delivery")
+
+    try:
+        legal_names = extract_string_set_constant(APWORLD / "items.py", "DEVINV_START_INVENTORY_ITEM_NAMES")
+        if legal_names & set(expected):
+            errors.append("Support Runes entered DevInv start-inventory legality")
+    except (OSError, ValueError, SyntaxError, RuntimeError, AttributeError) as exc:
+        errors.append(f"Support Rune start-inventory legality invalid: {exc}")
+    return errors
+
+
+def validate_replay_registry(item_ids: dict[str, int], commands: dict[int, object]) -> list[str]:
+    errors: list[str] = []
+    try:
+        registry = read_json(ROOT / "data" / "item_replay_policies.json").get("items")
+        if not isinstance(registry, dict):
+            raise ValueError("items must be an object")
+        policy_ids = {int(item_id) for item_id in registry}
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return [f"Item replay registry invalid: {exc}"]
+    command_ids = set(commands)
+    if policy_ids != command_ids:
+        errors.append(
+            "Item replay registry coverage drift: "
+            f"missing={sorted(command_ids - policy_ids)}, extra={sorted(policy_ids - command_ids)}"
+        )
+    expected_names = {item_id: name for name, item_id in item_ids.items()}
+    for raw_id, entry in registry.items():
+        item_id = int(raw_id)
+        if not isinstance(entry, dict) or entry.get("name") != expected_names.get(item_id):
+            errors.append(f"Item replay registry identity drift for {item_id}")
+    return errors
 
 
 def collect_duplicate_ids(values: dict[str, int]) -> dict[int, list[str]]:
@@ -708,7 +776,7 @@ def main(argv: list[str] | None = None) -> int:
         classification_path = ROOT / "data" / "item_classifications.json"
         classification_document = read_json(classification_path)
         classification_identity = load_item_classification_identity(classification_path)
-        if classification_document.get("item_mapping_revision") != 5:
+        if classification_document.get("item_mapping_revision") != 6:
             errors.append("Packaged item classification revision drifted")
         if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
             errors.append(
@@ -759,6 +827,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = {int(key): value for key, value in read_json(ROOT / "data" / "items.json").items()}
     errors.extend(validate_devinv_mapping(item_ids, commands))
     errors.extend(validate_start_inventory_catalog())
+    errors.extend(validate_support_rune_foundation(item_ids, commands))
+    errors.extend(validate_replay_registry(item_ids, commands))
     if {name: location_ids.get(name) for name in BATTERY_LOCATIONS} != BATTERY_LOCATIONS:
         errors.append("Six physical Sentinel Battery AP locations must remain active")
     if item_ids.get("Sentinel Battery") != 7770016:
@@ -1031,9 +1101,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 289:
+    if physical_location_count != 290:
         errors.append(
-            f"Expected 289 physical entity locations, found {physical_location_count}"
+            f"Expected 290 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -1194,7 +1264,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
-        "items": 117,
+        "items": len(item_ids),
         "locations": 369,
         "map_checks": 307,
         "runtime_locations": 62,
@@ -1207,8 +1277,8 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Item delivery plan compilation failed: {exc}")
         plans = []
-    if len(plans) != 117:
-        errors.append(f"Expected 117 compiled item plans, found {len(plans)}")
+    if len(plans) != len(commands):
+        errors.append(f"Expected {len(commands)} compiled item plans, found {len(plans)}")
 
     generated_bootstrap = generate_bootstrap_entities()
     if generated_bootstrap or any(prefix in generated_bootstrap for prefix in BOOTSTRAP_ENTITY_PREFIXES):
@@ -1422,15 +1492,18 @@ def main(argv: list[str] | None = None) -> int:
                 if (
                     not isinstance(perks, list)
                     or not perks
-                    or len(set(perks)) != len(perks)
                     or not all(
                         isinstance(perk, str)
-                        and perk.startswith("perk/player/")
+                        and (
+                            perk.startswith("perk/player/")
+                            or perk.startswith("weapon/player/")
+                        )
                         for perk in perks
                     )
                 ):
                     errors.append(
-                        f"Progressive perk command {item_id} must define unique player perks"
+                        f"Progressive perk command {item_id} must define "
+                        "player perk or weapon stages"
                     )
                 if item_id in {7770017, 7770088, 7770092} and (
                     not isinstance(perks, list)

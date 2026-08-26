@@ -635,7 +635,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 5
+ITEM_MAPPING_REVISION = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -4988,7 +4988,7 @@ class DoomEternalContext(CommonContext):
             return None, "authoritative received-item history is incomplete"
         return evidence, None
 
-    def _compile_reconciliation_plan_for_evidence(self, evidence):
+    def _compile_reconciliation_plan_for_evidence(self, evidence, *, include_manual_replay=False):
         seed = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None)
         identity = f"{seed}-{self.team}-{self.slot}"
         observation = observe_received_items(
@@ -5003,6 +5003,7 @@ class DoomEternalContext(CommonContext):
             ITEM_REPLAY_POLICIES,
             identity,
             evidence.epoch,
+            include_manual_replay=include_manual_replay,
         )
 
     def apply_reconciliation_plan(self, plan, *, intent=RECONCILIATION_REPAIR, reason="manual"):
@@ -5040,7 +5041,9 @@ class DoomEternalContext(CommonContext):
         if error:
             return None, error
         try:
-            plan = self._compile_reconciliation_plan_for_evidence(evidence)
+            plan = self._compile_reconciliation_plan_for_evidence(
+                evidence, include_manual_replay=True
+            )
         except ValueError as error:
             return None, str(error)
 
@@ -5057,11 +5060,12 @@ class DoomEternalContext(CommonContext):
         )
         logger.info(
             "RESYNC_PLAN reason=manual commands=%s replayed=%s special_stages=%s "
-            "skipped_never_replay=%s",
+            "skipped_never_replay=%s skipped_manual_replay=%s",
             len(plan.commands),
             plan.replayed,
             plan.special_stages,
             plan.skipped_never_replay,
+            plan.skipped_manual_replay,
         )
         queued, error = self.apply_reconciliation_plan(plan, reason="manual")
         if not queued:
@@ -5158,12 +5162,13 @@ class DoomEternalContext(CommonContext):
 
         logger.info(
             "RESYNC_PLAN reason=%s commands=%s replayed=%s special_stages=%s "
-            "skipped_never_replay=%s",
+            "skipped_never_replay=%s skipped_manual_replay=%s",
             reason,
             len(plan.commands),
             plan.replayed,
             plan.special_stages,
             plan.skipped_never_replay,
+            plan.skipped_manual_replay,
         )
         queued, error = self.apply_reconciliation_plan(plan, reason=reason)
         if not queued:

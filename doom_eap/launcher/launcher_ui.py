@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QKeySequenceEdit,
+    QLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -39,6 +40,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QGraphicsOpacityEffect,
 )
 
 from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
@@ -150,9 +152,24 @@ class NamedRangeControl(QWidget):
 class OptionSetControl(QWidget):
     """Schema-driven compact chooser for OptionSet values."""
 
+    LOCKED_PREFIX = "Already required by your Goal. "
+    UNAVAILABLE_PREFIX = "Not available in this room. "
+
+    TOOLTIPS = {
+        "Acquire the Unmaykr": "Claim the Unmaykr from its case in the Fortress of Doom. The six Base Campaign Slayer Gates provide the Empyrean Keys needed to unlock it, but you must actually pick up the weapon.",
+        "Complete All Enabled Missions": "Finish every mission included in this room: all 13 Base Campaign missions in a Base-only world, or all 19 Base, TAG1, and TAG2 missions in a Full Saga world.",
+        "Complete All Slayer Gates": "Complete every Slayer Gate included in the room. This means the six Base Campaign Gates, plus the UAC Atlantica and The Holt Gates when DLC content is enabled.",
+        "Complete All Escalation Encounters": "Complete both Wave 1 and Wave 2 of every Escalation Encounter in The World Spear, Reclaimed Earth, and Immora.",
+        "Complete All Secret Encounters": "Complete every Secret Encounter included in the room — the optional timed combat encounters found throughout the enabled campaigns.",
+        "Complete All Mission Challenges": "Earn the Mission Challenge completion check in every enabled mission that provides one.",
+        "Complete All Weapon Mastery Challenges": "Complete every Weapon Mastery Challenge location enabled for this room. If Weapon Mastery Challenges are disabled, this objective is unavailable.",
+    }
+
     def __init__(self, option: dict[str, object]):
         super().__init__()
         self.checks: list[tuple[object, QCheckBox]] = []
+        self._locked: set[str] = set()
+        self._unavailable: set[str] = set()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
@@ -170,37 +187,65 @@ class OptionSetControl(QWidget):
         grid.setVerticalSpacing(5)
         default = option.get("default", [])
         selected = set(default) if isinstance(default, list) else set()
-        tooltips = {
-            "Acquire the Unmaykr": "Physically claim the Unmaykr in the Fortress of Doom.",
-            "Complete All Enabled Missions": "Finish every mission included in this room: 13 Base Campaign missions or all 19 Full Saga missions.",
-            "Complete All Slayer Gates": "Complete every Slayer Gate included in the room.",
-            "Complete All Escalation Encounters": "Complete both waves of every TAG2 Escalation Encounter.",
-            "Complete All Secret Encounters": "Complete every Secret Encounter included in the room.",
-            "Complete All Mission Challenges": "Complete every Mission Challenge included in the room.",
-            "Complete All Weapon Mastery Challenges": "Complete every enabled Weapon Mastery Challenge.",
-        }
         for index, choice in enumerate(cast(list[object], option.get("choices", []))):
             if not isinstance(choice, dict):
                 continue
             key = choice.get("key")
             check = QCheckBox(str(choice.get("label", key)))
             check.setObjectName("requirementOption")
-            check.setToolTip(tooltips.get(str(key), ""))
+            check.setToolTip(self.TOOLTIPS.get(str(key), ""))
             check.setChecked(key in selected)
             grid.addWidget(check, index // 2, index % 2)
             self.checks.append((key, check))
         layout.addLayout(grid)
+        self._refresh_lock_state()
+
+    def set_dependencies(self, locked: set[str], unavailable: set[str]) -> None:
+        """Mark requirements implied by the Goal (locked) or absent from the room."""
+        self._locked = {str(key) for key in locked}
+        self._unavailable = {str(key) for key in unavailable}
+        self._refresh_lock_state()
+
+    def set_keys_checked(self, keys: set[str], checked: bool) -> None:
+        for key, check in self.checks:
+            name = str(key)
+            if name in keys and name not in self._locked and name not in self._unavailable:
+                check.setChecked(checked)
+
+    def _refresh_lock_state(self) -> None:
+        for key, check in self.checks:
+            name = str(key)
+            locked = name in self._locked
+            unavailable = name in self._unavailable
+            if locked:
+                check.setChecked(True)
+            elif unavailable:
+                check.setChecked(False)
+            check.setEnabled(not locked and not unavailable)
+            check.setProperty("goalLocked", locked)
+            prefix = self.LOCKED_PREFIX if locked else self.UNAVAILABLE_PREFIX if unavailable else ""
+            check.setToolTip(prefix + self.TOOLTIPS.get(name, ""))
+            style = check.style()
+            style.unpolish(check)
+            style.polish(check)
 
     def _set_all(self, checked: bool) -> None:
-        for _, check in self.checks:
+        for key, check in self.checks:
+            name = str(key)
+            if name in self._locked or name in self._unavailable:
+                continue
             check.setChecked(checked)
 
     def value(self) -> list[object]:
-        return [key for key, check in self.checks if check.isChecked()]
+        return [key for key, check in self.checks
+                if str(key) not in self._locked and str(key) not in self._unavailable
+                and check.isChecked()]
 
     def setValue(self, value: object) -> None:
         selected = set(value) if isinstance(value, list) else set()
         for key, check in self.checks:
+            if str(key) in self._locked:
+                continue
             check.setChecked(key in selected)
 
 
@@ -229,6 +274,7 @@ class LauncherUI(QMainWindow):
         self._room_connected = False
         self._connection_pending = False
         self._setup_state = "disconnected"
+        self._previous_setup_state = ""
         self._resolved_consent_requests: set[str] = set()
         self._native_health_presentation: tuple[str, str] | None = None
         self._session_log_limit = 400
@@ -266,27 +312,28 @@ class LauncherUI(QMainWindow):
             QFrame#effectiveConfig {{ background:#121614; border:1px solid #566044; border-left:4px solid {self.COLORS['good']}; }}
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
             QLabel#eyebrow {{ color:{self.COLORS['doom_hot']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
-            QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:23pt; font-weight:800; }}
-            QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:14pt; font-weight:800; letter-spacing:.4px; }}
+            QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:20pt; font-weight:800; }}
+            QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:12pt; font-weight:800; letter-spacing:.4px; }}
             QLabel#muted {{ color:{self.COLORS['muted']}; }} QLabel#state {{ font-weight:800; color:{self.COLORS['good']}; }}
             QLabel#stateDetail {{ color:{self.COLORS['muted']}; font-size:9pt; }}
             QLabel#stateName {{ color:{self.COLORS['muted']}; font-size:9pt; font-weight:800; }}
             QLabel#warning {{ color:{self.COLORS['warn']}; background:#292419; border-left:3px solid {self.COLORS['warn']}; padding:9px; }}
-            QLineEdit,QSpinBox,QKeySequenceEdit {{ background:#0c1113; color:{self.COLORS['text']}; border:1px solid #596164; padding:7px 9px; min-height:20px; selection-background-color:{self.COLORS['doom']}; selection-color:#fff; }}
-            QComboBox {{ background:#0c1419; border:1px solid #526871; padding:7px 9px; min-height:20px; }}
+            QLineEdit,QSpinBox,QKeySequenceEdit {{ background:#0c1113; color:{self.COLORS['text']}; border:1px solid #596164; padding:6px 8px; min-height:18px; selection-background-color:{self.COLORS['doom']}; selection-color:#fff; }}
+            QComboBox {{ background:#0c1419; border:1px solid #526871; padding:6px 8px; min-height:18px; }}
             QComboBox QAbstractItemView {{ background:#101a20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
             QLineEdit:focus,QSpinBox:focus,QKeySequenceEdit:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['doom_hot']}; outline:0; }}
-            QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:9px 13px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
+            QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:7px 11px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
             QPushButton:hover {{ background:#2d302b; border-color:{self.COLORS['doom_hot']}; }}
-            QPushButton:pressed {{ background:#0d151a; border-color:{self.COLORS['doom_hot']}; padding:10px 12px 8px 14px; }}
+            QPushButton:pressed {{ background:#0d151a; border-color:{self.COLORS['doom_hot']}; padding:8px 10px 6px 12px; }}
             QPushButton#primary {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; color:#102012; }}
             QPushButton#primary:hover {{ background:#b2e77a; }}
             QPushButton#primary:pressed {{ background:#7eaf50; color:#071008; }}
             QPushButton#danger {{ background:#522226; border-color:#b9494e; color:#fff1f1; }}
             QPushButton#danger:hover {{ background:#743037; border-color:#ff7676; }}
+            QPushButton#danger:disabled {{ background:#26292d; border-color:#3a3e43; color:#777d84; }}
             QPushButton#nav {{ text-align:left; background:transparent; border:0; border-left:3px solid transparent; color:{self.COLORS['muted']}; padding:10px 10px; }}
             QPushButton#nav:checked,QPushButton#nav:hover {{ background:#17242b; color:{self.COLORS['text']}; border-left-color:{self.COLORS['doom']}; }}
-            QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:10px 16px; color:{self.COLORS['muted']}; font-size:11pt; }}
+            QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:7px 9px; color:{self.COLORS['muted']}; font-size:10pt; }}
             QPushButton#sessionNav:checked {{ color:#19110b; border-color:{self.COLORS['doom_hot']}; background:{self.COLORS['doom_hot']}; }}
             QPushButton#sessionNav:hover {{ color:{self.COLORS['text']}; border-color:{self.COLORS['doom']}; background:#1d2d34; }}
             QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
@@ -297,7 +344,9 @@ class LauncherUI(QMainWindow):
             QCheckBox::indicator:checked {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; }}
             QCheckBox#requirementOption {{ background:#0d1214; border:1px solid #343d40; padding:10px 12px; }}
             QCheckBox#requirementOption:hover {{ border-color:{self.COLORS['doom_hot']}; background:#1b1b17; }}
-            QLabel#connectionBadge {{ background:#22272a; border:1px solid #596164; padding:6px 12px; font-weight:800; }}
+            QCheckBox#requirementOption[goalLocked="true"] {{ color:{self.COLORS['muted']}; border-style:dashed; }}
+            QCheckBox#requirementOption:disabled {{ color:{self.COLORS['muted']}; }}
+            QLabel#connectionBadge {{ background:#22272a; border:1px solid #596164; padding:4px 10px; font-weight:800; color:#c9d1d3; }}
             QLabel#connectionBadge[connected="true"] {{ color:{self.COLORS['good']}; border-color:#758f25; background:#18200f; }}
         """)
 
@@ -419,16 +468,19 @@ class LauncherUI(QMainWindow):
         self.status_strip = strip
         self.status_items: list[QWidget] = []
         self.statuses: dict[str, tuple[QWidget, QLabel, QLabel, QLabel]] = {}
-        for index, (key, title) in enumerate((("room", "CONNECTION"), ("mod", "ROOM PACKAGE"), ("game", "GAME INSTALLATION"), ("rpc", "GAME INTEGRATION"))):
+        for index, (key, title) in enumerate((("mod", "ROOM PACKAGE"), ("game", "GAME INSTALLATION"), ("rpc", "GAME INTEGRATION"), ("inventory", "INVENTORY"))):
             item = QWidget()
             item.setObjectName("statusItem")
             item.setProperty("statusTone", "muted")
+            item.setMinimumHeight(34)
             item_layout = QHBoxLayout(item)
             item_layout.setContentsMargins(9, 6, 9, 6)
             item_layout.setSpacing(6)
             indicator = self._label("○", "statusIndicator")
             name = self._label(title, "stateName")
             detail = self._label("WAITING", "stateDetail")
+            name.setWordWrap(False)
+            detail.setWordWrap(False)
             item_layout.addWidget(indicator)
             item_layout.addWidget(name)
             item_layout.addWidget(self._label("·", "muted"))
@@ -440,7 +492,7 @@ class LauncherUI(QMainWindow):
         return strip
 
     def _arrange_status_strip(self) -> None:
-        columns = 2 if self.status_strip.width() < 700 else 4
+        columns = 2 if self.width() < 1000 else 4
         for index, item in enumerate(self.status_items):
             self.status_layout.addWidget(item, index // columns, index % columns)
         for column in range(4):
@@ -545,17 +597,22 @@ class LauncherUI(QMainWindow):
         """Session identity, readiness, and room actions in one primary surface."""
         card = self._card("hero")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(13)
-        identity = QGridLayout()
-        identity.setHorizontalSpacing(20)
-        identity.setVerticalSpacing(4)
-        identity.addWidget(self._label("CURRENT SESSION", "eyebrow"), 0, 0, 1, 3)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(10)
+        identity = QHBoxLayout()
+        identity.setSpacing(14)
+        copy = QVBoxLayout()
+        copy.setSpacing(3)
+        copy.addWidget(self._label("CURRENT SESSION", "eyebrow"))
         self.session_player_name = self._label("NO ROOM CONNECTED", "title")
-        identity.addWidget(self.session_player_name, 1, 0, 1, 2)
+        copy.addWidget(self.session_player_name)
+        identity.addLayout(copy, 1)
         self.connection_badge = self._label("OFFLINE", "connectionBadge")
         self.connection_badge.setProperty("connected", False)
-        identity.addWidget(self.connection_badge, 1, 2, alignment=Qt.AlignmentFlag.AlignRight)
+        identity.addWidget(self.connection_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(identity)
+        meta = QHBoxLayout()
+        meta.setSpacing(16)
         self.player_team = self._label("Team —", "muted")
         self.player_slot = self._label("Slot —", "muted")
         self.player_inventory = self._label("Connect to restore inventory", "muted")
@@ -563,11 +620,13 @@ class LauncherUI(QMainWindow):
         self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
         self.resync_inventory_button.setEnabled(False)
         self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
-        identity.addWidget(self.player_team, 2, 0)
-        identity.addWidget(self.player_slot, 2, 1)
-        identity.addWidget(self.player_ammo_refills, 2, 2)
-        identity.addWidget(self.player_inventory, 3, 0, 1, 3)
-        layout.addLayout(identity)
+        meta.addWidget(self.player_team)
+        meta.addWidget(self.player_slot)
+        meta.addStretch(1)
+        meta.addWidget(self.player_inventory)
+        meta.addStretch(1)
+        meta.addWidget(self.player_ammo_refills)
+        layout.addLayout(meta)
         layout.addWidget(self._status_strip())
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -586,10 +645,11 @@ class LauncherUI(QMainWindow):
         self.session_setup = self._card("actionStrip")
         self.session_setup.setProperty("actionTone", "warning")
         setup_layout = QHBoxLayout(self.session_setup)
-        setup_layout.setContentsMargins(15, 12, 15, 12)
+        setup_layout.setContentsMargins(12, 8, 12, 8)
+        setup_layout.setSpacing(10)
         setup_copy = QVBoxLayout()
         setup_copy.setSpacing(2)
-        self.session_setup_title = self._label("ROOM PACKAGE", "section")
+        self.session_setup_title = self._label("ROOM PACKAGE", "stateName")
         self.session_setup_detail = self._label("Connect to a room to check its package.", "muted")
         setup_copy.addWidget(self.session_setup_title)
         setup_copy.addWidget(self.session_setup_detail)
@@ -609,15 +669,16 @@ class LauncherUI(QMainWindow):
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
         setup_layout.addLayout(setup_buttons)
-        layout.addWidget(self.session_setup)
         return card
 
     def _session_page(self) -> QWidget:
         body = QWidget()
         outer = QVBoxLayout(body)
-        outer.setContentsMargins(28, 24, 28, 30)
-        outer.setSpacing(14)
+        outer.setContentsMargins(22, 16, 22, 18)
+        outer.setSpacing(10)
+        outer.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         outer.addWidget(self._session_hero())
+        outer.addWidget(self.session_setup)
         header = QHBoxLayout()
         header.addStretch(1)
         self.session_nav_buttons: list[QPushButton] = []
@@ -636,10 +697,11 @@ class LauncherUI(QMainWindow):
         self.session_stack.addWidget(self._session_log_page())
         self.session_stack.addWidget(self._session_card())
         self.session_stack.currentChanged.connect(self._sync_session_tabs)
+        self.session_stack.setMinimumHeight(220)
         outer.addWidget(self.session_stack, 1)
         outer.addWidget(self._chat_bar())
         self._sync_session_tabs(0)
-        return body
+        return self._scroll(body)
 
     def _session_log_page(self) -> QFrame:
         card = self._card()
@@ -657,7 +719,6 @@ class LauncherUI(QMainWindow):
         card = self._card()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
-        layout.addWidget(self._label("ACTIVITY", "section"))
         layout.addWidget(self._label("Items, checks, DeathLink, and connection updates. Most recent first.", "muted"))
         self.activity = QTableWidget(0, 3)
         self.activity.setHorizontalHeaderLabels(["TIME", "UPDATE", "DETAILS"])
@@ -668,8 +729,7 @@ class LauncherUI(QMainWindow):
         self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.activity.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.activity.setMinimumHeight(320)
-        layout.addWidget(self.activity)
+        layout.addWidget(self.activity, 1)
         return card
 
     def _hints_card(self) -> QFrame:
@@ -752,13 +812,6 @@ class LauncherUI(QMainWindow):
                 option = options_by_key.get(key)
                 if option is not None:
                     group_layout.addWidget(self._option_widget(option))
-                if key == "additional_victory_requirements":
-                    self.select_all_side_content = QPushButton("SELECT ALL SIDE CONTENT")
-                    self.select_all_side_content.setToolTip(
-                        "Selects Slayer Gates, Escalation Encounters, Secret Encounters, and Acquire the Unmaykr."
-                    )
-                    self.select_all_side_content.clicked.connect(lambda: self._set_all_side_content(True))
-                    group_layout.addWidget(self.select_all_side_content)
             layout.addWidget(card)
         self._wire_create_dependencies()
         self._refresh_create_dependencies()
@@ -797,7 +850,7 @@ class LauncherUI(QMainWindow):
         return card
 
     def _wire_create_dependencies(self) -> None:
-        for key in ("use_dlc_content", "enhanced_melee_damage"):
+        for key in ("use_dlc_content", "enhanced_melee_damage", "include_weapon_mastery_challenges"):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
@@ -836,22 +889,6 @@ class LauncherUI(QMainWindow):
         if item is not None:
             item.setEnabled(enabled)
 
-    def _set_all_side_content(self, checked: bool) -> None:
-        if self._syncing_create_dependencies:
-            return
-        control = self.option_controls.get("additional_victory_requirements")
-        if not isinstance(control, OptionSetControl):
-            return
-        side_content = {
-            "Complete All Slayer Gates",
-            "Complete All Escalation Encounters",
-            "Complete All Secret Encounters",
-            "Acquire the Unmaykr",
-        }
-        for value, check in control.checks:
-            if value in side_content:
-                check.setChecked(checked)
-
     def _refresh_create_dependencies(self) -> None:
         if self._syncing_create_dependencies:
             return
@@ -877,28 +914,38 @@ class LauncherUI(QMainWindow):
             if dlc_timing_row is not None:
                 dlc_timing_row.setVisible(dlc_enabled)
             self._refresh_inventory_picker(dlc_enabled)
+            goal_key = self._choice_value("goal")
+            mastery_control = self.option_controls.get("include_weapon_mastery_challenges")
+            mastery_enabled = bool(cast(QCheckBox, mastery_control).isChecked()) if isinstance(mastery_control, QCheckBox) else True
+            locked: set[str] = set()
+            unavailable: set[str] = set()
+            if goal_key in {"acquire_the_unmaykr", "complete_the_full_saga"}:
+                locked.add("Acquire the Unmaykr")
+                if not dlc_enabled:
+                    locked.add("Complete All Slayer Gates")
+            if goal_key == "complete_the_full_saga":
+                locked.add("Complete All Enabled Missions")
+            if not dlc_enabled:
+                unavailable.add("Complete All Escalation Encounters")
+            if not mastery_enabled:
+                unavailable.add("Complete All Weapon Mastery Challenges")
             requirements = self.option_controls.get("additional_victory_requirements")
             if isinstance(requirements, OptionSetControl):
-                side_content = {
-                    "Complete All Slayer Gates",
-                    "Complete All Escalation Encounters",
-                    "Complete All Secret Encounters",
-                    "Acquire the Unmaykr",
-                }
-                selected = set(requirements.value())
-                all_selected = side_content.issubset(selected)
-                self.select_all_side_content.setText("SIDE CONTENT SELECTED" if all_selected else "SELECT ALL SIDE CONTENT")
-                self.select_all_side_content.setEnabled(not all_selected)
+                requirements.set_dependencies(locked, unavailable)
             goal_label = self._selected_label("goal")
             special_label = "The Crucible" if not dlc_enabled else self._selected_label("special_weapon")
             requirement_count = len(requirements.value()) if isinstance(requirements, OptionSetControl) else 0
+            victory_summary = "Goal only"
+            if requirement_count:
+                plural = "" if requirement_count == 1 else "s"
+                victory_summary = f"Goal + {requirement_count} extra objective{plural}"
             values = {
                 "goal": goal_label,
                 "campaign": "Full Saga · 19 missions" if dlc_enabled else "Base Campaign · 13 missions",
                 "dlc": self._selected_label("dlc_logic_timing") if dlc_enabled else "Base Campaign only",
                 "special": special_label,
                 "starting": self._selected_label("starting_weapon"),
-                "victory": "Goal only" if not requirement_count else f"Goal + {requirement_count} optional objectives",
+                "victory": victory_summary,
             }
             for key, value in values.items():
                 self.effective_config_values[key].setText(value)
@@ -955,12 +1002,19 @@ class LauncherUI(QMainWindow):
         card = self._card()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(20, 18, 20, 20)
+        card_layout.addWidget(self._label("GAME SETUP", "eyebrow"))
         self.doctor_status = self._label("SETUP NOT CHECKED", "state")
         self.doctor_evidence = self._label("Check setup when you need help joining or playing.", "muted")
         self.doctor_evidence.setWordWrap(True)
+        self.doctor_room_status = self._label("ROOM PACKAGE NOT CHECKED", "state")
+        self.doctor_room_evidence = self._label("Connect to a room to check its package.", "muted")
+        self.doctor_room_evidence.setWordWrap(True)
         self.doctor_action = self._label("", "muted")
         card_layout.addWidget(self.doctor_status)
         card_layout.addWidget(self.doctor_evidence)
+        card_layout.addWidget(self._label("ROOM PACKAGE", "eyebrow"))
+        card_layout.addWidget(self.doctor_room_status)
+        card_layout.addWidget(self.doctor_room_evidence)
         card_layout.addWidget(self.doctor_action)
         buttons = QHBoxLayout()
         for text, callback, primary in (
@@ -1016,9 +1070,45 @@ class LauncherUI(QMainWindow):
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)
+        if index == 2:
+            QTimer.singleShot(0, self._arrange_status_strip)
+        if index == 4:
+            self._refresh_help_room_package()
         self.top_context.setText(("HOME", "JOIN ROOM", "SESSION", "CREATE PLAYER", "HELP")[index])
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == index)
+
+    def _refresh_help_room_package(self) -> None:
+        if not hasattr(self, "doctor_room_status"):
+            return
+        presentations = {
+            "package_incompatible": (
+                "ROOM PACKAGE NEEDS REBUILDING",
+                "This room package was built with an older DOOM Eternal APWorld. Rebuild it with the current launcher and try again.",
+            ),
+            "package_failed": (
+                "ROOM PACKAGE NEEDS ATTENTION",
+                "This room package could not be prepared with the current launcher. Rebuild the room package and try again.",
+            ),
+            "install_needed": ("ROOM PACKAGE NEEDS INSTALLING", "Install this room's package in Session before playing."),
+            "update_required": ("ROOM PACKAGE NEEDS UPDATING", "Update this room's package in Session before playing."),
+            "checking": ("CHECKING ROOM PACKAGE", "Checking this room's package before play."),
+            "installing": ("PREPARING ROOM PACKAGE", "Preparing this room's package for play."),
+            "updating": ("PREPARING ROOM PACKAGE", "Preparing this room's package for play."),
+            "ready": ("ROOM PACKAGE READY", "This room's package is ready to play."),
+        }
+        title, detail = presentations.get(
+            self._setup_state,
+            ("ROOM PACKAGE NOT CHECKED", "Connect to a room to check its package."),
+        )
+        needs_attention = self._setup_state in {
+            "package_incompatible", "package_failed", "install_needed", "update_required",
+        }
+        self.doctor_room_status.setText(title)
+        self.doctor_room_status.setStyleSheet(
+            f"color:{self.COLORS['warn'] if needs_attention else self.COLORS['good']};"
+        )
+        self.doctor_room_evidence.setText(detail)
 
     def _show_session_tab(self, index: int) -> None:
         self.session_stack.setCurrentIndex(index)
@@ -1043,6 +1133,26 @@ class LauncherUI(QMainWindow):
         if key == "rpc":
             self._native_health_presentation = None
 
+    def _set_connection_badge(self, text: str, connected: bool) -> None:
+        self.connection_badge.setText(text)
+        self.connection_badge.setProperty("connected", connected)
+        self.connection_badge.style().unpolish(self.connection_badge)
+        self.connection_badge.style().polish(self.connection_badge)
+
+    def _set_inventory_tile(self, detail: str, color: str) -> None:
+        self._set_status("inventory", detail, color)
+
+    def _fade_in(self, widget: QWidget) -> None:
+        effect = QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(effect)
+        animation = QPropertyAnimation(effect, b"opacity", widget)
+        animation.setDuration(140)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.finished.connect(lambda: widget.setGraphicsEffect(None))
+        animation.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+
     def _set_home(self, title: str, detail: str, action: str, state: str, *, enabled: bool = True) -> None:
         self.hero_title.setText(title)
         self.hero_detail.setText(detail)
@@ -1060,6 +1170,8 @@ class LauncherUI(QMainWindow):
             "updating": ("UPDATING ROOM PACKAGE", "Preparing this room for play.", "UPDATING...", False, "WORKING"),
             "game_link_needed": ("GAME INTEGRATION SETUP NEEDED", "Set up game integration required by DOOM Eternal Archipelago.", "PREPARE", True, "ACTION NEEDED"),
             "game_link_update_needed": ("GAME INTEGRATION NEEDS REPAIR", "Game integration needs repair before play.", "REPAIR", True, "ACTION NEEDED"),
+            "package_failed": ("ROOM PACKAGE NEEDS ATTENTION", "This room package could not be prepared with the current launcher. Rebuild the room package and try again.", "REBUILD ROOM PACKAGE", True, "ACTION NEEDED"),
+            "package_incompatible": ("ROOM PACKAGE NEEDS REBUILDING", "This room package was built with an older DOOM Eternal APWorld. Rebuild it with the current launcher and try again.", "REBUILD ROOM PACKAGE", True, "ACTION NEEDED"),
             "manual_install_required": ("WINDOWS PACKAGE INSTALL NEEDS MANUAL SETUP", "Automatic room package setup could not be completed. Use the Windows Manual Mod Installer guide to continue.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
             "ready": (
                 "SETUP READY",
@@ -1068,11 +1180,11 @@ class LauncherUI(QMainWindow):
                 True,
                 "READY",
             ),
-            "failed": ("SETUP NEEDS ATTENTION", "Setup did not finish. Review Help or repair setup.", "REPAIR", True, "ACTION NEEDED"),
+            "failed": ("GAME SETUP NEEDS ATTENTION", "Game setup did not finish. Repair game integration and try again.", "FIX SETUP", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
-        copy = detail or fallback
+        copy = fallback if state in {"package_failed", "package_incompatible"} else detail or fallback
         tone = "ready" if state == "ready" else "working" if state in {"checking", "installing", "updating"} else "warning"
         self.session_setup.setProperty("actionTone", tone)
         self.session_setup.style().unpolish(self.session_setup)
@@ -1082,6 +1194,11 @@ class LauncherUI(QMainWindow):
         self.session_setup_action.setText(action)
         self.session_setup_action.setEnabled(enabled)
         self.session_setup_action.setVisible(state not in {"ready", "disconnected"})
+        strip_visible = state not in {"ready", "disconnected"}
+        self.session_setup.setVisible(strip_visible)
+        if strip_visible and state != self._previous_setup_state:
+            self._fade_in(self.session_setup)
+        self._previous_setup_state = state
         self.session_manual_complete_action.setVisible(state == "manual_install_required")
         self.session_manual_retry_action.setVisible(state == "manual_install_required")
         self.reinstall_button.setText(action)
@@ -1089,10 +1206,15 @@ class LauncherUI(QMainWindow):
         self.reinstall_button.setVisible(state not in {"ready", "disconnected"})
         self._set_home(title, copy, action, top_state, enabled=enabled)
         self.hero_action.setVisible(state != "disconnected")
+        self._refresh_help_room_package()
 
     def _run_setup_action(self) -> None:
         if self._setup_state in {"install_needed", "update_required"}:
             self._prepare()
+        elif self._setup_state == "package_failed":
+            self._prepare(force=True)
+        elif self._setup_state == "package_incompatible":
+            self._prepare(force=True)
         elif self._setup_state == "failed":
             self._show_page(4)
         elif self._setup_state == "game_link_needed":
@@ -1116,7 +1238,7 @@ class LauncherUI(QMainWindow):
                     self._prepare(force=True)
                 except Exception as error:
                     self._append_log(f"Game integration repair error: {error}")
-                    self._set_setup_state("failed", f"Game integration repair failed: {error}")
+                    self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
 
     def _open_manual_install_guide(self) -> None:
         """Open the Windows Manual Mod Installer section in INSTALL.md."""
@@ -1224,7 +1346,7 @@ class LauncherUI(QMainWindow):
         if self._setup_state == "ready":
             self._show_page(2)
             return
-        if self._setup_state in {"install_needed", "update_required", "failed", "manual_install_required"}:
+        if self._setup_state in {"install_needed", "update_required", "package_failed", "package_incompatible", "failed", "manual_install_required"}:
             self._run_setup_action()
             return
         text = self.hero_action.text()
@@ -1244,7 +1366,7 @@ class LauncherUI(QMainWindow):
             return
         self._connection_pending = True
         self._set_connection_controls(False)
-        self._set_status("room", "connecting", self.COLORS["ap"])
+        self._set_connection_badge("CONNECTING", False)
         self._show_page(2)
         self._set_home("CONNECTING TO ROOM", "Waiting for authoritative room data.", "RESUME SESSION", "CONNECTING", enabled=False)
 
@@ -1282,26 +1404,27 @@ class LauncherUI(QMainWindow):
         if confirmation != QMessageBox.StandardButton.Yes:
             return
         self.uninstall_button.setEnabled(False)
-        self.doctor_status.setText("UNINSTALL REQUESTED")
-        self.doctor_evidence.setText("Waiting to queue room package removal.")
+        self.doctor_room_status.setText("UNINSTALL REQUESTED")
+        self.doctor_room_evidence.setText("Waiting to queue room package removal.")
         try:
             self.controller.uninstall_setup()
         except Exception:
             self.uninstall_button.setEnabled(self._room_connected)
-            self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
-            self.doctor_evidence.setText("Room package could not be removed. Close the game and try again.")
+            self.doctor_room_status.setText("UNINSTALL NEEDS ATTENTION")
+            self.doctor_room_evidence.setText("Room package could not be removed. Close the game and try again.")
             self._append_log("Room package uninstall failed.")
 
     def _request_inventory_resync(self) -> None:
         if not self._room_connected:
             return
         self.resync_inventory_button.setEnabled(False)
-        self.player_inventory.setText("Inventory: Resync requested")
+        self._set_inventory_tile("resync requested", self.COLORS["warn"])
         try:
             self.controller.request_inventory_resync()
         except Exception as error:
             self.resync_inventory_button.setEnabled(True)
             self.player_inventory.setText("Inventory: Resync unavailable")
+            self._set_inventory_tile("resync unavailable", self.COLORS["bad"])
             self._append_log(f"Inventory resync request failed: {error}")
 
     def _prepare(self, *, force: bool = False) -> None:
@@ -1320,8 +1443,53 @@ class LauncherUI(QMainWindow):
                 return
             self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         except Exception as error:
-            self._set_setup_state("failed", str(error))
             self._append_log(f"Setup error: {error}")
+            self._set_setup_state(self._room_package_issue_state(str(error)))
+
+    @staticmethod
+    def _room_package_issue_state(detail: str) -> str:
+        text = detail.casefold()
+        incompatible_tokens = (
+            "contract is unsupported",
+            "unsupported capabilities",
+            "schema is unsupported",
+            "revision is unsupported",
+            "bridge_protocol is incompatible",
+        )
+        if any(token in text for token in incompatible_tokens):
+            return "package_incompatible"
+        return "package_failed"
+
+    @staticmethod
+    def _is_room_package_failure(event: dict[str, object] | None = None, detail: str = "") -> bool:
+        event = event or {}
+        domain = str(event.get("failure_domain", "")).casefold()
+        recovery = str(event.get("recovery_action", "")).casefold()
+        if domain in {"room_package", "room-package", "package", "mod_package"}:
+            return True
+        if recovery in {"rebuild_room_package", "rebuild-package", "rebuild_package"}:
+            return True
+        text = " ".join((
+            detail, str(event.get("message", "")), str(event.get("reason", "")),
+            str(event.get("adapter_state", "")), str(event.get("state", "")),
+        )).casefold()
+        return any(token in text for token in (
+            "room package", "room mod", "manifest", "compiler", "placement", "contract",
+            "schema", "capability", "install_needed", "adapter_state",
+        ))
+
+    def _current_room_package_failure(self) -> bool:
+        if self._setup_state in {"package_failed", "package_incompatible"}:
+            return True
+        failure = getattr(self.controller, "last_setup_failure", None)
+        if callable(failure):
+            try:
+                failure = failure()
+            except Exception:
+                return False
+        if isinstance(failure, dict):
+            return self._is_room_package_failure(failure)
+        return self._is_room_package_failure(detail=str(failure or ""))
 
     def _reinstall(self) -> None:
         self._run_setup_action()
@@ -1396,13 +1564,11 @@ class LauncherUI(QMainWindow):
             f"Slot {slot}",
         )
         self.session_player_name.setText(player)
-        self.connection_badge.setText("CONNECTED")
-        self.connection_badge.setProperty("connected", True)
-        self.connection_badge.style().unpolish(self.connection_badge)
-        self.connection_badge.style().polish(self.connection_badge)
+        self._set_connection_badge("CONNECTED", True)
         self.player_team.setText(f"Team {team}")
         self.player_slot.setText(f"Slot {slot} · {player}")
         self.player_inventory.setText("Inventory ready")
+        self._set_inventory_tile("synced", self.COLORS["good"])
         ammo_count = event.get("ammo_refills_available", "—")
         self.player_ammo_refills.setText(f"AMMO REFILLS {ammo_count} · {self.ammo_refill_keybind.value()}")
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
@@ -1606,7 +1772,7 @@ class LauncherUI(QMainWindow):
             "the_crucible": {"The Crucible"},
         }
         allowed_special = special_items.get(selected_special, {"The Crucible"})
-        unavailable = {"Berserk", "Haste", "Quad Damage"}
+        unavailable = {"Berserk", "Overdrive", "Onslaught"}
         if not dlc_enabled:
             unavailable.update({"Break Blast", "Desperate Punch", "Take Back"})
         allowed = [
@@ -1741,22 +1907,54 @@ class LauncherUI(QMainWindow):
             self._render_doctor_report(self.controller.run_doctor().document())
         except Exception as error:
             self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
-            self.doctor_evidence.setText(str(error))
+            self.doctor_evidence.setText("Setup could not be checked. Try again or save a support report.")
+            self._append_log(f"Setup check error: {error}")
 
     def _render_doctor_report(self, report: object) -> None:
         if not isinstance(report, dict):
             return
         healthy = bool(report.get("ok"))
         diagnostics = report.get("diagnostics", [])
-        lines = []
+        technical_lines = []
+        groups: dict[str, list[str]] = {
+            "DOOM Eternal": [], "Game Integration": [],
+            "Mod Installation": [], "Saved Games": [],
+        }
         if isinstance(diagnostics, list):
             for item in diagnostics:
                 if isinstance(item, dict):
-                    lines.append(f"{item.get('key', 'check')}: {item.get('status', 'unknown')} - {item.get('message', '')}")
-        self.doctor_status.setText("SETUP READY" if healthy else "SETUP NEEDS ATTENTION")
-        self.doctor_status.setStyleSheet(f"color:{self.COLORS['good' if healthy else 'warn']};")
-        self.doctor_evidence.setText("\n".join(lines) or "No setup details returned.")
-        self.doctor_action.setText("You are ready to play." if healthy else "Review failed checks, then use Fix Setup or try again.")
+                    key = str(item.get("key", "check"))
+                    status = str(item.get("status", "unknown"))
+                    technical_lines.append(f"{key}: {status} - {item.get('message', '')}")
+                    folded = key.casefold()
+                    group = (
+                        "Saved Games" if "save" in folded or "queue" in folded
+                        else "Mod Installation" if "mod" in folded or "inject" in folded or "receipt" in folded
+                        else "Game Integration" if any(token in folded for token in ("native", "xinput", "bridge", "runtime", "meathook"))
+                        else "DOOM Eternal"
+                    )
+                    groups[group].append(status)
+        bad = {"failed", "error", "missing", "invalid", "incompatible", "blocked"}
+
+        def group_state(statuses: list[str]) -> str:
+            if any(status.casefold() in bad for status in statuses):
+                return "NEEDS ATTENTION"
+            if any(status.casefold() in {"ok", "ready", "passed", "present", "applied"} for status in statuses):
+                return "READY"
+            return "NOT REQUIRED" if statuses else "NOT CHECKED"
+
+        room_issue = self._current_room_package_failure() or self._setup_state in {"install_needed", "update_required"}
+        summary = [f"{name}: {group_state(statuses)}" for name, statuses in groups.items()]
+        summary.append(f"CURRENT ROOM: {'CONNECTED' if self._room_connected else 'NOT CONNECTED'}")
+        game_ready = not any(group_state(statuses) == "NEEDS ATTENTION" for statuses in groups.values())
+        title = "GAME SETUP READY" if game_ready else "GAME SETUP NEEDS ATTENTION"
+        self.doctor_status.setText(title)
+        self.doctor_status.setStyleSheet(f"color:{self.COLORS['good' if game_ready else 'warn']};")
+        self.doctor_evidence.setText("\n".join(summary))
+        self._refresh_help_room_package()
+        self.doctor_action.setText("Use Rebuild Room Package in Session." if room_issue else "You are ready to play." if healthy else "Review failed checks, then use Fix Setup or try again.")
+        for line in technical_lines:
+            self._append_log(line)
 
     def _probe_handshake(self) -> None:
         try:
@@ -1775,6 +1973,9 @@ class LauncherUI(QMainWindow):
         except Exception as error: self._append_log(f"Support bundle error: {error}")
 
     def _preview_repairs(self) -> None:
+        if self._setup_state in {"package_failed", "package_incompatible"}:
+            self._prepare(force=True)
+            return
         try: actions = self.controller.repair_preview()
         except Exception as error:
             self._append_log(f"Repair preview error: {error}")
@@ -1850,7 +2051,7 @@ class LauncherUI(QMainWindow):
         semantic = {
             "connected": ("CONNECTED", self.COLORS["good"]), "disconnected": ("DISCONNECTED", self.COLORS["muted"]),
             "error": ("NEEDS ATTENTION", self.COLORS["bad"]), "setup_failed": ("NEEDS ATTENTION", self.COLORS["bad"]),
-            "warning": ("NOTICE", self.COLORS["warn"]), "room_install_state": ("MOD", self.COLORS["ap"]),
+            "warning": ("NOTICE", self.COLORS["warn"]), "room_install_state": ("ROOM PACKAGE", self.COLORS["ap"]),
             "setup_ready": ("READY", self.COLORS["good"]), "command_sent": ("MESSAGE SENT", self.COLORS["ap"]),
             "item": ("ITEM RECEIVED", self.COLORS["good"]), "location": ("CHECK COMPLETE", self.COLORS["ap"]),
             "deathlink": ("DEATHLINK", self.COLORS["warn"]),
@@ -1858,9 +2059,12 @@ class LauncherUI(QMainWindow):
             "game_link_installed": ("GAME LINK", self.COLORS["good"]),
             "ammo_refill": ("AMMO REFILL", self.COLORS["doom_hot"]),
         }
+        package_failure = self._is_room_package_failure(event)
         segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
-        fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Status", "state"), ("Reason", "reason"), ("Message", "message"))
+        fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Message", "message"))
         detail = " | ".join(f"{label}: {event[key]}" for label, key in fields if event.get(key) not in (None, ""))
+        if package_failure or (kind == "room_install_state" and str(event.get("readiness")) == "blocked"):
+            segment, color, detail = "ROOM PACKAGE", self.COLORS["bad"], "Could not prepare room package."
         row = 0
         self.activity.insertRow(row)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
@@ -1927,6 +2131,13 @@ class LauncherUI(QMainWindow):
             if presentation:
                 detail, enabled = presentation
                 self.player_inventory.setText(detail)
+                tile = {
+                    "queued": ("restoration queued", self.COLORS["ap"]),
+                    "noop": ("synced", self.COLORS["good"]),
+                    "error": ("resync unavailable", self.COLORS["bad"]),
+                }.get(status)
+                if tile:
+                    self._set_inventory_tile(*tile)
                 self.resync_inventory_button.setEnabled(enabled and self._room_connected)
             return
         if kind == "ammo_refill":
@@ -1939,41 +2150,40 @@ class LauncherUI(QMainWindow):
             return
         if kind == "uninstall_queued":
             self.uninstall_button.setEnabled(False)
-            self.doctor_status.setText("UNINSTALL QUEUED")
-            self.doctor_evidence.setText("Room package removal is queued.")
+            self.doctor_room_status.setText("UNINSTALL QUEUED")
+            self.doctor_room_evidence.setText("Room package removal is queued.")
             return
         if kind == "uninstall_started":
             self.uninstall_button.setEnabled(False)
-            self.doctor_status.setText("REMOVING ROOM PACKAGE")
-            self.doctor_evidence.setText("Removing DoomEAP room mod from DOOM Eternal.")
+            self.doctor_room_status.setText("REMOVING ROOM PACKAGE")
+            self.doctor_room_evidence.setText("Removing DoomEAP room mod from DOOM Eternal.")
             return
         if kind == "uninstall_progress":
             self.uninstall_button.setEnabled(False)
-            self.doctor_status.setText("REMOVING ROOM PACKAGE")
-            self.doctor_evidence.setText("Room package removal is in progress. Keep the launcher open.")
+            self.doctor_room_status.setText("REMOVING ROOM PACKAGE")
+            self.doctor_room_evidence.setText("Room package removal is in progress. Keep the launcher open.")
             return
         if kind == "injector_post_run_confirmation":
             self.uninstall_button.setEnabled(False)
-            self.doctor_status.setText("CHECKING ROOM PACKAGE")
-            self.doctor_evidence.setText("Checking that room package removal completed.")
+            self.doctor_room_status.setText("CHECKING ROOM PACKAGE")
+            self.doctor_room_evidence.setText("Checking that room package removal completed.")
             return
         if kind == "uninstall_complete":
             self.uninstall_button.setEnabled(False)
-            self.doctor_status.setText("ROOM PACKAGE UNINSTALLED")
-            self.doctor_evidence.setText("DoomEAP room mod is not installed. Other mods and Game integration were kept.")
+            self.doctor_room_status.setText("ROOM PACKAGE UNINSTALLED")
+            self.doctor_room_evidence.setText("DoomEAP room mod is not installed. Other mods and Game integration were kept.")
             self._set_status("mod", "not installed", self.COLORS["warn"])
             self._set_setup_state("install_needed", "Room package is not installed. Install it to play.")
             return
         if kind in {"uninstall_attention", "uninstall_failed"}:
             self.uninstall_button.setEnabled(self._room_connected)
-            self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
-            self.doctor_evidence.setText("Room package could not be removed. Close the game and try again.")
+            self.doctor_room_status.setText("UNINSTALL NEEDS ATTENTION")
+            self.doctor_room_evidence.setText("Room package could not be removed. Close the game and try again.")
             return
         if kind == "connected":
             self._connection_pending = False; self._room_connected = True
             self._set_connection_controls(False); self._render_room(event)
             self.uninstall_button.setEnabled(True)
-            self._set_status("room", "connected", self.COLORS["good"])
             self._set_status("mod", "checking", self.COLORS["ap"])
             self._set_setup_state("checking")
             self._set_chat_enabled(True)
@@ -1994,7 +2204,7 @@ class LauncherUI(QMainWindow):
             self._set_chat_enabled(self._room_connected)
         elif kind in {"client_started", "connecting"}:
             self._connection_pending = True; self._set_connection_controls(False)
-            self._set_status("room", "connecting", self.COLORS["ap"])
+            self._set_connection_badge("CONNECTING", False)
         elif kind == "game_link_installed":
             self._set_status("rpc", "waiting", self.COLORS["ap"])
             self._append_log(f"Game Link runtime verified and installed: {event.get('path')}")
@@ -2034,10 +2244,13 @@ class LauncherUI(QMainWindow):
                     if "another room" in reason
                     else "This room's installed mod needs an update."
                 )
-                self._set_setup_state(
-                    "update_required" if state == "update_required" else "install_needed",
-                    setup_copy if state == "update_required" else "Install this room's package before playing.",
-                )
+                if readiness == "blocked":
+                    self._set_setup_state(self._room_package_issue_state(readiness_reason))
+                else:
+                    self._set_setup_state(
+                        "update_required" if state == "update_required" else "install_needed",
+                        setup_copy if state == "update_required" else "Install this room's package before playing.",
+                    )
         elif kind in {"setup_started", "mod_building", "runtime_config_ready", "mod_staged", "injector_started"}:
             self._set_status("mod", "updating", self.COLORS["ap"])
             self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
@@ -2061,9 +2274,14 @@ class LauncherUI(QMainWindow):
                     self._show_page(2)
                     self._set_setup_state("ready")
             elif state == "manual_action_required":
-                self._set_setup_state("installing", str(event.get("message", "Finish the game manager step, then try again.")))
+                self._append_log(str(event.get("message", "Manual installation requires attention.")))
+                self._set_setup_state("installing", "Finish the game manager step, then try again.")
+            elif self._is_room_package_failure(event):
+                self._set_status("mod", "failed", self.COLORS["bad"])
+                self._set_setup_state("package_failed")
             else:
-                self._set_setup_state("failed", str(event.get("message", "Try setup again.")))
+                self._append_log(str(event.get("message", "Setup did not finish.")))
+                self._set_setup_state("failed")
             if event.get("new_install") is True:
                 self._show_setup_complete()
         elif kind in {"manager_started", "injector_started"}:
@@ -2088,11 +2306,11 @@ class LauncherUI(QMainWindow):
             )
             confirmed = reply == QMessageBox.StandardButton.Yes
             if confirmed:
-                self.doctor_status.setText("CHECKING ROOM PACKAGE")
-                self.doctor_evidence.setText("Confirming room package removal.")
+                self.doctor_room_status.setText("CHECKING ROOM PACKAGE")
+                self.doctor_room_evidence.setText("Confirming room package removal.")
             else:
-                self.doctor_status.setText("UNINSTALL NEEDS ATTENTION")
-                self.doctor_evidence.setText("Room package removal was not confirmed.")
+                self.doctor_room_status.setText("UNINSTALL NEEDS ATTENTION")
+                self.doctor_room_evidence.setText("Room package removal was not confirmed.")
             self.controller.resolve_uninstall_confirmation(request_id, confirmed)
         elif kind == "installation_confirmation_required":
             request_id = str(event.get("request_id", ""))
@@ -2132,14 +2350,12 @@ class LauncherUI(QMainWindow):
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")
             self.uninstall_button.setEnabled(False)
-            self.connection_badge.setText("OFFLINE")
-            self.connection_badge.setProperty("connected", False)
-            self.connection_badge.style().unpolish(self.connection_badge)
-            self.connection_badge.style().polish(self.connection_badge)
+            self._set_connection_badge("OFFLINE", False)
             self.session_player_name.setText("NO ROOM CONNECTED")
             self.player_team.setText("Team —")
             self.player_slot.setText("Slot —")
             self.player_inventory.setText("Connect to restore inventory")
+            self._set_inventory_tile("waiting", self.COLORS["muted"])
             self.player_ammo_refills.setText(f"AMMO REFILLS — · {self.ammo_refill_keybind.value()}")
             self.resync_inventory_button.setEnabled(False)
             self.session_uninstall_button.setEnabled(False)
@@ -2150,11 +2366,14 @@ class LauncherUI(QMainWindow):
             self._set_home("SESSION ENDED", "Update room details or reconnect.", "JOIN A ROOM", "OFFLINE")
         elif kind in {"setup_failed", "error"}:
             message = str(event.get("message", "Unknown error"))
+            self._append_log(f"{kind}: {message}")
             if not self._room_connected:
-                self._connection_pending = False; self._set_connection_controls(True); self._set_status("room", "failed", self.COLORS["bad"])
+                self._connection_pending = False; self._set_connection_controls(True); self._set_connection_badge("FAILED", False)
                 self._set_home("CONNECTION FAILED", message, "RETRY JOIN", "CONNECTION FAILED")
             else:
-                self._set_status("mod", "failed", self.COLORS["bad"]); self._set_setup_state("failed", message)
+                package_failure = self._is_room_package_failure(event, message)
+                self._set_status("mod" if package_failure else "rpc", "failed", self.COLORS["bad"])
+                self._set_setup_state(self._room_package_issue_state(message) if package_failure else "failed")
         elif kind == "warning":
             self._append_log("Warning: " + str(event.get("message", "")))
 

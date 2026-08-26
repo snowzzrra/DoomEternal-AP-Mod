@@ -3,27 +3,27 @@
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770001": {
       "name": "Plasma Rifle",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770002": {
       "name": "Rocket Launcher",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770003": {
       "name": "Super Shotgun",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770004": {
       "name": "Ballista",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770005": {
       "name": "Chaingun",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770006": {
       "name": "BFG-9000",
@@ -35,7 +35,7 @@
     },
     "7770900": {
       "name": "Combat Shotgun",
-      "policy": "replay_idempotent"
+      "policy": "replay_manual_only"
     },
     "7770008": {
       "name": "The Unmaykr",
@@ -481,6 +481,26 @@
     },
     "7770142": {
       "name": "Sentinel Battery Bundle",
+      "policy": "never_replay"
+    },
+    "7770143": {
+      "name": "Overdrive",
+      "policy": "never_replay"
+    },
+    "7770144": {
+      "name": "Onslaught",
+      "policy": "never_replay"
+    },
+    "7770145": {
+      "name": "Break Blast",
+      "policy": "never_replay"
+    },
+    "7770146": {
+      "name": "Desperate Punch",
+      "policy": "never_replay"
+    },
+    "7770147": {
+      "name": "Take Back",
       "policy": "never_replay"
     }
   }

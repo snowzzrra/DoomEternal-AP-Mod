@@ -27,7 +27,6 @@ ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve(
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 3
-MOD_CONTRACT_REVISION = 2
 SLOT_DATA_SCHEMA_VERSION = 3
 SLOT_DATA_REVISION = "0.5-B"
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
@@ -431,7 +430,7 @@ class SeedManifest:
             "content_revision": identity["content_revision"],
             "compiler_revision": identity["compiler_revision"],
             "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
-            "mod_contract_revision": MOD_CONTRACT_REVISION,
+            "mod_contract_revision": identity["session_mod_contract_revision"],
             "required_capabilities": sorted(required_capabilities),
             "options": normalized_options,
             "active_location_ids": list(active_ids),
@@ -453,10 +452,11 @@ class SeedManifest:
         if "bridge_protocol" in slot_data and slot_data["bridge_protocol"] != identity["bridge_protocol_version"]:
             raise ValueError(f"session bridge_protocol is incompatible: {slot_data['bridge_protocol']!r} != {identity['bridge_protocol_version']!r}")
         schema = slot_data.get("manifest_schema_version", 1)
-        contract = slot_data.get("mod_contract_revision", MOD_CONTRACT_REVISION)
+        supported_contract = identity["session_mod_contract_revision"]
+        contract = slot_data.get("mod_contract_revision", supported_contract)
         if not isinstance(schema, int) or schema < 1 or schema > MANIFEST_SCHEMA_VERSION:
             raise ValueError(f"session manifest schema is unsupported: {schema!r}")
-        if contract != MOD_CONTRACT_REVISION:
+        if contract != supported_contract:
             raise ValueError(f"session mod contract is unsupported: {contract!r}")
         slot_data_revision = slot_data.get("slot_data_revision")
         if slot_data_revision is not None and slot_data_revision != SLOT_DATA_REVISION:
@@ -607,7 +607,8 @@ class RoomCompiler:
         )
         output_root.mkdir(parents=True, exist_ok=True)
         destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
-        seed_document = manifest.document()
+        # JSON round-trip so tuple fields match what the archive stores.
+        seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(manifest.options)
         receipt = {
             "schema": 1,

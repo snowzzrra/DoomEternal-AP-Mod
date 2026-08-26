@@ -63,20 +63,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "major receipt single-line format"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.0: add Overdrive and Onslaught item entities"
     }
   ],
   "asset_package_contract_sha256": "f0186074dd8a2fdcc54cc5bdf4bafd0b4106051af1f9132d04b1655d7c8dc3ee",
-  "byte_sha256": "3155bf5a7615b46cf80f39c6c1647813180d4a79dbcc01fcdaf81cce50a19418",
-  "content_revision": "0.4.0-beta.4",
+  "byte_sha256": "0ff0362b4a5b5932503165f44ca0411a351214166e274acb3215bd67e3395fcf",
+  "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20094677,
-    "classes": 18322,
-    "entity_count": 18322,
+    "byte_size": 20106263,
+    "classes": 18340,
+    "entity_count": 18340,
     "layers": 4816,
     "targets": 10775,
     "transforms": 37089,
-    "unique_entity_names": 18322
+    "unique_entity_names": 18340
   },
   "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
   "map_key": "e1m3_cult",
@@ -112,5 +116,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "7957fe97e866eca009d4595ec6f32afc5e1cdb7245de6255f33b36318033d505"
+  "semantic_sha256": "50d018471761f5ebc6dd70ef0484f53374066ed466f9739d7071d4ddc8788df9"
 }

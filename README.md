@@ -32,7 +32,7 @@ Current campaign coverage includes:
 - 307 physical checks inside maps;
 - 62 runtime and meta checks;
 - 369 locations in total;
-- 117 item types;
+- 121 item types;
 - randomized starting weapons and starting inventory;
 - configurable Chainsaw, Dash, first Sentinel Battery, Start With Automap, traps, and
   DeathLink;
@@ -152,7 +152,7 @@ map, and load epoch.
 
 ### Item delivery
 
-The APWorld item table and game-side command table share the same 117 public
+The APWorld item table and game-side command table share the same 121 public
 item IDs. When the server sends an item, the bridge resolves its command and
 activates a map-owned `ap_rpc_v3_*` entity:
 

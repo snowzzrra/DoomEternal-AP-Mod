@@ -63,13 +63,26 @@ class RepairAction:
 class DoctorReport:
     version: str
     diagnostics: tuple[Diagnostic, ...]
+    summary_status: str = "ready"
+    failure_domain: str = ""
+    recovery_action: str = ""
+    summary_message: str = ""
 
     @property
     def ok(self) -> bool:
         return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
-        return {"version": self.version, "ok": self.ok, "diagnostics": [asdict(item) for item in self.diagnostics]}
+        return {
+            "version": self.version,
+            "ok": self.ok,
+            "status": self.summary_status,
+            "summary_status": self.summary_status,
+            "failure_domain": self.failure_domain,
+            "recovery_action": self.recovery_action,
+            "summary_message": self.summary_message,
+            "diagnostics": [asdict(item) for item in self.diagnostics],
+        }
 
 
 def _safe_path(value: object) -> str:
@@ -595,7 +608,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "beta.4"
+    VERSION = "0.5.0"
 
     def __init__(
         self,
@@ -603,10 +616,20 @@ class LauncherDoctor:
         config: Mapping[str, object] | None = None,
         paths: object | None = None,
         config_path: Path | None = None,
+        last_setup_failure: Mapping[str, object] | None = None,
+        last_room_package_issue: Mapping[str, object] | None = None,
     ):
         self.config = dict(config or {})
         self.paths = paths
         self.config_path = config_path
+        self.last_setup_failure = dict(last_setup_failure or {})
+        self.last_room_package_issue = dict(last_room_package_issue or {})
+
+    def _current_issue(self) -> dict[str, object] | None:
+        for issue in (self.last_room_package_issue, self.last_setup_failure):
+            if issue.get("failure_domain") in {"room_package", "installed_room_package"}:
+                return issue
+        return None
 
     def _state_dir(self) -> Path | None:
         value = getattr(self.paths, "state_dir", None)
@@ -641,6 +664,20 @@ class LauncherDoctor:
                 pass
 
         state_dir = self._state_dir()
+        issue = self._current_issue()
+        if issue is not None:
+            action_id = (
+                "update_room_package"
+                if issue.get("recovery_action") == "update_room_package"
+                else "rebuild_room_package"
+            )
+            actions.append(RepairAction(
+                action_id,
+                "Update room package" if action_id == "update_room_package" else "Rebuild room package",
+                ("Prepare and verify the current room package.",),
+                True,
+                "Keeps launcher-owned package verification and receipt checks in place.",
+            ))
         if state_dir is None:
             return tuple(actions)
 
@@ -689,6 +726,8 @@ class LauncherDoctor:
                 ))
                 return tuple(actions)
         except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            if issue is not None:
+                return tuple(actions)
             actions.append(RepairAction(
                 "archive_stale_install_record", "Archive stale install record",
                 (f"Move launcher record to repair backup: {receipt_path.name}",), False,
@@ -802,7 +841,10 @@ class LauncherDoctor:
         actions = self.repair_actions()
         room_actions = tuple(
             action for action in actions
-            if action.action_id in {"archive_stale_install_record", "reinstall_room_mod"}
+            if action.action_id in {
+                "archive_stale_install_record", "reinstall_room_mod",
+                "rebuild_room_package", "update_room_package",
+            }
         )
         if room_actions:
             checks.append(Diagnostic(
@@ -822,4 +864,31 @@ class LauncherDoctor:
             ))
         else:
             checks.append(Diagnostic("room_mod", "not_applicable", "Room package verification is unavailable without a receipt"))
-        return DoctorReport(self.VERSION, tuple(checks))
+        issue = self._current_issue()
+        if issue is not None:
+            domain = str(issue.get("failure_domain", "room_package"))
+            checks.append(Diagnostic(
+                "current_room_package",
+                "attention",
+                str(issue.get("user_message") or issue.get("technical_message") or "Current room package needs attention"),
+                dict(issue),
+            ))
+            summary_status = "room_package_needs_attention"
+            summary_message = str(issue.get("user_message") or "Current room package needs attention")
+            recovery_action = str(issue.get("recovery_action") or "rebuild_room_package")
+        else:
+            domain = ""
+            recovery_action = ""
+            summary_status = "ready" if all(
+                item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"}
+                for item in checks
+            ) else "needs_attention"
+            summary_message = ""
+        return DoctorReport(
+            self.VERSION,
+            tuple(checks),
+            summary_status,
+            domain,
+            recovery_action,
+            summary_message,
+        )

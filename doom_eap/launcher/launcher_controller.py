@@ -26,6 +26,8 @@ from .launcher_integration import (
     IntegratedLaunchWorkflow,
     IntegratedSetupRecord,
     RoomSetupCoordinator,
+    installed_package_issue_payload,
+    setup_failure_payload,
 )
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_platform import (
@@ -103,6 +105,7 @@ class LauncherController:
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
         self.last_setup_failure: dict[str, object] | None = None
+        self.last_room_package_issue: dict[str, object] | None = None
         self.session_start_time = time.time()
         self._consent_lock = threading.Lock()
         self._consent_requests: dict[str, tuple[threading.Event, list[bool]]] = {}
@@ -363,6 +366,8 @@ class LauncherController:
             config=self.config,
             paths=self.user_paths,
             config_path=self.config_path,
+            last_setup_failure=self.last_setup_failure,
+            last_room_package_issue=self.last_room_package_issue,
         ).run()
         self.emit("doctor_report", report=report.document())
         return report
@@ -372,6 +377,8 @@ class LauncherController:
             config=self.config,
             paths=self.user_paths,
             config_path=self.config_path,
+            last_setup_failure=self.last_setup_failure,
+            last_room_package_issue=self.last_room_package_issue,
         ).repair_preview()
 
     def apply_repair(self, action_key: str) -> str:
@@ -380,6 +387,8 @@ class LauncherController:
             config=self.config,
             paths=self.user_paths,
             config_path=self.config_path,
+            last_setup_failure=self.last_setup_failure,
+            last_room_package_issue=self.last_room_package_issue,
         )
         actions = {action.key: action for action in doctor.repair_preview()}
         action = actions.get(action_key)
@@ -389,11 +398,11 @@ class LauncherController:
             backup = doctor.archive_stale_install_record()
             self.emit("repair_complete", action=action_key, backup=str(backup))
             return str(backup)
-        if action_key == "reinstall_room_mod":
+        if action_key in {"rebuild_room_package", "update_room_package", "reinstall_room_mod"}:
             if not self.setup.start(force=True):
-                raise RuntimeError("connect to room before reinstalling its mod")
+                raise RuntimeError("connect to room before rebuilding its room package")
             self.emit("repair_started", action=action_key)
-            return "Room mod reinstall started; installed hash will be checked after setup."
+            return "Room package rebuild started; installed hash will be checked after setup."
         if action_key in {"install_game_link", "repair_game_link"}:
             result = self.install_game_link(force_repair=action_key == "repair_game_link")
             game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
@@ -542,7 +551,10 @@ class LauncherController:
         if "heartbeat" in kind.casefold():
             return
         fields = []
-        for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
+        for key in (
+            "endpoint", "slot", "seed_name", "state", "code", "reason", "message",
+            "raw_message", "technical_message", "failure_domain", "recovery_action",
+        ):
             if key in event and event[key] not in (None, ""):
                 fields.append(f"{key}={event[key]}")
         self._record_diagnostic(f"{kind}: {' | '.join(fields) or 'received'}")
@@ -551,6 +563,14 @@ class LauncherController:
         self, supervisor: BridgeSupervisor, event: dict[str, object]
     ) -> None:
         kind = str(event.get("type", ""))
+        if kind == "setup_failed" and not event.get("failure_domain"):
+            event = {
+                **event,
+                **setup_failure_payload(
+                    RuntimeError(str(event.get("message", "setup failed"))),
+                    phase="game_setup",
+                ),
+            }
         stop_failed_worker = False
         pending: dict[str, str] | None = None
         emit_event = True
@@ -567,6 +587,8 @@ class LauncherController:
                     emit_event = False
                 else:
                     self.state = LauncherState.CONNECTED
+                    self.last_setup_failure = None
+                    self.last_room_package_issue = None
             elif kind in {"error", "setup_failed"}:
                 if (
                     self.state is LauncherState.DISCONNECTING
@@ -579,6 +601,9 @@ class LauncherController:
                     stop_failed_worker = supervisor.running
                 stop_native = True
             elif kind in {"client_stopping", "disconnected"}:
+                if kind == "disconnected":
+                    self.last_setup_failure = None
+                    self.last_room_package_issue = None
                 if (
                     self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING}
                     or self._pending_connect is not None
@@ -617,8 +642,11 @@ class LauncherController:
     def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
         if kind == "setup_failed":
             self.last_setup_failure = dict(payload)
-        elif kind in {"setup_started", "setup_ready"}:
+            if payload.get("failure_domain") in {"room_package", "installed_room_package"}:
+                self.last_room_package_issue = dict(payload)
+        elif kind == "setup_ready":
             self.last_setup_failure = None
+            self.last_room_package_issue = None
         self.emit(kind, **payload)
         if kind == "setup_ready" and payload.get("adapter_state") == "applied":
             self._ensure_native_client()
@@ -725,6 +753,8 @@ class LauncherController:
         snapshot = RoomSnapshot.from_event(last_event)
         record = self.workflow.confirm_manual_installation(snapshot, str(last_event.get("endpoint") or ""))
         self.last_setup = record
+        self.last_setup_failure = None
+        self.last_room_package_issue = None
         self.emit(
             "setup_ready",
             manifest_hash=record.manifest_hash,
@@ -776,7 +806,11 @@ class LauncherController:
                 if self.supervisor is supervisor:
                     self.supervisor = None
                     self.state = LauncherState.FAILED
-            self.emit("setup_failed", code="bridge_start_failed", message=str(error))
+            self.emit(
+                "setup_failed",
+                code="bridge_start_failed",
+                **setup_failure_payload(error, phase="game_setup"),
+            )
             return
         self.emit("connecting", endpoint=connection["endpoint"], slot=connection["slot"])
 
@@ -829,6 +863,8 @@ class LauncherController:
         event_type = event.get("type")
         if event_type == "connected":
             self.connected_room = True
+            self.last_setup_failure = None
+            self.last_room_package_issue = None
             self.setup.observe(event)
             try:
                 from .launcher_core import RoomSnapshot
@@ -844,16 +880,36 @@ class LauncherController:
                     reason=state.reason,
                     readiness=state.readiness,
                     readiness_reason=state.readiness_reason,
+                    **(
+                        installed_package_issue_payload(state.reason)
+                        if state.state == "update_required"
+                        else {}
+                    ),
                 )
+                if state.state == "update_required":
+                    self.last_room_package_issue = {
+                        "type": "room_install_state",
+                        "state": state.state,
+                        "reason": state.reason,
+                        **installed_package_issue_payload(state.reason),
+                    }
                 if state.state == "already_installed" and state.readiness != "blocked":
                     self._ensure_native_client()
             except Exception as error:
+                issue = setup_failure_payload(error, phase="room_snapshot")
+                self.last_room_package_issue = {
+                    "type": "room_install_state",
+                    "state": "install_needed",
+                    "reason": str(error),
+                    **issue,
+                }
                 self.emit(
                     "room_install_state",
                     state="install_needed",
                     reason=f"could not verify installed room mod: {error}",
                     readiness="blocked",
                     readiness_reason=str(error),
+                    **issue,
                 )
         elif event_type == "setup_ready":
             if event.get("adapter_state") == "applied":
@@ -928,6 +984,8 @@ class LauncherController:
             supervisor = self.supervisor
             self._pending_connect = None
             self.connected_room = False
+            self.last_setup_failure = None
+            self.last_room_package_issue = None
             if supervisor is None:
                 self.state = LauncherState.IDLE
             else:

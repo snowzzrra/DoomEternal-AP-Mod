@@ -1,8 +1,8 @@
 {
-  "authoritative_fingerprint": "7d7db503a4a1644a9053a84c0dd57ad8a8f949cf99e7e2ad383d845807e16eb7",
+  "authoritative_fingerprint": "36e103fcb35f8f8e27ccd439288650b7a4f43a2e1aa0fcf3997a802a917f370f",
   "catalog_fingerprint": "569a36064ba55ee0490270c4a1e57d6638de7275c6da69c1bb52ea7e6867f157",
   "compiler_revision": 2,
-  "content_revision": "0.4.0-beta.4",
+  "content_revision": "0.5.0",
   "counts": {
     "event_only": 18,
     "no_visual": 7,
@@ -7862,7 +7862,7 @@
         "resource_sha256": "46a32bb3c60c51c021474d3d511d14c5d3a1423e2acc18556c36b215b0b63e45",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e3m4_boss/locations.json",
-        "source_sha256": "371587e838ac6aea996f704fb6281d747ae5f397ddd73d445b5b92317e24ab40"
+        "source_sha256": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587"
       }
     },
     {
@@ -7890,7 +7890,7 @@
         "resource_sha256": "46a32bb3c60c51c021474d3d511d14c5d3a1423e2acc18556c36b215b0b63e45",
         "source_entity": "PICKUPS_PROGRESS_CODEX_2_E3M4",
         "source_file": "content/maps/e3m4_boss/locations.json",
-        "source_sha256": "371587e838ac6aea996f704fb6281d747ae5f397ddd73d445b5b92317e24ab40"
+        "source_sha256": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587"
       }
     },
     {
@@ -7905,8 +7905,8 @@
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_identity": {
         "descriptor_sha256": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
-        "location_descriptor_sha256": "ba158b0b201476ee5978aea8daf6f74498ce9bbf85b4e041c7baebe92fecd9ca",
-        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "location_descriptor_sha256": "75f9e77068818f9d2b320fcce70e5f44695e5c5135e4317b8147efc56ab1bcc5",
+        "policy_sha256": "6279b1f45a5fd0066a39970c3a1e214fd8c21a71b57726c9c8955fa8d51c5720",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/sp/e3m4_boss/e3m4_boss.entities",
@@ -7918,7 +7918,7 @@
         "resource_sha256": "46a32bb3c60c51c021474d3d511d14c5d3a1423e2acc18556c36b215b0b63e45",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M4",
         "source_file": "content/maps/e3m4_boss/locations.json",
-        "source_sha256": "371587e838ac6aea996f704fb6281d747ae5f397ddd73d445b5b92317e24ab40"
+        "source_sha256": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587"
       }
     },
     {
@@ -7946,7 +7946,7 @@
         "resource_sha256": "46a32bb3c60c51c021474d3d511d14c5d3a1423e2acc18556c36b215b0b63e45",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M5",
         "source_file": "content/maps/e3m4_boss/locations.json",
-        "source_sha256": "371587e838ac6aea996f704fb6281d747ae5f397ddd73d445b5b92317e24ab40"
+        "source_sha256": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587"
       }
     },
     {
@@ -7974,7 +7974,7 @@
         "resource_sha256": "46a32bb3c60c51c021474d3d511d14c5d3a1423e2acc18556c36b215b0b63e45",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M6",
         "source_file": "content/maps/e3m4_boss/locations.json",
-        "source_sha256": "371587e838ac6aea996f704fb6281d747ae5f397ddd73d445b5b92317e24ab40"
+        "source_sha256": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587"
       }
     },
     {

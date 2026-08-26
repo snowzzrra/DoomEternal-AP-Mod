@@ -13,6 +13,7 @@ from typing import Any
 from doom_eap.contracts.foundation import compile_item_delivery_plan
 
 REPLAY_IDEMPOTENT = "replay_idempotent"
+REPLAY_MANUAL_ONLY = "replay_manual_only"
 SPECIAL_PROGRESSIVE = "special_progressive"
 NEVER_REPLAY = "never_replay"
 AP_RECEIPT_FEEDBACK = "ap"
@@ -31,7 +32,7 @@ DELIVERY_INTENTS = frozenset(
 )
 CLIENT_STATE_VERSION = 2
 SUPPORTED_POLICIES = frozenset(
-    {REPLAY_IDEMPOTENT, SPECIAL_PROGRESSIVE, NEVER_REPLAY}
+    {REPLAY_IDEMPOTENT, REPLAY_MANUAL_ONLY, SPECIAL_PROGRESSIVE, NEVER_REPLAY}
 )
 SUPPORTED_RECEIPT_FEEDBACK = frozenset(
     {AP_RECEIPT_FEEDBACK, NATIVE_ONLY_RECEIPT_FEEDBACK}
@@ -75,6 +76,7 @@ class ReconciliationPlan:
     special_stages: int
     skipped_never_replay: int
     skipped_unproven: int = 0
+    skipped_manual_replay: int = 0
 
 
 @dataclass(frozen=True)
@@ -576,8 +578,16 @@ def compile_reconciliation_plan(
     registry: Mapping[int, ReplayPolicy],
     slot_identity: str,
     epoch: int,
+    *,
+    include_manual_replay: bool = False,
 ) -> ReconciliationPlan:
-    """Compile ownership replay from authoritative receipts without side effects."""
+    """Compile ownership replay from authoritative receipts without side effects.
+
+    ``replay_manual_only`` items are persistent ownership grants whose in-game
+    acquisition presentation must not rerun on checkpoint/respawn epoch
+    refresh. They compile only for deliberate repair paths (manual Resync and
+    explicit campaign-context materialization).
+    """
     if (
         not isinstance(slot_identity, str)
         or not slot_identity
@@ -585,6 +595,7 @@ def compile_reconciliation_plan(
         or isinstance(epoch, bool)
         or not isinstance(epoch, int)
         or epoch < 0
+        or not isinstance(include_manual_replay, bool)
     ):
         raise ValueError("reconciliation requires slot identity and non-negative epoch")
     if set(registry) != set(definitions):
@@ -609,6 +620,7 @@ def compile_reconciliation_plan(
     replayed = 0
     special_stages = 0
     skipped_never_replay = 0
+    skipped_manual_replay = 0
 
     for item_id in sorted(counts):
         policy = registry[item_id]
@@ -618,7 +630,9 @@ def compile_reconciliation_plan(
         selected_commands: list[str] = []
         if policy.policy == NEVER_REPLAY:
             skipped_never_replay += 1
-        elif policy.policy == REPLAY_IDEMPOTENT:
+        elif policy.policy == REPLAY_MANUAL_ONLY and not include_manual_replay:
+            skipped_manual_replay += 1
+        elif policy.policy in {REPLAY_IDEMPOTENT, REPLAY_MANUAL_ONLY}:
             plan = compile_item_delivery_plan(item_id, definition_map)
             if not plan.commands:
                 raise ValueError(f"replay-safe item {item_id} compiled no commands")
@@ -674,4 +688,5 @@ def compile_reconciliation_plan(
     return ReconciliationPlan(
         tuple(commands), tuple(selections), replayed, special_stages,
         skipped_never_replay,
+        skipped_manual_replay=skipped_manual_replay,
     )

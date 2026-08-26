@@ -75,20 +75,24 @@
     {
       "content_revision": "0.4.0-beta.4",
       "reason": "Neutralize canonical Base plasma rifle pickup"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.0: add Overdrive and Onslaught item entities"
     }
   ],
   "asset_package_contract_sha256": "1301a39fcd94c697ef77009b823431bbb7eab9eaddf9db57e860d5a6071e367f",
-  "byte_sha256": "245e46a8e17f2789c00ddbae01b5a0850827ec3f791eb2f47cb642e311fb2e3d",
-  "content_revision": "0.4.0-beta.4",
+  "byte_sha256": "1c10e4b677c6aca14f6558a6f5be66303cdac675e2048bba28a9f0332a42ed93",
+  "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 707,
-    "byte_size": 10662235,
-    "classes": 9158,
-    "entity_count": 9160,
+    "byte_size": 10673427,
+    "classes": 9176,
+    "entity_count": 9178,
     "layers": 2357,
     "targets": 11961,
     "transforms": 19045,
-    "unique_entity_names": 9159
+    "unique_entity_names": 9177
   },
   "manifest_sha256": "60e0fe088bc0b64b2e58aaede9656e745b7d570f6556e883316f2e85c5b47f71",
   "map_key": "e1m4_boss",
@@ -119,5 +123,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "dc36c2ddc5194ed8e52b9a0df77424c8eb0a46a89768563b05a3d39c41ebd97e",
-  "semantic_sha256": "f8f3bc51da5941c1d9aed3413d653a0b5969251b5c193fd5a3566414272dbed8"
+  "semantic_sha256": "4efde2f404e4a1e6a183843206d1601b08051bf5a67cd2d3f32c92578f484ddc"
 }

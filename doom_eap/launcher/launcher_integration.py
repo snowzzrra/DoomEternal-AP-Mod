@@ -34,12 +34,112 @@ EventSink = Callable[[str, dict[str, object]], None]
 ConsentCallback = Callable[[object], bool]
 ConfirmationCallback = Callable[[], bool]
 
+ROOM_PACKAGE_FAILURE_TITLE = "ROOM PACKAGE NEEDS ATTENTION"
+ROOM_PACKAGE_FAILURE_MESSAGE = (
+    "This room package could not be prepared with the current launcher. "
+    "Rebuild the room package and try again."
+)
+ROOM_PACKAGE_FAILURE_ACTION = "REBUILD ROOM PACKAGE"
+GAME_SETUP_FAILURE_TITLE = "GAME SETUP NEEDS ATTENTION"
+GAME_SETUP_FAILURE_MESSAGE = (
+    "Game setup could not be completed. Repair game integration and try again."
+)
+GAME_SETUP_FAILURE_ACTION = "REPAIR GAME INTEGRATION"
+INSTALLED_PACKAGE_FAILURE_TITLE = "ROOM PACKAGE NEEDS UPDATE"
+INSTALLED_PACKAGE_FAILURE_MESSAGE = (
+    "This room's installed package needs an update. Update the room package and try again."
+)
+INSTALLED_PACKAGE_FAILURE_ACTION = "UPDATE ROOM PACKAGE"
+ROOM_PACKAGE_INCOMPATIBLE_TITLE = "ROOM PACKAGE NEEDS REBUILDING"
+ROOM_PACKAGE_INCOMPATIBLE_MESSAGE = (
+    "This room package was built with an older DOOM Eternal APWorld. "
+    "Rebuild it with the current launcher and try again."
+)
+ROOM_PACKAGE_INCOMPATIBLE_ACTION = "REBUILD ROOM PACKAGE"
+
 UNINSTALL_OWNED_STATES = frozenset({
     "uninstall_in_progress",
     "uninstall_attention",
     "uninstall_failed",
     "uninstalled",
 })
+
+
+def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
+    """Classify setup failures without weakening any validation boundary."""
+    if phase in {"room_snapshot", "manifest", "room_package"}:
+        return "room_package"
+    text = f"{type(error).__name__}: {error}".casefold()
+    room_tokens = (
+        "contract",
+        "capability",
+        "schema",
+        "manifest",
+        "placement",
+        "room package",
+        "room mod",
+        "compiler",
+        "release package",
+        "assembled room",
+        "location id",
+    )
+    if any(token in text for token in room_tokens):
+        return "room_package"
+    return "game_setup"
+
+
+def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str, object]:
+    """Return user routing metadata alongside untouched technical failure data."""
+    raw_message = str(error) or type(error).__name__
+    failure_domain = classify_setup_failure(error, phase=phase)
+    if failure_domain == "room_package":
+        recovery_action = "rebuild_room_package"
+        incompatible_tokens = (
+            "contract is unsupported",
+            "unsupported capabilities",
+            "schema is unsupported",
+            "revision is unsupported",
+            "bridge_protocol is incompatible",
+        )
+        if any(token in raw_message.casefold() for token in incompatible_tokens):
+            user_title = ROOM_PACKAGE_INCOMPATIBLE_TITLE
+            user_message = ROOM_PACKAGE_INCOMPATIBLE_MESSAGE
+            user_action = ROOM_PACKAGE_INCOMPATIBLE_ACTION
+        else:
+            user_title = ROOM_PACKAGE_FAILURE_TITLE
+            user_message = ROOM_PACKAGE_FAILURE_MESSAGE
+            user_action = ROOM_PACKAGE_FAILURE_ACTION
+    else:
+        recovery_action = "repair_game_integration"
+        user_title = GAME_SETUP_FAILURE_TITLE
+        user_message = GAME_SETUP_FAILURE_MESSAGE
+        user_action = GAME_SETUP_FAILURE_ACTION
+    return {
+        "error_type": type(error).__name__,
+        "message": raw_message,
+        "raw_message": raw_message,
+        "technical_error_type": type(error).__name__,
+        "technical_message": raw_message,
+        "stage": phase or "setup",
+        "failure_domain": failure_domain,
+        "recovery_action": recovery_action,
+        "user_title": user_title,
+        "user_message": user_message,
+        "user_action": user_action,
+    }
+
+
+def installed_package_issue_payload(reason: str) -> dict[str, object]:
+    """Return routing metadata for receipt-backed package verification failures."""
+    return {
+        "failure_domain": "installed_room_package",
+        "recovery_action": "update_room_package",
+        "user_title": INSTALLED_PACKAGE_FAILURE_TITLE,
+        "user_message": INSTALLED_PACKAGE_FAILURE_MESSAGE,
+        "user_action": INSTALLED_PACKAGE_FAILURE_ACTION,
+        "technical_message": reason,
+        "raw_message": reason,
+    }
 
 
 @dataclass(frozen=True)
@@ -106,6 +206,7 @@ class IntegratedLaunchWorkflow:
         self.consent = consent or (lambda _spec: False)
         self.confirmation = confirmation or (lambda: False)
         self.uninstall_confirmation = uninstall_confirmation or (lambda: False)
+        self._failure_phase = "game_setup"
 
     def _emit(self, kind: str, **payload: object) -> None:
         self.event_sink(kind, payload)
@@ -196,7 +297,7 @@ class IntegratedLaunchWorkflow:
             windows_confirmed = bool(receipt.get("windows_installation_confirmed", False))
             steam_option = str(receipt.get("steam_launch_option", ""))
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
-            return InstallState("install_needed", manifest.manifest_hash, reason=f"invalid install record: {error}")
+            return InstallState("update_required", manifest.manifest_hash, reason=f"invalid install record: {error}")
         if adapter_state in UNINSTALL_OWNED_STATES:
             if recorded_manifest != manifest.manifest_hash:
                 return InstallState(
@@ -452,8 +553,10 @@ class IntegratedLaunchWorkflow:
         )
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        self._failure_phase = "game_setup"
         config = self._config()
         game_root = self._game_root(config)
+        self._failure_phase = "room_package"
         pre_install_state = self.install_state(snapshot)
         cached = self._cached_linux_install(snapshot, pre_install_state)
         if cached is not None:
@@ -566,7 +669,9 @@ class IntegratedLaunchWorkflow:
             ),
         )
         self._emit("mod_staged", path=str(staged), manifest_hash=manifest.manifest_hash)
+        self._failure_phase = "game_setup"
         adapter, steam_option, steam_diff = self._adapter(config, game_root, staged)
+        self._failure_phase = "room_package"
         installation_mode = str(adapter.details.get("installation_mode", "automatic") if adapter.details else "automatic")
         user_confirmed = bool(adapter.details.get("user_confirmed", False) if adapter.details else False)
         record = IntegratedSetupRecord(
@@ -946,7 +1051,14 @@ class RoomSetupCoordinator:
         def worker() -> None:
             try:
                 with self._worker_lock:
-                    snapshot = RoomSnapshot.from_event(event)
+                    try:
+                        snapshot = RoomSnapshot.from_event(event)
+                    except Exception as error:
+                        self.event_sink(
+                            "setup_failed",
+                            setup_failure_payload(error, phase="room_snapshot"),
+                        )
+                        return
                     record = self.workflow.execute(
                         snapshot,
                         str(event.get("endpoint") or ""),
@@ -983,10 +1095,10 @@ class RoomSetupCoordinator:
             except Exception as error:
                 self.event_sink(
                     "setup_failed",
-                    {
-                        "error_type": type(error).__name__,
-                        "message": str(error),
-                    },
+                    setup_failure_payload(
+                        error,
+                        phase=str(getattr(self.workflow, "_failure_phase", "")),
+                    ),
                 )
             finally:
                 with self._state_lock:

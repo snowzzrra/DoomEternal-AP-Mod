@@ -105,7 +105,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 117, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
+    "counts": {"items": 124, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -474,6 +474,10 @@ def compile_item_delivery_plan(
         description = " -> ".join(definition)
         resolved_stage = None
     elif family == "no_op":
+        if definition.get("availability") == "unavailable" and receipt:
+            raise ValueError(
+                f"Item {item_id} is unavailable until runtime materialization is enabled"
+            )
         entities = []
         description = str(definition.get("description", "runtime-only no-op"))
         resolved_stage = None

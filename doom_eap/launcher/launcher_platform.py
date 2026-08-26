@@ -223,7 +223,7 @@ class RuntimePrerequisiteReport:
 
     @property
     def ok(self) -> bool:
-        """All mandatory beta.4 runtime prerequisites must be satisfied."""
+        """All mandatory 0.5.0 runtime prerequisites must be satisfied."""
         mandatory_keys = {"game", "meathook", "client_runtime"}
         return all(
             check.ok
@@ -383,7 +383,7 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe all mandatory and advisory beta.4 runtime prerequisites."""
+    """Probe all mandatory and advisory 0.5.0 runtime prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
     # 1. Game installation check

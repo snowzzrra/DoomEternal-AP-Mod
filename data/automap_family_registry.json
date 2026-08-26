@@ -275,6 +275,22 @@
       "vanilla_automap": false,
       "vanilla_exploration": false
     },
+    "unmaykr_case": {
+      "match": {
+        "inherit_prefixes": [
+          "interact/hub/unmaykr_case"
+        ]
+      },
+      "vanilla_class": "idInteractable_Obstacle",
+      "automap_marker_source": "no source marker; generated targetless idInfo uses the default marker declaration",
+      "automap_properties": [],
+      "dossier_total_owner": "native Fortress Unmaykr case interaction and unlock sequence",
+      "collected_state_writer": "native obstacle interaction state",
+      "reward_edge": "native Unmaykr case relay chain",
+      "safe_cut": "append AP target while retaining the complete native interaction contract",
+      "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
     "ability_progression": {
       "match": {
         "inherit_prefixes": [

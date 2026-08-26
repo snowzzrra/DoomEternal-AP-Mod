@@ -17,9 +17,10 @@ from tools.maps.ap_map_generator import (
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OLD_HUB_LOCATION_IDS = {7770072, 7770073, 7770074, 7770081, 7770086, 7770087, 7770088}
-NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172)) | {7770253, 7770254, 7770255}
+NEW_HUB_LOCATION_IDS = set(range(7770163, 7770172)) | {7770253, 7770254, 7770255, 7770418}
 EXPECTED_CHANGED = {
     "target_relay_pickup_ballista",
+    "sentinel_battery_room_interact_hub_unmaykr_case_1_1829410956",
 }
 EXPECTED_STATE_STATS_REMOVED = {
     "interact_hub_2_battery_station_1",

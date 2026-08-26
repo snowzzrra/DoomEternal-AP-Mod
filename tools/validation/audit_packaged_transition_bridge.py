@@ -31,6 +31,18 @@ def install_ap_stubs() -> None:
     sys.modules["CommonClient"] = common
     net = types.ModuleType("NetUtils")
     net.ClientStatus = types.SimpleNamespace(CLIENT_GOAL=30)
+    net.Hint = __import__("collections").namedtuple(
+        "Hint",
+        (
+            "receiving_player", "finding_player", "item_id", "location_id",
+            "found", "entrance", "item_flags", "status",
+        ),
+        defaults=(0, "", 0, 0),
+    )
+    net.HintStatus = enum.IntEnum(
+        "HintStatus",
+        {"HINT_UNSPECIFIED": 0, "HINT_PRIORITY": 10, "HINT_NO_PRIORITY": 20, "HINT_AVOID": 30, "HINT_FOUND": 40},
+    )
     net.JSONMessagePart = dict
     net.JSONTypes = enum.Enum(
         "JSONTypes",
