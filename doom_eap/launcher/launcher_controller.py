@@ -168,6 +168,7 @@ class LauncherController:
             self.client_dir,
             self.state_dir,
             self.config_path,
+            data_dir=self.user_paths.data_dir,
             event_sink=self._setup_event,
             consent=self._request_consent,
             confirmation=self._request_installation_confirmation,
@@ -429,6 +430,22 @@ class LauncherController:
         )
         return result
 
+    def repair_idfile_decompressor(self) -> str:
+        installed = self.workflow.repair_idfile_decompressor()
+        self.emit(
+            "repair_complete",
+            action="repair_idfile_decompressor",
+            state="verified",
+            path=installed.executable,
+            sha256=installed.artifact_sha256,
+        )
+        return f"idFileDeCompressor cache repaired and verified: {installed.executable}"
+
+    def remove_idfile_decompressor(self) -> str:
+        removed = self.workflow.remove_idfile_decompressor()
+        self.emit("repair_complete", action="remove_idfile_decompressor", removed=removed)
+        return "idFileDeCompressor cache removed." if removed else "idFileDeCompressor cache was already absent."
+
     def probe_handshake(self) -> dict[str, object]:
         base = self.config.get("doom_base_dir")
         if not base:
@@ -587,6 +604,10 @@ class LauncherController:
                 probe=post_probe.message,
             )
             return f"Game Link runtime repaired and verified: {post_probe.message}"
+        if action_key == "repair_idfile_decompressor":
+            return self.repair_idfile_decompressor()
+        if action_key == "remove_idfile_decompressor":
+            return self.remove_idfile_decompressor()
         raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
@@ -653,11 +674,12 @@ class LauncherController:
                 "message": f"Saved Games path unavailable: {type(error).__name__}: {error}",
                 "requested_at": requested_at,
             }
-        previous_mtime: dict[Path, float] = {}
+        previous_files: dict[Path, tuple[int, int]] = {}
         try:
-            for candidate in [save_dir / "AP_SUPPORT_FILE.txt", *sorted(save_dir.glob("AP_SUPPORT_FILE*.txt"))]:
+            for candidate in set(save_dir.glob("AP_SUPPORT_FILE*.txt")):
                 try:
-                    previous_mtime[candidate] = candidate.stat().st_mtime
+                    stat = candidate.stat()
+                    previous_files[candidate] = (stat.st_size, stat.st_mtime_ns)
                 except (OSError, ValueError, RuntimeError):
                     pass
         except (OSError, ValueError, RuntimeError):
@@ -674,23 +696,33 @@ class LauncherController:
 
         deadline = time.monotonic() + 4.0
         while time.monotonic() < deadline:
-            candidates = [save_dir / "AP_SUPPORT_FILE.txt"]
+            candidates: list[tuple[int, str, Path, os.stat_result, str]] = []
             try:
-                candidates.extend(sorted(save_dir.glob("AP_SUPPORT_FILE*.txt")))
+                paths = sorted(save_dir.glob("AP_SUPPORT_FILE*.txt"))
             except (OSError, ValueError, RuntimeError):
-                pass
-            for candidate in candidates:
+                paths = []
+            for candidate in paths:
                 try:
                     stat = candidate.stat()
                 except (OSError, ValueError, RuntimeError):
                     continue
-                if stat.st_mtime >= requested_at - 1.0 and stat.st_mtime > previous_mtime.get(candidate, 0.0):
-                    return {
-                        "status": "available",
-                        "path": str(candidate),
-                        "requested_at": requested_at,
-                        "mtime": stat.st_mtime,
-                    }
+                previous = previous_files.get(candidate)
+                freshness = "new" if previous is None else "modified"
+                changed = previous is None or previous != (stat.st_size, stat.st_mtime_ns)
+                if changed and stat.st_mtime >= requested_at - 1.0:
+                    candidates.append((stat.st_mtime_ns, candidate.name, candidate, stat, freshness))
+            if candidates:
+                _, _, candidate, stat, freshness = max(candidates)
+                return {
+                    "status": "available",
+                    "path": str(candidate),
+                    "source_filename": candidate.name,
+                    "requested_at": requested_at,
+                    "source_mtime": stat.st_mtime,
+                    "source_size": stat.st_size,
+                    "freshness": freshness,
+                    "selection_reason": "freshest_changed_candidate_by_mtime_ns_then_filename",
+                }
             time.sleep(0.1)
         return {
             "status": "pending",

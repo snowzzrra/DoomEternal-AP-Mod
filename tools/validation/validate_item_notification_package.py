@@ -266,7 +266,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         style = notification_style_for_item(item_id, classification)
         stages = range(len(definition["perks"])) if (
             isinstance(definition, dict)
-            and definition.get("type") == "progressive_perk"
+            and definition.get("type") in {"progressive_perk", "progressive_item"}
         ) else (None,)
         for stage in stages:
             stage_suffix = f"_{stage}" if stage is not None else ""

@@ -1,0 +1,20 @@
+{
+	inherit = "devinvloadout/dlc/e4m1_rig";
+	edit = {
+		startingInventory = {
+			num = 130;
+			item[127] = {
+				perk = "perk/player/runes/dlc/blood_punch_low_health_bonus_damage";
+				isRune = true;
+			}
+			item[128] = {
+				perk = "perk/player/runes/dlc/extra_life_refund";
+				isRune = true;
+			}
+			item[129] = {
+				perk = "perk/player/runes/dlc/weakpoint_concussive_blast";
+				isRune = true;
+			}
+		}
+	}
+}

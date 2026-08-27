@@ -18,6 +18,8 @@ from .launcher_integration import UNINSTALL_OWNED_STATES
 from .launcher_platform import (
     AMMO_HOTKEY_STATE_FILENAME,
     AMMO_REFILL_BIND_COMMAND,
+    idfile_decompressor_spec,
+    DependencyManager,
     PrerequisiteStatus,
     detect_doom_processes,
     probe_meathook,
@@ -948,12 +950,56 @@ def build_support_diagnostics(
         state_dir = Path(state_value).expanduser() if state_value else None
     except (OSError, TypeError, ValueError, RuntimeError):
         state_dir = None
+    data_value = getattr(paths, "data_dir", None) if paths else None
+    try:
+        data_dir = Path(data_value).expanduser() if data_value else None
+    except (OSError, TypeError, ValueError, RuntimeError):
+        data_dir = None
+    selected_spec = idfile_decompressor_spec()
+    idfile_diagnostics: dict[str, object] = {"status": "unsupported" if selected_spec is None else "unknown"}
+    if selected_spec is not None:
+        idfile_diagnostics.update({
+            "expected_version": selected_spec.version,
+            "expected_commit": selected_spec.commit,
+            "source_url": selected_spec.url,
+            "expected_size": selected_spec.expected_size,
+            "expected_sha256": selected_spec.sha256,
+        })
+        idfile_diagnostics["selected_spec"] = {
+            "name": selected_spec.name,
+            "version": selected_spec.version,
+            "commit": selected_spec.commit,
+            "url": selected_spec.url,
+            "sha256": selected_spec.sha256,
+            "executable": selected_spec.executable_glob,
+            "platforms": sorted(selected_spec.platforms),
+        }
+    if data_dir is not None:
+        cache_dir = data_dir / "dependencies"
+        idfile_diagnostics["cache_dir"] = cache_dir
+        idfile_diagnostics["cache_dir_display"] = str(cache_dir)
+        idfile_diagnostics["cache_dir_canonical"] = str(cache_dir.resolve())
+        manager = DependencyManager(cache_dir)
+        if selected_spec is None or not manager.platform_supported(selected_spec):
+            idfile_diagnostics.update({
+                "status": "unsupported",
+                "platform": manager.current_platform_name(),
+                "supported_platforms": ["linux", "windows"],
+            })
+        else:
+            try:
+                cache_details = manager.cache_diagnostics(selected_spec)
+            except OSError as error:
+                idfile_diagnostics.update({"status": "unreadable", "error": str(error)})
+            else:
+                idfile_diagnostics.update(cache_details)
     return {
         "item_state": _item_state_summary(config, config_path),
         "room_install_receipt": _room_install_receipt_summary(state_dir),
         "game_link": _support_game_link_diagnostics(
             config, config_path, paths, processes, runtime, meathook, live=live
         ),
+        "idfile_decompressor": idfile_diagnostics,
     }
 
 
@@ -980,8 +1026,46 @@ def write_support_bundle(
     payload["log_provenance"] = sanitize_support_value(provenance)
     if last_setup_failure is not None:
         payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
+    condump_content = None
+    condump_metadata = dict(support_condump or {})
+    support_path = condump_metadata.get("path")
+    if isinstance(support_path, (str, Path)):
+        separator = b"\n===== DOOMEAP SUPPORT CONDUMP MIDDLE OMITTED =====\n"
+        try:
+            source_path = Path(support_path)
+            source_size = source_path.stat().st_size
+            if source_size <= SUPPORT_DIAGNOSTIC_MAX_BYTES:
+                source_bytes = source_path.read_bytes()
+                truncation = "none"
+                omitted_bytes = 0
+            else:
+                retained = SUPPORT_DIAGNOSTIC_MAX_BYTES - len(separator)
+                head_size = retained // 2
+                tail_size = retained - head_size
+                with source_path.open("rb") as source:
+                    head = source.read(head_size)
+                    source.seek(source_size - tail_size)
+                    tail = source.read(tail_size)
+                source_bytes = head + separator + tail
+                truncation = "head_tail"
+                omitted_bytes = source_size - len(head) - len(tail)
+            condump_content = redact_secrets(
+                source_bytes.decode("utf-8", errors="replace")
+            )
+            condump_metadata.update({
+                "source_filename": condump_metadata.get("source_filename", source_path.name),
+                "source_size": source_size,
+                "archived_size": len(condump_content.encode("utf-8")),
+                "truncation": truncation,
+                "omitted_bytes": omitted_bytes,
+            })
+        except OSError as error:
+            condump_metadata.update({
+                "status": "unavailable",
+                "reason": f"source_unreadable: {type(error).__name__}",
+            })
     if support_condump is not None:
-        payload["support_condump"] = sanitize_support_value(dict(support_condump))
+        payload["support_condump"] = sanitize_support_value(condump_metadata)
     if support_diagnostics is not None:
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     safe_logs = _bound_support_text(
@@ -1012,15 +1096,8 @@ def write_support_bundle(
             archive.writestr("launcher.history.log", safe_logs + "\n")
         for name, tail in tails.items():
             archive.writestr(name, tail)
-        if support_condump is not None:
-            support_path = support_condump.get("path")
-            if isinstance(support_path, (str, Path)):
-                try:
-                    content = Path(support_path).read_bytes()[:SUPPORT_DIAGNOSTIC_MAX_BYTES]
-                except OSError:
-                    content = None
-                if content is not None:
-                    archive.writestr("AP_SUPPORT_FILE.txt", redact_secrets(content.decode("utf-8", errors="replace")))
+        if condump_content is not None:
+            archive.writestr("AP_SUPPORT_FILE.txt", condump_content)
     os.replace(temporary, destination)
     return destination
 
@@ -1084,6 +1161,39 @@ class LauncherDoctor:
                 pass
 
         state_dir = self._state_dir()
+        data_value = getattr(self.paths, "data_dir", None)
+        data_dir = Path(data_value).expanduser() if data_value else None
+        selected_spec = idfile_decompressor_spec()
+        if data_dir is not None and selected_spec is not None:
+            codec_manager = DependencyManager(data_dir / "dependencies")
+            if codec_manager.platform_supported(selected_spec):
+                if codec_manager.inspect(selected_spec) is None:
+                    actions.append(RepairAction(
+                        "repair_idfile_decompressor",
+                        "Repair idFileDeCompressor cache",
+                        (
+                            f"Download pinned idFileDeCompressor {selected_spec.version}",
+                            f"Verify SHA-256: {selected_spec.sha256}",
+                        ),
+                        True,
+                        "Keeps verified artifact in launcher data cache.",
+                    ))
+                else:
+                    actions.append(RepairAction(
+                        "remove_idfile_decompressor",
+                        "Remove cached idFileDeCompressor",
+                        ("Remove launcher-owned codec cache entry.",),
+                        True,
+                        "Room package repair reacquires tool after consent.",
+                    ))
+            elif codec_manager.cache_present(selected_spec):
+                actions.append(RepairAction(
+                    "remove_idfile_decompressor",
+                    "Remove unsupported idFileDeCompressor cache",
+                    ("Remove launcher-owned Linux codec cache from unsupported platform.",),
+                    True,
+                    "No Windows codec is available for this pinned Linux artifact.",
+                ))
         issue = self._current_issue()
         if issue is not None:
             action_id = (

@@ -122,7 +122,8 @@ def build_string_table(
         except KeyError as error:
             raise ValueError(f"item {item_id} has no notification name") from error
         stages = range(len(definition["perks"])) if (
-            isinstance(definition, dict) and definition.get("type") == "progressive_perk"
+            isinstance(definition, dict)
+            and definition.get("type") in {"progressive_perk", "progressive_item"}
         ) else (None,)
         for stage in stages:
             key = notification_key(item_id, definition, stage=stage)

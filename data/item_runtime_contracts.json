@@ -34,6 +34,27 @@
                 "requires_owned_item": [7770003, 7770083],
                 "automatic_weapon_receipt": false,
                 "reconcile": "reapply_if_owned"
+            },
+            "7770145": {
+                "name": "Break Blast",
+                "family": "runes",
+                "ownership_primitive": "devinv_is_rune",
+                "runtime_primitive": "context_deferred",
+                "reconcile": "tag_context_only"
+            },
+            "7770146": {
+                "name": "Desperate Punch",
+                "family": "runes",
+                "ownership_primitive": "devinv_is_rune",
+                "runtime_primitive": "context_deferred",
+                "reconcile": "tag_context_only"
+            },
+            "7770147": {
+                "name": "Take Back",
+                "family": "runes",
+                "ownership_primitive": "devinv_is_rune",
+                "runtime_primitive": "context_deferred",
+                "reconcile": "tag_context_only"
             }
         }
     },
@@ -58,7 +79,7 @@
             "name": "Progressive Special Weapon",
             "max_quantity": 3,
             "states": ["none", "crucible", "sentinel_hammer", "sentinel_hammer_upgraded"],
-            "replacement": "each_stage_replaces_prior_state",
+            "replacement": "derived_highest_state_with_targeted_remove",
             "selected_representation_only": true,
             "start_inventory_eligible": true,
             "replay": "special_progressive"
@@ -68,7 +89,7 @@
             "name": "Progressive Sentinel Hammer",
             "max_quantity": 2,
             "states": ["none", "sentinel_hammer", "sentinel_hammer_upgraded"],
-            "replacement": "each_stage_replaces_prior_state",
+            "replacement": "derived_highest_state_with_targeted_remove",
             "selected_representation_only": true,
             "start_inventory_eligible": true,
             "replay": "special_progressive"
@@ -78,7 +99,7 @@
             "name": "The Crucible",
             "max_quantity": 1,
             "states": ["none", "crucible"],
-            "replacement": "each_stage_replaces_prior_state",
+            "replacement": "derived_highest_state_with_targeted_remove",
             "selected_representation_only": true,
             "start_inventory_eligible": true,
             "replay": "replay_idempotent"
@@ -139,9 +160,9 @@
         },
         "7770030": {
             "name": "Berserk",
-            "runtime_family": "trap_spawn",
-            "runtime_primitive": "target_command",
-            "runtime_effect": "chrispy pickup/powerup/berserk",
+            "runtime_family": "physical_pickup_spawn",
+            "runtime_primitive": "physical_pickup_spawn",
+            "runtime_effect": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/berserk"},
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false

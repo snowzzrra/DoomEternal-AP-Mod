@@ -35,7 +35,9 @@ def _sanitized_name(item_name: str) -> str:
 
 
 def _progressive_stage_count(definition: Any, stage: int | None) -> int | None:
-    if not isinstance(definition, dict) or definition.get("type") != "progressive_perk":
+    if not isinstance(definition, dict) or definition.get("type") not in {
+        "progressive_perk", "progressive_item",
+    }:
         if stage is not None:
             raise ValueError("only progressive notifications accept a stage")
         return None

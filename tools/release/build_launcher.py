@@ -26,9 +26,6 @@ PYINSTALLER_EXCLUDES = (
     "rule_builder", "Cython", "PIL", "jinja2", "setuptools", "pip",
     "tkinter", "_tkinter",
 )
-IDFILE_DECOMPRESSOR_NAMES = ("idFileDeCompressor.exe", "idFileDeCompressor")
-
-
 def _within(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -67,14 +64,6 @@ def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs.extend(_source_inputs("manifests", REPO_ROOT / "manifests"))
     inputs.extend(_source_inputs("requirements-launcher.txt", REPO_ROOT / "requirements-launcher.txt"))
     inputs.extend(_source_inputs("archipelago", archipelago_source))
-    inputs.extend(_source_inputs(
-        "Tools/idFileDeCompressor",
-        next(
-            (WORKSPACE / "Tools" / name for name in IDFILE_DECOMPRESSOR_NAMES
-             if (WORKSPACE / "Tools" / name).is_file()),
-            WORKSPACE / "Tools" / IDFILE_DECOMPRESSOR_NAMES[0],
-        ),
-    ))
     return inputs
 
 
@@ -131,15 +120,6 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     build_root = RELEASE_ROOT / "build/launcher"
     build_root.mkdir(parents=True, exist_ok=True)
     data_separator = os.pathsep
-    decompressor = next(
-        (WORKSPACE / "Tools" / name for name in IDFILE_DECOMPRESSOR_NAMES
-         if (WORKSPACE / "Tools" / name).is_file()),
-        None,
-    )
-    if decompressor is None:
-        raise RuntimeError(
-            "project-native idFileDeCompressor is missing; expected ../Tools/idFileDeCompressor"
-        )
     command = [
         sys.executable,
         "-m",
@@ -168,8 +148,6 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
-        "--add-binary",
-        f"{decompressor}{data_separator}.",
         "--collect-data",
         "certifi",
         "--copy-metadata",

@@ -83,20 +83,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "0.5-B: narrow Final Sin vent-entry Extra Life trigger to vanilla-equivalent volume"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "typed map-side persistent item command contract"
     }
   ],
   "asset_package_contract_sha256": "26a2c9a87c5428771c8a71ed2613fc15314e55bece57bd1d369bf03e7fb2df9d",
-  "byte_sha256": "f40527854f07fa42f97c3fb79db55befac47d1009b1acc620447f210d97311bd",
+  "byte_sha256": "15a5c6d9dd5a4d356f83bfb156a871df990b30130c39aaaf969e2c9f73a34ab0",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15313151,
-    "classes": 12972,
-    "entity_count": 12972,
+    "byte_size": 15321171,
+    "classes": 12988,
+    "entity_count": 12988,
     "layers": 1650,
     "targets": 45517,
     "transforms": 26188,
-    "unique_entity_names": 12972
+    "unique_entity_names": 12988
   },
   "manifest_sha256": "8c008d72eea7172e4de492887baf143ba101e755a509395e2a71eb4531df48a4",
   "map_key": "e3m4_boss",
@@ -113,5 +117,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "df3956e34ead01236ded5f485c338c6f65497900dbfe5cfb6188c887739fb40f",
-  "semantic_sha256": "2ac0ca2678de737ace08a99d140a1ab7266f160fe9686b02c4966a7959104ea7"
+  "semantic_sha256": "dd07f0c31241ed8f85577c2a08d636b348a660f2b733b4ea0c3545a408b09df3"
 }

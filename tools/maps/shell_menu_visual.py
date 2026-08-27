@@ -1,8 +1,8 @@
 """Generate the shell (main menu) entities with the Archipelago world visual.
 
 The vanilla shell map is the single source of truth: the tool verifies its
-pinned SHA-256, injects one inert AP visual entity behind the main-menu
-podium, and writes the complete ``shell.entities`` file for packaging. The
+pinned SHA-256, injects one inert AP visual entity in the campaign camera's
+foreground, and writes the complete ``shell.entities`` file for packaging. The
 visual reuses the DoomEAP-owned Archipelago logo model already packaged for
 campaign maps and the vanilla ``rotate_slow`` think component proven in
 ``hub.map``.
@@ -22,11 +22,8 @@ SHELL_SOURCE_SHA256 = "c1ce664337a6c78d8f1e834b691a68646c791c6c0e8572fdf11a788d2
 
 AP_MENU_ENTITY_NAME = "ap_menu_archipelago_world"
 AP_MENU_MODEL = "art/pickups/codex.lwo"
-# Behind the Slayer podium (podium_placement at x=9.5, y=-100) relative to the
-# menu cameras at x~-2, y~-100, elevated above the podium rock base (z~0) and
-# level with the podium key light (z~8).
-AP_MENU_POSITION = (16.5, -100.0, 7.0)
-AP_MENU_SCALE = 8.0
+AP_MENU_POSITION = (8.0, -100.0, 2.5)
+AP_MENU_SCALE = 3.0
 AP_MENU_THINK_COMPONENT = "rotate_slow"
 
 ENTITY_TEMPLATE = '''entity {{

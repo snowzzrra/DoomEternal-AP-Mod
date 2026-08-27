@@ -1,0 +1,12 @@
+{
+	inherit = "devinvloadout/dlc/e5m2_earth";
+	edit = {
+		startingInventory = {
+			num = 133;
+			item[132] = {
+				perk = "perk/player/weapons/hammer/armor_and_health_drops_upgraded";
+				equip = true;
+			}
+		}
+	}
+}

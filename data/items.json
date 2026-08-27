@@ -16,8 +16,8 @@
     "7770900": "give weapon/player/shotgun",
     "7770008": "give weapon/player/unmaykr",
     "7770009": "give weapon/player/hammer",
-    "7770901": {"type": "progressive_perk", "perks": ["weapon/player/crucible", "weapon/player/hammer", "weapon/player/hammer"]},
-    "7770902": {"type": "progressive_perk", "perks": ["weapon/player/hammer", "weapon/player/hammer"]},
+    "7770901": {"type": "progressive_item", "perks": ["weapon/player/crucible", "weapon/player/hammer", ["weapon/player/hammer", "perk/player/weapons/hammer/ammo_drops_upgraded", "perk/player/weapons/hammer/armor_and_health_drops_upgraded"]]},
+    "7770902": {"type": "progressive_item", "perks": ["weapon/player/hammer", ["weapon/player/hammer", "perk/player/weapons/hammer/ammo_drops_upgraded", "perk/player/weapons/hammer/armor_and_health_drops_upgraded"]]},
     "7770010": "give weapon/player/chainsaw",
     "7770011": [
         "give equipmentlauncher/equipmentlauncherleft",
@@ -71,7 +71,7 @@
         "give health 200",
         "give armor 200"
     ],
-    "7770030": "chrispy pickup/powerup/berserk",
+    "7770030": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/berserk"},
     
     "7770031": "give health 25",
     "7770032": "give health 100",
@@ -251,25 +251,7 @@
     },
     "7770143": "chrispy pickup/powerup/overdrive",
     "7770144": "chrispy pickup/powerup/onslaught",
-    "7770145": {
-        "type": "no_op",
-        "availability": "unavailable",
-        "description": "Support Rune materialization deferred until 0.5-C",
-        "start_inventory_eligible": false,
-        "requires_dlc": true
-    },
-    "7770146": {
-        "type": "no_op",
-        "availability": "unavailable",
-        "description": "Support Rune materialization deferred until 0.5-C",
-        "start_inventory_eligible": false,
-        "requires_dlc": true
-    },
-    "7770147": {
-        "type": "no_op",
-        "availability": "unavailable",
-        "description": "Support Rune materialization deferred until 0.5-C",
-        "start_inventory_eligible": false,
-        "requires_dlc": true
-    }
+    "7770145": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/weakpoint_concussive_blast",
+    "7770146": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/blood_punch_low_health_bonus_damage",
+    "7770147": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/extra_life_refund"
 }

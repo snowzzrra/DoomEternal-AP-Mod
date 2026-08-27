@@ -1,0 +1,15 @@
+{
+	inherit = "devinvloadout/dlc/e5m1_spear";
+	edit = {
+		startingInventory = {
+			num = 132;
+			item[130] = {
+				item = "weapon/player/hammer";
+			}
+			item[131] = {
+				perk = "perk/player/weapons/hammer/ammo_drops_upgraded";
+				equip = true;
+			}
+		}
+	}
+}

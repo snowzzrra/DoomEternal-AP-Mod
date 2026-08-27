@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from doom_eap.content.map_registry import load_map_registry
-from tools.decls.devinv_builder import validate_devinv_source
+from tools.decls.devinv_builder import build_tag_devinv_overrides, validate_devinv_source
 
 
 DECL_PREFIX = Path("generated/decls/devinvloadout")
@@ -72,6 +72,23 @@ def validate(
         )
     except ValueError as error:
         raise AssertionError(str(error)) from error
+
+    tag_paths = [mod_root / path for path in build_tag_devinv_overrides(
+        options.get("starting_inventory", {}), options.get("starting_weapon")
+    )]
+    if options.get("use_dlc_content", True):
+        for tag_path in tag_paths:
+            if not tag_path.is_file():
+                raise AssertionError(f"missing TAG DevInv override: {tag_path}")
+            try:
+                tag_text = tag_path.read_text(encoding="utf-8")
+                if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
+                    raise ValueError("TAG DevInv override retains inherit declaration")
+                validate_devinv_source(tag_text, options.get("starting_inventory", {}), options.get("starting_weapon"))
+            except ValueError as error:
+                raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
+    elif any(path.exists() for path in tag_paths):
+        raise AssertionError("DLC-OFF package contains TAG DevInv overrides")
 
 
 def main() -> None:

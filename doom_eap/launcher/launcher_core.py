@@ -7,7 +7,6 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import zipfile
 from collections.abc import Mapping
@@ -23,7 +22,11 @@ from doom_eap.content.physical_options import (
     project_room_config,
     project_map_config,
 )
-from tools.decls.devinv_builder import build_devinv_loadout, output_path_for_map
+from tools.decls.devinv_builder import (
+    build_devinv_loadout,
+    build_tag_devinv_overrides,
+    output_path_for_map,
+)
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -31,7 +34,7 @@ DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 3
 SLOT_DATA_SCHEMA_VERSION = 3
-SLOT_DATA_REVISION = "0.5-B"
+SLOT_DATA_REVISION = "0.5-C"
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
@@ -46,6 +49,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "ammo_refill_v1",
     "physical_options_v1",
     "room_options_v1",
+    "cross_campaign_materialization_v1",
 })
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
@@ -85,7 +89,6 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     ],
     "starting_inventory": {},
 }
-IDFILE_DECOMPRESSOR_NAMES = ("idFileDeCompressor.exe", "idFileDeCompressor")
 LOGGER = logging.getLogger(__name__)
 GOAL_VALUES = frozenset({
     "Acquire the Unmaykr",
@@ -555,7 +558,16 @@ class RoomCompiler:
 }
 '''
 
-    def __init__(self, base_resource: Path, payload_resource: Path, payload_manifest: Path):
+    def __init__(
+        self,
+        base_resource: Path,
+        payload_resource: Path,
+        payload_manifest: Path,
+        *,
+        decompressor: Path | None = None,
+        dependency_manager: object | None = None,
+        consent: object | None = None,
+    ):
         from tools.release.room_payloads import load_room_payload_manifest
         missing = [
             str(p)
@@ -570,6 +582,9 @@ class RoomCompiler:
         self.base_resource = base_resource
         self.payload_resource = payload_resource
         self.payload_manifest = load_room_payload_manifest(payload_manifest)
+        self.decompressor = decompressor
+        self.dependency_manager = dependency_manager
+        self.consent = consent
 
     def _apply_placement_strings(self, assembled: dict[str, bytes], placements: tuple) -> None:
         """Merge placement-aware receipt strings into the packaged locale tables."""
@@ -617,29 +632,15 @@ class RoomCompiler:
                 json.dumps(table, indent=4, ensure_ascii=False) + "\n"
             ).encode("utf-8")
 
-    @staticmethod
     def _apply_placement_entities(
-        assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...]
+        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...]
     ) -> None:
         """Bind packaged location notifications to their room placements."""
         import re
 
         from tools.maps.notification_formatting import placement_sent_key
 
-        candidates: list[Path] = []
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            bundle_root = Path(getattr(sys, "_MEIPASS"))
-            candidates.extend(bundle_root / name for name in IDFILE_DECOMPRESSOR_NAMES)
-        candidates.extend(ROOT / "tools" / name for name in IDFILE_DECOMPRESSOR_NAMES)
-        candidates.extend(
-            Path(__file__).resolve().parents[3] / "Tools" / name
-            for name in IDFILE_DECOMPRESSOR_NAMES
-        )
-        decompressor = next((path for path in candidates if path.is_file()), None)
-        if decompressor is None:
-            raise FileNotFoundError(
-                "Release package is missing project-native idFileDeCompressor"
-            )
+        decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
         notification_header = re.compile(
@@ -720,6 +721,55 @@ class RoomCompiler:
                     len(assembled[member]),
                 )
 
+    def _verified_decompressor(self) -> Path:
+        from .launcher_platform import IDFILE_DECOMPRESSOR
+
+        if self.decompressor is None:
+            if self.dependency_manager is None or not callable(self.consent):
+                raise FileNotFoundError(
+                    "idFileDeCompressor is unavailable in verified dependency cache"
+                )
+            installed = self.dependency_manager.acquire(  # type: ignore[attr-defined]
+                IDFILE_DECOMPRESSOR,
+                consent=self.consent,
+            )
+            decompressor = Path(installed.executable)
+        else:
+            decompressor = self.decompressor
+        decompressor = decompressor.expanduser().resolve()
+        if not decompressor.is_file():
+            raise FileNotFoundError(
+                "idFileDeCompressor is unavailable in verified dependency cache"
+            )
+        actual_sha256 = hashlib.sha256(decompressor.read_bytes()).hexdigest()
+        if actual_sha256 != IDFILE_DECOMPRESSOR.sha256:
+            raise ValueError(
+                "Cached idFileDeCompressor SHA-256 mismatch: "
+                f"expected {IDFILE_DECOMPRESSOR.sha256}, got {actual_sha256}"
+            )
+        return decompressor
+
+    def _compress_entities_text(self, text: str) -> bytes:
+        decompressor = self._verified_decompressor()
+        with tempfile.TemporaryDirectory(prefix="doom-ap-overlay-") as temporary:
+            temporary_dir = Path(temporary)
+            decoded = temporary_dir / "decoded.entities"
+            compressed = temporary_dir / "compressed.entities"
+            decoded.write_text(text, encoding="utf-8")
+            try:
+                subprocess.run(
+                    [str(decompressor), "--compress", str(decoded), str(compressed)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as error:
+                detail = (error.stderr or error.stdout or "").strip()[:500]
+                raise ValueError(f"could not compress generated entity overlay: {detail}") from error
+            if not compressed.is_file():
+                raise ValueError("idFileDeCompressor produced no encoded overlay")
+            return compressed.read_bytes()
+
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
         placements = manifest.require_complete_placements()
@@ -747,8 +797,29 @@ class RoomCompiler:
             manifest.options.get("starting_inventory", {}),
             manifest.options.get("starting_weapon"),
         )
+        assembled[devinv_path] = devinv_source.encode("utf-8")
+        if manifest.options.get("use_dlc_content", True):
+            assembled.update({
+                path: source.encode("utf-8")
+                for path, source in build_tag_devinv_overrides(
+                    manifest.options.get("starting_inventory", {}),
+                    manifest.options.get("starting_weapon"),
+                ).items()
+            })
+            from doom_eap.runtime.context_registry import dlc_contexts
+            from tools.maps.ap_map_generator import generate_context_marker_overlay
+            for context in dlc_contexts():
+                if context.overlay_member is None:
+                    raise ValueError(f"DLC context lacks marker overlay target: {context.identity}")
+                if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
+                    raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
+                overlay_text = generate_context_marker_overlay(
+                    context.map_keys[0], context.runtime_maps[0]
+                )
+                assembled[context.overlay_member] = self._compress_entities_text(
+                    overlay_text
+                )
         assembled.update({
-            devinv_path: devinv_source.encode("utf-8"),
             "room_config.json": canonical_json(room_config),
             "seed_manifest.json": canonical_json(seed_document),
             "seed_receipt.json": canonical_json(receipt),
@@ -769,7 +840,7 @@ class RoomCompiler:
                 raise ValueError("assembled room config validation failed")
             if json.loads(output.read("seed_receipt.json")) != receipt:
                 raise ValueError("assembled room receipt validation failed")
-            if output.read(devinv_path) != devinv_source.encode("utf-8"):
+            if devinv_path is not None and devinv_source is not None and output.read(devinv_path) != devinv_source.encode("utf-8"):
                 raise ValueError("assembled DevInv validation failed")
             if (self.ENHANCED_MELEE_PATH in output.namelist()) != bool(
                 manifest.options.get("enhanced_melee_damage", False)

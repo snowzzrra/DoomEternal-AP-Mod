@@ -34,6 +34,8 @@
     "multi_command": "target_command",
     "no_op": "target_command",
     "perk": "target_command",
+    "physical_pickup_spawn": "physical_pickup_spawn",
+    "progressive_item": "target_command",
     "progressive_perk": "target_command",
     "resource": "target_command",
     "simple_give": "target_command",

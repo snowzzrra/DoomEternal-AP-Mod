@@ -1,0 +1,6 @@
+{
+	inherit = "devinvloadout/dlc/e4m2_swamp";
+	edit = {
+
+	}
+}

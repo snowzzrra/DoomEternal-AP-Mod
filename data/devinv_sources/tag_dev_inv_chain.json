@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "source_owner": "project",
+  "source_kind": "canonical_extracted_decl_projection",
+  "player_installation_build": false,
+  "extraction": {
+    "tool": "EternalResourceExtractor",
+    "version": "4.0.0",
+    "filter": "*devinv*",
+    "source_root": "base/game",
+    "canonical_input": "project-owned data/devinv_sources/tag/*.decl"
+  },
+  "contexts": {
+    "tag1": {
+      "e4m1_rig": "e4m1_rig",
+      "e4m2_swamp": "e4m1_rig + support_runes",
+      "e4m3_mcity": "e4m2_swamp"
+    },
+    "tag2": {
+      "e5m1_spear": "e4m3_mcity",
+      "e5m2_earth": "e5m1_spear + sentinel_hammer + upgrade",
+      "e5m3_hell": "e5m2_earth + second_upgrade"
+    }
+  },
+  "dark_lord_dev_inv_map": "game/dlc2/e5m3_hell/e5m3_hell",
+  "transform": "minimal_ap_baseline_only",
+  "tag_full_kit": false,
+  "declarations": {
+    "e4m1_rig": {"source": "data/devinv_sources/tag/e4m1_rig.decl", "source_archive": "base/game/dlc/e4m1_rig/e4m1_rig.resources", "archive": "game/dlc/e4m1_rig/e4m1_rig.resources", "map_key": "e4m1_rig", "sha256": "2e55f458c008b4f6db280823a21a9a57c233b624fdd3b83e98803667a78c4e84"},
+    "e4m2_swamp": {"source": "data/devinv_sources/tag/e4m2_swamp.decl", "source_archive": "base/game/dlc/e4m2_swamp/e4m2_swamp.resources", "archive": "game/dlc/e4m2_swamp/e4m2_swamp.resources", "map_key": "e4m2_swamp", "sha256": "5d270ae1ce363ac439c57fc2b76ac8eee40807f5c345c58281d482e67dc6ae63"},
+    "e4m3_mcity": {"source": "data/devinv_sources/tag/e4m3_mcity.decl", "source_archive": "base/game/dlc/e4m3_mcity/e4m3_mcity.resources", "archive": "game/dlc/e4m3_mcity/e4m3_mcity.resources", "map_key": "e4m3_mcity", "sha256": "963838e768b0ef32d8a59010c57f253f34c16e9523c0419ea143a88b4e203223"},
+    "e5m1_spear": {"source": "data/devinv_sources/tag/e5m1_spear.decl", "source_archive": "base/game/dlc2/e5m1_spear/e5m1_spear.resources", "archive": "game/dlc2/e5m1_spear/e5m1_spear.resources", "map_key": "e5m1_spear", "sha256": "c9b8e6becadd6dc32cbbc7005cf4db051ff66ae32ac178c5ce23b7cd9f449aa5"},
+    "e5m2_earth": {"source": "data/devinv_sources/tag/e5m2_earth.decl", "source_archive": "base/game/dlc2/e5m2_earth/e5m2_earth.resources", "archive": "game/dlc2/e5m2_earth/e5m2_earth.resources", "map_key": "e5m2_earth", "sha256": "b678b7217a3312db44c25cb5efa2016dca6ad64b45dcc6992a8a24b28ff8efca"},
+    "e5m3_hell": {"source": "data/devinv_sources/tag/e5m3_hell.decl", "source_archive": "base/game/dlc2/e5m3_hell/e5m3_hell.resources", "archive": "game/dlc2/e5m3_hell/e5m3_hell.resources", "map_key": "e5m3_hell", "sha256": "4072a082306cfad79f7e6822b319c3a5176028247ee733d857696cc66e4a6015"},
+    "arc_hub_e4m1": {"source": "data/devinv_sources/tag/e4m1_rig.decl", "source_archive": "base/game/dlc/e4m1_rig/e4m1_rig.resources", "archive": "game/dlc/hub/hub.resources", "map_key": "e4m1_rig", "sha256": "2e55f458c008b4f6db280823a21a9a57c233b624fdd3b83e98803667a78c4e84"},
+    "dark_lord_e5m3": {"source": "data/devinv_sources/tag/e5m3_hell.decl", "source_archive": "base/game/dlc2/e5m3_hell/e5m3_hell.resources", "archive": "game/dlc2/e5m4_boss/e5m4_boss.resources", "map_key": "e5m3_hell", "sha256": "4072a082306cfad79f7e6822b319c3a5176028247ee733d857696cc66e4a6015"}
+  }
+}

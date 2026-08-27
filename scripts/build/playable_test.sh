@@ -296,7 +296,6 @@ python3 "$REPO_ROOT/tools/release/build_string_table.py" \
     --location-names "$REPO_ROOT/data/location_names.json" \
     --maps-dir "$GENERATED_MAPS_DIR" \
     --output "$MOD_STAGING_DIR/gameresources_patch1/EternalMod/strings/portuguese.json"
-
 if [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
     cp -R "$AP_PIPELINE_ARTIFACT_ROOT/mod/." "$MOD_STAGING_DIR/"
 else
@@ -344,6 +343,36 @@ assert audit["campaign_goal"]["preserved_native_targets"] == [
 ]
 PY
 fi
+
+python3 - "$MOD_STAGING_DIR/gameresources_patch1/EternalMod/strings/english.json" \
+    "$MOD_STAGING_DIR/gameresources_patch1/EternalMod/strings/portuguese.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+for raw_path in sys.argv[1:]:
+    path = Path(raw_path)
+    table = json.loads(path.read_text(encoding="utf-8"))
+    entries = {
+        entry["name"]: entry
+        for entry in table["strings"]
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+    }
+    entries["#str_code__GHOST31004"] = {
+        "name": "#str_code__GHOST31004",
+        "text": "DOOM ETERNAL ARCHIPELAGO",
+    }
+    entries["#str_code_mainmenu_campaign_name"] = {
+        "name": "#str_code_mainmenu_campaign_name",
+        "text": "DOOM ETERNAL ARCHIPELAGO",
+    }
+    table["strings"] = [entries[name] for name in sorted(entries)]
+    path.write_text(json.dumps(table, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+
+mkdir -p "$MOD_STAGING_DIR/shell/EternalMod/assetsinfo"
+cp "$REPO_ROOT/packaging/shell_menu_assetsinfo.json" \
+    "$MOD_STAGING_DIR/shell/EternalMod/assetsinfo/shell.json"
 
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r map_key _ _ _ _ generated_output resource_path relative_entities_path _ <<< "$map_row"
@@ -494,6 +523,7 @@ cp "$REPO_ROOT/data/items.json" \
     "$REPO_ROOT/data/options_schema.json" \
     "$TEMP_DIR/publisher_contracts.json" \
     "$REPO_ROOT/data/content_identity.json" \
+    "$REPO_ROOT/data/runtime_contexts.json" \
     "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
@@ -867,6 +897,7 @@ public_files = [
         "client/doom_eap/runtime/__init__.py",
         "client/doom_eap/runtime/bootstrap_actions.py",
         "client/doom_eap/runtime/bridge_client.py",
+        "client/doom_eap/runtime/context_registry.py",
         "client/doom_eap/runtime/deathlink_receive.py",
         "client/doom_eap/runtime/item_reconciliation.py",
         "client/doom_eap/runtime/observer_lifecycle.py",
@@ -904,6 +935,7 @@ public_files = [
         "client/data/options_schema.json",
         "client/data/publisher_contracts.json",
         "client/data/content_identity.json",
+        "client/data/runtime_contexts.json",
         *map_manifest_files,
         "client/player_templates/DoomSlayer.yaml",
         "client/player_templates/Marine.yaml",

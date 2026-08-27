@@ -2063,6 +2063,112 @@ def generate_fast_travel_relay(map_key, fast_travel_coords, vanilla_content):
 def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
+
+def progressive_effect_command(effect):
+    """Compile physical item effects and perk effects to native-safe commands."""
+    if effect.startswith("weapon/"):
+        return f"give {effect}"
+    if effect.startswith(("ability_", "equipmentlauncher/", "throwable/", "ammo/", "inventory/")):
+        return f"ai_ScriptCmdEnt player1 give {effect}"
+    return (
+        f"ai_ScriptCmdEnt player1 givePlayerPerk {effect};"
+        f"ai_ScriptCmdEnt player1 activatePlayerPerk {effect}"
+    )
+
+
+def generate_physical_pickup_spawn(item_id, command_value):
+    """Emit one repeatable native spawner and one concrete Berserk pickup template."""
+    if command_value != {
+        "type": "physical_pickup_spawn",
+        "entity_def": "pickup/powerup/berserk",
+    }:
+        raise ValueError(f"Unsupported physical pickup definition for item {item_id}")
+    spawner_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
+    pickup_name = f"{spawner_name}_pickup"
+    spawner = build_primitive(
+        "physical_pickup_spawn",
+        spawner_name,
+        {"pickup_entity": pickup_name, "spawn_at": "player1"},
+    )
+    pickup = f'''entity {{
+	entityDef {pickup_name} {{
+		inherit = "pickup/powerup/berserk";
+		class = "idProp2";
+		expandInheritance = false;
+		poolCount = 0;
+		poolGranularity = 2;
+		networkReplicated = true;
+		disableAIPooling = false;
+		edit = {{
+			whenToSave = "SGT_CHECKPOINT";
+			removeFlag = "RMV_CHECKPOINT_ALLOW_MS";
+			flags = {{
+				canBecomeDormant = true;
+			}}
+			renderModelInfo = {{
+				contributesToLightProbeGen = false;
+				ignoreDesaturate = true;
+				fadeVisibilityOver = 400;
+				scale = {{
+					x = 2;
+					y = 2;
+					z = 2;
+				}}
+				model = "art/pickups/powerup/berserker_powerup.lwo";
+			}}
+			dormancy = {{
+				delay = 5;
+				distance = 2048;
+			}}
+			spawn_statIncreases = {{
+				num = 1;
+				item[0] = {{
+					stat = "STAT_ITEMS_SPAWNED";
+					increase = 1;
+				}}
+			}}
+			isStatic = false;
+			equipOnPickup = true;
+			displayPickupMessage = false;
+			supportsShowingGui = false;
+			lootStyle = "LOOT_TOUCH";
+			triggerDef = "trigger/props/pickup_large";
+			updateFX = true;
+			canBePossessed = true;
+			sendNotableItemTelemetryEvent = true;
+			clipModelInfo = {{
+				contentsFilter = {{
+					monsterClip = false;
+				}}
+			}}
+			fxDecl = "gameplay/powerups/berserk";
+			useableComponentDecl = "propstatuseffect/berserk";
+			thinkComponentDecl = "bobthink";
+			sound_spawn = "play_berserk_pickup_loop";
+			sound_stop = "stop_berserk_pickup_loop";
+			pickup_statIncreases = {{
+				num = 2;
+				item[0] = {{
+					stat = "STAT_ITEMS_COLLECTED";
+					increase = 1;
+				}}
+				item[1] = {{
+					stat = "STAT_POWERUPS";
+					increase = 1;
+				}}
+			}}
+			spawnPosition = {{
+				x = 0;
+				y = 0;
+				z = 0;
+			}}
+		}}
+	}}
+}}
+'''
+    return spawner + pickup
+
+
 def generate_rpc_command_entities(
     items_dict,
     item_names=None,
@@ -2091,18 +2197,29 @@ def generate_rpc_command_entities(
             command_type = command_value.get("type")
             if command_type == "no_op":
                 continue
-            if command_type == "progressive_perk":
+            if command_type == "physical_pickup_spawn":
+                blocks.append(generate_physical_pickup_spawn(item_id, command_value))
+                continue
+            if command_type in {"progressive_perk", "progressive_item"}:
                 perks = command_value.get("perks", [])
                 if not perks:
                     raise ValueError(
                         f"Progressive perk item {item_id} has no perk stages"
                     )
                 for stage, perk in enumerate(perks):
-                    entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"
-                    blocks.append(build_primitive(
-                        "target_command", entity_name,
-                        {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}"},
-                    ))
+                    effects = [perk] if isinstance(perk, str) else perk
+                    if not isinstance(effects, list) or not effects or any(not isinstance(effect, str) for effect in effects):
+                        raise ValueError(f"Progressive perk item {item_id} has invalid stage effects")
+                    for index, effect in enumerate(effects):
+                        entity_name = (
+                            f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"
+                            if isinstance(perk, str)
+                            else f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}_{index}"
+                        )
+                        blocks.append(build_primitive(
+                            "target_command", entity_name,
+                            {"command": progressive_effect_command(effect)},
+                        ))
                 continue
 
             if command_type == "perk":
@@ -2175,7 +2292,9 @@ def generate_rpc_command_entities(
                 )
             classification = item_classifications[item_id_int]
             
-            if isinstance(command_value, dict) and command_value.get("type") == "progressive_perk":
+            if isinstance(command_value, dict) and command_value.get("type") in {
+                "progressive_perk", "progressive_item",
+            }:
                 perks = command_value.get("perks", [])
                 for stage in range(len(perks)):
                     subtext_key = notification_key(item_id_int, command_value, stage=stage)
@@ -2268,6 +2387,23 @@ def generate_ap_lifecycle_entity(map_key):
 \t}}
 }}
 '''
+
+
+def generate_context_marker_overlay(map_key, runtime_map, items_dict=None):
+    """Generate technical marker, lifecycle, and persistent RPC entities."""
+    if not isinstance(map_key, str) or not re.fullmatch(r"[a-z0-9_]+", map_key):
+        raise ValueError(f"invalid context marker map key: {map_key!r}")
+    if not isinstance(runtime_map, str) or not runtime_map:
+        raise ValueError("context marker runtime map is required")
+    if items_dict is None:
+        item_path = Path(__file__).resolve().parents[2] / "data" / "items.json"
+        document = json.loads(item_path.read_text(encoding="utf-8"))
+        items_dict = {int(item_id): definition for item_id, definition in document.items()}
+    return (
+        generate_rpc_command_entities(items_dict)
+        + generate_system_command_entities(map_key=map_key, runtime_map=runtime_map)
+        + generate_ap_lifecycle_entity(map_key)
+    )
 
 
 def validate_ap_lifecycle_entity(content, map_key):

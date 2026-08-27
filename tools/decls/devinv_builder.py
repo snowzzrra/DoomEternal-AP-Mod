@@ -17,6 +17,8 @@ SOURCE_OWNER = "gameresources"
 SOURCE_PATH = "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl"
 SOURCE_SHA256 = "c68c18750a4267b43d4ffd6e32b67dbed6af1c86099b947ddca9b98f2187a824"
 OUTPUT_MAP_KEY = "e1m1_intro"
+TAG_DEVINV_MANIFEST = Path(__file__).resolve().parents[2] / "data" / "devinv_sources" / "tag_dev_inv_chain.json"
+TAG_DEVINV_DECL_PATH = "generated/decls/devinvloadout/devinvloadout/dlc/{map_key}.decl"
 
 PAGE_STATS_BLOCK = """\t\tstatsToGive = {
 \t\t\tnum = 2;
@@ -105,9 +107,10 @@ FORBIDDEN_MARKERS = frozenset({
 
 COMBAT_SHOTGUN_PATH = "weapon/player/shotgun"
 _STARTING_INVENTORY_RE = re.compile(
-    r"\t\tstartingInventory = \{\n(?P<body>.*?)\n\t\t\}\n\t\tcurrencyToGive = \{",
+    r"\t\tstartingInventory = \{\n(?P<body>.*?)\n\t\t\}",
     re.DOTALL,
 )
+_STARTING_INVENTORY_ANY_RE = _STARTING_INVENTORY_RE
 _ITEM_BLOCK_RE = re.compile(
     r"\t\t\titem\[(?P<index>\d+)\] = \{\n(?P<body>.*?)\n\t\t\t\}",
     re.DOTALL,
@@ -118,6 +121,7 @@ _CURRENCY_BLOCK_RE = re.compile(
     r"\t\tcurrencyToGive = \{\n(?P<body>.*?)\n\t\t\}\n\t\tclearAllBeforeApply",
     re.DOTALL,
 )
+_INHERIT_DECL_RE = re.compile(r"^[ \t]*inherit\s*=\s*[^;]+;\s*\n", re.MULTILINE)
 
 
 def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str, Any]]:
@@ -184,7 +188,7 @@ def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str,
                 raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid fields")
             if (
                 not isinstance(entry["state_family"], str)
-                or entry["replacement"] != "replace_prior_state"
+                or entry["replacement"] != "derived_highest_state_with_targeted_remove"
                 or isinstance(entry["max_quantity"], bool)
                 or not isinstance(entry["max_quantity"], int)
                 or entry["max_quantity"] < 1
@@ -639,6 +643,90 @@ def output_path_for_map(mod_root: Path, registry_path: Path, map_key: str) -> Pa
     except KeyError as error:
         raise ValueError(f"DevInvLoadout map is absent from registry: {map_key}") from error
     return mod_root / Path(resource_path).stem / SOURCE_PATH
+
+
+def build_tag_devinv_overrides(
+    starting_inventory: Mapping[str, int] | None = None,
+    starting_weapon: str | None = None,
+) -> dict[str, str]:
+    """Build exact TAG archive overrides from project-owned declaration inputs."""
+    manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
+    result: dict[str, str] = {}
+    baseline = build_devinv_loadout(starting_inventory, starting_weapon)
+    baseline_inventory = _STARTING_INVENTORY_RE.search(baseline)
+    baseline_currency = _CURRENCY_BLOCK_RE.search(baseline)
+    if baseline_inventory is None or baseline_currency is None:
+        raise ValueError("generated Base DevInv lacks replaceable loadout blocks")
+    baseline_inventory_block = (
+        "\t\tstartingInventory = {\n"
+        + baseline_inventory.group("body")
+        + "\n\t\t}"
+    )
+    baseline_currency_block = (
+        "\t\tcurrencyToGive = {\n"
+        + baseline_currency.group("body")
+        + "\n\t\t}"
+    )
+    for declaration_key, record in manifest["declarations"].items():
+        source_path = Path(__file__).resolve().parents[2] / record["source"]
+        source_bytes = source_path.read_bytes()
+        if hashlib.sha256(source_bytes).hexdigest() != record["sha256"]:
+            raise ValueError(f"TAG DevInv source hash drifted: {declaration_key}")
+        source = source_bytes.decode("utf-8").replace("\r\n", "\n")
+        source_inventory = _STARTING_INVENTORY_ANY_RE.search(source)
+        source_currency = _CURRENCY_BLOCK_RE.search(source)
+        # Preserve declaration framing and unrelated fields; replace only loadout data.
+        if source_inventory is None:
+            edit_start = source.find("\tedit = {\n")
+            edit_end = source.find("\n\t}", edit_start + 1)
+            if edit_start < 0 or edit_end < 0:
+                raise ValueError(f"TAG DevInv source lacks editable loadout block: {declaration_key}")
+            override = (
+                source[: edit_start + len("\tedit = {\n")]
+                + baseline_inventory_block
+                + "\n"
+                + source[edit_start + len("\tedit = {\n") :]
+            )
+        else:
+            override = (
+                source[: source_inventory.start()]
+                + baseline_inventory_block
+                + source[source_inventory.end() :]
+            )
+        source_currency = _CURRENCY_BLOCK_RE.search(override)
+        if source_currency is not None:
+            override = (
+                override[: source_currency.start("body")]
+                + baseline_currency.group("body")
+                + override[source_currency.end("body") :]
+            )
+        inherited_fields = []
+        if "currencyToGive = {" not in override:
+            inherited_fields.append(baseline_currency_block)
+        if "STAT_SUIT_PAGE_UNLOCKED" not in override:
+            inherited_fields.append(PAGE_STATS_BLOCK.rstrip("\n"))
+        if "clearAllBeforeApply = true;" not in override:
+            inherited_fields.append("\t\tclearAllBeforeApply = true;")
+        if inherited_fields:
+            edit_end = override.find("\n\t}", override.find("\tedit = {"))
+            if edit_end < 0:
+                raise ValueError(f"TAG DevInv source has no editable declaration: {declaration_key}")
+            override = (
+                override[:edit_end]
+                + "\n"
+                + "\n".join(inherited_fields)
+                + override[edit_end:]
+            )
+        # Runtime loads one self-contained declaration per archive.  The
+        # extracted inheritance chain is provenance, not a package dependency.
+        override = _INHERIT_DECL_RE.sub("", override)
+        if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
+            raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
+        validate_devinv_source(override, starting_inventory, starting_weapon)
+        archive = Path(record["archive"])
+        map_key = record["map_key"]
+        result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override
+    return result
 
 
 def main() -> None:

@@ -715,7 +715,9 @@ def compile_reconciliation_plan(
             replayed += 1
         elif policy.policy == SPECIAL_PROGRESSIVE:
             definition = definitions[item_id]
-            if not isinstance(definition, Mapping) or definition.get("type") != "progressive_perk":
+            if not isinstance(definition, Mapping) or definition.get("type") not in {
+                "progressive_perk", "progressive_item",
+            }:
                 raise ValueError(f"progressive item {item_id} has an invalid definition")
             perks = definition.get("perks")
             if not isinstance(perks, list) or not perks:

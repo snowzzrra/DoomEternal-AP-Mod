@@ -493,15 +493,15 @@
     },
     "7770145": {
       "name": "Break Blast",
-      "policy": "never_replay"
+      "policy": "replay_manual_only"
     },
     "7770146": {
       "name": "Desperate Punch",
-      "policy": "never_replay"
+      "policy": "replay_manual_only"
     },
     "7770147": {
       "name": "Take Back",
-      "policy": "never_replay"
+      "policy": "replay_manual_only"
     }
   }
 }

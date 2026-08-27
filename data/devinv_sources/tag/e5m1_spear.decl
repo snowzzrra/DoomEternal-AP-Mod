@@ -1,0 +1,45 @@
+{
+	inherit = "devinvloadout/dlc/e4m3_mcity";
+	edit = {
+		startingInventory = {
+			item[37] = {
+				equip = true;
+			}
+			item[38] = {
+				equip = true;
+			}
+			item[39] = {
+				equip = true;
+			}
+			item[40] = {
+				equip = true;
+			}
+			item[41] = {
+				equip = false;
+			}
+			item[42] = {
+				equip = false;
+			}
+			item[43] = {
+				equip = false;
+			}
+			item[44] = {
+				equip = false;
+			}
+			item[45] = {
+				equip = false;
+			}
+		}
+		codexEntriesToGive = {
+			num = 93;
+			item[67] = "codex/hell/dlc2/demon_marauder";
+			item[86] = "codex/tutorials/dlc_spirit";
+			item[87] = "codex/tutorials/dlc_turret";
+			item[88] = "codex/tutorials/dlc_blood_angel";
+			item[89] = "codex/hell/demon_spirit";
+			item[90] = "codex/hell/demon_turret";
+			item[91] = "codex/hell/demon_bloodangel";
+			item[92] = "codex/tutorials/dlc2_support_rune";
+		}
+	}
+}

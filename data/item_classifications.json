@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 6,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "c8a81ceb4853315b4d91de77db47c32dda1d09df3e51522d5621bd3ab6811d47",
+  "source_sha256": "4e8609bae9340692dc401edb5b7a5e834ac6847f85b2fd15276a07fe905743be",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",

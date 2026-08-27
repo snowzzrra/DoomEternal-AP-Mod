@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "contexts": [
+    {"identity": "base/e1m1_intro", "campaign": "Base", "runtime_maps": ["game/sp/e1m1_intro/e1m1_intro"], "map_keys": ["e1m1_intro"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e1m2_war", "campaign": "Base", "runtime_maps": ["game/sp/e1m2_battle/e1m2_battle"], "map_keys": ["e1m2_war"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e1m3_cult", "campaign": "Base", "runtime_maps": ["game/sp/e1m3_cult/e1m3_cult"], "map_keys": ["e1m3_cult"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e1m4_boss", "campaign": "Base", "runtime_maps": ["game/sp/e1m4_boss/e1m4_boss"], "map_keys": ["e1m4_boss"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e2m1_nest", "campaign": "Base", "runtime_maps": ["game/sp/e2m1_nest/e2m1_nest"], "map_keys": ["e2m1_nest"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e2m2_base", "campaign": "Base", "runtime_maps": ["game/sp/e2m2_base/e2m2_base"], "map_keys": ["e2m2_base"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e2m3_core", "campaign": "Base", "runtime_maps": ["game/sp/e2m3_core/e2m3_core"], "map_keys": ["e2m3_core"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e2m4_boss", "campaign": "Base", "runtime_maps": ["game/sp/e2m4_boss/e2m4_boss"], "map_keys": ["e2m4_boss"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e3m1_slayer", "campaign": "Base", "runtime_maps": ["game/sp/e3m1_slayer/e3m1_slayer"], "map_keys": ["e3m1_slayer"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e3m2_hell", "campaign": "Base", "runtime_maps": ["game/sp/e3m2_hell/e3m2_hell"], "map_keys": ["e3m2_hell"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e3m2_hell_b", "campaign": "Base", "runtime_maps": ["game/sp/e3m2_hell_b/e3m2_hell_b"], "map_keys": ["e3m2_hell_b"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e3m3_maykr", "campaign": "Base", "runtime_maps": ["game/sp/e3m3_maykr/e3m3_maykr"], "map_keys": ["e3m3_maykr"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/e3m4_boss", "campaign": "Base", "runtime_maps": ["game/sp/e3m4_boss/e3m4_boss"], "map_keys": ["e3m4_boss"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "base/hub", "campaign": "Base", "runtime_maps": ["game/hub/hub"], "map_keys": ["hub"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1"]},
+    {"identity": "tag1/e4m1_rig", "campaign": "TAG1", "runtime_maps": ["game/dlc/e4m1_rig/e4m1_rig"], "map_keys": ["e4m1_rig"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e4m1_rig/maps/game/dlc/e4m1_rig/e4m1_rig.entities"},
+    {"identity": "tag1/e4m2_swamp", "campaign": "TAG1", "runtime_maps": ["game/dlc/e4m2_swamp/e4m2_swamp"], "map_keys": ["e4m2_swamp"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e4m2_swamp/maps/game/dlc/e4m2_swamp/e4m2_swamp.entities"},
+    {"identity": "tag1/e4m3_mcity", "campaign": "TAG1", "runtime_maps": ["game/dlc/e4m3_mcity/e4m3_mcity"], "map_keys": ["e4m3_mcity"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e4m3_mcity/maps/game/dlc/e4m3_mcity/e4m3_mcity.entities"},
+    {"identity": "tag2/e5m1_spear", "campaign": "TAG2", "runtime_maps": ["game/dlc2/e5m1_spear/e5m1_spear"], "map_keys": ["e5m1_spear"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e5m1_spear/maps/game/dlc2/e5m1_spear/e5m1_spear.entities"},
+    {"identity": "tag2/e5m2_earth", "campaign": "TAG2", "runtime_maps": ["game/dlc2/e5m2_earth/e5m2_earth"], "map_keys": ["e5m2_earth"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e5m2_earth/maps/game/dlc2/e5m2_earth/e5m2_earth.entities"},
+    {"identity": "tag2/e5m3_hell", "campaign": "TAG2", "runtime_maps": ["game/dlc2/e5m3_hell/e5m3_hell"], "map_keys": ["e5m3_hell"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e5m3_hell/maps/game/dlc2/e5m3_hell/e5m3_hell.entities"},
+    {"identity": "arc/hub", "campaign": "ARC", "runtime_maps": ["game/dlc/hub/hub"], "map_keys": ["hub"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "hub/maps/game/dlc/hub/hub.entities"},
+    {"identity": "dark_lord/e5m4_boss", "campaign": "Dark Lord", "runtime_maps": ["game/dlc2/e5m4_boss/e5m4_boss"], "map_keys": ["e5m4_boss"], "capabilities": ["normal_inventory_v1", "special_weapon_v1", "crucible_v1", "support_runes_v1", "tag_special_v1"], "overlay_member": "e5m4_boss/maps/game/dlc2/e5m4_boss/e5m4_boss.entities"}
+  ]
+}

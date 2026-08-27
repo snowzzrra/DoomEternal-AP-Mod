@@ -211,38 +211,42 @@ def validate_support_rune_foundation(
         "Desperate Punch": 7770146,
         "Take Back": 7770147,
     }
+    expected_paths = {
+        7770145: "perk/player/runes/dlc/weakpoint_concussive_blast",
+        7770146: "perk/player/runes/dlc/blood_punch_low_health_bonus_damage",
+        7770147: "perk/player/runes/dlc/extra_life_refund",
+    }
+    try:
+        contracts = read_json(ROOT / "data" / "item_runtime_contracts.json")
+        contract_items = contracts["persistent_ownership"]["items"]
+        policies = read_json(ROOT / "data" / "item_replay_policies.json")["items"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        return [f"Support Rune contract data invalid: {exc}"]
     for name, item_id in expected.items():
         if item_ids.get(name) != item_id:
             errors.append(f"Support Rune identity drifted: {name}={item_ids.get(name)}")
             continue
         definition = commands.get(item_id)
-        if definition != {
-            "type": "no_op",
-            "availability": "unavailable",
-            "description": "Support Rune materialization deferred until 0.5-C",
-            "start_inventory_eligible": False,
-            "requires_dlc": True,
-        }:
-            errors.append(f"Support Rune {item_id} must remain an explicit unavailable foundation")
+        expected_command = expected_paths[item_id]
+        if definition != f"ai_ScriptCmdEnt player1 givePlayerPerk {expected_command}":
+            errors.append(f"Support Rune {item_id} direct perk mapping drifted")
         try:
             plan = compile_item_delivery_plan(item_id, commands, receipt=False)
-            if plan.commands:
-                errors.append(f"Unavailable Support Rune {item_id} generated delivery commands")
+            if not plan.commands:
+                errors.append(f"Support Rune {item_id} generated no native delivery")
         except ValueError as exc:
-            errors.append(f"Unavailable Support Rune {item_id} failed compile probe: {exc}")
-        try:
-            compile_item_delivery_plan(item_id, commands, receipt=True, classification=2)
-        except ValueError:
-            pass
-        else:
-            errors.append(f"Unavailable Support Rune {item_id} accepted receipt delivery")
-
-    try:
-        legal_names = extract_string_set_constant(APWORLD / "items.py", "DEVINV_START_INVENTORY_ITEM_NAMES")
-        if legal_names & set(expected):
-            errors.append("Support Runes entered DevInv start-inventory legality")
-    except (OSError, ValueError, SyntaxError, RuntimeError, AttributeError) as exc:
-        errors.append(f"Support Rune start-inventory legality invalid: {exc}")
+            errors.append(f"Support Rune {item_id} failed compile probe: {exc}")
+        contract = contract_items.get(str(item_id), {})
+        if contract.get("family") != "runes":
+            errors.append(f"Support Rune {item_id} contract family drifted")
+        if contract.get("ownership_primitive") != "devinv_is_rune":
+            errors.append(f"Support Rune {item_id} ownership primitive drifted")
+        if contract.get("runtime_primitive") != "context_deferred":
+            errors.append(f"Support Rune {item_id} context deferral drifted")
+        if contract.get("reconcile") != "tag_context_only":
+            errors.append(f"Support Rune {item_id} context reconciliation drifted")
+        if policies.get(str(item_id), {}).get("policy") != "replay_manual_only":
+            errors.append(f"Support Rune {item_id} replay policy drifted")
     return errors
 
 
@@ -1487,22 +1491,24 @@ def main(argv: list[str] | None = None) -> int:
             command_type = command_value.get("type")
             if command_type == "no_op":
                 continue
-            if command_type == "progressive_perk":
+            if command_type in {"progressive_perk", "progressive_item"}:
                 perks = command_value.get("perks")
+                stage_effects = []
+                if isinstance(perks, list):
+                    for stage in perks:
+                        stage_effects.extend([stage] if isinstance(stage, str) else stage if isinstance(stage, list) else [])
                 if (
                     not isinstance(perks, list)
                     or not perks
                     or not all(
                         isinstance(perk, str)
-                        and (
-                            perk.startswith("perk/player/")
-                            or perk.startswith("weapon/player/")
-                        )
-                        for perk in perks
+                        and (perk.startswith("perk/player/") or perk.startswith("weapon/player/"))
+                        for perk in stage_effects
                     )
+                    or not stage_effects
                 ):
                     errors.append(
-                        f"Progressive perk command {item_id} must define "
+                        f"Progressive command {item_id} must define "
                         "player perk or weapon stages"
                     )
                 if item_id in {7770017, 7770088, 7770092} and (

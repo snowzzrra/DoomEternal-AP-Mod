@@ -34,6 +34,12 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_Count", "inherit": "target/relay", "required_fields": ["count", "targets"], "forbidden_fields": ["commandText", "currencyList", "gameStat"]},
             "targets": ["parameterized"], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "hub", "e1m3_cult"], "allowed_in_release": True, "frozen": True,
         },
+        "physical_pickup_spawn": {
+            "family": "physical_pickup", "status": "static_evidence_only",
+            "source": {"map": "game/sp/e2m2_base/e2m2_base", "container": "e2m2_base.resources", "file": "vanillamaps/e2m2_base.map", "entity": "pickups_target_spawn_onslaught / pickups_pickup_powerup_onslaught_2", "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f"},
+            "shape": {"class": "idTarget_Spawn", "inherit": "target/spawn", "required_fields": ["spawnConditions", "entityDefs", "spawnEditable", "spawnPosition", "targets"], "forbidden_fields": ["commandText", "currencyList", "gameStat"]},
+            "targets": ["parameterized pickup template"], "runtime_verified_maps": [], "repeatability": "unlimited_zero_delay_static_evidence", "allowed_in_release": True, "frozen": False,
+        },
         "fast_travel_unlock": {
             "family": "native_fast_travel", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "fast_travel_target_fast_travel_unlock_1", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
@@ -106,7 +112,7 @@ ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
     "counts": {"items": 124, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
-    "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
+    "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "progressive_item": "target_command", "physical_pickup_spawn": "physical_pickup_spawn", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
         "7770074": {"map": "game/sp/hub/hub", "entity": "ap_independent_pickup_equipment_ice_bomb", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -275,6 +281,79 @@ def build_primitive(
 \t}}
 }}
 '''
+    elif primitive_id == "physical_pickup_spawn":
+        if set(parameters) != {"pickup_entity", "spawn_at"}:
+            raise ValueError("physical_pickup_spawn requires pickup_entity and spawn_at")
+        pickup_entity = parameters["pickup_entity"]
+        spawn_at = parameters["spawn_at"]
+        if not all(
+            isinstance(value, str) and value and value.replace("_", "").isalnum()
+            for value in (pickup_entity, spawn_at)
+        ):
+            raise ValueError("physical_pickup_spawn entity names must be identifiers")
+        block = f'''{header}
+		edit = {{
+			flags = {{
+				noFlood = true;
+			}}
+			spawnConditions = {{
+				maxCount = 0;
+				reuseDelaySec = 0;
+				doBoundsTest = false;
+				boundsTestType = "BOUNDSTEST_NONE";
+				fovCheck = 0;
+				minDistance = 0;
+				maxDistance = 0;
+				neighborSpawnerDistance = -1;
+				LOS_Test = "LOS_NONE";
+				playerToTest = "PLAYER_SP";
+				conditionProxy = "";
+			}}
+			spawnEditableShared = {{
+				groupName = "";
+				deathTrigger = "";
+				coverRadius = 0;
+				maxEnemyCoverDistance = 0;
+			}}
+			entityDefs = {{
+				num = 1;
+				item[0] = {{
+					name = "{pickup_entity}";
+				}}
+			}}
+			conductorEntityAIType = "SPAWN_AI_TYPE_ANY";
+			initialEntityDefs = {{
+				num = 0;
+			}}
+			spawnEditable = {{
+				spawnAt = "{spawn_at}";
+				copyTargets = false;
+				additionalTargets = {{
+					num = 0;
+				}}
+				overwriteTraversalFlags = true;
+				traversalClassFlags = "CLASS_A";
+				combatHintClass = "CLASS_ALL";
+				spawnAnim = "";
+				aiStateOverride = "AIOVERRIDE_DEFAULT";
+				initialTargetOverride = "";
+			}}
+			portal = "";
+			targetSpawnParent = "";
+			disablePooling = false;
+			spawnPosition = {{
+				x = 0;
+				y = 0;
+				z = 0;
+			}}
+			targets = {{
+				num = 1;
+				item[0] = "{pickup_entity}";
+			}}
+		}}
+	}}
+}}
+'''
     elif primitive_id == "currency_grant_direct":
         if set(parameters) != {"currency", "count"}:
             raise ValueError("currency_grant_direct accepts currency and count")
@@ -418,6 +497,8 @@ def classify_item_definition(definition: Any) -> str:
         return {
             "perk": "perk",
             "progressive_perk": "progressive_perk",
+            "progressive_item": "progressive_item",
+            "physical_pickup_spawn": "physical_pickup_spawn",
             "currency": "currency",
             "no_op": "no_op",
         }.get(definition.get("type"), "unknown")
@@ -459,14 +540,24 @@ def compile_item_delivery_plan(
     description: str
     resolved_stage = stage
     prefix = "ap_rpc_v3"
-    if family == "progressive_perk":
+    if family in {"progressive_perk", "progressive_item"}:
         perks = definition.get("perks", [])
         if stage is None:
             raise ValueError(f"Progressive item {item_id} requires a stage")
         if not 0 <= stage < len(perks):
             raise ValueError(f"Progressive stage {stage} exceeds {len(perks)} stages")
-        entities = [f"{prefix}_{item_id}_{stage}"]
-        description = f"stage {stage}: {perks[stage]}"
+        stage_effects = perks[stage]
+        if isinstance(stage_effects, str):
+            stage_effects = [stage_effects]
+        if not isinstance(stage_effects, list) or not stage_effects or any(not isinstance(effect, str) for effect in stage_effects):
+            raise ValueError(f"Progressive item {item_id} has invalid stage effects")
+        entities = [
+            f"{prefix}_{item_id}_{stage}"
+            if isinstance(perks[stage], str)
+            else f"{prefix}_{item_id}_{stage}_{index}"
+            for index in range(len(stage_effects))
+        ]
+        description = f"stage {stage}: " + " -> ".join(stage_effects)
     elif family == "multi_command":
         if not definition:
             raise ValueError("mapping list is empty")
@@ -512,7 +603,7 @@ def compile_item_delivery_plan(
 def compile_all_item_plans(definitions: dict[int, Any]) -> list[DeliveryPlan]:
     plans = []
     for item_id, definition in sorted(definitions.items()):
-        stage = 0 if classify_item_definition(definition) == "progressive_perk" else None
+        stage = 0 if classify_item_definition(definition) in {"progressive_perk", "progressive_item"} else None
         plans.append(compile_item_delivery_plan(item_id, definitions, stage=stage))
     return plans
 

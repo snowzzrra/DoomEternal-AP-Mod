@@ -35,6 +35,10 @@
       "label": "Blood Punch"
     },
     {
+      "name": "Break Blast",
+      "label": "Break Blast"
+    },
+    {
       "name": "Chaingun",
       "label": "Chaingun"
     },
@@ -61,6 +65,10 @@
     {
       "name": "Dazed and Confused",
       "label": "Dazed and Confused"
+    },
+    {
+      "name": "Desperate Punch",
+      "label": "Desperate Punch"
     },
     {
       "name": "Destroyer Blade",
@@ -309,6 +317,10 @@
     {
       "name": "Super Shotgun",
       "label": "Super Shotgun"
+    },
+    {
+      "name": "Take Back",
+      "label": "Take Back"
     },
     {
       "name": "The Crucible",

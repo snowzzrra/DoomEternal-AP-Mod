@@ -15,6 +15,8 @@ from pathlib import Path
 
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot
 from .launcher_platform import (
+    IDFILE_DECOMPRESSOR_LINUX,
+    IDFILE_DECOMPRESSOR_WINDOWS,
     LINUX_MOD_INJECTOR,
     WINDOWS_MOD_INJECTOR,
     AdapterResult,
@@ -26,6 +28,7 @@ from .launcher_platform import (
     cleanup_stale_doom_config_bind,
     detect_doom_processes,
     install_meathook,
+    idfile_decompressor_spec,
     probe_meathook,
     probe_runtime_prerequisites,
     stage_room_mod,
@@ -41,6 +44,10 @@ ROOM_PACKAGE_FAILURE_MESSAGE = (
     "Rebuild the room package and try again."
 )
 ROOM_PACKAGE_FAILURE_ACTION = "REBUILD ROOM PACKAGE"
+MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE = (
+    "A required mod-building tool could not be prepared. "
+    "Check your connection and try rebuilding the Room Package."
+)
 GAME_SETUP_FAILURE_TITLE = "GAME SETUP NEEDS ATTENTION"
 GAME_SETUP_FAILURE_MESSAGE = (
     "Game setup could not be completed. Repair game integration and try again."
@@ -83,6 +90,8 @@ def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
         "release package",
         "assembled room",
         "location id",
+        "idfiledecompressor",
+        "mod-building tool",
     )
     if any(token in text for token in room_tokens):
         return "room_package"
@@ -93,6 +102,10 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
     """Return user routing metadata alongside untouched technical failure data."""
     raw_message = str(error) or type(error).__name__
     failure_domain = classify_setup_failure(error, phase=phase)
+    tool_unavailable = (
+        "idfiledecompressor" in raw_message.casefold()
+        or "mod-building tool" in raw_message.casefold()
+    )
     if failure_domain == "room_package":
         recovery_action = "rebuild_room_package"
         incompatible_tokens = (
@@ -106,6 +119,10 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
             user_title = ROOM_PACKAGE_INCOMPATIBLE_TITLE
             user_message = ROOM_PACKAGE_INCOMPATIBLE_MESSAGE
             user_action = ROOM_PACKAGE_INCOMPATIBLE_ACTION
+        elif tool_unavailable:
+            user_title = ROOM_PACKAGE_FAILURE_TITLE
+            user_message = MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE
+            user_action = ROOM_PACKAGE_FAILURE_ACTION
         else:
             user_title = ROOM_PACKAGE_FAILURE_TITLE
             user_message = ROOM_PACKAGE_FAILURE_MESSAGE
@@ -192,6 +209,7 @@ class IntegratedLaunchWorkflow:
         state_dir: Path,
         config_path: Path,
         *,
+        data_dir: Path | None = None,
         platform_name: str | None = None,
         event_sink: EventSink | None = None,
         consent: ConsentCallback | None = None,
@@ -201,6 +219,7 @@ class IntegratedLaunchWorkflow:
         self.base_workflow = LaunchWorkflow()
         self.application_dir = application_dir
         self.state_dir = state_dir
+        self.data_dir = data_dir or state_dir.parent / "data"
         self.config_path = config_path
         self.platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
         self.event_sink = event_sink or (lambda _kind, _payload: None)
@@ -282,6 +301,46 @@ class IntegratedLaunchWorkflow:
             executable=installed.executable,
         )
         return installed
+
+    def _idfile_manager(self) -> DependencyManager:
+        manager = DependencyManager(
+            self.data_dir / "dependencies",
+            diagnostic_sink=lambda kind, payload: self._emit(kind, **payload),
+        )
+        spec = idfile_decompressor_spec(self.platform_name)
+        if spec is None or not manager.platform_supported(spec, self.platform_name):
+            message = (
+                f"idFileDeCompressor is unavailable on unsupported platform "
+                f"{self.platform_name}; no pinned codec artifact is available"
+            )
+            self._emit(
+                "prerequisite_missing",
+                key="idfile_decompressor",
+                message=message,
+                details={
+                    "status": "unsupported",
+                    "platform": self.platform_name,
+                    "supported_platforms": ["linux", "windows"],
+                },
+            )
+            raise RuntimeError(message)
+        return manager
+
+    def repair_idfile_decompressor(self):
+        """Acquire selected verified codec after explicit repair consent."""
+        spec = idfile_decompressor_spec(self.platform_name)
+        manager = self._idfile_manager()
+        if spec is None:
+            raise RuntimeError(f"idFileDeCompressor is unavailable on platform {self.platform_name}")
+        return self._acquire(manager, spec, None)
+
+    def remove_idfile_decompressor(self) -> bool:
+        """Remove only launcher-owned cached codec artifact."""
+        manager = DependencyManager(self.data_dir / "dependencies")
+        removed = False
+        for spec in (IDFILE_DECOMPRESSOR_LINUX, IDFILE_DECOMPRESSOR_WINDOWS):
+            removed = manager.remove(spec) or removed
+        return removed
 
     def install_state(self, snapshot: RoomSnapshot) -> InstallState:
         """Resolve current room identity against verified launcher ownership."""
@@ -644,10 +703,13 @@ class IntegratedLaunchWorkflow:
             "mod_building",
             randomize_dash=manifest.options["randomize_dash"],
         )
+        decompressor_manager = self._idfile_manager()
         generated = RoomCompiler(
             self.application_dir / "resources" / "base_mod.zip",
             self.application_dir / "resources" / "room_payloads.zip",
             self.application_dir / "resources" / "room_payload_manifest.json",
+            dependency_manager=decompressor_manager,
+            consent=self.consent,
         ).build(
             manifest,
             self.state_dir / "generated_mods",

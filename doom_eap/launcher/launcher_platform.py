@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from contextlib import contextmanager
 import difflib
 import hashlib
 import json
@@ -58,7 +59,13 @@ class LauncherUserPaths:
 
 
 class DownloadTransport(Protocol):
-    def fetch(self, url: str, destination: Path) -> None: ...
+    def fetch(self, url: str, destination: Path) -> "DownloadResult | None": ...
+
+
+@dataclass(frozen=True)
+class DownloadResult:
+    final_url: str
+    content_length: int | None
 
 
 def is_transient_download_error(exc: Exception) -> bool:
@@ -92,7 +99,7 @@ class UrlDownloadTransport:
         self.max_retries = max(0, max_retries)
         self.backoff_base = max(0.0, backoff_base)
 
-    def fetch(self, url: str, destination: Path) -> None:
+    def fetch(self, url: str, destination: Path) -> DownloadResult:
         total_attempts = self.max_retries + 1
         for attempt in range(1, total_attempts + 1):
             try:
@@ -106,7 +113,14 @@ class UrlDownloadTransport:
                     context=self.ssl_context,
                 ) as response, destination.open("wb") as output:
                     shutil.copyfileobj(response, output)
-                return
+                    headers = getattr(response, "headers", None)
+                    raw_length = headers.get("Content-Length") if headers is not None and hasattr(headers, "get") else None
+                    try:
+                        content_length = int(raw_length) if raw_length is not None else None
+                    except ValueError:
+                        content_length = None
+                    final_url = response.geturl() if hasattr(response, "geturl") else url
+                    return DownloadResult(final_url, content_length)
             except Exception as error:
                 if destination.exists():
                     try:
@@ -117,6 +131,7 @@ class UrlDownloadTransport:
                     time.sleep(self.backoff_base * (2 ** (attempt - 1)))
                     continue
                 raise
+        raise RuntimeError("download attempts exhausted")
 
 
 def launcher_user_paths(
@@ -461,6 +476,9 @@ class DependencySpec:
     sha256: str
     executable_glob: str
     archive_type: str
+    commit: str = ""
+    platforms: frozenset[str] = frozenset()
+    expected_size: int | None = None
 
 
 WINDOWS_INJECTOR_REQUIRED_MEMBERS: tuple[str, ...] = (
@@ -510,6 +528,44 @@ MEATHOOK = DependencySpec(
     executable_glob="XINPUT1_3.dll",
     archive_type="file",
 )
+
+IDFILE_DECOMPRESSOR_LINUX = DependencySpec(
+    name="idFileDeCompressor",
+    version="v1.0.1",
+    url="https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/idFileDeCompressor",
+    sha256="8bd14670fdb5a47533c5a59e9b6e1e32eaa3f06ce8b7ad2b4a8df520348b9ab8",
+    executable_glob="idFileDeCompressor",
+    archive_type="file",
+    commit="67cd82781edd0595b0513707907ab63cdaa2691a",
+    platforms=frozenset({"linux"}),
+    expected_size=946404,
+)
+
+IDFILE_DECOMPRESSOR_WINDOWS = DependencySpec(
+    name="idFileDeCompressor",
+    version="v1.0.1",
+    url="https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/idFileDeCompressor.exe",
+    sha256="02488dfb2999542cee4b7c0713ec03dd534ddd876169aac43b0217b362427a06",
+    executable_glob="idFileDeCompressor.exe",
+    archive_type="file",
+    commit="67cd82781edd0595b0513707907ab63cdaa2691a",
+    platforms=frozenset({"windows"}),
+    expected_size=877056,
+)
+
+
+def idfile_decompressor_spec(platform_name: str | None = None) -> DependencySpec | None:
+    selected = (platform_name or (
+        "windows" if os.name == "nt" else "linux" if sys.platform.startswith("linux") else sys.platform
+    )).casefold()
+    if selected == "linux":
+        return IDFILE_DECOMPRESSOR_LINUX
+    if selected == "windows":
+        return IDFILE_DECOMPRESSOR_WINDOWS
+    return None
+
+
+IDFILE_DECOMPRESSOR = idfile_decompressor_spec() or IDFILE_DECOMPRESSOR_LINUX
 
 
 @dataclass(frozen=True)
@@ -639,6 +695,7 @@ class InstalledDependency:
     source_url: str
     root: str
     executable: str
+    commit: str = ""
 
 
 class DependencyManager:
@@ -646,9 +703,99 @@ class DependencyManager:
 
     RECEIPT = "dependency.json"
 
-    def __init__(self, root: Path, transport: DownloadTransport | None = None):
+    def __init__(
+        self,
+        root: Path,
+        transport: DownloadTransport | None = None,
+        diagnostic_sink: Callable[[str, dict[str, object]], None] | None = None,
+    ):
         self.root = root
         self.transport = transport or UrlDownloadTransport()
+        self.diagnostic_sink = diagnostic_sink
+
+    @staticmethod
+    def current_platform_name() -> str:
+        if os.name == "nt":
+            return "windows"
+        if sys.platform.startswith("linux"):
+            return "linux"
+        return sys.platform.casefold()
+
+    _platform_name = current_platform_name
+
+    def platform_supported(self, spec: DependencySpec, platform_name: str | None = None) -> bool:
+        selected = (platform_name or self._platform_name()).casefold()
+        return not spec.platforms or selected in spec.platforms
+
+    @staticmethod
+    def _cache_key(spec: DependencySpec) -> str:
+        platform = "+".join(sorted(spec.platforms)) or "any"
+        return f"{spec.name}-{platform}-{spec.version}-{spec.sha256}"
+
+    def _destination(self, spec: DependencySpec) -> Path:
+        return self.root / self._cache_key(spec)
+
+    def _legacy_destination(self, spec: DependencySpec) -> Path:
+        return self.root / f"{spec.name}-{spec.version}"
+
+    def _acquisition_path(self, spec: DependencySpec) -> Path:
+        return self.root / f".{self._cache_key(spec)}.last-acquisition.json"
+
+    def _record_acquisition(self, spec: DependencySpec, state: str, **details: object) -> None:
+        payload: dict[str, object] = {
+            "name": spec.name,
+            "version": spec.version,
+            "platform": self._platform_name(),
+            "state": state,
+            "source_url": spec.url,
+            "expected_size": spec.expected_size,
+            "expected_sha256": spec.sha256,
+            **details,
+        }
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+            destination = self._acquisition_path(spec)
+            temporary = destination.with_suffix(".tmp")
+            temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, destination)
+        except OSError:
+            pass
+        if self.diagnostic_sink is not None:
+            self.diagnostic_sink("dependency_diagnostic", payload)
+
+    def last_acquisition(self, spec: DependencySpec) -> dict[str, object] | None:
+        try:
+            document = json.loads(self._acquisition_path(spec).read_text(encoding="utf-8"))
+            return document if isinstance(document, dict) else None
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    @contextmanager
+    def _cache_lock(self, spec: DependencySpec):
+        """Serialize cache inspection and publication across launcher processes."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        lock_path = self.root / f".{self._cache_key(spec)}.lock"
+        with lock_path.open("a+b") as lock:
+            if os.name == "nt":
+                import msvcrt
+
+                lock.seek(0)
+                lock.write(b"0")
+                lock.flush()
+                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    lock.seek(0)
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -694,25 +841,139 @@ class DependencyManager:
         else:
             raise ValueError(f"unsupported archive type: {spec.archive_type}")
 
-    def _installed(self, spec: DependencySpec, destination: Path) -> InstalledDependency | None:
+    @classmethod
+    def is_contained(cls, candidate: Path | str, root: Path | str) -> bool:
+        """Verify candidate physically resides inside root after canonical resolution."""
+        try:
+            canonical_candidate = Path(candidate).resolve()
+            canonical_root = Path(root).resolve()
+            if canonical_candidate == canonical_root:
+                return False
+            canonical_candidate.relative_to(canonical_root)
+            return True
+        except (ValueError, OSError, RuntimeError):
+            return False
+
+    is_contained_within = is_contained
+    is_contained_in = is_contained
+
+    @classmethod
+    def contains_path(cls, root: Path | str, candidate: Path | str) -> bool:
+        return cls.is_contained(candidate, root)
+
+    def _installed_with_reason(self, spec: DependencySpec, destination: Path) -> tuple[InstalledDependency | None, str]:
         receipt_path = destination / self.RECEIPT
         if not receipt_path.is_file():
-            return None
+            return None, "receipt_missing"
         try:
             receipt = InstalledDependency(**json.loads(receipt_path.read_text(encoding="utf-8")))
             executable = Path(receipt.executable)
-            if (
-                receipt.name == spec.name
-                and receipt.version == spec.version
-                and receipt.artifact_sha256 == spec.sha256
-                and executable.is_file()
-                and executable.is_relative_to(destination)
-                and (spec.archive_type != "file" or self._sha256(executable) == spec.sha256)
-            ):
-                return receipt
         except Exception:
+            return None, "receipt_invalid"
+        if receipt.name != spec.name:
+            return None, "receipt_name_mismatch"
+        if receipt.version != spec.version:
+            return None, "receipt_version_mismatch"
+        if receipt.artifact_sha256 != spec.sha256:
+            return None, "receipt_sha256_mismatch"
+        if spec.commit and receipt.commit not in {"", spec.commit}:
+            return None, "receipt_commit_mismatch"
+        if Path(receipt.root).resolve() != destination.resolve():
+            return None, "receipt_root_mismatch"
+        if not executable.is_file():
+            return None, "executable_missing"
+        if not self.is_contained(executable, destination):
+            return None, "executable_outside_cache"
+        if spec.archive_type == "file" and self._sha256(executable) != spec.sha256:
+            return None, "cached_sha256_mismatch"
+        if os.name != "nt" and not os.access(executable, os.X_OK):
+            return None, "executable_not_permitted"
+        return receipt, "verified"
+
+    def _installed(self, spec: DependencySpec, destination: Path) -> InstalledDependency | None:
+        return self._installed_with_reason(spec, destination)[0]
+
+    def cache_diagnostics(self, spec: DependencySpec) -> dict[str, object]:
+        destination = self._destination(spec)
+        installed, reason = self._installed_with_reason(spec, destination)
+        if installed is not None:
+            executable = Path(installed.executable)
+        else:
+            executable = destination / spec.executable_glob
+            receipt_path = destination / self.RECEIPT
+            if receipt_path.is_file():
+                try:
+                    payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+                    if isinstance(payload, dict) and isinstance(payload.get("executable"), str):
+                        executable = Path(payload["executable"])
+                except Exception:
+                    pass
+        canonical_destination = destination.resolve()
+        canonical_executable = executable.resolve()
+        details: dict[str, object] = {
+            "cache_path": str(executable),
+            "cache_path_display": str(executable),
+            "cache_path_canonical": str(canonical_executable),
+            "cache_root_display": str(destination),
+            "cache_root_canonical": str(canonical_destination),
+            "executable_display": str(executable),
+            "executable_canonical": str(canonical_executable),
+            "executable_path": str(executable),
+            "executable_path_canonical": str(canonical_executable),
+            "containment": self.is_contained(executable, destination),
+            "cache_exists": executable.is_file(),
+            "cached_size": None,
+            "cached_sha256": None,
+            "hash_valid": False,
+            "mode": None,
+            "executable": False,
+            "verification_stage": reason,
+        }
+        if executable.is_file():
+            stat_result = executable.stat()
+            details.update({
+                "cached_size": stat_result.st_size,
+                "cached_sha256": self._sha256(executable),
+                "hash_valid": self._sha256(executable) == spec.sha256,
+                "mode": oct(stat_result.st_mode & 0o777),
+                "executable": os.access(executable, os.X_OK),
+            })
+        if installed is not None:
+            details["status"] = "verified"
+        else:
+            details["status"] = "missing_or_invalid"
+        last = self.last_acquisition(spec)
+        if last is not None:
+            details["last_acquisition"] = last
+        return details
+
+    def inspect(self, spec: DependencySpec) -> InstalledDependency | None:
+        """Return dependency only when cache receipt and artifact remain verified."""
+        if not self.platform_supported(spec):
             return None
-        return None
+        with self._cache_lock(spec):
+            destination = self._destination(spec)
+            installed = self._installed(spec, destination)
+            if installed is not None:
+                return installed
+            legacy = self._installed(spec, self._legacy_destination(spec))
+            if legacy is None:
+                return None
+            self._promote_legacy(spec, legacy)
+            return self._installed(spec, destination)
+
+    def _promote_legacy(self, spec: DependencySpec, installed: InstalledDependency) -> None:
+        legacy = self._legacy_destination(spec)
+        destination = self._destination(spec)
+        relative_executable = Path(installed.executable).resolve().relative_to(legacy.resolve())
+        receipt_path = legacy / self.RECEIPT
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["root"] = str(destination.resolve())
+        receipt["executable"] = str((destination / relative_executable).resolve())
+        incoming_receipt = legacy / f".{self.RECEIPT}.incoming"
+        incoming_receipt.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(incoming_receipt, receipt_path)
+        os.replace(legacy, destination)
 
     def acquire(
         self,
@@ -720,58 +981,171 @@ class DependencyManager:
         *,
         consent: Callable[[DependencySpec], bool],
         local_artifact: Path | None = None,
+        platform_name: str | None = None,
     ) -> InstalledDependency:
-        destination = self.root / f"{spec.name}-{spec.version}"
-        installed = self._installed(spec, destination)
-        if installed is not None:
-            return installed
-        if local_artifact is None and not consent(spec):
-            raise PermissionError(f"dependency acquisition declined: {spec.name}")
+        if not self.platform_supported(spec, platform_name):
+            selected = platform_name or self._platform_name()
+            raise RuntimeError(f"dependency {spec.name} is unsupported on platform {selected}")
+        destination = self._destination(spec)
+        with self._cache_lock(spec):
+            installed = self._installed(spec, destination)
+            if installed is not None:
+                self._record_acquisition(spec, "cache_hit", cache_path=str(installed.executable))
+                return installed
+            legacy = self._installed(spec, self._legacy_destination(spec))
+            if legacy is not None:
+                self._promote_legacy(spec, legacy)
+                installed = self._installed(spec, destination)
+                if installed is not None:
+                    self._record_acquisition(spec, "cache_hit", cache_path=str(installed.executable))
+                    return installed
+            self._record_acquisition(spec, "cache_miss", cache_path=str(destination))
+            if local_artifact is None and not consent(spec):
+                self._record_acquisition(spec, "declined", failure_reason="consent_declined")
+                raise PermissionError(f"dependency acquisition declined: {spec.name}")
 
-        self.root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix=f".{spec.name}-", dir=self.root) as temporary_name:
-            temporary = Path(temporary_name)
-            archive = temporary / "artifact"
-            if local_artifact is None:
-                self.transport.fetch(spec.url, archive)
-            else:
-                if not local_artifact.is_file():
-                    raise FileNotFoundError(local_artifact)
-                shutil.copy2(local_artifact, archive)
-            actual = self._sha256(archive)
-            if actual != spec.sha256:
-                raise ValueError(f"SHA-256 mismatch for {spec.name}: expected {spec.sha256}, got {actual}")
+            with tempfile.TemporaryDirectory(prefix=f".{spec.name}-", dir=self.root) as temporary_name:
+                temporary = Path(temporary_name)
+                archive = temporary / "artifact"
+                if local_artifact is None:
+                    try:
+                        download = self.transport.fetch(spec.url, archive)
+                    except Exception as error:
+                        self._record_acquisition(
+                            spec, "failed", verification_stage="transport",
+                            failure_reason=f"{type(error).__name__}: {error}", final_url=spec.url,
+                        )
+                        raise
+                    final_url = download.final_url if download is not None else spec.url
+                    content_length = download.content_length if download is not None else None
+                else:
+                    if not local_artifact.is_file():
+                        raise FileNotFoundError(local_artifact)
+                    shutil.copy2(local_artifact, archive)
+                    final_url = str(local_artifact.resolve())
+                    content_length = archive.stat().st_size
+                actual = self._sha256(archive)
+                actual_size = archive.stat().st_size
+                self._record_acquisition(
+                    spec,
+                    "downloaded",
+                    final_url=final_url,
+                    content_length=content_length,
+                    actual_download_size=actual_size,
+                    actual_download_sha256=actual,
+                )
+                if spec.expected_size is not None and actual_size != spec.expected_size:
+                    self._record_acquisition(
+                        spec, "failed", verification_stage="download_size",
+                        failure_reason="download_size_mismatch", actual_download_size=actual_size,
+                        actual_download_sha256=actual, final_url=final_url,
+                    )
+                    raise ValueError(f"size mismatch for {spec.name}: expected {spec.expected_size}, got {actual_size}")
+                if actual != spec.sha256:
+                    self._record_acquisition(
+                        spec, "failed", verification_stage="download_sha256",
+                        failure_reason="download_sha256_mismatch", actual_download_size=actual_size,
+                        actual_download_sha256=actual, final_url=final_url,
+                    )
+                    raise ValueError(f"SHA-256 mismatch for {spec.name}: expected {spec.sha256}, got {actual}")
 
-            extracted = temporary / "extracted"
-            extracted.mkdir()
-            self._extract(spec, archive, extracted)
-            executables = sorted(extracted.glob(spec.executable_glob))
-            if len(executables) != 1:
-                raise ValueError(f"expected one {spec.executable_glob}, found {len(executables)}")
-            executable_relative = executables[0].relative_to(extracted)
-            if spec.archive_type != "file":
-                executables[0].chmod(executables[0].stat().st_mode | 0o100)
+                extracted = temporary / "extracted"
+                extracted.mkdir()
+                self._extract(spec, archive, extracted)
+                executables = sorted(extracted.glob(spec.executable_glob))
+                if len(executables) != 1:
+                    raise ValueError(f"expected one {spec.executable_glob}, found {len(executables)}")
+                executable_relative = executables[0].relative_to(extracted)
+                if os.name != "nt":
+                    executables[0].chmod(executables[0].stat().st_mode | 0o100)
 
-            staged = self.root / f".{spec.name}-{spec.version}.incoming"
-            shutil.rmtree(staged, ignore_errors=True)
-            shutil.copytree(extracted, staged)
-            receipt = InstalledDependency(
-                name=spec.name,
-                version=spec.version,
-                artifact_sha256=actual,
-                source_url=spec.url if local_artifact is None else str(local_artifact.resolve()),
-                root=str(destination.resolve()),
-                executable=str((destination / executable_relative).resolve()),
-            )
-            (staged / self.RECEIPT).write_text(
-                json.dumps(asdict(receipt), indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            shutil.rmtree(destination, ignore_errors=True)
-            os.replace(staged, destination)
-            if not Path(receipt.executable).is_file():
-                raise RuntimeError("dependency installation failed")
-            return receipt
+                staged = self.root / f".{self._cache_key(spec)}.incoming"
+                shutil.rmtree(staged, ignore_errors=True)
+                shutil.copytree(extracted, staged)
+                receipt = InstalledDependency(
+                    name=spec.name,
+                    version=spec.version,
+                    artifact_sha256=actual,
+                    source_url=spec.url if local_artifact is None else str(local_artifact.resolve()),
+                    root=str(destination.resolve()),
+                    executable=str((destination / executable_relative).resolve()),
+                    commit=spec.commit,
+                )
+                (staged / self.RECEIPT).write_text(
+                    json.dumps(asdict(receipt), indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                previous = self.root / f".{self._cache_key(spec)}.previous"
+                if previous.exists():
+                    if previous.is_dir() and not previous.is_symlink():
+                        shutil.rmtree(previous)
+                    else:
+                        previous.unlink()
+                if destination.exists():
+                    os.replace(destination, previous)
+                try:
+                    os.replace(staged, destination)
+                except Exception:
+                    if previous.exists() and not destination.exists():
+                        os.replace(previous, destination)
+                    raise
+                if previous.exists():
+                    shutil.rmtree(previous) if previous.is_dir() else previous.unlink()
+                if not Path(receipt.executable).is_file():
+                    raise RuntimeError("dependency installation failed")
+                verified = self._installed(spec, destination)
+                if verified is None:
+                    _, reason = self._installed_with_reason(spec, destination)
+                    self._record_acquisition(
+                        spec,
+                        "failed",
+                        verification_stage="post_publish",
+                        failure_reason=reason,
+                        cache_path=str(receipt.executable),
+                        cache_root_display=str(destination),
+                        cache_root_canonical=str(destination.resolve()),
+                        executable_display=str(receipt.executable),
+                        executable_canonical=str(Path(receipt.executable).resolve()),
+                        containment=self.is_contained(Path(receipt.executable), destination),
+                    )
+                    raise RuntimeError(f"dependency installation failed verification: {reason}")
+                executable = Path(verified.executable)
+                self._record_acquisition(
+                    spec, "published", verification_stage="post_publish",
+                    cache_path=str(executable), cached_size=executable.stat().st_size,
+                    cached_sha256=self._sha256(executable), mode=oct(executable.stat().st_mode & 0o777),
+                    executable=os.access(executable, os.X_OK), final_url=final_url,
+                    content_length=content_length, actual_download_size=actual_size,
+                    actual_download_sha256=actual,
+                )
+                return verified
+
+    @staticmethod
+    def _remove_path(path: Path) -> None:
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        elif path.exists() or path.is_symlink():
+            path.unlink()
+
+    def remove(self, spec: DependencySpec) -> bool:
+        """Remove hashed and legacy cache entries owned by dependency spec."""
+        with self._cache_lock(spec):
+            removed = False
+            for destination in (self._destination(spec), self._legacy_destination(spec)):
+                if destination.exists() or destination.is_symlink():
+                    self._remove_path(destination)
+                    removed = True
+            return removed
+
+    def cache_present(self, spec: DependencySpec) -> bool:
+        return any(
+            path.exists() or path.is_symlink()
+            for path in (self._destination(spec), self._legacy_destination(spec))
+        )
+
+
+is_contained = DependencyManager.is_contained
+is_contained_within = DependencyManager.is_contained
 
 
 @dataclass(frozen=True)
