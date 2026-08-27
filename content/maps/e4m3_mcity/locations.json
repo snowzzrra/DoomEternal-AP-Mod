@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "entities": {
+    "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770444,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770445,
+    "AP_CHECK_GAME_PROGRESS_CODEX_2": 7770446,
+    "AP_CHECK_GAME_PROGRESS_CODEX_3": 7770448,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770449,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B": 7770450,
+    "AP_CHECK_SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770451,
+    "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY": 7770452,
+    "AP_CHECK_GAME_PROGRESS_CODEX_4": 7770453,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770454,
+    "AP_CHECK_GAME_PROGRESS_CODEX_5": 7770456
+  },
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M3_1",
+      "location_id": 7770447,
+      "manager": "forest_glade_encounter_manager_extralife_01_e4m1",
+      "after_event_index": 8,
+      "automap_owner": "automap_info_null_extra_life_encounter_1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M3_2",
+      "location_id": 7770455,
+      "manager": "bridge_encounter_manager_extralife_02_e4m1",
+      "after_event_index": 6,
+      "automap_owner": "automap_info_null_extra_life_encounter_2"
+    }
+  ],
+  "names": {
+    "7770444": "The Holt - The Holt Codex",
+    "7770445": "The Holt - Extra Life - Floating Island Arch",
+    "7770446": "The Holt - Book of the Seraphs - Part V Codex",
+    "7770447": "The Holt - Secret Encounter - Crimson Glade Ruins",
+    "7770448": "The Holt - Book of the Seraphs - Part VI Codex",
+    "7770449": "The Holt - Extra Life - Maykr Canopy Perch 1",
+    "7770450": "The Holt - Extra Life - Maykr Canopy Perch 2",
+    "7770451": "The Holt - Slayer Key - Floating Platform Perch",
+    "7770452": "The Holt - Slayer Gate Complete",
+    "7770453": "The Holt - Book of the Seraphs - Part VII Codex",
+    "7770454": "The Holt - Extra Life - Ivory Colonnade Crypt",
+    "7770455": "The Holt - Secret Encounter - Ivory Bridge Alcove",
+    "7770456": "The Holt - Book of the Seraphs - Part VIII Codex"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  }
+}

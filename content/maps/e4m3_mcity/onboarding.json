@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e4m3_mcity",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e4m3_mcity.map",
+    "size": 11650133,
+    "sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904"
+  },
+  "owner": {
+    "resource": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+    "priority": 56
+  }
+}

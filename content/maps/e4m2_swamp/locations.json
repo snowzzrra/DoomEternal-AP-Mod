@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "entities": {
+    "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_1": 7770433,
+    "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_4": 7770434,
+    "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3": 7770435,
+    "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_2": 7770437,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_SWAMP_1": 7770438,
+    "AP_CHECK_DESOLATE_CAVERN_PROGRESS_SUPPORT_RUNE_1": 7770439,
+    "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_7": 7770441,
+    "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770442
+  },
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M2_1",
+      "location_id": 7770436,
+      "manager": "ai_encounter_manager_dlc1_1",
+      "after_event_index": 14,
+      "automap_owner": "automap_info_null_extra_life_encounter_1"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M2_2",
+      "location_id": 7770440,
+      "manager": "ai_encounter_manager_dlc1_2",
+      "after_event_index": 13,
+      "automap_owner": "automap_info_null_extra_life_encounter_2"
+    }
+  ],
+  "names": {
+    "7770433": "The Blood Swamps - The Blood Swamps Codex",
+    "7770434": "The Blood Swamps - Book of the Seraphs - Part II Codex",
+    "7770435": "The Blood Swamps - Extra Life - Sunken Courtyard Crypt",
+    "7770436": "The Blood Swamps - Secret Encounter - Fog Chasm Arena",
+    "7770437": "The Blood Swamps - Book of the Seraphs - Part III Codex",
+    "7770438": "The Blood Swamps - Extra Life - Misty Island Pier",
+    "7770439": "The Blood Swamps - Support Rune - Desolate Cavern",
+    "7770440": "The Blood Swamps - Secret Encounter - Toxic Mire Tree",
+    "7770441": "The Blood Swamps - Book of the Seraphs - Part IV Codex",
+    "7770442": "The Blood Swamps - Extra Life - Castle Keep Catacombs"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  }
+}

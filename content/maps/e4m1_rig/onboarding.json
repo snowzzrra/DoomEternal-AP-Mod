@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e4m1_rig",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e4m1_rig.map",
+    "size": 13054609,
+    "sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62"
+  },
+  "owner": {
+    "resource": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+    "priority": 14
+  }
+}

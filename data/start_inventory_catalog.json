@@ -23,6 +23,10 @@
       "label": "Arbalest Mastery"
     },
     {
+      "name": "ARC Complex Slayer Gate Key",
+      "label": "ARC Complex Slayer Gate Key"
+    },
+    {
       "name": "Ballista",
       "label": "Ballista"
     },
@@ -53,6 +57,10 @@
     {
       "name": "Combat Shotgun",
       "label": "Combat Shotgun"
+    },
+    {
+      "name": "Cultist Base Slayer Gate Key",
+      "label": "Cultist Base Slayer Gate Key"
     },
     {
       "name": "Dash",
@@ -93,6 +101,10 @@
     {
       "name": "Extended Ice Bomb Duration",
       "label": "Extended Ice Bomb Duration"
+    },
+    {
+      "name": "Exultia Slayer Gate Key",
+      "label": "Exultia Slayer Gate Key"
     },
     {
       "name": "Faster Dash Recharge",
@@ -173,6 +185,10 @@
     {
       "name": "Lock-on Burst Mastery",
       "label": "Lock-on Burst Mastery"
+    },
+    {
+      "name": "Mars Core Slayer Gate Key",
+      "label": "Mars Core Slayer Gate Key"
     },
     {
       "name": "Meat Hook",
@@ -315,6 +331,10 @@
       "label": "Sticky Bombs Mastery"
     },
     {
+      "name": "Super Gore Nest Slayer Gate Key",
+      "label": "Super Gore Nest Slayer Gate Key"
+    },
+    {
       "name": "Super Shotgun",
       "label": "Super Shotgun"
     },
@@ -323,8 +343,20 @@
       "label": "Take Back"
     },
     {
+      "name": "Taras Nabad Slayer Gate Key",
+      "label": "Taras Nabad Slayer Gate Key"
+    },
+    {
       "name": "The Crucible",
       "label": "The Crucible"
+    },
+    {
+      "name": "The Holt Slayer Gate Key",
+      "label": "The Holt Slayer Gate Key"
+    },
+    {
+      "name": "UAC Atlantica Slayer Gate Key",
+      "label": "UAC Atlantica Slayer Gate Key"
     }
   ]
 }

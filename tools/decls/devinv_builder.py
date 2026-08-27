@@ -220,6 +220,29 @@ def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str,
                         raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation flags")
             if quantities != list(range(1, entry["max_quantity"] + 1)):
                 raise ValueError(f"DevInv special-weapon mapping {item_id} states must be contiguous")
+        elif kind == "key":
+            representations = entry.get("representations")
+            if set(entry) != {"name", "kind", "map_key", "representations"} or not isinstance(representations, list) or not representations:
+                raise ValueError(f"DevInv key mapping {item_id} has invalid fields")
+            if not isinstance(entry.get("map_key"), str) or not entry["map_key"]:
+                raise ValueError(f"DevInv key mapping {item_id} has invalid map_key")
+            for representation in representations:
+                if not isinstance(representation, dict):
+                    raise ValueError(f"DevInv key mapping {item_id} has malformed representation")
+                allowed = {"field", "path", "flags", "dedupe"}
+                if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation fields")
+                if not isinstance(representation.get("path"), str) or not representation["path"]:
+                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation path")
+                flags = representation.get("flags", [])
+                if (
+                    not isinstance(flags, list)
+                    or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
+                    or len(flags) != len(set(flags))
+                ):
+                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation flags")
+                if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
+                    raise ValueError(f"DevInv key mapping {item_id} has invalid dedupe key")
         else:
             representations = entry.get("representations")
             if set(entry) != {"name", "kind", "representations"} or not isinstance(representations, list) or not representations:
@@ -264,6 +287,8 @@ def _materialized_representations(
         return []
     if entry["kind"] == "stored_charge":
         # Stored charges are AP ownership state, not native DevInv inventory.
+        return []
+    if entry["kind"] == "key":
         return []
     if entry["kind"] == "special_weapon":
         if quantity > entry["max_quantity"]:

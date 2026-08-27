@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "uac_atlantica_mission_complete",
+      "map_key": "e4m1_rig",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "underwater_facility_target_level_transition_1",
+          "filename": "ap_mission_uac_atlantica_complete.txt",
+          "marker": "AP_MISSION_EVENT_UAC_ATLANTICA_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "underwater_facility_target_level_transition_1"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/dlc/e4m1_rig/e4m1_rig",
+          "to_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770432
+        }
+      ],
+      "dedupe_scope": "uac_atlantica_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

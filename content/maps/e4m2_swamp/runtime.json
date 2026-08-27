@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_complete",
+      "name": "The Blood Swamps - Mission Complete",
+      "location_id": 7770443,
+      "strategy": "map_terminal",
+      "mission_key": "e4m2_swamp",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+      },
+      "order": 15
+    }
+  ]
+}

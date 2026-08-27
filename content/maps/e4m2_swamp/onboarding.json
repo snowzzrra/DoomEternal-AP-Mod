@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "map_key": "e4m2_swamp",
+  "status": "frozen_baseline",
+  "source": {
+    "path": "vanillamaps/e4m2_swamp.map",
+    "size": 14864619,
+    "sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690"
+  },
+  "owner": {
+    "resource": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+    "priority": 48
+  }
+}

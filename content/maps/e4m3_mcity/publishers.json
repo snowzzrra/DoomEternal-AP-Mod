@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "the_holt_mission_complete",
+      "map_key": "e4m3_mcity",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "game_target_level_transition_e4m3",
+          "filename": "ap_mission_the_holt_complete.txt",
+          "marker": "AP_MISSION_EVENT_THE_HOLT_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_target_level_transition_e4m3"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+          "to_map": "maps/game/dlc/hub/hub.map"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770457
+        }
+      ],
+      "dedupe_scope": "the_holt_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

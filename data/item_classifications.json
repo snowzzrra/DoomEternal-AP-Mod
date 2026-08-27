@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 6,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "4e8609bae9340692dc401edb5b7a5e834ac6847f85b2fd15276a07fe905743be",
+  "source_sha256": "ed25e1128a18b900b8c3d43e38e329c2f67f1773ff7d6b82a2b9efacb0024d8c",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -36,24 +36,12 @@
       "name": "The Crucible",
       "classification": 1
     },
-    "7770900": {
-      "name": "Combat Shotgun",
-      "classification": 1
-    },
     "7770008": {
       "name": "The Unmaykr",
       "classification": 1
     },
     "7770009": {
       "name": "Sentinel Hammer",
-      "classification": 1
-    },
-    "7770901": {
-      "name": "Progressive Special Weapon",
-      "classification": 1
-    },
-    "7770902": {
-      "name": "Progressive Sentinel Hammer",
       "classification": 1
     },
     "7770010": {
@@ -87,10 +75,6 @@
     "7770017": {
       "name": "Progressive Health Upgrade",
       "classification": 2
-    },
-    "7770018": {
-      "name": "Empyrean Key",
-      "classification": 1
     },
     "7770020": {
       "name": "Rune",
@@ -499,6 +483,50 @@
     "7770147": {
       "name": "Take Back",
       "classification": 2
+    },
+    "7770148": {
+      "name": "UAC Atlantica Slayer Gate Key",
+      "classification": 1
+    },
+    "7770149": {
+      "name": "The Holt Slayer Gate Key",
+      "classification": 1
+    },
+    "7770150": {
+      "name": "Exultia Slayer Gate Key",
+      "classification": 1
+    },
+    "7770151": {
+      "name": "Cultist Base Slayer Gate Key",
+      "classification": 1
+    },
+    "7770152": {
+      "name": "Super Gore Nest Slayer Gate Key",
+      "classification": 1
+    },
+    "7770153": {
+      "name": "ARC Complex Slayer Gate Key",
+      "classification": 1
+    },
+    "7770154": {
+      "name": "Mars Core Slayer Gate Key",
+      "classification": 1
+    },
+    "7770155": {
+      "name": "Taras Nabad Slayer Gate Key",
+      "classification": 1
+    },
+    "7770900": {
+      "name": "Combat Shotgun",
+      "classification": 1
+    },
+    "7770901": {
+      "name": "Progressive Special Weapon",
+      "classification": 1
+    },
+    "7770902": {
+      "name": "Progressive Sentinel Hammer",
+      "classification": 1
     }
   }
 }

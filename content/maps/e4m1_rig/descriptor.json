@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "key": "e4m1_rig",
+  "display_name": "UAC Atlantica Facility",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e4m1_rig.map",
+  "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+  "source_size": 13054609,
+  "source_owner": "id Software",
+  "generated_output": "e4m1_rig.entities",
+  "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+  "resource_base": "e4m1_rig",
+  "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+  "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+  "resource_priority": 14,
+  "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+        "order": 101
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+        "order": 102
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+        "order": 103
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+        "order": 104
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+        "order": 105
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+        "order": 106
+      },
+      {
+        "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+        "order": 107
+      },
+      {
+        "name": "UAC Atlantica Facility - Underwater Facility",
+        "order": 108
+      }
+    ],
+    "connections": [
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+        "to": "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+        "rule": "",
+        "order": 101
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+        "to": "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+        "rule": "",
+        "order": 102
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+        "to": "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+        "rule": "",
+        "order": 103
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+        "to": "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+        "rule": "",
+        "order": 104
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+        "to": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+        "rule": "",
+        "order": 105
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+        "to": "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+        "rule": "",
+        "order": 106
+      },
+      {
+        "from": "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+        "to": "UAC Atlantica Facility - Underwater Facility",
+        "rule": "",
+        "order": 107
+      },
+      {
+        "from": "UAC Atlantica Facility - Underwater Facility",
+        "to": "The Blood Swamps - Swamp Entrance",
+        "rule": "Proceed to The Blood Swamps",
+        "order": 108
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 14
+}

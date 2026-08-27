@@ -1,12 +1,12 @@
 {
-  "authoritative_fingerprint": "36e103fcb35f8f8e27ccd439288650b7a4f43a2e1aa0fcf3997a802a917f370f",
-  "catalog_fingerprint": "569a36064ba55ee0490270c4a1e57d6638de7275c6da69c1bb52ea7e6867f157",
+  "authoritative_fingerprint": "12a6773b28778ac8a4b439b8f05f99eeda86b5b0434f2f352954c6cd8f02af2f",
+  "catalog_fingerprint": "a6f8540b3c92aa7c5542a9147f5dab9c1532bd2608ec3d6fcb60c25d0a1b12f2",
   "compiler_revision": 2,
   "content_revision": "0.5.0",
   "counts": {
-    "event_only": 18,
+    "event_only": 24,
     "no_visual": 7,
-    "visible_cleanup": 283
+    "visible_cleanup": 312
   },
   "entries": [
     {
@@ -7978,6 +7978,962 @@
       }
     },
     {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770420",
+      "direct_target": "ap_location_visual_7770420",
+      "location_id": 7770420,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770420",
+      "reconciliation_entity": "ap_hide_location_visual_7770420",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "491bbf08b83cc5c679b8865e780aaa602876959181c1e2fcc172985433598bdb",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_4",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770421",
+      "direct_target": "ap_location_visual_7770421",
+      "location_id": 7770421,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770421",
+      "reconciliation_entity": "ap_hide_location_visual_7770421",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "62f9628561f269da4f4178119a8f2df4fa60f5b79f088d7fcf542b9f91e8bd3d",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_4",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M1_1",
+      "classification": "event_only",
+      "location_id": 7770422,
+      "map_key": "e4m1_rig",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "7213c3aa14e568ae5427c5cef3e0f50e54df86b30ef0a4337533b99803c45198",
+        "policy_sha256": "77f96b73aa0dab742eeb872e1eddc52302b820ab65b92ecdf0888cb5851e2d78",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "SECRET_ENCOUNTER_E4M1_1",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_5",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770423",
+      "direct_target": "ap_location_visual_7770423",
+      "location_id": 7770423,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770423",
+      "reconciliation_entity": "ap_hide_location_visual_7770423",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "c43b1f6355ea2d6d0e7e46aa85684d8f26c4ce9d168bcbcb8900f7819bc94f28",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_5",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770424",
+      "direct_target": "ap_location_visual_7770424",
+      "location_id": 7770424,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770424",
+      "reconciliation_entity": "ap_hide_location_visual_7770424",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "9b59a5826f99e1278f30d213642b44bc83de1f32a7502e3fd6f68d4a2842befb",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SLAYER_GATE_PROGRESS_SUPPORT_RUNE_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770425",
+      "direct_target": "ap_location_visual_7770425",
+      "location_id": 7770425,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770425",
+      "reconciliation_entity": "ap_hide_location_visual_7770425",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "b697d9d64109b6bb7a275d2aaf0f5e5f076c9d3cfc7cc7ce44b884075ec5117f",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "SLAYER_GATE_PROGRESS_SUPPORT_RUNE_1",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M1_2",
+      "classification": "event_only",
+      "location_id": 7770426,
+      "map_key": "e4m1_rig",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "3ac0e64709941539e4e1349c235bc58e47f60a65eb29f0680d1c8457ab3c1546",
+        "policy_sha256": "9f14e58a0919d25c9c220916d1755240f3a0ac459bdace1bf8562eb9c9904d2b",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "SECRET_ENCOUNTER_E4M1_2",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770427",
+      "direct_target": "ap_location_visual_7770427",
+      "location_id": 7770427,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770427",
+      "reconciliation_entity": "ap_hide_location_visual_7770427",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "1cfa6e78cb15dd6dc17cb2f0ab5d0bbb4047e634a132d3b3a27e05fe2475db57",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770428",
+      "direct_target": "ap_location_visual_7770428",
+      "location_id": 7770428,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770428",
+      "reconciliation_entity": "ap_hide_location_visual_7770428",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "53226e5f8bd1b3aa68a4421d8bbc76f5f80fdbc4f56456204a8f7c17bf44e154",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770429",
+      "direct_target": "ap_location_visual_7770429",
+      "location_id": 7770429,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770429",
+      "reconciliation_entity": "ap_hide_location_visual_7770429",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "c7b4c7b61d95d1956dceb884ac82c35f8a31a88f83291664ae0f095ff5c275a2",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_6",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770430",
+      "direct_target": "ap_location_visual_7770430",
+      "location_id": 7770430,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770430",
+      "reconciliation_entity": "ap_hide_location_visual_7770430",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "a1a993411dcd97445900f0b7d93af41cd7dcaf8c6e03828d12afd3141226a992",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_6",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770431",
+      "direct_target": "ap_location_visual_7770431",
+      "location_id": 7770431,
+      "map_key": "e4m1_rig",
+      "presentation_entity": "ap_location_visual_7770431",
+      "reconciliation_entity": "ap_hide_location_visual_7770431",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_identity": {
+        "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+        "location_descriptor_sha256": "a69ff900e57cc01f92da27b839651c1310900d0f21a56a081649daefae9eb8d7",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+          "resource_base": "e4m1_rig",
+          "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+          "resource_priority": 14
+        },
+        "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11",
+        "source_file": "content/maps/e4m1_rig/locations.json",
+        "source_sha256": "ff6912442964f55be460865062bfdc7bb8aaa83bf6435e71c46a9f91c7c0a050"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770433",
+      "direct_target": "ap_location_visual_7770433",
+      "location_id": 7770433,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770433",
+      "reconciliation_entity": "ap_hide_location_visual_7770433",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "c762830c071834d8c89ca03275cb1cb410877768e6bd6d7e3f665e75d10ec8cc",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_4",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770434",
+      "direct_target": "ap_location_visual_7770434",
+      "location_id": 7770434,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770434",
+      "reconciliation_entity": "ap_hide_location_visual_7770434",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "61bd1346ae5be93bdd98d66d9ae67a90e67aaac305a340e80b21a9153b5a1b6f",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PROGRESS_CODEX_4",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770435",
+      "direct_target": "ap_location_visual_7770435",
+      "location_id": 7770435,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770435",
+      "reconciliation_entity": "ap_hide_location_visual_7770435",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "9c0e3d451c2e00a3cdc79aa704f8639e68cf78fc97948f5bddc7eb06916db37e",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M2_1",
+      "classification": "event_only",
+      "location_id": 7770436,
+      "map_key": "e4m2_swamp",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "fc58c802cd4305ab1046c34a93d255200a7f5f4ef512b645edb15273ac15b6e4",
+        "policy_sha256": "18ddbf71c3d0b0f72567f7afa964b838602c19e662e7188c3d8fdc66721b4f12",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "SECRET_ENCOUNTER_E4M2_1",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770437",
+      "direct_target": "ap_location_visual_7770437",
+      "location_id": 7770437,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770437",
+      "reconciliation_entity": "ap_hide_location_visual_7770437",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "478188538edb28fd41bcb494bc8e1dca666770c405d57417e261419b23008123",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PROGRESS_CODEX_2",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_SWAMP_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770438",
+      "direct_target": "ap_location_visual_7770438",
+      "location_id": 7770438,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770438",
+      "reconciliation_entity": "ap_hide_location_visual_7770438",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "9c4bb703734c15da8f893d12cbf38d2e73e53b21f6e7a50b835d6a854ce9d097",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_SWAMP_1",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_DESOLATE_CAVERN_PROGRESS_SUPPORT_RUNE_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770439",
+      "direct_target": "ap_location_visual_7770439",
+      "location_id": 7770439,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770439",
+      "reconciliation_entity": "ap_hide_location_visual_7770439",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "8c9c7e430985b5c9fd8e87418aa57659a2ab17cd7dcf673f550add7fe2e74656",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "DESOLATE_CAVERN_PROGRESS_SUPPORT_RUNE_1",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M2_2",
+      "classification": "event_only",
+      "location_id": 7770440,
+      "map_key": "e4m2_swamp",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "5f3c35cc4741138184c9573d76211cdda10fed2be53012be1769a535dbec829a",
+        "policy_sha256": "e8fa195af114c84f8274447d5a6466359d0b85033e06fbc4e81e198e8e006e1d",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "SECRET_ENCOUNTER_E4M2_2",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_7",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770441",
+      "direct_target": "ap_location_visual_7770441",
+      "location_id": 7770441,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770441",
+      "reconciliation_entity": "ap_hide_location_visual_7770441",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "50fb71958f03dc7ba1e0b1b2b22ae5cfb8da9c1d8e3590bdefcaaeaf90450e36",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PROGRESS_CODEX_7",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770442",
+      "direct_target": "ap_location_visual_7770442",
+      "location_id": 7770442,
+      "map_key": "e4m2_swamp",
+      "presentation_entity": "ap_location_visual_7770442",
+      "reconciliation_entity": "ap_hide_location_visual_7770442",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_identity": {
+        "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+        "location_descriptor_sha256": "c30c2d41510fe8c8e0e81665df2c6be38b87e37fc8cac97d4b8c01aacc026fba",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+          "resource_base": "e4m2_swamp",
+          "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+          "resource_priority": 48
+        },
+        "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+        "source_entity": "COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+        "source_file": "content/maps/e4m2_swamp/locations.json",
+        "source_sha256": "d0e87e4c568c409b84609e44e0765a77ad6065fab4c9f3c09949f5718634c184"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770444",
+      "direct_target": "ap_location_visual_7770444",
+      "location_id": 7770444,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770444",
+      "reconciliation_entity": "ap_hide_location_visual_7770444",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "0d52e8e1acdb204efc4373b1a3e1051931b3c0de4008a19cc37a2e541972db47",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770445",
+      "direct_target": "ap_location_visual_7770445",
+      "location_id": 7770445,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770445",
+      "reconciliation_entity": "ap_hide_location_visual_7770445",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "941eea1f3903c1d0e5979859c66b62ed3303604865d963fe86d14ff484f0aa74",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770446",
+      "direct_target": "ap_location_visual_7770446",
+      "location_id": 7770446,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770446",
+      "reconciliation_entity": "ap_hide_location_visual_7770446",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "1a8b842188cea018fed024522be2a8e7480f97ab96b4aa489e5668e1b7266399",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PROGRESS_CODEX_2",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M3_1",
+      "classification": "event_only",
+      "location_id": 7770447,
+      "map_key": "e4m3_mcity",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "0346a99559921bb2417b32518ec8efc71405c3d240ad9e5f73032a57f48d434e",
+        "policy_sha256": "0db205255cf2f3094a3755cae64661e78ee826f9538fe1c12f50e99ee97d5883",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "SECRET_ENCOUNTER_E4M3_1",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_3",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770448",
+      "direct_target": "ap_location_visual_7770448",
+      "location_id": 7770448,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770448",
+      "reconciliation_entity": "ap_hide_location_visual_7770448",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "ff74f6a05b07fc35ee37f44c7d984c4af4ce3b1dc303658693f4e00d5c61b1af",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PROGRESS_CODEX_3",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770449",
+      "direct_target": "ap_location_visual_7770449",
+      "location_id": 7770449,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770449",
+      "reconciliation_entity": "ap_hide_location_visual_7770449",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "a08636fd406e1d0f386842daedc8b12aa488144d7f89c908b2b4498a6da306e7",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770450",
+      "direct_target": "ap_location_visual_7770450",
+      "location_id": 7770450,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770450",
+      "reconciliation_entity": "ap_hide_location_visual_7770450",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "25984ab4f8d43905f7876862c3f24fc906c27c1c100a699d9c2086515fa70331",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770451",
+      "direct_target": "ap_location_visual_7770451",
+      "location_id": 7770451,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770451",
+      "reconciliation_entity": "ap_hide_location_visual_7770451",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "51ebdcb9869b1389222fb3100dfaef5137d490c400d18f8beeee3dbe1a5fe423",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "SLAYERGATE_PICKUP_KEYCARD_SLAYER_KEY_1",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770452",
+      "direct_target": "ap_location_visual_7770452",
+      "location_id": 7770452,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770452",
+      "reconciliation_entity": "ap_hide_location_visual_7770452",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "4042f0e86560389c830b879fce852140f4645f15e745fd3cc9697617848d5c4d",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_4",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770453",
+      "direct_target": "ap_location_visual_7770453",
+      "location_id": 7770453,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770453",
+      "reconciliation_entity": "ap_hide_location_visual_7770453",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "9dd67031e00f4a9ce30e517f5b4dbb876cfd198b90eab6668bfc1648cda471a9",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PROGRESS_CODEX_4",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770454",
+      "direct_target": "ap_location_visual_7770454",
+      "location_id": 7770454,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770454",
+      "reconciliation_entity": "ap_hide_location_visual_7770454",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "1d295f61f19195c5049d2d01112bc0349ff589186b9fb641b89c9a2bf9f4c462",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M3_2",
+      "classification": "event_only",
+      "location_id": 7770455,
+      "map_key": "e4m3_mcity",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "ba9b243734374aec4f373f7867c5f500a098ad5bb5bb2ba505a12964f34a265b",
+        "policy_sha256": "74f5aeca73b604a021898ac7c4270f2ffeac7a07952426eaac7cb84e65dbca42",
+        "resolved_policy": "secret_encounter",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "SECRET_ENCOUNTER_E4M3_2",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_5",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770456",
+      "direct_target": "ap_location_visual_7770456",
+      "location_id": 7770456,
+      "map_key": "e4m3_mcity",
+      "presentation_entity": "ap_location_visual_7770456",
+      "reconciliation_entity": "ap_hide_location_visual_7770456",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_identity": {
+        "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+        "location_descriptor_sha256": "4452fe7c7521cf2bc7016b857ab3eded271f19b7073d01ddc7194dd07d7fa345",
+        "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+          "resource_base": "e4m3_mcity",
+          "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+          "resource_priority": 56
+        },
+        "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+        "source_entity": "GAME_PROGRESS_CODEX_5",
+        "source_file": "content/maps/e4m3_mcity/locations.json",
+        "source_sha256": "228a532297ba14bed394d96a4aab038e7510fbbd6256eb4586516ea5afd417f0"
+      }
+    },
+    {
       "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_1",
       "classification": "visible_cleanup",
       "cleanup_entity": "ap_remove_location_visual_7770072",
@@ -8716,6 +9672,48 @@
       "runtime_map": "game/sp/e3m4_boss/e3m4_boss",
       "source_file": "e3m4_boss.map",
       "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398"
+    },
+    "e4m1_rig": {
+      "descriptor_sha256": "981d19f9c55c335d6fa22c89742089060697ba20c221b78af18aaef4d6cda230",
+      "resource": {
+        "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
+        "resource_base": "e4m1_rig",
+        "resource_owner": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+        "resource_path": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+        "resource_priority": 14
+      },
+      "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
+      "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+      "source_file": "e4m1_rig.map",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62"
+    },
+    "e4m2_swamp": {
+      "descriptor_sha256": "33f4c68df86f81ef3ec9767140446e4a85eac40e68ed5a0039550bcf7b73bcf1",
+      "resource": {
+        "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+        "resource_base": "e4m2_swamp",
+        "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+        "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+        "resource_priority": 48
+      },
+      "resource_sha256": "adef6b5b74547ae0c41728c6471fc1cbb2370a7b276eb62b71c27fbb286daa46",
+      "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+      "source_file": "e4m2_swamp.map",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690"
+    },
+    "e4m3_mcity": {
+      "descriptor_sha256": "d8db36221b6ba873334dc6919df1f289446f238767964311630eb8a485278c9a",
+      "resource": {
+        "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+        "resource_base": "e4m3_mcity",
+        "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+        "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+        "resource_priority": 56
+      },
+      "resource_sha256": "cee45b1c528f0daf0fa4d4db63e8325fd6e0d7856bbe1f836dff3b069edc2cce",
+      "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+      "source_file": "e4m3_mcity.map",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904"
     },
     "hub": {
       "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",

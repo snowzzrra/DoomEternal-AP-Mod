@@ -406,6 +406,108 @@
           "map_group": "Final Sin"
         }
       ]
+    },
+    {
+      "mission_key": "e4m1_rig",
+      "display_name": "UAC Atlantica Facility",
+      "anchors": [
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+          "map_group": "UAC Facility (Intact)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+          "map_group": "UAC Facility (Intact)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+          "map_group": "UAC Facility (Intact)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+          "map_group": "UAC Facility (Intact)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+          "map_group": "UAC Facility (Destroyed)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+          "map_group": "UAC Facility (Destroyed)"
+        },
+        {
+          "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+          "map_group": "UAC Facility (Destroyed)"
+        },
+        {
+          "name": "UAC Atlantica Facility - Underwater Facility",
+          "map_group": "Underwater Facility"
+        }
+      ]
+    },
+    {
+      "mission_key": "e4m2_swamp",
+      "display_name": "The Blood Swamps",
+      "anchors": [
+        {
+          "name": "The Blood Swamps - Swamp Entrance",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Underworld Crossroad",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Sunken Courtyard",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Betruger Castle",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Forest of the Torch",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Ishii Castle Gate",
+          "map_group": "The Blood Swamps"
+        },
+        {
+          "name": "The Blood Swamps - Ishii Castle Keep",
+          "map_group": "The Blood Swamps"
+        }
+      ]
+    },
+    {
+      "mission_key": "e4m3_mcity",
+      "display_name": "The Holt",
+      "anchors": [
+        {
+          "name": "The Holt - Tranquility",
+          "map_group": "The Holt"
+        },
+        {
+          "name": "The Holt - Crimson Forest",
+          "map_group": "The Holt"
+        },
+        {
+          "name": "The Holt - Maykr Pillars",
+          "map_group": "The Holt"
+        },
+        {
+          "name": "The Holt - Ivory Path",
+          "map_group": "The Holt"
+        },
+        {
+          "name": "The Holt - Pantheon of Khans",
+          "map_group": "The Holt"
+        },
+        {
+          "name": "The Holt - Holy Chamber",
+          "map_group": "The Holt"
+        }
+      ]
     }
   ]
 }

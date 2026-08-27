@@ -6527,9 +6527,12 @@ class DoomEternalContext(CommonContext):
             excluded_context_items = SUPPORT_RUNE_IDS | {
                 7770007, 7770009, 7770901, 7770902,
             }
+            allowed_context_items = set(
+                context_item_ids(context, observation.historical_authoritative_item_ids)
+            )
             replayable = tuple(
                 item_id for item_id in observation.historical_authoritative_item_ids
-                if item_id not in excluded_context_items
+                if item_id not in excluded_context_items and item_id in allowed_context_items
             )
             plan = self._compile_reconciliation_plan_for_evidence(
                 evidence, received_item_ids=replayable

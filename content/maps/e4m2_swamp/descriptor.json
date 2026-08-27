@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "key": "e4m2_swamp",
+  "display_name": "The Blood Swamps",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e4m2_swamp.map",
+  "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+  "source_size": 14864619,
+  "source_owner": "id Software",
+  "generated_output": "e4m2_swamp.entities",
+  "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+  "resource_base": "e4m2_swamp",
+  "resource_path": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+  "resource_owner": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+  "resource_priority": 48,
+  "relative_entities_path": "game/dlc/e4m2_swamp/e4m2_swamp.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "The Blood Swamps - Swamp Entrance",
+        "order": 109
+      },
+      {
+        "name": "The Blood Swamps - Underworld Crossroad",
+        "order": 110
+      },
+      {
+        "name": "The Blood Swamps - Sunken Courtyard",
+        "order": 111
+      },
+      {
+        "name": "The Blood Swamps - Betruger Castle",
+        "order": 112
+      },
+      {
+        "name": "The Blood Swamps - Forest of the Torch",
+        "order": 113
+      },
+      {
+        "name": "The Blood Swamps - Ishii Castle Gate",
+        "order": 114
+      },
+      {
+        "name": "The Blood Swamps - Ishii Castle Keep",
+        "order": 115
+      }
+    ],
+    "connections": [
+      {
+        "from": "The Blood Swamps - Swamp Entrance",
+        "to": "The Blood Swamps - Underworld Crossroad",
+        "rule": "",
+        "order": 109
+      },
+      {
+        "from": "The Blood Swamps - Underworld Crossroad",
+        "to": "The Blood Swamps - Sunken Courtyard",
+        "rule": "",
+        "order": 110
+      },
+      {
+        "from": "The Blood Swamps - Sunken Courtyard",
+        "to": "The Blood Swamps - Betruger Castle",
+        "rule": "",
+        "order": 111
+      },
+      {
+        "from": "The Blood Swamps - Betruger Castle",
+        "to": "The Blood Swamps - Forest of the Torch",
+        "rule": "",
+        "order": 112
+      },
+      {
+        "from": "The Blood Swamps - Forest of the Torch",
+        "to": "The Blood Swamps - Ishii Castle Gate",
+        "rule": "",
+        "order": 113
+      },
+      {
+        "from": "The Blood Swamps - Ishii Castle Gate",
+        "to": "The Blood Swamps - Ishii Castle Keep",
+        "rule": "",
+        "order": 114
+      },
+      {
+        "from": "The Blood Swamps - Ishii Castle Keep",
+        "to": "The Holt - Tranquility",
+        "rule": "Proceed to The Holt",
+        "order": 115
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 15
+}

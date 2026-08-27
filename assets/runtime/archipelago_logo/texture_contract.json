@@ -418,6 +418,84 @@
         "emissive": "art/pickups/codex_e.tga",
         "cover": "art/pickups/codex.tga"
       }
+    },
+    {
+      "map_key": "e4m1_rig",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e4m1_rig.resources",
+      "resource_base": "e4m1_rig",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m1_intro_patch3.resources": 62,
+        "e1m1_intro.resources": 62
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e4m2_swamp",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e4m2_swamp.resources",
+      "resource_base": "e4m2_swamp",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m1_intro_patch3.resources": 62,
+        "e1m1_intro.resources": 62
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
+    },
+    {
+      "map_key": "e4m3_mcity",
+      "model": "art/pickups/codex.lwo",
+      "material2": "generated/decls/material2/art/pickups/codex.decl",
+      "material2_sha256": "90f91e8e63d65338515f04a294f2b10d097f848ad3d7a02393e0e6d797bcc562",
+      "inherit": "template/pbr_pickup",
+      "render_layers": 1,
+      "albedo_path": "art/pickups/codex.tga",
+      "true_filename": "art/pickups/codex.tga$streamed$mtlkind=albedo",
+      "resource_archive": "e4m3_mcity.resources",
+      "resource_base": "e4m3_mcity",
+      "packaged": true,
+      "higher_patch_copies": [],
+      "resource_priority_indices": {
+        "e1m1_intro_patch3.resources": 62,
+        "e1m1_intro.resources": 62
+      },
+      "preserved": {
+        "normal": "art/pickups/codex_n.tga",
+        "specular": "textures/system/specular/flatspec_35.tga",
+        "smoothness": "textures/system/constant_color/grey_dk.tga",
+        "heightmap": "textures/system/constant_color/grey_md.tga",
+        "emissive": "art/pickups/codex_e.tga",
+        "cover": "art/pickups/codex.tga"
+      }
     }
   ]
 }

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "entities": {
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_1": 7770420,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_4": 7770421,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_5": 7770423,
+    "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770424,
+    "AP_CHECK_SLAYER_GATE_PROGRESS_SUPPORT_RUNE_1": 7770425,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10": 7770427,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770428,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B": 7770429,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_6": 7770430,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11": 7770431
+  },
+  "secret_encounters": [
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M1_1",
+      "location_id": 7770422,
+      "manager": "starting_platform_encounter_manager_15",
+      "after_event_index": 5,
+      "automap_owner": "automap_info_null_extra_life_encounter"
+    },
+    {
+      "ap_check": "AP_CHECK_SECRET_ENCOUNTER_E4M1_2",
+      "location_id": 7770426,
+      "manager": "destroyed_rig_encounter_manager_8",
+      "after_event_index": 6,
+      "automap_owner": "automap_info_null_extra_life_encounter1"
+    }
+  ],
+  "names": {
+    "7770420": "UAC Atlantica Facility - UAC Atlantica Facility Codex",
+    "7770421": "UAC Atlantica Facility - The Seraphim Codex",
+    "7770422": "UAC Atlantica Facility - Secret Encounter - Lower Maintenance Platform",
+    "7770423": "UAC Atlantica Facility - The Father Codex",
+    "7770424": "UAC Atlantica Facility - Slayer Key - Overhead Crane Walkway",
+    "7770425": "UAC Atlantica Facility - Slayer Gate Complete",
+    "7770426": "UAC Atlantica Facility - Secret Encounter - Exterior Crane Landing",
+    "7770427": "UAC Atlantica Facility - Extra Life - Flooded Lab Vent",
+    "7770428": "UAC Atlantica Facility - Extra Life - Submerged Sub-Station 1",
+    "7770429": "UAC Atlantica Facility - Extra Life - Submerged Sub-Station 2",
+    "7770430": "UAC Atlantica Facility - Book of the Seraphs - Part I Codex",
+    "7770431": "UAC Atlantica Facility - Extra Life - Exterior Crane Walkway"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  }
+}

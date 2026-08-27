@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_complete",
+      "name": "The Holt - Mission Complete",
+      "location_id": 7770457,
+      "strategy": "map_terminal",
+      "mission_key": "e4m3_mcity",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity"
+      },
+      "order": 16
+    }
+  ]
+}

@@ -385,6 +385,93 @@
           "to_map": "game/sp/e3m4_boss/e3m4_boss/end_game"
         }
       ]
+    },
+    {
+      "dedupe_scope": "uac_atlantica_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770432,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "uac_atlantica_mission_complete",
+      "map_key": "e4m1_rig",
+      "triggers": [
+        {
+          "filename": "ap_mission_uac_atlantica_complete.txt",
+          "marker": "AP_MISSION_EVENT_UAC_ATLANTICA_COMPLETE",
+          "owner": "underwater_facility_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "underwater_facility_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc/e4m1_rig/e4m1_rig",
+          "strategy": "native_transition",
+          "to_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "blood_swamps_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770443,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "blood_swamps_mission_complete",
+      "map_key": "e4m2_swamp",
+      "triggers": [
+        {
+          "filename": "ap_mission_blood_swamps_complete.txt",
+          "marker": "AP_MISSION_EVENT_BLOOD_SWAMPS_COMPLETE",
+          "owner": "checkpoint_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "checkpoint_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+          "strategy": "native_transition",
+          "to_map": "game/dlc/e4m3_mcity/e4m3_mcity"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "the_holt_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770457,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "the_holt_mission_complete",
+      "map_key": "e4m3_mcity",
+      "triggers": [
+        {
+          "filename": "ap_mission_the_holt_complete.txt",
+          "marker": "AP_MISSION_EVENT_THE_HOLT_COMPLETE",
+          "owner": "game_target_level_transition_e4m3",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_e4m3",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+          "strategy": "native_transition",
+          "to_map": "maps/game/dlc/hub/hub.map"
+        }
+      ]
     }
   ],
   "schema_version": 1

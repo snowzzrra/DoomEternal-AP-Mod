@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_complete",
+      "name": "UAC Atlantica Facility - Mission Complete",
+      "location_id": 7770432,
+      "strategy": "map_terminal",
+      "mission_key": "e4m1_rig",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m1_rig/e4m1_rig"
+      },
+      "order": 14
+    }
+  ]
+}

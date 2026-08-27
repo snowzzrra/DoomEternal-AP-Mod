@@ -17,6 +17,16 @@ TAG_SPECIAL_CAPABILITY = "tag_special_v1"
 SUPPORT_RUNE_IDS = frozenset({7770145, 7770146, 7770147})
 TAG_SPECIAL_IDS = frozenset({7770009, 7770901, 7770902})
 CRUCIBLE_ID = 7770007
+GATE_KEY_TO_MAP = {
+    7770148: "e4m1_rig",
+    7770149: "e4m3_mcity",
+    7770150: "e1m2_war",
+    7770151: "e1m3_cult",
+    7770152: "e2m1_nest",
+    7770153: "e2m2_base",
+    7770154: "e2m3_core",
+    7770155: "e3m1_slayer",
+}
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,10 @@ def context_item_ids(context: RuntimeContext, received_item_ids: Iterable[int]) 
             continue
         if item_id == CRUCIBLE_ID and not context.supports("crucible_v1"):
             continue
+        if item_id in GATE_KEY_TO_MAP:
+            target_map = GATE_KEY_TO_MAP[item_id]
+            if target_map not in context.map_keys:
+                continue
         selected.append(item_id)
     return tuple(selected)
 

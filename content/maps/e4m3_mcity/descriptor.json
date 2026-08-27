@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "key": "e4m3_mcity",
+  "display_name": "The Holt",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "frozen_baseline",
+  "source_file": "e4m3_mcity.map",
+  "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+  "source_size": 11650133,
+  "source_owner": "id Software",
+  "generated_output": "e4m3_mcity.entities",
+  "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+  "resource_base": "e4m3_mcity",
+  "resource_path": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+  "resource_owner": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
+  "resource_priority": 56,
+  "relative_entities_path": "game/dlc/e4m3_mcity/e4m3_mcity.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {
+        "name": "The Holt - Tranquility",
+        "order": 116
+      },
+      {
+        "name": "The Holt - Crimson Forest",
+        "order": 117
+      },
+      {
+        "name": "The Holt - Maykr Pillars",
+        "order": 118
+      },
+      {
+        "name": "The Holt - Ivory Path",
+        "order": 119
+      },
+      {
+        "name": "The Holt - Pantheon of Khans",
+        "order": 120
+      },
+      {
+        "name": "The Holt - Holy Chamber",
+        "order": 121
+      }
+    ],
+    "connections": [
+      {
+        "from": "The Holt - Tranquility",
+        "to": "The Holt - Crimson Forest",
+        "rule": "",
+        "order": 116
+      },
+      {
+        "from": "The Holt - Crimson Forest",
+        "to": "The Holt - Maykr Pillars",
+        "rule": "",
+        "order": 117
+      },
+      {
+        "from": "The Holt - Maykr Pillars",
+        "to": "The Holt - Ivory Path",
+        "rule": "",
+        "order": 118
+      },
+      {
+        "from": "The Holt - Ivory Path",
+        "to": "The Holt - Pantheon of Khans",
+        "rule": "",
+        "order": 119
+      },
+      {
+        "from": "The Holt - Pantheon of Khans",
+        "to": "The Holt - Holy Chamber",
+        "rule": "",
+        "order": 120
+      }
+    ],
+    "virtual_locations": []
+  },
+  "order": 16
+}

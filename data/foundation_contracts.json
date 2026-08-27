@@ -13,6 +13,9 @@
     "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
     "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
     "e3m4_boss": "game/sp/e3m4_boss/e3m4_boss",
+    "e4m1_rig": "game/dlc/e4m1_rig/e4m1_rig",
+    "e4m2_swamp": "game/dlc/e4m2_swamp/e4m2_swamp",
+    "e4m3_mcity": "game/dlc/e4m3_mcity/e4m3_mcity",
     "hub": "game/hub/hub"
   },
   "bootstrap_test_entrypoints": {

@@ -528,6 +528,114 @@
       "mission_key": "e5m4_boss",
       "order": 100,
       "terminal": true
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+      "mission_key": "e4m1_rig",
+      "order": 101
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+      "mission_key": "e4m1_rig",
+      "order": 102
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+      "mission_key": "e4m1_rig",
+      "order": 103
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+      "mission_key": "e4m1_rig",
+      "order": 104
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+      "mission_key": "e4m1_rig",
+      "order": 105
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+      "mission_key": "e4m1_rig",
+      "order": 106
+    },
+    {
+      "name": "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+      "mission_key": "e4m1_rig",
+      "order": 107
+    },
+    {
+      "name": "UAC Atlantica Facility - Underwater Facility",
+      "mission_key": "e4m1_rig",
+      "order": 108,
+      "terminal": true
+    },
+    {
+      "name": "The Blood Swamps - Swamp Entrance",
+      "mission_key": "e4m2_swamp",
+      "order": 109
+    },
+    {
+      "name": "The Blood Swamps - Underworld Crossroad",
+      "mission_key": "e4m2_swamp",
+      "order": 110
+    },
+    {
+      "name": "The Blood Swamps - Sunken Courtyard",
+      "mission_key": "e4m2_swamp",
+      "order": 111
+    },
+    {
+      "name": "The Blood Swamps - Betruger Castle",
+      "mission_key": "e4m2_swamp",
+      "order": 112
+    },
+    {
+      "name": "The Blood Swamps - Forest of the Torch",
+      "mission_key": "e4m2_swamp",
+      "order": 113
+    },
+    {
+      "name": "The Blood Swamps - Ishii Castle Gate",
+      "mission_key": "e4m2_swamp",
+      "order": 114
+    },
+    {
+      "name": "The Blood Swamps - Ishii Castle Keep",
+      "mission_key": "e4m2_swamp",
+      "order": 115,
+      "terminal": true
+    },
+    {
+      "name": "The Holt - Tranquility",
+      "mission_key": "e4m3_mcity",
+      "order": 116
+    },
+    {
+      "name": "The Holt - Crimson Forest",
+      "mission_key": "e4m3_mcity",
+      "order": 117
+    },
+    {
+      "name": "The Holt - Maykr Pillars",
+      "mission_key": "e4m3_mcity",
+      "order": 118
+    },
+    {
+      "name": "The Holt - Ivory Path",
+      "mission_key": "e4m3_mcity",
+      "order": 119
+    },
+    {
+      "name": "The Holt - Pantheon of Khans",
+      "mission_key": "e4m3_mcity",
+      "order": 120
+    },
+    {
+      "name": "The Holt - Holy Chamber",
+      "mission_key": "e4m3_mcity",
+      "order": 121,
+      "terminal": true
     }
   ],
   "connections": [
@@ -1030,17 +1138,133 @@
       "Final Sin - South Station",
       "Immora - The Dark Lord",
       "The Dark Lord"
+    ],
+    [
+      "Menu",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+      "Portal to UAC Atlantica Facility"
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+      "UAC Atlantica Facility - Underwater Facility",
+      ""
+    ],
+    [
+      "UAC Atlantica Facility - Underwater Facility",
+      "The Blood Swamps - Swamp Entrance",
+      "Proceed to The Blood Swamps"
+    ],
+    [
+      "The Blood Swamps - Swamp Entrance",
+      "The Blood Swamps - Underworld Crossroad",
+      ""
+    ],
+    [
+      "The Blood Swamps - Underworld Crossroad",
+      "The Blood Swamps - Sunken Courtyard",
+      ""
+    ],
+    [
+      "The Blood Swamps - Sunken Courtyard",
+      "The Blood Swamps - Betruger Castle",
+      ""
+    ],
+    [
+      "The Blood Swamps - Betruger Castle",
+      "The Blood Swamps - Forest of the Torch",
+      ""
+    ],
+    [
+      "The Blood Swamps - Forest of the Torch",
+      "The Blood Swamps - Ishii Castle Gate",
+      ""
+    ],
+    [
+      "The Blood Swamps - Ishii Castle Gate",
+      "The Blood Swamps - Ishii Castle Keep",
+      ""
+    ],
+    [
+      "The Blood Swamps - Ishii Castle Keep",
+      "The Holt - Tranquility",
+      "Proceed to The Holt"
+    ],
+    [
+      "The Holt - Tranquility",
+      "The Holt - Crimson Forest",
+      ""
+    ],
+    [
+      "The Holt - Crimson Forest",
+      "The Holt - Maykr Pillars",
+      ""
+    ],
+    [
+      "The Holt - Maykr Pillars",
+      "The Holt - Ivory Path",
+      ""
+    ],
+    [
+      "The Holt - Ivory Path",
+      "The Holt - Pantheon of Khans",
+      ""
+    ],
+    [
+      "The Holt - Pantheon of Khans",
+      "The Holt - Holy Chamber",
+      ""
     ]
   ],
   "connection_conditions": {
     "Final Sin - South Station -> Immora - The Dark Lord": {
-      "soft_capabilities": ["requires_dlc_content"]
+      "soft_capabilities": [
+        "requires_dlc_content"
+      ]
     },
     "Fortress of Doom - Second Visit -> Cultist Base - Grotto of Penance": {
-      "soft_capabilities": ["requires_first_battery"]
+      "soft_capabilities": [
+        "requires_first_battery"
+      ]
     },
     "Urdak - Abyss of Sanctuary -> Urdak - Dimensional Lacerator": {
-      "soft_capabilities": ["requires_dash"]
+      "soft_capabilities": [
+        "requires_dash"
+      ]
+    },
+    "Menu -> UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad": {
+      "soft_capabilities": [
+        "requires_dlc_content"
+      ]
     }
   },
   "assignments": {
@@ -1582,6 +1806,84 @@
     ],
     "Immora - The Dark Lord": [
       7770419
+    ],
+    "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad": [
+      7770420
+    ],
+    "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator": [
+      7770421,
+      7770422
+    ],
+    "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower": [
+      7770423
+    ],
+    "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage": [],
+    "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber": [
+      7770424,
+      7770425,
+      7770426
+    ],
+    "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab": [
+      7770427,
+      7770428,
+      7770429
+    ],
+    "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard": [
+      7770430,
+      7770431
+    ],
+    "UAC Atlantica Facility - Underwater Facility": [
+      7770432
+    ],
+    "The Blood Swamps - Swamp Entrance": [
+      7770433
+    ],
+    "The Blood Swamps - Underworld Crossroad": [],
+    "The Blood Swamps - Sunken Courtyard": [
+      7770434,
+      7770435,
+      7770436
+    ],
+    "The Blood Swamps - Betruger Castle": [
+      7770437
+    ],
+    "The Blood Swamps - Forest of the Torch": [
+      7770438,
+      7770439,
+      7770440
+    ],
+    "The Blood Swamps - Ishii Castle Gate": [
+      7770441,
+      7770442
+    ],
+    "The Blood Swamps - Ishii Castle Keep": [
+      7770443
+    ],
+    "The Holt - Tranquility": [
+      7770444,
+      7770445
+    ],
+    "The Holt - Crimson Forest": [
+      7770446,
+      7770447
+    ],
+    "The Holt - Maykr Pillars": [
+      7770448,
+      7770449,
+      7770450,
+      7770451,
+      7770452
+    ],
+    "The Holt - Ivory Path": [
+      7770453,
+      7770454,
+      7770455
+    ],
+    "The Holt - Pantheon of Khans": [
+      7770456
+    ],
+    "The Holt - Holy Chamber": [
+      7770457
     ]
   }
 }

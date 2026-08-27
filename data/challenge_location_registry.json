@@ -1100,6 +1100,42 @@
     },
     {
       "category": "mission_complete",
+      "location_id": 7770432,
+      "mission_key": "e4m1_rig",
+      "name": "UAC Atlantica Facility - Mission Complete",
+      "order": 14,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m1_rig/e4m1_rig"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770443,
+      "mission_key": "e4m2_swamp",
+      "name": "The Blood Swamps - Mission Complete",
+      "order": 15,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770457,
+      "mission_key": "e4m3_mcity",
+      "name": "The Holt - Mission Complete",
+      "order": 16,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
       "location_id": 7770337,
       "mission_key": "e3m1_slayer",
       "name": "Taras Nabad - Mission Complete",

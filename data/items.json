@@ -47,7 +47,6 @@
             "perk/player/argent/health_capacity_3"
         ]
     },
-    "7770018": "give inventory/key",
     "7770020": "give inventory/rune",
     "7770021": {
         "type": "progressive_perk",
@@ -253,5 +252,13 @@
     "7770144": "chrispy pickup/powerup/onslaught",
     "7770145": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/weakpoint_concussive_blast",
     "7770146": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/blood_punch_low_health_bonus_damage",
-    "7770147": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/extra_life_refund"
+    "7770147": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/extra_life_refund",
+    "7770148": "give inventory/map_objects/keycard/slayer_key",
+    "7770149": "give inventory/map_objects/keycard/slayer_key",
+    "7770150": "give inventory/map_objects/keycard/slayer_key",
+    "7770151": "give inventory/map_objects/keycard/slayer_key",
+    "7770152": "give inventory/map_objects/keycard/slayer_key",
+    "7770153": "give inventory/map_objects/keycard/slayer_key",
+    "7770154": "give inventory/map_objects/keycard/slayer_key",
+    "7770155": "give inventory/map_objects/keycard/slayer_key"
 }

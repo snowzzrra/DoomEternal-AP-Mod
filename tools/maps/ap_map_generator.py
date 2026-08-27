@@ -2879,11 +2879,41 @@ def generate_map(
                                 visual, replacement_model
                             )
                         new_blocks.append(visual)
+                    secondary_ap_check_id = f"{ap_check_id}_B"
+                    secondary_location_id = config_entities.get(secondary_ap_check_id)
+                    completion_targets = list(target_policy.get("completion_targets") or [])
+                    if secondary_location_id is not None:
+                        manifest_data[secondary_ap_check_id] = secondary_location_id
+                        completion_targets.append(f"{EVENT_ENTITY_PREFIX}{secondary_location_id}")
+                        if include_ap_feedback:
+                            completion_targets.append(f"{LOCATION_NOTIFICATION_PREFIX}{secondary_location_id}")
+                            new_blocks.append(
+                                generate_pickup_notification(
+                                    secondary_location_id, placement_by_id.get(secondary_location_id)
+                                )
+                            )
+                        new_blocks.append(generate_check_event(secondary_location_id))
+                        new_blocks.append(
+                            generate_automap_location_helper(block, secondary_location_id, policy=target_policy)
+                        )
+                        secondary_universal = build_universal_physical_policy(
+                            secondary_ap_check_id,
+                            secondary_location_id,
+                            block,
+                            default_visual_model,
+                            policy=target_policy,
+                        )
+                        secondary_visual = generate_inert_location_visual(block, secondary_universal)
+                        if secondary_visual:
+                            new_blocks.append(secondary_visual)
+                        completion_targets.append(
+                            secondary_universal["independent_visual"]["cleanup_entity"]
+                        )
                     new_blocks.append(generate_target_relay(
                         ap_check_id,
                         location_id,
                         "",
-                        completion_targets=target_policy.get("completion_targets"),
+                        completion_targets=completion_targets,
                         include_notification=include_ap_feedback,
                     ))
                     if include_ap_feedback:
@@ -2892,6 +2922,8 @@ def generate_map(
                         )
                     new_blocks.append(generate_check_event(location_id))
                     modified_count += 1
+                    if secondary_location_id is not None:
+                        modified_count += 1
                     continue
                 else:
                     raise ValueError(f"Legacy non-independent physical check logic hit for {entity_name}")
@@ -2920,7 +2952,7 @@ def generate_map(
         expected_last_event_index = secret_hook["after_event_index"]
         automap_owner = secret_hook.get("automap_owner")
         if automap_owner:
-            if map_content.count(f"entityDef {automap_owner}") != 1:
+            if len(re.findall(rf"\bentityDef\s+{re.escape(automap_owner)}\b", map_content)) != 1:
                 raise ValueError(
                     f"Secret encounter automap owner is missing or duplicated: {automap_owner}"
                 )

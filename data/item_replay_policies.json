@@ -86,10 +86,6 @@
       "name": "Progressive Health Upgrade",
       "policy": "special_progressive"
     },
-    "7770018": {
-      "name": "Empyrean Key",
-      "policy": "never_replay"
-    },
     "7770020": {
       "name": "Rune",
       "policy": "never_replay"
@@ -502,6 +498,38 @@
     "7770147": {
       "name": "Take Back",
       "policy": "replay_manual_only"
+    },
+    "7770148": {
+      "name": "UAC Atlantica Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770149": {
+      "name": "The Holt Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770150": {
+      "name": "Exultia Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770151": {
+      "name": "Cultist Base Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770152": {
+      "name": "Super Gore Nest Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770153": {
+      "name": "ARC Complex Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770154": {
+      "name": "Mars Core Slayer Gate Key",
+      "policy": "replay_idempotent"
+    },
+    "7770155": {
+      "name": "Taras Nabad Slayer Gate Key",
+      "policy": "replay_idempotent"
     }
   }
 }
