@@ -42,7 +42,7 @@
     "preserve_motion": true,
     "preserve_bobbing": true,
     "preserve_rotation": true,
-    "think_component": "bob_rotate_fast",
+    "think_component": "bob_rotate_slow",
     "material_mode": "resource_scoped_opaque_override",
     "material_decl": "generated/decls/material2/art/pickups/codex.decl",
     "material_sha256": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",

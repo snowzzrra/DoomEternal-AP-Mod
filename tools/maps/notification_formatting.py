@@ -10,6 +10,13 @@ _CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
 ITEM_NOTIFICATION_HEADER_KEY = "#str_ap_item_received"
 MAJOR_NOTIFICATION_KEY_PREFIX = "#str_ap_notify_item_received_"
 LOCATION_NOTIFICATION_HEADER_KEY = "#str_ap_location_sent"
+PROGRESSIVE_NOTIFICATION_ITEM_IDS = frozenset({
+    7770017,
+    7770088,
+    7770092,
+    7770901,
+    7770902,
+})
 
 ITEM_NOTIFICATION_TITLE = {
     "english": "AP ITEM RECEIVED",
@@ -34,25 +41,36 @@ def _sanitized_name(item_name: str) -> str:
     return name
 
 
-def _progressive_stage_count(definition: Any, stage: int | None) -> int | None:
+def progressive_notification_stage_count(item_id: int, definition: Any) -> int | None:
+    if item_id not in PROGRESSIVE_NOTIFICATION_ITEM_IDS:
+        return None
     if not isinstance(definition, dict) or definition.get("type") not in {
         "progressive_perk", "progressive_item",
     }:
-        if stage is not None:
-            raise ValueError("only progressive notifications accept a stage")
-        return None
+        raise ValueError(f"progressive notification item {item_id} has invalid metadata")
     perks = definition.get("perks")
     if not isinstance(perks, list) or not perks:
         raise ValueError("progressive notification requires non-empty perks")
-    if not isinstance(stage, int) or not 0 <= stage < len(perks):
-        raise ValueError("progressive notification stage is out of range")
     return len(perks)
+
+
+def _progressive_stage_count(
+    item_id: int, definition: Any, stage: int | None
+) -> int | None:
+    count = progressive_notification_stage_count(item_id, definition)
+    if count is None:
+        if stage is not None:
+            raise ValueError("only progressive notifications accept a stage")
+        return None
+    if not isinstance(stage, int) or not 0 <= stage < count:
+        raise ValueError("progressive notification stage is out of range")
+    return count
 
 
 def notification_key(item_id: int, definition: Any, *, stage: int | None = None) -> str:
     if not isinstance(item_id, int):
         raise ValueError("notification item ID must be an integer")
-    if _progressive_stage_count(definition, stage) is None:
+    if _progressive_stage_count(item_id, definition, stage) is None:
         return f"#str_ap_notify_item_{item_id}"
     return f"#str_ap_notify_item_{item_id}_{stage}"
 
@@ -86,7 +104,7 @@ def notification_text(
     # intentionally independent of progressive/currency presentation details.
     notification_key(item_id, definition, stage=stage)
     name = _sanitized_name(item_name)
-    progressive_count = _progressive_stage_count(definition, stage)
+    progressive_count = _progressive_stage_count(item_id, definition, stage)
     if progressive_count is not None:
         if stage is None:
             raise ValueError("progressive notification stage is required")
@@ -111,7 +129,15 @@ def major_notification_text(
         suffix = MAJOR_NOTIFICATION_SUFFIX[locale]
     except KeyError as error:
         raise ValueError(f"unsupported notification locale: {locale}") from error
-    return f"{_sanitized_name(item_name)} {suffix}"
+    name = _sanitized_name(item_name)
+    progressive_count = _progressive_stage_count(item_id, definition, stage)
+    if progressive_count is not None:
+        if stage is None:
+            raise ValueError("progressive notification stage is required")
+        if name.startswith("Progressive "):
+            name = name[len("Progressive "):]
+        name = f"{name} ({stage + 1}/{progressive_count})"
+    return f"{name} {suffix}"
 
 
 def location_notification_key(location_id: int) -> str:

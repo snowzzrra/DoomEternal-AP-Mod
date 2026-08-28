@@ -65,9 +65,13 @@ def assert_separate_automap_helper_guard() -> int:
                 for entry in config.get("secret_encounters", [])
                 if entry.get("automap_owner")
             }
+            target_policies = config.get("target_policies", {})
             expected_names = {
                 f"ap_automap_location_{location_id}"
-                for location_id in config["entities"].values()
+                for ap_check, location_id in config["entities"].items()
+                if not target_policies.get(
+                    ap_check.removeprefix("AP_CHECK_").lower(), {}
+                ).get("no_auto_automap_helper")
             } | {
                 f"ap_automap_location_{location_id}"
                 for location_id in secret_automap_owners
@@ -83,9 +87,31 @@ def assert_separate_automap_helper_guard() -> int:
                 helper_bounds = find_entity_block_bounds(
                     generated, f"ap_automap_location_{location_id}"
                 )
-                if source_bounds is None or helper_bounds is None:
+                if source_bounds is None:
                     raise ValueError(f"Automap helper source/owner missing: {map_key}/{location_id}")
                 source_block = source_text[source_bounds[0]:source_bounds[1]]
+                target_policy = target_policies.get(entity_name, {})
+                if target_policy.get("no_auto_automap_helper"):
+                    if helper_bounds is not None:
+                        raise ValueError(f"Redundant Automap helper retained: {map_key}/{location_id}")
+                    generated_bounds = find_entity_block_bounds(generated, entity_name)
+                    if generated_bounds is None:
+                        raise ValueError(f"Native marker source missing: {map_key}/{location_id}")
+                    generated_owner = generated[generated_bounds[0]:generated_bounds[1]]
+                    marker_owner = generated_owner
+                    if _scalar(generated_owner, "automapPropertiesDecl") is None:
+                        visual_name = target_policy.get(
+                            "independent_visual", {}
+                        ).get("entity_name", f"ap_location_visual_{location_id}")
+                        visual_bounds = find_entity_block_bounds(generated, visual_name)
+                        if visual_bounds is not None:
+                            marker_owner = generated[visual_bounds[0]:visual_bounds[1]]
+                    if _scalar(marker_owner, "automapPropertiesDecl") != _expected_decl(source_block):
+                        raise ValueError(f"Native Automap marker drift: {map_key}/{location_id}")
+                    checked += 1
+                    continue
+                if helper_bounds is None:
+                    raise ValueError(f"Automap helper source/owner missing: {map_key}/{location_id}")
                 helper = generated[helper_bounds[0]:helper_bounds[1]]
                 if _scalar(helper, "class") != "idInfo" or _scalar(helper, "inherit") != "info/null":
                     raise ValueError(f"Automap helper type drift: {map_key}/{location_id}")
@@ -99,7 +125,6 @@ def assert_separate_automap_helper_guard() -> int:
                         raise ValueError(f"Automap helper retains {forbidden}: {map_key}/{location_id}")
                 if _scalar(helper, "automapPropertiesDecl") != _expected_decl(source_block):
                     raise ValueError(f"Automap helper decl drift: {map_key}/{location_id}")
-                target_policy = config.get("target_policies", {}).get(entity_name, {})
                 expected_position = target_policy.get(
                     "independent_position", _position(source_block)
                 )

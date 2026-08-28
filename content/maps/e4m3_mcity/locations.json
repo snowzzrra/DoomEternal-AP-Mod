@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "preserve_rotation": true,
+  "preserve_visual_layers": true,
   "entities": {
     "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770444,
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770445,
@@ -46,5 +48,22 @@
   },
   "location_feedback": {
     "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "slayergate_progress_support_rune_mcity": {
+      "native_entity_contract": {
+        "original_targets": ["slayergate_target_changelayer_slayergate_4"],
+        "required_snippets": [
+          "inherit = \"progress/support_rune\";",
+          "class = \"idInteractable_Rune\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "automapPropertiesDecl = \"rune_support\";",
+          "triggerDef = \"trigger/interact/progress_rune\";",
+          "progressionCategory = \"PROGRESSION_CATEGORY_SUPPORT_RUNE\";"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true
+    }
   }
 }

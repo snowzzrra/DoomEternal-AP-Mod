@@ -881,16 +881,21 @@ public:
     explicit MissionTransitionMonitor(const RuntimePathInfo& runtimePaths)
         : runtimePaths_(runtimePaths) {}
 
-    void Poll(bool gameplayLoaded, bool loading) {
+    void Poll(bool gameplayLoaded, bool loading, bool nativeSafe) {
         const DWORD now = GetTickCount();
         const bool stateChanged = !gameplayStateInitialized_
             || gameplayLoaded != gameplayLoaded_
             || !loadingStateInitialized_
-            || loading != loading_;
+            || loading != loading_
+            || !nativeSafeInitialized_
+            || nativeSafe != nativeSafe_;
         if (!stateChanged && now < nextPollTick_) {
             return;
         }
         nextPollTick_ = now + kGoalMonitorPollMs;
+        const bool nativeSafeChanged = !nativeSafeInitialized_ || nativeSafe != nativeSafe_;
+        nativeSafeInitialized_ = true;
+        nativeSafe_ = nativeSafe;
 
         if (!EnsureConfigured()) {
             return;
@@ -947,12 +952,17 @@ public:
             }
             activeSlotDirectory_ = entered->slotDirectory;
             lastSnapshot_ = *entered;
+            lastSnapshotProvisional_ = provisional;
             WriteGameplayEvidence(entered, provisional);
             return;
         }
 
         if (!gameplayLoaded_) {
             return;
+        }
+
+        if (nativeSafeChanged && !lastSnapshot_.path.empty()) {
+            WriteGameplayEvidence(lastSnapshot_, lastSnapshotProvisional_);
         }
 
         const std::optional<SaveSnapshot> changed = ReadChangedSnapshot(menuSlotTokens_);
@@ -974,6 +984,7 @@ public:
         activeSlotDirectory_ = latest->slotDirectory;
         lastSnapshot_ = *latest;
         const bool provisional = !changed.has_value();
+        lastSnapshotProvisional_ = provisional;
         WriteGameplayEvidence(latest, provisional);
     }
 
@@ -1232,6 +1243,7 @@ private:
             contents += "slot=" + snapshot->slotDirectory + "\n"
                 + "map_name=" + snapshot->mapName + "\n"
                 + "provisional=" + std::string(provisional ? "true" : "false") + "\n"
+                + "native_safe=" + std::string(nativeSafe_ ? "true" : "false") + "\n"
                 + "source_file=" + snapshot->path + "\n";
         }
         fwrite(contents.data(), 1, contents.size(), output);
@@ -1388,6 +1400,7 @@ private:
     std::string steamRemoteDir_;
     unsigned long long steamId3_ = 0;
     SaveSnapshot lastSnapshot_;
+    bool lastSnapshotProvisional_ = false;
     std::string activeSlotDirectory_;
     std::vector<std::pair<std::string, long long>> menuSlotTokens_;
     unsigned long long sequence_ = 0;
@@ -1396,6 +1409,8 @@ private:
     bool gameplayLoaded_ = false;
     bool loadingStateInitialized_ = false;
     bool loading_ = false;
+    bool nativeSafeInitialized_ = false;
+    bool nativeSafe_ = false;
     bool sawLoadingForEpoch_ = false;
     DWORD nextPollTick_ = 0;
     DWORD nextConfigRetryTick_ = 0;
@@ -1814,6 +1829,22 @@ bool IsTelemetryJob(const CommandJob& job) {
     return filename.rfind("telemetry.", 0) == 0;
 }
 
+bool IsSilentMaintenanceJob(const CommandJob& job) {
+    const std::string commandId = CommandIdFromPath(job.path);
+    return StartsWith(commandId, "reconcile-")
+        || commandId.find("-reconcile-") != std::string::npos
+        || StartsWith(commandId, "automap-cleanup-")
+        || commandId.find("-automap-cleanup-") != std::string::npos
+        || job.mapEntityOperation == MapEntityOperation::CheckedVisualHide;
+}
+
+bool IsFreshReceiptCommandId(const std::string& commandId) {
+    static const std::regex receipt(
+        R"(^recv-[0-9a-f]{16}-[0-9]+-item-[0-9]+-cmd-[0-9]+(?:-notify)?$)"
+    );
+    return std::regex_match(commandId, receipt);
+}
+
 bool IsMapEntitySafeJob(const CommandJob& job) {
     return job.executionClass == CommandExecutionClass::MapEntitySafe;
 }
@@ -2056,9 +2087,6 @@ int main(int argc, char** argv) {
     healthStatePublisher.PublishStarting();
 
     CommandSourceMap recoveredSources;
-    // A previous bridge process may have left its room marker behind. Do not
-    // trust it for startup recovery; current bridge publishes only after
-    // authoritative Connected identity.
     bool startupNamespaceCleared = DeleteFileA(kQueueSessionNamespacePath) != FALSE;
     if (!startupNamespaceCleared) {
         const DWORD error = GetLastError();
@@ -2118,7 +2146,8 @@ int main(int argc, char** argv) {
             gameStateProbe.Poll();
             missionTransitionMonitor.Poll(
                 gameStateProbe.IsGameplayLoaded(),
-                gameStateProbe.IsLoading()
+                gameStateProbe.IsLoading(),
+                gameStateProbe.IsSafeForRpc()
             );
             Sleep(100);
         }
@@ -2139,13 +2168,37 @@ int main(int argc, char** argv) {
     bool lastRpcEnabled = false;
     std::string lastGateReason;
     DWORD lastStallLog = 0;
+    bool silentBurstActive = false;
+    DWORD silentBurstStarted = 0;
+    DWORD silentBurstRpcMs = 0;
+    size_t silentBurstOperations = 0;
+    auto finishSilentBurst = [&](const char* reason) {
+        if (!silentBurstActive) return;
+        const DWORD totalMs = GetTickCount() - silentBurstStarted;
+        const DWORD schedulerMs = totalMs > silentBurstRpcMs
+            ? totalMs - silentBurstRpcMs : 0;
+        const DWORD averageRpcMs = silentBurstOperations
+            ? silentBurstRpcMs / static_cast<DWORD>(silentBurstOperations) : 0;
+        LogDebug(
+            "SILENT_MAINTENANCE_BURST operations=" + std::to_string(silentBurstOperations)
+            + " total_ms=" + std::to_string(totalMs)
+            + " average_rpc_ms=" + std::to_string(averageRpcMs)
+            + " scheduler_overhead_ms=" + std::to_string(schedulerMs)
+            + " reason=" + reason
+        );
+        silentBurstActive = false;
+        silentBurstStarted = 0;
+        silentBurstRpcMs = 0;
+        silentBurstOperations = 0;
+    };
     AmmoHotkeyHandler ammoHotkey(LogDebug);
 
     while (true) {
         gameStateProbe.Poll();
         missionTransitionMonitor.Poll(
             gameStateProbe.IsGameplayLoaded(),
-            gameStateProbe.IsLoading()
+            gameStateProbe.IsLoading(),
+            gameStateProbe.IsSafeForRpc()
         );
         RetryDeliveredSpoolRemovals(deliveredSpools, knownCommandIds);
         std::optional<std::string> activeNamespace;
@@ -2245,6 +2298,9 @@ int main(int argc, char** argv) {
 
         const bool frontGateOpen = !queue.empty()
             && CommandExecutionGateOpen(queue.front(), rpcArmed, rpcTransportReady, gameStateProbe);
+        if (silentBurstActive && (queue.empty() || !frontGateOpen)) {
+            finishSilentBurst(queue.empty() ? "queue_drained" : "safety_gate_closed");
+        }
         if (!queue.empty() && !frontGateOpen && now - lastStallLog >= kRpcStallWarnMs) {
             const DWORD oldestAge = now - queue.front().importedTick;
             const QueueSnapshot diskQueue = CountQueueFiles();
@@ -2277,8 +2333,12 @@ int main(int argc, char** argv) {
                 continue;
             }
             const std::string commandId = CommandIdFromPath(job.path);
-            const bool normalReceipt = IsNormalReceiptCommandId(commandId);
-            const bool dispatchReady = normalReceipt || job.diagnosticCondump
+            const bool normalReceipt = IsFreshReceiptCommandId(commandId);
+            const bool silentMaintenance = IsSilentMaintenanceJob(job);
+            if (silentBurstActive && !silentMaintenance) {
+                finishSilentBurst("next_job_not_silent");
+            }
+            const bool dispatchReady = normalReceipt || job.diagnosticCondump || silentMaintenance
                 ? ReceiptDispatchReady(now, job.nextAttemptTick)
                 : now - lastExecution >= kCommandSpacingMs;
             if (!dispatchReady) {
@@ -2339,6 +2399,7 @@ int main(int argc, char** argv) {
                 );
             }
             if (ExecuteCommand(job)) {
+                const DWORD rpcElapsedMs = GetTickCount() - dispatchTick;
                 const bool spoolRemoved = SpoolRemoved(job.path);
                 if (normalReceipt) {
                     LogDebug(
@@ -2347,7 +2408,7 @@ int main(int argc, char** argv) {
                         + " result=command_consumed_unverified"
                         + " spool_removal=" + (spoolRemoved ? "complete" : "pending")
                         + " elapsed_ms="
-                        + std::to_string(GetTickCount() - dispatchTick)
+                        + std::to_string(rpcElapsedMs)
                         + DeliveryContextFields()
                     );
                     if (spoolRemoved) {
@@ -2372,6 +2433,15 @@ int main(int argc, char** argv) {
                         + DeliveryContextFields()
                     );
                 }
+                if (silentMaintenance) {
+                    if (!silentBurstActive) {
+                        silentBurstActive = true;
+                        silentBurstStarted = dispatchTick;
+                    }
+                    ++silentBurstOperations;
+                    silentBurstRpcMs += rpcElapsedMs;
+                    dispatchNextImmediately = true;
+                }
                 ++acknowledgedCommands;
                 if (!spoolRemoved) {
                     deliveredSpools[commandId] = {
@@ -2384,6 +2454,9 @@ int main(int argc, char** argv) {
                 }
                 queue.erase(queue.begin() + dispatchIndex);
             } else {
+                if (silentMaintenance) {
+                    finishSilentBurst("rpc_failure");
+                }
                 if (normalReceipt) {
                     ++job.retryAttempt;
                     const DWORD delay = ReceiptRetryDelayMs(job.retryAttempt);

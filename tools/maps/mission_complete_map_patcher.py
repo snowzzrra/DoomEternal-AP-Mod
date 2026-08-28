@@ -372,7 +372,25 @@ def _patch_declared_terminal(
             f"{map_key}: preserved terminal targets differ from vanilla: "
             f"{compiled['preserved_native_targets']} != {before}"
         )
-    patched = replace_targets_block(block, compiled["owner_targets"])
+    terminal_class = re.search(r'\bclass\s*=\s*"([^"]+)";', block)
+    if terminal_class and terminal_class.group(1) == "idTarget_LevelTransition":
+        native_owner = f"{owner}_ap_native_transition"
+        native_delay = f"{owner}_ap_native_delay"
+        native = block.replace(f"entityDef {owner}", f"entityDef {native_owner}", 1)
+        relay_entity = _render_relay(
+            owner,
+            [*compiled["owner_targets"], native_delay],
+            0.0,
+        )
+        relay_bounds = find_entity_block_bounds(relay_entity, owner)
+        if relay_bounds is None:
+            raise ValueError(f"{map_key}: could not build terminal publisher relay")
+        patched = relay_entity[relay_bounds[0]:relay_bounds[1]] + "\n" + native
+        compiled["entities"] += _render_relay(native_delay, [native_owner], 0.25)
+        compiled["native_owner"] = native_owner
+        compiled["native_delay"] = native_delay
+    else:
+        patched = replace_targets_block(block, compiled["owner_targets"])
     generated_map.write_text(
         (text[:bounds[0]] + patched + text[bounds[1]:]).rstrip()
         + "\n" + compiled["entities"],
@@ -385,6 +403,8 @@ def _patch_declared_terminal(
         "after_targets": compiled["owner_targets"],
         "publishers": compiled["publishers"],
         "preserved_native_targets": compiled["preserved_native_targets"],
+        **({"native_owner": compiled["native_owner"], "native_delay": compiled["native_delay"]}
+           if "native_owner" in compiled else {}),
         "changed_lists": 1,
     }
 

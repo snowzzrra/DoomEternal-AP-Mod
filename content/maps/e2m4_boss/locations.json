@@ -63,7 +63,7 @@
         "class": "idProp2",
         "inherit": null,
         "model": "art/pickups/codex.lwo",
-        "thinkComponentDecl": "bob_rotate_fast",
+        "thinkComponentDecl": "bob_rotate_slow",
         "position": [
           -43.3499985,
           -20.1500034,
@@ -85,7 +85,7 @@
         "class": "idProp2",
         "inherit": null,
         "model": "art/pickups/codex.lwo",
-        "thinkComponentDecl": "bob_rotate_fast",
+        "thinkComponentDecl": "bob_rotate_slow",
         "position": [
           6.20003986,
           -6.19996214,

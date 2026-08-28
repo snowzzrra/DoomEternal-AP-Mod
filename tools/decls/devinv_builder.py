@@ -27,6 +27,196 @@ PAGE_STATS_BLOCK = """\t\tstatsToGive = {
 \t\t}
 """
 
+CODEX_DOSSIER_CATEGORIES = {
+    "earth": (
+        "codex/earth/remaining_population_1",
+        "codex/earth/remaining_population_2",
+        "codex/earth/formation_of_arc",
+        "codex/earth/cultist_base",
+        "codex/earth/doom_hunter",
+        "codex/earth/hellgrowth_1",
+        "codex/earth/hellgrowth_2",
+        "codex/earth/super_gore_nest",
+        "codex/earth/return_of_hayden_1",
+        "codex/earth/return_of_hayden_2",
+        "codex/earth/the_arc_1",
+        "codex/earth/the_arc_2",
+        "codex/earth/samuel_hayden",
+        "codex/earth/bfg_10k",
+        "codex/earth/icon_of_sin",
+        "codex/earth/arc_broadcast_1",
+        "codex/earth/arc_broadcast_2",
+        "codex/earth/arc_broadcast_3",
+        "codex/earth/arc_broadcast_4",
+        "codex/earth/arc_broadcast_5",
+        "codex/earth/arc_broadcast_6",
+        "codex/earth/elena_richardson_1",
+        "codex/earth/elena_richardson_2",
+        "codex/earth/elena_richardson_3",
+        "codex/earth/elena_richardson_4",
+    ),
+    "sentinel": (
+        "codex/sentinel/exultia",
+        "codex/sentinel/wolf",
+        "codex/sentinel/king_novik",
+        "codex/sentinel/betrayer",
+        "codex/sentinel/fortress_of_doom",
+        "codex/sentinel/lost_city_hebeth",
+        "codex/sentinel/sentinel_prime",
+        "codex/sentinel/taras_nabad",
+        "codex/sentinel/divinity_machine",
+        "codex/sentinelhistory/sentinel_history_01",
+        "codex/sentinelhistory/sentinel_history_02",
+        "codex/sentinelhistory/sentinel_history_03",
+        "codex/sentinelhistory/sentinel_history_04",
+        "codex/sentinelhistory/sentinel_history_05",
+        "codex/sentinelhistory/sentinel_history_06",
+        "codex/sentinelhistory/sentinel_history_07",
+        "codex/sentinelhistory/sentinel_history_08",
+        "codex/sentinelhistory/sentinel_history_09",
+        "codex/sentinelhistory/sentinel_history_10",
+        "codex/sentinelhistory/sentinel_history_11",
+        "codex/sentinelhistory/sentinel_history_12",
+        "codex/sentinelhistory/sentinel_history_13",
+        "codex/sentinelhistory/sentinel_history_14",
+    ),
+    "hell": (
+        "codex/hell/hell_barges",
+        "codex/hell/hell_priests",
+        "codex/hell/deag_nilox",
+        "codex/hell/deag_ranak",
+        "codex/hell/doom_hunter",
+        "codex/hell/marauder",
+        "codex/hell/deag_grav",
+        "codex/hell/gladiator",
+        "codex/hell/nekravol_1",
+        "codex/hell/fuel_eternal_flame_1",
+        "codex/hell/nekravol_2",
+        "codex/hell/fuel_eternal_flame_2",
+        "codex/hell/fuel_eternal_flame_3",
+        "codex/hell/icon_of_sin",
+    ),
+    "maykr": (
+        "codex/maykr/urdak_1",
+        "codex/maykr/khan_maykr",
+        "codex/maykr/maykr_angels",
+    ),
+    "demons": (
+        "codex/hell/demon_zombie_earth",
+        "codex/hell/demon_imp",
+        "codex/hell/demon_soldier_blaster",
+        "codex/hell/demon_gargoyle",
+        "codex/hell/demon_lostsoul",
+        "codex/maykr/maykr_drones",
+        "codex/hell/demon_arachnotron",
+        "codex/hell/demon_cacodemon",
+        "codex/hell/demon_carcass",
+        "codex/hell/demon_mancubus_cyber",
+        "codex/hell/demon_dreadknight",
+        "codex/hell/demon_hellknight",
+        "codex/hell/demon_mancubus_fire",
+        "codex/hell/demon_painelemental",
+        "codex/hell/demon_pinky",
+        "codex/hell/demon_prowler",
+        "codex/hell/demon_revenant",
+        "codex/hell/demon_pinky_spectre",
+        "codex/hell/demon_whiplash",
+        "codex/hell/demon_archvile",
+        "codex/hell/demon_baronofhell",
+        "codex/hell/demon_doom_hunter",
+        "codex/hell/demon_marauder",
+        "codex/hell/demon_tyrant",
+        "codex/hell/demon_buffpod",
+        "codex/hell/demon_cueball",
+        "codex/hell/demon_tentacle",
+    ),
+    "slayer": (
+        "codex/slayer/arsenal_doomblade",
+        "codex/slayer/arsenal_ballista",
+        "codex/slayer/arsenal_bfg",
+        "codex/slayer/arsenal_chaingun",
+        "codex/slayer/arsenal_chainsaw",
+        "codex/slayer/arsenal_combat_shotgun",
+        "codex/slayer/arsenal_crucible",
+        "codex/slayer/arsenal_equipment_launcher",
+        "codex/slayer/arsenal_heavy_cannon",
+        "codex/slayer/arsenal_plasmarifle",
+        "codex/slayer/arsenal_rocketlauncher",
+        "codex/slayer/arsenal_super_shotgun",
+        "codex/slayer/arsenal_unmaykr",
+    ),
+    "tutorials": (
+        "codex/tutorials/custom_skins",
+        "codex/tutorials/empowered_demon",
+        "codex/tutorials/secret",
+        "codex/tutorials/mission_select",
+        "codex/tutorials/cheat_codes",
+        "codex/tutorials/sentinel_battery",
+        "codex/tutorials/demon_prison",
+        "codex/tutorials/empyrean_shard",
+        "codex/tutorials/unmaykr",
+        "codex/tutorials/glory_kill",
+        "codex/tutorials/double_jump",
+        "codex/tutorials/chainsaw",
+        "codex/tutorials/objective_marker",
+        "codex/tutorials/mod_station",
+        "codex/tutorials/mod_swap",
+        "codex/tutorials/weapon_wheel",
+        "codex/tutorials/weak_point_arachnotron",
+        "codex/tutorials/weak_point_cacodemon",
+        "codex/tutorials/weak_point_revenant",
+        "codex/tutorials/weak_point_mancubus",
+        "codex/tutorials/plasma_vs_shields",
+        "codex/tutorials/cueball",
+        "codex/tutorials/weak_point_pinky",
+        "codex/tutorials/weak_point_doomhunter",
+        "codex/tutorials/weak_point_cyber_mancubus",
+        "codex/tutorials/weak_point_marauder",
+        "codex/tutorials/weak_point_maykr_zombie",
+        "codex/tutorials/boss_gladiator_a",
+        "codex/tutorials/boss_gladiator_b",
+        "codex/tutorials/boss_khan_maykr",
+        "codex/tutorials/boss_icon_of_sin_a",
+        "codex/tutorials/boss_icon_of_sin_b",
+        "codex/tutorials/automap_station",
+        "codex/tutorials/extra_lives",
+        "codex/tutorials/powerups",
+        "codex/tutorials/wall_climb",
+        "codex/tutorials/fast_travel",
+        "codex/tutorials/equipment_frag",
+        "codex/tutorials/equipment_flame",
+        "codex/tutorials/equipment_ice",
+        "codex/tutorials/argent_cell",
+        "codex/tutorials/blood_punch",
+        "codex/tutorials/blood_punch_upgrade_aoe",
+        "codex/tutorials/blood_punch_upgrade_charge",
+        "codex/tutorials/blood_punch_upgrade_maxcharges",
+        "codex/tutorials/rune",
+        "codex/tutorials/demonic_corruption",
+        "codex/tutorials/secret_encounters",
+        "codex/tutorials/slayer_key",
+        "codex/tutorials/slayer_gate",
+        "codex/tutorials/slayer_gate_retry",
+        "codex/tutorials/weapon_points",
+        "codex/tutorials/mastery_token_weapon",
+        "codex/tutorials/dash",
+        "codex/tutorials/dash_refill",
+        "codex/tutorials/praetor_suit_perks",
+        "codex/tutorials/play_as_revenant",
+        "codex/tutorials/super_shotgun",
+        "codex/tutorials/buffpod",
+        "codex/tutorials/rad_suit",
+        "codex/tutorials/bfg",
+        "codex/tutorials/crucible",
+    ),
+}
+CODEX_DOSSIER_ENTRIES = tuple(
+    entry for category in CODEX_DOSSIER_CATEGORIES.values() for entry in category
+)
+CODEX_DOSSIER_BLOCK = "\t\tcodexEntriesToGive = {\n" + f"\t\t\tnum = {len(CODEX_DOSSIER_ENTRIES)};\n" + "\n".join(
+    f'\t\t\titem[{index}] = "{entry}";' for index, entry in enumerate(CODEX_DOSSIER_ENTRIES)
+) + "\n\t\t}\n"
+
 # Hash-locked retail E1M1 loadout used by room and package generation.
 CANONICAL_BASE = """{
 \tedit = {
@@ -122,6 +312,10 @@ _CURRENCY_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 _INHERIT_DECL_RE = re.compile(r"^[ \t]*inherit\s*=\s*[^;]+;\s*\n", re.MULTILINE)
+_CODEX_ENTRIES_RE = re.compile(
+    r"\t\tcodexEntriesToGive\s*=\s*\{.*?\n\t\t\}", re.DOTALL
+)
+_CODEX_ITEM_RE = re.compile(r'\t\t\titem\[(?P<index>\d+)\] = "(?P<path>[^"]+)";')
 
 
 def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str, Any]]:
@@ -365,6 +559,11 @@ def _patch(source: str) -> str:
         raise ValueError("DevInvLoadout edit block is missing or ambiguous")
 
     override = source.replace(edit_marker, edit_marker + PAGE_STATS_BLOCK, 1)
+    override = override.replace(
+        "\t\tclearAllBeforeApply = true;",
+        "\t\tclearAllBeforeApply = true;\n" + CODEX_DOSSIER_BLOCK.rstrip("\n"),
+        1,
+    )
 
     # Verify patch succeeded
     if "STAT_SUIT_PAGE_UNLOCKED" not in override:
@@ -377,8 +576,22 @@ def _patch(source: str) -> str:
         raise ValueError("DevInvLoadout patch: existing currencyToGive was corrupted")
     if override.count("clearAllBeforeApply") != 1:
         raise ValueError("DevInvLoadout patch: existing clearAllBeforeApply was corrupted")
+    _assert_codex_dossier(override)
 
     return override
+
+
+def _assert_codex_dossier(source: str) -> None:
+    match = _CODEX_ENTRIES_RE.search(source)
+    if match is None:
+        raise ValueError("DevInvLoadout codexEntriesToGive block is missing or ambiguous")
+    items = [
+        (int(item.group("index")), item.group("path"))
+        for item in _CODEX_ITEM_RE.finditer(match.group(0))
+    ]
+    expected = list(enumerate(CODEX_DOSSIER_ENTRIES))
+    if items != expected:
+        raise ValueError("DevInvLoadout codexEntriesToGive does not match stable dossier baseline")
 
 
 def _decl_item(field: str, path: str, flags: tuple[str, ...], index: int, count: int | None = None) -> str:
@@ -545,6 +758,7 @@ def validate_devinv_source(
             raise ValueError(f"DevInvLoadout missing required marker: {marker}")
     if "STAT_CHALLENGE_PAGE_UNLOCKED" in source or "strip" in source.lower():
         raise ValueError("DevInvLoadout contains unsupported page/stripping capability")
+    _assert_codex_dossier(source)
     if starting_inventory is not None and not isinstance(starting_inventory, Mapping):
         raise ValueError("starting_inventory must be an object")
     if starting_weapon is not None and starting_weapon not in STARTING_WEAPON_NAMES:
@@ -733,7 +947,7 @@ def build_tag_devinv_overrides(
         if "clearAllBeforeApply = true;" not in override:
             inherited_fields.append("\t\tclearAllBeforeApply = true;")
         if inherited_fields:
-            edit_end = override.find("\n\t}", override.find("\tedit = {"))
+            edit_end = override.rfind("\n\t}")
             if edit_end < 0:
                 raise ValueError(f"TAG DevInv source has no editable declaration: {declaration_key}")
             override = (
@@ -741,6 +955,19 @@ def build_tag_devinv_overrides(
                 + "\n"
                 + "\n".join(inherited_fields)
                 + override[edit_end:]
+            )
+        codex_match = _CODEX_ENTRIES_RE.search(override)
+        if codex_match is None:
+            override = override.replace(
+                "\t\tclearAllBeforeApply = true;",
+                "\t\tclearAllBeforeApply = true;\n" + CODEX_DOSSIER_BLOCK.rstrip("\n"),
+                1,
+            )
+        else:
+            override = (
+                override[:codex_match.start()]
+                + CODEX_DOSSIER_BLOCK.rstrip("\n")
+                + override[codex_match.end():]
             )
         # Runtime loads one self-contained declaration per archive.  The
         # extracted inheritance chain is provenance, not a package dependency.

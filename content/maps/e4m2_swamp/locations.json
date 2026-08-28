@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "preserve_rotation": true,
+  "preserve_visual_layers": true,
   "entities": {
     "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_1": 7770433,
     "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_4": 7770434,

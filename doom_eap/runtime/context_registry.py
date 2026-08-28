@@ -15,7 +15,7 @@ SUPPORT_RUNE_CAPABILITY = "support_runes_v1"
 TAG_CAPABILITY = "tag_context_v1"
 TAG_SPECIAL_CAPABILITY = "tag_special_v1"
 SUPPORT_RUNE_IDS = frozenset({7770145, 7770146, 7770147})
-TAG_SPECIAL_IDS = frozenset({7770009, 7770901, 7770902})
+TAG_SPECIAL_IDS = frozenset({7770009, 7770902})
 CRUCIBLE_ID = 7770007
 GATE_KEY_TO_MAP = {
     7770148: "e4m1_rig",
@@ -157,6 +157,8 @@ def context_item_ids(context: RuntimeContext, received_item_ids: Iterable[int]) 
         if item_id in SUPPORT_RUNE_IDS and not context.supports(SUPPORT_RUNE_CAPABILITY):
             continue
         if item_id in TAG_SPECIAL_IDS and not context.supports(TAG_SPECIAL_CAPABILITY):
+            continue
+        if item_id == 7770901 and not context.supports("special_weapon_v1"):
             continue
         if item_id == CRUCIBLE_ID and not context.supports("crucible_v1"):
             continue

@@ -495,7 +495,7 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
                 or presentation.get("material_mode")
                 != "resource_scoped_opaque_override"
                 or presentation.get("opaque_template") != "template/pbr"
-                or presentation.get("think_component") != "bob_rotate_fast"
+                or presentation.get("think_component") != "bob_rotate_slow"
                 or any(
                     presentation.get(key) is not True
                     for key in (

@@ -127,7 +127,6 @@
     "7770080": {"type": "perk", "perk": "perk/player/weapons/chaingun/energy_shell_mastery"},
     "7770081": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/turret",
     "7770082": {"type": "perk", "perk": "perk/player/weapons/chaingun/turret_mastery"},
-    "7770083": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/double_barrel/meat_hook",
     "7770084": {"type": "perk", "perk": "perk/player/weapons/double_barrel/meat_hook_mastery"},
     "7770085": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_speed",
     "7770086": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_dash",
@@ -253,12 +252,12 @@
     "7770145": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/weakpoint_concussive_blast",
     "7770146": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/blood_punch_low_health_bonus_damage",
     "7770147": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/extra_life_refund",
-    "7770148": "give inventory/map_objects/keycard/slayer_key",
-    "7770149": "give inventory/map_objects/keycard/slayer_key",
-    "7770150": "give inventory/map_objects/keycard/slayer_key",
-    "7770151": "give inventory/map_objects/keycard/slayer_key",
-    "7770152": "give inventory/map_objects/keycard/slayer_key",
-    "7770153": "give inventory/map_objects/keycard/slayer_key",
-    "7770154": "give inventory/map_objects/keycard/slayer_key",
-    "7770155": "give inventory/map_objects/keycard/slayer_key"
+    "7770148": "give map_objects/keycard/slayer_key",
+    "7770149": "give map_objects/keycard/slayer_key",
+    "7770150": "give map_objects/keycard/slayer_key",
+    "7770151": "give map_objects/keycard/slayer_key",
+    "7770152": "give map_objects/keycard/slayer_key",
+    "7770153": "give map_objects/keycard/slayer_key",
+    "7770154": "give map_objects/keycard/slayer_key",
+    "7770155": "give map_objects/keycard/slayer_key"
 }

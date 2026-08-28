@@ -21,6 +21,7 @@ from tools.maps.notification_formatting import (
     major_notification_text,
     notification_key,
     notification_text,
+    progressive_notification_stage_count,
 )
 
 ITEM_KEY_PATTERN = re.compile(
@@ -121,10 +122,14 @@ def build_string_table(
             item_name = item_names[item_id]
         except KeyError as error:
             raise ValueError(f"item {item_id} has no notification name") from error
-        stages = range(len(definition["perks"])) if (
-            isinstance(definition, dict)
-            and definition.get("type") in {"progressive_perk", "progressive_item"}
-        ) else (None,)
+        progressive_stage_count = progressive_notification_stage_count(
+            item_id, definition
+        )
+        stages = (
+            range(progressive_stage_count)
+            if progressive_stage_count is not None
+            else (None,)
+        )
         for stage in stages:
             key = notification_key(item_id, definition, stage=stage)
             if key in referenced_keys:

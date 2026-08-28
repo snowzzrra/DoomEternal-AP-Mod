@@ -57,7 +57,6 @@
         "7770080": {"name": "Energy Shield Mastery", "kind": "mastery", "representations": [{"field": "perk", "path": "perk/player/weapons/chaingun/energy_shell_mastery", "flags": ["equip"]}]},
         "7770081": {"name": "Mobile Turret", "kind": "weapon_mod", "representations": [{"field": "perk", "path": "perk/player/weapons/chaingun/turret", "flags": ["equip"]}]},
         "7770082": {"name": "Mobile Turret Mastery", "kind": "mastery", "representations": [{"field": "perk", "path": "perk/player/weapons/chaingun/turret_mastery", "flags": ["equip"]}]},
-        "7770083": {"name": "Meat Hook", "kind": "weapon_mod", "representations": [{"field": "perk", "path": "perk/player/weapons/double_barrel/meat_hook", "flags": ["equip"]}]},
         "7770084": {"name": "Meat Hook Mastery", "kind": "mastery", "representations": [{"field": "perk", "path": "perk/player/weapons/double_barrel/meat_hook_mastery", "flags": ["equip"]}]},
         "7770085": {"name": "Savagery", "kind": "rune", "representations": [{"field": "perk", "path": "perk/player/runes/glory_kill_speed", "flags": ["isRune"]}]},
         "7770086": {"name": "Seek and Destroy", "kind": "rune", "representations": [{"field": "perk", "path": "perk/player/runes/glory_kill_dash", "flags": ["isRune"]}]},

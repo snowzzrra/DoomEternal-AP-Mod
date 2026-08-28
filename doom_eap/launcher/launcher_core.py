@@ -544,17 +544,55 @@ class RoomCompiler:
 
     DEVINV_MAP_KEY = "e1m1_intro"
     ENHANCED_MELEE_PATH = "gameresources/generated/decls/damage/damage/player/melee_d5_forward.decl"
-    ENHANCED_MELEE_DECL = b'''declType( damage ) {
-    edit = {
-        inherit = "damage/player/directional_melee";
-        damageName = "fists";
-        minDamage = 160;
-        maxDamage = 160;
-        isMelee = true;
-        doom5MeleeTest = {
-            isDoom5Melee = true;
-        }
-    }
+    ENHANCED_MELEE_DECL = b'''{
+\tinherit = "damage/player/directional_melee";
+\tedit = {
+\t\tdamageParms = {
+\t\t\tweaponDamageType = "PLAYER_WEAPON_MELEE";
+\t\t\tdoom5MeleeTest = {
+\t\t\t\timpulseVelocity = {
+\t\t\t\t\tx = 18;
+\t\t\t\t\tz = 1.5;
+\t\t\t\t}
+\t\t\t\tmonsterImpulseScales = {
+\t\t\t\t\tnum = 1;
+\t\t\t\t\titem[0] = {
+\t\t\t\t\t\tmonsterType = "AI_MONSTER_HELLKNIGHT AI_MONSTER_DREADKNIGHT AI_MONSTER_PINKY AI_MONSTER_SPECTRE AI_MONSTER_CACODEMON AI_MONSTER_PAIN_ELEMENTAL AI_MONSTER_MANCUBUS AI_MONSTER_CYBER_MANCUBUS AI_MONSTER_ARACHNOTRON AI_MONSTER_REVENANT AI_MONSTER_WHIPLASH";
+\t\t\t\t\t\tvalue = 0.800000012;
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\tmonsterImpulsePainTypes = {
+\t\t\t\t\tnum = 7;
+\t\t\t\t\titem[0] = "PAIN_FALTER_LIGHT";
+\t\t\t\t\titem[1] = "PAIN_FALTER";
+\t\t\t\t\titem[2] = "PAIN_PUSHBACK";
+\t\t\t\t\titem[3] = "PAIN_STAGGER";
+\t\t\t\t\titem[4] = "PAIN_STAGGER_VULNERABLE";
+\t\t\t\t\titem[5] = "PAIN_KNOCKDOWN";
+\t\t\t\t\titem[6] = "PAIN_LIVING_RAGDOLL";
+\t\t\t\t}
+\t\t\t\tattackerKnockback = 43.2054024;
+\t\t\t\tattackerKnockbackMS = 200;
+\t\t\t\tattackerVelocityScale = 0.850000024;
+\t\t\t\tmonsterMaxImpulseVelocity = {
+\t\t\t\t\tnum = 2;
+\t\t\t\t\titem[0] = {
+\t\t\t\t\t\tmonsterType = "AI_MONSTER_ZOMBIE_TIER_1 AI_MONSTER_ZOMBIE_TIER_3 AI_MONSTER_IMP AI_MONSTER_STONE_IMP AI_MONSTER_GARGOYLE AI_MONSTER_PROWLER AI_MONSTER_CURSED_PROWLER AI_MONSTER_SHOTGUN_SOLDIER AI_MONSTER_CARCASS AI_MONSTER_LOSTSOUL AI_MONSTER_CUEBALL";
+\t\t\t\t\t\tvalue = 20;
+\t\t\t\t\t}
+\t\t\t\t\titem[1] = {
+\t\t\t\t\t\tmonsterType = "AI_MONSTER_HELLKNIGHT AI_MONSTER_DREADKNIGHT AI_MONSTER_PINKY AI_MONSTER_SPECTRE AI_MONSTER_CACODEMON AI_MONSTER_PAIN_ELEMENTAL AI_MONSTER_MANCUBUS AI_MONSTER_CYBER_MANCUBUS AI_MONSTER_ARACHNOTRON AI_MONSTER_REVENANT AI_MONSTER_WHIPLASH AI_MONSTER_DOOM_HUNTER AI_MONSTER_MARAUDER AI_MONSTER_BARON AI_MONSTER_TYRANT AI_MONSTER_ARCHVILE AI_MONSTER_GLADIATOR AI_MONSTER_ICON_OF_SIN AI_MONSTER_MAYKR_ANGEL";
+\t\t\t\t\t\tvalue = 18.5;
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\tisDoom5Melee = true;
+\t\t\t\tfreezePlayer = true;
+\t\t\t}
+\t\t\tminDamage = 160;
+\t\t\tmaxDamage = 160;
+\t\t\tdamageDirAttackerToTarget = true;
+\t\t}
+\t}
 }
 '''
 

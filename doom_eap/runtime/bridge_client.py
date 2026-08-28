@@ -282,6 +282,7 @@ FAST_TRAVEL_MISSION_COMPLETE_IDS = {
     "e2m3_core": 7770289, "e2m4_boss": 7770290, "e3m1_slayer": 7770337,
     "e3m2_hell": 7770362, "e3m2_hell_b": 7770387, "e3m3_maykr": 7770411,
     "e3m4_boss": 7770414,
+    "e4m1_rig": 7770432, "e4m2_swamp": 7770443, "e4m3_mcity": 7770457,
 }
 FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
@@ -1508,6 +1509,7 @@ class GameplaySaveEvidence(NamedTuple):
     slot_directory: str
     map_name: str
     provisional: bool = False
+    native_safe: bool = False
 
 
 def primary_save_candidates(filename="game_duration.dat"):
@@ -1585,6 +1587,7 @@ def read_gameplay_save_evidence(path=None):
         slot_directory,
         map_name,
         values.get("provisional", "false").lower() == "true",
+        values.get("native_safe", "false").lower() == "true",
     )
 
 
@@ -1984,6 +1987,9 @@ FAST_TRAVEL_MAP_KEYS = frozenset(
         "game/sp/e3m2_hell_b/e3m2_hell_b",
         "game/sp/e3m3_maykr/e3m3_maykr",
         "game/sp/e3m4_boss/e3m4_boss",
+        "game/dlc/e4m1_rig/e4m1_rig",
+        "game/dlc/e4m2_swamp/e4m2_swamp",
+        "game/dlc/e4m3_mcity/e4m3_mcity",
     }
 )
 
@@ -3367,6 +3373,9 @@ class DoomEternalContext(CommonContext):
         self.context_materialization_block = None
         self.context_materialization_status = "uninitialized"
         self.context_materialization_mode = "none"
+        self.context_evidence_rejections = {}
+        self._pending_materialization_triggers = set()
+        self._materialization_completion = None
         self.automap_cleanup_epoch = None
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
         self.automap_cleanup_submitted = {}
@@ -3530,27 +3539,32 @@ class DoomEternalContext(CommonContext):
         marker = getattr(self, "cached_map_identity", None) or {}
         evidence_map = getattr(evidence, "map_name", "")
         materialization_suspended = bool(marker.get("materialization_suspended"))
-        context = None if materialization_suspended else classify_runtime_context(
-            evidence_map, base_maps=base_maps
+        marker_context = None if materialization_suspended else classify_runtime_context(
+            marker.get("runtime_map", ""), base_maps=base_maps
         )
-        source = "save"
-        if context is None and not materialization_suspended:
-            context = classify_runtime_context(marker.get("runtime_map", ""), base_maps=base_maps)
+        evidence_context = classify_runtime_context(evidence_map, base_maps=base_maps)
+        if marker_context is not None:
+            context = marker_context
             source = "map_marker"
+            if evidence_context is not None and evidence_context.identity != marker_context.identity:
+                self._record_context_evidence_rejection(
+                    "accepted_marker_authority",
+                    marker_context.identity,
+                    evidence_context.identity,
+                )
+            elif evidence_map and evidence_context is None:
+                self._record_context_evidence_rejection(
+                    "accepted_marker_over_unrecognized_save",
+                    marker_context.identity,
+                    evidence_map,
+                )
+        else:
+            context = evidence_context
+            source = "save"
         if context is None:
             return CONTEXT_BY_IDENTITY.get(getattr(self, "context_identity", "unknown"))
 
         previous_campaign = self.context_campaign
-        marker_context = classify_runtime_context(
-            marker.get("runtime_map", ""), base_maps=base_maps
-        )
-        if (
-            source == "save"
-            and marker_context is not None
-            and marker_context.campaign != context.campaign
-        ):
-            publish_materialization_lease(None)
-            self.published_materialization_lease = None
         self.context_identity = context.identity
         self.context_campaign = context.campaign
         self.context_capabilities = context.capabilities
@@ -3570,6 +3584,23 @@ class DoomEternalContext(CommonContext):
                 )
         return context
 
+    def _record_context_evidence_rejection(self, reason, marker_identity, evidence_identity):
+        """Aggregate bounded save-vs-marker disagreements without log flooding."""
+        key = (str(reason), str(marker_identity), str(evidence_identity))
+        rejections = getattr(self, "context_evidence_rejections", None)
+        if not isinstance(rejections, dict):
+            rejections = {}
+            self.context_evidence_rejections = rejections
+        if key not in rejections and len(rejections) >= 32:
+            key = ("overflow", "<bounded>", "<bounded>")
+        count = rejections.get(key, 0) + 1
+        rejections[key] = count
+        if count in {1, 2, 4, 8, 16, 32}:
+            logger.warning(
+                "CONTEXT_EVIDENCE_REJECTED reason=%s marker=%s evidence=%s count=%s",
+                key[0], key[1], key[2], count,
+            )
+
     def _active_materialization_lease(self, context=None):
         """Return current marker-owned gameplay lease for matching context."""
         marker = getattr(self, "cached_map_identity", None)
@@ -3588,6 +3619,52 @@ class DoomEternalContext(CommonContext):
         ):
             return None
         return lease
+
+    def authored_map_runtime_ready(self, evidence=None):
+        """Prove authored-map effects from marker, lease, native safety, and room."""
+        evidence = evidence or read_gameplay_save_evidence()
+        marker = getattr(self, "cached_map_identity", None)
+        if not isinstance(marker, dict) or marker.get("materialization_suspended"):
+            return False
+        context = classify_runtime_context(marker.get("runtime_map", ""))
+        if context is None or context.campaign == "Base":
+            return False
+        epoch = marker.get("gameplay_epoch")
+        lease = self._active_materialization_lease(context)
+        server = getattr(self, "server", None)
+        socket = getattr(server, "socket", None)
+        observation = getattr(self, "runtime_observation_lease", None)
+        return bool(
+            evidence is not None
+            and evidence.state == "gameplay"
+            and evidence.native_safe
+            and isinstance(epoch, str)
+            and lease == epoch
+            and getattr(self, "published_materialization_lease", None) == epoch
+            and observation is not None
+            and observation.process_probe()
+            and self.item_state_ready
+            and self.get_ap_state_key()
+            and socket is not None
+            and not socket.closed
+            and getattr(self, "_queue_session_authoritative", False)
+        )
+
+    def runtime_effects_ready(self, evidence=None):
+        """Canonical admission predicate for map-scoped runtime effects."""
+        evidence = evidence or read_gameplay_save_evidence()
+        marker = getattr(self, "cached_map_identity", None)
+        context = classify_runtime_context(
+            marker.get("runtime_map", "") if isinstance(marker, dict) else ""
+        )
+        if context is not None and context.campaign != "Base":
+            return self.authored_map_runtime_ready(evidence)
+        return bool(
+            evidence is not None
+            and evidence.state == "gameplay"
+            and evidence.native_safe
+            and self.has_authoritative_save_proof()
+        )
 
     def context_support_report(self):
         context = self._refresh_runtime_context(getattr(self, "_connected_slot_data", {}))
@@ -3623,14 +3700,34 @@ class DoomEternalContext(CommonContext):
         state = self.session_state.setdefault("context_materialization", {})
         state.pop("completed_key", None)
         evidence = read_gameplay_save_evidence()
-        if evidence is None or evidence.state != "gameplay":
+        if not self.runtime_effects_ready(evidence):
+            self._pending_materialization_triggers.add("receipt")
             return
-        _plan, error = self._context_materialize_inventory(evidence)
+        _plan, error = self._context_materialize_inventory(evidence, trigger="receipt")
         if error:
             logger.warning("CONTEXT_MATERIALIZATION_RETRY detail=%s", error)
 
-    def _context_materialize_inventory(self, evidence):
-        """Replay owned persistent state once when campaign context changes."""
+    def _poll_materialization_completion(self):
+        completion = getattr(self, "_materialization_completion", None)
+        if not isinstance(completion, dict):
+            return False
+        command_ids = completion.get("command_ids", ())
+        if any(command_spool_exists(command_id, state_key=self.state_key) for command_id in command_ids):
+            return False
+        duration_ms = max(0, int((time.monotonic() - completion["started_at"]) * 1000))
+        logger.info(
+            "MATERIALIZATION_COMPLETE context=%s lease=%s queued_ops=%s duration_to_last_ack_ms=%s",
+            completion["context"], completion["lease"], len(command_ids), duration_ms,
+        )
+        self._materialization_completion = None
+        return True
+
+    def _context_materialize_inventory(self, evidence, *, trigger="context"):
+        """Reconcile AP-owned persistent state for each accepted context lease."""
+        if trigger is not None:
+            self._pending_materialization_triggers.add(str(trigger))
+        if not self.runtime_effects_ready(evidence):
+            return None, "runtime effects are not level-ready"
         slot_data = getattr(self, "_connected_slot_data", {})
         try:
             validate_slot_contract(slot_data)
@@ -3658,21 +3755,19 @@ class DoomEternalContext(CommonContext):
             return None, self.context_materialization_block
         state = self.session_state.setdefault("context_materialization", {})
         transition = self.pending_context_transition
-        if transition is None:
-            self.context_materialization_mode = "none"
-            state.update(
-                context_identity=context.identity,
-                campaign=context.campaign,
-                status="same_campaign_noop",
-            )
-            self.persist_session_state()
-            self.context_materialization_status = "same_campaign_noop"
-            return None, None
-        previous, target_campaign = transition
+        previous = transition[0] if transition is not None else self.context_campaign
+        target_campaign = transition[1] if transition is not None else context.campaign
         materialization_lease = self._active_materialization_lease(context)
-        materialization_key = f"{previous}:{target_campaign}:{materialization_lease or 'deferred'}"
+        ownership_fingerprint = receipt_history_fingerprint(self.items_received)
+        materialization_key = ":".join((
+            str(self.get_ap_state_key() or "unbound"),
+            context.identity,
+            str(materialization_lease or "deferred"),
+            ownership_fingerprint,
+        ))
         if state.get("completed_key") == materialization_key:
             self.pending_context_transition = None
+            self._pending_materialization_triggers.clear()
             self.context_materialization_mode = "none"
             self.context_materialization_status = "completed_noop"
             return None, None
@@ -3696,8 +3791,10 @@ class DoomEternalContext(CommonContext):
                     previous, target_campaign, context.identity,
                 )
             return None, self.context_materialization_block
-        cross_context = True
-        self.context_materialization_mode = "cross_context"
+        cross_context = transition is not None and previous != target_campaign
+        if cross_context:
+            self._pending_materialization_triggers.add("context")
+        self.context_materialization_mode = "cross_context" if cross_context else "same_context"
         received_items = self.items_received[: self.items_processed]
         received = {item.item for item in received_items}
         received_counts = {}
@@ -3719,6 +3816,7 @@ class DoomEternalContext(CommonContext):
         if selected_special_ids is None:
             return None, f"unsupported special weapon option: {special_mode!r}"
         all_special_ids = {7770007, 7770009, 7770901, 7770902}
+        capacity_ids = {7770017, 7770088, 7770092}
         materializable_ids = tuple(
             item_id for item_id in materializable_ids
             if item_id not in all_special_ids or item_id in selected_special_ids
@@ -3731,6 +3829,10 @@ class DoomEternalContext(CommonContext):
                 and ITEM_REPLAY_POLICIES[item_id].policy in allowed_replay_policies
             )
             or item_id in {7770007, 7770009, 7770901, 7770902}
+            or (
+                item_id in capacity_ids
+                and (previous is None or cross_context)
+            )
         )
         selected_ids = tuple(sorted(set(selected_ids)))
         selected_receipts = tuple(
@@ -3743,11 +3845,14 @@ class DoomEternalContext(CommonContext):
         )
         definitions = {item_id: ITEM_ID_TO_COMMAND[item_id] for item_id in set(plan_ids)}
         policies = {item_id: ITEM_REPLAY_POLICIES[item_id] for item_id in set(plan_ids)}
+        reconciliation_slot_identity = stable_spool_id(
+            "context", self.room_seed_name, self.team, self.slot, context.identity
+        )
         plan = compile_reconciliation_plan(
             plan_ids, definitions, policies,
-            f"{self.room_seed_name}-{self.team}-{self.slot}-context-{context.identity}",
+            reconciliation_slot_identity,
             evidence.epoch,
-            include_manual_replay=True,
+            include_manual_replay=cross_context,
         )
         # Special ownership is one physical state: materialize highest selected intent.
         special_candidates = []
@@ -3794,7 +3899,10 @@ class DoomEternalContext(CommonContext):
                         policy.name,
                         policy.policy,
                         physical_stage,
-                        f"reconcile-{self.room_seed_name}-{self.team}-{self.slot}-context-{context.identity}-special{physical_stage}-remove-crucible",
+                        stable_spool_id(
+                            "reconcile", self.room_seed_name, self.team, self.slot,
+                            context.identity, "special", physical_stage, "remove-crucible",
+                        ),
                         "removeInventoryItem weapon/player/crucible",
                         "replace Crucible with Sentinel Hammer",
                     )
@@ -3806,11 +3914,18 @@ class DoomEternalContext(CommonContext):
                         policy.name,
                         policy.policy,
                         physical_stage,
-                        f"reconcile-{self.room_seed_name}-{self.team}-{self.slot}-context-{context.identity}-special{physical_stage}-{delivery.index}",
+                        stable_spool_id(
+                            "reconcile", self.room_seed_name, self.team, self.slot,
+                            context.identity, "special", physical_stage, delivery.index,
+                        ),
                         delivery.command,
                         deliveries.description,
                     )
                 )
+            logger.info(
+                "SPECIAL_WEAPON_PLAN item=%s owned_count=%s resolved_stage=%s context=%s ops=%s",
+                item_id, count, selected_special_stage, context.identity, len(special_commands),
+            )
         support_commands = []
         for item_id in support_rune_commands(received, context):
             support_delivery = compile_item_delivery_plan(
@@ -3828,12 +3943,24 @@ class DoomEternalContext(CommonContext):
                     policy.name,
                     policy.policy,
                     0,
-                    f"reconcile-{self.room_seed_name}-{self.team}-{self.slot}-context-{context.identity}-support-rune-{item_id}",
+                    stable_spool_id(
+                        "reconcile", self.room_seed_name, self.team, self.slot,
+                        context.identity, "support-rune", item_id,
+                    ),
                     delivery.command,
                     support_delivery.description,
                 )
             )
-        commands = tuple(plan.commands) + tuple(special_commands) + tuple(support_commands)
+        raw_commands = tuple(plan.commands) + tuple(special_commands) + tuple(support_commands)
+        commands = []
+        semantic_operations = set()
+        for command in raw_commands:
+            semantic_key = (command.item_id, command.stage, command.command)
+            if semantic_key in semantic_operations:
+                continue
+            semantic_operations.add(semantic_key)
+            commands.append(command)
+        commands = tuple(commands)
         plan = type(plan)(
             commands=commands,
             selections=plan.selections,
@@ -3842,6 +3969,19 @@ class DoomEternalContext(CommonContext):
             skipped_never_replay=plan.skipped_never_replay,
             skipped_unproven=plan.skipped_unproven,
             skipped_manual_replay=plan.skipped_manual_replay,
+        )
+        triggers = tuple(sorted(self._pending_materialization_triggers))
+        logger.info(
+            "MATERIALIZATION_PLAN context=%s lease=%s triggers=%s ownership_fingerprint=%s "
+            "raw_ops=%s deduped_ops=%s queued_ops=%s includes_manual_replay=%s",
+            context.identity,
+            materialization_lease,
+            ",".join(triggers),
+            ownership_fingerprint,
+            len(raw_commands),
+            len(commands),
+            len(commands),
+            str(cross_context).lower(),
         )
         queued, error = self.apply_reconciliation_plan(
             plan,
@@ -3857,7 +3997,7 @@ class DoomEternalContext(CommonContext):
             context_identity=context.identity,
             campaign=context.campaign,
             epoch=evidence.epoch,
-            mode="cross_context",
+            mode="cross_context" if cross_context else "same_context",
             pending_key=materialization_key,
             pending_plan=[command.__dict__ for command in commands],
             support_rune_jobs=len(support_commands),
@@ -3872,6 +4012,13 @@ class DoomEternalContext(CommonContext):
         state.pop("pending_plan", None)
         self.persist_session_state()
         self.pending_context_transition = None
+        self._pending_materialization_triggers.clear()
+        self._materialization_completion = {
+            "context": context.identity,
+            "lease": materialization_lease,
+            "command_ids": tuple(command.spool_id for command in commands),
+            "started_at": time.monotonic(),
+        } if commands else None
         self.context_materialization_status = "complete" if commands else "noop"
         self.context_materialization_block = None
         logger.info("CONTEXT_MATERIALIZATION context=%s previous=%s commands=%s", context.identity, previous, len(commands))
@@ -3910,7 +4057,12 @@ class DoomEternalContext(CommonContext):
             if not re.fullmatch(r"ai_ScriptCmdEnt [A-Za-z0-9_]+ activate", command):
                 raise ValueError("Directed tests accept only map-side entity activation")
             command_id = f"{correlation}-cmd-{index:02d}"
-            if not send_command(command, coalesce_key=command_id, state_key=self.state_key):
+            if not send_command(
+                command,
+                coalesce_key=command_id,
+                state_key=self.state_key,
+                room_scoped=False,
+            ):
                 return None
             logger.info(
                 "[Test] correlation=%s action=%s map=%s command_id=%s command=%s effect=unknown",
@@ -4104,17 +4256,44 @@ class DoomEternalContext(CommonContext):
         self._ammo_refill_rpc_was_enabled = False
 
     def _ammo_refill_runtime_safe(self):
+        return self._ammo_refill_readiness()[0] is None
+
+    def _ammo_refill_readiness(self):
         server = getattr(self, "server", None)
         socket = getattr(server, "socket", None)
-        return bool(
-            self._placement_connected_complete
-            and self.item_state_ready
-            and socket is not None
-            and not socket.closed
-            and not self.runtime_observers_frozen
-            and self.active_save_slot
-            and self.has_authoritative_save_proof()
+        evidence = read_gameplay_save_evidence()
+        marker = getattr(self, "cached_map_identity", None)
+        marker_epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
+        active_lease = self._active_materialization_lease()
+        namespace_match = bool(
+            getattr(self, "_queue_session_authoritative", False)
+            and queue_session_namespace(self.state_key) is not None
         )
+        connected = bool(socket is not None and not socket.closed)
+        lease_match = bool(marker_epoch and active_lease == marker_epoch)
+        native_safe = bool(evidence is not None and evidence.native_safe)
+        predicates = (
+            ("placement_connected", bool(self._placement_connected_complete)),
+            ("item_state_ready", bool(self.item_state_ready)),
+            ("connected", connected),
+            ("namespace_match", namespace_match),
+            ("marker_valid", isinstance(marker, dict) and not marker.get("materialization_suspended")),
+            ("lease_match", lease_match),
+            ("native_safe", native_safe),
+            ("runtime_effects_ready", self.runtime_effects_ready(evidence)),
+        )
+        failure = next((name for name, passed in predicates if not passed), None)
+        details = {
+            "marker": marker.get("runtime_map") if isinstance(marker, dict) else None,
+            "lease": active_lease,
+            "lease_match": lease_match,
+            "native_safe": native_safe,
+            "namespace_match": namespace_match,
+            "connected": connected,
+            "active_slot": self.active_save_slot,
+            "available_charges": self._ammo_refill_available or 0,
+        }
+        return failure, details
 
     def _configure_ammo_refill_storage(self):
         self._ammo_storage_key = self._ammo_refill_storage_name()
@@ -4253,12 +4432,27 @@ class DoomEternalContext(CommonContext):
         return queued
 
     async def request_ammo_refill(self):
-        if not self._ammo_refill_runtime_safe():
+        failing_predicate, readiness = self._ammo_refill_readiness()
+        if failing_predicate is not None:
+            logger.info(
+                "AMMO_REFILL_REQUEST result=rejected predicate=%s marker=%s lease=%s "
+                "lease_match=%s native_safe=%s namespace_match=%s connected=%s "
+                "active_slot=%s available_charges=%s",
+                failing_predicate,
+                readiness["marker"] or "<none>",
+                readiness["lease"] or "<none>",
+                str(readiness["lease_match"]).lower(),
+                str(readiness["native_safe"]).lower(),
+                str(readiness["namespace_match"]).lower(),
+                str(readiness["connected"]).lower(),
+                readiness["active_slot"] or "<none>",
+                readiness["available_charges"],
+            )
             emit_launcher_event(
                 "ammo_refill",
                 status="blocked",
                 available=self._ammo_refill_available or 0,
-                message="Ammo Refill unavailable outside safe connected gameplay",
+                message=f"Ammo Refill unavailable: {failing_predicate}",
             )
             return False
         available = self._refresh_ammo_refill_charge()
@@ -4499,6 +4693,9 @@ class DoomEternalContext(CommonContext):
             )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
+            if self.server_checked_locations_ready:
+                self.checked_locations = set(args["checked_locations"])
+                self.snapshot_fast_travel_eligibility(refresh=True)
             self.reconcile_checked_automap_cleanup("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")
             asyncio.create_task(self.check_mission_challenge_locations())
@@ -4788,6 +4985,7 @@ class DoomEternalContext(CommonContext):
                 return False
 
             batch_count = 0
+            fresh_receipt_boundary = self.items_processed
             while len(self.items_received) > self.items_processed:
                 item_index = self.items_processed
                 network_item = self.items_received[item_index]
@@ -5007,6 +5205,8 @@ class DoomEternalContext(CommonContext):
                         classification=classification,
                         packet_received_ns=packet_received_ns,
                         materialization_lease=materialization_lease,
+                        fresh_receipt_boundary=fresh_receipt_boundary,
+                        excluded_receipt_indices=duplicate_indices,
                         context_identity=(
                             runtime_context.identity
                             if runtime_context is not None
@@ -5211,10 +5411,8 @@ class DoomEternalContext(CommonContext):
             "evidence_epoch": evidence_epoch,
             "materialization_evidence_epoch": (
                 evidence_epoch
-                if evidence is not None
-                and getattr(evidence, "state", None) == "gameplay"
-                and canonical_map_name(getattr(evidence, "map_name", ""))
-                == canonical_map_name(marker_data.get("runtime_map", ""))
+                if isinstance(evidence_epoch, int)
+                and not isinstance(evidence_epoch, bool)
                 else None
             ),
         }
@@ -5244,14 +5442,19 @@ class DoomEternalContext(CommonContext):
             return False
         bound_epoch = cached.get("materialization_evidence_epoch")
         if bound_epoch is None:
-            if getattr(evidence, "provisional", False):
-                return self.suspend_map_materialization(
-                    cached, evidence_epoch, "provisional_same_map_load_edge"
-                )
             cached["materialization_evidence_epoch"] = evidence_epoch
             cached["evidence_epoch"] = evidence_epoch
+            logger.info(
+                "[MAP] MATERIALIZATION_GENERATION_BOUND map=%s evidence_epoch=%s "
+                "source=first_same_map_evidence provisional=%s",
+                cached.get("map_key", "<unknown>"),
+                evidence_epoch,
+                str(bool(getattr(evidence, "provisional", False))).lower(),
+            )
             return False
         if evidence_epoch == bound_epoch:
+            return False
+        if evidence_epoch < bound_epoch:
             return False
         if getattr(evidence, "provisional", False):
             return self.suspend_map_materialization(
@@ -5265,47 +5468,7 @@ class DoomEternalContext(CommonContext):
         lease = getattr(self, "runtime_observation_lease", None)
         if lease is not None:
             lease.observe_gameplay_loaded(evidence_mtime)
-        preserve_proven_slot = False
-        if getattr(evidence, "provisional", False):
-            active_slot = getattr(self, "active_save_slot", None)
-            active = primary_save_for_slot(active_slot) if active_slot else None
-            candidates = primary_save_candidates()
-            newest = candidates[0] if candidates else None
-            evidence_slot = getattr(evidence, "slot_directory", None)
-            newer_competing_candidate = bool(
-                newest
-                and active
-                and newest.slot_directory != active.slot_directory
-                and newest.mtime_ns > active.mtime_ns
-            )
-            preserve_proven_slot = bool(
-                active
-                and not newer_competing_candidate
-                and evidence_slot == active_slot
-                and getattr(self, "active_save_proof_authoritative", False)
-                and getattr(self, "active_save_proof_slot", None) == active_slot
-                and not getattr(self, "runtime_observers_frozen", False)
-            )
-            if preserve_proven_slot and active is not None:
-                self.active_save_path = str(active.path)
-                if self.active_save_token != active.mtime_ns:
-                    self.invalidate_save_observation_slot(active.slot_directory)
-                    self.active_save_token = active.mtime_ns
-                self.active_save_proof_slot = active.slot_directory
-                self.active_save_proof_evidence_epoch = evidence_epoch
-                self.active_save_proof_load_epoch = (
-                    getattr(lease, "gameplay_loaded_ns", None) if lease is not None else None
-                )
-                self.runtime_observers_frozen = False
-                logger.info(
-                    "SAVE_PROOF_REBOUND slot=%s load_epoch=%s evidence_epoch=%s "
-                    "reason=provisional_same_slot_no_newer_candidate",
-                    active.slot_directory,
-                    self.active_save_proof_load_epoch,
-                    evidence_epoch,
-                )
-        if not preserve_proven_slot:
-            self.invalidate_active_save_proof()
+        self.invalidate_active_save_proof()
         self.fast_travel_eligibility_snapshot = None
         self.fast_travel_epoch_state = None
         self.fast_travel_last_transition = None
@@ -5557,6 +5720,19 @@ class DoomEternalContext(CommonContext):
         self.ingest_visible_runtime_lifecycle(evidence=evidence)
         marker = self.read_active_map_identity(evidence=evidence)
         marker_map = marker["runtime_map"] if marker else None
+        if marker_map and evidence and getattr(evidence, "map_name", None):
+            marker_context = classify_runtime_context(marker_map)
+            evidence_context = classify_runtime_context(evidence.map_name)
+            if (
+                marker_context is not None
+                and evidence_context is not None
+                and marker_context.identity != evidence_context.identity
+            ):
+                self._record_context_evidence_rejection(
+                    "mission_select_save_details",
+                    marker_context.identity,
+                    evidence_context.identity,
+                )
 
         evidence_slot = evidence.slot_directory if (evidence and getattr(evidence, "slot_directory", None)) else None
         evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
@@ -5659,6 +5835,8 @@ class DoomEternalContext(CommonContext):
         if not active_map:
             return fail_proof("map_marker_unavailable")
         continue_target_map = canonical_map_name(details.get("mapName", ""))
+        if evidence and canonical_map_name(getattr(evidence, "map_name", "")) != active_map:
+            continue_target_map = active_map
         mission_select_required = bool(
             active_map in MISSION_CHALLENGE_RUNTIME_MAPS
             and continue_target_map
@@ -6294,15 +6472,17 @@ class DoomEternalContext(CommonContext):
         evidence = read_gameplay_save_evidence()
         if evidence is None or evidence.state != "gameplay":
             return None, "confirmed gameplay epoch required; menus are not eligible"
-        if self.runtime_observers_frozen:
-            return None, "gameplay observers are not level-ready"
-        if self.active_save_slot != evidence.slot_directory:
-            return None, "gameplay evidence does not match the active save slot"
-        if self.active_native_evidence_epoch != evidence.epoch:
-            return None, "gameplay evidence does not match the active epoch"
         marker = self.read_active_map_identity(evidence=evidence)
         if marker is None:
             return None, "active AP map marker is unavailable"
+        if not self.runtime_effects_ready(evidence):
+            return None, "runtime effects are not level-ready"
+        marker_context = classify_runtime_context(marker["runtime_map"])
+        if marker_context is None or marker_context.campaign == "Base":
+            if self.active_save_slot != evidence.slot_directory:
+                return None, "gameplay evidence does not match the active save slot"
+            if self.active_native_evidence_epoch != evidence.epoch:
+                return None, "gameplay evidence does not match the active epoch"
         active_map = canonical_map_name(marker["runtime_map"])
         supported = {
             canonical_map_name(name)
@@ -6457,6 +6637,9 @@ class DoomEternalContext(CommonContext):
 
     def automatic_reconcile_inventory(self, reason):
         """Run one guarded resync for a new lifecycle/history fingerprint."""
+        if reason in {"reconnect", "level_ready"}:
+            self._pending_materialization_triggers.add(reason)
+            return None, None
         fingerprint = receipt_history_fingerprint(self.items_received)
         evidence, error = self._reconciliation_eligibility(require_connection=True)
         if error:
@@ -6846,8 +7029,8 @@ class DoomEternalContext(CommonContext):
         if delivery_key in self.fast_travel_submitted:
             self._fast_travel_transition("COMMAND_QUEUED_UNVERIFIED", trigger=trigger)
             return False
-        if not self.has_authoritative_save_proof():
-            self._fast_travel_transition("PENDING", reason="save_proof_unavailable", trigger=trigger)
+        if not self.runtime_effects_ready():
+            self._fast_travel_transition("PENDING", reason="level_not_ready", trigger=trigger)
             return False
         if not getattr(self, "item_state_ready", False):
             self._fast_travel_transition("PENDING", reason="item_state_unavailable", trigger=trigger)
@@ -6894,8 +7077,8 @@ class DoomEternalContext(CommonContext):
         self._fast_travel_transition("COMMAND_QUEUED_UNVERIFIED", trigger=trigger)
         return True
 
-    def snapshot_fast_travel_eligibility(self, marker_data=None):
-        """Capture server-history eligibility once for each gameplay epoch."""
+    def snapshot_fast_travel_eligibility(self, marker_data=None, *, refresh=False):
+        """Capture server-history eligibility for current gameplay epoch."""
         if not isinstance(marker_data, dict):
             marker_data = (
                 getattr(self, "cached_map_identity", None)
@@ -6905,7 +7088,11 @@ class DoomEternalContext(CommonContext):
             return None
         epoch = marker_data.get("gameplay_epoch")
         existing = getattr(self, "fast_travel_epoch_state", None)
-        if isinstance(existing, dict) and existing.get("epoch") is not None:
+        if (
+            isinstance(existing, dict)
+            and existing.get("epoch") is not None
+            and not refresh
+        ):
             return getattr(self, "fast_travel_eligibility_snapshot", None)
         if epoch is None:
             return None
@@ -6966,31 +7153,20 @@ class DoomEternalContext(CommonContext):
         if epoch in in_flight:
             return False
         evidence_state = getattr(evidence, "state", None)
-        if evidence_state != "gameplay":
-            pending_signature = (epoch, "evidence_not_gameplay", evidence_state)
+        if not self.runtime_effects_ready(evidence):
+            reason = "native_gameplay_unsafe" if evidence_state == "gameplay" else "evidence_not_gameplay"
+            pending_signature = (epoch, reason, evidence_state)
             if pending_signature != getattr(self, "last_level_ready_pending_signature", None):
                 self.last_level_ready_pending_signature = pending_signature
                 logger.info(
-                    "[RPC] LEVEL_READY_PENDING epoch=%s reason=evidence_not_gameplay state=%s",
+                    "[RPC] LEVEL_READY_PENDING epoch=%s reason=%s state=%s",
                     epoch,
+                    reason,
                     evidence_state or "unavailable",
                 )
                 logger.info(
-                    "[MAP] RUNTIME_EFFECTS_PENDING reason=evidence_not_gameplay state=%s",
-                    evidence_state or "unavailable",
-                )
-            return False
-        if not self.has_authoritative_save_proof():
-            pending_signature = (epoch, "save_proof_unavailable", evidence_state)
-            if pending_signature != getattr(self, "last_level_ready_pending_signature", None):
-                self.last_level_ready_pending_signature = pending_signature
-                logger.info(
-                    "[RPC] LEVEL_READY_PENDING epoch=%s reason=save_proof_unavailable",
-                    epoch,
-                )
-                logger.info(
-                    "[MAP] RUNTIME_EFFECTS_PENDING reason=save_proof_unavailable state=%s",
-                    evidence_state,
+                    "[MAP] RUNTIME_EFFECTS_PENDING reason=%s state=%s",
+                    reason, evidence_state or "unavailable",
                 )
             return False
         active_context = self._refresh_runtime_context(
@@ -7028,8 +7204,9 @@ class DoomEternalContext(CommonContext):
             self.advance_automap_cleanup_epoch()
             self.reconcile_checked_automap_cleanup("level_ready")
             await self.check_mission_challenge_locations()
-            self.automatic_reconcile_inventory("level_ready")
-            _, context_error = self._context_materialize_inventory(evidence)
+            _, context_error = self._context_materialize_inventory(
+                evidence, trigger="level_ready"
+            )
             if context_error == "materialization queued; awaiting native application":
                 logger.info("[Context] LEVEL_READY_PENDING reason=native_materialization_pending")
                 return False
@@ -7045,6 +7222,8 @@ class DoomEternalContext(CommonContext):
 
     def reconcile_checked_automap_cleanup(self, trigger):
         """Remove only isolated AP visuals for server-checked map locations."""
+        if not self.runtime_effects_ready():
+            return False
         if not valid_materialization_epoch(self.automap_cleanup_epoch):
             return False
         map_name = canonical_map_name(self.current_map_name or "")
@@ -7441,21 +7620,111 @@ class DoomEternalContext(CommonContext):
         )
         return True
 
-    def progressive_stage(self, item_id, item_index):
+    def progressive_stage(self, item_id, item_index, *, excluded_receipt_indices=None):
+        """Resolve finite progressive stage from effective authoritative ownership."""
+        if (
+            isinstance(item_index, bool)
+            or not isinstance(item_index, int)
+            or item_index < 0
+        ):
+            return 0
+        if excluded_receipt_indices is None:
+            if self.items_received:
+                observation = self.observe_received_item_history()
+                excluded_receipt_indices = {
+                    receipt.index for receipt in observation.duplicates
+                }
+            else:
+                excluded_receipt_indices = set()
+        effective_count = sum(
+            1
+            for index, received in enumerate(self.items_received[:item_index + 1])
+            if index not in excluded_receipt_indices and received.item == item_id
+        )
+        stage = max(effective_count - 1, 0)
+        definition = ITEM_ID_TO_COMMAND.get(item_id)
+        if (
+            isinstance(definition, dict)
+            and definition.get("type") in {"progressive_perk", "progressive_item"}
+        ):
+            perks = definition.get("perks")
+            stage = min(stage, len(perks) - 1) if isinstance(perks, list) and perks else 0
+        return stage
+
+    def _fresh_receipt_owned_count(
+        self, item_id, item_index, boundary=None, excluded_receipt_indices=None
+    ):
+        """Count only current authoritative receipts eligible for receipt feedback."""
+        boundary = (
+            getattr(self, "items_processed", 0)
+            if boundary is None
+            else boundary
+        )
+        if excluded_receipt_indices is None:
+            excluded_receipt_indices = set()
+        if (
+            isinstance(item_index, bool)
+            or not isinstance(item_index, int)
+            or item_index < boundary
+            or item_index >= len(self.items_received)
+            or self.items_received[item_index].item != item_id
+        ):
+            return None
         return sum(
             1
-            for received in self.items_received[:item_index]
-            if received.item == item_id
+            for index, received in enumerate(
+                self.items_received[boundary:item_index + 1], boundary
+            )
+            if index not in excluded_receipt_indices and received.item == item_id
         )
 
-    def receipt_notification_slot(self, item_id, item_index):
+    def receipt_notification_slot(
+        self,
+        item_id,
+        item_index,
+        *,
+        fresh_receipt_boundary=None,
+        excluded_receipt_indices=None,
+    ):
         """Alternate the HUD identity per item, not merely per global receipt."""
-        if len(self.items_received) > item_index:
-            ordinal = self.progressive_stage(item_id, item_index)
-        else:
-            # Keeps direct/dev spools deterministic when no NetworkItem history exists.
-            ordinal = item_index
+        owned_count = self._fresh_receipt_owned_count(
+            item_id,
+            item_index,
+            fresh_receipt_boundary,
+            excluded_receipt_indices,
+        )
+        if not owned_count:
+            return None
+        ordinal = owned_count - 1
         return ("a", "b")[ordinal % 2]
+
+    def _suppress_found_your_toast(self, network_item, item_index, intent):
+        """Suppress AP receipt toast only for known checked local-slot sources."""
+        if intent != NEW_RECEIPT:
+            return False
+        if (
+            network_item is None
+            or isinstance(item_index, bool)
+            or not isinstance(item_index, int)
+            or item_index < getattr(self, "items_processed", 0)
+        ):
+            return False
+        source_location = getattr(network_item, "location", None)
+        if (
+            isinstance(source_location, bool)
+            or not isinstance(source_location, int)
+            or source_location <= 0
+            or not getattr(self, "server_checked_locations_ready", False)
+        ):
+            return False
+        checked_locations = getattr(self, "checked_locations", ())
+        known_local_locations = getattr(self, "locations_info", {})
+        known_placements = getattr(self, "_placement_info", {})
+        return bool(
+            source_location in checked_locations
+            and source_location in known_local_locations
+            and source_location in known_placements
+        )
 
     def item_activation_commands(
         self,
@@ -7465,6 +7734,8 @@ class DoomEternalContext(CommonContext):
         intent=HISTORICAL_OWNERSHIP,
         include_notification=None,
         classification=None,
+        fresh_receipt_boundary=None,
+        excluded_receipt_indices=None,
     ):
         if intent not in {
             NEW_RECEIPT,
@@ -7481,14 +7752,36 @@ class DoomEternalContext(CommonContext):
         receipt = receipt and (
             ITEM_REPLAY_POLICIES[item_id].receipt_feedback == AP_RECEIPT_FEEDBACK
         )
+        network_item = (
+            self.items_received[item_index]
+            if isinstance(item_index, int)
+            and not isinstance(item_index, bool)
+            and 0 <= item_index < len(self.items_received)
+            else None
+        )
+        if self._suppress_found_your_toast(network_item, item_index, intent):
+            receipt = False
+        if receipt and self.receipt_notification_slot(
+            item_id,
+            item_index,
+            fresh_receipt_boundary=fresh_receipt_boundary,
+            excluded_receipt_indices=excluded_receipt_indices,
+        ) is None:
+            receipt = False
         # Package capability validator marker: receipt=ENABLE_ITEM_NOTIFICATIONS.
         if receipt and classification is None:
             classification = ITEM_CLASSIFICATIONS.get(item_id)
         definition = ITEM_ID_TO_COMMAND.get(item_id)
         stage = (
-            self.progressive_stage(item_id, item_index)
+            self.progressive_stage(
+                item_id,
+                item_index,
+                excluded_receipt_indices=excluded_receipt_indices,
+            )
             if isinstance(definition, dict)
             and definition.get("type") in {"progressive_perk", "progressive_item"}
+            and isinstance(item_index, int)
+            and not isinstance(item_index, bool)
             else None
         )
         try:
@@ -7499,7 +7792,12 @@ class DoomEternalContext(CommonContext):
                 receipt=receipt,
                 classification=classification,
                 notification_slot=(
-                    self.receipt_notification_slot(item_id, item_index)
+                    self.receipt_notification_slot(
+                        item_id,
+                        item_index,
+                        fresh_receipt_boundary=fresh_receipt_boundary,
+                        excluded_receipt_indices=excluded_receipt_indices,
+                    )
                     if receipt else None
                 ),
             )
@@ -7536,6 +7834,8 @@ class DoomEternalContext(CommonContext):
         classification=None,
         packet_received_ns=None,
         materialization_lease=None,
+        fresh_receipt_boundary=None,
+        excluded_receipt_indices=None,
         context_identity=None,
     ):
         if getattr(self, "_queue_session_authoritative", self.item_state_ready) is False:
@@ -7550,6 +7850,8 @@ class DoomEternalContext(CommonContext):
             intent=intent,
             include_notification=include_notification,
             classification=classification,
+            fresh_receipt_boundary=fresh_receipt_boundary,
+            excluded_receipt_indices=excluded_receipt_indices,
         )
         if commands is None:
             return False, description
@@ -8833,7 +9135,7 @@ class DoomEternalContext(CommonContext):
                     self._refresh_runtime_context(
                         getattr(self, "_connected_slot_data", {}), evidence
                     )
-                    self._context_materialize_inventory(evidence)
+                    self._poll_materialization_completion()
                     if getattr(self, "_queue_session_authoritative", False):
                         if not ensure_queue_session_namespace(self.state_key):
                             self.reset_queue_session_authority("namespace_publish_failed")
@@ -8856,6 +9158,15 @@ class DoomEternalContext(CommonContext):
                 if not await self.process_level_ready(newest_path if markers else None):
                     await self.check_mission_challenge_locations()
                     self.reconcile_fast_travel_unlock("readiness")
+                if self._pending_materialization_triggers:
+                    _, context_error = self._context_materialize_inventory(
+                        evidence, trigger=None
+                    )
+                    if context_error:
+                        logger.info(
+                            "[Context] MATERIALIZATION_PENDING reason=%s",
+                            context_error,
+                        )
 
                 await self.process_pending_item_receipts("tracker")
 

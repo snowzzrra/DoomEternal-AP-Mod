@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "preserve_rotation": true,
+  "preserve_visual_layers": true,
   "entities": {
     "AP_CHECK_PICKUPS_PROGRESS_CODEX_1": 7770420,
     "AP_CHECK_PICKUPS_PROGRESS_CODEX_4": 7770421,
@@ -44,5 +46,33 @@
   },
   "location_feedback": {
     "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "pickups_pickup_keycard_slayer_key_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "independent_size": [1.3, 1.3, 1.3],
+      "preserve_targets": [
+        "slayer_gate_corridor_temp_sunken_rig_geo_func_mover_key_grate_961496569_1"
+      ],
+      "drop_targets": ["checkpoints_target_relay_54"],
+      "no_auto_automap_helper": true,
+      "independent_automap_properties_decl": "slayer_key"
+    },
+    "slayer_gate_progress_support_rune_1": {
+      "native_entity_contract": {
+        "original_targets": ["slayer_gate_target_changelayer_slayergate_5"],
+        "required_snippets": [
+          "inherit = \"progress/support_rune\";",
+          "class = \"idInteractable_Rune\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "automapPropertiesDecl = \"rune_support\";",
+          "triggerDef = \"trigger/interact/progress_rune\";",
+          "progressionCategory = \"PROGRESSION_CATEGORY_SUPPORT_RUNE\";"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true
+    }
   }
 }

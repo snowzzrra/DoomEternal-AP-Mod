@@ -351,12 +351,12 @@ Repair/Fix, and a sanitized support report.
 - FlavorfulGecko5 and the EntitySlayer contributors for
   [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
 - leveste for [Eternal Mod Injector Shell](https://github.com/leveste/EternalBasher/).
-- The DOOM Modding community for EternalModInjector, wiki material, and
-  general knowledge that made the map patches possible.
+- The DOOM Modding community for the wiki material, and general knowledge
+  that made the map patches possible.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model
   and overall very useful help.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
-  logo used by the AP client.
+  logo used by the AP client and the main menu marker.
 
 ## 6. License
 

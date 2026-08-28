@@ -30,6 +30,7 @@ from tools.maps.notification_formatting import (
     major_notification_key_from_item_key,
     notification_key,
     placement_sent_key,
+    progressive_notification_stage_count,
 )
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
@@ -579,6 +580,8 @@ TARGET_POLICY_CONSUMERS = {
     "independent_visual": "generate_inert_location_visual",
     "completion_targets": "generate_target_relay",
     "no_auto_visual": "generate_map visual branch",
+    "no_auto_automap_helper": "generate_map automap helper branch",
+    "independent_automap_properties_decl": "build_universal_physical_policy",
     "preserve_layers": "generate_independent_pickup_trigger",
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
     "preserve_original_visual": "generate_map original-owner branch",
@@ -1274,11 +1277,15 @@ def generate_inert_location_visual(block, policy):
     if len(visual["position"]) != 3 or len(visual["scale"]) != 3:
         raise ValueError("Independent AP visual position and scale require three values")
     layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
-    layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
+    layers = (
+        f"\t{layers_match.group(1).strip()}\n"
+        if layers_match and policy.get("preserve_visual_layers", True)
+        else ""
+    )
     position = visual["position"]
     scale = visual["scale"]
     entity_class = visual.get("class", "idDynamicEntity")
-    inherit = visual.get("inherit", "func/dynamic")
+    inherit = visual.get("inherit")
     inherit_line = f'\t\tinherit = "{inherit}";\n' if inherit else ""
     automap_decl = visual.get("automap_properties_decl")
     automap_line = (
@@ -1290,6 +1297,17 @@ def generate_inert_location_visual(block, policy):
         f'\t\t\tthinkComponentDecl = "{think_decl}";\n'
         if think_decl else ""
     )
+    orientation = visual.get("spawn_orientation")
+    if orientation is None and policy.get("preserve_rotation"):
+        orientation_match = re.search(r'\bspawnOrientation\s*=\s*\{', block)
+        if orientation_match:
+            orientation_end = find_matching_brace(block, orientation_match.end() - 1)
+            orientation = block[orientation_match.start():orientation_end + 1]
+    orientation_line = ""
+    if orientation:
+        orientation_line = "\n".join(
+            "\t" + line if line else line for line in orientation.splitlines()
+        ) + "\n"
     bind_parent = policy.get("bind_parent")
     bind_info_line = (
         f"\t\t\tbindInfo = {{\n\t\t\t\tbindParent = \"{bind_parent}\";\n\t\t\t}}\n"
@@ -1366,12 +1384,13 @@ def generate_inert_location_visual(block, policy):
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-{automap_line}{think_line}{bind_info_line}\t\t\tspawnPosition = {{
+{automap_line}{think_line}\t\t\tisStatic = false;
+{bind_info_line}\t\t\tspawnPosition = {{
 \t\t\t\tx = {position[0]};
 \t\t\t\ty = {position[1]};
 \t\t\t\tz = {position[2]};
 \t\t\t}}
-\t\t\trenderModelInfo = {{
+{orientation_line}\t\t\trenderModelInfo = {{
 \t\t\t\tmodel = "{visual["model"]}";
 \t\t\t\tcontributesToLightProbeGen = false;
 \t\t\t\tignoreDesaturate = true;
@@ -1596,6 +1615,7 @@ def build_universal_physical_policy(
     reconciliation_name = f"ap_hide_location_visual_{location_id}"
 
     policy = policy or {}
+    policy.setdefault("preserve_rotation", False)
     configured_position = policy.get("independent_position")
     visual_z_offset = policy.get("independent_visual_z_offset", 1.5)
     if (
@@ -1628,6 +1648,8 @@ def build_universal_physical_policy(
 
     independent_targets = [ap_check_id, cleanup_name]
 
+    think_match = re.search(r'\bthinkComponentDecl\s*=\s*"([^"]+)";', block)
+    think_component = think_match.group(1) if think_match else None
     return {
         "independent_ap_trigger": True,
         "independent_targets": independent_targets,
@@ -1637,14 +1659,17 @@ def build_universal_physical_policy(
             "entity_name": visual_name,
             "class": "idProp2",
             "inherit": None,
-            "automap_properties_decl": "default",
+            "automap_properties_decl": policy.get(
+                "independent_automap_properties_decl", "default"
+            ),
             "model": visual_model,
-            "thinkComponentDecl": "bob_rotate_fast",
+            "thinkComponentDecl": policy.get("thinkComponentDecl", "bob_rotate_slow"),
             "position": position,
             "scale": [1.0, 1.0, 1.0],
             "cleanup_entity": cleanup_name,
             "reconciliation_entity": reconciliation_name,
         },
+        "preserve_rotation": policy["preserve_rotation"],
         "completion_targets": [cleanup_name],
     }
 
@@ -2292,11 +2317,11 @@ def generate_rpc_command_entities(
                 )
             classification = item_classifications[item_id_int]
             
-            if isinstance(command_value, dict) and command_value.get("type") in {
-                "progressive_perk", "progressive_item",
-            }:
-                perks = command_value.get("perks", [])
-                for stage in range(len(perks)):
+            progressive_stage_count = progressive_notification_stage_count(
+                item_id_int, command_value
+            )
+            if progressive_stage_count is not None:
+                for stage in range(progressive_stage_count):
                     subtext_key = notification_key(item_id_int, command_value, stage=stage)
                     for slot in ("a", "b"):
                         blocks.append(generate_item_notification(
@@ -2509,6 +2534,12 @@ def generate_map(
     map_key = level_config.get("map_key")
     if not isinstance(map_key, str):
         raise ValueError("map config requires string map_key")
+    preserve_rotation = level_config.get("preserve_rotation", False)
+    if not isinstance(preserve_rotation, bool):
+        raise ValueError("map config preserve_rotation must be boolean")
+    preserve_visual_layers = level_config.get("preserve_visual_layers", True)
+    if not isinstance(preserve_visual_layers, bool):
+        raise ValueError("map config preserve_visual_layers must be boolean")
     fast_travel_path = Path(__file__).resolve().parents[2] / "data" / "fast_travel.json"
     fast_travel = json.loads(fast_travel_path.read_text(encoding="utf-8"))
     canonical_visual = canonical_ap_visual_for_map(map_key)
@@ -2689,16 +2720,34 @@ def generate_map(
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
                 if not target_policy:
                     target_policy = build_universal_physical_policy(
-                        ap_check_id, location_id, block, default_visual_model
+                        ap_check_id,
+                        location_id,
+                        block,
+                        default_visual_model,
+                        policy={
+                            "preserve_rotation": preserve_rotation,
+                            "preserve_visual_layers": preserve_visual_layers,
+                        },
                     )
                 elif is_sentinel_crystal_source(block) and not target_policy.get(
                     "independent_ap_trigger"
                 ):
                     generic = build_universal_physical_policy(
-                        ap_check_id, location_id, block, default_visual_model
+                        ap_check_id,
+                        location_id,
+                        block,
+                        default_visual_model,
+                        policy={
+                            "preserve_rotation": preserve_rotation,
+                            "preserve_visual_layers": preserve_visual_layers,
+                        },
                     )
                     generic.update(target_policy)
                     target_policy = generic
+                target_policy.setdefault("preserve_rotation", preserve_rotation)
+                target_policy.setdefault(
+                    "preserve_visual_layers", preserve_visual_layers
+                )
                 if is_sentinel_crystal_source(block):
                     target_policy.setdefault("independent_ap_trigger", True)
                     target_policy.setdefault("remove_original", True)
@@ -2745,9 +2794,10 @@ def generate_map(
 
                 audit_preserved_target_graph(content, entity_name, target_policy)
                 
-                new_blocks.append(
-                    generate_automap_location_helper(block, location_id, policy=target_policy)
-                )
+                if not target_policy.get("no_auto_automap_helper"):
+                    new_blocks.append(
+                        generate_automap_location_helper(block, location_id, policy=target_policy)
+                    )
                 if "native_entity_contract" in target_policy and not target_policy.get("independent_ap_trigger"):
                     native_contract = target_policy["native_entity_contract"]
                     native = apply_native_entity_contract(block, native_contract)
@@ -2893,9 +2943,10 @@ def generate_map(
                                 )
                             )
                         new_blocks.append(generate_check_event(secondary_location_id))
-                        new_blocks.append(
-                            generate_automap_location_helper(block, secondary_location_id, policy=target_policy)
-                        )
+                        if not target_policy.get("no_auto_automap_helper"):
+                            new_blocks.append(
+                                generate_automap_location_helper(block, secondary_location_id, policy=target_policy)
+                            )
                         secondary_universal = build_universal_physical_policy(
                             secondary_ap_check_id,
                             secondary_location_id,

@@ -18,7 +18,7 @@
         {
           "strategy": "native_transition",
           "from_map": "game/dlc/e4m1_rig/e4m1_rig",
-          "to_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+          "to_map": "maps/game/dlc/hub/hub.map"
         }
       ],
       "effects": [
