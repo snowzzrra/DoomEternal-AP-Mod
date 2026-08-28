@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "preserve_rotation": true,
+  "preserve_visual_layers": true,
+  "entities": {
+    "AP_CHECK_GAME_PROGRESS_CODEX_1": 7770466,
+    "AP_CHECK_GAME_PROGRESS_CODEX_2": 7770467,
+    "AP_CHECK_GAME_PROGRESS_CODEX_3": 7770468,
+    "AP_CHECK_GAME_PROGRESS_CODEX_4": 7770469,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770470,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770471,
+    "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3": 7770472,
+    "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770473,
+    "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE": 7770474
+  },
+  "names": {
+    "7770466": "Reclaimed Earth - Codex - City Entrance Streetlight",
+    "7770467": "Reclaimed Earth - Codex - Escalation Exit",
+    "7770468": "Reclaimed Earth - Codex - Overgrown Offices Pillars",
+    "7770469": "Reclaimed Earth - Codex - Gate of Divum Elevator",
+    "7770470": "Reclaimed Earth - Extra Life - City Entrance Truck",
+    "7770471": "Reclaimed Earth - Extra Life - Upper Offices Side Room",
+    "7770472": "Reclaimed Earth - Extra Life - Lockdown Red Door",
+    "7770473": "Reclaimed Earth - Escalation Encounter Wave 1",
+    "7770474": "Reclaimed Earth - Escalation Encounter Wave 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "game_progress_codex_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_progress_codex_2": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_progress_codex_3": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_progress_codex_4": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_pickup_extra_life_extra_life_1_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_pickup_extra_life_extra_life_1_2": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "game_pickup_extra_life_extra_life_1_3": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "target_relay_escalation_1_done": {
+      "ap_touch_only": true,
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true,
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;",
+          "whenToSave = \"SGT_NORMAL\";"
+        ]
+      }
+    },
+    "target_relay_escalation_3_done": {
+      "ap_touch_only": true,
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true,
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;",
+          "whenToSave = \"SGT_NORMAL\";"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "publishers": [
+    {
+      "key": "world_spear_mission_complete",
+      "map_key": "e5m1_spear",
+      "triggers": [
+        {
+          "strategy": "map_event_file",
+          "owner": "crystal_target_level_transition_1",
+          "filename": "ap_mission_world_spear_complete.txt",
+          "marker": "AP_MISSION_EVENT_WORLD_SPEAR_COMPLETE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "crystal_target_level_transition_1"
+        },
+        {
+          "strategy": "native_transition",
+          "from_map": "game/dlc2/e5m1_spear/e5m1_spear",
+          "to_map": "game/dlc2/e5m2_earth/e5m2_earth"
+        }
+      ],
+      "effects": [
+        {
+          "strategy": "location_check",
+          "location_id": 7770465
+        }
+      ],
+      "dedupe_scope": "world_spear_mission_complete_location",
+      "fallback_policy": "first_success_wins"
+    }
+  ]
+}

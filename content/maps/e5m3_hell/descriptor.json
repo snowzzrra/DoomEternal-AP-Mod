@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "key": "e5m3_hell",
+  "display_name": "Immora",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
+  "source_file": "e5m3_hell.map",
+  "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+  "source_size": 6722570,
+  "source_owner": "id Software",
+  "generated_output": "e5m3_hell.entities",
+  "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+  "resource_base": "e5m3_hell",
+  "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+  "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+  "resource_priority": 167,
+  "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {"name": "Immora", "order": 124}
+    ],
+    "connections": [],
+    "virtual_locations": []
+  },
+  "order": 19
+}

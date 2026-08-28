@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_complete",
+      "name": "The World Spear - Mission Complete",
+      "location_id": 7770465,
+      "strategy": "map_terminal",
+      "mission_key": "e5m1_spear",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear"
+      },
+      "order": 17
+    }
+  ]
+}

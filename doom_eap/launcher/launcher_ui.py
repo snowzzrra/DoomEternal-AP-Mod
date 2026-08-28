@@ -1798,6 +1798,7 @@ class LauncherUI(QMainWindow):
             options.setPlainText("\n".join(
                 f"{self._option_label(key)}: {self._option_value_text(value)}"
                 for key, value in sorted(slot_data.items(), key=lambda item: str(item[0]))
+                if key != "mission_difficulty"
             ) or "No settings supplied.")
         else:
             options.setPlainText("No settings supplied.")

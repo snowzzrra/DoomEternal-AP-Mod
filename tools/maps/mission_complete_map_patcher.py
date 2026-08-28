@@ -359,6 +359,17 @@ def _patch_declared_terminal(
     generated_map: Path,
 ) -> dict:
     text = generated_map.read_text(encoding="utf-8")
+    result, audit = _patch_declared_terminal_text(map_key, owner, publishers, text)
+    generated_map.write_text(result, encoding="utf-8", newline="")
+    return audit
+
+
+def _patch_declared_terminal_text(
+    map_key: str,
+    owner: str,
+    publishers: tuple[PublisherContract, ...],
+    text: str,
+) -> tuple[str, dict]:
     if text.count(f"entityDef {owner}") != 1:
         raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
     bounds = find_entity_block_bounds(text, owner)
@@ -391,13 +402,8 @@ def _patch_declared_terminal(
         compiled["native_delay"] = native_delay
     else:
         patched = replace_targets_block(block, compiled["owner_targets"])
-    generated_map.write_text(
-        (text[:bounds[0]] + patched + text[bounds[1]:]).rstrip()
-        + "\n" + compiled["entities"],
-        encoding="utf-8",
-        newline="",
-    )
-    return {
+    result = (text[:bounds[0]] + patched + text[bounds[1]:]).rstrip() + "\n" + compiled["entities"]
+    return result, {
         "owner": owner,
         "before_targets": before,
         "after_targets": compiled["owner_targets"],
@@ -407,6 +413,27 @@ def _patch_declared_terminal(
            if "native_owner" in compiled else {}),
         "changed_lists": 1,
     }
+
+
+def patch_generated_map_text(map_key: str, text: str, mod_root: Path) -> tuple[str, dict]:
+    """Apply catalog publisher contracts to one generated map text payload."""
+    publishers = load_content_catalog(mod_root).publishers
+    owners: dict[str, list[PublisherContract]] = {}
+    for publisher in publishers:
+        if publisher.map_key != map_key:
+            continue
+        for trigger in publisher.triggers:
+            if trigger["strategy"] in {"terminal_owner", "map_event_file"}:
+                group = owners.setdefault(trigger["owner"], [])
+                if not any(existing.key == publisher.key for existing in group):
+                    group.append(publisher)
+    audits: dict[str, dict] = {}
+    for owner, grouped in owners.items():
+        text, audit = _patch_declared_terminal_text(
+            map_key, owner, tuple(grouped), text
+        )
+        audits[f"{map_key}:{owner}"] = audit
+    return text, audits
 
 
 def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> int:
@@ -467,29 +494,6 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         else:
             raise ValueError(f"{name}: unknown Mission Complete patch strategy {strategy!r}")
         audits[name] = audit
-    legacy_patched_maps = {
-        contract["map_key"] for contract in contract_items.values()
-    }
-    owner_groups: dict[tuple[str, str], list[PublisherContract]] = {}
-    for publisher in publisher_contracts:
-        if publisher.map_key not in generated_maps or publisher.map_key in legacy_patched_maps:
-            continue
-        owners = {
-            trigger["owner"] for trigger in publisher.triggers
-            if trigger["strategy"] in {"terminal_owner", "map_event_file"}
-        }
-        for owner in owners:
-            owner_groups.setdefault((publisher.map_key, owner), []).append(publisher)
-    for (map_key, owner), grouped in owner_groups.items():
-        audit = _patch_declared_terminal(
-            map_key, owner, tuple(grouped), generated_maps[map_key]
-        )
-        audits[f"{map_key}:{owner}"] = audit
-        if any(
-            effect["strategy"] == "campaign_goal"
-            for publisher in grouped for effect in publisher.effects
-        ):
-            terminal_audit = audit
     for name, contract in contract_items.items():
         if contract["patch_strategy"] == "terminal_publishers":
             continue
@@ -506,7 +510,6 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
-    unrelated_owners.update(owner for _map_key, owner in owner_groups)
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),

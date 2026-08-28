@@ -797,7 +797,7 @@ class Pipeline:
             manifest_path = root / "RELEASE_MANIFEST.json"
             if not manifest_path.is_file():
                 raise ValueError(f"component=package file={manifest_path} field=manifest value=missing")
-            generated_maps = ROOT / "build" / "generated-maps"
+            generated_maps = root / "build" / "generated-maps"
             generated_root = generated_maps if generated_maps.is_dir() else None
             manifest = load_release_manifest(
                 manifest_path,

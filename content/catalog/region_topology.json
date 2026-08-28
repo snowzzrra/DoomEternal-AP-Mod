@@ -636,6 +636,144 @@
       "mission_key": "e4m3_mcity",
       "order": 121,
       "terminal": true
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Village Outskirts",
+      "mission_key": "e5m1_spear",
+      "order": 122
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Village Entrance",
+      "mission_key": "e5m1_spear",
+      "order": 123
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Sentinel Village",
+      "mission_key": "e5m1_spear",
+      "order": 124
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Village Sanctum",
+      "mission_key": "e5m1_spear",
+      "order": 125
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Ancient Tower",
+      "mission_key": "e5m1_spear",
+      "order": 126
+    },
+    {
+      "name": "The World Spear - Sentinel Village - Ancient Bridge",
+      "mission_key": "e5m1_spear",
+      "order": 127
+    },
+    {
+      "name": "The World Spear - Sentinel Mountain - Mountain Forest",
+      "mission_key": "e5m1_spear",
+      "order": 128
+    },
+    {
+      "name": "The World Spear - Sentinel Mountain - Mountain Cliffs",
+      "mission_key": "e5m1_spear",
+      "order": 129
+    },
+    {
+      "name": "The World Spear - Sentinel Mountain - Mountain Ruins",
+      "mission_key": "e5m1_spear",
+      "order": 130
+    },
+    {
+      "name": "The World Spear - Sentinel Mountain - Nether Lake",
+      "mission_key": "e5m1_spear",
+      "order": 131
+    },
+    {
+      "name": "The World Spear - World Spear - Spear Entrance",
+      "mission_key": "e5m1_spear",
+      "order": 132
+    },
+    {
+      "name": "The World Spear - World Spear - Spear Pits",
+      "mission_key": "e5m1_spear",
+      "order": 133
+    },
+    {
+      "name": "The World Spear - World Spear - Shard Altar",
+      "mission_key": "e5m1_spear",
+      "order": 134,
+      "terminal": true
+    },
+    {
+      "name": "Reclaimed Earth - City Entrance",
+      "mission_key": "e5m2_earth",
+      "order": 135
+    },
+    {
+      "name": "Reclaimed Earth - Reclaimed Train Stop",
+      "mission_key": "e5m2_earth",
+      "order": 136
+    },
+    {
+      "name": "Reclaimed Earth - Overgrown Offices",
+      "mission_key": "e5m2_earth",
+      "order": 137
+    },
+    {
+      "name": "Reclaimed Earth - Upper Overgrown Offices",
+      "mission_key": "e5m2_earth",
+      "order": 138
+    },
+    {
+      "name": "Reclaimed Earth - Lockdown",
+      "mission_key": "e5m2_earth",
+      "order": 139
+    },
+    {
+      "name": "Reclaimed Earth - Gate of Divum",
+      "mission_key": "e5m2_earth",
+      "order": 140,
+      "terminal": true
+    },
+    {
+      "name": "Immora - Immora Assault - Battlefield",
+      "mission_key": "e5m3_hell",
+      "order": 141
+    },
+    {
+      "name": "Immora - Immora Assault - Plateau Battle",
+      "mission_key": "e5m3_hell",
+      "order": 142
+    },
+    {
+      "name": "Immora - Immora Assault - Walls of Immora",
+      "mission_key": "e5m3_hell",
+      "order": 143
+    },
+    {
+      "name": "Immora - Immora Assault - Breach",
+      "mission_key": "e5m3_hell",
+      "order": 144
+    },
+    {
+      "name": "Immora - Immora Assault - Bridge Platform",
+      "mission_key": "e5m3_hell",
+      "order": 145
+    },
+    {
+      "name": "Immora - Immora Assault - Tower Seige",
+      "mission_key": "e5m3_hell",
+      "order": 146
+    },
+    {
+      "name": "Immora - Immora Interior - Escape Platform",
+      "mission_key": "e5m3_hell",
+      "order": 147
+    },
+    {
+      "name": "Immora - Final Plunge - Final Plunge",
+      "mission_key": "e5m3_hell",
+      "order": 148,
+      "terminal": true
     }
   ],
   "connections": [
@@ -1135,11 +1273,6 @@
       ""
     ],
     [
-      "Final Sin - South Station",
-      "Immora - The Dark Lord",
-      "The Dark Lord"
-    ],
-    [
       "Menu",
       "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
       "Portal to UAC Atlantica Facility"
@@ -1243,14 +1376,149 @@
       "The Holt - Pantheon of Khans",
       "The Holt - Holy Chamber",
       ""
+    ],
+    [
+      "Menu",
+      "The World Spear - Sentinel Village - Village Outskirts",
+      "The World Spear"
+    ],
+    [
+      "The World Spear - Sentinel Village - Village Outskirts",
+      "The World Spear - Sentinel Village - Village Entrance",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Village - Village Entrance",
+      "The World Spear - Sentinel Village - Sentinel Village",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Village - Sentinel Village",
+      "The World Spear - Sentinel Village - Village Sanctum",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Village - Village Sanctum",
+      "The World Spear - Sentinel Village - Ancient Tower",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Village - Ancient Tower",
+      "The World Spear - Sentinel Village - Ancient Bridge",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Village - Ancient Bridge",
+      "The World Spear - Sentinel Mountain - Mountain Forest",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Mountain - Mountain Forest",
+      "The World Spear - Sentinel Mountain - Mountain Cliffs",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Mountain - Mountain Cliffs",
+      "The World Spear - Sentinel Mountain - Mountain Ruins",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Mountain - Mountain Ruins",
+      "The World Spear - Sentinel Mountain - Nether Lake",
+      ""
+    ],
+    [
+      "The World Spear - Sentinel Mountain - Nether Lake",
+      "The World Spear - World Spear - Spear Entrance",
+      ""
+    ],
+    [
+      "The World Spear - World Spear - Spear Entrance",
+      "The World Spear - World Spear - Spear Pits",
+      ""
+    ],
+    [
+      "The World Spear - World Spear - Spear Pits",
+      "The World Spear - World Spear - Shard Altar",
+      ""
+    ],
+    [
+      "The World Spear - World Spear - Shard Altar",
+      "Reclaimed Earth - City Entrance",
+      "Proceed to Reclaimed Earth"
+    ],
+    [
+      "Reclaimed Earth - City Entrance",
+      "Reclaimed Earth - Reclaimed Train Stop",
+      ""
+    ],
+    [
+      "Reclaimed Earth - Reclaimed Train Stop",
+      "Reclaimed Earth - Overgrown Offices",
+      ""
+    ],
+    [
+      "Reclaimed Earth - Overgrown Offices",
+      "Reclaimed Earth - Upper Overgrown Offices",
+      ""
+    ],
+    [
+      "Reclaimed Earth - Upper Overgrown Offices",
+      "Reclaimed Earth - Lockdown",
+      ""
+    ],
+    [
+      "Reclaimed Earth - Lockdown",
+      "Reclaimed Earth - Gate of Divum",
+      ""
+    ],
+    [
+      "Reclaimed Earth - Gate of Divum",
+      "Immora - Immora Assault - Battlefield",
+      "Proceed to Immora"
+    ],
+    [
+      "Immora - Immora Assault - Battlefield",
+      "Immora - Immora Assault - Plateau Battle",
+      ""
+    ],
+    [
+      "Immora - Immora Assault - Plateau Battle",
+      "Immora - Immora Assault - Walls of Immora",
+      ""
+    ],
+    [
+      "Immora - Immora Assault - Walls of Immora",
+      "Immora - Immora Assault - Breach",
+      ""
+    ],
+    [
+      "Immora - Immora Assault - Breach",
+      "Immora - Immora Assault - Bridge Platform",
+      ""
+    ],
+    [
+      "Immora - Immora Assault - Bridge Platform",
+      "Immora - Immora Assault - Tower Seige",
+      ""
+    ],
+    [
+      "Immora - Immora Assault - Tower Seige",
+      "Immora - Immora Interior - Escape Platform",
+      ""
+    ],
+    [
+      "Immora - Immora Interior - Escape Platform",
+      "Immora - Final Plunge - Final Plunge",
+      ""
+    ],
+    [
+      "Immora - Final Plunge - Final Plunge",
+      "Immora - The Dark Lord",
+      "The Dark Lord"
     ]
   ],
   "connection_conditions": {
-    "Final Sin - South Station -> Immora - The Dark Lord": {
-      "soft_capabilities": [
-        "requires_dlc_content"
-      ]
-    },
     "Fortress of Doom - Second Visit -> Cultist Base - Grotto of Penance": {
       "soft_capabilities": [
         "requires_first_battery"
@@ -1262,6 +1530,11 @@
       ]
     },
     "Menu -> UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad": {
+      "soft_capabilities": [
+        "requires_dlc_content"
+      ]
+    },
+    "Menu -> The World Spear - Sentinel Village - Village Outskirts": {
       "soft_capabilities": [
         "requires_dlc_content"
       ]
@@ -1884,6 +2157,79 @@
     ],
     "The Holt - Holy Chamber": [
       7770457
+    ],
+    "The World Spear - Sentinel Village - Village Outskirts": [],
+    "The World Spear - Sentinel Village - Village Entrance": [],
+    "The World Spear - Sentinel Village - Sentinel Village": [
+      7770461
+    ],
+    "The World Spear - Sentinel Village - Village Sanctum": [],
+    "The World Spear - Sentinel Village - Ancient Tower": [],
+    "The World Spear - Sentinel Village - Ancient Bridge": [
+      7770462
+    ],
+    "The World Spear - Sentinel Mountain - Mountain Forest": [],
+    "The World Spear - Sentinel Mountain - Mountain Cliffs": [
+      7770459,
+      7770460
+    ],
+    "The World Spear - Sentinel Mountain - Mountain Ruins": [
+      7770463,
+      7770464
+    ],
+    "The World Spear - Sentinel Mountain - Nether Lake": [],
+    "The World Spear - World Spear - Spear Entrance": [],
+    "The World Spear - World Spear - Spear Pits": [],
+    "The World Spear - World Spear - Shard Altar": [
+      7770458,
+      7770465
+    ],
+    "Reclaimed Earth - City Entrance": [
+      7770466,
+      7770470
+    ],
+    "Reclaimed Earth - Reclaimed Train Stop": [
+      7770467,
+      7770473,
+      7770474
+    ],
+    "Reclaimed Earth - Overgrown Offices": [
+      7770468
+    ],
+    "Reclaimed Earth - Upper Overgrown Offices": [
+      7770471
+    ],
+    "Reclaimed Earth - Lockdown": [
+      7770472
+    ],
+    "Reclaimed Earth - Gate of Divum": [
+      7770469,
+      7770475
+    ],
+    "Immora - Immora Assault - Battlefield": [
+      7770476,
+      7770481
+    ],
+    "Immora - Immora Assault - Plateau Battle": [
+      7770482,
+      7770483,
+      7770484
+    ],
+    "Immora - Immora Assault - Walls of Immora": [
+      7770480
+    ],
+    "Immora - Immora Assault - Breach": [
+      7770477
+    ],
+    "Immora - Immora Assault - Bridge Platform": [
+      7770478
+    ],
+    "Immora - Immora Assault - Tower Seige": [],
+    "Immora - Immora Interior - Escape Platform": [
+      7770479
+    ],
+    "Immora - Final Plunge - Final Plunge": [
+      7770485
     ]
   }
 }

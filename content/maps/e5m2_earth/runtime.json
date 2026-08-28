@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "locations": [
+    {
+      "category": "mission_complete",
+      "name": "Reclaimed Earth - Mission Complete",
+      "location_id": 7770475,
+      "strategy": "map_terminal",
+      "mission_key": "e5m2_earth",
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth"
+      },
+      "order": 19
+    }
+  ]
+}

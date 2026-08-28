@@ -77,6 +77,10 @@ class MapSpec:
     resource_priority: int = 0
     supported_game_revision: str = ""
 
+    @property
+    def requires_dlc_content(self) -> bool:
+        return self.runtime_map.startswith("game/dlc")
+
 
 @dataclass(frozen=True)
 class PhysicalLocationSpec:
@@ -224,7 +228,12 @@ def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
             raise ValueError(f"component=map_package map={key} field=key value=duplicate")
         keys.add(key)
         documents = {name: _json(path) for name, path in paths.items() if name != "descriptor"}
-        if any(document.get("schema_version") != 1 for document in documents.values()):
+        invalid_components = [
+            name for name, document in documents.items()
+            if document.get("schema_version") != 1
+            and not (name == "onboarding" and document.get("schema_version") == 2)
+        ]
+        if invalid_components:
             raise ValueError(f"component=map_package map={key} field=schema_version value!=1")
         packages.append({"directory": directory, "descriptor": descriptor, **documents})
     if not packages:

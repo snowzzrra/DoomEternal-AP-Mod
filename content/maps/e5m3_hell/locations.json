@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "preserve_rotation": true,
+  "preserve_visual_layers": true,
+  "entities": {
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_1": 7770476,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_2": 7770477,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_3": 7770478,
+    "AP_CHECK_PICKUPS_PROGRESS_CODEX_4": 7770479,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1": 7770480,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770481,
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770482,
+    "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770483,
+    "AP_CHECK_TARGET_RELAY_ESCALATION_2_DONE": 7770484
+  },
+  "names": {
+    "7770476": "Immora - Codex - Battlefield Second Bend",
+    "7770477": "Immora - Codex - Breach Tank Landing",
+    "7770478": "Immora - Codex - Bridge Platform",
+    "7770479": "Immora - Codex - Escape Platform Portal",
+    "7770480": "Immora - Extra Life - Walls of Immora Spike Cave",
+    "7770481": "Immora - Extra Life - Battlefield Breakable Wall",
+    "7770482": "Immora - Extra Life - Plateau Battle 2-Up",
+    "7770483": "Immora - Escalation Encounter Wave 1",
+    "7770484": "Immora - Escalation Encounter Wave 2"
+  },
+  "location_feedback": {
+    "default_policy": "ap_only"
+  },
+  "target_policies": {
+    "pickups_progress_codex_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_progress_codex_2": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_progress_codex_3": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_progress_codex_4": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_pickup_extra_life_extra_life_1_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_pickup_extra_life_extra_life_1_2": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "pickups_pickup_extra_life_extra_life_2up_1": {
+      "independent_ap_trigger": true,
+      "remove_original": true
+    },
+    "target_relay_escalation_1_done": {
+      "ap_touch_only": true,
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true,
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;",
+          "whenToSave = \"SGT_NORMAL\";"
+        ]
+      }
+    },
+    "target_relay_escalation_2_done": {
+      "ap_touch_only": true,
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true,
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;",
+          "whenToSave = \"SGT_NORMAL\";"
+        ]
+      }
+    }
+  }
+}

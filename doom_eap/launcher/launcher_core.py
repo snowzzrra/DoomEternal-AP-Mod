@@ -787,6 +787,36 @@ class RoomCompiler:
             )
         return decompressor
 
+    def _decompress_entities_text(self, content: bytes, member: str) -> str:
+        decompressor = self._verified_decompressor()
+        with tempfile.TemporaryDirectory(prefix="doom-ap-patch-") as temporary:
+            temporary_dir = Path(temporary)
+            compressed = temporary_dir / "input.entities"
+            decoded = temporary_dir / "decoded.entities"
+            compressed.write_bytes(content)
+            try:
+                subprocess.run(
+                    [str(decompressor), "--decompress", str(compressed), str(decoded)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as error:
+                detail = (error.stderr or error.stdout or "").strip()[:500]
+                raise ValueError(
+                    f"could not decompress compiled entities member {member}: {detail}"
+                ) from error
+            if not decoded.is_file():
+                raise ValueError(
+                    f"idFileDeCompressor produced no decoded entities member: {member}"
+                )
+            try:
+                return decoded.read_bytes().decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise ValueError(
+                    f"compiled entities member is not UTF-8 after decompression: {member}"
+                ) from error
+
     def _compress_entities_text(self, text: str) -> bytes:
         decompressor = self._verified_decompressor()
         with tempfile.TemporaryDirectory(prefix="doom-ap-overlay-") as temporary:
@@ -828,6 +858,25 @@ class RoomCompiler:
             "starting_weapon": manifest.options.get("starting_weapon"),
             "room_config": room_config,
         }
+        if manifest.options.get("use_dlc_content", True):
+            from doom_eap.content.content_catalog import load_content_catalog
+            from tools.maps.mission_complete_map_patcher import patch_generated_map_text
+
+            catalog = load_content_catalog()
+            for map_key in selected:
+                spec = catalog.maps.get(map_key)
+                if spec is None or not spec.requires_dlc_content:
+                    continue
+                member = str(self.payload_manifest["maps"][map_key]["target_member"])
+                compiled_content = assembled.get(member)
+                if compiled_content is None:
+                    raise ValueError(f"DLC map compiled payload is missing: {map_key}/{member}")
+                compiled_text = self._decompress_entities_text(compiled_content, member)
+                patched_text, _publisher_audit = patch_generated_map_text(
+                    map_key, compiled_text, ROOT
+                )
+                if patched_text != compiled_text:
+                    assembled[member] = self._compress_entities_text(patched_text)
         devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY
         ).as_posix()
@@ -851,9 +900,18 @@ class RoomCompiler:
                     raise ValueError(f"DLC context lacks marker overlay target: {context.identity}")
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
                     raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
+                compiled_content = assembled.get(context.overlay_member)
+                if compiled_content is not None:
+                    continue
                 overlay_text = generate_context_marker_overlay(
                     context.map_keys[0], context.runtime_maps[0]
                 )
+                import re
+                marker_names = re.findall(r"\bentityDef\s+(\S+)\s*\{", overlay_text)
+                if len(marker_names) != len(set(marker_names)):
+                    raise ValueError(
+                        f"DLC context marker entity names are duplicated: {context.identity}"
+                    )
                 assembled[context.overlay_member] = self._compress_entities_text(
                     overlay_text
                 )
@@ -1065,6 +1123,7 @@ class ModCompiler:
         campaign_maps = tuple(
             spec for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
+            and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
         )
         for map_spec in campaign_maps:
             map_key = map_spec.key
@@ -1081,6 +1140,7 @@ class ModCompiler:
         campaign_keys = {
             spec.key for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
+            and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
         }
         if map_key not in campaign_keys:
             raise ValueError(

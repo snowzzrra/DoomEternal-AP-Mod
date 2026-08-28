@@ -4395,6 +4395,18 @@ class DoomEternalContext(CommonContext):
         )
         self._schedule_ammo_refill_overflow_normalization("storage_update")
 
+    def _is_crucible_active_special_weapon(self):
+        slot_data = getattr(self, "_connected_slot_data", {})
+        special_mode = slot_data.get("special_weapon")
+        received_items = self.items_received[: self.items_processed]
+        received_ids = [item.item for item in received_items]
+        if special_mode in {"the_crucible", "The Crucible"}:
+            return 7770007 in received_ids
+        if special_mode in {"progressive_special_weapon", "Progressive Special Weapon"}:
+            count = sum(1 for item_id in received_ids if item_id == 7770901)
+            return count == 1
+        return False
+
     def _queue_ammo_refill_primitive(self):
         namespace = queue_session_namespace(self.state_key)
         if namespace is None:
@@ -4413,8 +4425,11 @@ class DoomEternalContext(CommonContext):
         if not commands or len(commands) != 1:
             logger.error("[Ammo Refill] Proven refill primitive is unavailable: %s", description)
             return False
+        refill_cmd = commands[0]
+        if self._is_crucible_active_special_weapon():
+            refill_cmd = f"{refill_cmd}; give ammo/sharedammopool/crucible 3"
         queued = send_command(
-            commands[0],
+            refill_cmd,
             coalesce_key=command_key,
             arm_rpc=False,
             already_queued_ok=False,

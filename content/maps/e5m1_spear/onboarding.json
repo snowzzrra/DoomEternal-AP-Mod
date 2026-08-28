@@ -1,0 +1,358 @@
+{
+  "schema_version": 2,
+  "map_key": "e5m1_spear",
+  "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+  "resource_priority": 175,
+  "resource_priority_metadata_only": true,
+  "mission_complete_transition": {
+    "kind": "native_transition",
+    "owner": "crystal_target_level_transition_1",
+    "target": "game/dlc2/e5m2_earth/e5m2_earth",
+    "classification": "progression"
+  },
+  "entry_transition": {
+    "kind": "runtime_route",
+    "owner": "Menu",
+    "target": "game/dlc2/e5m1_spear/e5m1_spear",
+    "classification": "progression"
+  },
+  "exit_transition": {
+    "kind": "native_transition",
+    "owner": "crystal_target_level_transition_1",
+    "target": "game/dlc2/e5m2_earth/e5m2_earth",
+    "classification": "progression"
+  },
+  "campaign_goal_owner": "crystal_target_level_transition_1",
+  "layers": [
+    "game/sp/extralives/extralives_many"
+  ],
+  "checkpoints": [
+    "interact_gore_nest_escalation_1_e5m1",
+    "_example_encounter_manager_0",
+    "arena_escalation_02_start",
+    "_example_encounter_manager_2",
+    "crystal_target_level_transition_1"
+  ],
+  "movers": [],
+  "gates": [],
+  "new_decl_resources": [],
+  "bfg_ownership_graph": [],
+  "inventory_exclusions": [],
+  "source_evidence": {
+    "source_identity": {
+      "path": "vanillamaps/e5m1_spear.map",
+      "sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "size": 13628342
+    },
+    "transform_policy": {
+      "physical": "source spawnPosition/spawnOrientation and source layers preserved",
+      "replacement": "independent AP trigger, idProp2 visual, bob_rotate_slow, isStatic false, no native inheritance",
+      "escalation": "native relay preserved with AP touch only"
+    },
+    "source_entities": [
+      "crystal_progress_codex_2",
+      "mountain_pass_pickup_extra_life_extra_life_2up_1",
+      "mountain_pass_progress_codex_1",
+      "target_relay_escalation_1_done",
+      "target_relay_escalation_3_done",
+      "village_pickup_extra_life_extra_life_1_1",
+      "village_pickup_extra_life_extra_life_1_2"
+    ],
+    "physical_source_layers": {
+      "crystal_progress_codex_2": [],
+      "mountain_pass_progress_codex_1": [],
+      "mountain_pass_pickup_extra_life_extra_life_2up_1": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "village_pickup_extra_life_extra_life_1_1": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "village_pickup_extra_life_extra_life_1_2": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "target_relay_escalation_1_done": [],
+      "target_relay_escalation_3_done": []
+    },
+    "transform_snippets": {
+      "crystal_progress_codex_2": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -113.001312;\n\t\t\ty = -740.804688;\n\t\t\tz = -1184.94885;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.707106709;\n\t\t\t\t\ty = -0.707106829;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.707106829;\n\t\t\t\t\ty = 0.707106709;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "mountain_pass_progress_codex_1": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 3.84913945;\n\t\t\ty = 1149.49902;\n\t\t\tz = 169.700363;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -0.707106948;\n\t\t\t\t\ty = -0.707106709;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.707106709;\n\t\t\t\t\ty = -0.707106948;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "mountain_pass_pickup_extra_life_extra_life_2up_1": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -30.6000023;\n\t\t\ty = 1132.50061;\n\t\t\tz = 181.750153;\n\t\t}"
+      },
+      "village_pickup_extra_life_extra_life_1_1": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 53.7499771;\n\t\t\ty = 117.349998;\n\t\t\tz = 13.6000481;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -8.34464913e-07;\n\t\t\t\t\ty = -1;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 1;\n\t\t\t\t\ty = -8.3446497e-07;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "village_pickup_extra_life_extra_life_1_2": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 53.2999992;\n\t\t\ty = 309.499969;\n\t\t\tz = -16.4499989;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -1.1920929e-07;\n\t\t\t\t\ty = -1;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 1;\n\t\t\t\t\ty = -1.1920929e-07;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "target_relay_escalation_1_done": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -133.000092;\n\t\t\ty = 1248.99927;\n\t\t\tz = 182.699951;\n\t\t}"
+      },
+      "target_relay_escalation_3_done": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -112.000076;\n\t\t\ty = 1248.99927;\n\t\t\tz = 182.699951;\n\t\t}"
+      }
+    },
+    "completion_relays": {
+      "wave_1": {
+        "source": "interact_gore_nest_escalation_1_e5m1",
+        "manager": "_example_encounter_manager_0",
+        "relay": "target_relay_escalation_1_done"
+      },
+      "wave_2": {
+        "source": "arena_escalation_02_start",
+        "manager": "_example_encounter_manager_2",
+        "relay": "target_relay_escalation_3_done"
+      }
+    },
+    "fast_travel": {
+      "anchors": [
+        "fast_travel_info_fast_travel_1",
+        "fast_travel_info_fast_travel_2",
+        "fast_travel_info_fast_travel_3",
+        "fast_travel_info_fast_travel_4",
+        "fast_travel_info_fast_travel_5",
+        "fast_travel_info_fast_travel_6",
+        "fast_travel_info_fast_travel_7",
+        "fast_travel_info_fast_travel_8",
+        "fast_travel_info_fast_travel_9",
+        "fast_travel_info_fast_travel_10",
+        "fast_travel_info_fast_travel_11",
+        "fast_travel_info_fast_travel_12",
+        "fast_travel_info_fast_travel_13"
+      ],
+      "unlock_target": "fast_travel_target_fast_travel_unlock_1"
+    },
+    "terminal": "crystal_target_level_transition_1"
+  },
+  "locations": [
+    {
+      "entity": "crystal_progress_codex_2",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770458,
+      "ap_name": "The World Spear - Codex - Shard Altar",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -113.001312;\n\t\t\ty = -740.804688;\n\t\t\tz = -1184.94885;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.707106709;\n\t\t\t\t\ty = -0.707106829;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.707106829;\n\t\t\t\t\ty = 0.707106709;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/sentinel/world_spear_2",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "mountain_pass_progress_codex_1",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770459,
+      "ap_name": "The World Spear - Codex - Mountain Cliffs",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 3.84913945;\n\t\t\ty = 1149.49902;\n\t\t\tz = 169.700363;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -0.707106948;\n\t\t\t\t\ty = -0.707106709;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.707106709;\n\t\t\t\t\ty = -0.707106948;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/sentinel/world_spear_1",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "mountain_pass_pickup_extra_life_extra_life_2up_1",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_2up",
+      "ap_id": 7770460,
+      "ap_name": "The World Spear - Extra Life - Mountain Cliffs 2-Up",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -30.6000023;\n\t\t\ty = 1132.50061;\n\t\t\tz = 181.750153;\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_2",
+        "automap_decl": "extra_life_2up",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "village_pickup_extra_life_extra_life_1_1",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770461,
+      "ap_name": "The World Spear - Extra Life - Sentinel Village Skull Gate",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 53.7499771;\n\t\t\ty = 117.349998;\n\t\t\tz = 13.6000481;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -8.34464913e-07;\n\t\t\t\t\ty = -1;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 1;\n\t\t\t\t\ty = -8.3446497e-07;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_1",
+        "automap_decl": "extra_life",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "village_pickup_extra_life_extra_life_1_2",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770462,
+      "ap_name": "The World Spear - Extra Life - Ancient Bridge Pipe",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 53.2999992;\n\t\t\ty = 309.499969;\n\t\t\tz = -16.4499989;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -1.1920929e-07;\n\t\t\t\t\ty = -1;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 1;\n\t\t\t\t\ty = -1.1920929e-07;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_1",
+        "automap_decl": "extra_life",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "target_relay_escalation_1_done",
+      "class": "idTarget_Count",
+      "inherit": "target/relay",
+      "ap_id": 7770463,
+      "ap_name": "The World Spear - Escalation Encounter Wave 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_escalation_1_done",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -133.000092;\n\t\t\ty = 1248.99927;\n\t\t\tz = 182.699951;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_class": "idTarget_Count",
+        "native_inherit": "target/relay",
+        "policy": "ap_touch_only"
+      },
+      "family": "escalation_completion_relay",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    },
+    {
+      "entity": "target_relay_escalation_3_done",
+      "class": "idTarget_Count",
+      "inherit": "target/relay",
+      "ap_id": 7770464,
+      "ap_name": "The World Spear - Escalation Encounter Wave 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_escalation_3_done",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -112.000076;\n\t\t\ty = 1248.99927;\n\t\t\tz = 182.699951;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_class": "idTarget_Count",
+        "native_inherit": "target/relay",
+        "policy": "ap_touch_only"
+      },
+      "family": "escalation_completion_relay",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    }
+  ]
+}

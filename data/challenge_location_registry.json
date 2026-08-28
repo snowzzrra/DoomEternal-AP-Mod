@@ -1136,6 +1136,42 @@
     },
     {
       "category": "mission_complete",
+      "location_id": 7770465,
+      "mission_key": "e5m1_spear",
+      "name": "The World Spear - Mission Complete",
+      "order": 17,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770475,
+      "mission_key": "e5m2_earth",
+      "name": "Reclaimed Earth - Mission Complete",
+      "order": 19,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7770485,
+      "mission_key": "e5m3_hell",
+      "name": "Immora - Mission Complete",
+      "order": 21,
+      "signal": {
+        "kind": "map_terminal",
+        "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
       "location_id": 7770337,
       "mission_key": "e3m1_slayer",
       "name": "Taras Nabad - Mission Complete",
@@ -1233,7 +1269,7 @@
         "fallback_terminal_owner": "stage_3_target_level_transition_1",
         "kind": "map_terminal",
         "owner": "stage_3_target_campaign_complete_1",
-        "runtime_map": "game/sp/e5m4_boss/e5m4_boss"
+        "runtime_map": "game/dlc2/e5m4_boss/e5m4_boss"
       },
       "strategy": "map_terminal"
     }

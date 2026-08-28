@@ -1,0 +1,445 @@
+{
+  "schema_version": 2,
+  "map_key": "e5m2_earth",
+  "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+  "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+  "resource_priority": 179,
+  "resource_priority_metadata_only": true,
+  "mission_complete_transition": {
+    "kind": "native_transition",
+    "owner": "checkpoints_target_level_transition_1",
+    "target": "game/dlc2/e5m3_hell/e5m3_hell",
+    "classification": "progression"
+  },
+  "entry_transition": {
+    "kind": "runtime_route",
+    "owner": "Menu",
+    "target": "game/dlc2/e5m2_earth/e5m2_earth",
+    "classification": "progression"
+  },
+  "exit_transition": {
+    "kind": "native_transition",
+    "owner": "checkpoints_target_level_transition_1",
+    "target": "game/dlc2/e5m3_hell/e5m3_hell",
+    "classification": "progression"
+  },
+  "campaign_goal_owner": "checkpoints_target_level_transition_1",
+  "layers": [
+    "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone12",
+    "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone5",
+    "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone8",
+    "game/sp/extralives/extralives_many"
+  ],
+  "checkpoints": [
+    "interact_gore_nest_escalation_1_e5m2",
+    "_example_encounter_manager_0",
+    "_example_encounter_manager_1",
+    "target_relay_escalation_2_done",
+    "target_relay_escalation_3_done",
+    "checkpoints_target_level_transition_1"
+  ],
+  "movers": [],
+  "gates": [],
+  "new_decl_resources": [],
+  "bfg_ownership_graph": [],
+  "inventory_exclusions": [],
+  "source_evidence": {
+    "source_identity": {
+      "path": "vanillamaps/e5m2_earth.map",
+      "sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "size": 4432256
+    },
+    "transform_policy": {
+      "physical": "source spawnPosition/spawnOrientation and source layers preserved",
+      "replacement": "independent AP trigger, idProp2 visual, bob_rotate_slow, isStatic false, no native inheritance",
+      "escalation": "native relay preserved with AP touch only"
+    },
+    "source_entities": [
+      "game_pickup_extra_life_extra_life_1_1",
+      "game_pickup_extra_life_extra_life_1_2",
+      "game_pickup_extra_life_extra_life_1_3",
+      "game_progress_codex_1",
+      "game_progress_codex_2",
+      "game_progress_codex_3",
+      "game_progress_codex_4",
+      "target_relay_escalation_1_done",
+      "target_relay_escalation_3_done"
+    ],
+    "physical_source_layers": {
+      "game_progress_codex_1": [],
+      "game_progress_codex_2": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone5"
+      ],
+      "game_progress_codex_3": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone8"
+      ],
+      "game_progress_codex_4": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone12"
+      ],
+      "game_pickup_extra_life_extra_life_1_1": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "game_pickup_extra_life_extra_life_1_2": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "game_pickup_extra_life_extra_life_1_3": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "target_relay_escalation_1_done": [],
+      "target_relay_escalation_3_done": []
+    },
+    "transform_snippets": {
+      "game_progress_codex_1": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 375;\n\t\t\ty = -922.5;\n\t\t\tz = -145.694809;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.71670562;\n\t\t\t\t\ty = 0.697375834;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.697375834;\n\t\t\t\t\ty = 0.71670562;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_progress_codex_2": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 14.5700045;\n\t\t\ty = -691.330078;\n\t\t\tz = -140.004776;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.887999296;\n\t\t\t\t\ty = -0.459844887;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.459844887;\n\t\t\t\t\ty = 0.887999296;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_progress_codex_3": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -48.3699951;\n\t\t\ty = -788.669983;\n\t\t\tz = -159.893875;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.411292315;\n\t\t\t\t\ty = 0.911503613;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.911503553;\n\t\t\t\t\ty = 0.411292285;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_progress_codex_4": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -105.859985;\n\t\t\ty = -1040.0293;\n\t\t\tz = -100.98999;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.411292315;\n\t\t\t\t\ty = 0.911503613;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.911503553;\n\t\t\t\t\ty = 0.411292285;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_pickup_extra_life_extra_life_1_1": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -119.159767;\n\t\t\ty = -939.057739;\n\t\t\tz = -121.988289;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.500683188;\n\t\t\t\t\ty = 0.865630627;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.865630627;\n\t\t\t\t\ty = 0.500683188;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_pickup_extra_life_extra_life_1_2": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -136.200012;\n\t\t\ty = -843.099487;\n\t\t\tz = -110.498306;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.713626921;\n\t\t\t\t\ty = -0.700526059;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.700525999;\n\t\t\t\t\ty = 0.713626862;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "game_pickup_extra_life_extra_life_1_3": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 277.299652;\n\t\t\ty = -830.069946;\n\t\t\tz = -148.249939;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -0.349897861;\n\t\t\t\t\ty = 0.936787844;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.936787844;\n\t\t\t\t\ty = -0.349897861;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "target_relay_escalation_1_done": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 437.5;\n\t\t\ty = -804;\n\t\t\tz = -103.5;\n\t\t}"
+      },
+      "target_relay_escalation_3_done": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 448.5;\n\t\t\ty = -806;\n\t\t\tz = -103.5;\n\t\t}"
+      }
+    },
+    "completion_relays": {
+      "wave_1": {
+        "source": "interact_gore_nest_escalation_1_e5m2",
+        "manager": "_example_encounter_manager_0",
+        "relay": "target_relay_escalation_1_done"
+      },
+      "wave_2": {
+        "source": "_example_encounter_manager_1",
+        "manager": "_example_encounter_manager_1",
+        "relay": "target_relay_escalation_3_done",
+        "intermediate_relay": "target_relay_escalation_2_done"
+      }
+    },
+    "fast_travel": {
+      "anchors": [
+        "fasttravel_info_fast_travel_1",
+        "fasttravel_info_fast_travel_2",
+        "fasttravel_info_fast_travel_3",
+        "fasttravel_info_fast_travel_4",
+        "fasttravel_info_fast_travel_5",
+        "fasttravel_info_fast_travel_6"
+      ],
+      "unlock_target": "fast_travel_target_fast_travel_unlock_1"
+    },
+    "terminal": "checkpoints_target_level_transition_1"
+  },
+  "locations": [
+    {
+      "entity": "game_progress_codex_1",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770466,
+      "ap_name": "Reclaimed Earth - Codex - City Entrance Streetlight",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 375;\n\t\t\ty = -922.5;\n\t\t\tz = -145.694809;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.71670562;\n\t\t\t\t\ty = 0.697375834;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.697375834;\n\t\t\t\t\ty = 0.71670562;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/earth/reclaimed_earth_1",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_progress_codex_2",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770467,
+      "ap_name": "Reclaimed Earth - Codex - Escalation Exit",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 14.5700045;\n\t\t\ty = -691.330078;\n\t\t\tz = -140.004776;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.887999296;\n\t\t\t\t\ty = -0.459844887;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.459844887;\n\t\t\t\t\ty = 0.887999296;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone5"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/earth/reclaimed_earth_2",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_progress_codex_3",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770468,
+      "ap_name": "Reclaimed Earth - Codex - Overgrown Offices Pillars",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -48.3699951;\n\t\t\ty = -788.669983;\n\t\t\tz = -159.893875;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.411292315;\n\t\t\t\t\ty = 0.911503613;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.911503553;\n\t\t\t\t\ty = 0.411292285;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone8"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/earth/reclaimed_earth_3",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_progress_codex_4",
+      "class": "idProp2",
+      "inherit": "progress/codex",
+      "ap_id": 7770469,
+      "ap_name": "Reclaimed Earth - Codex - Gate of Divum Elevator",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -105.859985;\n\t\t\ty = -1040.0293;\n\t\t\tz = -100.98999;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.411292315;\n\t\t\t\t\ty = 0.911503613;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.911503553;\n\t\t\t\t\ty = 0.411292285;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/dlc2/e5m2_earth/visibility/vis_geo_zone12"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "propitem/codex/earth/reclaimed_earth_4",
+        "automap_decl": "codex",
+        "policy": "remove_original"
+      },
+      "family": "codex",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_pickup_extra_life_extra_life_1_1",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770470,
+      "ap_name": "Reclaimed Earth - Extra Life - City Entrance Truck",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -119.159767;\n\t\t\ty = -939.057739;\n\t\t\tz = -121.988289;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.500683188;\n\t\t\t\t\ty = 0.865630627;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.865630627;\n\t\t\t\t\ty = 0.500683188;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_1",
+        "automap_decl": "extra_life",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_pickup_extra_life_extra_life_1_2",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770471,
+      "ap_name": "Reclaimed Earth - Extra Life - Upper Offices Side Room",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = -136.200012;\n\t\t\ty = -843.099487;\n\t\t\tz = -110.498306;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = 0.713626921;\n\t\t\t\t\ty = -0.700526059;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = 0.700525999;\n\t\t\t\t\ty = 0.713626862;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_1",
+        "automap_decl": "extra_life",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "game_pickup_extra_life_extra_life_1_3",
+      "class": "idProp2",
+      "inherit": "pickup/extra_life/extra_life_1",
+      "ap_id": 7770472,
+      "ap_name": "Reclaimed Earth - Extra Life - Lockdown Red Door",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 277.299652;\n\t\t\ty = -830.069946;\n\t\t\tz = -148.249939;\n\t\t}",
+        "spawnOrientation": "spawnOrientation = {\n\t\t\tmat = {\n\t\t\t\tmat[0] = {\n\t\t\t\t\tx = -0.349897861;\n\t\t\t\t\ty = 0.936787844;\n\t\t\t\t}\n\t\t\t\tmat[1] = {\n\t\t\t\t\tx = -0.936787844;\n\t\t\t\t\ty = -0.349897861;\n\t\t\t\t}\n\t\t\t}\n\t\t}"
+      },
+      "layers": [
+        "game/sp/extralives/extralives_many"
+      ],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_component": "sp_extra_life_1",
+        "automap_decl": "extra_life",
+        "policy": "remove_original"
+      },
+      "family": "extra_life",
+      "feedback_policy": "ap_only",
+      "reward_removed": true
+    },
+    {
+      "entity": "target_relay_escalation_1_done",
+      "class": "idTarget_Count",
+      "inherit": "target/relay",
+      "ap_id": 7770473,
+      "ap_name": "Reclaimed Earth - Escalation Encounter Wave 1",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_escalation_1_done",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 437.5;\n\t\t\ty = -804;\n\t\t\tz = -103.5;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_class": "idTarget_Count",
+        "native_inherit": "target/relay",
+        "policy": "ap_touch_only"
+      },
+      "family": "escalation_completion_relay",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    },
+    {
+      "entity": "target_relay_escalation_3_done",
+      "class": "idTarget_Count",
+      "inherit": "target/relay",
+      "ap_id": 7770474,
+      "ap_name": "Reclaimed Earth - Escalation Encounter Wave 2",
+      "entity_match_count": 1,
+      "original_targets": [],
+      "reward_grant_currency_ownership_edges": [],
+      "progression_objective_relays": [
+        {
+          "target": "target_relay_escalation_3_done",
+          "classification": "progression",
+          "disposition": "preserve"
+        },
+        {
+          "target": "target_relay_escalation_2_done",
+          "classification": "progression",
+          "disposition": "preserve"
+        }
+      ],
+      "drop_targets": [],
+      "bind_parent": null,
+      "local_transform": {
+        "spawnPosition": "spawnPosition = {\n\t\t\tx = 448.5;\n\t\t\ty = -806;\n\t\t\tz = -103.5;\n\t\t}"
+      },
+      "layers": [],
+      "checkpoints": [],
+      "movers": [],
+      "gates": [],
+      "conditional_pickup_behavior": {
+        "native_class": "idTarget_Count",
+        "native_inherit": "target/relay",
+        "policy": "ap_touch_only"
+      },
+      "family": "escalation_completion_relay",
+      "feedback_policy": "ap_only",
+      "reward_removed": false
+    }
+  ]
+}

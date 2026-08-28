@@ -240,7 +240,17 @@ def load_room_payload_manifest(
 
 def select_room_payloads(document: Mapping[str, Any], options: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     selected: dict[str, dict[str, Any]] = {}
+    dlc_map_keys: set[str] = set()
+    if not options.get("use_dlc_content", True):
+        from doom_eap.content.content_catalog import load_content_catalog
+
+        dlc_map_keys = {
+            spec.key for spec in load_content_catalog().maps.values()
+            if spec.requires_dlc_content
+        }
     for map_key, record in document["maps"].items():
+        if map_key in dlc_map_keys:
+            continue
         relevant = {key: options.get(key, False) for key in record["option_keys"]}
         matches = [state for state in record["states"] if state["options"] == relevant]
         if len(matches) != 1:
@@ -269,6 +279,21 @@ def assemble_room_files(
     if set(payloads) != expected_payload_members:
         raise ValueError("room payload archive member set drifted")
     assembled = dict(base)
+    excluded_members = {
+        str(payload_manifest["maps"][map_key]["target_member"])
+        for map_key in payload_manifest["maps"]
+        if map_key not in selected
+    }
+    if not options.get("use_dlc_content", True):
+        from doom_eap.runtime.context_registry import dlc_contexts
+
+        excluded_members.update(
+            context.overlay_member
+            for context in dlc_contexts()
+            if context.overlay_member is not None
+        )
+    for member in excluded_members:
+        assembled.pop(member, None)
     for map_key, state in selected.items():
         target = str(payload_manifest["maps"][map_key]["target_member"])
         if target not in assembled:
@@ -283,7 +308,8 @@ def assemble_room_files(
         assembled[target] = payloads[member]
         if sha256_bytes(assembled[target]) != state["sha256"]:
             raise ValueError(f"replacement room payload identity drifted: {map_key}")
-    if any(name not in assembled for name in payload_manifest.get("base_members", [])):
+    expected_base_members = set(payload_manifest.get("base_members", [])) - excluded_members
+    if any(name not in assembled for name in expected_base_members):
         raise ValueError("base room payload member set is incomplete")
     return assembled, selected
 

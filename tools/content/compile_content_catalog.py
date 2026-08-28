@@ -109,6 +109,16 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         [
             ")",
             f"CAMPAIGN_GOAL_LOCATION = {string(goal_location)}",
+            "MISSION_DIFFICULTY = {",
+        ]
+    )
+    for region in route["regions"]:
+        difficulty = catalog.region_metadata.get(region, {}).get("mission_difficulty")
+        if difficulty is not None:
+            lines.append(f"    {string(region)}: {dict(difficulty)!r},")
+    lines.extend(
+        [
+            "}",
             "RUNTIME_LOCATION_NAMES = frozenset({",
         ]
     )

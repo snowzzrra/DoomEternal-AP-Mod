@@ -508,6 +508,243 @@
           "map_group": "The Holt"
         }
       ]
+    },
+    {
+      "mission_key": "e5m1_spear",
+      "display_name": "The World Spear",
+      "unlock_target": "fast_travel_target_fast_travel_unlock_1",
+      "anchors": [
+        {
+          "entity": "fast_travel_info_fast_travel_1",
+          "sort_order": 0,
+          "name": "The World Spear - Sentinel Village - Village Outskirts",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_0",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Village Outskirts"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_2",
+          "sort_order": 1,
+          "name": "The World Spear - Sentinel Village - Village Entrance",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_1",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Village Entrance"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_3",
+          "sort_order": 2,
+          "name": "The World Spear - Sentinel Village - Sentinel Village",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_2",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Sentinel Village"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_4",
+          "sort_order": 3,
+          "name": "The World Spear - Sentinel Village - Village Sanctum",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_3",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Village Sanctum"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_5",
+          "sort_order": 4,
+          "name": "The World Spear - Sentinel Village - Ancient Tower",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_4",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Ancient Tower"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_6",
+          "sort_order": 5,
+          "name": "The World Spear - Sentinel Village - Ancient Bridge",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_5",
+          "map_group": "Sentinel Village",
+          "region": "The World Spear - Sentinel Village - Ancient Bridge"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_7",
+          "sort_order": 6,
+          "name": "The World Spear - Sentinel Mountain - Mountain Forest",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_6",
+          "map_group": "Sentinel Mountain",
+          "region": "The World Spear - Sentinel Mountain - Mountain Forest"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_8",
+          "sort_order": 7,
+          "name": "The World Spear - Sentinel Mountain - Mountain Cliffs",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_7",
+          "map_group": "Sentinel Mountain",
+          "region": "The World Spear - Sentinel Mountain - Mountain Cliffs"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_9",
+          "sort_order": 8,
+          "name": "The World Spear - Sentinel Mountain - Mountain Ruins",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_8",
+          "map_group": "Sentinel Mountain",
+          "region": "The World Spear - Sentinel Mountain - Mountain Ruins"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_10",
+          "sort_order": 9,
+          "name": "The World Spear - Sentinel Mountain - Nether Lake",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_9",
+          "map_group": "Sentinel Mountain",
+          "region": "The World Spear - Sentinel Mountain - Nether Lake"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_11",
+          "sort_order": 10,
+          "name": "The World Spear - World Spear - Spear Entrance",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_10",
+          "map_group": "World Spear",
+          "region": "The World Spear - World Spear - Spear Entrance"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_12",
+          "sort_order": 11,
+          "name": "The World Spear - World Spear - Spear Pits",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_11",
+          "map_group": "World Spear",
+          "region": "The World Spear - World Spear - Spear Pits"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_13",
+          "sort_order": 12,
+          "name": "The World Spear - World Spear - Shard Altar",
+          "string_id": "#str_decl_fasttravel_e5m1_sortorder_12",
+          "map_group": "World Spear",
+          "region": "The World Spear - World Spear - Shard Altar"
+        }
+      ]
+    },
+    {
+      "mission_key": "e5m2_earth",
+      "display_name": "Reclaimed Earth",
+      "unlock_target": "fasttravel_target_fast_travel_unlock_1",
+      "anchors": [
+        {
+          "entity": "fasttravel_info_fast_travel_1",
+          "sort_order": 0,
+          "name": "Reclaimed Earth - City Entrance",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_0",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - City Entrance"
+        },
+        {
+          "entity": "fasttravel_info_fast_travel_2",
+          "sort_order": 1,
+          "name": "Reclaimed Earth - Reclaimed Train Stop",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_1",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - Reclaimed Train Stop"
+        },
+        {
+          "entity": "fasttravel_info_fast_travel_3",
+          "sort_order": 2,
+          "name": "Reclaimed Earth - Overgrown Offices",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_2",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - Overgrown Offices"
+        },
+        {
+          "entity": "fasttravel_info_fast_travel_4",
+          "sort_order": 3,
+          "name": "Reclaimed Earth - Upper Overgrown Offices",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_3",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - Upper Overgrown Offices"
+        },
+        {
+          "entity": "fasttravel_info_fast_travel_5",
+          "sort_order": 4,
+          "name": "Reclaimed Earth - Lockdown",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_4",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - Lockdown"
+        },
+        {
+          "entity": "fasttravel_info_fast_travel_6",
+          "sort_order": 5,
+          "name": "Reclaimed Earth - Gate of Divum",
+          "string_id": "#str_decl_fasttravel_e5m2_sortorder_5",
+          "map_group": "Reclaimed Earth",
+          "region": "Reclaimed Earth - Gate of Divum"
+        }
+      ]
+    },
+    {
+      "mission_key": "e5m3_hell",
+      "display_name": "Immora",
+      "unlock_target": "fast_travel_target_fast_travel_unlock_1",
+      "anchors": [
+        {
+          "entity": "fast_travel_info_fast_travel_1",
+          "sort_order": 0,
+          "name": "Immora - Immora Assault - Battlefield",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_0",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Battlefield"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_2",
+          "sort_order": 1,
+          "name": "Immora - Immora Assault - Plateau Battle",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_1",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Plateau Battle"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_3",
+          "sort_order": 2,
+          "name": "Immora - Immora Assault - Walls of Immora",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_2",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Walls of Immora"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_4",
+          "sort_order": 3,
+          "name": "Immora - Immora Assault - Breach",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_3",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Breach"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_5",
+          "sort_order": 4,
+          "name": "Immora - Immora Assault - Bridge Platform",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_4",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Bridge Platform"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_6",
+          "sort_order": 5,
+          "name": "Immora - Immora Assault - Tower Seige",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_5",
+          "map_group": "Immora Assault",
+          "region": "Immora - Immora Assault - Tower Seige"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_7",
+          "sort_order": 6,
+          "name": "Immora - Immora Interior - Escape Platform",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_6",
+          "map_group": "Immora Interior",
+          "region": "Immora - Immora Interior - Escape Platform"
+        },
+        {
+          "entity": "fast_travel_info_fast_travel_8",
+          "sort_order": 7,
+          "name": "Immora - Final Plunge - Final Plunge",
+          "string_id": "#str_decl_fasttravel_e5m3_sortorder_7",
+          "map_group": "Final Plunge",
+          "region": "Immora - Final Plunge - Final Plunge"
+        }
+      ]
     }
   ]
 }

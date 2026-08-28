@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "key": "e5m1_spear",
+  "display_name": "The World Spear",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
+  "source_file": "e5m1_spear.map",
+  "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+  "source_size": 13628342,
+  "source_owner": "id Software",
+  "generated_output": "e5m1_spear.entities",
+  "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+  "resource_base": "e5m1_spear",
+  "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+  "resource_priority": 175,
+  "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {"name": "The World Spear", "order": 122}
+    ],
+    "connections": [],
+    "virtual_locations": []
+  },
+  "order": 17
+}

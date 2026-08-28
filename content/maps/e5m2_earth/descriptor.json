@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "key": "e5m2_earth",
+  "display_name": "Reclaimed Earth",
+  "enabled": true,
+  "test_only": false,
+  "onboarding_status": "implementation_candidate",
+  "source_file": "e5m2_earth.map",
+  "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+  "source_size": 4432256,
+  "source_owner": "id Software",
+  "generated_output": "e5m2_earth.entities",
+  "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+  "resource_base": "e5m2_earth",
+  "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+  "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+  "resource_priority": 179,
+  "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+  "supported_game_revision": "Steam 6.66 Rev 3.1",
+  "route": {
+    "regions": [
+      {"name": "Reclaimed Earth", "order": 123}
+    ],
+    "connections": [],
+    "virtual_locations": []
+  },
+  "order": 18
+}

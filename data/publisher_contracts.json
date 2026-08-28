@@ -472,6 +472,117 @@
           "to_map": "maps/game/dlc/hub/hub.map"
         }
       ]
+    },
+    {
+      "dedupe_scope": "world_spear_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770465,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "world_spear_mission_complete",
+      "map_key": "e5m1_spear",
+      "triggers": [
+        {
+          "filename": "ap_mission_world_spear_complete.txt",
+          "marker": "AP_MISSION_EVENT_WORLD_SPEAR_COMPLETE",
+          "owner": "crystal_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "crystal_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc2/e5m1_spear/e5m1_spear",
+          "strategy": "native_transition",
+          "to_map": "game/dlc2/e5m2_earth/e5m2_earth"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "reclaimed_earth_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770475,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "reclaimed_earth_mission_complete",
+      "map_key": "e5m2_earth",
+      "triggers": [
+        {
+          "filename": "ap_mission_reclaimed_earth_complete.txt",
+          "marker": "AP_MISSION_EVENT_RECLAIMED_EARTH_COMPLETE",
+          "owner": "checkpoints_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "checkpoints_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc2/e5m2_earth/e5m2_earth",
+          "strategy": "native_transition",
+          "to_map": "game/dlc2/e5m3_hell/e5m3_hell"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "immora_mission_complete_location",
+      "effects": [
+        {
+          "location_id": 7770485,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "immora_mission_complete",
+      "map_key": "e5m3_hell",
+      "triggers": [
+        {
+          "filename": "ap_mission_immora_complete.txt",
+          "marker": "AP_MISSION_EVENT_IMMORA_COMPLETE",
+          "owner": "hangar_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "hangar_target_level_transition_1",
+          "strategy": "terminal_owner"
+        },
+        {
+          "from_map": "game/dlc2/e5m3_hell/e5m3_hell",
+          "strategy": "native_transition",
+          "to_map": "game/dlc2/e5m4_boss/e5m4_boss"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "dark_lord_defeated_location",
+      "effects": [
+        {
+          "location_id": 7770419,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "dark_lord_defeated",
+      "map_key": "e5m4_boss",
+      "triggers": [
+        {
+          "filename": "ap_mission_dark_lord_defeated.txt",
+          "marker": "AP_MISSION_EVENT_DARK_LORD_DEFEATED",
+          "owner": "stage_3_target_campaign_complete_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "stage_3_target_campaign_complete_1",
+          "strategy": "terminal_owner"
+        }
+      ]
     }
   ],
   "schema_version": 1

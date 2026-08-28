@@ -830,6 +830,7 @@ def validate_target_policies(config_entities, target_policies, content):
                     "2_battery_required",
                     "triggerDef =",
                     "transitionName =",
+                    "class = \"idTarget_Count\";",
                 )
             ):
                 raise ValueError(

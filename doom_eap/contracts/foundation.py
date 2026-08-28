@@ -386,10 +386,11 @@ def build_primitive(
 }}
 '''
     elif primitive_id == "fast_travel_unlock":
-        if set(parameters) != {"x", "y", "z"}:
-            raise ValueError("fast_travel_unlock requires x, y, and z")
-        if not all(isinstance(parameters[key], (int, float)) for key in ("x", "y", "z")):
+        if set(parameters) not in ({"x", "y"}, {"x", "y", "z"}):
+            raise ValueError("fast_travel_unlock requires x and y, with optional z")
+        if not all(isinstance(parameters[key], (int, float)) for key in parameters):
             raise ValueError("fast_travel_unlock coordinates must be numeric")
+        z_line = f'\n\t\t\t\tz = {parameters["z"]};' if "z" in parameters else ""
         block = f'''{header}
 \t\tedit = {{
 \t\t\tflags = {{
@@ -398,7 +399,7 @@ def build_primitive(
 \t\t\tspawnPosition = {{
 \t\t\t\tx = {parameters["x"]};
 \t\t\t\ty = {parameters["y"]};
-\t\t\t\tz = {parameters["z"]};
+\t\t\t\t{z_line}
 \t\t\t}}
 \t\t}}
 \t}}

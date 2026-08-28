@@ -1,12 +1,12 @@
 {
-  "authoritative_fingerprint": "7a11f840280687ca5c708098b1511093e5c5f90debcb60de8b3893ab71fd8569",
-  "catalog_fingerprint": "a6f8540b3c92aa7c5542a9147f5dab9c1532bd2608ec3d6fcb60c25d0a1b12f2",
+  "authoritative_fingerprint": "b921d5462a23e3d8a530f5dc94f0290a64a95a7887e7ccb83de4ae22fef41316",
+  "catalog_fingerprint": "e99bf9925be5b35e4cc24cbc49f43bbe76d41389aef84af87cc52fb161f52587",
   "compiler_revision": 2,
   "content_revision": "0.5.0",
   "counts": {
     "event_only": 24,
-    "no_visual": 9,
-    "visible_cleanup": 310
+    "no_visual": 15,
+    "visible_cleanup": 329
   },
   "entries": [
     {
@@ -8926,6 +8926,682 @@
       }
     },
     {
+      "ap_check": "AP_CHECK_CRYSTAL_PROGRESS_CODEX_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770458",
+      "direct_target": "ap_location_visual_7770458",
+      "location_id": 7770458,
+      "map_key": "e5m1_spear",
+      "presentation_entity": "ap_location_visual_7770458",
+      "reconciliation_entity": "ap_hide_location_visual_7770458",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "28bb90937f4e864910f2835d815c6d383350311f56d332d607d1acc9c104d75d",
+        "policy_sha256": "ce1879aa714fcbedefac95b61c09f3c6ba4ff96a7b976ecd8988dbf21699cc46",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "CRYSTAL_PROGRESS_CODEX_2",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_MOUNTAIN_PASS_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770459",
+      "direct_target": "ap_location_visual_7770459",
+      "location_id": 7770459,
+      "map_key": "e5m1_spear",
+      "presentation_entity": "ap_location_visual_7770459",
+      "reconciliation_entity": "ap_hide_location_visual_7770459",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "39edc6196b3eae38d73b237a536bdc1ca301b352a016909f42d05136c1a3af3e",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "MOUNTAIN_PASS_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_MOUNTAIN_PASS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770460",
+      "direct_target": "ap_location_visual_7770460",
+      "location_id": 7770460,
+      "map_key": "e5m1_spear",
+      "presentation_entity": "ap_location_visual_7770460",
+      "reconciliation_entity": "ap_hide_location_visual_7770460",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "363a78c3e21ba04957892acb43cdd45e4c70a132ce8e8b7bfbeb76fa4e036762",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "MOUNTAIN_PASS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770461",
+      "direct_target": "ap_location_visual_7770461",
+      "location_id": 7770461,
+      "map_key": "e5m1_spear",
+      "presentation_entity": "ap_location_visual_7770461",
+      "reconciliation_entity": "ap_hide_location_visual_7770461",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "fc0c8d80992a6dbea53ccf89ba74d3b4b93db9d067fcddcb6c001f5b4660918f",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770462",
+      "direct_target": "ap_location_visual_7770462",
+      "location_id": 7770462,
+      "map_key": "e5m1_spear",
+      "presentation_entity": "ap_location_visual_7770462",
+      "reconciliation_entity": "ap_hide_location_visual_7770462",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "6bbf1d97e4ca6e2d3741dfe1fbd00f6afbdb505f76f33a4b32e007f090e152c6",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE",
+      "classification": "no_visual",
+      "location_id": 7770463,
+      "map_key": "e5m1_spear",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "68af6e3340ba346c6fa84c85c7837fb78c6ca02a12134b99bf6a8455b59eaf60",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE",
+      "classification": "no_visual",
+      "location_id": 7770464,
+      "map_key": "e5m1_spear",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_identity": {
+        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "location_descriptor_sha256": "86b73ff0db30162d9ea76a38910b9b739e564dee2836a2dfa33365e88c1c3395",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+          "resource_base": "e5m1_spear",
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "resource_priority": 175
+        },
+        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "source_entity": "TARGET_RELAY_ESCALATION_3_DONE",
+        "source_file": "content/maps/e5m1_spear/locations.json",
+        "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770466",
+      "direct_target": "ap_location_visual_7770466",
+      "location_id": 7770466,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770466",
+      "reconciliation_entity": "ap_hide_location_visual_7770466",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "55fe73d684fa77656b2e059a0c8d7ea43de25002c05547656b93c636cafebaee",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770467",
+      "direct_target": "ap_location_visual_7770467",
+      "location_id": 7770467,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770467",
+      "reconciliation_entity": "ap_hide_location_visual_7770467",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "99a5ff79ef448fe843e1cdf3931d77cef75ee0d01f1fe467c38e7e6c7e04a9ac",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PROGRESS_CODEX_2",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_3",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770468",
+      "direct_target": "ap_location_visual_7770468",
+      "location_id": 7770468,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770468",
+      "reconciliation_entity": "ap_hide_location_visual_7770468",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "9479aaa4a073cd7615cd55f1af7ee615e7600bc228f7151d2582731b51f04b26",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PROGRESS_CODEX_3",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_4",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770469",
+      "direct_target": "ap_location_visual_7770469",
+      "location_id": 7770469,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770469",
+      "reconciliation_entity": "ap_hide_location_visual_7770469",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "8c8f3e2d9f61f9130df139df457cdd7f110126de609efddf6530b4eee14c3d33",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PROGRESS_CODEX_4",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770470",
+      "direct_target": "ap_location_visual_7770470",
+      "location_id": 7770470,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770470",
+      "reconciliation_entity": "ap_hide_location_visual_7770470",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "f1f992753c5ebb7f191159aae3f2008525c7919fa0485e82d20b4d457ae48101",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770471",
+      "direct_target": "ap_location_visual_7770471",
+      "location_id": 7770471,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770471",
+      "reconciliation_entity": "ap_hide_location_visual_7770471",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "25fd85ab37cbac63f1fe7d41119388e188fbd07faa866f78a7cb6c3031621cb3",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770472",
+      "direct_target": "ap_location_visual_7770472",
+      "location_id": 7770472,
+      "map_key": "e5m2_earth",
+      "presentation_entity": "ap_location_visual_7770472",
+      "reconciliation_entity": "ap_hide_location_visual_7770472",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "33fff52a7ba555b122152267de6ea1aa29226f74ded1c5065196e542c6ecbf69",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE",
+      "classification": "no_visual",
+      "location_id": 7770473,
+      "map_key": "e5m2_earth",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "85fc9cf4c1f21f6afa990b205382ff057cf1bd6434c5c46c3fd6f396deac0b19",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE",
+      "classification": "no_visual",
+      "location_id": 7770474,
+      "map_key": "e5m2_earth",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_identity": {
+        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "location_descriptor_sha256": "255ff64d99c31d8dadb49a2620dbca2f538409337155d82255af70a19940425d",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+          "resource_base": "e5m2_earth",
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "resource_priority": 179
+        },
+        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "source_entity": "TARGET_RELAY_ESCALATION_3_DONE",
+        "source_file": "content/maps/e5m2_earth/locations.json",
+        "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770476",
+      "direct_target": "ap_location_visual_7770476",
+      "location_id": 7770476,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770476",
+      "reconciliation_entity": "ap_hide_location_visual_7770476",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "6f80d22415af12ccd2296de029af30b8e1da92e255cdd90a06572e324cbd4b62",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_1",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770477",
+      "direct_target": "ap_location_visual_7770477",
+      "location_id": 7770477,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770477",
+      "reconciliation_entity": "ap_hide_location_visual_7770477",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "80cd1addd88231f2486c0eec3c38ad1d04031b069a4b020726326c6d4cf1e451",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_2",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_3",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770478",
+      "direct_target": "ap_location_visual_7770478",
+      "location_id": 7770478,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770478",
+      "reconciliation_entity": "ap_hide_location_visual_7770478",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "78a001d833d2d74a789abe0f20382e63deb7e01273830397628bc7058992e58f",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_3",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PROGRESS_CODEX_4",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770479",
+      "direct_target": "ap_location_visual_7770479",
+      "location_id": 7770479,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770479",
+      "reconciliation_entity": "ap_hide_location_visual_7770479",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "3888bca47381b3d0abaaebc59d960e8d7712898e0d0a6ebd68d62ce0b80dc93a",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PROGRESS_CODEX_4",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770480",
+      "direct_target": "ap_location_visual_7770480",
+      "location_id": 7770480,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770480",
+      "reconciliation_entity": "ap_hide_location_visual_7770480",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "58d15e85974a442ce212d99e285d9bd69a4b0defee28c76b1bce616507d7551c",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770481",
+      "direct_target": "ap_location_visual_7770481",
+      "location_id": 7770481,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770481",
+      "reconciliation_entity": "ap_hide_location_visual_7770481",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "cbdfb1e7ff8de8d242f1d5f7dcded260a34277958492d322f8fd2ed5ee3cece2",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+      "classification": "visible_cleanup",
+      "cleanup_entity": "ap_remove_location_visual_7770482",
+      "direct_target": "ap_location_visual_7770482",
+      "location_id": 7770482,
+      "map_key": "e5m3_hell",
+      "presentation_entity": "ap_location_visual_7770482",
+      "reconciliation_entity": "ap_hide_location_visual_7770482",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "02836f29561ac3df599b89fa3cdc4237712064c29f9a8d045e813a4de9ef8b33",
+        "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
+        "resolved_policy": "generated_universal",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE",
+      "classification": "no_visual",
+      "location_id": 7770483,
+      "map_key": "e5m3_hell",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "95726395a1278f64195328a1684f4b073de800e3cc64add7984ee3ccafd296f5",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
+      "ap_check": "AP_CHECK_TARGET_RELAY_ESCALATION_2_DONE",
+      "classification": "no_visual",
+      "location_id": 7770484,
+      "map_key": "e5m3_hell",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_identity": {
+        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "location_descriptor_sha256": "af663af0cec752f3f00a8be39891361607813b870c9df76113a134031ce83107",
+        "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
+        "resolved_policy": "no_auto_visual",
+        "resource": {
+          "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+          "resource_base": "e5m3_hell",
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "resource_priority": 167
+        },
+        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "source_entity": "TARGET_RELAY_ESCALATION_2_DONE",
+        "source_file": "content/maps/e5m3_hell/locations.json",
+        "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
+      }
+    },
+    {
       "ap_check": "AP_CHECK_GAME_PROGRESS_CODEX_1",
       "classification": "visible_cleanup",
       "cleanup_entity": "ap_remove_location_visual_7770072",
@@ -9706,6 +10382,48 @@
       "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
       "source_file": "e4m3_mcity.map",
       "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904"
+    },
+    "e5m1_spear": {
+      "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+      "resource": {
+        "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
+        "resource_base": "e5m1_spear",
+        "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "resource_priority": 175
+      },
+      "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+      "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+      "source_file": "e5m1_spear.map",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6"
+    },
+    "e5m2_earth": {
+      "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+      "resource": {
+        "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
+        "resource_base": "e5m2_earth",
+        "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "resource_priority": 179
+      },
+      "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+      "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
+      "source_file": "e5m2_earth.map",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1"
+    },
+    "e5m3_hell": {
+      "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+      "resource": {
+        "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
+        "resource_base": "e5m3_hell",
+        "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "resource_priority": 167
+      },
+      "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+      "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+      "source_file": "e5m3_hell.map",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44"
     },
     "hub": {
       "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",

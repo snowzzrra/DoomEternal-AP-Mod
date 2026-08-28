@@ -16,6 +16,9 @@
     "e4m1_rig": "game/dlc/e4m1_rig/e4m1_rig",
     "e4m2_swamp": "game/dlc/e4m2_swamp/e4m2_swamp",
     "e4m3_mcity": "game/dlc/e4m3_mcity/e4m3_mcity",
+    "e5m1_spear": "game/dlc2/e5m1_spear/e5m1_spear",
+    "e5m2_earth": "game/dlc2/e5m2_earth/e5m2_earth",
+    "e5m3_hell": "game/dlc2/e5m3_hell/e5m3_hell",
     "hub": "game/hub/hub"
   },
   "bootstrap_test_entrypoints": {
