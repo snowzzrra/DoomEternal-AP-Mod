@@ -4,8 +4,8 @@
   "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
-  "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-  "resource_priority": 179,
+  "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+  "resource_priority": 44,
   "resource_priority_metadata_only": true,
   "mission_complete_transition": {
     "kind": "native_transition",

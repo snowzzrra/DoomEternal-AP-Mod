@@ -3273,7 +3273,7 @@ class DoomEternalContext(CommonContext):
         self._ammo_refill_pending = False
         self._ammo_refill_discard_pending_target = None
         self._ammo_refill_overflow_task = None
-        self._ammo_refill_staged_command_key = None
+        self._ammo_refill_staged_command_keys = ()
         self._ammo_refill_rpc_was_enabled = False
         self._ammo_refill_request_queue = deque()
         self._ammo_refill_request_task = None
@@ -4243,11 +4243,12 @@ class DoomEternalContext(CommonContext):
         self._schedule_ammo_refill_overflow_normalization("discarded_storage_update")
 
     def _cancel_staged_ammo_refill(self, reason):
-        command_key = self._ammo_refill_staged_command_key
-        if command_key is not None:
-            discard_queued_coalesced_command(command_key, self.state_key)
-            logger.info("[Ammo Refill] Cancelled staged command: %s", reason)
-        self._ammo_refill_staged_command_key = None
+        command_keys = self._ammo_refill_staged_command_keys
+        if command_keys:
+            for command_key in command_keys:
+                discard_queued_coalesced_command(command_key, self.state_key)
+            logger.info("[Ammo Refill] Cancelled staged commands: %s", reason)
+        self._ammo_refill_staged_command_keys = ()
         if self._ammo_refill_rpc_was_enabled:
             try:
                 set_rpc_execution(True)
@@ -4303,7 +4304,7 @@ class DoomEternalContext(CommonContext):
         self._ammo_refill_available = None
         self._ammo_refill_pending = False
         self._ammo_refill_discard_pending_target = None
-        self._ammo_refill_staged_command_key = None
+        self._ammo_refill_staged_command_keys = ()
         if self._ammo_storage_key is None or self._ammo_discarded_storage_key is None:
             return
         self.stored_data.pop(self._ammo_storage_key, None)
@@ -4375,7 +4376,7 @@ class DoomEternalContext(CommonContext):
         available = self._refresh_ammo_refill_charge()
         if self._ammo_refill_pending:
             self._ammo_refill_pending = False
-            self._ammo_refill_staged_command_key = None
+            self._ammo_refill_staged_command_keys = ()
             self._ammo_refill_rpc_was_enabled = False
             try:
                 if not set_rpc_execution(True):
@@ -4407,44 +4408,54 @@ class DoomEternalContext(CommonContext):
             return count == 1
         return False
 
+    def _ammo_refill_command_plan(self, crucible_active):
+        commands = ["give ammo"]
+        if crucible_active:
+            commands.append("judgementMeter_Set 3")
+        return tuple(commands)
+
     def _queue_ammo_refill_primitive(self):
         namespace = queue_session_namespace(self.state_key)
         if namespace is None:
             return False
-        command_key = f"ammo-refill-{namespace}"
+        crucible_active = self._is_crucible_active_special_weapon()
         try:
-            commands, description = self.item_activation_commands(
-                AMMO_REFILL_PRIMITIVE_ITEM_ID,
-                0,
-                intent=RECONCILIATION_REPAIR,
-                include_notification=False,
-            )
+            commands = self._ammo_refill_command_plan(crucible_active)
         except Exception as error:
             logger.error("[Ammo Refill] Primitive compilation failed: %s", error)
             return False
-        if not commands or len(commands) != 1:
-            logger.error("[Ammo Refill] Proven refill primitive is unavailable: %s", description)
+        expected = ("give ammo",)
+        if crucible_active:
+            expected += ("judgementMeter_Set 3",)
+        if commands != expected:
+            logger.error("[Ammo Refill] Invalid raw console command plan: %r", commands)
             return False
-        refill_cmd = commands[0]
-        if self._is_crucible_active_special_weapon():
-            refill_cmd = f"{refill_cmd}; give ammo/sharedammopool/crucible 3"
-        queued = send_command(
-            refill_cmd,
-            coalesce_key=command_key,
-            arm_rpc=False,
-            already_queued_ok=False,
-            state_key=self.state_key,
-            delivery_fields={
-                "source": "ammo_refill",
-                "item_id": AMMO_REFILL_ITEM_ID,
-                "primitive_item_id": AMMO_REFILL_PRIMITIVE_ITEM_ID,
-                "active_map": self.current_map_name,
-                "slot": self.active_save_slot,
-            },
-        )
-        if queued:
-            self._ammo_refill_staged_command_key = command_key
-        return queued
+        command_keys = []
+        for stage, command in enumerate(commands):
+            command_key = f"ammo-refill-{namespace}-stage{stage}"
+            queued = send_command(
+                command,
+                coalesce_key=command_key,
+                arm_rpc=False,
+                already_queued_ok=False,
+                state_key=self.state_key,
+                delivery_fields={
+                    "source": "ammo_refill",
+                    "item_id": AMMO_REFILL_ITEM_ID,
+                    "primitive_item_id": AMMO_REFILL_PRIMITIVE_ITEM_ID,
+                    "stage": stage,
+                    "active_map": self.current_map_name,
+                    "slot": self.active_save_slot,
+                },
+            )
+            if not queued:
+                discard_queued_coalesced_command(command_key, self.state_key)
+                for staged_key in command_keys:
+                    discard_queued_coalesced_command(staged_key, self.state_key)
+                return False
+            command_keys.append(command_key)
+        self._ammo_refill_staged_command_keys = tuple(command_keys)
+        return True
 
     async def request_ammo_refill(self):
         failing_predicate, readiness = self._ammo_refill_readiness()

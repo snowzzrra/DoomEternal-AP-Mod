@@ -1,7 +1,7 @@
 {
-  "authoritative_fingerprint": "b921d5462a23e3d8a530f5dc94f0290a64a95a7887e7ccb83de4ae22fef41316",
-  "catalog_fingerprint": "e99bf9925be5b35e4cc24cbc49f43bbe76d41389aef84af87cc52fb161f52587",
-  "compiler_revision": 2,
+  "authoritative_fingerprint": "d7163576250a02aa5cf3f6f1be0f254890256959df67bc9ef071dbfee4429190",
+  "catalog_fingerprint": "c82264e778da24ca785a16c49afc365f816e62221b6123b77913399f801bfdc6",
+  "compiler_revision": 3,
   "content_revision": "0.5.0",
   "counts": {
     "event_only": 24,
@@ -5108,7 +5108,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770291",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "ebd41018a68c69d43de968b9685775e10fe21db768ca8fb4f242a65ad0ab7f4b",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5117,9 +5117,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_1_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5136,7 +5136,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770292",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "3e13ca691b137be40febf4808e8ca0295b6d84ca64a2484fe20c38b1c7c1107e",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5145,9 +5145,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_2_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5164,7 +5164,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770293",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "77b5f68cf66b9a8edbaedb7a7eeba391606810f0fc4d9cb95d2c0644eb139f05",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5173,9 +5173,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_3_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5192,7 +5192,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770294",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "924166bb8d5c3eb93abc565d54789e0bf3cc68027f1c6bd0607a79b975a07d26",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5201,9 +5201,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_4_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5220,7 +5220,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770295",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "7f93ff83b8ee14f07a30af2c82a74588865e61c3b7c548c4754a8773c7be0f80",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5229,9 +5229,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_5_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5248,7 +5248,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770296",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "aede07227d0aa2583ccacdaa14aba7a26c20e1a3039189f8e8775078b113526b",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5257,9 +5257,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_6_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5276,7 +5276,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770297",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "82de9b0e2e53dc2e837ce8791218847bd1527dd69457408fffffeab7ef24c0bb",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5285,9 +5285,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_7_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5304,7 +5304,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770298",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "1f3e34e6fa4b9dd86054b193819c9d387a9073171e3a59b84d970bb8010c0779",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5313,9 +5313,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_8_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5332,7 +5332,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770299",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "fbb41462155fb023399f4618be275d3f62939ee951cc20dd56858ed2ae08a59c",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
@@ -5341,9 +5341,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_9_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5360,7 +5360,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770300",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "f89ec82b0c2220263952e0f910554f69cb6cac578f68474b7876d5a29a6449e5",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5369,9 +5369,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_PRAETOR_TOKEN_1_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5388,7 +5388,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770301",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "1a203b9a743f99d54d68dc6e5752ae8d60da770560f0aae0ede46f91552ffdf6",
         "policy_sha256": "98c489101a4a49a0ffeccc92f60589316cbdbe970aa35e0ae8fe174612a8db91",
         "resolved_policy": "explicit_independent_visual",
@@ -5397,9 +5397,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5416,7 +5416,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770302",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
-        "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+        "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
         "location_descriptor_sha256": "0eecebe99cdba6400faac65424e5a787d5aea4738f1289ca090089f07f3891a7",
         "policy_sha256": "6e20eaea80095b1108a896fc51d0a4dd5419485f6a00f102ddd9e7473a57eec1",
         "resolved_policy": "explicit_independent_visual",
@@ -5425,9 +5425,9 @@
           "resource_base": "e2m4_boss",
           "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
           "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-          "resource_priority": 76
+          "resource_priority": 60
         },
-        "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+        "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
         "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
@@ -5444,7 +5444,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770303",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "7a85e48fd346dd44a36a7408a37be9ba17ac1b4afedd23c315dd5f809b098762",
         "policy_sha256": "db4b24aed2dea3a7e9fdca1344560e5a0cf7fe0d91bf8a5f98b51e64ed89cf6b",
         "resolved_policy": "generated_universal",
@@ -5453,9 +5453,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "GAME_PROGRESS_ARGENT_CELL_1_498834914",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5472,7 +5472,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770306",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "1344ca2d525826f8984c78804059c75642c00fb2d383629aab73b51ac803c1c6",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5481,9 +5481,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5500,7 +5500,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770307",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "86961e767f4fd62454a340178e644aa20a1eb440a94763ecf149bca307034ed5",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5509,9 +5509,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5528,7 +5528,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770308",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "bd3bf647502bd4fef954bbede4eb7a714af525ae439f2d0f20ee6eb16b167ee9",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5537,9 +5537,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5556,7 +5556,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770309",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "1f1593d5864cfb36f956ec070f0d6a3995b4194d8a9da09ec295565a00016253",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5565,9 +5565,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5584,7 +5584,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770310",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "d196be4b0aab211692803f54ef958005eeb064ac01389261f93b60ee75a4be17",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5593,9 +5593,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5612,7 +5612,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770311",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "9be5d4128ec582fdb864b3e3a997acfdfa008af8122e41ad60df6d2e330bdeef",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5621,9 +5621,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5640,7 +5640,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770312",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "8d1c178cf6932ce99bb5b1b356817dc48590654d8a56591f10832fbbd0f68890",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5649,9 +5649,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5668,7 +5668,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770313",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "0639040f7046afce62f2f130d0e06b473bbe6675e9784380bae04e7b70a53039",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5677,9 +5677,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5696,7 +5696,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770314",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "fdf190c5ebcd42f6e3245f0d2975f8ae7c8415bf8259e9dc206ec8c3e10bd184",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5705,9 +5705,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5724,7 +5724,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770315",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "3a7b7f35bf9dd887f659b9ca6219b250ddd1445856680f03434284f567093d3a",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5733,9 +5733,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5752,7 +5752,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770316",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "48244a3189c23752370c91e8add04900525648287add38fbfb0c8cb9d42b401c",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5761,9 +5761,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5780,7 +5780,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770317",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "a50d445bef2d67e569913ff26f3ee1181c4a3eb329b01f91a6ea55c2d9f8128a",
         "policy_sha256": "f156f1ab1d21b023d0587a7a4823864ce640ab0e3a178a719e8f17c3e22dd712",
         "resolved_policy": "generated_universal",
@@ -5789,9 +5789,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_GOO_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5808,7 +5808,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770318",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "43d902b3debeb823d87d3bdc74858f77352c1d062a0dbdc78a21c9bc099c853d",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5817,9 +5817,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_MARAUDER_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5836,7 +5836,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770319",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "52671790c75bdcf7d30c179bf7a8216840797a913e719452994e56ec77e53cdb",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5845,9 +5845,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_PAIN_ELEMENTAL_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5864,7 +5864,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770320",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "592086faf4c4e178e08e1a5e7f8d84b533dbe9356ac0dcfb30ff7e0294799e0e",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5873,9 +5873,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5892,7 +5892,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770321",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "c43f353840d99de9d06fe5016b3a29079d28027cac2c1d21fd468c91ab97e6f5",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5901,9 +5901,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5920,7 +5920,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770322",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "c51e670c4239675e695566036c013ced84648c87b727337ebf7e02dad0364a6f",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5929,9 +5929,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5948,7 +5948,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770323",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "0e0612149bc5d9da811c19efb5285fe5b0c26d42f8ae81d186541159003024bd",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5957,9 +5957,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -5976,7 +5976,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770324",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "f2472d8a3732208a0f60abe03bd0e67a0e3670bba639bafebba9b2160351b8fa",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -5985,9 +5985,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_5_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6004,7 +6004,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770325",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "1ed60487c6a4d864e9e361f91de2f9cd3208198d11a3092c0275e1dd00bdea48",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6013,9 +6013,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_6_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6032,7 +6032,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770326",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "b282955cfe802dd92178e9383b90912300bc68df72090bc318a0bad25d8e7078",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6041,9 +6041,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_7_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6060,7 +6060,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770327",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "494d998da69aa0b9a6ea297cb2a3b2865ac84b8e17b7c34c3d99ae01830ee3b1",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6069,9 +6069,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_POWERUP_INFINITE_OVERDRIVE_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6088,7 +6088,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770328",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "3311f3c0c5c33ad55e940c3feedd126465df9748f93c310b7419797628fb5962",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6097,9 +6097,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_10_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6116,7 +6116,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770329",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "5213829ac1ac770570bf03103f3f5b10e539b31c45624dbe3a1a85726123f60f",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6125,9 +6125,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_11_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6144,7 +6144,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770330",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "6989299921ba4b6ac5d78905bca69237cdd42d04145c9e2a54bd0d3ff0e61ede",
         "policy_sha256": "864f659a949dc8095e5f1f596b0b11687a2b717ed2b5211e5204039fa7206b61",
         "resolved_policy": "generated_universal",
@@ -6153,9 +6153,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6168,7 +6168,7 @@
       "map_key": "e3m1_slayer",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "9ac98a3ad2610d08d4bacc65747006996663b904f7a0b728fd968f2e72339f74",
         "policy_sha256": "7b1da1c96b1e09a98b3e36899805c350d26565cd82be299bbf1d0faceec5e99e",
         "resolved_policy": "secret_encounter",
@@ -6177,9 +6177,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "SECRET_ENCOUNTER_E3M1_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6192,7 +6192,7 @@
       "map_key": "e3m1_slayer",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "94eedec8598c50abe583461d3f6a61c47b51084be7009df3c42967b31f00ba5b",
         "policy_sha256": "9d4c71450973b646cf26652cc1e8d444a6f13fec4f7caf4b37ab737faf7b9201",
         "resolved_policy": "secret_encounter",
@@ -6201,9 +6201,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "SECRET_ENCOUNTER_E3M1_2",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6220,7 +6220,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770338",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "d6ff2a5de2f33b1d1d2b3bc6f3982f143a93f556caf214e3fc26e8b3763d762d",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6229,9 +6229,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -6248,7 +6248,7 @@
       "reconciliation_entity": "ap_hide_location_visual_7770339",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
-        "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+        "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
         "location_descriptor_sha256": "726cccc74c22d4d7f2048dd905d7f7f6c29114e6d5f88dc8cf9d146957fef8f5",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
@@ -6257,9 +6257,9 @@
           "resource_base": "e3m1_slayer",
           "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
           "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-          "resource_priority": 34
+          "resource_priority": 22
         },
-        "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+        "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
         "source_sha256": "57511bac88001727b189ea65cc4ff2112c50afd6186520f2c8997eafc295281c"
@@ -8936,18 +8936,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770458",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "28bb90937f4e864910f2835d815c6d383350311f56d332d607d1acc9c104d75d",
         "policy_sha256": "ce1879aa714fcbedefac95b61c09f3c6ba4ff96a7b976ecd8988dbf21699cc46",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "CRYSTAL_PROGRESS_CODEX_2",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -8964,18 +8964,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770459",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "39edc6196b3eae38d73b237a536bdc1ca301b352a016909f42d05136c1a3af3e",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "MOUNTAIN_PASS_PROGRESS_CODEX_1",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -8992,18 +8992,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770460",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "363a78c3e21ba04957892acb43cdd45e4c70a132ce8e8b7bfbeb76fa4e036762",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "MOUNTAIN_PASS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -9020,18 +9020,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770461",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "fc0c8d80992a6dbea53ccf89ba74d3b4b93db9d067fcddcb6c001f5b4660918f",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -9048,18 +9048,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770462",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "6bbf1d97e4ca6e2d3741dfe1fbd00f6afbdb505f76f33a4b32e007f090e152c6",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -9072,18 +9072,18 @@
       "map_key": "e5m1_spear",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "68af6e3340ba346c6fa84c85c7837fb78c6ca02a12134b99bf6a8455b59eaf60",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -9096,18 +9096,18 @@
       "map_key": "e5m1_spear",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_identity": {
-        "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+        "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
         "location_descriptor_sha256": "86b73ff0db30162d9ea76a38910b9b739e564dee2836a2dfa33365e88c1c3395",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
           "resource_base": "e5m1_spear",
-          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-          "resource_priority": 175
+          "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+          "resource_priority": 18
         },
-        "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+        "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
         "source_entity": "TARGET_RELAY_ESCALATION_3_DONE",
         "source_file": "content/maps/e5m1_spear/locations.json",
         "source_sha256": "ac89066120695387a4c1804b87936211463aa35d80d7331f7566d27872275870"
@@ -9124,18 +9124,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770466",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "55fe73d684fa77656b2e059a0c8d7ea43de25002c05547656b93c636cafebaee",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PROGRESS_CODEX_1",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9152,18 +9152,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770467",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "99a5ff79ef448fe843e1cdf3931d77cef75ee0d01f1fe467c38e7e6c7e04a9ac",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PROGRESS_CODEX_2",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9180,18 +9180,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770468",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "9479aaa4a073cd7615cd55f1af7ee615e7600bc228f7151d2582731b51f04b26",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PROGRESS_CODEX_3",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9208,18 +9208,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770469",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "8c8f3e2d9f61f9130df139df457cdd7f110126de609efddf6530b4eee14c3d33",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PROGRESS_CODEX_4",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9236,18 +9236,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770470",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "f1f992753c5ebb7f191159aae3f2008525c7919fa0485e82d20b4d457ae48101",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9264,18 +9264,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770471",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "25fd85ab37cbac63f1fe7d41119388e188fbd07faa866f78a7cb6c3031621cb3",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9292,18 +9292,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770472",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "33fff52a7ba555b122152267de6ea1aa29226f74ded1c5065196e542c6ecbf69",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9316,18 +9316,18 @@
       "map_key": "e5m2_earth",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "85fc9cf4c1f21f6afa990b205382ff057cf1bd6434c5c46c3fd6f396deac0b19",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9340,18 +9340,18 @@
       "map_key": "e5m2_earth",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_identity": {
-        "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+        "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
         "location_descriptor_sha256": "255ff64d99c31d8dadb49a2620dbca2f538409337155d82255af70a19940425d",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
           "resource_base": "e5m2_earth",
-          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-          "resource_priority": 179
+          "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+          "resource_priority": 44
         },
-        "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+        "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
         "source_entity": "TARGET_RELAY_ESCALATION_3_DONE",
         "source_file": "content/maps/e5m2_earth/locations.json",
         "source_sha256": "162fb93df1f366fba925a5b43dc484daba346efff172182a5fedcd539cb4dff1"
@@ -9368,18 +9368,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770476",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "6f80d22415af12ccd2296de029af30b8e1da92e255cdd90a06572e324cbd4b62",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9396,18 +9396,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770477",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "80cd1addd88231f2486c0eec3c38ad1d04031b069a4b020726326c6d4cf1e451",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PROGRESS_CODEX_2",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9424,18 +9424,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770478",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "78a001d833d2d74a789abe0f20382e63deb7e01273830397628bc7058992e58f",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PROGRESS_CODEX_3",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9452,18 +9452,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770479",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "3888bca47381b3d0abaaebc59d960e8d7712898e0d0a6ebd68d62ce0b80dc93a",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9480,18 +9480,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770480",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "58d15e85974a442ce212d99e285d9bd69a4b0defee28c76b1bce616507d7551c",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9508,18 +9508,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770481",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "cbdfb1e7ff8de8d242f1d5f7dcded260a34277958492d322f8fd2ed5ee3cece2",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9536,18 +9536,18 @@
       "reconciliation_entity": "ap_hide_location_visual_7770482",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "02836f29561ac3df599b89fa3cdc4237712064c29f9a8d045e813a4de9ef8b33",
         "policy_sha256": "a1db7819c8f3782ca407eb4b571f77f652231f773b7947e6dbc5b46e1b7504bd",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9560,18 +9560,18 @@
       "map_key": "e5m3_hell",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "95726395a1278f64195328a1684f4b073de800e3cc64add7984ee3ccafd296f5",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "TARGET_RELAY_ESCALATION_1_DONE",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -9584,18 +9584,18 @@
       "map_key": "e5m3_hell",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_identity": {
-        "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+        "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
         "location_descriptor_sha256": "af663af0cec752f3f00a8be39891361607813b870c9df76113a134031ce83107",
         "policy_sha256": "59b518e058f096a425b7f20fcec9ba4e33cede000b6ba23f0318115597ca195b",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
           "resource_base": "e5m3_hell",
-          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-          "resource_priority": 167
+          "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+          "resource_priority": 58
         },
-        "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+        "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
         "source_entity": "TARGET_RELAY_ESCALATION_2_DONE",
         "source_file": "content/maps/e5m3_hell/locations.json",
         "source_sha256": "31d2a6a337fe5de2390231ebac12bbeb36decef69639a34e726412ddf3361430"
@@ -10258,29 +10258,29 @@
       "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff"
     },
     "e2m4_boss": {
-      "descriptor_sha256": "416de3e042284810b157a9741300db26adec0178aa510865a4ef2bc985619faf",
+      "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
       "resource": {
         "relative_entities_path": "game/sp/e2m4_boss/e2m4_boss.entities",
         "resource_base": "e2m4_boss",
         "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
         "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-        "resource_priority": 76
+        "resource_priority": 60
       },
-      "resource_sha256": "98a41addd4c0a67a1af30859f1903f51e03f81885531027246ec697c9fe0801c",
+      "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_file": "e2m4_boss.map",
       "source_sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390"
     },
     "e3m1_slayer": {
-      "descriptor_sha256": "e71e37b04b8dc0709ca1b088c97cc3a98e1880a862f395fa884a593a9ffbab5a",
+      "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
       "resource": {
         "relative_entities_path": "game/sp/e3m1_slayer/e3m1_slayer.entities",
         "resource_base": "e3m1_slayer",
         "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
         "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-        "resource_priority": 34
+        "resource_priority": 22
       },
-      "resource_sha256": "963f0a19588f34ee0db1855e503d5a29d7937a653a7c1e9e1ef08214ba5d1318",
+      "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_file": "e3m1_slayer.map",
       "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705"
@@ -10384,43 +10384,43 @@
       "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904"
     },
     "e5m1_spear": {
-      "descriptor_sha256": "80ee1d724d3db6f628ec677001ed3d12cd2dd50f2e160ffacb2f2b3e0a5996b8",
+      "descriptor_sha256": "e11bec54fd22c3ed3765ab27020ff400daff590d37cc2313e9d5e45b723d5d31",
       "resource": {
         "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
         "resource_base": "e5m1_spear",
-        "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-        "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-        "resource_priority": 175
+        "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+        "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+        "resource_priority": 18
       },
-      "resource_sha256": "dcc5172d4757a7240e848ef8e210312148fb0e9bba15970f0bd5341b332f9657",
+      "resource_sha256": "a23307d43fa96c37ce37f910790e82fdf113b4b25c3c7abfe3e144879fadb80a",
       "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
       "source_file": "e5m1_spear.map",
       "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6"
     },
     "e5m2_earth": {
-      "descriptor_sha256": "18817ff87f9d2cb53cf6ca5d65d1b958e2a57208a0ad1ded9ab7993682fc828c",
+      "descriptor_sha256": "cafc87c2e2bb106b39cd8adcd603ec6fbcdc9fac259ae28cc344734fa055be2a",
       "resource": {
         "relative_entities_path": "game/dlc2/e5m2_earth/e5m2_earth.entities",
         "resource_base": "e5m2_earth",
-        "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-        "resource_path": "game/dlc2/e5m2_earth/e5m2_earth.resources",
-        "resource_priority": 179
+        "resource_owner": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+        "resource_path": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+        "resource_priority": 44
       },
-      "resource_sha256": "04ce691e8bcd5bf8f789a63df34d26a76e2310ff236311ec0dbfbbd9e618cb24",
+      "resource_sha256": "07d9fb7a83f40a0be25a5e9241669bdbc733b95eeaa2ceaf26b391004f42efe3",
       "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth",
       "source_file": "e5m2_earth.map",
       "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1"
     },
     "e5m3_hell": {
-      "descriptor_sha256": "e1724f8ea47d1f1cd2ddcff67a5b166f52b78df57743bc64dace324b99aeabf9",
+      "descriptor_sha256": "e9f92a939320a7ef4aaa51d5b3c1870b7526c9bf42c73dad934ff8fe89d7f83b",
       "resource": {
         "relative_entities_path": "game/dlc2/e5m3_hell/e5m3_hell.entities",
         "resource_base": "e5m3_hell",
-        "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-        "resource_path": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-        "resource_priority": 167
+        "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+        "resource_path": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+        "resource_priority": 58
       },
-      "resource_sha256": "2c6c1cccbe211c3efbe18d9495134f004b91b3b34b0188c11b8324fcea865efe",
+      "resource_sha256": "438484bdd277ceacf640d2c9824a3acb287678681912e380491812b1e244ba32",
       "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
       "source_file": "e5m3_hell.map",
       "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44"

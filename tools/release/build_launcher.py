@@ -62,6 +62,7 @@ def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs.extend(_source_inputs("packaging/standalone_runtime", REPO_ROOT / "packaging/standalone_runtime"))
     inputs.extend(_source_inputs("data", REPO_ROOT / "data"))
     inputs.extend(_source_inputs("manifests", REPO_ROOT / "manifests"))
+    inputs.extend(_source_inputs("content", REPO_ROOT / "content"))
     inputs.extend(_source_inputs("requirements-launcher.txt", REPO_ROOT / "requirements-launcher.txt"))
     inputs.extend(_source_inputs("archipelago", archipelago_source))
     return inputs
@@ -97,7 +98,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
             "pyinstaller": _dependency_version("pyinstaller"),
             "pyside6": _dependency_version("PySide6"),
             "command": [
-                "onefile", "console", "standalone_runtime", "data", "manifests",
+                "onefile", "console", "standalone_runtime", "data", "manifests", "content",
                 *PYINSTALLER_EXCLUDES,
             ],
         },
@@ -148,6 +149,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
+        "--add-data",
+        f"{REPO_ROOT / 'content'}{data_separator}content",
         "--collect-data",
         "certifi",
         "--copy-metadata",

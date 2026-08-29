@@ -141,6 +141,17 @@ def validate_room_payload_manifest(
     maps = document.get("maps")
     if not isinstance(maps, Mapping) or not maps:
         raise ValueError("room payload manifest maps are missing")
+    context_targets = document.get("context_targets")
+    if not isinstance(context_targets, Mapping) or not context_targets:
+        raise ValueError("room payload manifest context targets are missing")
+    for identity, target_member in context_targets.items():
+        if (
+            not isinstance(identity, str)
+            or not identity
+            or not isinstance(target_member, str)
+            or _safe_member(target_member) != target_member
+        ):
+            raise ValueError("room payload context target is invalid")
     seen_members: set[str] = set()
     base_members = document.get("base_members")
     if not isinstance(base_members, list) or any(not isinstance(name, str) for name in base_members):
@@ -284,14 +295,6 @@ def assemble_room_files(
         for map_key in payload_manifest["maps"]
         if map_key not in selected
     }
-    if not options.get("use_dlc_content", True):
-        from doom_eap.runtime.context_registry import dlc_contexts
-
-        excluded_members.update(
-            context.overlay_member
-            for context in dlc_contexts()
-            if context.overlay_member is not None
-        )
     for member in excluded_members:
         assembled.pop(member, None)
     for map_key, state in selected.items():

@@ -36,7 +36,6 @@ class RuntimeContext:
     runtime_maps: tuple[str, ...]
     map_keys: tuple[str, ...]
     capabilities: frozenset[str]
-    overlay_member: str | None = None
 
     def supports(self, capability: str) -> bool:
         return capability in self.capabilities
@@ -71,7 +70,6 @@ def _load_registry() -> tuple[RuntimeContext, ...]:
             runtime_maps=tuple(raw["runtime_maps"]),
             map_keys=tuple(raw["map_keys"]),
             capabilities=frozenset(raw["capabilities"]),
-            overlay_member=raw.get("overlay_member"),
         ))
     return tuple(contexts)
 

@@ -293,9 +293,7 @@ def assemble_platform_release(
     repo_data = repo_root / "data"
     if repo_data.is_dir():
         dst_data = client_dir / "data"
-        dst_data.mkdir(parents=True, exist_ok=True)
-        for f in repo_data.glob("*.json"):
-            shutil.copy2(f, dst_data / f.name)
+        shutil.copytree(repo_data, dst_data, dirs_exist_ok=True)
 
     # Manifests directory
     repo_manifests = repo_root / "manifests"
@@ -311,6 +309,17 @@ def assemble_platform_release(
         dst_templates = client_dir / "player_templates"
         shutil.copytree(repo_templates, dst_templates, dirs_exist_ok=True)
 
+    # Canonical content tree (maps, catalog, global_runtime.json)
+    repo_content = repo_root / "content"
+    if repo_content.is_dir():
+        dst_content = client_dir / "content"
+        shutil.copytree(
+            repo_content,
+            dst_content,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            dirs_exist_ok=True,
+        )
+
     # doom_eap python package
     repo_doom_eap = repo_root / "doom_eap"
     if repo_doom_eap.is_dir():
@@ -321,6 +330,23 @@ def assemble_platform_release(
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache"),
             dirs_exist_ok=True,
         )
+
+    # tools python package
+    repo_tools = repo_root / "tools"
+    if repo_tools.is_dir():
+        dst_tools = client_dir / "tools"
+        dst_tools.mkdir(parents=True, exist_ok=True)
+        for subpkg in ("decls", "maps", "release"):
+            src_sub = repo_tools / subpkg
+            if src_sub.is_dir():
+                shutil.copytree(
+                    src_sub,
+                    dst_tools / subpkg,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                    dirs_exist_ok=True,
+                )
+        if (repo_tools / "__init__.py").is_file():
+            shutil.copy2(repo_tools / "__init__.py", dst_tools / "__init__.py")
 
     # Copy top-level doom_logo.png if available
     logo_src = repo_root.parent / "Archipelago" / "worlds" / "doometernal" / "doom_logo.png"

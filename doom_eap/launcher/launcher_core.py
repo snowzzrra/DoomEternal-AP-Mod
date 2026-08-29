@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -363,6 +364,7 @@ class SeedManifest:
     options: dict[str, Any]
     active_location_ids: tuple[int, ...]
     placements: tuple[PlacementRecord, ...]
+    static_content_digest: str
     manifest_hash: str
     static_precompile: bool = False
 
@@ -377,6 +379,7 @@ class SeedManifest:
         active_location_ids: list[int],
         placements: object = (),
         static_precompile: bool = False,
+        static_content_digest: str = "",
     ) -> SeedManifest:
         identity = release_identity()
         normalized_options = {
@@ -405,6 +408,8 @@ class SeedManifest:
         active_ids = tuple(sorted(set(active_location_ids)))
         if not isinstance(static_precompile, bool):
             raise ValueError("static_precompile must be boolean")
+        if static_content_digest and not re.fullmatch(r"[0-9a-f]{64}", static_content_digest):
+            raise ValueError("static_content_digest must be an empty string or SHA-256")
         normalized_placements = (
             ()
             if static_precompile
@@ -443,6 +448,7 @@ class SeedManifest:
             "options": normalized_options,
             "active_location_ids": list(active_ids),
             "placements": [record.document() for record in normalized_placements],
+            "static_content_digest": static_content_digest,
             "static_precompile": static_precompile,
         }
         return cls(
@@ -466,7 +472,13 @@ class SeedManifest:
         )
 
     @classmethod
-    def from_room(cls, snapshot: RoomSnapshot, known_location_ids: set[int]) -> SeedManifest:
+    def from_room(
+        cls,
+        snapshot: RoomSnapshot,
+        known_location_ids: set[int],
+        *,
+        static_content_digest: str = "",
+    ) -> SeedManifest:
         identity = release_identity()
         slot_data = snapshot.slot_data
         if "bridge_protocol" in slot_data and slot_data["bridge_protocol"] != identity["bridge_protocol_version"]:
@@ -536,6 +548,7 @@ class SeedManifest:
             },
             active_location_ids=list(snapshot.active_location_ids),
             placements=snapshot.placements,
+            static_content_digest=static_content_digest,
         )
 
 
@@ -543,7 +556,7 @@ class RoomCompiler:
     """Assemble canonical base resources and selected dependent map payloads."""
 
     DEVINV_MAP_KEY = "e1m1_intro"
-    ENHANCED_MELEE_PATH = "gameresources/generated/decls/damage/damage/player/melee_d5_forward.decl"
+    ENHANCED_MELEE_PATH = "gameresources_patch1/generated/decls/damage/damage/player/melee_d5_forward.decl"
     ENHANCED_MELEE_DECL = b'''{
 \tinherit = "damage/player/directional_melee";
 \tedit = {
@@ -588,9 +601,13 @@ class RoomCompiler:
 \t\t\t\tisDoom5Melee = true;
 \t\t\t\tfreezePlayer = true;
 \t\t\t}
-\t\t\tminDamage = 160;
-\t\t\tmaxDamage = 160;
 \t\t\tdamageDirAttackerToTarget = true;
+\t\t}
+\t\tmaxDamage = {
+\t\t\tdefaultValue = 160;
+\t\t}
+\t\tminDamage = {
+\t\t\tdefaultValue = 160;
 \t\t}
 \t}
 }
@@ -606,7 +623,7 @@ class RoomCompiler:
         dependency_manager: object | None = None,
         consent: object | None = None,
     ):
-        from tools.release.room_payloads import load_room_payload_manifest
+        from tools.release.room_payloads import canonical_json, load_room_payload_manifest
         missing = [
             str(p)
             for p in (base_resource, payload_resource, payload_manifest)
@@ -620,6 +637,22 @@ class RoomCompiler:
         self.base_resource = base_resource
         self.payload_resource = payload_resource
         self.payload_manifest = load_room_payload_manifest(payload_manifest)
+        static_material = {
+            "schema": 1,
+            "base_mod_sha256": hashlib.sha256(base_resource.read_bytes()).hexdigest(),
+            "room_payloads_sha256": hashlib.sha256(payload_resource.read_bytes()).hexdigest(),
+            "room_payload_manifest_sha256": hashlib.sha256(
+                canonical_json(self.payload_manifest)
+            ).hexdigest(),
+            "conditional_members": {
+                self.ENHANCED_MELEE_PATH: hashlib.sha256(
+                    self.ENHANCED_MELEE_DECL
+                ).hexdigest(),
+            },
+        }
+        self.static_content_digest = hashlib.sha256(
+            canonical_json(static_material)
+        ).hexdigest()
         self.decompressor = decompressor
         self.dependency_manager = dependency_manager
         self.consent = consent
@@ -841,6 +874,8 @@ class RoomCompiler:
     def build(self, manifest: SeedManifest, output_root: Path) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
         placements = manifest.require_complete_placements()
+        if manifest.static_content_digest != self.static_content_digest:
+            raise ValueError("room static content identity drifted")
         assembled, selected = assemble_room_files(
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
@@ -858,25 +893,6 @@ class RoomCompiler:
             "starting_weapon": manifest.options.get("starting_weapon"),
             "room_config": room_config,
         }
-        if manifest.options.get("use_dlc_content", True):
-            from doom_eap.content.content_catalog import load_content_catalog
-            from tools.maps.mission_complete_map_patcher import patch_generated_map_text
-
-            catalog = load_content_catalog()
-            for map_key in selected:
-                spec = catalog.maps.get(map_key)
-                if spec is None or not spec.requires_dlc_content:
-                    continue
-                member = str(self.payload_manifest["maps"][map_key]["target_member"])
-                compiled_content = assembled.get(member)
-                if compiled_content is None:
-                    raise ValueError(f"DLC map compiled payload is missing: {map_key}/{member}")
-                compiled_text = self._decompress_entities_text(compiled_content, member)
-                patched_text, _publisher_audit = patch_generated_map_text(
-                    map_key, compiled_text, ROOT
-                )
-                if patched_text != compiled_text:
-                    assembled[member] = self._compress_entities_text(patched_text)
         devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY
         ).as_posix()
@@ -896,11 +912,12 @@ class RoomCompiler:
             from doom_eap.runtime.context_registry import dlc_contexts
             from tools.maps.ap_map_generator import generate_context_marker_overlay
             for context in dlc_contexts():
-                if context.overlay_member is None:
-                    raise ValueError(f"DLC context lacks marker overlay target: {context.identity}")
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
                     raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
-                compiled_content = assembled.get(context.overlay_member)
+                overlay_member = self.payload_manifest["context_targets"].get(context.identity)
+                if not isinstance(overlay_member, str):
+                    raise ValueError(f"DLC context lacks room payload target: {context.identity}")
+                compiled_content = assembled.get(overlay_member)
                 if compiled_content is not None:
                     continue
                 overlay_text = generate_context_marker_overlay(
@@ -912,9 +929,28 @@ class RoomCompiler:
                     raise ValueError(
                         f"DLC context marker entity names are duplicated: {context.identity}"
                     )
-                assembled[context.overlay_member] = self._compress_entities_text(
+                assembled[overlay_member] = self._compress_entities_text(
                     overlay_text
                 )
+            from doom_eap.content.content_catalog import load_content_catalog
+            from tools.maps.mission_complete_map_patcher import patch_generated_map_text
+
+            catalog = load_content_catalog()
+            for context in dlc_contexts():
+                map_key = context.map_keys[0]
+                spec = catalog.maps.get(map_key)
+                if spec is None or not spec.requires_dlc_content:
+                    continue
+                member = self.payload_manifest["context_targets"][context.identity]
+                compiled_content = assembled.get(member)
+                if compiled_content is None:
+                    raise ValueError(f"DLC map compiled payload is missing: {map_key}/{member}")
+                compiled_text = self._decompress_entities_text(compiled_content, member)
+                patched_text, _publisher_audit = patch_generated_map_text(
+                    map_key, compiled_text, ROOT
+                )
+                if patched_text != compiled_text:
+                    assembled[member] = self._compress_entities_text(patched_text)
         assembled.update({
             "room_config.json": canonical_json(room_config),
             "seed_manifest.json": canonical_json(seed_document),
@@ -1216,8 +1252,17 @@ class LaunchWorkflow:
         self.vanilla_exultia = vanilla_exultia
         self.injector = injector
 
-    def manifest_for(self, snapshot: RoomSnapshot) -> SeedManifest:
-        return SeedManifest.from_room(snapshot, self.compiler.known_location_ids())
+    def manifest_for(
+        self,
+        snapshot: RoomSnapshot,
+        *,
+        static_content_digest: str = "",
+    ) -> SeedManifest:
+        return SeedManifest.from_room(
+            snapshot,
+            self.compiler.known_location_ids(),
+            static_content_digest=static_content_digest,
+        )
 
     def execute(self, snapshot: RoomSnapshot, install_root: Path, endpoint: str = "") -> InstallRecord:
         manifest = self.manifest_for(snapshot)

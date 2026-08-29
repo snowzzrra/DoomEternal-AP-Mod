@@ -12,9 +12,9 @@
   "generated_output": "e5m1_spear.entities",
   "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
   "resource_base": "e5m1_spear",
-  "resource_path": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-  "resource_priority": 175,
+  "resource_path": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+  "resource_priority": 18,
   "relative_entities_path": "game/dlc2/e5m1_spear/e5m1_spear.entities",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {

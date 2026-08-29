@@ -47,7 +47,7 @@ MOD_STAGING_DIR="$TEMP_DIR/mod"
 MAP_SOURCES_FILE="${AP_MAP_SOURCES_FILE:-$REPO_ROOT/data/map_sources.json}"
 VANILLA_MAPS_DIR="${VANILLA_MAPS_DIR:-$REPO_ROOT/vanillamaps}"
 RELEASE_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["release_version"])' "$REPO_ROOT/data/content_identity.json")"
-PTB_ZIP_NAME="DoomEternalArchipelagoPlayableTest-${RELEASE_VERSION}.zip"
+PTB_ZIP_NAME="DoomEternalArchipelago-${RELEASE_VERSION}.zip"
 STALE_DEV_ZIP="$OUTPUT_DIR/DoomEternalArchipelagoPlayableTest-v0.3.0-pre-alpha-dev.zip"
 AUTOMAP_PROTOTYPE_ONLY="${AP_AUTOMAP_PROTOTYPE_ONLY:-0}"
 DEEP_AUDIT="${AP_PIPELINE_DEEP_AUDIT:-0}"
@@ -505,31 +505,25 @@ mkdir -p "$OUTPUT_DIR/client/tools/release"
 cp "$REPO_ROOT/tools/release/__init__.py" \
    "$REPO_ROOT/tools/release/room_payloads.py" \
    "$OUTPUT_DIR/client/tools/release/"
+mkdir -p "$OUTPUT_DIR/client/tools/decls"
+cp "$REPO_ROOT/tools/decls/"*.py "$OUTPUT_DIR/client/tools/decls/"
+mkdir -p "$OUTPUT_DIR/client/tools/maps"
+cp "$REPO_ROOT/tools/maps/"*.py "$OUTPUT_DIR/client/tools/maps/"
 cp "$WORKSPACE/Archipelago/worlds/doometernal/doom_logo.png" \
     "$OUTPUT_DIR/client/doom_logo.png"
 mkdir -p "$OUTPUT_DIR/client/data" "$OUTPUT_DIR/client/manifests"
 python3 -m tools.content.compile_content_catalog --output-root "$OUTPUT_DIR/client/data"
 python3 -m tools.content.compile_start_inventory_catalog
-cp "$REPO_ROOT/data/items.json" \
-    "$REPO_ROOT/data/item_classifications.json" \
-    "$REPO_ROOT/data/start_inventory_catalog.json" \
-    "$REPO_ROOT/data/item_runtime_contracts.json" \
-    "$REPO_ROOT/data/item_replay_policies.json" \
-    "$REPO_ROOT/data/location_names.json" \
-    "$TEMP_DIR/challenge_location_registry.json" \
-    "$REPO_ROOT/data/runtime_locations.json" \
-    "$REPO_ROOT/data/campaign_goal_contract.json" \
-    "$REPO_ROOT/data/observer_contracts.json" \
-    "$REPO_ROOT/data/options_schema.json" \
-    "$TEMP_DIR/publisher_contracts.json" \
-    "$REPO_ROOT/data/content_identity.json" \
-    "$REPO_ROOT/data/runtime_contexts.json" \
-    "$OUTPUT_DIR/client/data/"
+cp -R "$REPO_ROOT/data"/* "$OUTPUT_DIR/client/data/"
+cp "$TEMP_DIR/challenge_location_registry.json" \
+   "$TEMP_DIR/publisher_contracts.json" \
+   "$OUTPUT_DIR/client/data/"
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r _ _ _ _ manifest_path _ <<< "$map_row"
     cp "$REPO_ROOT/$manifest_path" "$OUTPUT_DIR/client/manifests/"
 done
 cp -R "$REPO_ROOT/player_templates" "$OUTPUT_DIR/client/"
+cp -R "$REPO_ROOT/content" "$OUTPUT_DIR/client/"
 SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" -m tools.release.apworld_cache \
     --output "$OUTPUT_DIR/doometernal.apworld" \
     --archipelago-source "$WORKSPACE/Archipelago" \
@@ -593,11 +587,15 @@ from tools.release.room_payloads import (
     write_deterministic_zip, zip_directory,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from tools.maps.mission_complete_map_patcher import find_entity_block_bounds
+from tools.maps.ap_map_generator import generate_context_marker_overlay
 from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.runtime.context_registry import dlc_contexts
 
 compiler = ModCompiler(root)
 map_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-release_map_specs = tuple(load_content_catalog(root).enabled_maps())
+catalog = load_content_catalog(root)
+release_map_specs = tuple(catalog.enabled_maps())
 release_map_keys = tuple(spec.key for spec in release_map_specs)
 maps = {
     map_key: (
@@ -758,6 +756,38 @@ for map_key in maps:
     compile_cached_state(
         map_key, vanilla, plan.base_options, local_identities[map_key], entities, target
     )
+for context in dlc_contexts():
+    map_key = context.map_keys[0]
+    spec = catalog.maps[map_key]
+    target = staged / (
+        f"{Path(spec.resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
+    )
+    if target.is_file():
+        continue
+    runtime_document = json.loads(
+        (root / "content" / "maps" / map_key / "runtime.json").read_text(encoding="utf-8")
+    )
+    terminal_signals = [
+        record["signal"]
+        for record in runtime_document["locations"]
+        if record["strategy"] == "map_terminal"
+    ]
+    overlay_text = generate_context_marker_overlay(map_key, context.runtime_maps[0])
+    if terminal_signals:
+        source = (root / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
+        terminal_blocks = []
+        for signal in terminal_signals:
+            for owner_key in ("owner", "fallback_terminal_owner"):
+                owner = signal[owner_key]
+                bounds = find_entity_block_bounds(source, owner)
+                if bounds is None or source.count(f"entityDef {owner}") != 1:
+                    raise SystemExit(f"Context terminal owner is missing or duplicated: {map_key}/{owner}")
+                terminal_blocks.append(source[bounds[0]:bounds[1]])
+        overlay_text = "\n".join(terminal_blocks) + "\n" + overlay_text
+    entities = room_root / f"{map_key}-context.entities"
+    entities.write_text(overlay_text, encoding="utf-8", newline="")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)
 payload_files = {}
 map_records = {}
@@ -803,6 +833,13 @@ payload_manifest = {
     "physical_option_keys": list(PHYSICAL_OPTION_KEYS),
     "base_members": sorted(base_members),
     "maps": map_records,
+    "context_targets": {
+        context.identity: (
+            f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}"
+            f"/maps/{context.runtime_maps[0]}.entities"
+        )
+        for context in dlc_contexts()
+    },
 }
 validate_room_payload_manifest(
     payload_manifest,
@@ -837,110 +874,13 @@ launcher_executable = (
     if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
     else "DoomEternalArchipelagoLauncher"
 )
-
-public_files = [
-        *sorted(expected_release_roots(launcher_executable) - {"client", launcher_executable}),
-        "client/ap_client.exe",
-        "client/bridge_client.py",
-        "client/bridge_identity.json",
-        "client/deathlink_receive.py",
-        "client/bootstrap_actions.py",
-        "client/campaign_goal_contract.py",
-        "client/challenge_registry.py",
-        "client/content_catalog.py",
-        "client/automap_visual_registry.py",
-        "client/ap_visual_contract.py",
-        "client/foundation.py",
-        "client/item_classification.py",
-        "client/item_contracts.py",
-        "client/item_reconciliation.py",
-        "client/rune_reconciliation.py",
-        "client/launcher_app.py",
-        "client/launcher_controller.py",
-        "client/launcher_core.py",
-        "client/launcher_integration.py",
-        "client/launcher_platform.py",
-        "client/launcher_supervisor.py",
-        "client/launcher_ui.py",
-        "client/launcher_native_health.py",
-        "client/launcher_doctor.py",
-        "client/options_foundation.py",
-        "client/map_registry.py",
-        "client/observer_lifecycle.py",
-        "client/publisher_contracts.py",
-        "client/publisher_runtime.py",
-        "client/doom_eap/__init__.py",
-        "client/doom_eap/content/__init__.py",
-        "client/doom_eap/content/automap_visual_registry.py",
-        "client/doom_eap/content/content_catalog.py",
-        "client/doom_eap/content/item_classification.py",
-        "client/doom_eap/content/map_registry.py",
-        "client/doom_eap/content/options_foundation.py",
-        "client/doom_eap/content/physical_options.py",
-        "client/doom_eap/contracts/__init__.py",
-        "client/doom_eap/contracts/ap_visual_contract.py",
-        "client/doom_eap/contracts/campaign_goal_contract.py",
-        "client/doom_eap/contracts/challenge_registry.py",
-        "client/doom_eap/contracts/foundation.py",
-        "client/doom_eap/contracts/item_contracts.py",
-        "client/doom_eap/contracts/publisher_contracts.py",
-        "client/doom_eap/launcher/__init__.py",
-        "client/doom_eap/launcher/launcher_app.py",
-        "client/doom_eap/launcher/launcher_controller.py",
-        "client/doom_eap/launcher/launcher_core.py",
-        "client/doom_eap/launcher/launcher_doctor.py",
-        "client/doom_eap/launcher/launcher_integration.py",
-        "client/doom_eap/launcher/launcher_native_health.py",
-        "client/doom_eap/launcher/launcher_platform.py",
-        "client/doom_eap/launcher/launcher_supervisor.py",
-        "client/doom_eap/launcher/launcher_ui.py",
-        "client/doom_eap/runtime/__init__.py",
-        "client/doom_eap/runtime/bootstrap_actions.py",
-        "client/doom_eap/runtime/bridge_client.py",
-        "client/doom_eap/runtime/context_registry.py",
-        "client/doom_eap/runtime/deathlink_receive.py",
-        "client/doom_eap/runtime/item_reconciliation.py",
-        "client/doom_eap/runtime/observer_lifecycle.py",
-        "client/doom_eap/runtime/publisher_runtime.py",
-        "client/doom_eap/runtime/rune_reconciliation.py",
-        "client/doom_eap/runtime/save_decrypt.py",
-        "client/save_death_probe.exe",
-        "client/save_decrypt.py",
-        "client/tools/__init__.py",
-        "client/tools/release/__init__.py",
-        "client/tools/release/room_payloads.py",
-        "client/run_bridge.sh",
-        "client/doom_logo.png",
-        "client/resources/base_mod.zip",
-        "client/resources/room_payloads.zip",
-        "client/resources/room_payload_manifest.json",
-        "client/runtime_install.sh",
-        "client/validate_runtime_install.sh",
-        "client/ap_config.example.json",
-        "client/data/items.json",
-        "client/data/item_classifications.json",
-        "client/data/start_inventory_catalog.json",
-        "client/data/item_runtime_contracts.json",
-        "client/data/item_replay_policies.json",
-        "client/data/location_names.json",
-        "client/data/challenge_location_registry.json",
-        "client/data/runtime_locations.json",
-        "client/data/map_sources.json",
-        "client/data/foundation_contracts.json",
-        "client/data/catalog.json",
-        "client/data/checked_location_visuals.json",
-        "client/data/generated_content.py",
-        "client/data/campaign_goal_contract.json",
-        "client/data/observer_contracts.json",
-        "client/data/options_schema.json",
-        "client/data/publisher_contracts.json",
-        "client/data/content_identity.json",
-        "client/data/runtime_contexts.json",
-        *map_manifest_files,
-        "client/player_templates/DoomSlayer.yaml",
-        "client/player_templates/Marine.yaml",
-        launcher_executable,
-]
+from tools.validation.release_layout import public_file_members
+client_files = sorted(f"client/{path.relative_to(output_dir / 'client').as_posix()}" for path in (output_dir / "client").rglob("*") if path.is_file())
+public_files = sorted(
+    list(expected_release_roots(launcher_executable) - {"client", launcher_executable})
+    + client_files
+    + [launcher_executable]
+)
 
 from tools.release.release_manifest import build_release_manifest, write_release_manifest
 write_release_manifest(

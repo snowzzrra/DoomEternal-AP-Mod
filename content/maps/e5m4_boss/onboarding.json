@@ -4,8 +4,8 @@
   "runtime_map": "game/dlc2/e5m4_boss/e5m4_boss",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "source_sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
-  "resource_owner": "game/dlc2/e5m4_boss/e5m4_boss.resources",
-  "resource_priority": 181,
+  "resource_owner": "game/dlc2/e5m4_boss/e5m4_boss_patch1.resources",
+  "resource_priority": 52,
   "resource_priority_metadata_only": true,
   "mission_complete_transition": {
     "kind": "native_transition",

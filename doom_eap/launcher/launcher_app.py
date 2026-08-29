@@ -65,6 +65,17 @@ def _run_self_test(arguments: list[str]) -> int:
         if not isinstance(schema_data, dict):
             raise RuntimeError("Bundled options_schema.json is not a valid JSON object")
         print(f"  [OK] Bundled options schema verified -> {bundled_schema} ({bundled_schema.stat().st_size} bytes)")
+
+        bundled_content = bundle_dir / "content"
+        bundled_topology = bundled_content / "catalog" / "region_topology.json"
+        bundled_global = bundled_content / "global_runtime.json"
+        bundled_maps = bundled_content / "maps"
+        if not (bundled_topology.is_file() and bundled_global.is_file() and bundled_maps.is_dir()):
+            raise RuntimeError(
+                f"Bundled content catalog incomplete in bundle root: {bundled_content} "
+                f"(frozen={getattr(sys, 'frozen', False)})"
+            )
+        print(f"  [OK] Bundled content catalog verified -> {bundled_content}")
     except Exception as e:
         print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
         return 1

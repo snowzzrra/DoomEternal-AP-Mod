@@ -12,9 +12,9 @@
   "generated_output": "e5m4_boss.entities",
   "runtime_map": "game/dlc2/e5m4_boss/e5m4_boss",
   "resource_base": "e5m4_boss",
-  "resource_path": "game/dlc2/e5m4_boss/e5m4_boss.resources",
-  "resource_owner": "game/dlc2/e5m4_boss/e5m4_boss.resources",
-  "resource_priority": 181,
+  "resource_path": "game/dlc2/e5m4_boss/e5m4_boss_patch1.resources",
+  "resource_owner": "game/dlc2/e5m4_boss/e5m4_boss_patch1.resources",
+  "resource_priority": 52,
   "relative_entities_path": "game/dlc2/e5m4_boss/e5m4_boss.entities",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {

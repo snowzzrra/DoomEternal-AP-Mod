@@ -14,7 +14,7 @@
   "resource_base": "e2m4_boss",
   "resource_path": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
   "resource_owner": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
-  "resource_priority": 76,
+  "resource_priority": 60,
   "relative_entities_path": "game/sp/e2m4_boss/e2m4_boss.entities",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {

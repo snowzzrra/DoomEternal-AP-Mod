@@ -682,6 +682,25 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
         for effect in publisher.effects:
             if effect["strategy"] not in EFFECT_STRATEGIES:
                 raise ValueError(f"unsupported publisher effect: {effect['strategy']}")
+    import os
+    from tools.maps.resource_priority import resolve_owner
+
+    packagemapspec_env = os.environ.get("DOOM_PACKAGEMAPSPEC")
+    packagemapspec_path = Path(packagemapspec_env) if packagemapspec_env else Path(
+        "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
+    )
+    if packagemapspec_path.is_file():
+        for map_key, spec in catalog.maps.items():
+            expected_owner, expected_priority = resolve_owner(
+                spec.runtime_map, packagemapspec_path
+            )
+            actual = (spec.resource_owner, spec.resource_path, spec.resource_priority)
+            expected = (expected_owner, expected_owner, expected_priority)
+            if actual != expected:
+                raise ValueError(
+                    f"{map_key}: resource relation {actual!r} does not match "
+                    f"ordered packagemapspec relation {expected!r}"
+                )
 
 
 def discover_maps(root: Path = ROOT) -> tuple[MapSpec, ...]:

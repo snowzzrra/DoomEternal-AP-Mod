@@ -14,7 +14,7 @@
   "resource_base": "e3m1_slayer",
   "resource_path": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
   "resource_owner": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
-  "resource_priority": 34,
+  "resource_priority": 22,
   "relative_entities_path": "game/sp/e3m1_slayer/e3m1_slayer.entities",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {

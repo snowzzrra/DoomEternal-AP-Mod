@@ -4,8 +4,8 @@
   "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
-  "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell.resources",
-  "resource_priority": 167,
+  "resource_owner": "game/dlc2/e5m3_hell/e5m3_hell_patch1.resources",
+  "resource_priority": 58,
   "resource_priority_metadata_only": true,
   "mission_complete_transition": {
     "kind": "native_transition",

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot
+from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
 from .launcher_platform import (
     IDFILE_DECOMPRESSOR_LINUX,
     IDFILE_DECOMPRESSOR_WINDOWS,
@@ -44,6 +44,12 @@ ROOM_PACKAGE_FAILURE_MESSAGE = (
     "Rebuild the room package and try again."
 )
 ROOM_PACKAGE_FAILURE_ACTION = "REBUILD ROOM PACKAGE"
+APPLICATION_PACKAGE_FAILURE_TITLE = "APPLICATION PACKAGE INCOMPLETE"
+APPLICATION_PACKAGE_FAILURE_MESSAGE = (
+    "The application package is incomplete or corrupted. "
+    "Re-extract the full DOOM Eternal Archipelago release package."
+)
+APPLICATION_PACKAGE_FAILURE_ACTION = "RE-EXTRACT RELEASE PACKAGE"
 MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE = (
     "A required mod-building tool could not be prepared. "
     "Check your connection and try rebuilding the Room Package."
@@ -75,9 +81,23 @@ UNINSTALL_OWNED_STATES = frozenset({
 
 def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
     """Classify setup failures without weakening any validation boundary."""
+    text = f"{type(error).__name__}: {error}".casefold()
+    app_tokens = (
+        "component=map_package",
+        "release package is incomplete",
+        "application package is incomplete",
+        "file=content/maps",
+        "content/maps value=missing",
+        "region_topology.json",
+        "global_runtime.json",
+        "options_schema.json missing",
+        "region topology",
+        "content catalog",
+    )
+    if any(token in text for token in app_tokens):
+        return "application_package"
     if phase in {"room_snapshot", "manifest", "room_package"}:
         return "room_package"
-    text = f"{type(error).__name__}: {error}".casefold()
     room_tokens = (
         "contract",
         "capability",
@@ -106,7 +126,12 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "idfiledecompressor" in raw_message.casefold()
         or "mod-building tool" in raw_message.casefold()
     )
-    if failure_domain == "room_package":
+    if failure_domain == "application_package":
+        recovery_action = "reinstall_application"
+        user_title = APPLICATION_PACKAGE_FAILURE_TITLE
+        user_message = APPLICATION_PACKAGE_FAILURE_MESSAGE
+        user_action = APPLICATION_PACKAGE_FAILURE_ACTION
+    elif failure_domain == "room_package":
         recovery_action = "rebuild_room_package"
         incompatible_tokens = (
             "contract is unsupported",
@@ -228,6 +253,29 @@ class IntegratedLaunchWorkflow:
         self.uninstall_confirmation = uninstall_confirmation or (lambda: False)
         self._failure_phase = "game_setup"
 
+    def _room_compiler(
+        self,
+        *,
+        decompressor: Path | None = None,
+        dependency_manager: object | None = None,
+        consent: object | None = None,
+    ) -> RoomCompiler:
+        return RoomCompiler(
+            self.application_dir / "resources" / "base_mod.zip",
+            self.application_dir / "resources" / "room_payloads.zip",
+            self.application_dir / "resources" / "room_payload_manifest.json",
+            decompressor=decompressor,
+            dependency_manager=dependency_manager,
+            consent=consent,
+        )
+
+    def _manifest_for(self, snapshot: RoomSnapshot) -> SeedManifest:
+        room_compiler = self._room_compiler()
+        return self.base_workflow.manifest_for(
+            snapshot,
+            static_content_digest=room_compiler.static_content_digest,
+        )
+
     def _emit(self, kind: str, **payload: object) -> None:
         self.event_sink(kind, payload)
 
@@ -344,7 +392,7 @@ class IntegratedLaunchWorkflow:
 
     def install_state(self, snapshot: RoomSnapshot) -> InstallState:
         """Resolve current room identity against verified launcher ownership."""
-        manifest = self.base_workflow.manifest_for(snapshot)
+        manifest = self._manifest_for(snapshot)
         receipt_path = self.state_dir / "launcher_setup.json"
         if not receipt_path.is_file():
             return InstallState("install_needed", manifest.manifest_hash, reason="no launcher install record")
@@ -593,7 +641,7 @@ class IntegratedLaunchWorkflow:
 
         receipt_path = self.state_dir / "launcher_setup.json"
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        manifest = self.base_workflow.manifest_for(snapshot)
+        manifest = self._manifest_for(snapshot)
         raw_command = receipt.get("adapter_command", ())
         adapter_command = tuple(str(item) for item in raw_command) if isinstance(raw_command, (list, tuple)) else ()
         return IntegratedSetupRecord(
@@ -690,7 +738,7 @@ class IntegratedLaunchWorkflow:
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Runtime prerequisites not met: {'; '.join(failed)}")
 
-        manifest = self.base_workflow.manifest_for(snapshot)
+        manifest = self._manifest_for(snapshot)
         self._emit(
             "room_validated",
             seed_name=manifest.seed_name,
@@ -704,10 +752,7 @@ class IntegratedLaunchWorkflow:
             randomize_dash=manifest.options["randomize_dash"],
         )
         decompressor_manager = self._idfile_manager()
-        generated = RoomCompiler(
-            self.application_dir / "resources" / "base_mod.zip",
-            self.application_dir / "resources" / "room_payloads.zip",
-            self.application_dir / "resources" / "room_payload_manifest.json",
+        generated = self._room_compiler(
             dependency_manager=decompressor_manager,
             consent=self.consent,
         ).build(
@@ -789,7 +834,7 @@ class IntegratedLaunchWorkflow:
 
     def uninstall(self, snapshot: RoomSnapshot) -> UninstallResult:
         """Remove only receipt-proven room package, then run platform injector once."""
-        manifest = self.base_workflow.manifest_for(snapshot)
+        manifest = self._manifest_for(snapshot)
         config = self._config()
         game_root = self._game_root(config)
         running = detect_doom_processes()
@@ -1006,7 +1051,7 @@ class IntegratedLaunchWorkflow:
 
     def confirm_manual_installation(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
         """Record manual mod installation completion after player verifies external injector run."""
-        manifest = self.base_workflow.manifest_for(snapshot)
+        manifest = self._manifest_for(snapshot)
         receipt_path = self.state_dir / "launcher_setup.json"
         try:
             receipt_document = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -1316,7 +1361,7 @@ class RoomSetupCoordinator:
                 )
                 with self._worker_lock:
                     snapshot = RoomSnapshot.from_event(event)
-                    manifest = self.workflow.base_workflow.manifest_for(snapshot)
+                    manifest = self.workflow._manifest_for(snapshot)
                     self._emit_room_event(
                         "ROOM_UNINSTALL_PLAN",
                         event,

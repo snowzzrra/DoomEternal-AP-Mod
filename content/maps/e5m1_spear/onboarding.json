@@ -4,8 +4,8 @@
   "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
-  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear.resources",
-  "resource_priority": 175,
+  "resource_owner": "game/dlc2/e5m1_spear/e5m1_spear_patch1.resources",
+  "resource_priority": 18,
   "resource_priority_metadata_only": true,
   "mission_complete_transition": {
     "kind": "native_transition",
