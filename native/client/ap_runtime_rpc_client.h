@@ -22,6 +22,7 @@ public:
     bool PollHealth();
     bool Ready() const { return ready_; }
     bool ExecuteConsoleCommand(const std::string& command);
+    unsigned long long AttachmentEpoch() const { return attachment_epoch_; }
     bool RequestEntityLoad(const std::string& path, bool begin, int size = 0);
     bool RetrieveEntities(unsigned char* data, size_t* capacity);
     bool Checkpoint(int* size, unsigned char* data, int capacity);
@@ -40,6 +41,7 @@ private:
     ApRpcResult result_ = AP_RPC_NONE;
     std::string command_id_ = "-";
     unsigned long long call_sequence_ = 0;
+    unsigned long long attachment_epoch_ = 0;
     bool health_log_initialized_ = false;
     bool health_available_ = false;
     DWORD next_health_summary_tick_ = 0;

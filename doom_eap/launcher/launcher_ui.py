@@ -11,8 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QShortcut
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPolygonF, QShortcut, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -111,6 +111,41 @@ class _AmmoRefillKeyEdit(QLineEdit):
         self.setText(token)
         self.captured.emit(token)
         event.accept()
+
+
+class _AmmoRefillPips(QWidget):
+    """Three compact diagonal resource pips."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._available: int | None = None
+        metrics = QFontMetrics(self.font())
+        self.setMinimumSize(metrics.horizontalAdvance("MMM"), max(12, metrics.height() // 2))
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def set_available(self, available: int | None) -> None:
+        self._available = available
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        bounds = self.contentsRect().adjusted(1, 1, -1, -1)
+        gap = max(2.0, bounds.width() / 24.0)
+        width = max(7.0, (bounds.width() - gap * 2.0) / 3.0)
+        height = max(6.0, min(float(bounds.height()), QFontMetrics(self.font()).height() * 0.55))
+        top = bounds.center().y() - height / 2.0
+        slant = min(5.0, width * 0.28)
+        for index in range(3):
+            left = bounds.left() + index * (width + gap)
+            shape = QPolygonF([
+                QPointF(left + slant, top), QPointF(left + width, top),
+                QPointF(left + width - slant, top + height), QPointF(left, top + height),
+            ])
+            active = self._available is not None and index < self._available
+            painter.setPen(QColor("#c7ef82") if active else QColor("#4a543c"))
+            painter.setBrush(QColor("#9cdc4a") if active else QColor("#182019"))
+            painter.drawPolygon(shape)
 
 
 class AmmoRefillKeyControl(QWidget):
@@ -241,6 +276,9 @@ class OptionSetControl(QWidget):
         clear.clicked.connect(lambda: self._set_all(False))
         actions.addWidget(select_all)
         actions.addWidget(clear)
+        side_content = QPushButton("SELECT ALL SIDE CONTENT")
+        side_content.clicked.connect(self._select_side_content)
+        actions.addWidget(side_content)
         actions.addStretch(1)
         layout.addLayout(actions)
         grid = QGridLayout()
@@ -297,6 +335,14 @@ class OptionSetControl(QWidget):
                 continue
             check.setChecked(checked)
 
+    def _select_side_content(self) -> None:
+        self.set_keys_checked({
+            "Complete All Slayer Gates",
+            "Complete All Escalation Encounters",
+            "Complete All Secret Encounters",
+            "Acquire the Unmaykr",
+        }, True)
+
     def value(self) -> list[object]:
         return [key for key, check in self.checks
                 if str(key) not in self._locked and str(key) not in self._unavailable
@@ -316,7 +362,7 @@ class LauncherUI(QMainWindow):
     COLORS = {
         "ink": "#080b0d", "panel": "#111619", "panel2": "#171e22",
         "line": "#3b4549", "text": "#f1f3ef", "muted": "#9ba3a3",
-        "doom": "#e86f1c", "doom_hot": "#ff8a2b", "ap": "#43bfc7",
+        "doom": "#9edb45", "doom_hot": "#f28a35", "ap": "#43bfc7",
         "good": "#a8d52a", "warn": "#f2c230", "bad": "#df3f3f",
     }
 
@@ -362,9 +408,9 @@ class LauncherUI(QMainWindow):
         self.setStyleSheet(f"""
             QWidget {{ background:{self.COLORS['ink']}; color:{self.COLORS['text']}; font-family:'Noto Sans','Segoe UI','Aptos',sans-serif; font-size:10.5pt; }}
             QLabel {{ background:transparent; }} QMainWindow {{ background:{self.COLORS['ink']}; }}
-            QFrame#shell {{ background:#0d151a; border-right:1px solid {self.COLORS['line']}; }}
-            QFrame#topbar {{ background:#0d151a; border-bottom:1px solid {self.COLORS['line']}; }}
-            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #242017,stop:.46 #15191b,stop:1 #0b0e10); border:1px solid #5a4b38; border-left:4px solid {self.COLORS['doom']}; }}
+            QFrame#shell {{ background:#0d1512; border-right:1px solid #48543b; }}
+            QFrame#topbar {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #111a16,stop:.48 #0d1512,stop:.52 #111a16,stop:1 #0d1512); border-bottom:1px solid #48543b; }}
+            QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #202719,stop:.46 #151a17,stop:1 #0b0e10); border:1px solid #566447; border-left:4px solid {self.COLORS['doom']}; }}
             QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; border-radius:2px; }}
             QWidget#statusItem {{ background:#0c151a; border:1px solid #30444d; border-radius:11px; }}
             QLabel#statusIndicator {{ color:#64737a; font-size:12pt; }}
@@ -377,7 +423,7 @@ class LauncherUI(QMainWindow):
             QFrame#actionStrip[actionTone="working"] {{ background:#10252a; border-color:#32636a; border-left-color:{self.COLORS['ap']}; }}
             QFrame#effectiveConfig {{ background:#121614; border:1px solid #566044; border-left:4px solid {self.COLORS['good']}; }}
             QLabel#brand {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16pt; font-weight:800; }}
-            QLabel#eyebrow {{ color:{self.COLORS['doom_hot']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
+            QLabel#eyebrow {{ color:{self.COLORS['doom']}; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:9pt; font-weight:800; letter-spacing:1px; }}
             QLabel#title {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:20pt; font-weight:800; }}
             QLabel#sessionPlayerName {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:16.5pt; font-weight:800; line-height:1.05; }}
             QLabel#section {{ font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:12pt; font-weight:800; letter-spacing:.4px; }}
@@ -388,10 +434,10 @@ class LauncherUI(QMainWindow):
             QLineEdit,QSpinBox,QKeySequenceEdit {{ background:#0c1113; color:{self.COLORS['text']}; border:1px solid #596164; padding:6px 8px; min-height:18px; selection-background-color:{self.COLORS['doom']}; selection-color:#fff; }}
             QComboBox {{ background:#0c1419; border:1px solid #526871; padding:6px 8px; min-height:18px; }}
             QComboBox QAbstractItemView {{ background:#101a20; color:{self.COLORS['text']}; selection-background-color:{self.COLORS['doom']}; }}
-            QLineEdit:focus,QSpinBox:focus,QKeySequenceEdit:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['doom_hot']}; outline:0; }}
-            QPushButton {{ background:#17242b; border:1px solid #4a626c; padding:7px 11px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
-            QPushButton:hover {{ background:#2d302b; border-color:{self.COLORS['doom_hot']}; }}
-            QPushButton:pressed {{ background:#0d151a; border-color:{self.COLORS['doom_hot']}; padding:8px 10px 6px 12px; }}
+            QLineEdit:focus,QSpinBox:focus,QKeySequenceEdit:focus,QComboBox:focus,QPushButton:focus,QCheckBox:focus {{ border:2px solid {self.COLORS['doom']}; outline:0; }}
+            QPushButton {{ background:#17241d; border:1px solid #526446; padding:7px 11px; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-weight:800; letter-spacing:.3px; }}
+            QPushButton:hover {{ background:#263322; border-color:{self.COLORS['doom']}; }}
+            QPushButton:pressed {{ background:#0d1510; border-color:{self.COLORS['doom']}; padding:8px 10px 6px 12px; }}
             QPushButton#primary {{ background:{self.COLORS['good']}; border-color:{self.COLORS['good']}; color:#102012; }}
             QPushButton#primary:hover {{ background:#b2e77a; }}
             QPushButton#primary:pressed {{ background:#7eaf50; color:#071008; }}
@@ -401,7 +447,7 @@ class LauncherUI(QMainWindow):
             QPushButton#nav {{ text-align:left; background:transparent; border:0; border-left:3px solid transparent; color:{self.COLORS['muted']}; padding:10px 10px; }}
             QPushButton#nav:checked,QPushButton#nav:hover {{ background:#17242b; color:{self.COLORS['text']}; border-left-color:{self.COLORS['doom']}; }}
             QPushButton#sessionNav {{ background:transparent; border:1px solid #405761; padding:7px 9px; color:{self.COLORS['muted']}; font-size:10pt; }}
-            QPushButton#sessionNav:checked {{ color:#19110b; border-color:{self.COLORS['doom_hot']}; background:{self.COLORS['doom_hot']}; }}
+            QPushButton#sessionNav:checked {{ color:#11180b; border-color:{self.COLORS['doom']}; background:#6e8d31; }}
             QPushButton#sessionNav:hover {{ color:{self.COLORS['text']}; border-color:{self.COLORS['doom']}; background:#1d2d34; }}
             QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
             QPlainTextEdit,QTableWidget {{ background:#0b1217; color:{self.COLORS['text']}; border:1px solid {self.COLORS['line']}; }}
@@ -417,8 +463,6 @@ class LauncherUI(QMainWindow):
             QLabel#connectionBadge[connected="true"] {{ color:{self.COLORS['good']}; border-color:#758f25; background:#18200f; }}
             QWidget#ammoRefillIndicator {{ background:#0c1012; border:1px solid #3b4143; border-left:3px solid #6c491f; }}
             QLabel#ammoRefillTitle {{ color:#c3a17a; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.7px; }}
-            QFrame#ammoRefillSegment {{ background:#1a1e20; border:1px solid #343b3e; min-width:11px; max-width:11px; min-height:7px; max-height:7px; }}
-            QFrame#ammoRefillSegment[active="true"] {{ background:{self.COLORS['doom_hot']}; border-color:#ffc16e; }}
             QLabel#ammoRefillKey {{ color:#899397; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.5px; }}
         """)
 
@@ -723,13 +767,8 @@ class LauncherUI(QMainWindow):
         ammo_layout.setContentsMargins(8, 5, 8, 5)
         ammo_layout.setSpacing(5)
         ammo_layout.addWidget(self._label("AMMO REFILL", "ammoRefillTitle"))
-        self.ammo_refill_segments: list[QFrame] = []
-        for _ in range(3):
-            segment = QFrame()
-            segment.setObjectName("ammoRefillSegment")
-            segment.setProperty("active", False)
-            self.ammo_refill_segments.append(segment)
-            ammo_layout.addWidget(segment)
+        self.ammo_refill_pips = _AmmoRefillPips()
+        ammo_layout.addWidget(self.ammo_refill_pips, 1)
         self.ammo_refill_key = self._label("", "ammoRefillKey")
         ammo_layout.addWidget(self.ammo_refill_key)
         self._set_ammo_refill_indicator(None)
@@ -915,7 +954,7 @@ class LauncherUI(QMainWindow):
             for option in cast(list[dict[str, object]], self.controller.options_schema["options"])
         }
         groups = (
-            ("GOAL & CAMPAIGN", ("goal", "use_dlc_content", "dlc_logic_timing", "additional_victory_requirements")),
+            ("GOAL & CAMPAIGN", ("goal", "use_dlc_content", "include_dlc_missions", "dlc_logic_timing", "additional_victory_requirements")),
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
             ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "randomize_first_battery", "include_weapon_mastery_challenges", "praetor_suit_upgrades_in_pool")),
             ("COMBAT & QoL", ("reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
@@ -971,7 +1010,7 @@ class LauncherUI(QMainWindow):
         return card
 
     def _wire_create_dependencies(self) -> None:
-        for key in ("use_dlc_content", "enhanced_melee_damage", "include_weapon_mastery_challenges"):
+        for key in ("use_dlc_content", "include_dlc_missions", "enhanced_melee_damage", "include_weapon_mastery_challenges"):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
@@ -1006,9 +1045,10 @@ class LauncherUI(QMainWindow):
         index = combo.findData(value)
         if index < 0:
             return
-        item = combo.model().item(index)
+        item = cast(QStandardItemModel, combo.model()).item(index)
         if item is not None:
             item.setEnabled(enabled)
+        combo.setItemData(index, None if enabled else "Requires DLC Missions.", Qt.ItemDataRole.ToolTipRole)
 
     def _refresh_create_dependencies(self) -> None:
         if self._syncing_create_dependencies:
@@ -1016,11 +1056,19 @@ class LauncherUI(QMainWindow):
         self._syncing_create_dependencies = True
         try:
             dlc_enabled = self._choice_value("use_dlc_content") is True
+            missions_control = self.option_controls.get("include_dlc_missions")
+            if isinstance(missions_control, QCheckBox):
+                missions_control.setEnabled(dlc_enabled)
+                if not dlc_enabled and missions_control.isChecked():
+                    missions_control.blockSignals(True)
+                    missions_control.setChecked(False)
+                    missions_control.blockSignals(False)
+            dlc_missions = bool(dlc_enabled and isinstance(missions_control, QCheckBox) and missions_control.isChecked())
             special_weapon = self.option_controls.get("special_weapon")
             special_row = self.option_rows.get("special_weapon")
             dlc_timing_row = self.option_rows.get("dlc_logic_timing")
-            self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_enabled)
-            self._set_choice_enabled("goal", "complete_the_full_saga", dlc_enabled)
+            self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_missions)
+            self._set_choice_enabled("goal", "complete_the_full_saga", dlc_missions)
             if not dlc_enabled:
                 if self._choice_value("goal") in {"kill_the_dark_lord", "complete_the_full_saga"}:
                     goal_control = self.option_controls.get("goal")
@@ -1033,7 +1081,7 @@ class LauncherUI(QMainWindow):
             if special_row is not None:
                 special_row.setVisible(dlc_enabled)
             if dlc_timing_row is not None:
-                dlc_timing_row.setVisible(dlc_enabled)
+                dlc_timing_row.setVisible(dlc_missions)
             self._refresh_inventory_picker(dlc_enabled)
             goal_key = self._choice_value("goal")
             mastery_control = self.option_controls.get("include_weapon_mastery_challenges")
@@ -1042,11 +1090,11 @@ class LauncherUI(QMainWindow):
             unavailable: set[str] = set()
             if goal_key in {"acquire_the_unmaykr", "complete_the_full_saga"}:
                 locked.add("Acquire the Unmaykr")
-                if not dlc_enabled:
+                if not dlc_missions:
                     locked.add("Complete All Slayer Gates")
             if goal_key == "complete_the_full_saga":
                 locked.add("Complete All Enabled Missions")
-            if not dlc_enabled:
+            if not dlc_missions:
                 unavailable.add("Complete All Escalation Encounters")
             if not mastery_enabled:
                 unavailable.add("Complete All Weapon Mastery Challenges")
@@ -1062,8 +1110,8 @@ class LauncherUI(QMainWindow):
                 victory_summary = f"Goal + {requirement_count} extra objective{plural}"
             values = {
                 "goal": goal_label,
-                "campaign": "Full Saga · 19 missions" if dlc_enabled else "Base Campaign · 13 missions",
-                "dlc": self._selected_label("dlc_logic_timing") if dlc_enabled else "Base Campaign only",
+                "campaign": "Full Saga · 19 missions" if dlc_missions else ("Base Campaign + DLC Gear" if dlc_enabled else "Base Campaign"),
+                "dlc": self._selected_label("dlc_logic_timing") if dlc_missions else "Not active",
                 "special": special_label,
                 "starting": self._selected_label("starting_weapon"),
                 "victory": victory_summary,
@@ -1086,7 +1134,7 @@ class LauncherUI(QMainWindow):
             title = "Randomize Dash"
             message = (
                 "Randomizing Dash can make some routes significantly harder and may require advanced "
-                "movement or unintended techniques depending on your seed.\n\nContinue?"
+                "movement depending on your seed.\n\nContinue?"
             )
         else:
             title = "Randomize Chainsaw"
@@ -1215,12 +1263,8 @@ class LauncherUI(QMainWindow):
         self.player_ammo_refills.setAccessibleDescription(description)
         self.ammo_refill_key.setText(keybind)
         self.ammo_refill_key.setToolTip(f"Ammo Refill key: {keybind}")
-        for index, segment in enumerate(self.ammo_refill_segments):
-            segment.setProperty("active", available is not None and index < available)
-            segment.setToolTip(description)
-            style = segment.style()
-            style.unpolish(segment)
-            style.polish(segment)
+        self.ammo_refill_pips.set_available(available)
+        self.ammo_refill_pips.setToolTip(description)
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)
@@ -1871,6 +1915,29 @@ class LauncherUI(QMainWindow):
         escaped = re.sub(r"(\*\*|__)(.+?)\1", r"<b>\2</b>", escaped)
         return re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", escaped)
 
+    @staticmethod
+    def _choice_purpose(key: str, fallback: object) -> str:
+        return {
+            "goal": "Choose how this world is won.",
+            "dlc_logic_timing": "Choose when the DLC mission paths enter progression.",
+            "special_weapon": "Choose how the Crucible and Sentinel Hammer are randomized.",
+        }.get(key, str(fallback).split("\n\n", 1)[0])
+
+    @staticmethod
+    def _choice_description(key: str, value: object, label: str) -> str:
+        descriptions = {
+            ("goal", "acquire_the_unmaykr"): "Claim the Unmaykr in the Fortress of Doom.",
+            ("goal", "kill_the_icon_of_sin"): "Defeat the Icon of Sin at the end of the Base Campaign.",
+            ("goal", "kill_the_dark_lord"): "Defeat the Dark Lord in The Ancient Gods Part Two.",
+            ("goal", "complete_the_full_saga"): "Finish every enabled Full Saga mission, claim the Unmaykr, defeat the Icon of Sin, and defeat the Dark Lord.",
+            ("dlc_logic_timing", "late_game"): "DLC mission paths enter logic once your inventory is strong enough.",
+            ("dlc_logic_timing", "from_the_beginning"): "Hell on Earth, UAC Atlantica Facility, and The World Spear are logical starting paths, subject to their required equipment and movement.",
+            ("special_weapon", "progressive_special_weapon"): "Crucible → Sentinel Hammer → fully upgraded Sentinel Hammer.",
+            ("special_weapon", "progressive_sentinel_hammer"): "Sentinel Hammer → fully upgraded Sentinel Hammer.",
+            ("special_weapon", "the_crucible"): "Only the Crucible is randomized as the Special Weapon.",
+        }
+        return descriptions.get((key, str(value)), f"Current selection: {label}.")
+
     def _option_widget(self, option: dict[str, object]) -> QWidget:
         key, default = str(option["key"]), option.get("default")
         self.option_defaults[key] = default
@@ -1881,8 +1948,11 @@ class LauncherUI(QMainWindow):
         title = self._label(str(option["display_name"]))
         title.setStyleSheet("font-weight:800;")
         layout.addWidget(title, 0, 0)
-        layout.addWidget(self._label(self._format_markdown(option["description"]), "muted", rich=True), 1, 0)
         kind = str(option["ui_type"])
+        description = option["description"]
+        if kind == "choice":
+            description = self._choice_purpose(key, description)
+        layout.addWidget(self._label(self._format_markdown(description), "muted", rich=True), 1, 0)
         if kind == "toggle":
             control: QWidget = QCheckBox("Enabled")
             control.setChecked(bool(default))
@@ -1891,6 +1961,16 @@ class LauncherUI(QMainWindow):
             for choice in cast(list[dict[str, object]], option["choices"]):
                 control.addItem(str(choice.get("label", choice["key"])), choice["key"])
             control.setCurrentIndex(max(0, control.findData(default)))
+            selected_description = self._label("", "muted")
+            selected_description.setStyleSheet(f"color:{self.COLORS['good']}; font-size:9pt;")
+            selected_description.setText(
+                self._choice_description(key, control.currentData(), control.currentText())
+            )
+            control.currentIndexChanged.connect(
+                lambda _index, combo=control, target=selected_description, option_key=key:
+                target.setText(self._choice_description(option_key, combo.currentData(), combo.currentText()))
+            )
+            layout.addWidget(selected_description, 2, 0)
         elif kind == "range":
             control = QSpinBox()
             control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
@@ -1902,7 +1982,7 @@ class LauncherUI(QMainWindow):
         control.setMinimumWidth(200)
         self.option_controls[key] = control
         self.option_rows[key] = row
-        layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(control, 0, 1, 3 if kind == "choice" else 2, 1, Qt.AlignmentFlag.AlignVCenter)
         return row
 
     def _start_inventory_widget(self) -> QWidget:

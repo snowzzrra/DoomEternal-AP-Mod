@@ -128,14 +128,18 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate MOD-facing 0.5-C identity and exact option contract."""
-    if slot_data.get("slot_data_revision") != "0.5-C":
-        raise ValueError("slot_data_revision must be 0.5-C")
+    """Validate MOD-facing 0.5-D identity and exact option contract."""
+    if slot_data.get("slot_data_revision") != "0.5-D":
+        raise ValueError("slot_data_revision must be 0.5-D")
     required = slot_data.get("required_capabilities")
     if not isinstance(required, list) or CAPABILITY_CROSS_CAMPAIGN not in required:
         raise ValueError("cross_campaign_materialization_v1 capability is required")
     if not isinstance(slot_data.get("use_dlc_content"), bool):
         raise ValueError("use_dlc_content must be boolean")
+    if not isinstance(slot_data.get("include_dlc_missions"), bool):
+        raise ValueError("include_dlc_missions must be boolean")
+    if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
+        raise ValueError("include_dlc_missions requires use_dlc_content")
     if slot_data.get("dlc_logic_timing") not in {
         "late_game", "from_the_beginning", "Late Game", "From the Beginning",
     }:

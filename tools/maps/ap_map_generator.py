@@ -2223,6 +2223,8 @@ def generate_rpc_command_entities(
             command_type = command_value.get("type")
             if command_type == "no_op":
                 continue
+            if command_type == "transient_effect":
+                continue
             if command_type == "physical_pickup_spawn":
                 blocks.append(generate_physical_pickup_spawn(item_id, command_value))
                 continue

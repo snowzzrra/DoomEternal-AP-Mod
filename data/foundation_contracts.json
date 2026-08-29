@@ -27,7 +27,7 @@
     "rune_page": "ap_bootstrap_v2_rune_page"
   },
   "counts": {
-    "items": 124,
+    "items": 132,
     "locations": 369,
     "map_checks": 307,
     "route_sentinel_batteries": 18,
@@ -45,6 +45,7 @@
     "progressive_perk": "target_command",
     "resource": "target_command",
     "simple_give": "target_command",
+    "transient_effect": "transient_effect",
     "trap_spawn": "target_command"
   },
   "location_entrypoints": {

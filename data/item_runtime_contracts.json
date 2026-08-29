@@ -16,7 +16,8 @@
             "equipment": {"ownership_primitive": "equipment_item", "replay": "replay_idempotent"},
             "suit_perks": {"ownership_primitive": "perk_item", "replay": "replay_idempotent"},
             "capacities": {"ownership_primitive": "progressive_perk_item", "replay": "replay_idempotent"},
-            "special_weapon": {"ownership_primitive": "replacement_state", "replay": "special_progressive"}
+            "special_weapon": {"ownership_primitive": "replacement_state", "replay": "special_progressive"},
+            "transient_effect": {"ownership_primitive": "receipt_only", "replay": "never_replay"}
         },
         "items": {
             "7770084": {
@@ -97,28 +98,6 @@
             "replay": "replay_idempotent"
         }
     },
-    "physical_pickup_contracts": {
-        "haste": {
-            "name": "Overdrive",
-            "native_resource": "statuseffect/overdrive",
-            "native_data": "hasteData",
-            "pickup_sound": "play_haste_pickup",
-            "pickup_delivery": "physical_pickup",
-            "start_inventory_eligible": false,
-            "replay_policy": "never_replay",
-            "powerup_extender_preserved": true
-        },
-        "quad_damage": {
-            "name": "Onslaught",
-            "native_resource": "statuseffect/onslaught",
-            "native_data": "onslaughtData",
-            "pickup_sound": "play_quad_pickup",
-            "pickup_delivery": "physical_pickup",
-            "start_inventory_eligible": false,
-            "replay_policy": "never_replay",
-            "powerup_extender_preserved": true
-        }
-    },
     "items": {
         "7770025": {
             "name": "Full Heal",
@@ -150,29 +129,47 @@
             "receipt_feedback": "ap",
             "start_inventory_eligible": false
         },
-        "7770030": {
-            "name": "Berserk",
-            "runtime_family": "physical_pickup_spawn",
-            "runtime_primitive": "physical_pickup_spawn",
-            "runtime_effect": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/berserk"},
+        "7770156": {
+            "name": "Damage Boost",
+            "runtime_family": "transient_effect",
+            "runtime_primitive": "transient_effect",
+            "runtime_effect": {"type": "transient_effect", "name": "damage_boost", "cvar": "g_damageScaleAllToAI", "factor": 1.50, "duration_seconds": 20},
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false
         },
-        "7770143": {
-            "name": "Overdrive",
-            "runtime_family": "trap_spawn",
-            "runtime_primitive": "target_command",
-            "runtime_effect": "chrispy pickup/powerup/overdrive",
+        "7770157": {
+            "name": "Damage Resistance",
+            "runtime_family": "transient_effect",
+            "runtime_primitive": "transient_effect",
+            "runtime_effect": {"type": "transient_effect", "name": "damage_resistance", "cvar": "g_damageScaleAllToSlayer", "factor": 0.65, "duration_seconds": 20},
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false
         },
-        "7770144": {
-            "name": "Onslaught",
-            "runtime_family": "trap_spawn",
-            "runtime_primitive": "target_command",
-            "runtime_effect": "chrispy pickup/powerup/onslaught",
+        "7770158": {
+            "name": "Infinite Ammo",
+            "runtime_family": "transient_effect",
+            "runtime_primitive": "transient_effect",
+            "runtime_effect": {"type": "transient_effect", "name": "infinite_ammo", "cvar": "g_infiniteAmmo", "factor": 1, "duration_seconds": 10},
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770159": {
+            "name": "Weakness Trap",
+            "runtime_family": "transient_effect",
+            "runtime_primitive": "transient_effect",
+            "runtime_effect": {"type": "transient_effect", "name": "weakness_trap", "cvar": "g_damageScaleAllToAI", "factor": 0.70, "duration_seconds": 12},
+            "replay_policy": "never_replay",
+            "receipt_feedback": "ap",
+            "start_inventory_eligible": false
+        },
+        "7770160": {
+            "name": "Vulnerability Trap",
+            "runtime_family": "transient_effect",
+            "runtime_primitive": "transient_effect",
+            "runtime_effect": {"type": "transient_effect", "name": "vulnerability_trap", "cvar": "g_damageScaleAllToSlayer", "factor": 1.35, "duration_seconds": 12},
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false

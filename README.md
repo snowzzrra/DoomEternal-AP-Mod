@@ -4,53 +4,55 @@
 > This project is a beta, not a finished 1.0 release. Windows and Linux/Proton
 > are supported.
 
+[What gets randomized](#1-what-gets-randomized) · [Player options](#2-player-options) · [Installation](#3-installation) · [How it works](#4-how-it-works) · [Version scope](#5-version-scope) · [Credits](#6-credits) · [License](#7-license)
 
-## 1. What this mod is
+## 1. What gets randomized
 
-DOOM Eternal Archipelago turns the base campaign into an Archipelago
-progression randomizer. Weapons, weapon mods, runes, suit upgrades, equipment,
-resources, and other useful items are distributed across hundreds of objectives
-throughout the campaign. A secret, challenge, collectible, combat encounter, or
-mission milestone can provide the item that opens your next route.
+DOOM Eternal Archipelago turns DOOM Eternal into an [Archipelago](https://archipelago.gg/) progression randomizer. Campaign objectives can contain items for any player in a multiworld, while checks from other supported games can send weapons, abilities, upgrades, and resources to the Slayer. One-player rooms use the same systems for solo seeds.
 
-[Archipelago](https://archipelago.gg/) connects randomizers through one shared
-multiworld. Every player keeps playing their own game, while items found across
-the connected worlds travel to their assigned owners. A DOOM Eternal check may
-send an item to someone playing another supported game, and their next check may
-send you a weapon, mod, rune, or upgrade. The server routes each item
-automatically.
+The randomizer supports **13 Base Campaign missions** or the **19-mission Full Saga**, with **437 locations** and **132 item types**. Locations include secrets, collectibles, Slayer Gates, Secret Encounters, Mission Challenges, Weapon Masteries, mission milestones, Fortress objectives, and selected The Ancient Gods content.
 
-This integration is Archipelago-first. A multiworld can include any mix of
-supported games and players. A one-player room works equally well as a solo
-DOOM Eternal randomizer: every item stays inside that campaign, while the same
-generation rules, progression logic, and runtime systems remain active.
+Randomized progression includes:
 
-Current campaign coverage includes:
+- weapons, weapon mods, runes, equipment, Sentinel Crystals, Praetor Suit upgrades, Sentinel Batteries, Support Runes, and Sentinel Hammer;
+- configurable Chainsaw, Dash, first Sentinel Battery, starting weapon, starting inventory, and Automap reveal;
+- four victory goals with optional mission, Slayer Gate, Escalation Encounter, Secret Encounter, Mission Challenge, Weapon Mastery, and Unmaykr requirements;
+- Base Campaign, Base Campaign with DLC gear, and Full Saga campaign scopes;
+- physical campaign checks, combat encounters, challenges, masteries, mission completion, and Fortress progression;
+- Ammo Refill charges, temporary combat effects, enemy traps, resource-drain traps, and DeathLink;
+- reconnect-safe permanent inventory, checked-location cleanup, native Fast Travel on completed mission replays, and room-specific map packages.
 
-- all 13 base-campaign missions;
-- 100 connected regions;
-- 307 physical checks inside maps;
-- 62 runtime and meta checks;
-- 369 locations in total;
-- 121 item types;
-- randomized starting weapons and starting inventory;
-- configurable Chainsaw, Dash, first Sentinel Battery, Start With Automap, traps, and
-  DeathLink;
-- room-specific map packages for Windows and Linux/Proton.
+Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, starts game, displays session activity, and provides setup checks, repair actions, logs, and support reports.
 
-The launcher handles room connection, YAML creation, room package preparation,
-installation guidance, session activity, logs, diagnostics, repair, and explicit
-Steam launch. Each generated room carries its own options and identity, so the
-game, client, save, and installed map package operate as one consistent session.
-From Home, use Join for a room or Resume for saved room identity; Session shows
-connected-room state and setup actions, while Help provides setup checks and
-troubleshooting actions. Create YAML is for generating a future room.
+## 2. Player options
 
-## 2. Installation
+| Option name | Default | Summary | Other values |
+|---|---|---|---|
+| Progression Balancing | Normal (50) | Moves progression earlier when generation needs more reachable advancement. | 0–99; Disabled (0); Extreme (99) |
+| Accessibility | Full | Keeps every generated location and item reachable. | Minimal: guarantees progression required for victory |
+| Death Link | Off | Shares deaths with DeathLink-enabled worlds. | On |
+| Use DLC Content | On | Adds supported TAG gear, Sentinel Hammer, and Support Runes. | Off: Base item catalog |
+| Include DLC Missions | On | Adds TAG1/TAG2 missions and locations. Requires DLC Content. | Off: Base locations with enabled DLC gear |
+| DLC Logic Timing | Late Game | Opens TAG routes at intended loadout tiers. | From the Beginning: Hell on Earth, UAC Atlantica, and World Spear start open |
+| Goal | Acquire the Unmaykr | Requires six Base Slayer Gates and Unmaykr. | Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
+| Additional Victory Requirements | Enabled Missions, Slayer Gates, Escalation Encounters | Adds selected objectives to victory. | Secret Encounters; Mission Challenges; Weapon Masteries; Unmaykr; any valid subset |
+| Special Weapon | Progressive Special Weapon | Uses Crucible unlock, Crucible improvement, then Sentinel Hammer. | Progressive Sentinel Hammer; The Crucible |
+| Enhanced Melee Damage | Off | Strengthens normal punches. | On |
+| Randomize Chainsaw | Off | Places Chainsaw in item pool. | On |
+| Randomize Dash | Off | Places Dash in item pool and enables Dash-aware logic. | On |
+| Randomize First Sentinel Battery | Off | Places mandatory Exultia Battery in item pool. | On |
+| Include Weapon Mastery Challenges | On | Adds 13 Weapon Mastery Challenge locations. | Off |
+| Reveal AP Locations on Automap | Off | Displays AP progression-location markers on Automap. | On |
+| Starting Weapon | Combat Shotgun | Selects starting weapon. | Random; Heavy Cannon; Plasma Rifle; Rocket Launcher; Ballista; Chaingun; Super Shotgun |
+| Praetor Suit Upgrades in Pool | 6 | Selects individual suit-upgrade count in pool. | 0–21; All; Random |
+| Trap Percentage | 10% | Replaces filler padding with enabled traps. | 0–100% |
+| Enabled Traps | All 16 types | Selects eligible enemy, drain, Weakness, and Vulnerability traps. | Any subset or empty set |
+
+## 3. Installation
 
 See the [Windows and Linux/Proton installation guide](docs/INSTALL.md).
 
-## 3. How it works
+## 4. How it works
 
 ### Room generation
 
@@ -152,7 +154,7 @@ map, and load epoch.
 
 ### Item delivery
 
-The APWorld item table and game-side command table share the same 121 public
+The APWorld item table and game-side runtime contracts share 132 public
 item IDs. When the server sends an item, the bridge resolves its command and
 activates a map-owned `ap_rpc_v3_*` entity:
 
@@ -219,7 +221,6 @@ up owned content, applies confirmed actions, and validates installed files.
   replay whose Mission Complete state was already checked at load start.
 - **DeathLink** applies a short two-hit lethal burst to the Slayer
   during safe gameplay; native Extra Life and Saving Throw protections are preserved.
-  Hardcore tracking is deferred to Sentinel Core.
 - **Marker cleanup** reconciles server-confirmed locations with their map and
   Automap presentation across reloads and revisits.
 
@@ -242,10 +243,8 @@ and option definitions, and `contracts/` owns shared content contracts.
 digest-backed materialization, package assembly and structural artifact smoke.
 `scripts/pipeline.sh audit`/`full` run explicit semantic map validation.
 `scripts/pipeline.sh release --build` is formal package validation. `affected`
-is diagnostic only; it does not determine build correctness. Room payload states
-are finite transitional 0.4.x artifacts. Future seed compilation uses
-project-controlled `vanillamaps` source, never player installation sources;
-Enemizer requires that seed-time compiler and cannot extend payload enumeration.
+is diagnostic only; it does not determine build correctness. Seed compilation uses project-controlled `vanillamaps` source. Enemizer uses
+that seed-time compiler and bounded payload construction.
 
 The active runtime has three cooperating layers:
 
@@ -261,9 +260,9 @@ YAML, discovers supported installations, prepares the room package, supervises
 the bridge, opens DOOM Eternal through Steam, and provides Help, setup check,
 Repair/Fix, and a sanitized support report.
 
-## 4. Roadmap
+## 5. Roadmap
 
-### 0.1.1 — Runtime stabilization — DONE
+## 0.1.1 — Runtime stabilization — DONE
 
 - Froze the initial route through Cultist Base.
 - Added RPC recovery, DeathLink, and Windows/Linux smoke coverage.
@@ -330,7 +329,7 @@ Repair/Fix, and a sanitized support report.
 - Horde Mode and Master Levels.
 - Hard Mode and checkpoint removal.
 
-## 5. Credits
+## 6. Credits
 
 - The Archipelago project and contributors for the multiworld framework,
   protocol, server, and `CommonClient`.
@@ -358,7 +357,7 @@ Repair/Fix, and a sanitized support report.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
   logo used by the AP client and the main menu marker.
 
-## 6. License
+## 7. License
 
 This project is distributed under the [MIT License](docs/LICENSE).
 

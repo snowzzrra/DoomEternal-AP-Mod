@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "item_mapping_revision": 6,
+  "item_mapping_revision": 7,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "ed25e1128a18b900b8c3d43e38e329c2f67f1773ff7d6b82a2b9efacb0024d8c",
+  "source_sha256": "788edbb7e7b050d2ff2a7fca65781e93f1143c015cfda75e719dd2f8ff990035",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -114,10 +114,6 @@
     },
     "7770029": {
       "name": "Soulsphere",
-      "classification": 0
-    },
-    "7770030": {
-      "name": "Berserk",
       "classification": 0
     },
     "7770031": {
@@ -460,14 +456,6 @@
       "name": "Sentinel Battery Bundle",
       "classification": 1
     },
-    "7770143": {
-      "name": "Overdrive",
-      "classification": 0
-    },
-    "7770144": {
-      "name": "Onslaught",
-      "classification": 0
-    },
     "7770145": {
       "name": "Break Blast",
       "classification": 2
@@ -512,6 +500,11 @@
       "name": "Taras Nabad Slayer Gate Key",
       "classification": 1
     },
+    "7770156": {"name": "Damage Boost", "classification": 0},
+    "7770157": {"name": "Damage Resistance", "classification": 0},
+    "7770158": {"name": "Infinite Ammo", "classification": 0},
+    "7770159": {"name": "Weakness Trap", "classification": 4},
+    "7770160": {"name": "Vulnerability Trap", "classification": 4},
     "7770900": {
       "name": "Combat Shotgun",
       "classification": 1

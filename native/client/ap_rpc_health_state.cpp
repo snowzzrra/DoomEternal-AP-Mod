@@ -11,6 +11,7 @@
 namespace {
 
 const char* kHealthStateFile = "ap_rpc_health.state";
+const char* kBaselineStateFile = "ap_effect_baseline.state";
 const size_t kDiagnosticLimit = 64;
 
 unsigned long long UnixTimestampMs() {
@@ -84,13 +85,14 @@ bool WriteAtomically(const std::filesystem::path& path, const std::string& conte
 }  // namespace
 
 ApRpcHealthStatePublisher::ApRpcHealthStatePublisher(std::filesystem::path base_directory)
-    : path_(std::move(base_directory) / kHealthStateFile) {}
+    : path_(base_directory / kHealthStateFile), baseline_path_(std::move(base_directory) / kBaselineStateFile) {}
 
 ApRpcHealthStatePublisher::~ApRpcHealthStatePublisher() {
     PublishStopped();
 }
 
 void ApRpcHealthStatePublisher::PublishStarting() {
+    PublishEffectBaseline(false, 0);
     Publish("starting", 0, ERROR_SUCCESS, true);
 }
 
@@ -106,6 +108,26 @@ void ApRpcHealthStatePublisher::PublishStopped() {
     if (!stopped_) {
         Publish("stopped", 0, ERROR_SUCCESS, true);
         stopped_ = true;
+    }
+    PublishEffectBaseline(false, 0);
+}
+
+void ApRpcHealthStatePublisher::PublishEffectBaseline(bool ready, unsigned long long attachment_epoch) {
+    const unsigned long long now = UnixTimestampMs();
+    if (baseline_ready_ == ready && baseline_epoch_ == attachment_epoch
+            && now < baseline_timestamp_ms_ + kFreshnessMs / 3) {
+        return;
+    }
+    const std::string contents =
+        std::string("schema=1\nstate=") + (ready ? "ready" : "pending") + "\n"
+        "pid=" + std::to_string(GetCurrentProcessId()) + "\n"
+        "timestamp_ms=" + std::to_string(now) + "\n"
+        "freshness_ms=" + std::to_string(kFreshnessMs) + "\n"
+        "attachment_epoch=" + std::to_string(attachment_epoch) + "\n";
+    if (WriteAtomically(baseline_path_, contents)) {
+        baseline_ready_ = ready;
+        baseline_epoch_ = attachment_epoch;
+        baseline_timestamp_ms_ = now;
     }
 }
 

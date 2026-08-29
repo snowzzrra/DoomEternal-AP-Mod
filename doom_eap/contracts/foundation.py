@@ -111,8 +111,8 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 124, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
-    "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "progressive_item": "target_command", "physical_pickup_spawn": "physical_pickup_spawn", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "no_op": "target_command"},
+    "counts": {"items": 132, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
+    "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "progressive_item": "target_command", "physical_pickup_spawn": "physical_pickup_spawn", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "transient_effect": "transient_effect", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
         "7770074": {"map": "game/sp/hub/hub", "entity": "ap_independent_pickup_equipment_ice_bomb", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -604,6 +604,8 @@ def compile_item_delivery_plan(
 def compile_all_item_plans(definitions: dict[int, Any]) -> list[DeliveryPlan]:
     plans = []
     for item_id, definition in sorted(definitions.items()):
+        if isinstance(definition, dict) and definition.get("type") == "transient_effect":
+            continue
         stage = 0 if classify_item_definition(definition) in {"progressive_perk", "progressive_item"} else None
         plans.append(compile_item_delivery_plan(item_id, definitions, stage=stage))
     return plans

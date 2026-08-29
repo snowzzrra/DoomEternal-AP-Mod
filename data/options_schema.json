@@ -108,11 +108,20 @@
     },
     {
       "default": true,
-      "description": "Include The Ancient Gods Part One and Part Two. Disable for Base Campaign content only.",
+      "description": "Adds supported The Ancient Gods equipment and gameplay content to the randomizer, including the Sentinel Hammer and Support Runes. DLC missions are controlled separately.",
       "display_name": "Use DLC Content",
       "group": "Game Options",
       "key": "use_dlc_content",
       "source_class": "UseDLCContent",
+      "ui_type": "toggle"
+    },
+    {
+      "default": true,
+      "description": "Adds The Ancient Gods Part One and Part Two missions and their Archipelago locations. Disable this for the Base Campaign while keeping enabled DLC equipment and gameplay content in the randomizer.",
+      "display_name": "Include DLC Missions",
+      "group": "Game Options",
+      "key": "include_dlc_missions",
+      "source_class": "IncludeDLCMissions",
       "ui_type": "toggle"
     },
     {
@@ -230,7 +239,7 @@
       ],
       "default": "progressive_special_weapon",
       "description": "Choose a three-stage Crucible-to-Hammer progression, a two-stage Sentinel Hammer progression, or one standalone Crucible stage.",
-      "display_name": "Special Weapon Behavior",
+      "display_name": "Special Weapon",
       "group": "Game Options",
       "key": "special_weapon",
       "source_class": "SpecialWeapon",
@@ -428,6 +437,14 @@
         {
           "key": "Tyrant Trap",
           "label": "Tyrant Trap"
+        },
+        {
+          "key": "Vulnerability Trap",
+          "label": "Vulnerability Trap"
+        },
+        {
+          "key": "Weakness Trap",
+          "label": "Weakness Trap"
         }
       ],
       "default": [
@@ -444,7 +461,9 @@
         "Imp Trap",
         "Marauder Trap",
         "Revenant Trap",
-        "Tyrant Trap"
+        "Tyrant Trap",
+        "Vulnerability Trap",
+        "Weakness Trap"
       ],
       "description": "Trap types eligible for filler-padding replacement.",
       "display_name": "Enabled Traps",
@@ -456,5 +475,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "a0294b01140789b135f8b2b4a4f912d8d5192a0a0a809e7dd4a8b000e8ed237e"
+  "source_sha256": "44798b018e6fc8f5a2a17f6ef0339ac08f92230931c74636274be2ac07a728a5"
 }

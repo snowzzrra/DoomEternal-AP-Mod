@@ -34,12 +34,13 @@ ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve(
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
 MANIFEST_SCHEMA_VERSION = 3
-SLOT_DATA_SCHEMA_VERSION = 3
-SLOT_DATA_REVISION = "0.5-C"
+SLOT_DATA_SCHEMA_VERSION = 4
+SLOT_DATA_REVISION = "0.5-D"
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
-    "slot_data_v3",
+    "slot_data_v4",
+    "dlc_missions_v1",
     "goal_events_v1",
     "goal_endpoint_events_v1",
     "placement_scouts_v1",
@@ -54,6 +55,7 @@ SUPPORTED_CAPABILITIES = frozenset({
 })
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
+    "include_dlc_missions": True,
     "dlc_logic_timing": "Late Game",
     "goal": "Acquire the Unmaykr",
     "goal_endpoint_event": "Internal Goal Endpoint: Acquire the Unmaykr",
@@ -417,7 +419,8 @@ class SeedManifest:
         )
         required_capabilities = {
             "room_mod_v2",
-            "slot_data_v3",
+            "slot_data_v4",
+            "dlc_missions_v1",
             "goal_events_v1",
             "goal_endpoint_events_v1",
             "placement_scouts_v1",

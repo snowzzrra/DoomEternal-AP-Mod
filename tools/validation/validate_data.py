@@ -780,7 +780,7 @@ def main(argv: list[str] | None = None) -> int:
         classification_path = ROOT / "data" / "item_classifications.json"
         classification_document = read_json(classification_path)
         classification_identity = load_item_classification_identity(classification_path)
-        if classification_document.get("item_mapping_revision") != 6:
+        if classification_document.get("item_mapping_revision") != 7:
             errors.append("Packaged item classification revision drifted")
         if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
             errors.append(
@@ -1281,8 +1281,12 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         errors.append(f"Item delivery plan compilation failed: {exc}")
         plans = []
-    if len(plans) != len(commands):
-        errors.append(f"Expected {len(commands)} compiled item plans, found {len(plans)}")
+    map_delivery_count = sum(
+        not (isinstance(command, dict) and command.get("type") == "transient_effect")
+        for command in commands.values()
+    )
+    if len(plans) != map_delivery_count:
+        errors.append(f"Expected {map_delivery_count} compiled item plans, found {len(plans)}")
 
     generated_bootstrap = generate_bootstrap_entities()
     if generated_bootstrap or any(prefix in generated_bootstrap for prefix in BOOTSTRAP_ENTITY_PREFIXES):
@@ -1327,7 +1331,12 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, json.JSONDecodeError):
         item_names = None
 
-    generated_real_commands = generate_rpc_command_entities(commands, item_names=item_names)
+    map_commands = {
+        item_id: command
+        for item_id, command in commands.items()
+        if not (isinstance(command, dict) and command.get("type") == "transient_effect")
+    }
+    generated_real_commands = generate_rpc_command_entities(map_commands, item_names=item_names)
     if "give armor -200" in json.dumps(commands, sort_keys=True) or "give armor -200" in generated_real_commands:
         errors.append("Armor Drain Trap command reappeared")
     if "CURRENCY_WEAPON_MASTERY" in generated_real_commands:
@@ -1528,6 +1537,8 @@ def main(argv: list[str] | None = None) -> int:
                 perk = command_value.get("perk")
                 if not isinstance(perk, str) or not perk.startswith("perk/player/"):
                     errors.append(f"Perk command {item_id} has invalid path: {perk}")
+                continue
+            if command_type == "transient_effect":
                 continue
             if command_type != "currency":
                 errors.append(f"Entity command {item_id} has unsupported type: {command_value.get('type')}")

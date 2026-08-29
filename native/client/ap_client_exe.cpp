@@ -36,14 +36,16 @@ static const char* kMaterializationLeasePath = "base\\ap_queue\\active_materiali
 static const char* kMaterializationLeaseHeader = "AP_MATERIALIZATION_LEASE_V1";
 static const char* kExecutionClassHeader = "AP_EXECUTION_CLASS_V1";
 static const char* kDiagnosticCondumpHeader = "AP_DIAGNOSTIC_CONDUMP_V1";
+static const char* kTransientScopeHeader = "AP_TRANSIENT_SCOPE_V1";
+static const char* kTransientScopePath = "base\\ap_queue\\active_transient_scope";
 static const char* kMapEntityOperationHeader = "AP_MAP_ENTITY_OPERATION_V1";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "0.5.0";
+static const char* kReleaseVersion = "0.5.1";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kRpcEntityContractRevision = 3;
-static const int kNativeCommandPolicyRevision = 10;
+static const int kNativeCommandPolicyRevision = 11;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kCommandSpacingMs = 250;
 static const DWORD kQueueStateLogMs = 5000;
@@ -69,6 +71,7 @@ std::string CanonicalMapName(std::string name) {
 enum class CommandExecutionClass {
     PlayerRuntime,
     MapEntitySafe,
+    TransientEffect,
 };
 
 enum class MapEntityOperation {
@@ -86,6 +89,7 @@ struct CommandJob {
     DWORD importedTick = 0;
     std::optional<std::string> receiptNamespace;
     std::optional<std::string> materializationLease;
+    std::optional<std::string> transientScope;
     CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
     MapEntityOperation mapEntityOperation = MapEntityOperation::None;
     bool diagnosticCondump = false;
@@ -1422,7 +1426,8 @@ bool ReadCommandFile(
     std::optional<std::string>* materializationLease = nullptr,
     CommandExecutionClass* executionClass = nullptr,
     MapEntityOperation* mapEntityOperation = nullptr,
-    bool* diagnosticCondump = nullptr
+    bool* diagnosticCondump = nullptr,
+    std::optional<std::string>* transientScope = nullptr
 ) {
     FILE* file = fopen(path.c_str(), "rb");
     if (!file) return false;
@@ -1435,11 +1440,13 @@ bool ReadCommandFile(
     if (executionClass) *executionClass = CommandExecutionClass::PlayerRuntime;
     if (mapEntityOperation) *mapEntityOperation = MapEntityOperation::None;
     if (diagnosticCondump) *diagnosticCondump = false;
+    if (transientScope) transientScope->reset();
 
     bool sawExecutionClass = false;
     bool sawMaterializationLease = false;
     bool sawMapEntityOperation = false;
     bool sawDiagnosticCondump = false;
+    bool sawTransientScope = false;
     CommandExecutionClass parsedExecutionClass = CommandExecutionClass::PlayerRuntime;
     MapEntityOperation parsedMapEntityOperation = MapEntityOperation::None;
     size_t payloadOffset = 0;
@@ -1447,6 +1454,7 @@ bool ReadCommandFile(
     const std::string executionPrefix = std::string(kExecutionClassHeader) + " ";
     const std::string operationPrefix = std::string(kMapEntityOperationHeader) + " ";
     const std::string diagnosticPrefix = std::string(kDiagnosticCondumpHeader) + " ";
+    const std::string transientPrefix = std::string(kTransientScopeHeader) + " ";
     while (payloadOffset < contents.size()) {
         const size_t lineEnd = contents.find('\n', payloadOffset);
         const std::string line = TrimLine(contents.substr(
@@ -1463,6 +1471,8 @@ bool ReadCommandFile(
                 parsedExecutionClass = CommandExecutionClass::PlayerRuntime;
             } else if (value == "MAP_ENTITY_SAFE") {
                 parsedExecutionClass = CommandExecutionClass::MapEntitySafe;
+            } else if (value == "TRANSIENT_EFFECT") {
+                parsedExecutionClass = CommandExecutionClass::TransientEffect;
             } else {
                 return false;
             }
@@ -1496,6 +1506,13 @@ bool ReadCommandFile(
                 return false;
             }
             sawDiagnosticCondump = true;
+        } else if (line.rfind(std::string(kTransientScopeHeader), 0) == 0) {
+            if (sawTransientScope || line.rfind(transientPrefix, 0) != 0) return false;
+            const std::string scope = line.substr(transientPrefix.size());
+            static const std::regex validScope(R"(^effectscope-[0-9a-f]{16}$)");
+            if (!std::regex_match(scope, validScope)) return false;
+            if (transientScope) *transientScope = scope;
+            sawTransientScope = true;
         } else {
             if (line.rfind("AP_", 0) == 0) {
                 return false;
@@ -1524,6 +1541,10 @@ bool ReadCommandFile(
             && parsedMapEntityOperation != MapEntityOperation::None) {
         return false;
     }
+    if (parsedExecutionClass == CommandExecutionClass::TransientEffect
+            && !sawTransientScope) return false;
+    if (parsedExecutionClass != CommandExecutionClass::TransientEffect
+            && sawTransientScope) return false;
     if (executionClass) *executionClass = parsedExecutionClass;
     if (mapEntityOperation) *mapEntityOperation = parsedMapEntityOperation;
     if (diagnosticCondump) *diagnosticCondump = sawDiagnosticCondump;
@@ -1606,6 +1627,15 @@ std::optional<std::string> ActiveMaterializationLease() {
     value = value.substr(prefix.size());
     static const std::regex validLease(R"(^[0-9]+:[0-9]+$)");
     if (!std::regex_match(value, validLease)) return std::nullopt;
+    return value;
+}
+
+std::optional<std::string> ActiveTransientScope() {
+    std::ifstream input(kTransientScopePath);
+    std::string value;
+    if (!std::getline(input, value)) return std::nullopt;
+    static const std::regex valid(R"(^effectscope-[0-9a-f]{16}$)");
+    if (!std::regex_match(value, valid)) return std::nullopt;
     return value;
 }
 
@@ -1764,13 +1794,15 @@ void ImportSpoolFiles(
         CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
         MapEntityOperation mapEntityOperation = MapEntityOperation::None;
         bool diagnosticCondump = false;
+        std::optional<std::string> transientScope;
         if (ReadCommandFile(
                 processingPath,
                 command,
                 &materializationLease,
                 &executionClass,
                 &mapEntityOperation,
-                &diagnosticCondump
+                &diagnosticCondump,
+                &transientScope
         )) {
             if (executionClass == CommandExecutionClass::MapEntitySafe
                     && !MapEntityOperationMatchesCommand(mapEntityOperation, command)) {
@@ -1803,6 +1835,7 @@ void ImportSpoolFiles(
                 GetTickCount(),
                 receiptNamespace,
                 materializationLease,
+                transientScope,
                 executionClass,
                 mapEntityOperation,
                 diagnosticCondump,
@@ -1849,6 +1882,17 @@ bool IsMapEntitySafeJob(const CommandJob& job) {
     return job.executionClass == CommandExecutionClass::MapEntitySafe;
 }
 
+bool IsTransientEffectJob(const CommandJob& job) {
+    return job.executionClass == CommandExecutionClass::TransientEffect;
+}
+
+bool IsValidTransientEffectCommand(const std::string& command) {
+    static const std::regex valid(
+        R"(^g_(damageScaleAllToAI|damageScaleAllToSlayer) (0|[0-9]+\.[0-9]{2})$|^g_infiniteAmmo [01]$)"
+    );
+    return std::regex_match(command, valid);
+}
+
 bool MapEntitySafeLeaseMatchesCurrent(const CommandJob& job) {
     if (!IsMapEntitySafeJob(job)) return true;
     if (!MapEntityOperationMatchesCommand(job.mapEntityOperation, job.command)) return false;
@@ -1862,12 +1906,23 @@ bool CommandExecutionGateOpen(
     const CommandJob& job,
     bool rpcArmed,
     bool rpcTransportReady,
-    const GameStateProbe& gameStateProbe
+    const GameStateProbe& gameStateProbe,
+    bool transientBaselineReady
 ) {
     if (job.diagnosticCondump) {
         // Support condump bypasses gameplay/RPC safety gates, but still needs
         // live native transport, which is only healthy while game is open.
         return rpcTransportReady;
+    }
+    if (IsTransientEffectJob(job)) {
+        const std::optional<std::string> activeScope = ActiveTransientScope();
+        return rpcTransportReady
+            && transientBaselineReady
+            && gameStateProbe.IsSafeForRpc()
+            && job.transientScope.has_value()
+            && activeScope.has_value()
+            && job.transientScope.value() == activeScope.value()
+            && IsValidTransientEffectCommand(job.command);
     }
     if (!rpcArmed || !rpcTransportReady) return false;
     if (IsMapEntitySafeJob(job)) {
@@ -2085,6 +2140,7 @@ int main(int argc, char** argv) {
     }
     ApRpcHealthStatePublisher healthStatePublisher(runtimePaths.gameRootDir / "base");
     healthStatePublisher.PublishStarting();
+    DeleteFileA(kTransientScopePath);
 
     CommandSourceMap recoveredSources;
     bool startupNamespaceCleared = DeleteFileA(kQueueSessionNamespacePath) != FALSE;
@@ -2166,6 +2222,8 @@ int main(int argc, char** argv) {
     bool queueWasActive = false;
     bool lastRpcArmed = false;
     bool lastRpcEnabled = false;
+    bool transientBaselineReady = false;
+    unsigned long long transientBaselineEpoch = 0;
     std::string lastGateReason;
     DWORD lastStallLog = 0;
     bool silentBurstActive = false;
@@ -2226,7 +2284,9 @@ int main(int argc, char** argv) {
         const DWORD now = GetTickCount();
         bool rpcArmed = IsRpcExecutionEnabled();
         const bool normalCommandPending = std::any_of(
-            queue.begin(), queue.end(), [](const CommandJob& job) { return !job.diagnosticCondump; }
+            queue.begin(), queue.end(), [](const CommandJob& job) {
+                return !job.diagnosticCondump && !IsTransientEffectJob(job);
+            }
         );
         if (normalCommandPending && !rpcArmed) {
             if (ArmRpcExecution()) {
@@ -2236,6 +2296,33 @@ int main(int argc, char** argv) {
         }
         const bool rpcTransportReady =
             meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
+        if (!rpcTransportReady) {
+            transientBaselineReady = false;
+            DeleteFileA(kTransientScopePath);
+            healthStatePublisher.PublishEffectBaseline(false, 0);
+        } else if (g_ApRpc->AttachmentEpoch() != transientBaselineEpoch) {
+            transientBaselineEpoch = g_ApRpc->AttachmentEpoch();
+            transientBaselineReady = false;
+            DeleteFileA(kTransientScopePath);
+            healthStatePublisher.PublishEffectBaseline(false, transientBaselineEpoch);
+        }
+        if (rpcTransportReady && g_ApRpc->Ready() && !transientBaselineReady) {
+            static const std::array<const char*, 3> baselineCommands = {
+                "g_damageScaleAllToAI 1",
+                "g_damageScaleAllToSlayer 1",
+                "g_infiniteAmmo 0",
+            };
+            transientBaselineReady = true;
+            for (const char* command : baselineCommands) {
+                if (!g_ApRpc->ExecuteConsoleCommand(command)) {
+                    transientBaselineReady = false;
+                    break;
+                }
+            }
+            healthStatePublisher.PublishEffectBaseline(
+                transientBaselineReady, transientBaselineEpoch
+            );
+        }
         healthStatePublisher.PublishHealth(
             rpcTransportReady,
             g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
@@ -2297,7 +2384,10 @@ int main(int argc, char** argv) {
         queueWasActive = queueActive;
 
         const bool frontGateOpen = !queue.empty()
-            && CommandExecutionGateOpen(queue.front(), rpcArmed, rpcTransportReady, gameStateProbe);
+            && CommandExecutionGateOpen(
+                queue.front(), rpcArmed, rpcTransportReady, gameStateProbe,
+                transientBaselineReady
+            );
         if (silentBurstActive && (queue.empty() || !frontGateOpen)) {
             finishSilentBurst(queue.empty() ? "queue_drained" : "safety_gate_closed");
         }
@@ -2328,7 +2418,7 @@ int main(int argc, char** argv) {
                 }
             }
             CommandJob& job = queue[dispatchIndex];
-            if (!rpcArmed && !job.diagnosticCondump) {
+            if (!rpcArmed && !job.diagnosticCondump && !IsTransientEffectJob(job)) {
                 Sleep(50);
                 continue;
             }
@@ -2383,7 +2473,8 @@ int main(int argc, char** argv) {
                 queue.erase(queue.begin() + dispatchIndex);
                 continue;
             }
-            if (!CommandExecutionGateOpen(job, rpcArmed, rpcTransportReady, gameStateProbe)) {
+            if (!CommandExecutionGateOpen(
+                    job, rpcArmed, rpcTransportReady, gameStateProbe, transientBaselineReady)) {
                 Sleep(50);
                 continue;
             }

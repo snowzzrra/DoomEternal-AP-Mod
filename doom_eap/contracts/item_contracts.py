@@ -43,13 +43,29 @@ def validate_item_contracts(
     for item_id, contract in contracts.items():
         if item_id not in definitions or item_id not in classifications or item_id not in policies:
             raise ValueError(f"incomplete item contract for {item_id}")
-        if classifications[item_id] != 2:
-            raise ValueError(f"item {item_id} must remain useful-classified")
         policy = policies[item_id]
         if getattr(policy, "policy", None) != contract["replay_policy"]:
             raise ValueError(f"item {item_id} replay policy mismatch")
         if getattr(policy, "receipt_feedback", None) != contract["receipt_feedback"]:
             raise ValueError(f"item {item_id} receipt policy mismatch")
+        if contract.get("runtime_family") == "transient_effect":
+            if classifications[item_id] not in {0, 4}:
+                raise ValueError(f"transient item {item_id} has invalid classification")
+            if contract.get("runtime_primitive") != "transient_effect":
+                raise ValueError(f"transient item {item_id} primitive mismatch")
+            effect = definitions[item_id]
+            if (
+                not isinstance(effect, dict)
+                or effect.get("type") != "transient_effect"
+                or effect.get("name") != contract.get("name")
+                or effect != contract.get("runtime_effect")
+            ):
+                raise ValueError(f"transient item {item_id} definition mismatch")
+            if contract["start_inventory_eligible"] is not False:
+                raise ValueError(f"transient item {item_id} must not start in inventory")
+            continue
+        if classifications[item_id] != 2:
+            raise ValueError(f"item {item_id} must remain useful-classified")
         if contract["start_inventory_eligible"] is not False:
             raise ValueError(f"item {item_id} must not be start-inventory eligible")
         if definitions[item_id] != contract["runtime_effect"]:

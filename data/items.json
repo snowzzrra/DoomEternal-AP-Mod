@@ -70,7 +70,6 @@
         "give health 200",
         "give armor 200"
     ],
-    "7770030": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/berserk"},
     
     "7770031": "give health 25",
     "7770032": "give health 100",
@@ -247,8 +246,6 @@
         "currency": "CURRENCY_SENTINEL_BATTERY",
         "count": 2
     },
-    "7770143": "chrispy pickup/powerup/overdrive",
-    "7770144": "chrispy pickup/powerup/onslaught",
     "7770145": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/weakpoint_concussive_blast",
     "7770146": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/blood_punch_low_health_bonus_damage",
     "7770147": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/dlc/extra_life_refund",
@@ -259,5 +256,10 @@
     "7770152": "give map_objects/keycard/slayer_key",
     "7770153": "give map_objects/keycard/slayer_key",
     "7770154": "give map_objects/keycard/slayer_key",
-    "7770155": "give map_objects/keycard/slayer_key"
+    "7770155": "give map_objects/keycard/slayer_key",
+    "7770156": {"type": "transient_effect", "name": "damage_boost", "cvar": "g_damageScaleAllToAI", "factor": 1.50, "duration_seconds": 20},
+    "7770157": {"type": "transient_effect", "name": "damage_resistance", "cvar": "g_damageScaleAllToSlayer", "factor": 0.65, "duration_seconds": 20},
+    "7770158": {"type": "transient_effect", "name": "infinite_ammo", "cvar": "g_infiniteAmmo", "factor": 1, "duration_seconds": 10},
+    "7770159": {"type": "transient_effect", "name": "weakness_trap", "cvar": "g_damageScaleAllToAI", "factor": 0.70, "duration_seconds": 12},
+    "7770160": {"type": "transient_effect", "name": "vulnerability_trap", "cvar": "g_damageScaleAllToSlayer", "factor": 1.35, "duration_seconds": 12}
 }

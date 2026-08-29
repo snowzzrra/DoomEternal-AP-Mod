@@ -130,11 +130,6 @@
       "policy": "never_replay",
       "receipt_feedback": "ap"
     },
-    "7770030": {
-      "name": "Berserk",
-      "policy": "never_replay",
-      "receipt_feedback": "ap"
-    },
     "7770031": {
       "name": "Small Health",
       "policy": "never_replay"
@@ -475,14 +470,6 @@
       "name": "Sentinel Battery Bundle",
       "policy": "never_replay"
     },
-    "7770143": {
-      "name": "Overdrive",
-      "policy": "never_replay"
-    },
-    "7770144": {
-      "name": "Onslaught",
-      "policy": "never_replay"
-    },
     "7770145": {
       "name": "Break Blast",
       "policy": "replay_manual_only"
@@ -526,6 +513,11 @@
     "7770155": {
       "name": "Taras Nabad Slayer Gate Key",
       "policy": "replay_idempotent"
-    }
+    },
+    "7770156": {"name": "Damage Boost", "policy": "never_replay", "receipt_feedback": "ap"},
+    "7770157": {"name": "Damage Resistance", "policy": "never_replay", "receipt_feedback": "ap"},
+    "7770158": {"name": "Infinite Ammo", "policy": "never_replay", "receipt_feedback": "ap"},
+    "7770159": {"name": "Weakness Trap", "policy": "never_replay", "receipt_feedback": "ap"},
+    "7770160": {"name": "Vulnerability Trap", "policy": "never_replay", "receipt_feedback": "ap"}
   }
 }

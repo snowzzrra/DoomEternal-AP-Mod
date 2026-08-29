@@ -1,8 +1,10 @@
-# Install DOOM Eternal Archipelago beta.4
+# Install DOOM Eternal Archipelago 0.5.0
 
-DOOM Eternal Archipelago **0.4.0-beta.4** requires a legally obtained,
-player-supplied DOOM Eternal installation. Releases do not include game files
-or external modding tools.
+[Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
+
+DOOM Eternal Archipelago **0.5.0** uses a legally obtained, player-supplied
+DOOM Eternal installation. Launcher acquires supported external modding tools
+from pinned providers after player consent and verifies each SHA-256.
 
 ## Requirements
 
@@ -20,10 +22,16 @@ Supported external mod injectors:
 - **Windows:** [EternalModInjector](https://gamebanana.com/tools/7475) (Community mod injector toolchain);
 - **Linux/Proton:**
   [EternalModInjectorShell](https://github.com/leveste/EternalBasher)
-  6.66-rev3.12.
+  6.66-rev3.13.
 
 Launcher requests consent before acquiring pinned dependencies (Meathook v7.2 and the platform mod injector) and verifies
 SHA-256 before installation. An official verified artifact may be supplied instead.
+
+Pinned dependencies:
+
+- **Windows EternalModInjector:** provider GameBanana, download `1788872`, version `2026-08-18`, SHA-256 `94d2cfd62cdb86ae93c480054e7b160edc4f73b63efdf66fbf826df3eb7a0a84`;
+- **Linux EternalModInjectorShell:** provider EternalBasher GitHub releases, version `6.66-rev3.13`, SHA-256 `79874b20834ba3e0a8e94c67cab5f7f80af7c57e53035c4ec5075f7f28174935`;
+- **Meathook:** version `7.2`, SHA-256 `02c715f60482bf9727a0464c560575478a13c032db6522547864405a8dd8cdab`.
 
 ## Install APWorld
 
@@ -61,15 +69,15 @@ playing. Open **Help** for launcher guidance. Run **Setup check** for bounded
 installation, bridge, and handshake diagnostics; use **Repair/Fix** for supported
 repairs and **Support report** for sanitized troubleshooting data.
 
-## Create YAML
+## Create Player YAML
 
-Use **Create YAML** or the **Options** tab for a future room:
+Use **Create Player** for room generation:
 
 1. Set player name, starting inventory, and supported room options.
 2. Select **Save Player YAML**.
 3. Use saved YAML with Archipelago generation.
 
-Create YAML writes player options for room generation. Active room options come
+Create Player writes player options for room generation. Active room options come
 from the server.
 
 ## Prepare and Install
@@ -147,7 +155,7 @@ Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
 by Steam inside the configured Proton prefix. Do not launch the Windows game
 executable directly through Wine.
 
-1. Approve verified EternalModInjectorShell 6.66-rev3.12 acquisition or provide
+1. Approve verified EternalModInjectorShell 6.66-rev3.13 acquisition or provide
    an official verified local artifact.
 2. Launcher stages the generated mod.
 3. Launcher opens the interactive EternalModInjectorShell workflow.
@@ -172,17 +180,26 @@ the option into DOOM Eternal's Steam **Properties → Launch Options**.
 Close DOOM Eternal normally. Stop **DOOM Eternal Client** to terminate the
 supervised bridge. Do not run two bridge clients for one profile.
 
-## Feature limits
+## Player configuration
 
-Beta.4 campaign contract: `28` Sentinel Battery checks and `13` Battery
-consumers.
+Version **0.5.0** identifies public launcher, APWorld, room package, and generated content. Development phase **0.5-F** identifies 0.5.0 closure work.
+
+| DLC Content | DLC Missions | Campaign scope |
+|---|---|---|
+| Off | Off | 13 Base Campaign missions and Base item catalog |
+| On | Off | 13 Base Campaign missions with globally useful DLC gear |
+| On | On | 19 Base, TAG1, and TAG2 missions with Full Saga content |
+
+`Include DLC Missions: On` requires `Use DLC Content: On`. Goal defaults to **Acquire the Unmaykr**. Dark Lord and Full Saga goals require DLC missions.
+
+Sentinel Battery economy contains `28` units and `13` two-Battery Fortress consumers.
 
 ### Automap
 
 Automap progression items use ordinary AP inventory behavior. Native Automap
 presentation and marker cleanup remain part of map content.
 
-**Reveal AP Locations on Automap** is a slot setting that controls starting
+**Reveal AP Locations on Automap** is a player setting that controls starting
 ownership of the AP progression-item reveal capability.
 
 ### Traps
@@ -198,7 +215,11 @@ Fast Travel means that whenever the player has completed a level, it will always
 
 ### DeathLink
 
-When enabled, a received DeathLink applies a short two-hit lethal burst during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops. Hardcore tracking is deferred to Sentinel Core.
+When enabled, a received DeathLink applies a short two-hit lethal burst during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops.
+
+### Temporary effects
+
+Damage Boost, Damage Resistance, Infinite Ammo, Weakness, and Vulnerability activate from live item receipts during safe gameplay. Duplicate receipts extend duration. Lifecycle cleanup restores baseline CVAR values. Reconnect restoration and Resync Inventory reconcile permanent inventory.
 
 ## Setup checks and support
 

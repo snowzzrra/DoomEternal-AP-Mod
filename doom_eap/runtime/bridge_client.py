@@ -98,6 +98,12 @@ from doom_eap.runtime.context_registry import (
     support_rune_commands,
     validate_slot_contract,
 )
+from doom_eap.runtime.transient_effects import (
+    TRANSIENT_EFFECTS,
+    TRANSIENT_SCOPE_HEADER,
+    TransientEffectManager,
+    transient_baseline_ready,
+)
 
 try:
     from .save_decrypt import decrypt, steam_id64
@@ -692,6 +698,8 @@ EXECUTION_CLASS_HEADER = "AP_EXECUTION_CLASS_V1"
 PLAYER_RUNTIME = "PLAYER_RUNTIME"
 MAP_ENTITY_SAFE = "MAP_ENTITY_SAFE"
 VALID_EXECUTION_CLASSES = frozenset({PLAYER_RUNTIME, MAP_ENTITY_SAFE})
+TRANSIENT_EFFECT = "TRANSIENT_EFFECT"
+VALID_EXECUTION_CLASSES = frozenset({PLAYER_RUNTIME, MAP_ENTITY_SAFE, TRANSIENT_EFFECT})
 MAP_ENTITY_OPERATION_HEADER = "AP_MAP_ENTITY_OPERATION_V1"
 CHECKED_VISUAL_HIDE = "CHECKED_VISUAL_HIDE"
 FAST_TRAVEL_UNLOCK = "FAST_TRAVEL_UNLOCK"
@@ -710,7 +718,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 6
+ITEM_MAPPING_REVISION = 7
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -2319,6 +2327,7 @@ def send_command(
     execution_class=PLAYER_RUNTIME,
     operation=None,
     diagnostic=False,
+    transient_scope=None,
 ):
     """Atomically enqueue one command without overwriting another command.
 
@@ -2333,6 +2342,10 @@ def send_command(
         if execution_class == MAP_ENTITY_SAFE:
             if operation not in VALID_MAP_ENTITY_OPERATIONS:
                 logger.error("[Queue] Refusing MAP_ENTITY_SAFE command with invalid operation: %r", operation)
+                return False
+        elif execution_class == TRANSIENT_EFFECT:
+            if operation is not None or not isinstance(transient_scope, str) or not transient_scope:
+                logger.error("[Queue] Refusing transient command without scope")
                 return False
         elif operation is not None:
             logger.error("[Queue] Refusing PLAYER_RUNTIME command with map operation: %r", operation)
@@ -2370,6 +2383,8 @@ def send_command(
             payload = "AP_DIAGNOSTIC_CONDUMP_V1 AP_SUPPORT_FILE.txt\n"
         if execution_class == MAP_ENTITY_SAFE:
             payload += f"{MAP_ENTITY_OPERATION_HEADER} {operation}\n"
+        if execution_class == TRANSIENT_EFFECT:
+            payload += f"{TRANSIENT_SCOPE_HEADER} {transient_scope}\n"
         if materialization_lease is not None:
             payload += f"{MATERIALIZATION_LEASE_HEADER} {materialization_lease}\n"
         payload += cmd.strip() + "\n"
@@ -3293,6 +3308,8 @@ class DoomEternalContext(CommonContext):
         self._automatic_resync_noop_logged_at = None
         self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
         self.state_key = ""
+        self.base_directory = DOOM_BASE_DIR
+        self.transient_effect_manager = TransientEffectManager(self)
         self.session_state = {}
         self.death_link_enabled = False
         self.death_link_mode = DEFAULT_DEATH_LINK_MODE
@@ -3513,6 +3530,9 @@ class DoomEternalContext(CommonContext):
 
     def reset_queue_session_authority(self, reason):
         self._queue_session_authoritative = False
+        manager = getattr(self, "transient_effect_manager", None)
+        if manager is not None:
+            manager.reset(reason)
         invalidate_queue_session_namespace(reason)
 
     def _report_launcher_connection_failure(self, message):
@@ -3574,6 +3594,7 @@ class DoomEternalContext(CommonContext):
         elif previous_campaign not in {"Unknown", context.campaign}:
             transition = (previous_campaign, context.campaign)
         if transition is not None:
+            self.transient_effect_manager.reset("context_transition")
             self.pending_context_transition = transition
             signature = (*transition, context.identity)
             if signature != self.last_context_transition_log:
@@ -3664,6 +3685,31 @@ class DoomEternalContext(CommonContext):
             and evidence.state == "gameplay"
             and evidence.native_safe
             and self.has_authoritative_save_proof()
+        )
+
+    def transient_effects_ready(self, evidence=None):
+        """Admit only receipt effects after current native baseline acceptance."""
+        evidence = evidence or read_gameplay_save_evidence()
+        return bool(
+            evidence is not None
+            and evidence.state == "gameplay"
+            and evidence.native_safe
+            and transient_baseline_ready(self.base_directory)
+        )
+
+    def transient_command_id(self, cvar, command, scope):
+        return stable_spool_id("effect", self.state_key, scope, cvar, command)
+
+    def send_transient_command(self, command, command_id, scope, *, room_scoped=True):
+        return send_command(
+            command,
+            coalesce_key=command_id,
+            arm_rpc=False,
+            already_queued_ok=True,
+            state_key=self.state_key,
+            room_scoped=room_scoped,
+            execution_class=TRANSIENT_EFFECT,
+            transient_scope=scope,
         )
 
     def context_support_report(self):
@@ -4026,6 +4072,7 @@ class DoomEternalContext(CommonContext):
 
     def handle_connection_loss(self, msg: str) -> None:
         state_key = self.state_key
+        self.transient_effect_manager.reset("connection_loss")
         self.reset_queue_session_authority("connection_loss")
         self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
         discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY, state_key)
@@ -4034,6 +4081,7 @@ class DoomEternalContext(CommonContext):
 
     async def connection_closed(self):
         state_key = self.state_key
+        self.transient_effect_manager.reset("connection_closed")
         self.reset_queue_session_authority("connection_closed")
         self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
         discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY, state_key)
@@ -4590,6 +4638,7 @@ class DoomEternalContext(CommonContext):
 
     def on_package(self, cmd: str, args: dict):
         if cmd == "RoomInfo":
+            self.transient_effect_manager.reset("room_info")
             # Durable item state cannot authorize queue work until matching
             # Connected rebinds state_key to this room.
             self.reset_queue_session_authority("room_info")
@@ -4615,7 +4664,7 @@ class DoomEternalContext(CommonContext):
             try:
                 slot_data = validate_slot_contract(slot_data)
             except ValueError as error:
-                message = f"Unsupported DOOM Eternal 0.5-C slot contract: {error}"
+                message = f"Unsupported DOOM Eternal 0.5-D slot contract: {error}"
                 logger.error("[Contract] Connected slot rejected: %s", error)
                 emit_launcher_event(
                     "archipelago",
@@ -5136,6 +5185,30 @@ class DoomEternalContext(CommonContext):
                     )
                     break
 
+                if item_id in TRANSIENT_EFFECTS:
+                    applied, description = self.transient_effect_manager.apply_receipt(item_id)
+                    if not applied:
+                        logger.info(
+                            "[To Game] Transient item %s pending: %s",
+                            item_id, description,
+                        )
+                        break
+                    self._record_processed_receipt(network_item)
+                    self.items_processed += 1
+                    self.persist_session_state()
+                    log_item_event(
+                        "ITEM_RECEIPT_ACK",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        receipt_id=receipt_identity(network_item),
+                        outcome="transient_effect_armed",
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
+                    batch_count += 1
+                    continue
+
                 definition = ITEM_ID_TO_COMMAND[item_id]
                 runtime_context = self._refresh_runtime_context(
                     getattr(self, "_connected_slot_data", {})
@@ -5599,6 +5672,7 @@ class DoomEternalContext(CommonContext):
         )
 
     def invalidate_map_identity(self, reason, *, clear_pending=True):
+        self.transient_effect_manager.reset(reason)
         if getattr(self, "last_marker_reject_reason", None) != reason:
             logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
             self.last_marker_reject_reason = reason
@@ -5639,6 +5713,12 @@ class DoomEternalContext(CommonContext):
         return self.pending_map_identity
 
     def accept_map_identity(self, marker_data, evidence_epoch=None):
+        previous = getattr(self, "cached_map_identity", None)
+        if isinstance(previous, dict) and any(
+            previous.get(key) != marker_data.get(key)
+            for key in ("map_key", "runtime_map", "gameplay_epoch")
+        ):
+            self.transient_effect_manager.reset("map_transition")
         marker_data = {
             **marker_data,
             "evidence_epoch": evidence_epoch,
@@ -6320,6 +6400,7 @@ class DoomEternalContext(CommonContext):
         )
 
     def reset_item_state(self):
+        self.transient_effect_manager.reset("item_state_reset")
         boundary_before = self.items_processed
         self.items_processed = 0
         self.session_state["processed_items"] = 0
@@ -8082,6 +8163,7 @@ class DoomEternalContext(CommonContext):
         self.checkpoint_death_by_save_slot[selected.slot_directory] = died
         self.previous_checkpoint_death = died
         if transitioned_to_dead:
+            self.transient_effect_manager.reset("death_boundary")
             logger.info("[DeathLink] numCheckpointDeaths changed 0 -> 1.")
             await self.report_local_death()
         return True
@@ -9138,6 +9220,10 @@ class DoomEternalContext(CommonContext):
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
                     evidence = read_gameplay_save_evidence()
+                    if getattr(evidence, "state", None) == "not_running":
+                        self.transient_effect_manager.reset("game_exit")
+                    else:
+                        self.transient_effect_manager.tick()
                     markers = discover_telemetry_markers()
                     newest_path = None
                     if markers:

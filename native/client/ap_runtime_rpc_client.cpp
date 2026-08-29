@@ -53,6 +53,7 @@ bool ApRuntimeRpcClient::Initialize()
     if (status != RPC_S_OK) { status_ = status; DropBinding(); return false; }
     status = RpcStringFreeA(&string_binding_);
     if (status != RPC_S_OK) { status_ = status; }
+    ++attachment_epoch_;
     return true;
 }
 
