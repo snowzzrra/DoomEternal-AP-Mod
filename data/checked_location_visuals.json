@@ -1,7 +1,7 @@
 {
   "authoritative_fingerprint": "d7163576250a02aa5cf3f6f1be0f254890256959df67bc9ef071dbfee4429190",
   "catalog_fingerprint": "c82264e778da24ca785a16c49afc365f816e62221b6123b77913399f801bfdc6",
-  "compiler_revision": 3,
+  "compiler_revision": 4,
   "content_revision": "0.5.0",
   "counts": {
     "event_only": 24,

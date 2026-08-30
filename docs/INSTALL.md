@@ -93,7 +93,7 @@ After room connection reports that setup is required, select the explicit
 6. reports installation state.
 
 Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
-explicit through Steam after setup.
+normally through Steam after setup.
 
 ### Windows
 
@@ -141,7 +141,7 @@ If automatic installation is unavailable, install the mod loader manually:
    ```text
    :AUTO_LAUNCH_GAME=0
    ```
-   so Doom Eternal Archipelago manages game startup.
+   so the injector does not launch the game automatically.
 7. Run `EternalModInjector.bat`.
 8. Follow all prompts in the command window. On the first run, the tool displays informational pages and prompts.
 9. Allow the installer to finish and close the command window when prompted.
@@ -182,7 +182,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.0** identifies public launcher, APWorld, room package, and generated content. Development phase **0.5-F** identifies 0.5.0 closure work.
+Version **0.5.0** identifies public launcher, APWorld, room package, and generated content.
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|
@@ -211,7 +211,7 @@ ownership of the AP progression-item reveal capability.
 
 ### Fast Travel
 
-Fast Travel means that whenever the player has completed a level, it will always have Fast Travel enabled in posterior playthroughs, as in Mission Select replays.
+After a level is complete, Fast Travel is enabled when replaying it through Mission Select.
 
 ### DeathLink
 

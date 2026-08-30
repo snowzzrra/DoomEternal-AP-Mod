@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "map_member_suffix": "game/hub/hub.entities",
+  "primitive": {
+    "inherit": "gui/text",
+    "class": "idGuiEntity_Text",
+    "model": "editors/models/gui_text.lwo",
+    "swf": "swf/guientity/generic_text.swf"
+  },
+  "labels": [
+    {"location_id": 7770087, "source_entity": "progress_argent_cell_1_750400652", "position": [15.680006, -109.739883, -14.78]},
+    {"location_id": 7770088, "source_entity": "progress_argent_cell_1_2075197287", "position": [-14.721446, -109.74411, -14.78]},
+    {"location_id": 7770163, "source_entity": "sentinel_battery_room_progress_praetor_token_1", "position": [15.706711, -109.698196, -5.18]},
+    {"location_id": 7770164, "source_entity": "sentinel_battery_room_progress_praetor_token_2", "position": [-14.679006, -109.682449, -5.18]},
+    {"location_id": 7770165, "source_entity": "sentinel_battery_room_progress_mod_bot_3", "position": [-24.999998, -97.199974, -5.17]},
+    {"location_id": 7770166, "source_entity": "sentinel_battery_room_progress_mod_bot_4", "position": [25.999969, -97.199974, -5.17]},
+    {"location_id": 7770167, "source_entity": "progress_praetor_token_3", "position": [-43.530094, 5.642945, -19.1]},
+    {"location_id": 7770168, "source_entity": "progress_praetor_token_4", "position": [44.659996, 5.400015, -24.92]},
+    {"location_id": 7770169, "source_entity": "progress_cheats_all_mastered_runes_1", "position": [91.210037, 61.320004, -39.81]},
+    {"location_id": 7770171, "source_entity": "progress_cheats_fully_upgraded_progression_wheel_final", "position": [0.44, -48.550003, 15.99]},
+    {"location_id": 7770253, "source_entity": "interact_hub_2_battery_station_1", "position": [94.25, 58.45, -9.1]},
+    {"location_id": 7770254, "source_entity": "interact_hub_2_battery_station_2", "position": [-92.5, 85.9, -1.8]},
+    {"location_id": 7770255, "source_entity": "interact_hub_2_battery_station_3", "position": [0.55, -115.57, 8.54]}
+  ]
+}

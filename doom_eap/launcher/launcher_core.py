@@ -559,6 +559,11 @@ class RoomCompiler:
     """Assemble canonical base resources and selected dependent map payloads."""
 
     DEVINV_MAP_KEY = "e1m1_intro"
+    FORTRESS_BATTERY_LABEL_SPEC_PATH = ROOT / "data" / "fortress_battery_labels.json"
+    FORTRESS_BATTERY_LOCATION_IDS = frozenset({
+        7770087, 7770088, 7770163, 7770164, 7770165, 7770166, 7770167,
+        7770168, 7770169, 7770171, 7770253, 7770254, 7770255,
+    })
     ENHANCED_MELEE_PATH = "gameresources_patch1/generated/decls/damage/damage/player/melee_d5_forward.decl"
     ENHANCED_MELEE_DECL = b'''{
 \tinherit = "damage/player/directional_melee";
@@ -651,6 +656,9 @@ class RoomCompiler:
                 self.ENHANCED_MELEE_PATH: hashlib.sha256(
                     self.ENHANCED_MELEE_DECL
                 ).hexdigest(),
+                "fortress_battery_labels": hashlib.sha256(
+                    self.FORTRESS_BATTERY_LABEL_SPEC_PATH.read_bytes()
+                ).hexdigest(),
             },
         }
         self.static_content_digest = hashlib.sha256(
@@ -717,6 +725,10 @@ class RoomCompiler:
         decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
+        fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
+            placement_by_id
+        )
+        fortress_labels_written = False
         notification_header = re.compile(
             r'(entityDef\s+ap_notify_location_(\d+)\s*\{.*?'
             r'header\s*=\s*")#str_ap_location_sent(";)',
@@ -768,7 +780,13 @@ class RoomCompiler:
                         + match.group(3)
                     )
 
-                rewritten = notification_header.sub(replace_header, text).encode("utf-8")
+                rewritten_text = notification_header.sub(replace_header, text)
+                if member.endswith(fortress_member_suffix):
+                    if fortress_labels_written:
+                        raise ValueError("room package contains multiple Fortress hub entity members")
+                    rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
+                    fortress_labels_written = True
+                rewritten = rewritten_text.encode("utf-8")
                 decoded.write_bytes(rewritten)
                 try:
                     subprocess.run(
@@ -794,6 +812,152 @@ class RoomCompiler:
                     len(rewritten),
                     len(assembled[member]),
                 )
+        if not fortress_labels_written:
+            raise ValueError(
+                "room package lacks Fortress hub entities required for Battery placement labels"
+            )
+
+    @staticmethod
+    def _doom_gui_text(value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Fortress Battery placement text contains empty display name")
+        return normalized.replace("\\", "\\\\").replace('"', '\\"')
+
+    def _fortress_battery_label_entities(
+        self, placement_by_id: dict[int, PlacementRecord]
+    ) -> tuple[str, str]:
+        """Compile seed-specific pre-purchase labels for all Battery consumers."""
+        from doom_eap.presentation import (
+            ARCHIPELAGO_PRESENTATION_COLORS,
+            color_rgb_floats,
+            item_classification_color_key,
+        )
+
+        missing = sorted(self.FORTRESS_BATTERY_LOCATION_IDS - set(placement_by_id))
+        if missing:
+            raise ValueError(
+                "Fortress Battery placement scout is incomplete; missing location IDs: "
+                + ", ".join(str(value) for value in missing)
+            )
+        document = json.loads(self.FORTRESS_BATTERY_LABEL_SPEC_PATH.read_text(encoding="utf-8"))
+        if document.get("schema_version") != 1:
+            raise ValueError("Fortress Battery label specification schema is unsupported")
+        member_suffix = document.get("map_member_suffix")
+        primitive = document.get("primitive")
+        rows = document.get("labels")
+        if not isinstance(member_suffix, str) or not member_suffix.endswith(".entities"):
+            raise ValueError("Fortress Battery label map member is invalid")
+        if not isinstance(primitive, dict) or not isinstance(rows, list):
+            raise ValueError("Fortress Battery label specification is incomplete")
+        required_primitive = {
+            "inherit": "gui/text",
+            "class": "idGuiEntity_Text",
+            "model": "editors/models/gui_text.lwo",
+            "swf": "swf/guientity/generic_text.swf",
+        }
+        if primitive != required_primitive:
+            raise ValueError("Fortress Battery label primitive drifted from vanilla gui/text donor")
+        rows_by_id: dict[int, tuple[float, float, float]] = {}
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"location_id", "source_entity", "position"}:
+                raise ValueError("Fortress Battery label transform row is invalid")
+            location_id = row["location_id"]
+            position = row["position"]
+            if (
+                not isinstance(location_id, int)
+                or not isinstance(row["source_entity"], str)
+                or not row["source_entity"]
+                or not isinstance(position, list)
+                or len(position) != 3
+                or any(not isinstance(value, (int, float)) for value in position)
+                or location_id in rows_by_id
+            ):
+                raise ValueError("Fortress Battery label transform row is invalid")
+            rows_by_id[location_id] = tuple(float(value) for value in position)  # type: ignore[assignment]
+        if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
+            raise ValueError("Fortress Battery label specification must cover exactly 13 consumers")
+
+        entities: list[str] = []
+        for location_id in sorted(rows_by_id):
+            record = placement_by_id[location_id]
+            if record.trap:
+                display = "A TRAP\\nFOR SOMEONE"
+            elif record.local:
+                display = "YOUR " + self._doom_gui_text(record.item_name)
+            else:
+                display = (
+                    self._doom_gui_text(record.item_name)
+                    + "\\nFOR "
+                    + self._doom_gui_text(record.recipient_name)
+                )
+            color_key = item_classification_color_key(
+                record.classification, trap=record.trap
+            )
+            red, green, blue = color_rgb_floats(
+                ARCHIPELAGO_PRESENTATION_COLORS[color_key]
+            )
+            x, y, z = rows_by_id[location_id]
+            entities.append(f'''entity {{
+\tentityDef ap_fortress_battery_placement_{location_id} {{
+\t\tinherit = "gui/text";
+\t\tclass = "idGuiEntity_Text";
+\t\texpandInheritance = false;
+\t\tpoolCount = 0;
+\t\tpoolGranularity = 2;
+\t\tnetworkReplicated = false;
+\t\tdisableAIPooling = false;
+\t\tedit = {{
+\t\t\tflags = {{
+\t\t\t\tnoknockback = false;
+\t\t\t}}
+\t\t\trenderModelInfo = {{
+\t\t\t\tmodel = "editors/models/gui_text.lwo";
+\t\t\t\tscale = {{
+\t\t\t\t\tx = 10;
+\t\t\t\t\ty = 10;
+\t\t\t\t\tz = 10;
+\t\t\t\t}}
+\t\t\t}}
+\t\t\tclipModelInfo = {{
+\t\t\t\ttype = "CLIPMODEL_NONE";
+\t\t\t}}
+\t\t\tswf = "swf/guientity/generic_text.swf";
+\t\t\tspawnPosition = {{
+\t\t\t\tx = {x:.6f};
+\t\t\t\ty = {y:.6f};
+\t\t\t\tz = {z:.6f};
+\t\t\t}}
+\t\t\tspawnOrientation = {{
+\t\t\t\tmat = {{
+\t\t\t\t\tmat[0] = {{ x = 1; y = 0; z = 0; }}
+\t\t\t\t\tmat[1] = {{ x = 0; y = 1; z = 0; }}
+\t\t\t\t\tmat[2] = {{ x = 0; y = 0; z = 1; }}
+\t\t\t\t}}
+\t\t\t}}
+\t\t\tdormancy = {{
+\t\t\t\tallowDistanceDormancy = false;
+\t\t\t\tallowDormancy = false;
+\t\t\t\tallowPvsDormancy = false;
+\t\t\t}}
+\t\t\tdynamicMoveActive = true;
+\t\t\tswfScale = 0.020000;
+\t\t\theaderText = {{
+\t\t\t\ttext = "{display}";
+\t\t\t\tcolor = {{
+\t\t\t\t\tr = {red:.6f};
+\t\t\t\t\tg = {green:.6f};
+\t\t\t\t\tb = {blue:.6f};
+\t\t\t\t}}
+\t\t\t\trelativeWidth = 1;
+\t\t\t\talignment = "SWF_ET_ALIGN_CENTER";
+\t\t\t}}
+\t\t\tbillboard = true;
+\t\t}}
+\t}}
+}}
+''')
+        return member_suffix, "".join(entities)
 
     def _verified_decompressor(self) -> Path:
         from .launcher_platform import IDFILE_DECOMPRESSOR

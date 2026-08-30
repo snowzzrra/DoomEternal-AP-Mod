@@ -22,7 +22,7 @@ Randomized progression includes:
 - Ammo Refill charges, temporary combat effects, enemy traps, resource-drain traps, and DeathLink;
 - reconnect-safe permanent inventory, checked-location cleanup, native Fast Travel on completed mission replays, and room-specific map packages.
 
-Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, starts game, displays session activity, and provides setup checks, repair actions, logs, and support reports.
+Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, displays session activity, and provides setup checks, repair actions, logs, and support reports. After setup, start DOOM Eternal normally through Steam and keep launcher open.
 
 ## 2. Player options
 
@@ -33,10 +33,10 @@ Launcher creates player YAML files, connects to rooms, prepares matching room pa
 | Death Link | Off | Shares deaths with DeathLink-enabled worlds. | On |
 | Use DLC Content | On | Adds supported TAG gear, Sentinel Hammer, and Support Runes. | Off: Base item catalog |
 | Include DLC Missions | On | Adds TAG1/TAG2 missions and locations. Requires DLC Content. | Off: Base locations with enabled DLC gear |
-| DLC Logic Timing | Late Game | Opens TAG routes at intended loadout tiers. | From the Beginning: Hell on Earth, UAC Atlantica, and World Spear start open |
+| DLC Logic Timing | Late Game | Opens TAG routes at intended loadout tiers. | From the Beginning: campaign roots are logical starting paths, subject to traversal and capability requirements |
 | Goal | Acquire the Unmaykr | Requires six Base Slayer Gates and Unmaykr. | Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
 | Additional Victory Requirements | Enabled Missions, Slayer Gates, Escalation Encounters | Adds selected objectives to victory. | Secret Encounters; Mission Challenges; Weapon Masteries; Unmaykr; any valid subset |
-| Special Weapon | Progressive Special Weapon | Uses Crucible unlock, Crucible improvement, then Sentinel Hammer. | Progressive Sentinel Hammer; The Crucible |
+| Special Weapon | Progressive Special Weapon | Grants the Crucible, then Sentinel Hammer, then fully upgraded Sentinel Hammer. | Progressive Sentinel Hammer; The Crucible |
 | Enhanced Melee Damage | Off | Strengthens normal punches. | On |
 | Randomize Chainsaw | Off | Places Chainsaw in item pool. | On |
 | Randomize Dash | Off | Places Dash in item pool and enables Dash-aware logic. | On |
@@ -126,9 +126,8 @@ edit reviewable at the level of gameplay structure rather than only as a large
 text diff.
 
 Physical options are projected while the room package is prepared.
-**Start With
-Automap** defaults to OFF. When enabled, AP precollects **Reveal Automap
-Progression Items**.
+**Reveal AP Locations on Automap** defaults to OFF. When enabled, AP precollects
+**Reveal Automap Progression Items**.
 ### Location checks
 
 A completed physical objective activates its `AP_CHECK_*` publisher. The
@@ -210,7 +209,7 @@ up owned content, applies confirmed actions, and validates installed files.
 - **Sentinel Batteries** form an economy of 28 units: two individual Batteries
   and thirteen bundles worth two each. The thirteen Fortress consumers each
   require a balance of two.
-- **Start With Automap** defaults to OFF. ON precollects exactly one
+- **Reveal AP Locations on Automap** defaults to OFF. ON precollects exactly one
   **Reveal Automap Progression Items**. AP progression-item markers become visible
   through each mission's transformed native Automap station.
 - **Trap Percentage** replaces that percentage of filler padding with traps. It
@@ -257,10 +256,10 @@ The active runtime has three cooperating layers:
 
 The launcher surrounds those layers. It reads the room schema, creates player
 YAML, discovers supported installations, prepares the room package, supervises
-the bridge, opens DOOM Eternal through Steam, and provides Help, setup check,
+the bridge while the player runs DOOM Eternal through Steam, and provides Help, setup check,
 Repair/Fix, and a sanitized support report.
 
-## 5. Roadmap
+## 5. Version scope
 
 ## 0.1.1 — Runtime stabilization — DONE
 
@@ -291,14 +290,14 @@ Repair/Fix, and a sanitized support report.
 - Starting Weapon Choice, Random, and configurable starting inventory.
 - Hard, Soft, and Combat logic profiles.
 - Physical Chainsaw, Dash, and first Sentinel Battery options.
-- Start With Automap, mission replay Fast Travel and single-burst DeathLink.
+- Reveal AP Locations on Automap, mission replay Fast Travel and single-burst DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
-### 0.5.x Beta — The Ancient Gods — CURRENT
+### 0.5.0 Beta — The Full Saga — CURRENT
 
-- Add The Ancient Gods Part One and Part Two campaigns, including missions,
-  regions, locations, items, progression rules, and completion flow.
-- Extend generation, runtime, and validation for DLC-specific mechanics.
+- Base Campaign, The Ancient Gods Part One, and The Ancient Gods Part Two form
+  one 19-mission Archipelago world with global inventory and completion flow.
+- DLC-specific gear, mission logic, generation, runtime, and validation are in scope.
 
 ### 0.6.x Beta — Random Mission Order + Sentinel Core
 

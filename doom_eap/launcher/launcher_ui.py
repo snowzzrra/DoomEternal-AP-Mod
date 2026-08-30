@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import cast
 
 from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPolygonF, QShortcut, QStandardItemModel
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPen, QPolygonF, QShortcut, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (
 )
 
 from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
+from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
 from .launcher_platform import (
@@ -146,6 +147,54 @@ class _AmmoRefillPips(QWidget):
             painter.setPen(QColor("#c7ef82") if active else QColor("#4a543c"))
             painter.setBrush(QColor("#9cdc4a") if active else QColor("#182019"))
             painter.drawPolygon(shape)
+
+
+class _ScanlineFrame(QFrame):
+    """Panel background with a static, clipped green-and-ink scan texture."""
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        bounds = self.contentsRect().adjusted(1, 1, -1, -1)
+        if bounds.width() < 32 or bounds.height() < 18:
+            return
+        painter = QPainter(self)
+        painter.setClipRect(bounds)
+        dpr = self.devicePixelRatioF()
+        spacing = max(4.0, 7.0 / dpr)
+        pen = QPen(QColor(133, 185, 83, 15))
+        pen.setWidthF(1.0 / dpr)
+        painter.setPen(pen)
+        y = float(bounds.top()) + spacing * 0.5
+        while y < bounds.bottom():
+            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.right(), y - 1.5 / dpr))
+            y += spacing
+        pen.setColor(QColor(0, 0, 0, 18))
+        painter.setPen(pen)
+        y = float(bounds.top()) + spacing
+        while y < bounds.bottom():
+            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.right(), y - 1.5 / dpr))
+            y += spacing
+
+
+class _ScanlineButton(QPushButton):
+    """Primary-action button with a quiet, non-text scanline edge."""
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        bounds = self.contentsRect().adjusted(3, 3, -3, -3)
+        if bounds.width() < 20 or bounds.height() < 14:
+            return
+        painter = QPainter(self)
+        painter.setClipRect(bounds.left(), bounds.top(), min(6, bounds.width()), bounds.height())
+        dpr = self.devicePixelRatioF()
+        pen = QPen(QColor(15, 37, 17, 38))
+        pen.setWidthF(1.0 / dpr)
+        painter.setPen(pen)
+        spacing = max(4.0, 6.0 / dpr)
+        y = float(bounds.top()) + spacing * 0.5
+        while y < bounds.bottom():
+            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.left() + 7, y - 1.0 / dpr))
+            y += spacing
 
 
 class AmmoRefillKeyControl(QWidget):
@@ -276,9 +325,6 @@ class OptionSetControl(QWidget):
         clear.clicked.connect(lambda: self._set_all(False))
         actions.addWidget(select_all)
         actions.addWidget(clear)
-        side_content = QPushButton("SELECT ALL SIDE CONTENT")
-        side_content.clicked.connect(self._select_side_content)
-        actions.addWidget(side_content)
         actions.addStretch(1)
         layout.addLayout(actions)
         grid = QGridLayout()
@@ -305,12 +351,6 @@ class OptionSetControl(QWidget):
         self._unavailable = {str(key) for key in unavailable}
         self._refresh_lock_state()
 
-    def set_keys_checked(self, keys: set[str], checked: bool) -> None:
-        for key, check in self.checks:
-            name = str(key)
-            if name in keys and name not in self._locked and name not in self._unavailable:
-                check.setChecked(checked)
-
     def _refresh_lock_state(self) -> None:
         for key, check in self.checks:
             name = str(key)
@@ -335,14 +375,6 @@ class OptionSetControl(QWidget):
                 continue
             check.setChecked(checked)
 
-    def _select_side_content(self) -> None:
-        self.set_keys_checked({
-            "Complete All Slayer Gates",
-            "Complete All Escalation Encounters",
-            "Complete All Secret Encounters",
-            "Acquire the Unmaykr",
-        }, True)
-
     def value(self) -> list[object]:
         return [key for key, check in self.checks
                 if str(key) not in self._locked and str(key) not in self._unavailable
@@ -361,9 +393,9 @@ class LauncherUI(QMainWindow):
 
     COLORS = {
         "ink": "#080b0d", "panel": "#111619", "panel2": "#171e22",
-        "line": "#3b4549", "text": "#f1f3ef", "muted": "#9ba3a3",
-        "doom": "#9edb45", "doom_hot": "#f28a35", "ap": "#43bfc7",
-        "good": "#a8d52a", "warn": "#f2c230", "bad": "#df3f3f",
+        "line": "#3b4549", "text": ARCHIPELAGO_PRESENTATION_COLORS["text"], "muted": "#9ba3a3",
+        "doom": ARCHIPELAGO_PRESENTATION_COLORS["item_trap"], "doom_hot": ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], "ap": ARCHIPELAGO_PRESENTATION_COLORS["location"],
+        "good": ARCHIPELAGO_PRESENTATION_COLORS["player_self"], "warn": "#f2c230", "bad": "#df3f3f",
     }
 
     def __init__(self, controller: LauncherController):
@@ -486,7 +518,7 @@ class LauncherUI(QMainWindow):
 
     @staticmethod
     def _card(name: str = "card") -> QFrame:
-        card = QFrame()
+        card = _ScanlineFrame() if name in {"hero", "actionStrip", "effectiveConfig"} else QFrame()
         card.setObjectName(name)
         return card
 
@@ -552,7 +584,7 @@ class LauncherUI(QMainWindow):
         self.hero_detail.setWordWrap(True)
         copy.addWidget(self.hero_detail)
         hero_layout.addLayout(copy, 1)
-        self.hero_action = QPushButton("JOIN A ROOM")
+        self.hero_action = _ScanlineButton("JOIN A ROOM")
         self.hero_action.setObjectName("primary")
         self.hero_action.clicked.connect(self._primary_action)
         hero_layout.addWidget(self.hero_action, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -690,7 +722,7 @@ class LauncherUI(QMainWindow):
         self._entry_row(layout, 7, "PLAYER", self.slot)
         self._entry_row(layout, 8, "PASSWORD", self.password)
         self._entry_row(layout, 9, "AMMO REFILL KEY", self.ammo_refill_keybind)
-        self.join_button = QPushButton("CONNECT")
+        self.join_button = _ScanlineButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
         layout.addWidget(self.join_button, 10, 1, 1, 2)
@@ -821,7 +853,7 @@ class LauncherUI(QMainWindow):
         self.session_manual_retry_action = QPushButton("TRY AGAIN")
         self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
         self.session_manual_retry_action.setVisible(False)
-        self.session_setup_action = QPushButton("INSTALL ROOM PACKAGE")
+        self.session_setup_action = _ScanlineButton("INSTALL ROOM PACKAGE")
         self.session_setup_action.setObjectName("primary")
         self.session_setup_action.clicked.connect(self._run_setup_action)
         self.reinstall_button = self.session_setup_action
@@ -978,7 +1010,7 @@ class LauncherUI(QMainWindow):
         actions = QHBoxLayout()
         reset = QPushButton("RESET DEFAULTS")
         reset.clicked.connect(self._reset_options)
-        save = QPushButton("SAVE PLAYER YAML…")
+        save = _ScanlineButton("SAVE PLAYER YAML…")
         save.setObjectName("primary")
         save.clicked.connect(self._save_player_options)
         actions.addWidget(reset)
@@ -2354,16 +2386,7 @@ class LauncherUI(QMainWindow):
         segments = event.get("segments")
         if event.get("schema") != 1 or not isinstance(segments, list):
             return html.escape(plain)
-        colors = {
-            "text": self.COLORS["text"],
-            "location": self.COLORS["ap"],
-            "player_self": self.COLORS["good"],
-            "player_remote": self.COLORS["doom_hot"],
-            "item_filler": "#8fc8e8",
-            "item_useful": "#438bc4",
-            "item_progression": "#bd84e8",
-            "item_trap": self.COLORS["doom"],
-        }
+        colors = ARCHIPELAGO_PRESENTATION_COLORS
         rendered: list[str] = []
         for segment in segments:
             if not isinstance(segment, dict):

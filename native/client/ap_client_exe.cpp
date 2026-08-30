@@ -42,7 +42,7 @@ static const char* kMapEntityOperationHeader = "AP_MAP_ENTITY_OPERATION_V1";
 static const char* kRpcGatePath = "base\\ap_rpc_enabled";
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "0.5.1";
+static const char* kReleaseVersion = "0.5.0";
 static const char* kRpcEntityPrefix = "ap_rpc_v3";
 static const int kRpcEntityContractRevision = 3;
 static const int kNativeCommandPolicyRevision = 11;
@@ -662,7 +662,7 @@ void LogStartupHeader(
 #endif
 
     LogDebug("=== AP Client startup header ===");
-    LogDebug(std::string("PTB version: ") + kReleaseVersion);
+    LogDebug(std::string("Release version: ") + kReleaseVersion);
     LogDebug(std::string("Build ID: ") + __DATE__ + " " + __TIME__);
     LogDebug(std::string("UTC time: ") + utcTimestamp);
     LogDebug(std::string("Local time: ") + localTimestamp);
