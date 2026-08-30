@@ -1538,6 +1538,11 @@
       "soft_capabilities": [
         "requires_dlc_content"
       ]
+    },
+    "The Blood Swamps - Underworld Crossroad -> The Blood Swamps - Sunken Courtyard": {
+      "soft_capabilities": [
+        "anti_spirit"
+      ]
     }
   },
   "assignments": {
