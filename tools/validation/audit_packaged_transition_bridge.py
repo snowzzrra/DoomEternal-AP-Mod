@@ -112,11 +112,15 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
         raise AssertionError("unpacked bridge identity revision diverges")
     if "Ignoring unexpected goal transition event" in bridge.read_text(encoding="utf-8"):
         raise AssertionError("unpacked bridge still contains old goal-only handler")
+    if not (client_dir / "doom_eap" / "presentation.py").is_file():
+        raise AssertionError("packaged client lacks doom_eap/presentation.py")
     packaged_tools = client_dir / "tools"
     expected_tools = {
         Path("__init__.py"),
         Path("release") / "__init__.py",
         Path("release") / "room_payloads.py",
+        *(Path("decls") / path.name for path in (source_root / "tools" / "decls").glob("*.py")),
+        *(Path("maps") / path.name for path in (source_root / "tools" / "maps").glob("*.py")),
     }
     actual_tools = {
         path.relative_to(packaged_tools)

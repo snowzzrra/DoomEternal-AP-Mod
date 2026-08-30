@@ -33,7 +33,7 @@ Launcher creates player YAML files, connects to rooms, prepares matching room pa
 | Death Link | Off | Shares deaths with DeathLink-enabled worlds. | On |
 | Use DLC Content | On | Adds supported TAG gear, Sentinel Hammer, and Support Runes. | Off: Base item catalog |
 | Include DLC Missions | On | Adds TAG1/TAG2 missions and locations. Requires DLC Content. | Off: Base locations with enabled DLC gear |
-| DLC Logic Timing | Late Game | Opens TAG routes at intended loadout tiers. | From the Beginning: campaign roots are logical starting paths, subject to traversal and capability requirements |
+| DLC Logic Timing | Late Game | DLC mission paths enter logic once your inventory reaches their intended combat readiness. | From the Beginning: removes the extra late-game combat-readiness gate; DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (vanilla Dash becomes available after Exultia; World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool) |
 | Goal | Acquire the Unmaykr | Requires six Base Slayer Gates and Unmaykr. | Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
 | Additional Victory Requirements | Enabled Missions, Slayer Gates, Escalation Encounters | Adds selected objectives to victory. | Secret Encounters; Mission Challenges; Weapon Masteries; Unmaykr; any valid subset |
 | Special Weapon | Progressive Special Weapon | Grants the Crucible, then Sentinel Hammer, then fully upgraded Sentinel Hammer. | Progressive Sentinel Hammer; The Crucible |

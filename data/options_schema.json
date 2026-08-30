@@ -138,7 +138,7 @@
         }
       ],
       "default": "late_game",
-      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 UAC Atlantica becomes available once your weapons and abilities are strong enough for TAG1. The World Spear becomes available later, once your loadout is strong enough for TAG2.\n\nFrom the Beginning \u2014 Hell on Earth, UAC Atlantica, and The World Spear are campaign roots from the beginning. Each route still respects its traversal and capability requirements; TAG2 requires Super Shotgun / Meat Hook capability and Dash when Dash is randomized.\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
+      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 DLC mission paths enter logic once your inventory reaches their intended combat readiness.\n\nFrom the Beginning \u2014 Removes the extra late-game combat-readiness gate. DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (vanilla Dash becomes available after Exultia; The World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool).\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
       "display_name": "DLC Logic Timing",
       "group": "Game Options",
       "key": "dlc_logic_timing",
@@ -475,5 +475,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "56ee137e0bebbbb5e60bce81b907742b90e5c3f71376e532b8e69d512a72ec0a"
+  "source_sha256": "914d5683ffc4bc548cf4cf60f6bfd338656548971e3f75850ad15b135b71c618"
 }

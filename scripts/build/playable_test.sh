@@ -478,27 +478,26 @@ cp "$REPO_ROOT/doom_eap/runtime/observer_lifecycle.py" "$OUTPUT_DIR/client/obser
 cp "$REPO_ROOT/doom_eap/contracts/publisher_contracts.py" "$OUTPUT_DIR/client/publisher_contracts.py"
 cp "$REPO_ROOT/doom_eap/runtime/publisher_runtime.py" "$OUTPUT_DIR/client/publisher_runtime.py"
 cp "$REPO_ROOT/doom_eap/runtime/save_decrypt.py" "$OUTPUT_DIR/client/save_decrypt.py"
+cp "$REPO_ROOT/doom_eap/presentation.py" "$OUTPUT_DIR/client/presentation.py"
 cp "$REPO_ROOT/scripts/launch/run_bridge.sh" \
     "$REPO_ROOT/packaging/client/ap_config.example.json" \
     "$REPO_ROOT/scripts/validate/runtime_install.sh" \
     "$OUTPUT_DIR/client/"
 mkdir -p "$OUTPUT_DIR/client/doom_eap/launcher" "$OUTPUT_DIR/client/doom_eap/runtime" \
     "$OUTPUT_DIR/client/doom_eap/content" "$OUTPUT_DIR/client/doom_eap/contracts"
-cp "$REPO_ROOT/doom_eap/__init__.py" "$OUTPUT_DIR/client/doom_eap/"
-cp "$REPO_ROOT/doom_eap/launcher/__init__.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_app.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_controller.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_core.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_doctor.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_integration.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_native_health.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_platform.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_supervisor.py" \
-   "$REPO_ROOT/doom_eap/launcher/launcher_ui.py" \
-   "$OUTPUT_DIR/client/doom_eap/launcher/"
+cp "$REPO_ROOT/doom_eap/"*.py "$OUTPUT_DIR/client/doom_eap/"
+cp "$REPO_ROOT/doom_eap/launcher/"*.py "$OUTPUT_DIR/client/doom_eap/launcher/"
+cp "$REPO_ROOT/doom_eap/launcher/launcher_cli.py" "$OUTPUT_DIR/client/launcher_cli.py"
 cp "$REPO_ROOT/doom_eap/runtime/"*.py "$OUTPUT_DIR/client/doom_eap/runtime/"
 cp "$REPO_ROOT/doom_eap/content/"*.py "$OUTPUT_DIR/client/doom_eap/content/"
 cp "$REPO_ROOT/doom_eap/contracts/"*.py "$OUTPUT_DIR/client/doom_eap/contracts/"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$OUTPUT_DIR/client" python3 -B -c "
+import doom_eap.presentation
+import presentation
+from doom_eap.launcher.launcher_core import RoomCompiler
+from doom_eap.launcher.launcher_ui import LauncherUI
+from doom_eap.content.content_catalog import load_content_catalog
+" || { echo "Packaged Python client import closure failed" >&2; exit 1; }
 mkdir -p "$OUTPUT_DIR/client/tools"
 cp "$REPO_ROOT/tools/__init__.py" "$OUTPUT_DIR/client/tools/__init__.py"
 mkdir -p "$OUTPUT_DIR/client/tools/release"
@@ -848,6 +847,8 @@ validate_room_payload_manifest(
 write_deterministic_zip(payload_files, resources / ROOM_PAYLOAD_RESOURCE_NAME)
 (resources / ROOM_PAYLOAD_MANIFEST_NAME).write_bytes(canonical_json(payload_manifest))
 PY
+
+find "$OUTPUT_DIR/client" -type d -name __pycache__ -prune -exec rm -rf {} +
 
 python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" <<'PY'
 import hashlib

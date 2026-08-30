@@ -94,6 +94,7 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/launcher_supervisor.py",
     "doom_eap/launcher/launcher_ui.py",
     "doom_eap/runtime/publisher_runtime.py",
+    "doom_eap/presentation.py",
     "doom_eap/__init__.py",
     "doom_eap/launcher/__init__.py",
     "doom_eap/runtime/__init__.py",
@@ -818,6 +819,26 @@ class Pipeline:
                 if actual_value != expected_value:
                     raise ValueError(f"component=package field=manifest_disagreement value={field}")
             packaged_options = root / "client" / "data" / "options_schema.json"
+            client_dir = root / "client"
+            if client_dir.is_dir():
+                presentation_path = client_dir / "doom_eap" / "presentation.py"
+                if not presentation_path.is_file():
+                    raise ValueError("component=package field=missing_module value=client/doom_eap/presentation.py")
+                cmd = [
+                    sys.executable,
+                    "-B",
+                    "-c",
+                    "import doom_eap.presentation; from doom_eap.launcher.launcher_core import RoomCompiler",
+                ]
+                env = os.environ.copy()
+                env["PYTHONDONTWRITEBYTECODE"] = "1"
+                env["PYTHONPATH"] = str(client_dir)
+                res = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                for pycache in client_dir.rglob("__pycache__"):
+                    if pycache.is_dir():
+                        shutil.rmtree(pycache, ignore_errors=True)
+                if res.returncode != 0:
+                    raise ValueError(f"component=package field=import_closure error={res.stderr.strip()}")
             print(f"PACKAGE_PREFLIGHT package=checked root={root}")
 
     def playtest(self) -> None:
