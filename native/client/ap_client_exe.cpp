@@ -1988,6 +1988,62 @@ bool CommandExecutionGateOpen(
     return gameStateProbe.IsSafeForRpc();
 }
 
+const char* CommandExecutionClassName(CommandExecutionClass executionClass) {
+    switch (executionClass) {
+    case CommandExecutionClass::MapEntitySafe:
+        return "MAP_ENTITY_SAFE";
+    case CommandExecutionClass::TransientEffect:
+        return "TRANSIENT_EFFECT";
+    case CommandExecutionClass::PlayerRuntime:
+    default:
+        return "PLAYER_RUNTIME";
+    }
+}
+
+std::string CommandExecutionGateReason(
+    const CommandJob& job,
+    bool rpcArmed,
+    bool rpcTransportReady,
+    const GameStateProbe& gameStateProbe,
+    bool transientBaselineReady
+) {
+    if (job.diagnosticCondump) {
+        return rpcTransportReady ? "ready" : "rpc_unavailable";
+    }
+    if (IsTransientEffectJob(job)) {
+        if (!rpcTransportReady) return "rpc_unavailable";
+        if (!transientBaselineReady) return "transient_baseline_unready";
+        if (!gameStateProbe.IsSafeForRpc()) return "player_unavailable";
+        if (!job.transientScope.has_value()) return "transient_scope_missing";
+        const std::optional<std::string> activeScope = ActiveTransientScope();
+        if (!activeScope.has_value()) return "transient_scope_unavailable";
+        if (job.transientScope.value() != activeScope.value()) {
+            return "transient_scope_mismatch";
+        }
+        if (!IsValidTransientEffectCommand(job.command)) {
+            return "transient_command_invalid";
+        }
+        return "ready";
+    }
+    if (!rpcArmed) return "rpc_disarmed";
+    if (!rpcTransportReady) return "rpc_unavailable";
+    if (IsMapEntitySafeJob(job)) {
+        if (!gameStateProbe.IsMapEntitySafe()) return "map_entity_unsafe";
+        if (!MapEntityOperationMatchesCommand(job.mapEntityOperation, job.command)) {
+            return "map_entity_operation_invalid";
+        }
+        const std::optional<std::string> currentLease = ActiveMaterializationLease();
+        if (!job.materializationLease.has_value()) return "materialization_lease_missing";
+        if (!currentLease.has_value()) return "materialization_lease_unavailable";
+        if (job.materializationLease.value() != currentLease.value()) {
+            return "materialization_lease_mismatch";
+        }
+        return "ready";
+    }
+    if (!gameStateProbe.IsSafeForRpc()) return "player_unavailable";
+    return "ready";
+}
+
 void DiscardMapEntitySafeJobsWithMismatchedLease(
     std::deque<CommandJob>& queue,
     std::unordered_set<std::string>& knownCommandIds,
@@ -2008,6 +2064,37 @@ void DiscardMapEntitySafeJobsWithMismatchedLease(
         LogDebug(
             "QUEUE_STALE_DROP command_id=" + commandId
             + " kind=map_entity_safe reason=materialization_lease_mismatch"
+            + " effect=unconfirmed"
+            + DeliveryContextFields()
+        );
+        job = queue.erase(job);
+    }
+}
+
+void DiscardTransientEffectJobsWithMismatchedScope(
+    std::deque<CommandJob>& queue,
+    std::unordered_set<std::string>& knownCommandIds,
+    const std::optional<std::string>& currentScope
+) {
+    auto job = queue.begin();
+    while (job != queue.end()) {
+        if (!IsTransientEffectJob(*job)
+                || (job->transientScope.has_value()
+                    && currentScope.has_value()
+                    && job->transientScope.value() == currentScope.value())) {
+            ++job;
+            continue;
+        }
+        const std::string commandId = CommandIdFromPath(job->path);
+        const std::string reason = !currentScope.has_value()
+            ? "transient_scope_unavailable"
+            : (!job->transientScope.has_value()
+                ? "transient_scope_missing" : "transient_scope_mismatch");
+        DeleteFileA(job->path.c_str());
+        knownCommandIds.erase(commandId);
+        LogDebug(
+            "QUEUE_STALE_DROP command_id=" + commandId
+            + " kind=transient_effect reason=" + reason
             + " effect=unconfirmed"
             + DeliveryContextFields()
         );
@@ -2373,7 +2460,9 @@ int main(int argc, char** argv) {
     bool transientBaselineReady = false;
     unsigned long long transientBaselineEpoch = 0;
     std::string lastGateReason;
-    DWORD lastStallLog = 0;
+    bool noSelectionDiagnosticActive = false;
+    DWORD nextNoSelectionDiagnosticTick = 0;
+    size_t suppressedNoSelectionDiagnostics = 0;
     bool silentBurstActive = false;
     DWORD silentBurstStarted = 0;
     DWORD silentBurstRpcMs = 0;
@@ -2524,6 +2613,9 @@ int main(int argc, char** argv) {
         DiscardMapEntitySafeJobsWithMismatchedLease(
             queue, knownCommandIds, ActiveMaterializationLease()
         );
+        DiscardTransientEffectJobsWithMismatchedScope(
+            queue, knownCommandIds, ActiveTransientScope()
+        );
         ammoHotkey.Poll(
             gameStateProbe.GetProcessId(),
             activeNamespace.has_value(),
@@ -2548,41 +2640,59 @@ int main(int argc, char** argv) {
         }
         queueWasActive = queueActive;
 
-        const bool frontGateOpen = !queue.empty()
-            && CommandExecutionGateOpen(
-                queue.front(), rpcArmed, rpcTransportReady, gameStateProbe,
-                transientBaselineReady
-            );
-        if (silentBurstActive && (queue.empty() || !frontGateOpen)) {
+        std::optional<size_t> dispatchIndex;
+        for (size_t index = 0; index < queue.size(); ++index) {
+            if (CommandExecutionGateOpen(
+                    queue[index], rpcArmed, rpcTransportReady, gameStateProbe,
+                    transientBaselineReady)) {
+                dispatchIndex = index;
+                break;
+            }
+        }
+        if (silentBurstActive && !dispatchIndex.has_value()) {
             finishSilentBurst(queue.empty() ? "queue_drained" : "safety_gate_closed");
         }
-        if (!queue.empty() && !frontGateOpen && now - lastStallLog >= kRpcStallWarnMs) {
-            const DWORD oldestAge = now - queue.front().importedTick;
-            const QueueSnapshot diskQueue = CountQueueFiles();
-            LogDebug(
-                "QUEUE_STALL oldest_age_ms=" + std::to_string(oldestAge)
-                + " pending_count=" + std::to_string(queue.size())
-                + " processing_count=" + std::to_string(diskQueue.processing)
-                + " in_flight_id=none gate=" + gateReason
-                + DeliveryContextFields()
-            );
-            lastStallLog = now;
+        const bool globallyReadyWithoutSelection =
+            gateReason == "ready" && !queue.empty() && !dispatchIndex.has_value();
+        if (globallyReadyWithoutSelection) {
+            const CommandJob& front = queue.front();
+            if (!noSelectionDiagnosticActive
+                    || static_cast<LONG>(now - nextNoSelectionDiagnosticTick) >= 0) {
+                LogDebug(
+                    "QUEUE_NO_SELECTION global_gate=ready in_flight_id=none"
+                    " pending_count=" + std::to_string(queue.size())
+                    + " front_command_id=" + CommandIdFromPath(front.path)
+                    + " front_class=" + CommandExecutionClassName(front.executionClass)
+                    + " front_gate_reason=" + CommandExecutionGateReason(
+                        front, rpcArmed, rpcTransportReady, gameStateProbe,
+                        transientBaselineReady
+                    )
+                    + " suppressed=" + std::to_string(suppressedNoSelectionDiagnostics)
+                    + DeliveryContextFields()
+                );
+                noSelectionDiagnosticActive = true;
+                nextNoSelectionDiagnosticTick = now + kRpcStallWarnMs;
+                suppressedNoSelectionDiagnostics = 0;
+            } else {
+                ++suppressedNoSelectionDiagnostics;
+            }
+        } else if (noSelectionDiagnosticActive) {
+            if (suppressedNoSelectionDiagnostics != 0) {
+                LogDebug(
+                    "QUEUE_NO_SELECTION_RECOVERY suppressed="
+                    + std::to_string(suppressedNoSelectionDiagnostics)
+                );
+            }
+            noSelectionDiagnosticActive = false;
+            suppressedNoSelectionDiagnostics = 0;
         }
 
         bool dispatchNextImmediately = false;
-        if (!queue.empty()
+        if (dispatchIndex.has_value()
                 && rpcTransportReady
                 && g_ApRpc->Ready()) {
-            size_t dispatchIndex = 0;
-            if (!frontGateOpen) {
-                for (size_t index = 1; index < queue.size(); ++index) {
-                    if (queue[index].diagnosticCondump) {
-                        dispatchIndex = index;
-                        break;
-                    }
-                }
-            }
-            CommandJob& job = queue[dispatchIndex];
+            const size_t selectedIndex = dispatchIndex.value();
+            CommandJob& job = queue[selectedIndex];
             if (!rpcArmed && !job.diagnosticCondump && !IsTransientEffectJob(job)) {
                 Sleep(50);
                 continue;
@@ -2605,7 +2715,7 @@ int main(int argc, char** argv) {
                     "QUEUE_CANCELLED command_id=" + commandId + DeliveryContextFields()
                 );
                 knownCommandIds.erase(commandId);
-                queue.erase(queue.begin() + dispatchIndex);
+                queue.erase(queue.begin() + selectedIndex);
                 continue;
             }
             if (job.receiptNamespace.has_value()) {
@@ -2622,7 +2732,7 @@ int main(int argc, char** argv) {
                     // Leave .processing in place. EnsureQueueDirectory owns recovery;
                     // bridge owns only .cmd and may quarantine foreign receipts.
                     knownCommandIds.erase(commandId);
-                    queue.erase(queue.begin() + dispatchIndex);
+                    queue.erase(queue.begin() + selectedIndex);
                     continue;
                 }
             }
@@ -2635,7 +2745,7 @@ int main(int argc, char** argv) {
                 );
                 DeleteFileA(job.path.c_str());
                 knownCommandIds.erase(commandId);
-                queue.erase(queue.begin() + dispatchIndex);
+                queue.erase(queue.begin() + selectedIndex);
                 continue;
             }
             if (!CommandExecutionGateOpen(
@@ -2708,7 +2818,7 @@ int main(int argc, char** argv) {
                 } else {
                     knownCommandIds.erase(commandId);
                 }
-                queue.erase(queue.begin() + dispatchIndex);
+                queue.erase(queue.begin() + selectedIndex);
             } else {
                 if (silentMaintenance) {
                     finishSilentBurst("rpc_failure");
@@ -2737,7 +2847,7 @@ int main(int argc, char** argv) {
                             + " attempts=" + std::to_string(job.retryAttempt)
                         );
                         knownCommandIds.erase(commandId);
-                        queue.erase(queue.begin() + dispatchIndex);
+                        queue.erase(queue.begin() + selectedIndex);
                     } else {
                         job.nextAttemptTick = GetTickCount() + ReceiptRetryDelayMs(job.retryAttempt);
                         LogDebug(

@@ -816,6 +816,16 @@ class Pipeline:
                 if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:
                     actual_value = dict(actual_value)
                     actual_value["generated_map_sha256"] = {}
+                if field == "room_compiler" and generated_root is None:
+                    actual_value = dict(actual_value)
+                    actual_value["maps"] = {
+                        map_key: {
+                            key: value
+                            for key, value in map_value.items()
+                            if key not in ("generated_map_sha256", "generated_map_size")
+                        }
+                        for map_key, map_value in actual_value["maps"].items()
+                    }
                 if actual_value != expected_value:
                     raise ValueError(f"component=package field=manifest_disagreement value={field}")
             packaged_options = root / "client" / "data" / "options_schema.json"
