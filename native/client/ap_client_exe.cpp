@@ -2470,7 +2470,8 @@ int main(int argc, char** argv) {
             DeleteFileA(kTransientScopePath);
             healthStatePublisher.PublishEffectBaseline(false, transientBaselineEpoch);
         }
-        if (rpcTransportReady && g_ApRpc->Ready() && !transientBaselineReady) {
+        if (rpcTransportReady && g_ApRpc->Ready() && gameStateProbe.IsSafeForRpc()
+                && !transientBaselineReady) {
             static const std::array<const char*, 3> baselineCommands = {
                 "g_damageScaleAllToAI 1",
                 "g_damageScaleAllToSlayer 1",

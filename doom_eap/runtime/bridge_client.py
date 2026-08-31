@@ -3275,6 +3275,8 @@ class DoomEternalContext(CommonContext):
         self._item_delivery_task = None
         self._item_delivery_wakeup = False
         self._item_delivery_waiting_for_state = False
+        self._pending_receipt_observations = set()
+        self._local_chat_echoes = deque()
         self._queue_session_authoritative = False
         self._placement_expected_ids = None
         self._placement_info = {}
@@ -3412,7 +3414,9 @@ class DoomEternalContext(CommonContext):
         except Exception:
             logger.exception("[Bridge] Archipelago PrintJSON logging failed")
         try:
-            emit_launcher_event("archipelago", **format_archipelago_event(self, args))
+            event = format_archipelago_event(self, args)
+            if not self._consume_local_chat_echo(event):
+                emit_launcher_event("archipelago", **event)
         except Exception:
             logger.exception("[Bridge] Archipelago PrintJSON event formatting failed")
 
@@ -3423,7 +3427,27 @@ class DoomEternalContext(CommonContext):
         accepted = self.on_user_say(text)
         if accepted is None:
             raise RuntimeError("Archipelago rejected message")
+        self._local_chat_echoes.append((accepted, time.monotonic() + 5.0))
         await self.send_msgs([{"cmd": "Say", "text": accepted}])
+
+    def _consume_local_chat_echo(self, event):
+        now = time.monotonic()
+        while self._local_chat_echoes and self._local_chat_echoes[0][1] < now:
+            self._local_chat_echoes.popleft()
+        if not any(
+            segment.get("type") == "player" and segment.get("self") is True
+            for segment in event.get("segments", ())
+            if isinstance(segment, dict)
+        ):
+            return False
+        plain = event.get("plain")
+        if not isinstance(plain, str):
+            return False
+        for index, (text, _) in enumerate(self._local_chat_echoes):
+            if plain.endswith(text):
+                del self._local_chat_echoes[index]
+                return True
+        return False
 
     def _launcher_hints_key(self):
         if (
@@ -5067,19 +5091,27 @@ class DoomEternalContext(CommonContext):
                 item_id = network_item.item
                 packet_received_ns = self._packet_received_timestamp(item_index)
                 duplicate = item_index in duplicate_indices
+                observation_key = (
+                    getattr(self, "state_key", ""),
+                    item_index,
+                    receipt_identity(network_item),
+                )
+                pending = not duplicate and observation_key in self._pending_receipt_observations
                 log_delivery_event(
                     "ITEM_RECEIPT_CLASSIFIED",
                     receipt_index=item_index,
                     item_id=item_id,
                     receipt_id=receipt_identity(network_item),
                     trigger=trigger,
-                    classification="duplicate" if duplicate else "new",
+                    classification="duplicate" if duplicate else "pending" if pending else "new",
                     boundary=self.items_processed,
                     state_key=getattr(self, "state_key", None),
                     bridge_revision=BRIDGE_REVISION,
                     mapping_revision=ITEM_MAPPING_REVISION,
                     packet_received_monotonic_ns=packet_received_ns,
                 )
+                if not duplicate:
+                    self._pending_receipt_observations.add(observation_key)
                 if duplicate:
                     logger.info(
                         "[To Game] Duplicate authoritative receipt acknowledged "
@@ -6169,6 +6201,7 @@ class DoomEternalContext(CommonContext):
         initialization_boundary_before = getattr(self, "items_processed", 0)
         previous_state_key = self.state_key
         self._item_session_generation = getattr(self, "_item_session_generation", 0) + 1
+        self._pending_receipt_observations.clear()
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
         if (

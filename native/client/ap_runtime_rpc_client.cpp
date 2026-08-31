@@ -14,17 +14,47 @@ const DWORD kHealthInterval = 1000;
 const DWORD kHealthSummaryInterval = 12000;
 const size_t kMaxCommand = 64 * 1024;
 const size_t kMaxPath = 32 * 1024;
+CRITICAL_SECTION g_rpc_binding_lock;
+volatile LONG g_rpc_binding_lock_state = 0;
+
+void EnsureRpcBindingLock()
+{
+    if (InterlockedCompareExchange(&g_rpc_binding_lock_state, 1, 0) == 0) {
+        InitializeCriticalSection(&g_rpc_binding_lock);
+        InterlockedExchange(&g_rpc_binding_lock_state, 2);
+        return;
+    }
+    while (InterlockedCompareExchange(&g_rpc_binding_lock_state, 2, 2) != 2) {
+        Sleep(0);
+    }
+}
+
+class RpcBindingLock {
+public:
+    RpcBindingLock()
+    {
+        EnsureRpcBindingLock();
+        EnterCriticalSection(&g_rpc_binding_lock);
+    }
+
+    ~RpcBindingLock()
+    {
+        LeaveCriticalSection(&g_rpc_binding_lock);
+    }
+};
 }
 
 ApRuntimeRpcClient::ApRuntimeRpcClient() = default;
 
 ApRuntimeRpcClient::~ApRuntimeRpcClient()
 {
+    RpcBindingLock lock;
     DropBinding();
 }
 
 void ApRuntimeRpcClient::SetLogCallback(LogCallback callback)
 {
+    RpcBindingLock lock;
     log_callback_ = std::move(callback);
 }
 
@@ -44,6 +74,12 @@ void ApRuntimeRpcClient::DropBinding()
 
 bool ApRuntimeRpcClient::Initialize()
 {
+    RpcBindingLock lock;
+    return InitializeUnlocked();
+}
+
+bool ApRuntimeRpcClient::InitializeUnlocked()
+{
     if (binding_ != nullptr) return true;
     RPC_STATUS status = RpcStringBindingComposeA(
         nullptr, (RPC_CSTR)kProtocol, nullptr, (RPC_CSTR)kEndpoint,
@@ -55,6 +91,42 @@ bool ApRuntimeRpcClient::Initialize()
     if (status != RPC_S_OK) { status_ = status; }
     ++attachment_epoch_;
     return true;
+}
+
+bool ApRuntimeRpcClient::Ready() const
+{
+    RpcBindingLock lock;
+    return ready_;
+}
+
+unsigned long long ApRuntimeRpcClient::AttachmentEpoch() const
+{
+    RpcBindingLock lock;
+    return attachment_epoch_;
+}
+
+void ApRuntimeRpcClient::SetCurrentCommandId(const std::string& id)
+{
+    RpcBindingLock lock;
+    command_id_ = id;
+}
+
+std::string ApRuntimeRpcClient::CurrentCommandId() const
+{
+    RpcBindingLock lock;
+    return command_id_;
+}
+
+ApRpcResult ApRuntimeRpcClient::LastResult() const
+{
+    RpcBindingLock lock;
+    return result_;
+}
+
+DWORD ApRuntimeRpcClient::LastTransportStatus() const
+{
+    RpcBindingLock lock;
+    return status_;
 }
 
 bool ApRuntimeRpcClient::SetCallTimeout(ULONG milliseconds)
@@ -99,7 +171,7 @@ bool ApRuntimeRpcClient::Prepare(const char* operation, DWORD* start_tick,
                 << " command_id=" << command_id_;
         log_callback_(message.str());
     }
-    if (!Initialize()) {
+    if (!InitializeUnlocked()) {
         Record(operation, *start_tick, *call_id, AP_RPC_UNKNOWN, status_);
         return false;
     }
@@ -180,6 +252,7 @@ void ApRuntimeRpcClient::Record(
 
 bool ApRuntimeRpcClient::PollHealth()
 {
+    RpcBindingLock lock;
     const std::string saved_command_id = command_id_;
     command_id_ = "-";
     const DWORD now = GetTickCount();
@@ -200,6 +273,7 @@ bool ApRuntimeRpcClient::PollHealth()
 
 bool ApRuntimeRpcClient::ExecuteConsoleCommand(const std::string& command)
 {
+    RpcBindingLock lock;
     if (command.empty() || command.size() > kMaxCommand || command.find('\0') != std::string::npos) {
         Record("execute", GetTickCount(), ++call_sequence_, AP_RPC_UNKNOWN, ERROR_INVALID_PARAMETER);
         return false;
@@ -214,6 +288,7 @@ bool ApRuntimeRpcClient::ExecuteConsoleCommand(const std::string& command)
 
 bool ApRuntimeRpcClient::RequestEntityLoad(const std::string& path, bool begin, int size)
 {
+    RpcBindingLock lock;
     if (path.empty() || path.size() > kMaxPath || size < 0 || path.find('\0') != std::string::npos) {
         Record("request_entities", GetTickCount(), ++call_sequence_, AP_RPC_UNKNOWN, ERROR_INVALID_PARAMETER);
         return false;
@@ -228,6 +303,7 @@ bool ApRuntimeRpcClient::RequestEntityLoad(const std::string& path, bool begin, 
 
 bool ApRuntimeRpcClient::RetrieveEntities(unsigned char* data, size_t* capacity)
 {
+    RpcBindingLock lock;
     if (!data || !capacity || *capacity > 128u * 1024u * 1024u || *capacity > INT_MAX) {
         Record("retrieve_entities", GetTickCount(), ++call_sequence_, AP_RPC_UNKNOWN, ERROR_INVALID_PARAMETER);
         return false;
@@ -245,6 +321,7 @@ bool ApRuntimeRpcClient::RetrieveEntities(unsigned char* data, size_t* capacity)
 
 bool ApRuntimeRpcClient::Checkpoint(int* size, unsigned char* data, int capacity)
 {
+    RpcBindingLock lock;
     if (!size || !data || capacity < 0 || *size < 0 || *size > capacity) {
         Record("checkpoint", GetTickCount(), ++call_sequence_, AP_RPC_UNKNOWN, ERROR_INVALID_PARAMETER);
         return false;
@@ -261,6 +338,7 @@ bool ApRuntimeRpcClient::Checkpoint(int* size, unsigned char* data, int capacity
 
 bool ApRuntimeRpcClient::Spawn(int* size, unsigned char* data, int capacity)
 {
+    RpcBindingLock lock;
     if (!size || !data || capacity < 0 || *size < 0 || *size > capacity) {
         Record("spawn", GetTickCount(), ++call_sequence_, AP_RPC_UNKNOWN, ERROR_INVALID_PARAMETER);
         return false;
