@@ -3,20 +3,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "TAG1 authoring baseline"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
     }
   ],
-  "asset_package_contract_sha256": "519c367a15a6f797bbb9198fcde9c52afcf7d1ad7791b2bb81b54ba1a2ab8cb8",
-  "byte_sha256": "c495a5f6488a9f5b4538c43a74ebb65efe79a3db46eb18744b7a4c1d97f756cb",
+  "asset_package_contract_sha256": "8fab5ab750545ab6033eeee536fd8a4b5b11d24f1f82dee032419e52549d25e2",
+  "byte_sha256": "8407c0335c927a974a455dfb28d77d92fb1f9143c94ccb4d89b4c62f96f37a04",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 463,
-    "byte_size": 15154292,
-    "classes": 13012,
-    "entity_count": 13026,
+    "byte_size": 15863219,
+    "classes": 13010,
+    "entity_count": 13024,
     "layers": 2027,
-    "targets": 17718,
-    "transforms": 28534,
-    "unique_entity_names": 13013
+    "targets": 17713,
+    "transforms": 28536,
+    "unique_entity_names": 13011
   },
   "manifest_sha256": "ad144f5a1d942ac362a902fa3fcd96fa5156aaace5c1a8ab921f125bee36cc3c",
   "map_key": "e4m2_swamp",
@@ -38,5 +42,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "c35ee7de5e97e8e01f5c5727a3826b733f85d1dcb4b7c501161875c0eb454e8b",
-  "semantic_sha256": "014a0e692ac07eff2d0d1c1e9db310e7f0ddf7c880438cf302629037b84475d5"
+  "semantic_sha256": "331f502527b1735fcd5f8fa39f87ae8bc0963ab0006123a7e444213bb3a31bc2"
 }

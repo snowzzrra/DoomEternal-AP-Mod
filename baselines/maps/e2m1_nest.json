@@ -67,20 +67,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "typed map-side persistent item command contract"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
     }
   ],
-  "asset_package_contract_sha256": "39237e28326cdda5cc0b39b946495e49d28e08d7c1341ccee36d5e59784d53c8",
-  "byte_sha256": "6ba5d4d6bd8b7ac96efab5336bc74ed885951f1f08ad51863ad572637ebf6771",
+  "asset_package_contract_sha256": "2114d4f3c8372ca53a27512f26623011a29cb31af9600d4f8bde3b342062491c",
+  "byte_sha256": "f7f9d8590826d9fba08d73a28582ba033b14ed5959e20f214a339049e1b43f57",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 271,
-    "byte_size": 14435584,
-    "classes": 13408,
-    "entity_count": 13411,
-    "layers": 2110,
+    "byte_size": 14440254,
+    "classes": 13414,
+    "entity_count": 13417,
+    "layers": 2113,
     "targets": 8762,
     "transforms": 27372,
-    "unique_entity_names": 13409
+    "unique_entity_names": 13415
   },
   "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
   "map_key": "e2m1_nest",
@@ -120,5 +124,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "719ac741fa7d8e02c15c4d4bcbcba587612051325b5fffc101f66a215a889e5b",
-  "semantic_sha256": "1cdb243f12c349330a3da9a5ee3556ea3b291f7fcc7dafe99c936ad0e15dcc2b"
+  "semantic_sha256": "830108d230b704f8f6326ae9fa2fee5f082be99fea690e0d1ddca5469ec5eb44"
 }

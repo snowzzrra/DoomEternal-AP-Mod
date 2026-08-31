@@ -1159,6 +1159,248 @@ class AdapterResult:
     details: dict[str, object] = field(default_factory=dict)
 
 
+class LinuxVerificationError(ValueError):
+    def __init__(self, message: str, details: Mapping[str, object] | None = None):
+        super().__init__(message)
+        self.details = dict(details or {})
+
+
+def _contains_bytes(path: Path, needle: bytes, *, chunk_size: int = 1024 * 1024) -> bool:
+    """Search bounded chunks without loading an entire game resource archive."""
+    if not needle:
+        return False
+    overlap = len(needle) - 1
+    try:
+        with path.open("rb") as source:
+            previous = b""
+            while chunk := source.read(chunk_size):
+                if needle in previous + chunk:
+                    return True
+                previous = (previous + chunk)[-overlap:] if overlap else b""
+    except OSError:
+        return False
+    return False
+
+
+def _packagemapspec_owner(
+    packagemapspec: Path,
+    runtime_map: str,
+) -> tuple[str, int, list[str]]:
+    document = json.loads(packagemapspec.read_text(encoding="utf-8"))
+    files = document.get("files")
+    maps = document.get("maps")
+    refs = document.get("mapFileRefs")
+    if not isinstance(files, list) or not isinstance(maps, list) or not isinstance(refs, list):
+        raise ValueError("packagemapspec.json has invalid resource tables")
+    map_indices = [
+        index for index, record in enumerate(maps)
+        if isinstance(record, dict) and record.get("name") == runtime_map
+    ]
+    if len(map_indices) != 1:
+        raise ValueError(f"runtime map {runtime_map!r} has no unique packagemapspec record")
+    map_index = map_indices[0]
+    candidates: list[tuple[int, str]] = []
+    for relation in refs:
+        if not isinstance(relation, dict) or relation.get("map") != map_index:
+            continue
+        file_index = relation.get("file")
+        if not isinstance(file_index, int) or not 0 <= file_index < len(files):
+            raise ValueError(f"runtime map {runtime_map!r} has invalid resource reference")
+        record = files[file_index]
+        name = record.get("name") if isinstance(record, dict) else None
+        if isinstance(name, str) and name.endswith(".resources"):
+            candidates.append((file_index, name))
+    if not candidates:
+        raise ValueError(f"runtime map {runtime_map!r} has no resource reference")
+    return candidates[0][1], candidates[0][0], [name for _, name in candidates]
+
+
+def _required_linux_resource_specs(
+    staged_mod: Path,
+    packagemapspec: Path,
+) -> tuple[list[dict[str, object]], list[str]]:
+    with zipfile.ZipFile(staged_mod) as archive:
+        members = sorted(archive.namelist())
+        payloads = {name: archive.read(name) for name in members}
+    owners = sorted({name.split("/", 1)[0] for name in members if "/" in name})
+    owner_members = {
+        owner: [name for name in members if name.startswith(owner + "/")]
+        for owner in owners
+    }
+
+    def map_member(runtime_map: str, owner: str) -> str | None:
+        marker = f"/maps/{runtime_map}.entities"
+        candidates = [name for name in owner_members.get(owner, ()) if marker in f"/{name}"]
+        return candidates[0] if candidates else None
+
+    required: list[tuple[str, str, str | None]] = []
+    for label, runtime_map in (
+        ("e1m1", "game/sp/e1m1_intro/e1m1_intro"),
+        ("hub", "game/hub/hub"),
+    ):
+        owner, _, _ = _packagemapspec_owner(packagemapspec, runtime_map)
+        owner_stem = PurePosixPath(owner).name.removesuffix(".resources")
+        required.append((label, runtime_map, map_member(runtime_map, owner_stem)))
+
+    shell_owners = [
+        owner for owner in owners
+        if re.fullmatch(r"gameresources(?:_patch\d+)?", owner, re.IGNORECASE)
+    ]
+    if not shell_owners:
+        raise ValueError("room package has no shell resource owner")
+    shell_owner = "gameresources_patch1" if "gameresources_patch1" in shell_owners else shell_owners[0]
+    shell_members = [
+        name for name in owner_members[shell_owner]
+        if name.casefold().endswith((".decl", ".entities"))
+    ]
+    required.append(("shell", "", shell_members[0] if shell_members else owner_members[shell_owner][0]))
+
+    tag_candidates: list[tuple[str, str, str]] = []
+    for name in members:
+        match = re.search(r"/maps/(game/(?:dlc|dlc2)/[^/]+/[^/]+)\.entities$", f"/{name}")
+        if match is None:
+            continue
+        runtime_map = match.group(1)
+        owner = name.split("/", 1)[0]
+        if runtime_map == "game/dlc/hub/hub":
+            continue
+        tag_candidates.append((runtime_map, owner, name))
+    for runtime_map, staged_owner, member in sorted(tag_candidates):
+        expected_owner, _, _ = _packagemapspec_owner(packagemapspec, runtime_map)
+        expected_owner_stem = PurePosixPath(expected_owner).name.removesuffix(".resources")
+        if expected_owner_stem == staged_owner:
+            required.append(("tag", runtime_map, member))
+            break
+    if not any(label == "tag" for label, _, _ in required):
+        raise ValueError("room package has no TAG map with matching resource owner")
+
+    results: list[dict[str, object]] = []
+    warnings: list[str] = []
+    for label, runtime_map, member in required:
+        expected_owner = ""
+        priority: int | None = None
+        candidates: list[str] = []
+        if runtime_map:
+            expected_owner, priority, candidates = _packagemapspec_owner(packagemapspec, runtime_map)
+        else:
+            expected_owner = f"{shell_owner}.resources"
+        owner_stem = PurePosixPath(expected_owner).name.removesuffix(".resources")
+        selected_member = member if member and member.split("/", 1)[0] == owner_stem else None
+        owner_member_list = owner_members.get(owner_stem, [])
+        if selected_member is None and owner_member_list:
+            selected_member = owner_member_list[0]
+        resource_path = packagemapspec.parent / expected_owner
+        meta_path = resource_path.with_suffix(".meta")
+        path_marker = ""
+        payload_present = False
+        path_present = False
+        if selected_member is not None:
+            path_marker = selected_member.split("/", 1)[1]
+            path_present = _contains_bytes(resource_path, path_marker.encode("utf-8"))
+            payload_present = _contains_bytes(resource_path, payloads[selected_member])
+        status = "verified" if (
+            selected_member is not None
+            and resource_path.is_file()
+            and meta_path.is_file()
+            and path_present
+            and payload_present
+        ) else "failed"
+        result = {
+            "label": label,
+            "runtime_map": runtime_map,
+            "expected_owner": expected_owner,
+            "resource_path": str(resource_path),
+            "meta_path": str(meta_path),
+            "resource_priority": priority,
+            "resource_candidates": candidates,
+            "staged_owner": owner_stem,
+            "staged_member": selected_member or "",
+            "staged_member_sha256": (
+                hashlib.sha256(payloads[selected_member]).hexdigest()
+                if selected_member is not None else ""
+            ),
+            "owner_member_count": len(owner_member_list),
+            "resource_exists": resource_path.is_file(),
+            "meta_exists": meta_path.is_file(),
+            "path_present": path_present,
+            "payload_present": payload_present,
+            "status": status,
+        }
+        results.append(result)
+        if status != "verified":
+            warnings.append(f"{label}:{expected_owner}:{selected_member or 'missing staged member'}")
+    return results, warnings
+
+
+def _required_resource_output_issues(
+    output: str,
+    results: Sequence[Mapping[str, object]],
+) -> list[str]:
+    names = {
+        str(value).casefold()
+        for result in results
+        for value in (
+            result.get("label"), result.get("expected_owner"),
+            result.get("runtime_map"), result.get("staged_owner"),
+        )
+        if value
+    }
+    issues: list[str] = []
+    for line in output.splitlines():
+        lowered = line.casefold()
+        warning = re.search(r"\bwarning\b", lowered) is not None
+        skipped = re.search(r"\bskipped?\b", lowered) is not None
+        if not (warning or skipped):
+            continue
+        if "resource" in lowered or any(name in lowered for name in names):
+            issues.append(line.strip()[:500])
+    return issues
+
+
+def verify_linux_mod_installation(
+    game_root: Path,
+    staged_mod: Path,
+    *,
+    stdout: str = "",
+    stderr: str = "",
+) -> dict[str, object]:
+    """Verify InjectorShell changed required owner resources in current game format."""
+    root = validate_game_root(game_root)
+    staged_input = staged_mod.expanduser()
+    if staged_input.is_symlink():
+        raise ValueError("staged room ZIP is a symbolic link")
+    staged = staged_input.resolve()
+    mods = (root / "Mods").resolve()
+    if staged.parent != mods or not staged.is_file():
+        raise ValueError("staged room ZIP is outside configured game Mods folder")
+    if not zipfile.is_zipfile(staged):
+        raise ValueError("staged room ZIP is invalid")
+    packagemapspec = root / "base" / "packagemapspec.json"
+    if not packagemapspec.is_file():
+        raise FileNotFoundError("packagemapspec.json is missing from current game resources")
+    results, missing = _required_linux_resource_specs(staged, packagemapspec)
+    output_issues = _required_resource_output_issues(
+        f"{stdout}\n{stderr}", results
+    )
+    if output_issues:
+        raise LinuxVerificationError(
+            "InjectorShell reported required resource warnings/skips: " + " | ".join(output_issues),
+            {"required_resources": results, "output_issues": output_issues},
+        )
+    if missing:
+        raise LinuxVerificationError(
+            "required resource evidence missing: " + ", ".join(missing),
+            {"required_resources": results},
+        )
+    return {
+        "state": "verified",
+        "mods_path": str(mods),
+        "packagemapspec_path": str(packagemapspec),
+        "packagemapspec_sha256": hashlib.sha256(packagemapspec.read_bytes()).hexdigest(),
+        "required_resources": results,
+    }
+
+
 def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
         raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
@@ -1632,6 +1874,11 @@ class LinuxModManagerAdapter:
                 command=command,
                 stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
                 stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
+                details={
+                    "injector_version": self.dependency.version,
+                    "mods_path": str((game_root / "Mods").resolve()),
+                    "post_install_verification": "not_run",
+                },
             )
         state = "applied" if completed.returncode == 0 else "failed"
         return AdapterResult(
@@ -1645,11 +1892,55 @@ class LinuxModManagerAdapter:
             stdout=completed.stdout,
             stderr=completed.stderr,
             returncode=completed.returncode,
+            details={
+                "injector_version": self.dependency.version,
+                "mods_path": str((game_root / "Mods").resolve()),
+                "post_install_verification": "not_run",
+            },
         )
 
     def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        _stage_mod(mod_zip, game_root)
-        return self.run(game_root)
+        staged = _stage_mod(mod_zip, game_root)
+        result = self.run(game_root)
+        if result.state != "applied":
+            return result
+        try:
+            verification = verify_linux_mod_installation(
+                game_root,
+                staged,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Mod injector completed, but post-install verification failed: {error}",
+                command=result.command,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                returncode=result.returncode,
+                details={
+                    **result.details,
+                    **getattr(error, "details", {}),
+                    "post_install_verification": "failed",
+                    "verification_error": str(error),
+                },
+            )
+        return AdapterResult(
+            state="applied",
+            message="Mod installed and verified successfully. Start DOOM Eternal through Steam.",
+            command=result.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+            details={
+                **result.details,
+                "post_install_verification": verification["state"],
+                "required_resources": verification["required_resources"],
+                "packagemapspec_path": verification["packagemapspec_path"],
+                "packagemapspec_sha256": verification["packagemapspec_sha256"],
+            },
+        )
 
 
 @dataclass(frozen=True)

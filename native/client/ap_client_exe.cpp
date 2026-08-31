@@ -1929,7 +1929,7 @@ bool IsSilentMaintenanceJob(const CommandJob& job) {
 
 bool IsFreshReceiptCommandId(const std::string& commandId) {
     static const std::regex receipt(
-        R"(^recv-[0-9a-f]{16}-[0-9]+-item-[0-9]+-cmd-[0-9]+(?:-notify)?$)"
+        R"(^recv-[0-9a-f]{16}-[0-9]+-item-[0-9]+-(?:cmd-[0-9]+(?:-notify)?|effect-[0-9]+|notify)$)"
     );
     return std::regex_match(commandId, receipt);
 }

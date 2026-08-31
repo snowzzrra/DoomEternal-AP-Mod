@@ -22,6 +22,7 @@ from tools.validation.validate_item_notification_package import (
     LOCATION_NOTIFICATION_RE,
     NOTIFICATION_RE,
     capability,
+    progressive_notification_stage_count,
     entity_block,
     string_table_names,
 )
@@ -84,13 +85,47 @@ def _map_payload_path(mod_root: Path, plan) -> Path:
     return mod_root / resource_name / "maps" / plan.relative_entities_path
 
 
-def _assert_notifications(content: str, map_key: str) -> None:
+def _assert_notifications(
+    content: str,
+    map_key: str,
+    item_definitions: dict[str, Any],
+) -> None:
     if "entityDef ap_rpc_item_" in content:
         raise AssertionError(f"forbidden receipt root: {map_key}")
+    checked_rpc_ids: set[int] = set()
     for suffix in NOTIFICATION_RE.findall(content):
         notification = entity_block(content, f"ap_notify_item_{suffix}")
         rpc_suffix = suffix.split('_', 1)[1].rsplit('_', 1)[0]
-        entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
+        try:
+            item_id = int(rpc_suffix.split("_", 1)[0])
+        except ValueError as error:
+            raise AssertionError(f"notification has invalid item ID: {map_key}/{suffix}") from error
+        definition = item_definitions.get(str(item_id))
+        if definition is None:
+            raise AssertionError(f"notification has unknown item ID: {map_key}/{suffix}")
+        progressive_stage_count = progressive_notification_stage_count(item_id, definition)
+        if progressive_stage_count is not None:
+            parts = rpc_suffix.split("_")
+            if len(parts) != 2 or not parts[1].isdigit() or int(parts[1]) >= progressive_stage_count:
+                raise AssertionError(f"notification has invalid progressive stage: {map_key}/{suffix}")
+        if item_id not in checked_rpc_ids:
+            checked_rpc_ids.add(item_id)
+            if isinstance(definition, dict) and definition.get("type") == "transient_effect":
+                pass
+            elif isinstance(definition, dict) and definition.get("type") in {
+                "progressive_perk", "progressive_item",
+            }:
+                for stage, stage_effects in enumerate(definition["perks"]):
+                    effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
+                    for index in range(len(effects)):
+                        rpc_name = (
+                            f"ap_rpc_v3_{item_id}_{stage}"
+                            if isinstance(stage_effects, str)
+                            else f"ap_rpc_v3_{item_id}_{stage}_{index}"
+                        )
+                        entity_block(content, rpc_name)
+            else:
+                entity_block(content, f"ap_rpc_v3_{item_id}")
         if any(field in notification for field in (
             'triggerOnce = true;', 'removeAfterActivation = true;',
             'disableAfterActivation = true;', 'startOff = true;',
@@ -364,6 +399,7 @@ def audit_mod_payload(
     mod_root: Path,
     map_registry: Path,
     decompressor: Path | None,
+    item_definitions: dict[str, Any],
     *,
     require_generated_identity: bool = True,
     visual_registry: dict[str, object] | None = None,
@@ -409,7 +445,7 @@ def audit_mod_payload(
                     raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
                 if generated_identity_required and generated_notifications != packaged_notifications:
                     raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
-                _assert_notifications(packaged_text, plan.map_key)
+                _assert_notifications(packaged_text, plan.map_key, item_definitions)
             elif "entityDef ap_rpc_item_" in packaged_text or packaged_notifications:
                 raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
             records[plan.map_key] = {
@@ -440,6 +476,15 @@ def _audit_locales(enabled: bool, mod_root: Path) -> None:
         raise AssertionError("notification payload lacks locale strings")
     if string_table_names(tables[0]) != string_table_names(tables[1]):
         raise AssertionError("payload locale string names diverge")
+
+
+def _load_item_definitions(client_dir: Path) -> dict[str, Any]:
+    payload = json.loads(
+        (client_dir / "data/items.json").read_text(encoding="utf-8")
+    )
+    if not isinstance(payload, dict):
+        raise AssertionError("packaged item definitions are not an object")
+    return payload
 
 
 def _audit_room_resources(
@@ -513,6 +558,7 @@ def _audit_final_content(
     visual_registry: dict[str, object],
 ) -> dict[str, dict[str, int | str]]:
     content_cache: dict[str, bytes] = {}
+    item_definitions = _load_item_definitions(client_dir)
     stats = _audit_final_physical_states(
         client_dir / "resources",
         payload_manifest,
@@ -530,6 +576,7 @@ def _audit_final_content(
         mod_root,
         map_registry,
         decompressor,
+        item_definitions,
         visual_registry=visual_registry,
         content_cache=content_cache,
     )

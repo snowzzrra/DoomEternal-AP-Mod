@@ -502,18 +502,24 @@ def classify_item_definition(definition: Any) -> str:
             "physical_pickup_spawn": "physical_pickup_spawn",
             "currency": "currency",
             "no_op": "no_op",
+            "transient_effect": "transient_effect",
         }.get(definition.get("type"), "unknown")
     if not isinstance(definition, str):
         return "unknown"
     lowered = definition.lower()
     if lowered.startswith("chrispy "):
         return "trap_spawn"
-    if lowered.startswith("g_giveextralives ") or "extra_life" in lowered:
-        return "extra_life"
-    if lowered.startswith(("give health", "give armor", "give ammo")):
-        return "resource"
     if "giveplayerperk" in lowered:
         return "perk"
+    if lowered.startswith("g_giveextralives ") or "extra_life" in lowered:
+        return "extra_life"
+    if lowered.startswith("give ammo") and any(
+        token.startswith("-") and token[1:].isdigit()
+        for token in lowered.split()
+    ):
+        return "trap_spawn"
+    if lowered.startswith(("give health", "give armor", "give ammo")):
+        return "resource"
     return "simple_give"
 
 
@@ -536,6 +542,15 @@ def compile_item_delivery_plan(
         primitive_id = contracts["family_primitives"][family]
     except KeyError as error:
         raise ValueError(f"Unregistered item family for {item_id}: {family}") from error
+    if family == "transient_effect":
+        return DeliveryPlan(
+            item_id,
+            family,
+            primitive_id,
+            (),
+            None,
+            str(definition),
+        )
     primitive(primitive_id, release=True)
     entities: list[str]
     description: str

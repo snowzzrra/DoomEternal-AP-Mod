@@ -32,6 +32,7 @@ from .launcher_platform import (
     probe_meathook,
     probe_runtime_prerequisites,
     stage_room_mod,
+    verify_linux_mod_installation,
 )
 
 EventSink = Callable[[str, dict[str, object]], None]
@@ -195,11 +196,19 @@ class IntegratedSetupRecord:
     adapter_state: str
     adapter_message: str
     adapter_command: tuple[str, ...] = ()
+    injector_command: tuple[str, ...] = ()
     steam_launch_option: str = ""
     steam_launch_option_diff: str = ""
     installation_mode: str = "automatic"
     user_confirmed: bool = False
     new_install: bool = False
+    room_zip_sha256: str = ""
+    generated_sha256: str = ""
+    mods_path: str = ""
+    injector_version: str = ""
+    injector_exit_code: int | None = None
+    required_resources: tuple[dict[str, object], ...] = ()
+    post_install_verification: str = ""
 
 
 @dataclass(frozen=True)
@@ -447,10 +456,49 @@ class IntegratedLaunchWorkflow:
         if adapter_state != "applied":
             return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
 
+        generated_path = Path(str(receipt.get("generated_mod", ""))).expanduser()
+        generated_sha = str(receipt.get("generated_sha256", ""))
+        room_zip_sha = str(receipt.get("room_zip_sha256", expected_sha))
+        if not generated_path.is_file() or not generated_sha:
+            return InstallState(
+                "already_installed", manifest.manifest_hash, str(staged), steam_option,
+                readiness="blocked", readiness_reason="install record lacks generated room ZIP evidence",
+            )
+        try:
+            generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
+        except OSError as error:
+            return InstallState(
+                "already_installed", manifest.manifest_hash, str(staged), steam_option,
+                readiness="blocked", readiness_reason=f"generated room ZIP evidence unavailable: {error}",
+            )
+        if generated_actual != generated_sha or expected_sha != room_zip_sha or generated_sha != expected_sha:
+            return InstallState(
+                "already_installed", manifest.manifest_hash, str(staged), steam_option,
+                readiness="blocked", readiness_reason="generated and staged room ZIP hashes differ",
+            )
+
         # Room package is verified installed. Now check live runtime prerequisites.
         try:
             config = self._config()
             game_root = self._game_root(config)
+            if self.platform_name == "linux":
+                raw_command = receipt.get("injector_command", receipt.get("adapter_command", ()))
+                raw_resources = receipt.get("required_resources", ())
+                if (
+                    str(receipt.get("post_install_verification", "")) != "verified"
+                    or not str(receipt.get("injector_version", ""))
+                    or not isinstance(raw_command, (list, tuple)) or not raw_command
+                    or receipt.get("injector_exit_code") != 0
+                    or not isinstance(raw_resources, (list, tuple))
+                    or len(raw_resources) != 4
+                    or any(not isinstance(item, dict) or item.get("status") != "verified" for item in raw_resources)
+                    or str(receipt.get("mods_path", "")) != str((game_root / "Mods").resolve())
+                ):
+                    return InstallState(
+                        "already_installed", manifest.manifest_hash, str(staged), steam_option,
+                        readiness="blocked", readiness_reason="Linux install evidence is incomplete",
+                    )
+                verify_linux_mod_installation(game_root, staged)
             prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
             if not prereqs.ok:
                 meathook = prereqs.meathook
@@ -644,6 +692,16 @@ class IntegratedLaunchWorkflow:
         manifest = self._manifest_for(snapshot)
         raw_command = receipt.get("adapter_command", ())
         adapter_command = tuple(str(item) for item in raw_command) if isinstance(raw_command, (list, tuple)) else ()
+        raw_injector_command = receipt.get("injector_command", adapter_command)
+        injector_command = (
+            tuple(str(item) for item in raw_injector_command)
+            if isinstance(raw_injector_command, (list, tuple)) else adapter_command
+        )
+        raw_required_resources = receipt.get("required_resources", ())
+        required_resources = (
+            tuple(item for item in raw_required_resources if isinstance(item, dict))
+            if isinstance(raw_required_resources, (list, tuple)) else ()
+        )
         return IntegratedSetupRecord(
             manifest_hash=manifest.manifest_hash,
             randomize_dash=bool(receipt.get("randomize_dash", manifest.options["randomize_dash"])),
@@ -653,11 +711,22 @@ class IntegratedLaunchWorkflow:
             adapter_state="applied",
             adapter_message=str(receipt.get("adapter_message", "Mod is already installed for current room.")),
             adapter_command=adapter_command,
+            injector_command=injector_command,
             steam_launch_option=state.steam_launch_option,
             steam_launch_option_diff=str(receipt.get("steam_launch_option_diff", "")),
             installation_mode=str(receipt.get("installation_mode", "automatic")),
             user_confirmed=bool(receipt.get("user_confirmed", False)),
             new_install=False,
+            room_zip_sha256=str(receipt.get("room_zip_sha256", receipt["staged_sha256"])),
+            generated_sha256=str(receipt.get("generated_sha256", "")),
+            mods_path=str(receipt.get("mods_path", "")),
+            injector_version=str(receipt.get("injector_version", "")),
+            injector_exit_code=(
+                receipt.get("injector_exit_code")
+                if isinstance(receipt.get("injector_exit_code"), int) else None
+            ),
+            required_resources=required_resources,
+            post_install_verification=str(receipt.get("post_install_verification", "")),
         )
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
@@ -759,6 +828,7 @@ class IntegratedLaunchWorkflow:
             manifest,
             self.state_dir / "generated_mods",
         )
+        generated_sha256 = hashlib.sha256(generated.read_bytes()).hexdigest()
         runtime_config = self.base_workflow.write_client_config(
             self.application_dir,
             endpoint=endpoint or str(config.get("server_address") or ""),
@@ -777,20 +847,29 @@ class IntegratedLaunchWorkflow:
             ),
         )
         self._emit("mod_staged", path=str(staged), manifest_hash=manifest.manifest_hash)
+        staged_sha256 = hashlib.sha256(staged.read_bytes()).hexdigest()
+        if staged_sha256 != generated_sha256:
+            raise RuntimeError("generated and staged room mod hashes differ")
         self._failure_phase = "game_setup"
         adapter, steam_option, steam_diff = self._adapter(config, game_root, staged)
         self._failure_phase = "room_package"
         installation_mode = str(adapter.details.get("installation_mode", "automatic") if adapter.details else "automatic")
         user_confirmed = bool(adapter.details.get("user_confirmed", False) if adapter.details else False)
+        raw_required_resources = adapter.details.get("required_resources", ()) if adapter.details else ()
+        required_resources = (
+            tuple(item for item in raw_required_resources if isinstance(item, dict))
+            if isinstance(raw_required_resources, (list, tuple)) else ()
+        )
         record = IntegratedSetupRecord(
             manifest_hash=manifest.manifest_hash,
             randomize_dash=manifest.options["randomize_dash"],
             generated_mod=str(generated.resolve()),
             staged_mod=str(staged.resolve()),
-            staged_sha256=hashlib.sha256(staged.read_bytes()).hexdigest(),
+            staged_sha256=staged_sha256,
             adapter_state=adapter.state,
             adapter_message=adapter.message,
             adapter_command=adapter.command,
+            injector_command=adapter.command,
             steam_launch_option=steam_option,
             steam_launch_option_diff=steam_diff,
             installation_mode=installation_mode,
@@ -798,6 +877,15 @@ class IntegratedLaunchWorkflow:
             new_install=(
                 pre_install_state.state == "install_needed"
                 and adapter.state in {"applied", "manual_install_required"}
+            ),
+            room_zip_sha256=staged_sha256,
+            generated_sha256=generated_sha256,
+            mods_path=str((game_root / "Mods").resolve()),
+            injector_version=str(adapter.details.get("injector_version", "") if adapter.details else ""),
+            injector_exit_code=adapter.returncode,
+            required_resources=required_resources,
+            post_install_verification=str(
+                adapter.details.get("post_install_verification", "") if adapter.details else ""
             ),
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
@@ -1079,10 +1167,18 @@ class IntegratedLaunchWorkflow:
             raise RuntimeError(f"Pending manual installation receipt is invalid: {error}") from error
 
         config = self._config()
-        self._game_root(config)
+        game_root = self._game_root(config)
+        verification: dict[str, object] = {}
+        if self.platform_name == "linux":
+            verification = verify_linux_mod_installation(game_root, staged_mod_path)
         steam_plan = self._steam_plan(config) if self.platform_name == "linux" else None
         steam_option = steam_plan.proposed if steam_plan else ""
         steam_diff = steam_plan.diff if steam_plan else ""
+        raw_required_resources = verification.get("required_resources", ())
+        required_resources = (
+            tuple(item for item in raw_required_resources if isinstance(item, dict))
+            if isinstance(raw_required_resources, (list, tuple)) else ()
+        )
 
         record = IntegratedSetupRecord(
             manifest_hash=manifest.manifest_hash,
@@ -1093,11 +1189,17 @@ class IntegratedLaunchWorkflow:
             adapter_state="applied",
             adapter_message="Manual mod installation confirmed by user.",
             adapter_command=(),
+            injector_command=(),
             steam_launch_option=steam_option,
             steam_launch_option_diff=steam_diff,
             installation_mode="manual_fallback",
             user_confirmed=True,
             new_install=new_install,
+            room_zip_sha256=staged_sha256,
+            generated_sha256=staged_sha256,
+            mods_path=str((game_root / "Mods").resolve()),
+            required_resources=required_resources,
+            post_install_verification=str(verification.get("state", "")),
         )
 
         payload = {

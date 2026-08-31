@@ -130,6 +130,7 @@
       "independent_visual": {
         "entity_name": "ap_location_visual_7770074",
         "cleanup_entity": "ap_remove_location_visual_7770074",
+        "inherit": "func/dynamic",
         "model": "art/pickups/codex.lwo",
         "thinkComponentDecl": "bob_rotate_slow",
         "position": [

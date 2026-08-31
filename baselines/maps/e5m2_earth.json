@@ -1,0 +1,41 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
+    }
+  ],
+  "asset_package_contract_sha256": "3d2ae16dbd477578567416b74b2d39fe252735354027edfe59bff2056bd9cc99",
+  "byte_sha256": "5fdf494e260bedce9eee3bf9e211d60d21c78fe7c52187a710e568388d90f726",
+  "content_revision": "0.5.0",
+  "generated_entity_metrics": {
+    "bind_parents": 69,
+    "byte_size": 4951536,
+    "classes": 5020,
+    "entity_count": 5020,
+    "layers": 498,
+    "targets": 2369,
+    "transforms": 9620,
+    "unique_entity_names": 5020
+  },
+  "manifest_sha256": "485963960122bf6c3096186e9ccc70481d871632af5a46321a12d437f456e8dc",
+  "map_key": "e5m2_earth",
+  "physical_ap_ids": [
+    7770466,
+    7770467,
+    7770468,
+    7770469,
+    7770470,
+    7770471,
+    7770472,
+    7770473,
+    7770474
+  ],
+  "publisher_contract_sha256": "fa356167cc0f92b7242aa2d3e5d9b84704409715fe0c079b214815539a6a0b70",
+  "runtime_location_ids": [
+    7770475
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "4186992de9b03134d5b810a555edd6cc66c85d91cee68be0f6ac21e73709b208",
+  "semantic_sha256": "05b3c50fc89bcd8a5a920d2acb8e50b4cc1b322a2076430dbc44ac8101eb731e"
+}

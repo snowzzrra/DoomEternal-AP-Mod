@@ -71,20 +71,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "typed map-side persistent item command contract"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
     }
   ],
-  "asset_package_contract_sha256": "f0186074dd8a2fdcc54cc5bdf4bafd0b4106051af1f9132d04b1655d7c8dc3ee",
-  "byte_sha256": "4ae3594184eee3b3e8c1f494a9a19a03c3a1219560b8284f34facebb98698e99",
+  "asset_package_contract_sha256": "ef3a4dc42ee3979a6f025bfe3789a411a735c7d474666b114b170d5c6ec8f996",
+  "byte_sha256": "6bbbbf681ebba17af17b5efe3da5d8daeb920144ce72a8d5bd31273810635384",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20114569,
-    "classes": 18356,
-    "entity_count": 18356,
+    "byte_size": 20118982,
+    "classes": 18362,
+    "entity_count": 18362,
     "layers": 4816,
     "targets": 10775,
     "transforms": 37089,
-    "unique_entity_names": 18356
+    "unique_entity_names": 18362
   },
   "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
   "map_key": "e1m3_cult",
@@ -120,5 +124,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "8e9a361d22ece224f608d195c0bc4b14fb3c6b28218d15981db52d17374788f6"
+  "semantic_sha256": "752754fa4879d2a12f778d3f090d74c04b2cd76014ec8f256b1c73fb475aab89"
 }

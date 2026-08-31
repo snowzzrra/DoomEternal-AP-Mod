@@ -86,6 +86,7 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path):
 
 
 def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
+    source_root = Path(__file__).resolve().parents[2]
     manifest = load_release_manifest(manifest_path, package_root=manifest_path.parent)
     registry_path = client_dir / "data" / "checked_location_visuals.json"
     registry_record = manifest["checked_location_visuals"]

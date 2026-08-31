@@ -22,8 +22,8 @@ SHELL_SOURCE_SHA256 = "c1ce664337a6c78d8f1e834b691a68646c791c6c0e8572fdf11a788d2
 
 AP_MENU_ENTITY_NAME = "ap_menu_archipelago_world"
 AP_MENU_MODEL = "art/pickups/codex.lwo"
-AP_MENU_POSITION = (12.0, -100.0, 2.5)
-AP_MENU_SCALE = 3.6
+AP_MENU_POSITION = (20.0, -100.0, 2.5)
+AP_MENU_SCALE = 4.8
 AP_MENU_THINK_COMPONENT = "rotate_slow"
 
 ENTITY_TEMPLATE = '''entity {{

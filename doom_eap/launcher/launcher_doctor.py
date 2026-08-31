@@ -26,6 +26,7 @@ from .launcher_platform import (
     redact_secrets,
     resolve_doom_config_path,
     validate_game_root,
+    verify_linux_mod_installation,
 )
 
 SUPPORT_LOG_TAIL_BYTES = 256 * 1024
@@ -842,6 +843,9 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
         return result
     for key in (
         "schema", "manifest_hash", "staged_mod", "staged_sha256",
+        "room_zip_sha256", "generated_mod", "generated_sha256", "mods_path",
+        "injector_version", "injector_command", "adapter_command", "injector_exit_code",
+        "required_resources", "post_install_verification",
         "adapter_state", "installation_mode", "steam_launch_option",
     ):
         if key in document:
@@ -858,8 +862,68 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
                 result["hash_match"] = actual == expected
             except OSError:
                 result["hash_match"] = False
+    result["support_evidence"] = {
+        key: result[key]
+        for key in (
+            "room_zip_sha256", "generated_sha256", "mods_path", "injector_version",
+            "injector_command", "adapter_command", "injector_exit_code",
+            "required_resources", "post_install_verification",
+        )
+        if key in result
+    }
+    generated = document.get("generated_mod")
+    generated_expected = document.get("generated_sha256")
+    if isinstance(generated, str) and generated and isinstance(generated_expected, str) and generated_expected:
+        generated_path = Path(generated)
+        result["generated_exists"] = generated_path.is_file()
+        if generated_path.is_file():
+            try:
+                generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
+                result["generated_sha256_actual"] = generated_actual
+                result["generated_hash_match"] = generated_actual == generated_expected
+                if isinstance(expected, str) and expected and "staged_sha256_actual" in result:
+                    result["generated_stage_match"] = generated_actual == result["staged_sha256_actual"]
+            except OSError:
+                result["generated_hash_match"] = False
     result["status"] = "available"
     return result
+
+
+def _verify_linux_receipt(
+    receipt: Mapping[str, object],
+    config: Mapping[str, object],
+) -> dict[str, object]:
+    if os.name == "nt":
+        return {"state": "not_applicable"}
+    base = Path(str(config.get("doom_base_dir", ""))).expanduser().resolve()
+    root = base.parent if base.name.casefold() == "base" else base
+    staged = Path(str(receipt.get("staged_mod", ""))).expanduser()
+    staged_expected = str(receipt.get("staged_sha256", ""))
+    room_zip_expected = str(receipt.get("room_zip_sha256", staged_expected))
+    generated_path = Path(str(receipt.get("generated_mod", ""))).expanduser()
+    generated_expected = str(receipt.get("generated_sha256", ""))
+    if not staged_expected or not room_zip_expected or not generated_expected or not generated_path.is_file():
+        raise ValueError("Linux install record lacks complete room ZIP hash evidence")
+    staged_actual = hashlib.sha256(staged.read_bytes()).hexdigest()
+    generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
+    if not (staged_actual == staged_expected == room_zip_expected == generated_expected == generated_actual):
+        raise ValueError("generated and staged room ZIP hashes differ")
+    raw_command = receipt.get("injector_command", receipt.get("adapter_command", ()))
+    raw_resources = receipt.get("required_resources", ())
+    expected_mods = str((root / "Mods").resolve())
+    if (
+        not str(receipt.get("injector_version", ""))
+        or not isinstance(raw_command, (list, tuple)) or not raw_command
+        or receipt.get("injector_exit_code") != 0
+        or not isinstance(raw_resources, (list, tuple)) or len(raw_resources) != 4
+        or any(not isinstance(item, Mapping) or item.get("status") != "verified" for item in raw_resources)
+        or str(receipt.get("mods_path", "")) != expected_mods
+    ):
+        raise ValueError("Linux install record lacks complete injector or resource evidence")
+    verification = verify_linux_mod_installation(root, staged)
+    if str(receipt.get("post_install_verification", "")) != "verified":
+        raise ValueError("Linux post-install verification is not recorded")
+    return verification
 
 
 def _support_game_link_diagnostics(
@@ -1350,6 +1414,16 @@ class LauncherDoctor:
                     "Installer keeps file backups and verifies installed hash.",
                 ))
                 return tuple(actions)
+            if os.name != "nt" and adapter_state == "applied":
+                try:
+                    _verify_linux_receipt(receipt, self.config)
+                except Exception as error:
+                    actions.append(RepairAction(
+                        "reinstall_room_mod", "Repair unverified Linux room mod",
+                        (f"Reapply and verify launcher-owned package: {staged.name}",), True,
+                        f"Post-install resource evidence failed: {error}",
+                    ))
+                    return tuple(actions)
             if adapter_state != "applied":
                 actions.append(RepairAction(
                     "reinstall_room_mod", "Apply room mod setup",
@@ -1458,8 +1532,30 @@ class LauncherDoctor:
                 room_uninstall_state = adapter_state if adapter_state in UNINSTALL_OWNED_STATES else ""
                 mode = str(receipt.get("installation_mode", ""))
                 if adapter_state == "applied":
-                    checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
-                    checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                    if os.name != "nt":
+                        try:
+                            verification = _verify_linux_receipt(receipt, self.config)
+                        except Exception as error:
+                            details = {
+                                "adapter_state": adapter_state,
+                                "installation_mode": mode,
+                                "post_install_verification": receipt.get("post_install_verification", ""),
+                                "verification_error": str(error),
+                            }
+                            checks.append(Diagnostic("mod_injection", "failed", "Linux mod installation evidence is not verified", details))
+                            checks.append(Diagnostic("windows_mod_installer", "failed", "Linux mod installation evidence is not verified", details))
+                        else:
+                            details = {
+                                "adapter_state": adapter_state,
+                                "installation_mode": mode,
+                                "post_install_verification": verification.get("state", ""),
+                                "required_resources": verification.get("required_resources", ()),
+                            }
+                            checks.append(Diagnostic("mod_injection", "ok", "Linux mod installation applied and verified", details))
+                            checks.append(Diagnostic("windows_mod_installer", "ok", "Linux mod installation applied and verified", details))
+                    else:
+                        checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
+                        checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
                 elif adapter_state in UNINSTALL_OWNED_STATES:
                     details = {"adapter_state": adapter_state, "installation_mode": mode}
                     if adapter_state == "uninstalled":

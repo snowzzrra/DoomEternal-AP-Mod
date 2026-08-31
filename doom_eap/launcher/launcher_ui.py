@@ -421,6 +421,7 @@ class LauncherUI(QMainWindow):
         self._hints_state = "disconnected"
         self._warning_state: dict[str, bool] = {}
         self._ammo_refills_available: int | None = None
+        self._ammo_refill_debounce = False
         self._configure_style()
         self._build()
         self._set_connection_badge("OFFLINE", False)
@@ -496,6 +497,9 @@ class LauncherUI(QMainWindow):
             QWidget#ammoRefillIndicator {{ background:#0c1012; border:1px solid #3b4143; border-left:3px solid #6c491f; }}
             QLabel#ammoRefillTitle {{ color:#c3a17a; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.7px; }}
             QLabel#ammoRefillKey {{ color:#899397; font-family:'Bahnschrift SemiCondensed','Segoe UI',sans-serif; font-size:8.5pt; font-weight:800; letter-spacing:.5px; }}
+            QPushButton#ammoRefillButton {{ background:#413019; border-color:#9b7131; color:#f1d39b; padding:4px 8px; font-size:8.5pt; }}
+            QPushButton#ammoRefillButton:hover {{ background:#60451f; border-color:#d99c42; }}
+            QPushButton#ammoRefillButton:disabled {{ background:#171b1c; border-color:#30383a; color:#687174; }}
         """)
 
     @staticmethod
@@ -788,12 +792,19 @@ class LauncherUI(QMainWindow):
         self.player_team = self._label("Team —", "muted")
         self.player_slot = self._label("Slot —", "muted")
         self.player_inventory = self._label("Connect to restore inventory", "muted")
+        ammo_refill_block = QWidget()
+        ammo_refill_block.setMinimumWidth(230)
+        ammo_refill_block.setMaximumWidth(260)
+        ammo_refill_block.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
+        ammo_block_layout = QVBoxLayout(ammo_refill_block)
+        ammo_block_layout.setContentsMargins(0, 0, 0, 0)
+        ammo_block_layout.setSpacing(4)
         self.player_ammo_refills = QWidget()
         self.player_ammo_refills.setObjectName("ammoRefillIndicator")
-        self.player_ammo_refills.setMinimumWidth(230)
-        self.player_ammo_refills.setMaximumWidth(260)
         self.player_ammo_refills.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
         ammo_layout = QHBoxLayout(self.player_ammo_refills)
         ammo_layout.setContentsMargins(8, 5, 8, 5)
@@ -803,6 +814,12 @@ class LauncherUI(QMainWindow):
         ammo_layout.addWidget(self.ammo_refill_pips, 1)
         self.ammo_refill_key = self._label("", "ammoRefillKey")
         ammo_layout.addWidget(self.ammo_refill_key)
+        ammo_block_layout.addWidget(self.player_ammo_refills)
+        self.ammo_refill_button = QPushButton("USE AMMO REFILL")
+        self.ammo_refill_button.setObjectName("ammoRefillButton")
+        self.ammo_refill_button.setToolTip("Use one available Ammo Refill charge.")
+        self.ammo_refill_button.clicked.connect(self._request_ammo_refill)
+        ammo_block_layout.addWidget(self.ammo_refill_button)
         self._set_ammo_refill_indicator(None)
         self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
         self.resync_inventory_button.setEnabled(False)
@@ -811,7 +828,7 @@ class LauncherUI(QMainWindow):
         meta.addWidget(self.player_slot, 0, 1)
         meta.addWidget(self.player_inventory, 1, 0)
         meta.addWidget(
-            self.player_ammo_refills,
+            ammo_refill_block,
             1,
             1,
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
@@ -1297,6 +1314,29 @@ class LauncherUI(QMainWindow):
         self.ammo_refill_key.setToolTip(f"Ammo Refill key: {keybind}")
         self.ammo_refill_pips.set_available(available)
         self.ammo_refill_pips.setToolTip(description)
+        self._update_ammo_refill_button()
+
+    def _update_ammo_refill_button(self) -> None:
+        enabled = (
+            self._room_connected
+            and not self._connection_pending
+            and not self._ammo_refill_debounce
+            and isinstance(self._ammo_refills_available, int)
+            and self._ammo_refills_available > 0
+        )
+        self.ammo_refill_button.setEnabled(enabled)
+
+    def _request_ammo_refill(self) -> None:
+        if not self.ammo_refill_button.isEnabled():
+            return
+        self._ammo_refill_debounce = True
+        self._update_ammo_refill_button()
+        self.controller.request_ammo_refill()
+        QTimer.singleShot(650, self._end_ammo_refill_debounce)
+
+    def _end_ammo_refill_debounce(self) -> None:
+        self._ammo_refill_debounce = False
+        self._update_ammo_refill_button()
 
     def _show_page(self, index: int) -> None:
         self.pages.setCurrentIndex(index)

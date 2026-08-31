@@ -37,7 +37,7 @@
         "clip_type": "CLIPMODEL_NONE",
         "targets": [],
         "persists_after_check": false,
-        "generated_sha256": "66a05679e231737bbfda5ee9faef624f85c92b06b4c3ec1097ffd8b4aba02723",
+        "generated_sha256": "3465b856c4db2990b3833f6ab3739885e672cfb5fc1f52abd0cb108eb5d0324e",
         "evidence": [
           "vanillamaps/hub.map: func_dynamic_shoot_symbol renders an LWO through func/dynamic + idDynamicEntity with CLIPMODEL_NONE",
           "Tools/kaizo: art/pickups/question_mark_a.lwo renders through renderModelInfo with contributesToLightProbeGen=false",

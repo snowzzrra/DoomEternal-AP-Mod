@@ -59,7 +59,8 @@ def validate(
         raise AssertionError("DevInvLoadout unexpectedly unlocks Challenge Page")
     options = {}
     manifest_path = manifest_path or mod_root / "seed_manifest.json"
-    if manifest_path.is_file():
+    has_room_manifest = manifest_path.is_file()
+    if has_room_manifest:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         options = manifest.get("options", {})
         if not isinstance(options, dict):
@@ -73,22 +74,23 @@ def validate(
     except ValueError as error:
         raise AssertionError(str(error)) from error
 
-    tag_paths = [mod_root / path for path in build_tag_devinv_overrides(
-        options.get("starting_inventory", {}), options.get("starting_weapon")
-    )]
-    if options.get("use_dlc_content", True):
-        for tag_path in tag_paths:
-            if not tag_path.is_file():
-                raise AssertionError(f"missing TAG DevInv override: {tag_path}")
-            try:
-                tag_text = tag_path.read_text(encoding="utf-8")
-                if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
-                    raise ValueError("TAG DevInv override retains inherit declaration")
-                validate_devinv_source(tag_text, options.get("starting_inventory", {}), options.get("starting_weapon"))
-            except ValueError as error:
-                raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
-    elif any(path.exists() for path in tag_paths):
-        raise AssertionError("DLC-OFF package contains TAG DevInv overrides")
+    if has_room_manifest:
+        tag_paths = [mod_root / path for path in build_tag_devinv_overrides(
+            options.get("starting_inventory", {}), options.get("starting_weapon")
+        )]
+        if options.get("use_dlc_content", True):
+            for tag_path in tag_paths:
+                if not tag_path.is_file():
+                    raise AssertionError(f"missing TAG DevInv override: {tag_path}")
+                try:
+                    tag_text = tag_path.read_text(encoding="utf-8")
+                    if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
+                        raise ValueError("TAG DevInv override retains inherit declaration")
+                    validate_devinv_source(tag_text, options.get("starting_inventory", {}), options.get("starting_weapon"))
+                except ValueError as error:
+                    raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
+        elif any(path.exists() for path in tag_paths):
+            raise AssertionError("DLC-OFF package contains TAG DevInv overrides")
 
 
 def main() -> None:

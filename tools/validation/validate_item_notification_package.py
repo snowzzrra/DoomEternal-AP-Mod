@@ -18,6 +18,7 @@ from tools.maps.notification_formatting import (
     LOCATION_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_TITLE,
     major_notification_key_from_item_key,
+    progressive_notification_stage_count,
 )
 from tools.release.release_manifest import load_release_manifest
 
@@ -264,10 +265,14 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         if isinstance(classification, dict):
             classification = classification["classification"]
         style = notification_style_for_item(item_id, classification)
-        stages = range(len(definition["perks"])) if (
-            isinstance(definition, dict)
-            and definition.get("type") in {"progressive_perk", "progressive_item"}
-        ) else (None,)
+        progressive_stage_count = progressive_notification_stage_count(
+            item_id, definition
+        )
+        stages = (
+            range(progressive_stage_count)
+            if progressive_stage_count is not None
+            else (None,)
+        )
         for stage in stages:
             stage_suffix = f"_{stage}" if stage is not None else ""
             expected_notifications.update(
@@ -306,10 +311,21 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         raise AssertionError("enabled notifier build lacks English or Portuguese strings")
     locale_names = [string_table_names(path) for path in table_paths]
     expected_locale_names = item_keys | location_strings
-    if locale_names[0] != expected_locale_names:
-        raise AssertionError("english.json keys diverge from generated notification headers")
-    if locale_names[1] != expected_locale_names:
-        raise AssertionError("portuguese.json keys diverge from generated notification headers")
+    if not expected_locale_names <= locale_names[0]:
+        raise AssertionError("english.json is missing generated notification keys")
+    if not expected_locale_names <= locale_names[1]:
+        raise AssertionError("portuguese.json is missing generated notification keys")
+    expected_received_keys = {
+        key for key in item_keys if key.startswith("#str_ap_notify_item_received_")
+    }
+    for names, locale in zip(locale_names, ("english", "portuguese")):
+        received_keys = {
+            key for key in names if key.startswith("#str_ap_notify_item_received_")
+        }
+        if received_keys != expected_received_keys:
+            raise AssertionError(
+                f"{locale}.json received-item notification keys diverge"
+            )
     if locale_names[0] != locale_names[1]:
         raise AssertionError("English and Portuguese string keys diverge")
     locale_values = [string_table_values(path) for path in table_paths]
@@ -339,7 +355,23 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             suffix,
             classification["classification"] if isinstance(classification, dict) else classification,
         )
-        entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
+        definition = all_commands[str(item_id)]
+        if isinstance(definition, dict) and definition.get("type") == "transient_effect":
+            continue
+        if isinstance(definition, dict) and definition.get("type") in {
+            "progressive_perk", "progressive_item",
+        }:
+            for stage, stage_effects in enumerate(definition["perks"]):
+                effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
+                for index in range(len(effects)):
+                    rpc_name = (
+                        f"ap_rpc_v3_{item_id}_{stage}"
+                        if isinstance(stage_effects, str)
+                        else f"ap_rpc_v3_{item_id}_{stage}_{index}"
+                    )
+                    entity_block(content, rpc_name)
+        else:
+            entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
 
     for style in ("major", "filler"):
         pairs = {

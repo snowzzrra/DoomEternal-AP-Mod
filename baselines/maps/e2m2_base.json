@@ -71,20 +71,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "typed map-side persistent item command contract"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
     }
   ],
-  "asset_package_contract_sha256": "229e53dac6f890364c30fc312a58965140c19453e8b7f6108a25a15bbcc50fef",
-  "byte_sha256": "39a44b18613dcbe324d20e8b598f0a905bff85db458df608af68c1a3409dffc5",
+  "asset_package_contract_sha256": "2e588bf2d2a403e3911f57fa3f5d765568586850f45ed4af54657508382e33cb",
+  "byte_sha256": "dc83da16ce09807d05bdedeb49125b3201f6681c76ab4ebd05de027fd51c9055",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 126,
-    "byte_size": 28834835,
-    "classes": 19194,
-    "entity_count": 19198,
+    "byte_size": 28839173,
+    "classes": 19200,
+    "entity_count": 19204,
     "layers": 3694,
     "targets": 96236,
     "transforms": 40952,
-    "unique_entity_names": 19195
+    "unique_entity_names": 19201
   },
   "manifest_sha256": "b23240f1ecc1d2cadcd0d8f25fb803acb9666afa470383c26bc9e87ae39e85f1",
   "map_key": "e2m2_base",
@@ -128,5 +132,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "e1038fe9a3bf6cbee2566d626d3761b5e543097d7e5c89ea783cdeb14d0b3438",
-  "semantic_sha256": "bd3f527076e19de12959a4d8f63fd29c38fa0da4bcd4720c13af1bd09405097a"
+  "semantic_sha256": "4c6e0a585fe2c753328f42bd8727be6a9f3d851415d1687d1e149ac88c109af4"
 }
