@@ -10,6 +10,9 @@ from typing import Any, Iterable, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO_ROOT / "data" / "runtime_contexts.json"
+SLOT_DATA_REVISION = str(json.loads(
+    (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
+)["slot_data_revision"])
 CAPABILITY_CROSS_CAMPAIGN = "cross_campaign_materialization_v1"
 SUPPORT_RUNE_CAPABILITY = "support_runes_v1"
 TAG_CAPABILITY = "tag_context_v1"
@@ -129,8 +132,8 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     """Validate MOD-facing 0.5-D identity and exact option contract."""
-    if slot_data.get("slot_data_revision") != "0.5-D":
-        raise ValueError("slot_data_revision must be 0.5-D")
+    if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
+        raise ValueError(f"slot_data_revision must be {SLOT_DATA_REVISION}")
     required = slot_data.get("required_capabilities")
     if not isinstance(required, list) or CAPABILITY_CROSS_CAMPAIGN not in required:
         raise ValueError("cross_campaign_materialization_v1 capability is required")

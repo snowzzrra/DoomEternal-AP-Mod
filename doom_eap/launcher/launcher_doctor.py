@@ -234,6 +234,102 @@ def _read_log_tail(path: Path, limit: int = SUPPORT_LOG_TAIL_BYTES) -> str | Non
         return None
 
 
+def _native_lifecycle_summary(
+    config: Mapping[str, object],
+    processes: Sequence[Mapping[str, object]],
+    health: Mapping[str, object],
+) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "ap_client_present": False,
+        "ap_client_process": False,
+        "ap_client_pid": None,
+        "native_health_age_ms": (
+            max(0, int(time.time() * 1000) - int(health["timestamp_ms"]))
+            if health.get("timestamp_ms") is not None
+            else "unavailable"
+        ),
+        "doom_process_detected": False,
+        "doom_pid": None,
+        "xinput_disk_status": "unavailable",
+        "xinput_runtime_module_status": "unavailable",
+        "rpc_client_created": False,
+        "rpc_server_status": "unavailable",
+        "rpc_wait_elapsed": "unavailable",
+        "last_rpc_result": health.get("result", "unavailable"),
+        "memory_probe": "unavailable",
+        "gameplay_loaded": "unavailable",
+        "native_safe": "unavailable",
+        "queue_pending": "unavailable",
+        "queue_processing": "unavailable",
+        "queue_failed": "unavailable",
+        "last_dispatch": "unavailable",
+        "last_ack": "unavailable",
+    }
+    client_dir = config.get("client_dir")
+    if client_dir:
+        summary["ap_client_path"] = str(Path(str(client_dir)).expanduser() / "ap_client.exe")
+        summary["ap_client_present"] = Path(str(summary["ap_client_path"])).is_file()
+    else:
+        summary["ap_client_path"] = "unavailable"
+    for process in processes:
+        name = str(process.get("name", "")).casefold()
+        if name in {"ap_client", "ap_client.exe"}:
+            summary["ap_client_process"] = True
+            summary["ap_client_pid"] = process.get("pid")
+        if name in {"doometernalx64vk", "doometernalx64vk.exe"}:
+            summary["doom_process_detected"] = True
+            summary["doom_pid"] = process.get("pid")
+
+    log_text = None
+    for candidate in _native_log_candidates(config)[::2]:
+        log_text = _read_log_tail(candidate)
+        if log_text:
+            break
+    if not log_text:
+        return summary
+
+    def fields(line: str) -> dict[str, str]:
+        return dict(re.findall(r"([a-z_]+)=([^\s]+)", line))
+
+    for line in log_text.splitlines():
+        if "XINPUT_DISK_PREFLIGHT " in line:
+            summary["xinput_disk_status"] = fields(line).get("status", "unavailable")
+        elif "XINPUT_RUNTIME_MODULE " in line:
+            values = fields(line)
+            summary["xinput_runtime_module_status"] = values.get("status", "unavailable")
+            summary["doom_pid"] = values.get("doom_pid", summary["doom_pid"])
+        elif "RPC_CLIENT_CREATED " in line:
+            summary["rpc_client_created"] = True
+            summary["rpc_server_status"] = "waiting"
+        elif "RPC_SERVER_WAIT " in line:
+            values = fields(line)
+            summary["rpc_server_status"] = "waiting"
+            summary["rpc_wait_elapsed"] = values.get("elapsed_ms", "unavailable")
+            summary["last_rpc_result"] = values.get("last_rpc_result", "unavailable")
+            summary["doom_process_detected"] = values.get("doom_process_detected") == "yes"
+            summary["doom_pid"] = values.get("doom_pid", summary["doom_pid"])
+            summary["gameplay_loaded"] = values.get("gameplay_loaded", "unavailable")
+            summary["native_safe"] = values.get("native_safe", "unavailable")
+            for key in ("queue_pending", "queue_processing", "queue_failed"):
+                summary[key] = values.get(key, "unavailable")
+        elif "RPC_SERVER_VERIFIED " in line:
+            values = fields(line)
+            summary["rpc_server_status"] = "verified"
+            summary["rpc_wait_elapsed"] = values.get(
+                "elapsed_ms", summary["rpc_wait_elapsed"]
+            )
+            summary["last_rpc_result"] = values.get(
+                "transport", summary["last_rpc_result"]
+            )
+        elif "Game state transition:" in line:
+            summary["memory_probe"] = line[-512:]
+        elif "RPC_DISPATCH " in line or "RPC_RESULT " in line:
+            summary["last_dispatch"] = line[-512:]
+        elif "ACK_REMOVE" in line:
+            summary["last_ack"] = line[-512:]
+    return summary
+
+
 def _read_support_log(path: Path) -> str | None:
     """Keep complete bounded session logs, otherwise retain meaningful head and tail."""
     try:
@@ -630,6 +726,11 @@ def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None,
         details["native"] = NativeHealthReader(health_path).read(force=True).document() if base else {"state": "not_ready", "reason": "base_directory_unconfigured"}
     except Exception as error:
         details["native"] = {"state": "unavailable", "reason": str(error)}
+    details["native_lifecycle"] = _native_lifecycle_summary(
+        config,
+        processes,
+        details["native"] if isinstance(details["native"], Mapping) else {},
+    )
     if paths is not None:
         details["launcher_paths"] = {name: str(getattr(paths, name)) for name in ("config_dir", "state_dir", "data_dir") if getattr(paths, name, None)}
     return details
@@ -811,6 +912,7 @@ def _support_game_link_diagnostics(
         "evidence": "direct" if direct_native.get("native_state") else "unavailable",
         "health": direct_native,
     }
+    native_rpc["lifecycle"] = dict(runtime.get("native_lifecycle", {}))
     if isinstance(native_rpc, Mapping):
         native_rpc.setdefault(
             "evidence",

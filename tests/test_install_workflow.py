@@ -1272,7 +1272,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
              patch.object(launcher_controller_mod, "launch_doom_via_steam") as mock_steam:
             with self.assertRaises(RuntimeError) as ctx:
                 self.controller.launch_game(platform="nt")
-            self.assertIn("Could not start Doom Eternal Archipelago client runtime", str(ctx.exception))
+            self.assertIn("Game integration helper could not start", str(ctx.exception))
             mock_steam.assert_not_called()
 
     def test_linux_launch_game_preserves_linux_behavior(self):

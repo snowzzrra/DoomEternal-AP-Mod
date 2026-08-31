@@ -4,6 +4,7 @@
 #include <tlhelp32.h>
 #include <winver.h>
 #include <cstdlib>
+#include <climits>
 #include <stdio.h>
 #include <algorithm>
 #include <array>
@@ -495,6 +496,61 @@ DWORD CountProcessesNamed(const char* executableName) {
     return count;
 }
 
+void LogXinputRuntimeModule(DWORD processId, const std::filesystem::path& expectedPath) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
+        processId
+    );
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        LogDebug(
+            "XINPUT_RUNTIME_MODULE status=unavailable doom_pid="
+            + std::to_string(processId)
+            + " expected_game_root_path=" + expectedPath.string()
+            + " error=" + std::to_string(GetLastError())
+        );
+        return;
+    }
+
+    MODULEENTRY32 module = {};
+    module.dwSize = sizeof(module);
+    bool loaded = false;
+    std::string loadedPath;
+    DWORD enumerationError = ERROR_SUCCESS;
+    if (Module32First(snapshot, &module)) {
+        do {
+            if (_stricmp(module.szModule, "XINPUT1_3.dll") == 0) {
+                loaded = true;
+                loadedPath = module.szExePath;
+                break;
+            }
+        } while (Module32Next(snapshot, &module));
+        if (!loaded) {
+            enumerationError = GetLastError();
+            if (enumerationError == ERROR_NO_MORE_FILES) enumerationError = ERROR_SUCCESS;
+        }
+    } else {
+        enumerationError = GetLastError();
+    }
+    CloseHandle(snapshot);
+
+    if (enumerationError != ERROR_SUCCESS) {
+        LogDebug(
+            "XINPUT_RUNTIME_MODULE status=unavailable doom_pid="
+            + std::to_string(processId)
+            + " expected_game_root_path=" + expectedPath.string()
+            + " error=" + std::to_string(enumerationError)
+        );
+        return;
+    }
+    LogDebug(
+        "XINPUT_RUNTIME_MODULE status=" + std::string(loaded ? "loaded" : "not_loaded")
+        + " doom_pid=" + std::to_string(processId)
+        + " module_path=" + (loaded ? loadedPath : "unavailable")
+        + " expected_game_root_path=" + expectedPath.string()
+        + " error=0"
+    );
+}
+
 std::string CurrentWorkingDirectory() {
     std::error_code error;
     const std::filesystem::path current = std::filesystem::current_path(error);
@@ -741,14 +797,14 @@ void LogStartupHeader(
         LogDebug("Meathook XINPUT1_3.dll FileVersion: " + preflight.fileVersion);
         LogDebug("Meathook XINPUT1_3.dll ProductVersion: " + preflight.productVersion);
     }
-    LogDebug(
-        "Meathook XINPUT1_3.dll hash validated: "
-        + std::string(preflight.hashValidated ? "yes" : "no")
-    );
     if (kValidatedXinputSha256.empty()) {
-        LogDebug("Validated Meathook hash list: not configured in this build.");
+        LogDebug("Native XINPUT allowlist: not configured.");
+        LogDebug("Launcher Game Link SHA-256 verification remains authoritative.");
     } else {
-        LogDebug("Validated Meathook hash list: configured.");
+        LogDebug(
+            "Native XINPUT allowlist: configured; disk hash match="
+            + std::string(preflight.hashValidated ? "yes" : "no")
+        );
     }
     if (!preflight.suspiciousLoaders.empty()) {
         for (const std::string& loaderPath : preflight.suspiciousLoaders) {
@@ -2099,6 +2155,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     RotateClientLog();
+    LogDebug("NATIVE_START process=ap_client.exe");
 
     char executablePath[MAX_PATH] = {};
     if (GetModuleFileNameA(nullptr, executablePath, MAX_PATH) == 0) {
@@ -2172,9 +2229,24 @@ int main(int argc, char** argv) {
         preflight,
         runtimePaths
     );
-    LogDebug("RPC command execution is PAUSED. Use /doom_rpc_on inside a loaded level.");
+    LogDebug(
+        "NATIVE_PREFLIGHT status="
+        + std::string(preflight.deliveryAllowed ? "passed" : "failed")
+    );
+    LogDebug(
+        "XINPUT_DISK_PREFLIGHT status="
+        + std::string(preflight.xinputPresent ? "present" : "missing")
+        + " path=" + preflight.xinputPath
+        + " sha256=" + (preflight.sha256.empty() ? "unavailable" : preflight.sha256)
+        + " launcher_game_link_verification=authoritative"
+    );
+    LogDebug(
+        "RPC execution starts disarmed and auto-arms when eligible work is pending; "
+        "safe gameplay is still required."
+    );
 
     GameStateProbe gameStateProbe(LogDebug);
+    DWORD moduleProbePid = 0;
     const bool meathookPreflightPassed = preflight.deliveryAllowed;
     if (!meathookPreflightPassed) {
         healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
@@ -2187,11 +2259,39 @@ int main(int argc, char** argv) {
         g_ApRpcOwner = std::make_unique<ApRuntimeRpcClient>();
         g_ApRpc = g_ApRpcOwner.get();
         g_ApRpc->SetLogCallback(LogDebug);
-        LogDebug(
-            "Meathook RPC client binding initialized. Waiting for the in-game "
-            "Meathook server..."
-        );
+        LogDebug("RPC_CLIENT_CREATED binding=Meathook");
+        const DWORD rpcWaitStarted = GetTickCount();
+        DWORD nextRpcWaitSummary = rpcWaitStarted;
+        DWORD lastWaitPid = MAXDWORD;
+        bool lastWaitGameplay = false;
+        bool lastWaitSafe = false;
+        int lastWaitResult = INT_MIN;
+        DWORD lastWaitTransport = MAXDWORD;
+        unsigned long long rpcWaitAttempts = 0;
+        auto logRpcWait = [&](const char* reason) {
+            const QueueSnapshot snapshot = CountQueueFiles();
+            LogDebug(
+                "RPC_SERVER_WAIT reason=" + std::string(reason)
+                + " elapsed_ms=" + std::to_string(GetTickCount() - rpcWaitStarted)
+                + " attempts=" + std::to_string(rpcWaitAttempts)
+                + " last_rpc_result="
+                + std::string(g_ApRpc ? RpcCallResultName(g_ApRpc->LastResult()) : "UNAVAILABLE")
+                + " last_transport_state="
+                + std::to_string(g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND)
+                + " doom_process_detected="
+                + std::string(gameStateProbe.GetProcessId() != 0 ? "yes" : "no")
+                + " doom_pid=" + std::to_string(gameStateProbe.GetProcessId())
+                + " gameplay_loaded="
+                + std::string(gameStateProbe.IsGameplayLoaded() ? "yes" : "no")
+                + " native_safe=" + std::string(gameStateProbe.IsSafeForRpc() ? "yes" : "no")
+                + " queue_pending=" + std::to_string(snapshot.pending)
+                + " queue_processing=" + std::to_string(snapshot.processing)
+                + " queue_failed=" + std::to_string(snapshot.failed)
+            );
+        };
+        logRpcWait("initial");
         while (!g_ApRpc || !g_ApRpc->PollHealth()) {
+            ++rpcWaitAttempts;
             if (g_ApRpc) {
                 healthStatePublisher.PublishHealth(
                     false, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
@@ -2200,17 +2300,65 @@ int main(int argc, char** argv) {
                 healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
             }
             gameStateProbe.Poll();
+            const DWORD doomPid = gameStateProbe.GetProcessId();
+            if (doomPid != 0 && doomPid != moduleProbePid) {
+                LogXinputRuntimeModule(
+                    doomPid,
+                    runtimePaths.gameRootDir / "XINPUT1_3.dll"
+                );
+                moduleProbePid = doomPid;
+            }
             missionTransitionMonitor.Poll(
                 gameStateProbe.IsGameplayLoaded(),
                 gameStateProbe.IsLoading(),
                 gameStateProbe.IsSafeForRpc()
             );
+            const int waitResult =
+                g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN;
+            const DWORD waitTransport =
+                g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND;
+            const bool transition =
+                doomPid != lastWaitPid
+                || gameStateProbe.IsGameplayLoaded() != lastWaitGameplay
+                || gameStateProbe.IsSafeForRpc() != lastWaitSafe
+                || waitResult != lastWaitResult
+                || waitTransport != lastWaitTransport;
+            const DWORD now = GetTickCount();
+            if (transition || now >= nextRpcWaitSummary) {
+                logRpcWait(transition ? "transition" : "periodic");
+                nextRpcWaitSummary = now + 5000;
+                lastWaitPid = doomPid;
+                lastWaitGameplay = gameStateProbe.IsGameplayLoaded();
+                lastWaitSafe = gameStateProbe.IsSafeForRpc();
+                lastWaitResult = waitResult;
+                lastWaitTransport = waitTransport;
+            }
             Sleep(100);
+        }
+        if (gameStateProbe.GetProcessId() != 0 && gameStateProbe.GetProcessId() != moduleProbePid) {
+            LogXinputRuntimeModule(
+                gameStateProbe.GetProcessId(),
+                runtimePaths.gameRootDir / "XINPUT1_3.dll"
+            );
+        } else if (gameStateProbe.GetProcessId() == 0) {
+            LogDebug(
+                "XINPUT_RUNTIME_MODULE status=unavailable doom_pid=0"
+                " module_path=unavailable expected_game_root_path="
+                + (runtimePaths.gameRootDir / "XINPUT1_3.dll").string()
+                + " error=0 reason=doom_process_not_detected"
+            );
         }
         healthStatePublisher.PublishHealth(
             true, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
         );
-        LogDebug("Meathook RPC server verified.");
+        LogDebug(
+            "RPC_SERVER_VERIFIED elapsed_ms="
+            + std::to_string(GetTickCount() - rpcWaitStarted)
+            + " attempts=" + std::to_string(rpcWaitAttempts)
+            + " doom_pid=" + std::to_string(gameStateProbe.GetProcessId())
+            + " transport=" + RpcCallResultName(g_ApRpc->LastResult())
+            + "/" + std::to_string(g_ApRpc->LastTransportStatus())
+        );
     }
 
     std::deque<CommandJob> queue;
@@ -2250,9 +2398,25 @@ int main(int argc, char** argv) {
         silentBurstOperations = 0;
     };
     AmmoHotkeyHandler ammoHotkey(LogDebug);
+    {
+        const QueueSnapshot runtimeQueue = CountQueueFiles();
+        LogDebug(
+            "QUEUE_RUNTIME_READY pending=" + std::to_string(runtimeQueue.pending)
+            + " processing=" + std::to_string(runtimeQueue.processing)
+            + " failed=" + std::to_string(runtimeQueue.failed)
+        );
+    }
 
     while (true) {
         gameStateProbe.Poll();
+        const DWORD doomPid = gameStateProbe.GetProcessId();
+        if (doomPid != 0 && doomPid != moduleProbePid) {
+            LogXinputRuntimeModule(
+                doomPid,
+                runtimePaths.gameRootDir / "XINPUT1_3.dll"
+            );
+            moduleProbePid = doomPid;
+        }
         missionTransitionMonitor.Poll(
             gameStateProbe.IsGameplayLoaded(),
             gameStateProbe.IsLoading(),

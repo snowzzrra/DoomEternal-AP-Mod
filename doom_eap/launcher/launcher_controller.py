@@ -184,6 +184,55 @@ class LauncherController:
         self._native_client_process: subprocess.Popen | None = None
         self._last_game_running: bool = False
 
+    def _native_start_failure(
+        self,
+        *,
+        reason: str,
+        technical_message: str,
+        executable_path: Path,
+        exit_code: int | None = None,
+    ) -> None:
+        if reason == "executable_missing":
+            message = (
+                "The Game integration helper is missing from this installation. "
+                "Repair or reinstall DoomEAP, then retry. If the problem continues, "
+                "generate a Support Report."
+            )
+        elif reason == "access_denied":
+            message = (
+                "Windows denied access to the Game integration helper. Windows Security "
+                "or antivirus software may have blocked it. Check Protection history "
+                "and restore or allow the DoomEAP file if it was blocked, then retry. "
+                "If the problem continues, generate a Support Report."
+            )
+        elif reason == "immediate_exit":
+            message = (
+                "The Game integration helper stopped immediately before Game Link became "
+                "ready. Windows Security or antivirus software may have blocked it. "
+                "Retry once, then generate a Support Report if the problem continues."
+            )
+        else:
+            message = (
+                "Windows could not create the Game integration helper process. "
+                "Retry once, then generate a Support Report if the problem continues."
+            )
+        detail = (
+            f"Game integration helper startup failed: reason={reason} "
+            f"path={executable_path} detail={technical_message}"
+        )
+        if exit_code is not None:
+            detail += f" exit_code={exit_code}"
+        self._record_diagnostic(detail)
+        self.emit(
+            "native_client_start_failed",
+            title="Game integration helper could not start",
+            message=message,
+            reason=reason,
+            executable_path=str(executable_path),
+            technical_message=technical_message,
+            exit_code=exit_code,
+        )
+
     def _native_client_running(self) -> bool:
         with self._lifecycle_lock:
             if self._native_client_process is None:
@@ -220,7 +269,11 @@ class LauncherController:
 
             client_exe = self.client_dir / "ap_client.exe"
             if not client_exe.is_file():
-                self._record_diagnostic(f"native client executable missing at {client_exe}")
+                self._native_start_failure(
+                    reason="executable_missing",
+                    technical_message=f"file not found: {client_exe}",
+                    executable_path=client_exe,
+                )
                 return False
 
             meathook = probe_meathook(root)
@@ -236,11 +289,39 @@ class LauncherController:
                     cwd=str(root),
                     creationflags=creationflags,
                 )
+                time.sleep(0.15)
+                exit_code = self._native_client_process.poll()
+                if exit_code is not None:
+                    health = self.read_native_health(force=True)
+                    self._native_client_process = None
+                    if health.get("native_state") in {"starting", "ready", "unavailable"}:
+                        self.emit(
+                            "native_client_already_running",
+                            pid=health.get("pid"),
+                            native_state=health.get("native_state"),
+                        )
+                        return True
+                    self._native_start_failure(
+                        reason="immediate_exit",
+                        technical_message="process exited before publishing current native health",
+                        executable_path=client_exe,
+                        exit_code=exit_code,
+                    )
+                    return False
                 self.emit("native_client_started", path=str(client_exe), game_root=str(root))
                 return True
             except Exception as error:
                 self._native_client_process = None
-                self.emit("native_client_start_failed", message=str(error))
+                winerror = getattr(error, "winerror", None)
+                access_denied = isinstance(error, PermissionError) or winerror == 5
+                self._native_start_failure(
+                    reason="access_denied" if access_denied else "process_creation_failed",
+                    technical_message=(
+                        f"{type(error).__name__}: {error}"
+                        + (f" (winerror={winerror})" if winerror is not None else "")
+                    ),
+                    executable_path=client_exe,
+                )
                 return False
 
     def _stop_native_client(self) -> None:
@@ -333,13 +414,20 @@ class LauncherController:
 
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
+        configured_saves: Path | None = None
+        configured_value = self.config.get("save_games_dir")
+        if configured_value:
+            try:
+                configured_saves = validate_save_directory(Path(str(configured_value)))
+            except (OSError, TypeError, ValueError):
+                configured_saves = None
         installations, sentinel = SteamInstallationLocator().inspect_discovery()
         found["game_discovery"] = asdict(sentinel)
         if len(installations) == 1:
             installation = installations[0]
             found["game_root"] = str(installation.game_root)
             found["doom_base_dir"] = str(installation.game_root / "base")
-            if os.name != "nt":
+            if os.name != "nt" and configured_saves is None:
                 saves = (
                     installation.library_root
                     / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games"
@@ -350,7 +438,7 @@ class LauncherController:
         elif len(installations) > 1:
             found["ambiguous_game_roots"] = [str(item.game_root) for item in installations]
 
-        if os.name == "nt" and "save_games_dir" not in found:
+        if os.name == "nt" and configured_saves is None and "save_games_dir" not in found:
             saves = Path.home() / "Saved Games/id Software/DOOMEternal/base"
             if saves.is_dir():
                 found["save_games_dir"] = str(saves)
@@ -399,7 +487,10 @@ class LauncherController:
             raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
         if target_platform == "nt":
             if not self._ensure_native_client(platform=target_platform):
-                raise RuntimeError("Could not start Doom Eternal Archipelago client runtime (ap_client.exe).")
+                raise RuntimeError(
+                    "Game integration helper could not start. Review the launcher warning "
+                    "or generate a Support Report."
+                )
         url = launch_doom_via_steam()
         self.emit("steam_launch_requested", url=url)
         return url
@@ -540,7 +631,11 @@ class LauncherController:
 
     def run_doctor(self) -> DoctorReport:
         report = LauncherDoctor(
-            config=self.config,
+            config={
+                **self.config,
+                "application_dir": str(self.application_dir),
+                "client_dir": str(self.client_dir),
+            },
             paths=self.user_paths,
             config_path=self.config_path,
             last_setup_failure=self.last_setup_failure,

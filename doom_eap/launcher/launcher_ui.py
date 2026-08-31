@@ -2410,6 +2410,13 @@ class LauncherUI(QMainWindow):
         if kind == "log":
             self._append_log(str(event.get("message", "")))
             return
+        if kind == "native_client_start_failed":
+            QMessageBox.warning(
+                self,
+                str(event.get("title") or "Game integration helper could not start"),
+                str(event.get("message") or "Generate a Support Report for details."),
+            )
+            return
         if kind == "inventory_resync":
             status = str(event.get("status", ""))
             presentation = {

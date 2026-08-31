@@ -33,9 +33,12 @@ MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
 DASH_LOCATION_ID = 7770083
 DASH_ENTITY = "AP_CHECK_CAPITOL_PROGRESS_DASH_1"
-MANIFEST_SCHEMA_VERSION = 3
-SLOT_DATA_SCHEMA_VERSION = 4
-SLOT_DATA_REVISION = "0.5-D"
+_CONTRACT_IDENTITY = json.loads(
+    (ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
+)
+MANIFEST_SCHEMA_VERSION = int(_CONTRACT_IDENTITY["manifest_schema_version"])
+SLOT_DATA_SCHEMA_VERSION = int(_CONTRACT_IDENTITY["slot_data_schema_version"])
+SLOT_DATA_REVISION = str(_CONTRACT_IDENTITY["slot_data_revision"])
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
@@ -884,12 +887,12 @@ class RoomCompiler:
             if record.trap:
                 display = "A TRAP\\nFOR SOMEONE"
             elif record.local:
-                display = "YOUR " + self._doom_gui_text(record.item_name)
+                display = "YOUR " + self._doom_gui_text(record.item_name).upper()
             else:
                 display = (
-                    self._doom_gui_text(record.item_name)
+                    self._doom_gui_text(record.item_name).upper()
                     + "\\nFOR "
-                    + self._doom_gui_text(record.recipient_name)
+                    + self._doom_gui_text(record.recipient_name).upper()
                 )
             color_key = item_classification_color_key(
                 record.classification, trap=record.trap

@@ -5,6 +5,9 @@
   "content_revision": "0.5.0",
   "content_schema_version": 3,
   "game": "DOOM Eternal",
+  "manifest_schema_version": 3,
   "release_version": "0.5.0",
-  "session_mod_contract_revision": 1
+  "session_mod_contract_revision": 1,
+  "slot_data_revision": "0.5-D",
+  "slot_data_schema_version": 4
 }
