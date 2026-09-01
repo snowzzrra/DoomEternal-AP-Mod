@@ -79,20 +79,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: generate the canonical inert AP visual for the independent Rocket Launcher location."
     }
   ],
   "asset_package_contract_sha256": "ef3a4dc42ee3979a6f025bfe3789a411a735c7d474666b114b170d5c6ec8f996",
-  "byte_sha256": "eac4fc7e18b2728814efafb97af9ccd03be2e7527de912df5d3d9476200f413a",
+  "byte_sha256": "da08f78d6d785d6caceab83f60cfe9692172e1957399ed3b19393de6719f4e3c",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20129938,
-    "classes": 18374,
-    "entity_count": 18374,
-    "layers": 4816,
-    "targets": 10787,
-    "transforms": 37089,
-    "unique_entity_names": 18374
+    "byte_size": 20131739,
+    "classes": 18377,
+    "entity_count": 18377,
+    "layers": 4819,
+    "targets": 10790,
+    "transforms": 37092,
+    "unique_entity_names": 18377
   },
   "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
   "map_key": "e1m3_cult",
@@ -127,6 +131,6 @@
   "publisher_contract_sha256": "b80266e15ad259f4a69192c42981f4a3acb6e922bf0214b1c92de482d32e80c9",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "1425158600dd6d772804f9350ea13a0833c0c26d85f1126a101306cf92b15333"
+  "scripted_contract_sha256": "add7a4175af6b7c8b13c727434445d9ba2b1f8188d0cda411c9f33f9c53c68db",
+  "semantic_sha256": "9ba563f5f9f2e806e5ad335df6df8509e5dab987df7bf06fcf5707263d49a671"
 }

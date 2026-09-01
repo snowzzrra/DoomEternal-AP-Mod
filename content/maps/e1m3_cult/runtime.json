@@ -19,8 +19,9 @@
       "signal": {
         "kind": "physical_event_equivalent",
         "physical_location_ids": [
-          7770059
+          7770058
         ],
+        "required_count": 1,
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e1m3/challenge_1",
         "numUnlockableRules": 1,

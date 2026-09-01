@@ -104,7 +104,6 @@
       "independent_ap_trigger": true,
       "independent_entity_name": "ap_independent_rocket_launcher_7770056",
       "remove_original": true,
-      "no_auto_visual": true,
       "preserve_layers": false,
       "preserve_targets": [
         "game_target_relay_1244"

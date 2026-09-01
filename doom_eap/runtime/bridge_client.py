@@ -3397,7 +3397,6 @@ class DoomEternalContext(CommonContext):
         self._materialization_completion = None
         self.automap_cleanup_epoch = None
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
-        self.automap_cleanup_submitted = {}
         self.automap_local_cleanup_owned = set()
         self.automap_cleanup_retry = {}
         self.automap_cleanup_status = {}
@@ -4933,12 +4932,6 @@ class DoomEternalContext(CommonContext):
         asyncio.create_task(self.check_mission_challenge_locations())
         if self._item_delivery_wakeup:
             self._schedule_item_delivery("connected")
-        if hasattr(self, "_ammo_server_consumed"):
-            self._emit_ammo_refill_balance(
-                status="ready" if self._ammo_server_consumed is not None else "loading",
-                source="reconnect",
-                message="Ammo Refill balance recomputed after reconnect",
-            )
         balance = self._ammo_refill_balance_payload()
         emit_launcher_event(
             "connected",
@@ -5009,11 +5002,6 @@ class DoomEternalContext(CommonContext):
             packet_received_monotonic_ns=packet_received_ns,
         )
         self._schedule_item_delivery("packet")
-        self._emit_ammo_refill_balance(
-            status="ready" if self._ammo_server_consumed is not None else "loading",
-            source="received_items",
-            message="Ammo Refill balance updated from received items",
-        )
         self._schedule_ammo_refill_overflow_normalization("received_items")
 
     def _schedule_item_delivery(self, trigger):
@@ -6327,7 +6315,6 @@ class DoomEternalContext(CommonContext):
         self.session_state.setdefault("goal_sent", False)
         self.session_state.setdefault("cultist_autosave_path", None)
         self.session_state.setdefault("save_slot_observations", {})
-        self.automap_cleanup_submitted = {}
         self.automap_local_cleanup_owned = set()
         self.fast_travel_submitted = {}
         self.session_state.pop("automap_cleanup", None)
@@ -7096,7 +7083,7 @@ class DoomEternalContext(CommonContext):
         return lines
 
     def advance_automap_cleanup_epoch(self):
-        """Open one idempotent cleanup pass after a level-ready marker."""
+        """Start map-safe checked-visual reconciliation for the current level epoch."""
         previous_epoch = self.automap_cleanup_epoch
         marker = getattr(self, "cached_map_identity", None)
         epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
@@ -7105,14 +7092,12 @@ class DoomEternalContext(CommonContext):
             if previous_epoch != self.automap_cleanup_epoch:
                 self.automap_cleanup_retry.clear()
                 self.automap_cleanup_status.clear()
-                self.automap_cleanup_submitted.clear()
                 self.automap_local_cleanup_owned.clear()
             return None
         self.automap_cleanup_epoch = epoch
         if previous_epoch != epoch:
             self.automap_cleanup_retry.clear()
             self.automap_cleanup_status.clear()
-            self.automap_cleanup_submitted.clear()
             self.automap_local_cleanup_owned.clear()
         return self.automap_cleanup_epoch
 
@@ -7454,14 +7439,6 @@ class DoomEternalContext(CommonContext):
                     trigger=trigger,
                 )
                 continue
-            if self.automap_cleanup_submitted.get(delivery_key) == self.automap_cleanup_epoch:
-                self._automap_cleanup_transition(
-                    runtime_key,
-                    "COMMAND_QUEUED_UNVERIFIED",
-                    "already_submitted_current_epoch",
-                    trigger=trigger,
-                )
-                continue
             retry = self.automap_cleanup_retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})
             if now < retry["deadline"]:
                 self._automap_cleanup_transition(
@@ -7501,8 +7478,11 @@ class DoomEternalContext(CommonContext):
                     trigger=trigger,
                 )
                 continue
-            self.automap_cleanup_submitted[delivery_key] = self.automap_cleanup_epoch
-            self.automap_cleanup_retry.pop(runtime_key, None)
+            retry["attempt"] += 1
+            retry["deadline"] = now + min(
+                AUTOMAP_CLEANUP_RETRY_MAX_SECONDS,
+                AUTOMAP_CLEANUP_RETRY_BASE_SECONDS * (2 ** min(retry["attempt"] - 1, 3)),
+            )
             changed = True
             self._automap_cleanup_transition(
                 runtime_key,
@@ -8114,6 +8094,16 @@ class DoomEternalContext(CommonContext):
         self.received_deathlink_event_ids.add(event_id)
         self.persist_session_state()
         logger.info("[DeathLink] Received logical event %s; queued for safe gameplay.", event_id[:12])
+        source = _bounded_event_text(str(data.get("source") or "Another player"), 128)
+        cause = _bounded_event_text(str(data.get("cause") or ""), 512)
+        emit_launcher_event(
+            "deathlink",
+            direction="received",
+            event_id=event_id,
+            source=source,
+            cause=cause,
+            message=cause or f"{source} sent you a DeathLink.",
+        )
 
     def queue_received_deathlink(self):
         if not self.death_link_enabled:
@@ -8653,7 +8643,14 @@ class DoomEternalContext(CommonContext):
             )
             return
         player = self.auth or "The Doom Slayer"
-        await self.send_death(random.choice(DEATHLINK_MESSAGES).format(player=player))
+        cause = random.choice(DEATHLINK_MESSAGES).format(player=player)
+        await self.send_death(cause)
+        emit_launcher_event(
+            "deathlink",
+            direction="sent",
+            cause=cause,
+            message=cause,
+        )
 
     def record_publisher_ack(self, publisher_key, effect_index, effect):
         state = self.session_state.setdefault("publisher_acknowledgements", {})

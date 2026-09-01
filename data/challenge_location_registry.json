@@ -186,8 +186,9 @@
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "numUnlockableRules": 1,
         "physical_location_ids": [
-          7770059
+          7770058
         ],
+        "required_count": 1,
         "rule_0_satisfied": true,
         "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_ARGENT_UPGRADED",

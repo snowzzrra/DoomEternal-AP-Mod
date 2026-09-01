@@ -175,11 +175,11 @@ def _placement_identity(placement: Any) -> tuple[str, str, bool, bool]:
 def location_sent_text(placement: Any) -> str:
     """Return the placement-aware ``AP LOCATION SENT`` header text.
 
-    Local checks report ``FOUND YOUR <ITEM>``; remote and trap checks report
+    Local checks report ``FOUND YOUR <ITEM>``; remote checks report
     ``SENT <ITEM> TO <RECIPIENT>``.
     """
-    item_name, recipient_name, local, trap = _placement_identity(placement)
-    if local and not trap:
+    item_name, recipient_name, local, _trap = _placement_identity(placement)
+    if local:
         return f"FOUND YOUR {item_name.upper()}"
     return f"SENT {item_name.upper()} TO {recipient_name.upper()}"
 

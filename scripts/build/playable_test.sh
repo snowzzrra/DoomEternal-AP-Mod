@@ -374,6 +374,10 @@ mkdir -p "$MOD_STAGING_DIR/shell/EternalMod/assetsinfo"
 cp "$REPO_ROOT/packaging/shell_menu_assetsinfo.json" \
     "$MOD_STAGING_DIR/shell/EternalMod/assetsinfo/shell.json"
 
+mkdir -p "$MOD_STAGING_DIR/hub_patch2/EternalMod/assetsinfo"
+cp "$REPO_ROOT/packaging/hub_world_text_assetsinfo.json" \
+    "$MOD_STAGING_DIR/hub_patch2/EternalMod/assetsinfo/hub.json"
+
 for map_row in "${MAP_ROWS[@]}"; do
     IFS=$'\t' read -r map_key _ _ _ _ generated_output resource_path relative_entities_path _ <<< "$map_row"
     resource_name="$(basename "$resource_path" .resources)"

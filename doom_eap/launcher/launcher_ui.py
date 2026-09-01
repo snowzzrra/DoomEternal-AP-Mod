@@ -779,8 +779,15 @@ class LauncherUI(QMainWindow):
         copy.setSpacing(3)
         copy.addWidget(self._label("CURRENT SESSION", "eyebrow"))
         self.session_player_name = self._label("NO ROOM CONNECTED", "sessionPlayerName")
-        self.session_player_name.setWordWrap(True)
+        self.session_player_name.setWordWrap(False)
         copy.addWidget(self.session_player_name)
+        identity_copy = QWidget()
+        identity_copy.setLayout(copy)
+        identity_copy.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        identity.addWidget(identity_copy, 1, Qt.AlignmentFlag.AlignVCenter)
+        identity.addStretch(1)
         ammo_refill_block = QWidget()
         ammo_refill_block.setMinimumWidth(230)
         ammo_refill_block.setMaximumWidth(260)
@@ -915,9 +922,9 @@ class LauncherUI(QMainWindow):
         card = self._card()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 20)
-        layout.addWidget(self._label("Items, checks, DeathLink, and connection updates. Most recent first.", "muted"))
+        layout.addWidget(self._label("Items, chat, DeathLink, and installation milestones. Most recent first.", "muted"))
         self.activity = QTableWidget(0, 3)
-        self.activity.setHorizontalHeaderLabels(["TIME", "UPDATE", "DETAILS"])
+        self.activity.setHorizontalHeaderLabels(["TIME", "CATEGORY", "DETAILS"])
         self.activity.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.activity.setAlternatingRowColors(True)
@@ -2371,25 +2378,14 @@ class LauncherUI(QMainWindow):
 
     def _activity_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
-        if kind == "log":
+        normalized = self._normalize_activity_event(event)
+        if normalized is None:
             return
-        semantic = {
-            "connected": ("CONNECTED", self.COLORS["good"]), "disconnected": ("DISCONNECTED", self.COLORS["muted"]),
-            "error": ("NEEDS ATTENTION", self.COLORS["bad"]), "setup_failed": ("NEEDS ATTENTION", self.COLORS["bad"]),
-            "warning": ("NOTICE", self.COLORS["warn"]), "room_install_state": ("ROOM PACKAGE", self.COLORS["ap"]),
-            "setup_ready": ("READY", self.COLORS["good"]), "command_sent": ("MESSAGE SENT", self.COLORS["ap"]),
-            "item": ("ITEM RECEIVED", self.COLORS["good"]), "location": ("CHECK COMPLETE", self.COLORS["ap"]),
-            "deathlink": ("DEATHLINK", self.COLORS["warn"]),
-            "archipelago": ("ARCHIPELAGO", self.COLORS["doom_hot"]),
-            "game_link_installed": ("GAME LINK", self.COLORS["good"]),
-            "ammo_refill": ("AMMO REFILL", self.COLORS["doom_hot"]),
-        }
-        package_failure = self._is_room_package_failure(event)
-        segment, color = semantic.get(kind, (kind.replace("_", " ").upper(), self.COLORS["muted"]))
-        fields = (("Server", "endpoint"), ("Seed", "seed_name"), ("Message", "message"))
-        detail = " | ".join(f"{label}: {event[key]}" for label, key in fields if event.get(key) not in (None, ""))
-        if package_failure or (kind == "room_install_state" and str(event.get("readiness")) == "blocked"):
-            segment, color, detail = "ROOM PACKAGE", self.COLORS["bad"], "Could not prepare room package."
+        segment, color, detail = normalized
+        scroll = self.activity.verticalScrollBar()
+        was_at_top = scroll.value() == scroll.minimum()
+        anchor = self.activity.itemAt(self.activity.viewport().rect().topLeft())
+        selected = self.activity.currentItem()
         row = 0
         self.activity.insertRow(row)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
@@ -2407,6 +2403,42 @@ class LauncherUI(QMainWindow):
             self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
         while self.activity.rowCount() > 100:
             self.activity.removeRow(self.activity.rowCount() - 1)
+        if was_at_top:
+            scroll.setValue(scroll.minimum())
+        elif anchor is not None and self.activity.row(anchor) >= 0:
+            self.activity.scrollToItem(anchor, QTableWidget.ScrollHint.PositionAtTop)
+        if selected is not None and self.activity.row(selected) >= 0:
+            self.activity.setCurrentItem(selected)
+
+    def _normalize_activity_event(
+        self, event: dict[str, object]
+    ) -> tuple[str, str, str] | None:
+        """Project whitelisted player events into Activity; diagnostics stay in Log."""
+        kind = str(event.get("type", ""))
+        if kind == "archipelago":
+            return "ARCHIPELAGO", self.COLORS["doom_hot"], ""
+        if kind == "chat_sent":
+            message = str(event.get("text", "")).strip()
+            return ("CHAT", self.COLORS["ap"], message) if message else None
+        if kind == "deathlink":
+            detail = str(event.get("message") or event.get("cause") or "DeathLink received.")
+            return "DEATHLINK", self.COLORS["warn"], detail[:512]
+        if kind in {"item", "location"}:
+            detail = str(event.get("message") or event.get("plain") or "Archipelago update")
+            return "ARCHIPELAGO", self.COLORS["ap"], detail[:512]
+        if kind == "ammo_refill":
+            status = str(event.get("status", ""))
+            if status not in {"used", "empty", "blocked", "error"}:
+                return None
+            detail = str(event.get("message") or "Ammo Refill update")
+            return "ARCHIPELAGO", self.COLORS["doom_hot"], detail[:512]
+        if kind == "setup_ready":
+            return "INSTALLATION", self.COLORS["good"], "Installation complete"
+        if kind == "room_install_state":
+            if self._is_room_package_failure(event) or str(event.get("readiness")) == "blocked":
+                return "INSTALLATION", self.COLORS["bad"], "Installation failed"
+            return "INSTALLATION", self.COLORS["ap"], "Preparing this room for play"
+        return None
 
     def _archipelago_activity_detail(self, event: dict[str, object]) -> str:
         plain = str(event.get("plain") or "Archipelago update received")
@@ -2528,7 +2560,6 @@ class LauncherUI(QMainWindow):
                 self.command_input.clear()
                 self._chat_pending_text = None
                 self._set_chat_enabled(self._room_connected)
-            self._activity_event({"type": "command_sent", "message": event.get("text", "")})
         elif kind == "chat_send_failed":
             self._append_log("Command error: " + str(event.get("message", "Could not send message.")))
             self._chat_pending_text = None
