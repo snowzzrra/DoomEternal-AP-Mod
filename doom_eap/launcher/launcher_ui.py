@@ -444,6 +444,18 @@ class LauncherUI(QMainWindow):
             QFrame#shell {{ background:#0d1512; border-right:1px solid #48543b; }}
             QFrame#topbar {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #111a16,stop:.48 #0d1512,stop:.52 #111a16,stop:1 #0d1512); border-bottom:1px solid #48543b; }}
             QFrame#hero {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #202719,stop:.46 #151a17,stop:1 #0b0e10); border:1px solid #566447; border-left:4px solid {self.COLORS['doom']}; }}
+            QFrame#hero QWidget {{ background: transparent; }}
+            QFrame#hero QWidget#statusItem {{ background:#0c151a; border:1px solid #30444d; border-radius:11px; }}
+            QFrame#hero QWidget#ammoRefillIndicator {{ background:#0c1012; border:1px solid #3b4143; border-left:3px solid #6c491f; }}
+            QFrame#hero QPushButton {{ background:#17241d; border:1px solid #526446; }}
+            QFrame#hero QPushButton:hover {{ background:#263322; border-color:{self.COLORS['doom']}; }}
+            QFrame#hero QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
+            QFrame#hero QPushButton#danger {{ background:#522226; border-color:#b9494e; color:#fff1f1; }}
+            QFrame#hero QPushButton#danger:hover {{ background:#743037; border-color:#ff7676; }}
+            QFrame#hero QPushButton#danger:disabled {{ background:#26292d; border-color:#3a3e43; color:#777d84; }}
+            QFrame#hero QPushButton#ammoRefillButton {{ background:#413019; border-color:#9b7131; color:#f1d39b; padding:4px 8px; font-size:8.5pt; }}
+            QFrame#hero QPushButton#ammoRefillButton:hover {{ background:#60451f; border-color:#d99c42; }}
+            QFrame#hero QPushButton#ammoRefillButton:disabled {{ background:#171b1c; border-color:#30383a; color:#687174; }}
             QFrame#card {{ background:{self.COLORS['panel']}; border:1px solid {self.COLORS['line']}; border-radius:2px; }}
             QWidget#statusItem {{ background:#0c151a; border:1px solid #30444d; border-radius:11px; }}
             QLabel#statusIndicator {{ color:#64737a; font-size:12pt; }}

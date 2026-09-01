@@ -8,18 +8,18 @@
     "swf": "swf/guientity/generic_text.swf"
   },
   "labels": [
-    {"location_id": 7770087, "source_entity": "progress_argent_cell_1_750400652", "position": [15.680006, -109.739883, -14.78], "orientation": [[-0.708127, 0.706086, 0.0], [-0.706086, -0.708127, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770088, "source_entity": "progress_argent_cell_1_2075197287", "position": [-14.721446, -109.74411, -14.78], "orientation": [[0.554035, 0.832493, 0.0], [-0.832493, 0.554035, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770163, "source_entity": "sentinel_battery_room_progress_praetor_token_1", "position": [15.706711, -109.698196, -5.18], "orientation": [[-0.573005, 0.819552, 0.0], [-0.819552, -0.573005, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770164, "source_entity": "sentinel_battery_room_progress_praetor_token_2", "position": [-14.679006, -109.682449, -5.18], "orientation": [[0.569785, 0.821794, 0.0], [-0.821794, 0.569785, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770165, "source_entity": "sentinel_battery_room_progress_mod_bot_3", "position": [-24.999998, -97.199974, -5.17], "orientation": [[0.924255, 0.381774, 0.0], [-0.381774, 0.924255, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770166, "source_entity": "sentinel_battery_room_progress_mod_bot_4", "position": [25.999969, -97.199974, -5.17], "orientation": [[-0.940380, 0.340124, 0.0], [-0.340124, -0.940380, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770167, "source_entity": "progress_praetor_token_3", "position": [-43.530094, 5.642945, -19.1], "orientation": [[0.999848, 0.017452, 0.0], [-0.017452, 0.999848, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770168, "source_entity": "progress_praetor_token_4", "position": [44.659996, 5.400015, -24.92], "orientation": [[-0.999972, -0.007435, 0.0], [0.007435, -0.999972, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770169, "source_entity": "progress_cheats_all_mastered_runes_1", "position": [91.210037, 61.320004, -39.81], "orientation": [[-0.707107, 0.707107, 0.0], [-0.707107, -0.707107, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770171, "source_entity": "progress_cheats_fully_upgraded_progression_wheel_final", "position": [0.44, -48.550003, 15.99], "orientation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770253, "source_entity": "interact_hub_2_battery_station_1", "position": [94.25, 58.45, -9.1], "orientation": [[-0.700378, -0.713772, 0.0], [0.713772, -0.700378, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770254, "source_entity": "interact_hub_2_battery_station_2", "position": [-92.5, 85.9, -1.8], "orientation": [[0.667277, -0.744810, 0.0], [0.744810, 0.667277, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770255, "source_entity": "interact_hub_2_battery_station_3", "position": [0.55, -115.57, 8.54], "orientation": [[0.003119, 0.999995, 0.0], [-0.999995, 0.003119, 0.0], [0.0, 0.0, 1.0]]}
+    {"location_id": 7770087, "source_entity": "progress_argent_cell_1_750400652", "position": [15.121396, -108.910453, -14.780000], "orientation": [[-0.708127, 0.706086, 0.0], [-0.706086, -0.708127, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770088, "source_entity": "progress_argent_cell_1_2075197287", "position": [-14.158370, -108.917705, -14.780000], "orientation": [[0.554035, 0.832493, 0.0], [-0.832493, 0.554035, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770163, "source_entity": "sentinel_battery_room_progress_praetor_token_1", "position": [15.141717, -108.873101, -5.180000], "orientation": [[-0.573005, 0.819552, 0.0], [-0.819552, -0.573005, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770164, "source_entity": "sentinel_battery_room_progress_praetor_token_2", "position": [-14.115980, -108.856010, -5.180000], "orientation": [[0.569785, 0.821794, 0.0], [-0.821794, 0.569785, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770165, "source_entity": "sentinel_battery_room_progress_mod_bot_3", "position": [-24.068336, -96.836647, -5.170000], "orientation": [[0.924255, 0.381774, 0.0], [-0.381774, 0.924255, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770166, "source_entity": "sentinel_battery_room_progress_mod_bot_4", "position": [25.068308, -96.836645, -5.170000], "orientation": [[-0.940380, 0.340124, 0.0], [-0.340124, -0.940380, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770167, "source_entity": "progress_praetor_token_3", "position": [-42.530094, 5.642442, -19.100000], "orientation": [[0.999848, 0.017452, 0.0], [-0.017452, 0.999848, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770168, "source_entity": "progress_praetor_token_4", "position": [43.660009, 5.394831, -24.920000], "orientation": [[-0.999972, -0.007435, 0.0], [0.007435, -0.999972, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770169, "source_entity": "progress_cheats_all_mastered_runes_1", "position": [91.916007, 60.611762, -39.810000], "orientation": [[-0.707107, 0.707107, 0.0], [-0.707107, -0.707107, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770171, "source_entity": "progress_cheats_fully_upgraded_progression_wheel_final", "position": [0.446376, -47.550023, 15.990000], "orientation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770253, "source_entity": "interact_hub_2_battery_station_1", "position": [93.549779, 57.736074, -9.100000], "orientation": [[-0.700378, -0.713772, 0.0], [0.713772, -0.700378, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770254, "source_entity": "interact_hub_2_battery_station_2", "position": [-91.864982, 85.127503, -1.800000], "orientation": [[0.667277, -0.744810, 0.0], [0.744810, 0.667277, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770255, "source_entity": "interact_hub_2_battery_station_3", "position": [0.545646, -114.570009, 8.540000], "orientation": [[0.003119, 0.999995, 0.0], [-0.999995, 0.003119, 0.0], [0.0, 0.0, 1.0]]}
   ]
 }

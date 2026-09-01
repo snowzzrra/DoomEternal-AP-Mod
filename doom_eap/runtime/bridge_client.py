@@ -3398,6 +3398,7 @@ class DoomEternalContext(CommonContext):
         self.automap_cleanup_epoch = None
         self.automap_cleanup_session = uuid.uuid4().hex[:8]
         self.automap_local_cleanup_owned = set()
+        self.automap_cleanup_submitted = set()
         self.automap_cleanup_retry = {}
         self.automap_cleanup_status = {}
         self.server_checked_locations_ready = False
@@ -3426,10 +3427,14 @@ class DoomEternalContext(CommonContext):
         accepted = self.on_user_say(text)
         if accepted is None:
             raise RuntimeError("Archipelago rejected message")
+        if not hasattr(self, "_local_chat_echoes"):
+            self._local_chat_echoes = deque()
         self._local_chat_echoes.append((accepted, time.monotonic() + 5.0))
         await self.send_msgs([{"cmd": "Say", "text": accepted}])
 
     def _consume_local_chat_echo(self, event):
+        if not hasattr(self, "_local_chat_echoes"):
+            self._local_chat_echoes = deque()
         now = time.monotonic()
         while self._local_chat_echoes and self._local_chat_echoes[0][1] < now:
             self._local_chat_echoes.popleft()
@@ -5058,6 +5063,8 @@ class DoomEternalContext(CommonContext):
                 self._item_delivery_wakeup = True
                 return False
             self._item_delivery_waiting_for_state = False
+            if not hasattr(self, "_pending_receipt_observations"):
+                self._pending_receipt_observations = set()
             captured_state_key = getattr(self, "state_key", "")
             captured_generation = getattr(self, "_item_session_generation", 0)
             try:
@@ -5969,7 +5976,7 @@ class DoomEternalContext(CommonContext):
             self.invalidate_active_save_proof()
             return fail_proof("menu")
 
-        if evidence and evidence.provisional:
+        if evidence and evidence.provisional and marker is None:
             continued = continue_authoritative_active()
             if continued is not None:
                 self.reconcile_fast_travel_unlock("save_proof")
@@ -5992,8 +5999,6 @@ class DoomEternalContext(CommonContext):
         if not active_map:
             return fail_proof("map_marker_unavailable")
         continue_target_map = canonical_map_name(details.get("mapName", ""))
-        if evidence and canonical_map_name(getattr(evidence, "map_name", "")) != active_map:
-            continue_target_map = active_map
         mission_select_required = bool(
             active_map in MISSION_CHALLENGE_RUNTIME_MAPS
             and continue_target_map
@@ -6316,6 +6321,7 @@ class DoomEternalContext(CommonContext):
         self.session_state.setdefault("cultist_autosave_path", None)
         self.session_state.setdefault("save_slot_observations", {})
         self.automap_local_cleanup_owned = set()
+        self.automap_cleanup_submitted = set()
         self.fast_travel_submitted = {}
         self.session_state.pop("automap_cleanup", None)
         self.session_state.pop("fast_travel_delivered", None)
@@ -7087,18 +7093,22 @@ class DoomEternalContext(CommonContext):
         previous_epoch = self.automap_cleanup_epoch
         marker = getattr(self, "cached_map_identity", None)
         epoch = marker.get("gameplay_epoch") if isinstance(marker, dict) else None
+        if not hasattr(self, "automap_cleanup_submitted"):
+            self.automap_cleanup_submitted = set()
         if not valid_materialization_epoch(epoch):
             self.automap_cleanup_epoch = None
             if previous_epoch != self.automap_cleanup_epoch:
                 self.automap_cleanup_retry.clear()
                 self.automap_cleanup_status.clear()
                 self.automap_local_cleanup_owned.clear()
+                self.automap_cleanup_submitted.clear()
             return None
         self.automap_cleanup_epoch = epoch
         if previous_epoch != epoch:
             self.automap_cleanup_retry.clear()
             self.automap_cleanup_status.clear()
             self.automap_local_cleanup_owned.clear()
+            self.automap_cleanup_submitted.clear()
         return self.automap_cleanup_epoch
 
     def _fast_travel_transition(self, event, *, reason=None, trigger=None):
@@ -7378,16 +7388,31 @@ class DoomEternalContext(CommonContext):
 
     def reconcile_checked_automap_cleanup(self, trigger):
         """Remove only isolated AP visuals for server-checked map locations."""
+        self.advance_automap_cleanup_epoch()
         if not self.runtime_effects_ready():
             return False
-        if not valid_materialization_epoch(self.automap_cleanup_epoch):
+        marker = getattr(self, "cached_map_identity", None)
+        if not isinstance(marker, dict):
             return False
-        map_name = canonical_map_name(self.current_map_name or "")
-        map_key = next(
-            (key for key, runtime_map in KNOWN_CATALOG_MAPS.items()
-             if canonical_map_name(runtime_map) == map_name),
-            None,
-        )
+        epoch = marker.get("gameplay_epoch")
+        if (
+            not valid_materialization_epoch(epoch)
+            or not valid_materialization_epoch(self.automap_cleanup_epoch)
+            or epoch != self.automap_cleanup_epoch
+        ):
+            return False
+        marker_map = canonical_map_name(marker.get("runtime_map", ""))
+        current_map = canonical_map_name(self.current_map_name or "")
+        if not marker_map or not current_map or marker_map != current_map:
+            return False
+        map_name = marker_map
+        map_key = marker.get("map_key")
+        if not isinstance(map_key, str) or not map_key:
+            map_key = next(
+                (key for key, runtime_map in KNOWN_CATALOG_MAPS.items()
+                 if canonical_map_name(runtime_map) == map_name),
+                None,
+            )
         entries = [
             entry for entry in AUTOMAP_VISUALS_BY_MAP.get(map_key or "", {}).values()
             if entry["classification"] == "visible_cleanup"
@@ -7395,7 +7420,6 @@ class DoomEternalContext(CommonContext):
         if not entries:
             return False
         room_identity = self.get_ap_state_key()
-        epoch = self.automap_cleanup_epoch
         if not room_identity:
             self._automap_cleanup_transition(
                 (epoch, "", map_name, ""),
@@ -7421,6 +7445,10 @@ class DoomEternalContext(CommonContext):
                 trigger=trigger,
             )
             return False
+        if not hasattr(self, "automap_cleanup_submitted"):
+            self.automap_cleanup_submitted = set()
+        if not hasattr(self, "automap_cleanup_retry"):
+            self.automap_cleanup_retry = {}
         checked = set(checked)
         changed = False
         now = time.monotonic()
@@ -7436,6 +7464,14 @@ class DoomEternalContext(CommonContext):
                     runtime_key,
                     "LOCAL_FLOW_OWNS_EFFECT",
                     "local_flow_owns_effect",
+                    trigger=trigger,
+                )
+                continue
+            if runtime_key in self.automap_cleanup_submitted:
+                self._automap_cleanup_transition(
+                    runtime_key,
+                    "SUBMITTED",
+                    "spool_already_submitted",
                     trigger=trigger,
                 )
                 continue
@@ -7478,15 +7514,12 @@ class DoomEternalContext(CommonContext):
                     trigger=trigger,
                 )
                 continue
-            retry["attempt"] += 1
-            retry["deadline"] = now + min(
-                AUTOMAP_CLEANUP_RETRY_MAX_SECONDS,
-                AUTOMAP_CLEANUP_RETRY_BASE_SECONDS * (2 ** min(retry["attempt"] - 1, 3)),
-            )
+            self.automap_cleanup_retry.pop(runtime_key, None)
+            self.automap_cleanup_submitted.add(runtime_key)
             changed = True
             self._automap_cleanup_transition(
                 runtime_key,
-                "COMMAND_QUEUED_UNVERIFIED",
+                "SUBMITTED",
                 "spool_enqueued",
                 trigger=trigger,
             )
@@ -7550,9 +7583,6 @@ class DoomEternalContext(CommonContext):
             "bootstrap", {"revision": BOOTSTRAP_REVISION, "actions": {}}
         )
         actions = bootstrap.setdefault("actions", {})
-        # dev1 stored entries by bare action name. Preserve them as revision 1
-        # evidence rather than treating consumption as confirmation or replaying
-        # them under revision 2.
         for action_name in (*BOOTSTRAP_ACTIONS, "suit_page"):
             legacy = actions.pop(action_name, None)
             if legacy is not None:

@@ -1,5 +1,5 @@
 {
-  "authoritative_fingerprint": "407676dbb478ce7aff8fb9ecd5eda99b8e93402feb09d2c7a9300f6414d441f1",
+  "authoritative_fingerprint": "d9953e005dc63c49a842bbaf438acfad23761f7a5d1958f070274e6c61a23c37",
   "catalog_fingerprint": "c82264e778da24ca785a16c49afc365f816e62221b6123b77913399f801bfdc6",
   "compiler_revision": 4,
   "content_revision": "0.5.0",
@@ -5126,7 +5126,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_1_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5154,7 +5154,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_2_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5182,7 +5182,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_3_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5210,7 +5210,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_4_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5238,7 +5238,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_5_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5266,7 +5266,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_6_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5294,7 +5294,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_7_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5322,7 +5322,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_8_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5350,7 +5350,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_CODEX_9_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5378,7 +5378,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PROGRESS_PRAETOR_TOKEN_1_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5393,8 +5393,8 @@
       "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
       "source_identity": {
         "descriptor_sha256": "8f875f8931c407bfb8cfe7a3caa94f4cd2e118abe48e6abe5cb53790e6496391",
-        "location_descriptor_sha256": "1a203b9a743f99d54d68dc6e5752ae8d60da770560f0aae0ede46f91552ffdf6",
-        "policy_sha256": "98c489101a4a49a0ffeccc92f60589316cbdbe970aa35e0ae8fe174612a8db91",
+        "location_descriptor_sha256": "d6f82c61d3c2b5a1f84fc7de2d574d74bc5368c6b0bf2d24d841971b3a50b098",
+        "policy_sha256": "4c57485da8c8479c88eee9d75fd35180f05043b8f6395536ecd59da73f49652d",
         "resolved_policy": "explicit_independent_visual",
         "resource": {
           "relative_entities_path": "game/sp/e2m4_boss/e2m4_boss.entities",
@@ -5406,7 +5406,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {
@@ -5434,7 +5434,7 @@
         "resource_sha256": "1e85e477df22b2c3452b9994f16061f54dc7735eb40e54d5fb53116d56ea499c",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E2M4",
         "source_file": "content/maps/e2m4_boss/locations.json",
-        "source_sha256": "85884f294fbc6b877c3430ccd384aa43883cdc6ca58dd6c3c3e625e490433c40"
+        "source_sha256": "c7a0562f586538bd5f5f14b1784fda5541e63f3e5f0e5f2c15e2fb0098910aa1"
       }
     },
     {

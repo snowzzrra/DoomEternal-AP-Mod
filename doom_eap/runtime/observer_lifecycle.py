@@ -242,7 +242,7 @@ class RuntimeObservationLease:
             return False, "gameplay_not_loaded"
         if evidence_mtime_ns < self.started_ns:
             return False, "stale_runtime_proof"
-        if save_mtime_ns < self.gameplay_loaded_ns:
+        if save_mtime_ns and save_mtime_ns < self.started_ns:
             return False, "mission_select_save_not_fresh"
         canonical = lambda value: str(value or "").replace("\\", "/").rstrip("/")
         if not canonical(current_map) or canonical(current_map) != canonical(mission_map):

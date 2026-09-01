@@ -28,6 +28,7 @@ from tools.decls.devinv_builder import (
     build_tag_devinv_overrides,
     output_path_for_map,
 )
+from .launcher_platform import IDFILE_DECOMPRESSOR
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -947,41 +948,39 @@ class RoomCompiler:
 \t\t\tspawnPosition = {{
 \t\t\t\tx = {x:.6f};
 \t\t\t\ty = {y:.6f};
-\t\t\t\tz = {z:.6f};
-\t\t\t}}
-\t\t\tspawnOrientation = {{
-\t\t\t\tmat = {{
-\t\t\t\t\tmat[0] = {{ x = {m0[0]:.6f}; y = {m0[1]:.6f}; z = {m0[2]:.6f}; }}
-\t\t\t\t\tmat[1] = {{ x = {m1[0]:.6f}; y = {m1[1]:.6f}; z = {m1[2]:.6f}; }}
-\t\t\t\t\tmat[2] = {{ x = {m2[0]:.6f}; y = {m2[1]:.6f}; z = {m2[2]:.6f}; }}
-\t\t\t\t}}
-\t\t\t}}
-\t\t\tdormancy = {{
-\t\t\t\tallowDistanceDormancy = false;
-\t\t\t\tallowDormancy = false;
-\t\t\t\tallowPvsDormancy = false;
-\t\t\t}}
-\t\t\tdynamicMoveActive = true;
-\t\t\tswfScale = 0.009667;
-\t\t\tbodyText = {{
-\t\t\t\ttext = "{display}";
-\t\t\t\tcolor = {{
-\t\t\t\t\tr = {red:.6f};
-\t\t\t\t\tg = {green:.6f};
-\t\t\t\t\tb = {blue:.6f};
-\t\t\t\t}}
-\t\t\t\trelativeWidth = 1;
-\t\t\t\talignment = "SWF_ET_ALIGN_CENTER";
-\t\t\t}}
-\t\t}}
-\t}}
+				z = {z:.6f};
+			}}
+			spawnOrientation = {{
+				mat = {{
+					mat[0] = {{ x = {m0[0]:.6f}; y = {m0[1]:.6f}; z = {m0[2]:.6f}; }}
+					mat[1] = {{ x = {m1[0]:.6f}; y = {m1[1]:.6f}; z = {m1[2]:.6f}; }}
+					mat[2] = {{ x = {m2[0]:.6f}; y = {m2[1]:.6f}; z = {m2[2]:.6f}; }}
+				}}
+			}}
+			dormancy = {{
+				allowDistanceDormancy = false;
+				allowDormancy = false;
+				allowPvsDormancy = false;
+			}}
+			dynamicMoveActive = true;
+			swfScale = 0.009667;
+			bodyText = {{
+				text = "{display}";
+				color = {{
+					r = {red:.6f};
+					g = {green:.6f};
+					b = {blue:.6f};
+				}}
+				relativeWidth = 1;
+				alignment = "SWF_ET_ALIGN_CENTER";
+			}}
+		}}
+	}}
 }}
 ''')
         return member_suffix, "".join(entities)
 
     def _verified_decompressor(self) -> Path:
-        from .launcher_platform import IDFILE_DECOMPRESSOR
-
         if self.decompressor is None:
             if self.dependency_manager is None or not callable(self.consent):
                 raise FileNotFoundError(

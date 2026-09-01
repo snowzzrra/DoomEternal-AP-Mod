@@ -426,7 +426,6 @@ bool GameStateProbe::ReadState(
     } else if (!IsPlausiblePointer(mapInstance)) {
         playerState = mapInstance == 0 ? "map_null" : "map_invalid";
     } else {
-        mapEntitySafe = true;
         if (!Read(mapInstance + kPlayerOffset, player)) {
             playerState = "player_read_failed";
         } else if (!IsPlausiblePointer(player)) {
@@ -456,10 +455,7 @@ bool GameStateProbe::ReadState(
         && !hideReticle
         && !hideHudForCinematic;
     safeForRpc = safeCandidate;
-    mapEntitySafe = mapEntitySafe
-        && !isLoading
-        && isInGame
-        && !cutsceneActive;
+    mapEntitySafe = gameplayLoaded && !cutsceneActive;
     gameplayLoaded_ = gameplayLoaded;
 
     state = std::string("Memory state: gameplay_loaded=")

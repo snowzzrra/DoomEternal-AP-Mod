@@ -87,14 +87,18 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "reduce Extra Life trigger hitbox in Switch-Opened Wall Alcove to prevent through-wall collection"
     }
   ],
   "asset_package_contract_sha256": "9d979ded13ff77aa6d138e3324720a596b9a725e4a1806bd62b2c56e7ca7bbbd",
-  "byte_sha256": "2b431ef08d6dd6062363619446b2086c6898051c28deb62eb182cbdc869fe0e8",
+  "byte_sha256": "6d89a66aaef01f046a895f98657e4bbaf4cef010f8b85b24058a974cfc6f1630",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 11,
-    "byte_size": 2752553,
+    "byte_size": 2752559,
     "classes": 2921,
     "entity_count": 2923,
     "layers": 125,
@@ -123,6 +127,6 @@
     7770290
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "f40a313976db848b82fadea530ac55b2b31af93fdd0f36e4ddd81e71d2aa4725",
-  "semantic_sha256": "cd596ff1f01ca4c9ce3a9d939a86588a13ef314f29206c02b79062c9d4b9fc65"
+  "scripted_contract_sha256": "29abb56feab4beb8ef5f9e881730b20e9978a55d031bbeb54ec51966775e2ee0",
+  "semantic_sha256": "710039889f023be3bedcffe0af073b27d44c4c2f6df730420e80e380c0bd16f0"
 }

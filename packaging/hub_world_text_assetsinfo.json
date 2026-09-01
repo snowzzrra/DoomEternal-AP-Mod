@@ -1,7 +1,19 @@
 {
   "resources": [
     {
-      "name": "hub.resources"
+      "name": "e5m1_spear.resources"
+    },
+    {
+      "name": "e5m1_spear_patch1.resources"
+    },
+    {
+      "name": "e5m1_spear_patch2.resources"
+    },
+    {
+      "name": "e6m3_mcity_horde.resources"
+    },
+    {
+      "name": "e6m3_mcity_horde_patch1.resources"
     }
   ]
 }
