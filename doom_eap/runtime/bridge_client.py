@@ -4992,6 +4992,7 @@ class DoomEternalContext(CommonContext):
                     accepted_start_index,
                     accepted_start_index + packet_item_count,
                     packet_received_ns,
+                    accepted_start_index >= self.items_processed,
                 )
             )
         log_item_event(
@@ -5040,10 +5041,18 @@ class DoomEternalContext(CommonContext):
             logger.exception("[Tracking] ITEM_DELIVERY_RUNNER_CRASH")
 
     def _packet_received_timestamp(self, receipt_index):
-        for start, end, timestamp_ns in reversed(self._packet_received_ranges):
+        for timing_range in reversed(self._packet_received_ranges):
+            start, end, timestamp_ns = timing_range[:3]
             if start <= receipt_index < end:
                 return timestamp_ns
         return None
+
+    def _packet_receipt_is_live_tail(self, receipt_index):
+        for timing_range in reversed(self._packet_received_ranges):
+            start, end = timing_range[:2]
+            if start <= receipt_index < end:
+                return len(timing_range) >= 4 and timing_range[3] is True
+        return False
 
     async def process_pending_item_receipts(self, trigger):
         """Consume authoritative receipts once, in increasing receive-index order."""
@@ -5218,13 +5227,26 @@ class DoomEternalContext(CommonContext):
                     break
 
                 if item_id in TRANSIENT_EFFECTS:
-                    applied, description = self.transient_effect_manager.apply_receipt(item_id)
+                    live_tail_receipt = self._packet_receipt_is_live_tail(item_index)
+                    if live_tail_receipt:
+                        applied, description, retryable = (
+                            self.transient_effect_manager.apply_receipt(item_id)
+                        )
+                    else:
+                        applied = False
+                        description = "historical transient receipt is not replayable"
+                        retryable = False
                     if not applied:
+                        if retryable:
+                            logger.info(
+                                "[To Game] Transient item %s pending: %s",
+                                item_id, description,
+                            )
+                            break
                         logger.info(
-                            "[To Game] Transient item %s pending: %s",
+                            "[To Game] Transient item %s skipped: %s",
                             item_id, description,
                         )
-                        break
                     self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
@@ -5233,7 +5255,16 @@ class DoomEternalContext(CommonContext):
                         receipt_index=item_index,
                         item_id=item_id,
                         receipt_id=receipt_identity(network_item),
-                        outcome="transient_effect_armed",
+                        outcome=(
+                            "transient_effect_armed"
+                            if applied
+                            else (
+                                "transient_effect_skipped_unsafe"
+                                if live_tail_receipt
+                                else "transient_effect_skipped_historical"
+                            )
+                        ),
+                        detail=description,
                         boundary=self.items_processed,
                         trigger=trigger,
                         state_key=getattr(self, "state_key", None),

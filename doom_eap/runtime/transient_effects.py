@@ -139,23 +139,23 @@ class TransientEffectManager:
                 return False
         return True
 
-    def apply_receipt(self, item_id: int) -> tuple[bool, str]:
+    def apply_receipt(self, item_id: int) -> tuple[bool, str, bool]:
         effect = TRANSIENT_EFFECTS.get(item_id)
         if effect is None:
-            return False, "not a transient effect"
+            return False, "not a transient effect", False
         now = time.monotonic()
         self.tick(now, emit=False)
         if not self.owner.transient_effects_ready():
-            return False, "transient baseline or safe gameplay unavailable"
+            return False, "transient baseline or safe gameplay unavailable", False
         current = self.active.get(effect["name"])
         expiry = max(now, current[0] if current is not None else now)
         self.active[effect["name"]] = (
             expiry + effect["duration"], effect["factor"], effect["cvar"]
         )
         if not self._emit(now):
-            return False, "transient command spool rejected"
+            return False, "transient command spool rejected", True
         self.reset_pending = False
-        return True, effect["name"]
+        return True, effect["name"], False
 
     def tick(self, now: float | None = None, *, emit: bool = True) -> bool:
         now = time.monotonic() if now is None else now

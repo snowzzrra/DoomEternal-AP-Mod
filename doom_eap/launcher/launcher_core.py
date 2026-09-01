@@ -860,7 +860,7 @@ class RoomCompiler:
             "swf": "swf/guientity/generic_text.swf",
         }
         if primitive != required_primitive:
-            raise ValueError("Fortress Battery label primitive drifted from vanilla gui/text donor")
+            raise ValueError("Fortress Battery label primitive contract is invalid")
         rows_by_id: dict[int, tuple[float, float, float]] = {}
         for row in rows:
             if not isinstance(row, dict) or set(row) != {"location_id", "source_entity", "position"}:

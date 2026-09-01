@@ -71,20 +71,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "enable location sent notification feedback for all checks"
     }
   ],
   "asset_package_contract_sha256": "2114d4f3c8372ca53a27512f26623011a29cb31af9600d4f8bde3b342062491c",
-  "byte_sha256": "f7f9d8590826d9fba08d73a28582ba033b14ed5959e20f214a339049e1b43f57",
+  "byte_sha256": "662b9b727b7ab11d092d6b9e46824ab75a17deb573e0fd9fd14a87972d38e376",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 271,
-    "byte_size": 14440254,
-    "classes": 13414,
-    "entity_count": 13417,
+    "byte_size": 14447558,
+    "classes": 13422,
+    "entity_count": 13425,
     "layers": 2113,
-    "targets": 8762,
+    "targets": 8770,
     "transforms": 27372,
-    "unique_entity_names": 13415
+    "unique_entity_names": 13423
   },
   "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
   "map_key": "e2m1_nest",
@@ -124,5 +128,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "719ac741fa7d8e02c15c4d4bcbcba587612051325b5fffc101f66a215a889e5b",
-  "semantic_sha256": "830108d230b704f8f6326ae9fa2fee5f082be99fea690e0d1ddca5469ec5eb44"
+  "semantic_sha256": "821d0825a7b574f481c4440a286307c3cbc4dff4aa1585722e94c766a2b12b73"
 }

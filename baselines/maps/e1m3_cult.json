@@ -75,20 +75,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "enable location sent notification feedback for all checks"
     }
   ],
   "asset_package_contract_sha256": "ef3a4dc42ee3979a6f025bfe3789a411a735c7d474666b114b170d5c6ec8f996",
-  "byte_sha256": "6bbbbf681ebba17af17b5efe3da5d8daeb920144ce72a8d5bd31273810635384",
+  "byte_sha256": "eac4fc7e18b2728814efafb97af9ccd03be2e7527de912df5d3d9476200f413a",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20118982,
-    "classes": 18362,
-    "entity_count": 18362,
+    "byte_size": 20129938,
+    "classes": 18374,
+    "entity_count": 18374,
     "layers": 4816,
-    "targets": 10775,
+    "targets": 10787,
     "transforms": 37089,
-    "unique_entity_names": 18362
+    "unique_entity_names": 18374
   },
   "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
   "map_key": "e1m3_cult",
@@ -124,5 +128,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "f35171d341748813c8aa6f60449ef130ae8d41c1974b6ca5817da63ec0b4dee7",
-  "semantic_sha256": "752754fa4879d2a12f778d3f090d74c04b2cd76014ec8f256b1c73fb475aab89"
+  "semantic_sha256": "1425158600dd6d772804f9350ea13a0833c0c26d85f1126a101306cf92b15333"
 }

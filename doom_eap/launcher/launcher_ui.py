@@ -781,17 +781,6 @@ class LauncherUI(QMainWindow):
         self.session_player_name = self._label("NO ROOM CONNECTED", "sessionPlayerName")
         self.session_player_name.setWordWrap(True)
         copy.addWidget(self.session_player_name)
-        identity.addLayout(copy, 1)
-        self.connection_badge = self._label("OFFLINE", "connectionBadge")
-        self.connection_badge.setProperty("connected", False)
-        identity.addWidget(self.connection_badge, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addLayout(identity)
-        meta = QGridLayout()
-        meta.setHorizontalSpacing(16)
-        meta.setVerticalSpacing(3)
-        self.player_team = self._label("Team —", "muted")
-        self.player_slot = self._label("Slot —", "muted")
-        self.player_inventory = self._label("Connect to restore inventory", "muted")
         ammo_refill_block = QWidget()
         ammo_refill_block.setMinimumWidth(230)
         ammo_refill_block.setMaximumWidth(260)
@@ -821,21 +810,19 @@ class LauncherUI(QMainWindow):
         self.ammo_refill_button.clicked.connect(self._request_ammo_refill)
         ammo_block_layout.addWidget(self.ammo_refill_button)
         self._set_ammo_refill_indicator(None)
+        identity.addWidget(ammo_refill_block, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.connection_badge = self._label("OFFLINE", "connectionBadge")
+        self.connection_badge.setProperty("connected", False)
+        identity.addWidget(self.connection_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(identity)
+
+        self.player_team = self._label("Team —", "muted")
+        self.player_slot = self._label("Slot —", "muted")
+        self.player_inventory = self._label("Connect to restore inventory", "muted")
         self.resync_inventory_button = QPushButton("RESYNC INVENTORY")
         self.resync_inventory_button.setEnabled(False)
         self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
-        meta.addWidget(self.player_team, 0, 0)
-        meta.addWidget(self.player_slot, 0, 1)
-        meta.addWidget(self.player_inventory, 1, 0)
-        meta.addWidget(
-            ammo_refill_block,
-            1,
-            1,
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-        )
-        meta.setColumnStretch(0, 1)
-        meta.setColumnStretch(1, 1)
-        layout.addLayout(meta)
         layout.addWidget(self._status_strip())
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -1838,7 +1825,7 @@ class LauncherUI(QMainWindow):
             event.get("slot_name") or event.get("player_name") or self.controller.config.get("slot"),
             f"Slot {slot}",
         )
-        self.session_player_name.setText(player)
+        self.session_player_name.setText(f"{player} · Team {team} · Slot {slot}")
         self._set_connection_badge("CONNECTED", True)
         self.player_team.setText(f"Team {team}")
         self.player_slot.setText(f"Slot {slot} · {player}")

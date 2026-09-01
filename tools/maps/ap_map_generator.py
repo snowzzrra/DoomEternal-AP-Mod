@@ -2719,7 +2719,7 @@ def generate_map(
                 feedback_policy = location_feedback_policy(
                     location_feedback, ap_check_id
                 )
-                include_ap_feedback = feedback_policy != "vanilla_only"
+                include_ap_feedback = True
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
                 if not target_policy:
                     target_policy = build_universal_physical_policy(
@@ -3033,7 +3033,7 @@ def generate_map(
         feedback_policy = location_feedback_policy(
             location_feedback, ap_check_id
         )
-        include_ap_feedback = feedback_policy != "vanilla_only"
+        include_ap_feedback = True
         secret_blocks.append(
             generate_event_relay(
                 ap_check_id,

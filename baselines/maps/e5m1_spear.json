@@ -3,6 +3,10 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: enlarged and centered global main-menu AP mark."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "enable location sent notification feedback for all checks"
     }
   ],
   "asset_package_contract_sha256": "5e6e9aaacd11591988a4dc4aebd5243b7518880349298b38b93594f7cde2cd53",

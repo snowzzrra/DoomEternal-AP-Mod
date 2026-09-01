@@ -107,20 +107,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: accept combined approved AP-menu transform and restored 7770074 dynamic visual primitive."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "enable location sent notification feedback for all checks"
     }
   ],
   "asset_package_contract_sha256": "bc7fdbb28182c177af6af7496795d6804b0c7ace5c8f8e4745bf7f157a8ac258",
-  "byte_sha256": "cf8c9f6c1d0162884a321295daddce1579b042cb8db86c1a8b65d6fb14d04f93",
+  "byte_sha256": "ac1bb500516dbfbe5d4693ea30350a0a47a2048c17cf126515dae895d5c3a93c",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 140,
-    "byte_size": 4336889,
-    "classes": 4206,
-    "entity_count": 4208,
+    "byte_size": 4338715,
+    "classes": 4208,
+    "entity_count": 4210,
     "layers": 162,
-    "targets": 2827,
+    "targets": 2829,
     "transforms": 8054,
-    "unique_entity_names": 4207
+    "unique_entity_names": 4209
   },
   "manifest_sha256": "eebb418acb722f27f2ff977f174ddd1537ad0b5dc5df42dd929ca0e3b931a323",
   "map_key": "hub",
@@ -150,5 +154,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "a0a0eb9a090692f4a73dce31928b730807679b53b0db60f272e4efa2c2dc69f9",
-  "semantic_sha256": "58a73feb419b18cc89a0aa753832ead9e4e47d6d302b370236095ad10d873cf8"
+  "semantic_sha256": "9e38be09dbdb8ed2c48a159c5c48b831560d0e915dc45a4bcb0978704890c0da"
 }
