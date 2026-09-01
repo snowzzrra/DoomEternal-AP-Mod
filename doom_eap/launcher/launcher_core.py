@@ -862,11 +862,17 @@ class RoomCompiler:
         if primitive != required_primitive:
             raise ValueError("Fortress Battery label primitive contract is invalid")
         rows_by_id: dict[int, tuple[float, float, float]] = {}
+        orientations_by_id: dict[int, list[list[float]]] = {}
         for row in rows:
-            if not isinstance(row, dict) or set(row) != {"location_id", "source_entity", "position"}:
+            if not isinstance(row, dict) or not {"location_id", "source_entity", "position"}.issubset(set(row)):
                 raise ValueError("Fortress Battery label transform row is invalid")
             location_id = row["location_id"]
             position = row["position"]
+            orientation = row.get("orientation", [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ])
             if (
                 not isinstance(location_id, int)
                 or not isinstance(row["source_entity"], str)
@@ -874,10 +880,20 @@ class RoomCompiler:
                 or not isinstance(position, list)
                 or len(position) != 3
                 or any(not isinstance(value, (int, float)) for value in position)
+                or not isinstance(orientation, list)
+                or len(orientation) != 3
+                or any(
+                    not isinstance(vec, list) or len(vec) != 3
+                    or any(not isinstance(val, (int, float)) for val in vec)
+                    for vec in orientation
+                )
                 or location_id in rows_by_id
             ):
                 raise ValueError("Fortress Battery label transform row is invalid")
             rows_by_id[location_id] = tuple(float(value) for value in position)  # type: ignore[assignment]
+            orientations_by_id[location_id] = [
+                [float(val) for val in vec] for vec in orientation
+            ]
         if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
             raise ValueError("Fortress Battery label specification must cover exactly 13 consumers")
 
@@ -901,6 +917,7 @@ class RoomCompiler:
                 ARCHIPELAGO_PRESENTATION_COLORS[color_key]
             )
             x, y, z = rows_by_id[location_id]
+            m0, m1, m2 = orientations_by_id[location_id]
             entities.append(f'''entity {{
 \tentityDef ap_fortress_battery_placement_{location_id} {{
 \t\tinherit = "gui/text";
@@ -912,14 +929,15 @@ class RoomCompiler:
 \t\tdisableAIPooling = false;
 \t\tedit = {{
 \t\t\tflags = {{
+\t\t\t\thide = false;
 \t\t\t\tnoknockback = false;
 \t\t\t}}
 \t\t\trenderModelInfo = {{
 \t\t\t\tmodel = "editors/models/gui_text.lwo";
 \t\t\t\tscale = {{
-\t\t\t\t\tx = 10;
-\t\t\t\t\ty = 10;
-\t\t\t\t\tz = 10;
+\t\t\t\t\tx = 15;
+\t\t\t\t\ty = 15;
+\t\t\t\t\tz = 15;
 \t\t\t\t}}
 \t\t\t}}
 \t\t\tclipModelInfo = {{
@@ -933,9 +951,9 @@ class RoomCompiler:
 \t\t\t}}
 \t\t\tspawnOrientation = {{
 \t\t\t\tmat = {{
-\t\t\t\t\tmat[0] = {{ x = 1; y = 0; z = 0; }}
-\t\t\t\t\tmat[1] = {{ x = 0; y = 1; z = 0; }}
-\t\t\t\t\tmat[2] = {{ x = 0; y = 0; z = 1; }}
+\t\t\t\t\tmat[0] = {{ x = {m0[0]:.6f}; y = {m0[1]:.6f}; z = {m0[2]:.6f}; }}
+\t\t\t\t\tmat[1] = {{ x = {m1[0]:.6f}; y = {m1[1]:.6f}; z = {m1[2]:.6f}; }}
+\t\t\t\t\tmat[2] = {{ x = {m2[0]:.6f}; y = {m2[1]:.6f}; z = {m2[2]:.6f}; }}
 \t\t\t\t}}
 \t\t\t}}
 \t\t\tdormancy = {{
@@ -944,8 +962,8 @@ class RoomCompiler:
 \t\t\t\tallowPvsDormancy = false;
 \t\t\t}}
 \t\t\tdynamicMoveActive = true;
-\t\t\tswfScale = 0.020000;
-\t\t\theaderText = {{
+\t\t\tswfScale = 0.009667;
+\t\t\tbodyText = {{
 \t\t\t\ttext = "{display}";
 \t\t\t\tcolor = {{
 \t\t\t\t\tr = {red:.6f};
@@ -955,7 +973,6 @@ class RoomCompiler:
 \t\t\t\trelativeWidth = 1;
 \t\t\t\talignment = "SWF_ET_ALIGN_CENTER";
 \t\t\t}}
-\t\t\tbillboard = true;
 \t\t}}
 \t}}
 }}

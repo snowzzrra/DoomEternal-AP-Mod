@@ -4792,7 +4792,7 @@ class DoomEternalContext(CommonContext):
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             if self.server_checked_locations_ready:
-                self.checked_locations = set(args["checked_locations"])
+                self.checked_locations.update(args["checked_locations"])
                 self.snapshot_fast_travel_eligibility(refresh=True)
             self.reconcile_checked_automap_cleanup("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")

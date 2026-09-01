@@ -495,7 +495,8 @@ cp "$REPO_ROOT/doom_eap/launcher/launcher_cli.py" "$OUTPUT_DIR/client/launcher_c
 cp "$REPO_ROOT/doom_eap/runtime/"*.py "$OUTPUT_DIR/client/doom_eap/runtime/"
 cp "$REPO_ROOT/doom_eap/content/"*.py "$OUTPUT_DIR/client/doom_eap/content/"
 cp "$REPO_ROOT/doom_eap/contracts/"*.py "$OUTPUT_DIR/client/doom_eap/contracts/"
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$OUTPUT_DIR/client" python3 -B -c "
+LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-$ARCHIPELAGO_PYTHON}"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$OUTPUT_DIR/client" "$LAUNCHER_PYTHON" -B -c "
 import doom_eap.presentation
 import presentation
 from doom_eap.launcher.launcher_core import RoomCompiler
