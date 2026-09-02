@@ -83,7 +83,6 @@ from doom_eap.content.automap_visual_registry import (
     load_automap_visual_registry,
 )
 from doom_eap.runtime.rune_reconciliation import (
-    RUNE_WRITER_EVIDENCE,
     RuneNativeState,
     compile_rune_reconciliation_plan,
     with_rune_reconciliation_commands,
@@ -7128,12 +7127,10 @@ class DoomEternalContext(CommonContext):
         self.persist_session_state()
         if plan.repairs:
             logger.warning(
-                "RUNE_RECONCILE_QUEUED trigger=%s candidates=%s fingerprint=%s "
-                "writer=%s",
+                "RUNE_RECONCILE_QUEUED trigger=%s candidates=%s fingerprint=%s",
                 trigger,
                 len(plan.repairs),
                 plan.fingerprint,
-                RUNE_WRITER_EVIDENCE,
             )
         else:
             logger.info(
@@ -7188,8 +7185,6 @@ class DoomEternalContext(CommonContext):
                 f"Plan: {plan.status}; noops={len(plan.noops)} "
                 f"repair_candidates={len(plan.repairs)}"
             )
-            if plan.repairs:
-                lines.append(f"Writer proof: {RUNE_WRITER_EVIDENCE}")
         return lines
 
     def advance_automap_cleanup_epoch(self):

@@ -292,7 +292,7 @@
         58.45,
         -11.3
       ],
-      "independent_visual_z_offset": -1.5,
+      "independent_visual_z_offset": -0.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
@@ -313,7 +313,7 @@
         85.9,
         -4.0
       ],
-      "independent_visual_z_offset": -1.5,
+      "independent_visual_z_offset": -0.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
@@ -334,7 +334,7 @@
         -115.57,
         6.34
       ],
-      "independent_visual_z_offset": -1.5,
+      "independent_visual_z_offset": -0.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",
