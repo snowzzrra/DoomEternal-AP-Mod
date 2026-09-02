@@ -10,11 +10,6 @@ from typing import Any, Iterable, Mapping
 
 from doom_eap.runtime.item_reconciliation import ReconciliationCommand
 
-RUNE_WRITER_STATUS = "bounded_per_owned_writer"
-RUNE_WRITER_EVIDENCE = (
-    "existing target_command projection ap_rpc_v3_<item_id> replays one owned "
-    "givePlayerPerk effect; no grant-all or auto-equip command is emitted"
-)
 _RUNE_COMMAND = re.compile(
     r"ai_ScriptCmdEnt player1 givePlayerPerk (?P<perk>perk/player/runes/[A-Za-z0-9_./-]+)"
 )
@@ -128,7 +123,6 @@ class RuneReconciliationPlan:
     entries: tuple[RunePlanEntry, ...]
     fingerprint: str
     status: str
-    writer_status: str = RUNE_WRITER_STATUS
     commands: tuple[Any, ...] = ()
 
     @property
@@ -173,7 +167,6 @@ def with_rune_reconciliation_commands(
         entries=plan.entries,
         fingerprint=plan.fingerprint,
         status=plan.status,
-        writer_status=plan.writer_status,
         commands=compile_rune_reconciliation_commands(plan, slot_identity, epoch),
     )
 
@@ -253,7 +246,7 @@ def compile_rune_reconciliation_plan(
     fingerprint = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
-    status = RUNE_WRITER_STATUS if any(
+    status = "repair_needed" if any(
         entry.disposition == "repair_candidate" for entry in entries
     ) else "noop"
     return RuneReconciliationPlan(tuple(entries), fingerprint, status)
