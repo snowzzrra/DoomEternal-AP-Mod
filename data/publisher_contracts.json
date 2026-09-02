@@ -180,6 +180,9 @@
       "dedupe_scope": "ap_session_goal",
       "effects": [
         {
+          "strategy": "campaign_goal"
+        },
+        {
           "strategy": "preserved_native_target",
           "target": "e2m4_endoflevel_transition_native"
         }
@@ -360,9 +363,6 @@
         {
           "location_id": 7770414,
           "strategy": "location_check"
-        },
-        {
-          "strategy": "campaign_goal"
         }
       ],
       "fallback_policy": "first_success_wins",

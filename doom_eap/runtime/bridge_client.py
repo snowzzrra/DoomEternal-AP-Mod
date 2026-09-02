@@ -86,11 +86,13 @@ from doom_eap.runtime.rune_reconciliation import (
     RUNE_WRITER_EVIDENCE,
     RuneNativeState,
     compile_rune_reconciliation_plan,
+    with_rune_reconciliation_commands,
     rune_item_perk_mapping,
     rune_plan_already_recorded,
 )
 from doom_eap.runtime.context_registry import (
     CONTEXT_BY_IDENTITY,
+    GOAL_CAPABILITIES,
     SUPPORT_RUNE_IDS,
     classify_runtime_context,
     context_item_ids,
@@ -246,13 +248,64 @@ def doom_process_identity():
 
 
 def _doom_location_ids():
+    locations = _doom_location_names()
+    if not locations:
+        raise ValueError("DOOM location-name data is malformed")
+    return set(locations)
+
+
+def _doom_location_names():
     identity = json.loads(
         (REPO_ROOT / "data" / "location_names.json").read_text(encoding="utf-8")
     )
-    locations = identity.get("locations")
-    if not isinstance(locations, dict):
-        raise ValueError("DOOM location-name data is malformed")
-    return {int(location_id) for location_id in locations}
+    raw_locations = identity.get("locations")
+    if not isinstance(raw_locations, dict):
+        return {}
+    try:
+        return {int(location_id): name for location_id, name in raw_locations.items() if isinstance(name, str)}
+    except (TypeError, ValueError):
+        return {}
+
+
+DOOM_LOCATION_NAMES = _doom_location_names()
+GOAL_ENDPOINT_LOCATION_IDS = {
+    "Acquire the Unmaykr": 7770418,
+    "Kill the Icon of Sin": 7770414,
+    "Kill the Dark Lord": 7770419,
+    "Complete the Full Saga": 7770419,
+}
+GOAL_ENDPOINT_LOCATION_NAMES = {
+    "Acquire the Unmaykr": "Fortress of Doom - Unmaykr Acquired",
+    "Kill the Icon of Sin": "Final Sin - Mission Complete",
+    "Kill the Dark Lord": "The Dark Lord - Defeated",
+    "Complete the Full Saga": "The Dark Lord - Defeated",
+}
+if any(
+    DOOM_LOCATION_NAMES.get(location_id) != location_name
+    for goal, location_id in GOAL_ENDPOINT_LOCATION_IDS.items()
+    for location_name in (GOAL_ENDPOINT_LOCATION_NAMES[goal],)
+):
+    raise RuntimeError("packaged goal endpoint IDs diverge from canonical location names")
+
+GOAL_REQUIREMENT_SUFFIXES = {
+    "Complete All Enabled Missions": " - Mission Complete",
+    "Complete All Slayer Gates": " - Slayer Gate Complete",
+    "Complete All Escalation Encounters": " - Escalation Encounter Wave ",
+    "Complete All Secret Encounters": " - Secret Encounter - ",
+    "Complete All Mission Challenges": " - All Mission Challenges Completed",
+    "Complete All Weapon Mastery Challenges": " - Weapon Mastery Challenge",
+}
+GOAL_NAMES = frozenset(GOAL_ENDPOINT_LOCATION_IDS)
+GOAL_REQUIREMENT_NAMES = frozenset(GOAL_REQUIREMENT_SUFFIXES) | {"Acquire the Unmaykr"}
+DLC_MISSION_PREFIXES = frozenset({
+    "UAC Atlantica Facility",
+    "The Blood Swamps",
+    "The Holt",
+    "The World Spear",
+    "Reclaimed Earth",
+    "Immora",
+    "The Dark Lord",
+})
 DEATHLINK_RECEIVE_TIMEOUT = 20.0
 DEATHLINK_CONFIRM_TIMEOUT = 8.0
 DEATHLINK_TOTAL_TIMEOUT = 60.0
@@ -730,7 +783,7 @@ REVISION_ONE_RUNE_IDS = {
     7770093,
     7770094,
     7770095,
-}
+} | SUPPORT_RUNE_IDS
 REVISION_TWO_SUIT_IDS = {7770021}
 REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
 REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
@@ -1979,6 +2032,18 @@ def _validated_catalog_maps(active_maps):
 KNOWN_CATALOG_MAPS = _validated_catalog_maps(
     load_foundation_contracts().get("active_maps")
 )
+
+
+def _catalog_map_key(runtime_map):
+    runtime_map = canonical_map_name(runtime_map)
+    matches = [
+        map_key
+        for map_key, catalog_runtime_map in KNOWN_CATALOG_MAPS.items()
+        if catalog_runtime_map == runtime_map
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 FAST_TRAVEL_MAP_KEYS = frozenset(
     map_key for map_key, runtime_map in KNOWN_CATALOG_MAPS.items()
     if map_key != "hub" and runtime_map in {
@@ -2713,7 +2778,7 @@ def parse_active_map_marker(path, mtime_ns):
         runtime_map,
         base_maps=KNOWN_CATALOG_MAPS.values(),
     )
-    if context is None or map_key not in context.map_keys:
+    if context is None or map_key not in context.map_keys or _catalog_map_key(runtime_map) != map_key:
         return None
 
     expected_marker = f"AP_MAP_START_{map_key.upper()}"
@@ -3377,6 +3442,8 @@ class DoomEternalContext(CommonContext):
         self.cultist_autosave_path = None
         self.mission_locations_in_flight = set()
         self.mission_goal_in_flight = False
+        self.goal_dispatch_in_flight = False
+        self.goal_dispatch_sent = False
         self.publisher_effects_in_flight = set()
         self.last_rpc_map_name = None
         self.room_seed_name = None
@@ -4702,6 +4769,14 @@ class DoomEternalContext(CommonContext):
                 )
                 return
             self._connected_slot_data = slot_data
+            self.goal_dispatch_in_flight = False
+            self.goal_dispatch_sent = False
+            session_state = getattr(self, "session_state", None)
+            if isinstance(session_state, dict):
+                session_state["goal_sent"] = False
+                persist_session_state = getattr(self, "persist_session_state", None)
+                if callable(persist_session_state):
+                    persist_session_state()
             self._refresh_runtime_context(slot_data)
             configured_mode = slot_data.get("death_link_mode", DEFAULT_DEATH_LINK_MODE)
             if configured_mode not in {"soft", "hardcore"}:
@@ -4763,7 +4838,6 @@ class DoomEternalContext(CommonContext):
             self._placement_expected_ids = active
             self._placement_info = {}
             self.locations_info.clear()
-            self._connected_slot_data = args.get("slot_data", {})
             if not active:
                 self._try_complete_location_scouts()
             else:
@@ -5291,6 +5365,19 @@ class DoomEternalContext(CommonContext):
                         "[To Game] Item %s deferred to supported runtime context.",
                         item_id,
                     )
+                    notified, notification_error = self.spool_deferred_receipt_notification(
+                        item_id,
+                        item_index,
+                        fresh_receipt_boundary=fresh_receipt_boundary,
+                        excluded_receipt_indices=duplicate_indices,
+                    )
+                    if not notified:
+                        logger.warning(
+                            "[To Game] Deferred item %s notification pending: %s",
+                            item_id,
+                            notification_error,
+                        )
+                        break
                     self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
@@ -6471,6 +6558,7 @@ class DoomEternalContext(CommonContext):
         }
         self.session_state["item_resync"] = {}
         self.session_state["rune_reconciliation"] = {}
+        self.session_state["receipt_notifications"] = {}
         self.reconnect_resync_attempted = False
         self.session_state["item_mapping_revision"] = ITEM_MAPPING_REVISION
         self.session_state.pop("mapping_repair_indices", None)
@@ -7001,7 +7089,7 @@ class DoomEternalContext(CommonContext):
         return plan, None
 
     def reconcile_owned_runes(self, trigger, *, force=False):
-        """Plan Rune reconciliation once per native/AP fingerprint."""
+        """Queue bounded corrections for each owned Rune with missing state."""
         plan, error = self.compile_owned_rune_plan()
         if error:
             logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
@@ -7014,6 +7102,22 @@ class DoomEternalContext(CommonContext):
                 plan.fingerprint,
             )
             return plan, None
+        if plan.repairs:
+            try:
+                seed = getattr(self, "room_seed_name", None) or getattr(self, "seed_name", None)
+                command_plan = with_rune_reconciliation_commands(
+                    plan,
+                    f"{seed}-{self.team}-{self.slot}",
+                    self.reconciliation_epoch(),
+                )
+            except ValueError as error:
+                return None, str(error)
+            queued, queue_error = self.apply_reconciliation_plan(
+                command_plan,
+                reason=f"rune:{trigger}",
+            )
+            if not queued:
+                return None, queue_error
         state.update(
             fingerprint=plan.fingerprint,
             status=plan.status,
@@ -7024,7 +7128,7 @@ class DoomEternalContext(CommonContext):
         self.persist_session_state()
         if plan.repairs:
             logger.warning(
-                "RUNE_RECONCILE_BLOCKED trigger=%s candidates=%s fingerprint=%s "
+                "RUNE_RECONCILE_QUEUED trigger=%s candidates=%s fingerprint=%s "
                 "writer=%s",
                 trigger,
                 len(plan.repairs),
@@ -7152,16 +7256,12 @@ class DoomEternalContext(CommonContext):
         if accepted.get("gameplay_epoch") != epoch:
             return "map_epoch_mismatch"
         accepted_map_key = accepted.get("map_key")
+        accepted_runtime_map = canonical_map_name(accepted.get("runtime_map", ""))
+        canonical_key = _catalog_map_key(accepted_runtime_map)
         if not isinstance(accepted_map_key, str):
-            accepted_runtime_map = canonical_map_name(accepted.get("runtime_map", ""))
-            accepted_map_key = next(
-                (
-                    key
-                    for key, runtime_map in KNOWN_CATALOG_MAPS.items()
-                    if runtime_map == accepted_runtime_map
-                ),
-                None,
-            )
+            accepted_map_key = canonical_key
+        if accepted_map_key != canonical_key:
+            return "map_identity_mismatch"
         if accepted_map_key != map_key:
             return "map_mismatch"
         return None
@@ -7265,10 +7365,9 @@ class DoomEternalContext(CommonContext):
 
         identity = self.get_ap_state_key()
         runtime_map = canonical_map_name(marker_data.get("runtime_map", ""))
-        map_key = next(
-            (key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map),
-            None,
-        )
+        map_key = _catalog_map_key(runtime_map)
+        if marker_data.get("map_key") != map_key:
+            return None
         mission_id = FAST_TRAVEL_MISSION_COMPLETE_IDS.get(map_key)
         checked = getattr(self, "checked_locations", None)
         history_available = isinstance(checked, (set, frozenset, list, tuple))
@@ -7406,13 +7505,9 @@ class DoomEternalContext(CommonContext):
         if not marker_map or not current_map or marker_map != current_map:
             return False
         map_name = marker_map
-        map_key = marker.get("map_key")
-        if not isinstance(map_key, str) or not map_key:
-            map_key = next(
-                (key for key, runtime_map in KNOWN_CATALOG_MAPS.items()
-                 if canonical_map_name(runtime_map) == map_name),
-                None,
-            )
+        map_key = _catalog_map_key(map_name)
+        if marker.get("map_key") != map_key:
+            return False
         entries = [
             entry for entry in AUTOMAP_VISUALS_BY_MAP.get(map_key or "", {}).values()
             if entry["classification"] == "visible_cleanup"
@@ -7541,6 +7636,8 @@ class DoomEternalContext(CommonContext):
             return False
         epoch = marker.get("gameplay_epoch")
         map_key = marker.get("map_key")
+        if map_key != _catalog_map_key(marker.get("runtime_map", "")):
+            return False
         entry = AUTOMAP_VISUALS_BY_MAP.get(map_key or "", {}).get(location_id)
         if not valid_materialization_epoch(epoch) or not entry:
             return False
@@ -7917,6 +8014,7 @@ class DoomEternalContext(CommonContext):
         classification=None,
         fresh_receipt_boundary=None,
         excluded_receipt_indices=None,
+        suppress_local_toast=True,
     ):
         if intent not in {
             NEW_RECEIPT,
@@ -7940,7 +8038,9 @@ class DoomEternalContext(CommonContext):
             and 0 <= item_index < len(self.items_received)
             else None
         )
-        if self._suppress_found_your_toast(network_item, item_index, intent):
+        if suppress_local_toast and self._suppress_found_your_toast(
+            network_item, item_index, intent
+        ):
             receipt = False
         if receipt and self.receipt_notification_slot(
             item_id,
@@ -8004,6 +8104,64 @@ class DoomEternalContext(CommonContext):
         if identity is not None:
             return identity["name"]
         return f"Unknown item (ID: {item_id})"
+
+    def spool_deferred_receipt_notification(
+        self,
+        item_id,
+        item_index,
+        *,
+        fresh_receipt_boundary=None,
+        excluded_receipt_indices=None,
+    ):
+        """Queue local receipt feedback without queuing deferred gameplay effects."""
+        if not ENABLE_ITEM_NOTIFICATIONS:
+            return True, "item notifications disabled"
+        if not ensure_queue_session_namespace(self.state_key):
+            self.reset_queue_session_authority("notification_namespace_unavailable")
+            return False, "active notification namespace unavailable"
+        commands, description = self.item_activation_commands(
+            item_id,
+            item_index,
+            intent=NEW_RECEIPT,
+            include_notification=True,
+            fresh_receipt_boundary=fresh_receipt_boundary,
+            excluded_receipt_indices=excluded_receipt_indices,
+            suppress_local_toast=False,
+        )
+        if commands is None:
+            return False, description
+        notification = next(
+            (command for command in commands if command.startswith("ai_ScriptCmdEnt ap_notify_item_")),
+            None,
+        )
+        if notification is None:
+            return True, "no local notification generated"
+
+        notification_state = self.session_state.setdefault("receipt_notifications", {})
+        notification_key = str(item_index)
+        if notification_state.get(notification_key):
+            return True, "local notification already queued"
+        command_id = self.item_command_id(item_id, item_index, 0, notification)
+        if not send_command(
+            notification,
+            coalesce_key=command_id,
+            already_queued_ok=True,
+            state_key=self.state_key,
+            delivery_fields={
+                "item_id": item_id,
+                "item_name": self.delivery_item_name(item_id),
+                "stage": 0,
+                "source": "deferred_receipt_notification",
+                "intent": NEW_RECEIPT,
+            },
+        ):
+            return False, f"failed to spool {command_id}"
+        notification_state[notification_key] = {
+            "item_id": item_id,
+            "command_id": command_id,
+        }
+        self.persist_session_state()
+        return True, description
 
     def spool_item_commands(
         self,
@@ -8692,6 +8850,96 @@ class DoomEternalContext(CommonContext):
         if hasattr(self, "persist_session_state"):
             self.persist_session_state()
 
+    @staticmethod
+    def _active_goal_location_names(slot_data):
+        names = set(DOOM_LOCATION_NAMES.values())
+        if not slot_data.get("use_dlc_content") or not slot_data.get("include_dlc_missions", True):
+            names = {
+                name for name in names
+                if name.split(" - ", 1)[0] not in DLC_MISSION_PREFIXES
+            }
+        return names
+
+    @classmethod
+    def goal_objective_ids(cls, slot_data):
+        if not isinstance(slot_data, dict):
+            return frozenset()
+        goal = slot_data.get("goal")
+        endpoint_event = slot_data.get("goal_endpoint_event")
+        required_capabilities = slot_data.get("required_capabilities")
+        if (
+            goal not in GOAL_NAMES
+            or endpoint_event != f"Internal Goal Endpoint: {goal}"
+            or slot_data.get("goal_endpoint_available") is not True
+        ):
+            return frozenset()
+        if (
+            not isinstance(required_capabilities, list)
+            or any(not isinstance(value, str) for value in required_capabilities)
+            or not GOAL_CAPABILITIES <= set(required_capabilities)
+        ):
+            return frozenset()
+        requirements = slot_data.get("additional_victory_requirements", ())
+        if not isinstance(requirements, (list, tuple, set, frozenset)):
+            return frozenset()
+        requirements = set(requirements)
+        if not requirements <= GOAL_REQUIREMENT_NAMES:
+            return frozenset()
+
+        active_names = cls._active_goal_location_names(slot_data)
+        objective_ids = {GOAL_ENDPOINT_LOCATION_IDS[goal]}
+        if goal == "Complete the Full Saga":
+            objective_ids.update({7770418, 7770414, 7770419})
+            objective_ids.update(
+                location_id
+                for location_id, location_name in DOOM_LOCATION_NAMES.items()
+                if location_name in active_names
+                and location_name.endswith(" - Mission Complete")
+            )
+        if "Acquire the Unmaykr" in requirements:
+            objective_ids.add(GOAL_ENDPOINT_LOCATION_IDS["Acquire the Unmaykr"])
+        for requirement in requirements - {"Acquire the Unmaykr"}:
+            if requirement == "Complete All Slayer Gates":
+                objective_ids.add(GOAL_ENDPOINT_LOCATION_IDS["Acquire the Unmaykr"])
+            suffix = GOAL_REQUIREMENT_SUFFIXES[requirement]
+            objective_ids.update(
+                location_id
+                for location_id, location_name in DOOM_LOCATION_NAMES.items()
+                if location_name in active_names and suffix in location_name
+            )
+        return frozenset(objective_ids)
+
+    async def evaluate_campaign_goal(self, source_description):
+        if getattr(self, "goal_dispatch_sent", False):
+            return True
+        if getattr(self, "goal_dispatch_in_flight", False):
+            return False
+        if not getattr(self, "server_checked_locations_ready", False):
+            return False
+        objective_ids = DoomEternalContext.goal_objective_ids(
+            getattr(self, "_connected_slot_data", {})
+        )
+        checked_locations = getattr(self, "checked_locations", set())
+        if not objective_ids or not objective_ids <= set(checked_locations):
+            return False
+        if not self.server or not self.server.socket or self.server.socket.closed:
+            return False
+        message = {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
+        self.goal_dispatch_in_flight = True
+        logger.info(
+            "[Goal] CLIENT_GOAL_SEND source=%s objective_ids=%s",
+            source_description,
+            sorted(objective_ids),
+        )
+        try:
+            await self.send_msgs([message])
+        except Exception:
+            self.goal_dispatch_in_flight = False
+            raise
+        self.goal_dispatch_in_flight = False
+        self.goal_dispatch_sent = True
+        return True
+
     async def send_publisher_effect(
         self, publisher, effect_index, effect, source_description
     ):
@@ -8731,7 +8979,7 @@ class DoomEternalContext(CommonContext):
                 return False
             message = {"cmd": "LocationChecks", "locations": [location_id]}
         elif strategy == "campaign_goal":
-            if self.session_state.get("goal_sent", False):
+            if getattr(self, "goal_dispatch_sent", False):
                 self.publisher_effects_in_flight.discard(effect_key)
                 DoomEternalContext.record_publisher_ack(
                     self, publisher.key, effect_index, effect
@@ -8741,13 +8989,12 @@ class DoomEternalContext(CommonContext):
                     publisher.key,
                 )
                 return True
-            if effect_key in self.publisher_effects_in_flight:
-                logger.info(
-                    "[PUBLISHER] FALLBACK_SUPPRESSED key=%s reason=in_flight",
-                    publisher.key,
-                )
-                return False
-            message = {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
+            self.publisher_effects_in_flight.discard(effect_key)
+            logger.info(
+                "[PUBLISHER] EFFECT_FACT_ONLY key=%s effect=campaign_goal",
+                publisher.key,
+            )
+            return True
         else:
             raise ValueError(f"unsupported publisher effect strategy: {strategy}")
 
@@ -8780,22 +9027,13 @@ class DoomEternalContext(CommonContext):
                 )
                 return True
             return False
-        self.session_state["goal_sent"] = True
-        self.publisher_effects_in_flight.discard(effect_key)
-        DoomEternalContext.record_publisher_ack(
-            self, publisher.key, effect_index, effect
-        )
-        logger.info(
-            "[PUBLISHER] EFFECT_ACK key=%s effect=campaign_goal",
-            publisher.key,
-        )
-        return True
+        raise RuntimeError(f"unsupported publisher effect strategy: {strategy}")
 
     async def execute_publisher(self, publisher, trigger_strategy, source_description):
         if publisher_acknowledged(
             publisher,
             getattr(self, "checked_locations", set()),
-            self.session_state.get("goal_sent", False),
+            getattr(self, "goal_dispatch_sent", False),
         ):
             logger.info(
                 "[PUBLISHER] FALLBACK_SUPPRESSED key=%s reason=already_acknowledged",
@@ -8830,6 +9068,10 @@ class DoomEternalContext(CommonContext):
         self, location_id, source_description, report_goal=False
     ):
         """Compatibility wrapper routed through the declarative effect sender."""
+        if report_goal:
+            return await DoomEternalContext.evaluate_campaign_goal(
+                self, source_description
+            )
         matching = next(
             (
                 publisher
@@ -8854,8 +9096,6 @@ class DoomEternalContext(CommonContext):
         for index, effect in enumerate(matching.effects):
             if effect["strategy"] == "preserved_native_target":
                 continue
-            if effect["strategy"] == "campaign_goal" and not report_goal:
-                continue
             if effect["strategy"] == "location_check" and location_id is None:
                 continue
             results.append(
@@ -8866,11 +9106,8 @@ class DoomEternalContext(CommonContext):
         return bool(results) and all(results)
 
     async def send_campaign_goal(self, source_description):
-        return await DoomEternalContext.send_mission_complete(
-            self,
-            None,
-            source_description,
-            report_goal=True,
+        return await DoomEternalContext.evaluate_campaign_goal(
+            self, source_description
         )
 
     async def check_campaign_goal_event(self):
@@ -9111,7 +9348,6 @@ class DoomEternalContext(CommonContext):
         prev_status = self.session_map_completion_states.get(key)
         self.session_map_completion_states[key] = "1" if is_completed else "0"
 
-        # Edge fallback triggers only on a fresh in-session transition from incomplete to completed
         fresh_completion = (prev_status == "0" and is_completed)
 
         if record_map == CULTIST_BASE_MAP:
@@ -9122,14 +9358,6 @@ class DoomEternalContext(CommonContext):
                     f"[Goal] Tracking Cultist Base completion from {details_path}."
                 )
             return
-
-        completed_cultist_base = (
-            record_map != CULTIST_BASE_MAP
-            and is_completed
-            and details_path == self.cultist_autosave_path
-        )
-        if completed_cultist_base:
-            await self.send_campaign_goal("legacy save fallback")
 
         if fresh_completion and record_map in {"e3m4_boss", "game/sp/e3m4_boss/e3m4_boss"}:
             matching = [p for p in PUBLISHERS if p.key == "final_sin_mission_complete"]
@@ -9150,10 +9378,9 @@ class DoomEternalContext(CommonContext):
             await self.check_campaign_goal_event()
             return
 
-        if await self.check_campaign_goal_event():
-            return
-
+        await self.check_campaign_goal_event()
         await self.check_campaign_goal_save_fallback()
+        await self.evaluate_campaign_goal("central objective evaluator")
 
     def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()

@@ -17,6 +17,22 @@ CAPABILITY_CROSS_CAMPAIGN = "cross_campaign_materialization_v1"
 SUPPORT_RUNE_CAPABILITY = "support_runes_v1"
 TAG_CAPABILITY = "tag_context_v1"
 TAG_SPECIAL_CAPABILITY = "tag_special_v1"
+GOAL_CAPABILITIES = frozenset({"goal_events_v1", "goal_endpoint_events_v1"})
+GOAL_VALUES = frozenset({
+    "Acquire the Unmaykr",
+    "Kill the Icon of Sin",
+    "Kill the Dark Lord",
+    "Complete the Full Saga",
+})
+VICTORY_REQUIREMENT_VALUES = frozenset({
+    "Complete All Enabled Missions",
+    "Complete All Slayer Gates",
+    "Complete All Escalation Encounters",
+    "Complete All Secret Encounters",
+    "Complete All Mission Challenges",
+    "Complete All Weapon Mastery Challenges",
+    "Acquire the Unmaykr",
+})
 SUPPORT_RUNE_IDS = frozenset({7770145, 7770146, 7770147})
 TAG_SPECIAL_IDS = frozenset({7770009, 7770902})
 CRUCIBLE_ID = 7770007
@@ -135,8 +151,21 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
         raise ValueError(f"slot_data_revision must be {SLOT_DATA_REVISION}")
     required = slot_data.get("required_capabilities")
-    if not isinstance(required, list) or CAPABILITY_CROSS_CAMPAIGN not in required:
+    if (
+        not isinstance(required, list)
+        or any(not isinstance(value, str) for value in required)
+        or CAPABILITY_CROSS_CAMPAIGN not in required
+    ):
         raise ValueError("cross_campaign_materialization_v1 capability is required")
+    goal_fields = {
+        "goal",
+        "goal_endpoint_event",
+        "goal_endpoint_available",
+        "additional_victory_requirements",
+    }
+    goal_contract_present = bool(goal_fields & slot_data.keys()) or bool(
+        GOAL_CAPABILITIES & set(required)
+    )
     if not isinstance(slot_data.get("use_dlc_content"), bool):
         raise ValueError("use_dlc_content must be boolean")
     if not isinstance(slot_data.get("include_dlc_missions"), bool):
@@ -152,6 +181,23 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
         "Progressive Special Weapon", "Progressive Sentinel Hammer", "The Crucible",
     }:
         raise ValueError("special_weapon is invalid")
+    if goal_contract_present:
+        if not GOAL_CAPABILITIES <= set(required):
+            raise ValueError("goal event capabilities are required")
+        goal = slot_data.get("goal")
+        if goal not in GOAL_VALUES:
+            raise ValueError("goal is invalid")
+        if slot_data.get("goal_endpoint_event") != f"Internal Goal Endpoint: {goal}":
+            raise ValueError("goal_endpoint_event is invalid")
+        if slot_data.get("goal_endpoint_available") is not True:
+            raise ValueError("goal_endpoint_available must be true")
+        requirements = slot_data.get("additional_victory_requirements")
+        if (
+            not isinstance(requirements, list)
+            or any(value not in VICTORY_REQUIREMENT_VALUES for value in requirements)
+            or len(requirements) != len(set(requirements))
+        ):
+            raise ValueError("additional_victory_requirements is invalid")
     return dict(slot_data)
 
 

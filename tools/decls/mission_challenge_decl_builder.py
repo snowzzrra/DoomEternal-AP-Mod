@@ -447,24 +447,16 @@ def _reward_free_override(entry: dict) -> str:
     edit = "\tedit = {\n"
     if source.count(edit) != 1:
         raise ValueError(f"{entry['name']}: edit block is missing or ambiguous")
-    override = source.replace(edit, edit + REWARD_FIELD, 1)
+    hammer_event = f'violenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";'
     if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-        if "violenceEvent" in source:
+        if source.count(hammer_event) != 1:
             raise ValueError(f"{entry['name']}: native Hammer observer owner drift")
-        override = override.replace(
-            REWARD_FIELD,
-            REWARD_FIELD + f'\t\tviolenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";\n',
-            1,
-        )
+    elif hammer_event in source:
+        raise ValueError(f"{entry['name']}: Hammer observer escaped location scope")
+    override = source.replace(edit, edit + REWARD_FIELD, 1)
     if "CURRENCY_PRAETOR_UPGRADE" in override or override.count("currencyToGive") != 1:
         raise ValueError(f"{entry['name']}: scoped reward suppression failed")
     source_equivalent = override.replace(REWARD_FIELD, "", 1)
-    if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-        source_equivalent = source_equivalent.replace(
-            f'\t\tviolenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";\n',
-            "",
-            1,
-        )
     if source_equivalent != source:
         raise ValueError(f"{entry['name']}: fields other than the inherited reward changed")
     return override

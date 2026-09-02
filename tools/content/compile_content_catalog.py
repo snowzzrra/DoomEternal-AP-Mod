@@ -42,16 +42,6 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         "# This file has no timestamp: stable input yields a stable diff.",
     ]
     identity = json.loads((catalog.root / "data" / "content_identity.json").read_text(encoding="utf-8"))
-    goal_publisher = next(
-        publisher
-        for publisher in catalog.publishers
-        if any(effect["strategy"] == "campaign_goal" for effect in publisher.effects)
-    )
-    goal_location = next(
-        item.name
-        for item in catalog.runtime_locations
-        if item.mission_key == goal_publisher.map_key and item.category == "mission_complete"
-    )
     lines.extend(
         [
             f"CONTENT_SCHEMA_VERSION = {identity['content_schema_version']!r}",
@@ -111,7 +101,6 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     lines.extend(
         [
             ")",
-            f"CAMPAIGN_GOAL_LOCATION = {string(goal_location)}",
             "MISSION_DIFFICULTY = {",
         ]
     )

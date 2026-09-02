@@ -1,4 +1,4 @@
-"""Read-only Rune state model and fail-closed reconciliation planning."""
+"""Bounded per-owned Rune state reconciliation planning."""
 
 from __future__ import annotations
 
@@ -8,11 +8,12 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
+from doom_eap.runtime.item_reconciliation import ReconciliationCommand
 
-RUNE_WRITER_STATUS = "blocked_native_writer_unproven"
+RUNE_WRITER_STATUS = "bounded_per_owned_writer"
 RUNE_WRITER_EVIDENCE = (
-    "devInvLoadout isRune=true is the only proven Rune Manager writer; its "
-    "runtime consumer is idTarget_DevLoadoutSwap and no safe player script event exists"
+    "existing target_command projection ap_rpc_v3_<item_id> replays one owned "
+    "givePlayerPerk effect; no grant-all or auto-equip command is emitted"
 )
 _RUNE_COMMAND = re.compile(
     r"ai_ScriptCmdEnt player1 givePlayerPerk (?P<perk>perk/player/runes/[A-Za-z0-9_./-]+)"
@@ -128,6 +129,7 @@ class RuneReconciliationPlan:
     fingerprint: str
     status: str
     writer_status: str = RUNE_WRITER_STATUS
+    commands: tuple[Any, ...] = ()
 
     @property
     def repairs(self) -> tuple[RunePlanEntry, ...]:
@@ -136,6 +138,44 @@ class RuneReconciliationPlan:
     @property
     def noops(self) -> tuple[RunePlanEntry, ...]:
         return tuple(entry for entry in self.entries if entry.disposition == "noop")
+
+
+def compile_rune_reconciliation_commands(
+    plan: RuneReconciliationPlan,
+    slot_identity: str,
+    epoch: int | str,
+) -> tuple[Any, ...]:
+    """Compile one existing generated effect activation per repair candidate."""
+    if not isinstance(slot_identity, str) or not slot_identity:
+        raise ValueError("Rune reconciliation requires slot identity")
+    if isinstance(epoch, bool) or not isinstance(epoch, (int, str)):
+        raise ValueError("Rune reconciliation requires an evidence epoch")
+    return tuple(
+        ReconciliationCommand(
+            item_id=entry.item_id,
+            name=entry.perk.rsplit("/", 1)[-1],
+            policy="rune_visual_repair",
+            stage=0,
+            spool_id=f"rune-reconcile-{slot_identity}-e{epoch}-item{entry.item_id}",
+            command=f"ai_ScriptCmdEnt ap_rpc_v3_{entry.item_id} activate",
+            description="reapply one AP-owned Rune perk without changing equipped slots",
+        )
+        for entry in plan.repairs
+    )
+
+
+def with_rune_reconciliation_commands(
+    plan: RuneReconciliationPlan,
+    slot_identity: str,
+    epoch: int | str,
+) -> RuneReconciliationPlan:
+    return RuneReconciliationPlan(
+        entries=plan.entries,
+        fingerprint=plan.fingerprint,
+        status=plan.status,
+        writer_status=plan.writer_status,
+        commands=compile_rune_reconciliation_commands(plan, slot_identity, epoch),
+    )
 
 
 def rune_plan_already_recorded(

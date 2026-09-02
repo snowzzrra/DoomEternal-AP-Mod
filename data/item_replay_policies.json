@@ -483,35 +483,35 @@
       "policy": "replay_manual_only"
     },
     "7770148": {
-      "name": "UAC Atlantica Slayer Gate Key",
+      "name": "Slayer Gate Key UAC Atlantica",
       "policy": "replay_idempotent"
     },
     "7770149": {
-      "name": "The Holt Slayer Gate Key",
+      "name": "Slayer Gate Key The Holt",
       "policy": "replay_idempotent"
     },
     "7770150": {
-      "name": "Exultia Slayer Gate Key",
+      "name": "Slayer Gate Key Exultia",
       "policy": "replay_idempotent"
     },
     "7770151": {
-      "name": "Cultist Base Slayer Gate Key",
+      "name": "Slayer Gate Key Cultist Base",
       "policy": "replay_idempotent"
     },
     "7770152": {
-      "name": "Super Gore Nest Slayer Gate Key",
+      "name": "Slayer Gate Key Super Gore Nest",
       "policy": "replay_idempotent"
     },
     "7770153": {
-      "name": "ARC Complex Slayer Gate Key",
+      "name": "Slayer Gate Key ARC Complex",
       "policy": "replay_idempotent"
     },
     "7770154": {
-      "name": "Mars Core Slayer Gate Key",
+      "name": "Slayer Gate Key Mars Core",
       "policy": "replay_idempotent"
     },
     "7770155": {
-      "name": "Taras Nabad Slayer Gate Key",
+      "name": "Slayer Gate Key Taras Nabad",
       "policy": "replay_idempotent"
     },
     "7770156": {"name": "Damage Boost", "policy": "never_replay", "receipt_feedback": "ap"},

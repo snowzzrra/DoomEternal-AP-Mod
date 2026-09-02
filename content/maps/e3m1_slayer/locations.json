@@ -87,6 +87,11 @@
         5.0
       ]
     },
+    "pickups_progress_praetor_token_2_e3m1": {
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "independent_size": [1.5, 1.5, 3.0]
+    },
     "pickups_pickup_keycard_slayer_key_1": {
       "independent_ap_trigger": true,
       "remove_original": true,

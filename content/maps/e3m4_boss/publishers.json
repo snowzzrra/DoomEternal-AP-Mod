@@ -25,9 +25,6 @@
         {
           "strategy": "location_check",
           "location_id": 7770414
-        },
-        {
-          "strategy": "campaign_goal"
         }
       ],
       "dedupe_scope": "final_sin_mission_complete_location",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 7,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "788edbb7e7b050d2ff2a7fca65781e93f1143c015cfda75e719dd2f8ff990035",
+  "source_sha256": "e7e1dd16b4637982e062b49685ecb128e43f49a4cb0da20399021c396cb71293",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -469,35 +469,35 @@
       "classification": 2
     },
     "7770148": {
-      "name": "UAC Atlantica Slayer Gate Key",
+      "name": "Slayer Gate Key UAC Atlantica",
       "classification": 1
     },
     "7770149": {
-      "name": "The Holt Slayer Gate Key",
+      "name": "Slayer Gate Key The Holt",
       "classification": 1
     },
     "7770150": {
-      "name": "Exultia Slayer Gate Key",
+      "name": "Slayer Gate Key Exultia",
       "classification": 1
     },
     "7770151": {
-      "name": "Cultist Base Slayer Gate Key",
+      "name": "Slayer Gate Key Cultist Base",
       "classification": 1
     },
     "7770152": {
-      "name": "Super Gore Nest Slayer Gate Key",
+      "name": "Slayer Gate Key Super Gore Nest",
       "classification": 1
     },
     "7770153": {
-      "name": "ARC Complex Slayer Gate Key",
+      "name": "Slayer Gate Key ARC Complex",
       "classification": 1
     },
     "7770154": {
-      "name": "Mars Core Slayer Gate Key",
+      "name": "Slayer Gate Key Mars Core",
       "classification": 1
     },
     "7770155": {
-      "name": "Taras Nabad Slayer Gate Key",
+      "name": "Slayer Gate Key Taras Nabad",
       "classification": 1
     },
     "7770156": {"name": "Damage Boost", "classification": 0},

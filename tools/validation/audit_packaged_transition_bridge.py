@@ -148,8 +148,6 @@ def assert_generation_only_apworld(apworld_path: Path) -> None:
 
 async def consume(
     module, event: Path, expected: int | None, fail_send: bool = False,
-    allowed_locations: set[int] | None = None,
-    expect_goal: bool = False,
 ) -> list[dict]:
     sent = []
 
@@ -158,18 +156,15 @@ async def consume(
             self.session_state = {"goal_sent": False}
             self.locations_checked = set()
             self.checked_locations = set()
-            self.server_locations = (
-                {7770122, 7770123, 7770124, 7770162}
-                if allowed_locations is None else allowed_locations
-            )
+            self.server_locations = {7770122, 7770123, 7770124, 7770162}
+            if expected is not None:
+                self.server_locations.add(expected)
             self.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
 
         async def send_msgs(self, messages):
             if fail_send:
                 raise ConnectionError("test network failure")
             sent.extend(messages)
-            for message in messages:
-                self.checked_locations.update(message.get("locations", ()))
 
         def persist_session_state(self):
             pass
@@ -184,42 +179,57 @@ async def consume(
     original_dump_dir = module.INV_DUMP_DIR
     module.DOOM_BASE_DIR = str(event.parent)
     module.INV_DUMP_DIR = str(event.parent)
+    context = Context()
     try:
-        await module.DoomEternalContext.check_campaign_goal_event(Context())
+        await module.DoomEternalContext.check_campaign_goal_event(context)
+        if not fail_send and sent:
+            context.checked_locations.update(
+                location_id
+                for message in sent
+                for location_id in message.get("locations", ())
+            )
+            await module.DoomEternalContext.check_campaign_goal_event(context)
     finally:
         module.DOOM_BASE_DIR = original
         module.INV_DUMP_DIR = original_dump_dir
-    if expect_goal:
-        if fail_send:
-            if not event.exists() or sent:
-                raise AssertionError("retryable goal must preserve event")
-        else:
-            goal_publisher = next(
-                publisher for publisher in module.PUBLISHERS
-                if publisher.key == module.CAMPAIGN_GOAL_CONTRACT["publisher_key"]
-            )
-            expected_messages = [
-                {"cmd": "LocationChecks", "locations": [effect["location_id"]]}
-                for effect in goal_publisher.effects
-                if effect["strategy"] == "location_check"
-            ]
-            expected_messages.append(
-                {"cmd": "StatusUpdate", "status": module.ClientStatus.CLIENT_GOAL}
-            )
-            if event.exists() or sent != expected_messages:
-                raise AssertionError(
-                    f"packaged campaign goal event drift: {sent!r}"
-                )
-    elif expected is None:
+    if expected is None:
         if event.exists() or sent:
             raise AssertionError("Hub -> mission transition must be ignored and consumed")
-    elif fail_send or (
-        allowed_locations is not None and expected not in allowed_locations
-    ):
+    elif fail_send:
         if not event.exists() or sent:
             raise AssertionError("retryable transition must preserve event")
     elif event.exists() or sent != [{"cmd": "LocationChecks", "locations": [expected]}]:
         raise AssertionError(f"packaged event did not send expected LocationChecks {expected}: {sent!r}")
+    return sent
+
+
+async def evaluate_checked_state(module, slot_data, checked_locations, expect_goal):
+    sent = []
+
+    class Context:
+        def __init__(self):
+            self.session_state = {"goal_sent": False}
+            self.goal_dispatch_in_flight = False
+            self.goal_dispatch_sent = False
+            self.server_checked_locations_ready = True
+            self._connected_slot_data = slot_data
+            self.checked_locations = set(checked_locations)
+            self.server = types.SimpleNamespace(socket=types.SimpleNamespace(closed=False))
+
+        async def send_msgs(self, messages):
+            sent.extend(messages)
+
+    result = await module.DoomEternalContext.evaluate_campaign_goal(
+        Context(), "packaged transition audit"
+    )
+    saw_goal = any(
+        message == {"cmd": "StatusUpdate", "status": module.ClientStatus.CLIENT_GOAL}
+        for message in sent
+    )
+    if result is not expect_goal or saw_goal is not expect_goal:
+        raise AssertionError(
+            f"central goal predicate drift: result={result!r} sent={sent!r}"
+        )
     return sent
 
 
@@ -333,13 +343,52 @@ def main() -> int:
             for effect in goal_publisher.effects
             if effect["strategy"] == "location_check"
         }
-        asyncio.run(consume(
-            bridge, goal_event, None, fail_send=True,
-            allowed_locations=goal_locations, expect_goal=True,
+        if goal_locations != {7770414}:
+            raise AssertionError(f"Final Sin publisher effects drifted: {goal_locations!r}")
+        asyncio.run(consume(bridge, goal_event, 7770414, fail_send=True))
+        final_sin_sent = asyncio.run(consume(bridge, goal_event, 7770414))
+        if final_sin_sent != [{"cmd": "LocationChecks", "locations": [7770414]}]:
+            raise AssertionError(f"Final Sin event emitted unexpected messages: {final_sin_sent!r}")
+
+        required_capabilities = [
+            "cross_campaign_materialization_v1",
+            "goal_events_v1",
+            "goal_endpoint_events_v1",
+        ]
+        icon_goal = {
+            "goal": "Kill the Icon of Sin",
+            "goal_endpoint_event": "Internal Goal Endpoint: Kill the Icon of Sin",
+            "goal_endpoint_available": True,
+            "additional_victory_requirements": ["Complete All Slayer Gates"],
+            "use_dlc_content": True,
+            "include_dlc_missions": True,
+            "required_capabilities": required_capabilities,
+        }
+        base_missions = {
+            location_id
+            for location_id, name in bridge.DOOM_LOCATION_NAMES.items()
+            if name.endswith(" - Mission Complete")
+            and name.split(" - ", 1)[0] not in bridge.DLC_MISSION_PREFIXES
+        }
+        base_end_checked = base_missions | {7770418, 7770414, 7770419}
+        asyncio.run(evaluate_checked_state(
+            bridge, dict(icon_goal, goal="Complete the Full Saga",
+                         goal_endpoint_event="Internal Goal Endpoint: Complete the Full Saga"),
+            base_end_checked,
+            False,
         ))
-        asyncio.run(consume(
-            bridge, goal_event, None,
-            allowed_locations=goal_locations, expect_goal=True,
+        tag_gate_ids = {
+            location_id
+            for location_id, name in bridge.DOOM_LOCATION_NAMES.items()
+            if name in {
+                "UAC Atlantica Facility - Slayer Gate Complete",
+                "The Holt - Slayer Gate Complete",
+            }
+        }
+        if tag_gate_ids != {7770425, 7770452}:
+            raise AssertionError(f"TAG gate projection drifted: {tag_gate_ids!r}")
+        asyncio.run(evaluate_checked_state(
+            bridge, icon_goal, {7770414, 7770418, *tag_gate_ids}, True
         ))
     return 0
 

@@ -363,12 +363,12 @@ def validate_vanilla_source_equivalence(
             1,
         )
         if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-            expected_override = expected_override.replace(
-                "\t\tcurrencyToGive = {\n\t\t\tnum = 0;\n\t\t}\n",
-                "\t\tcurrencyToGive = {\n\t\t\tnum = 0;\n\t\t}\n"
-                f'\t\tviolenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";\n',
-                1,
-            )
+            if expected_override.count(
+                f'violenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";'
+            ) != 1:
+                errors.append(
+                    f"Vanilla child source missing scoped Hammer violenceEvent for {rel_path}"
+                )
         if override_content != expected_override:
             errors.append(
                 f"Vanilla child source template drift for {rel_path} "

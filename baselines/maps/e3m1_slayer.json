@@ -98,7 +98,7 @@
     }
   ],
   "asset_package_contract_sha256": "b6ee6a008d608fdb9b5fd4aa959b13b1d858dbab0ba6a1860fed8752ffe73450",
-  "byte_sha256": "19e2caaf72495182fab35e59b28da14ab3256b26b7d58047f44693257c407002",
+  "byte_sha256": "f30dbd0757791d1e03237b2dd9f32c66418be1639be44fe767f786d02165bc00",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 298,
@@ -153,6 +153,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "674e4f40d6e7e3538b883851ca023b007e2861859059a31b589f254246f68015",
-  "semantic_sha256": "a79c653aa2680b1a6a2829e4d3e5249337e8616b6152f55667756ef3488539f4"
+  "scripted_contract_sha256": "e8178d7bef0c9b082d084e3bdfa9f8d3759fcbb5947afcfd3337e7ef9b33133d",
+  "semantic_sha256": "0b7e61a7140c198b363f386992cb15d5f97a506733ef3a61bf116ee200d03225"
 }
