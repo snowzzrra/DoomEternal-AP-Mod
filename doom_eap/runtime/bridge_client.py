@@ -1851,6 +1851,14 @@ def read_sticky_mastery_record(payload):
     }
 
 
+def read_checkpoint_deaths(unpacked: bytes) -> int | None:
+    marker = b"numCheckpointDeaths\x01"
+    idx = unpacked.find(marker)
+    if idx == -1 or idx + len(marker) >= len(unpacked):
+        return None
+    return int(unpacked[idx + len(marker)])
+
+
 def probe_game_duration(path):
     """Return checkpoint-death and native unlockable records from one save."""
     DEATH_PROBE_RUNTIME.mkdir(parents=True, exist_ok=True)
@@ -1910,9 +1918,15 @@ def probe_game_duration(path):
     if result.returncode in {0, 20}:
         unpacked = runtime_unpacked.read_bytes()
         mastery_records = read_weapon_mastery_records(unpacked)
+        raw_deaths = read_checkpoint_deaths(unpacked)
+        if raw_deaths is None and result.stdout:
+            m = re.search(r"numCheckpointDeaths=(\d+)", result.stdout)
+            if m:
+                raw_deaths = int(m.group(1))
         snapshot = {
             "mastery_records": mastery_records,
             "mission_challenge_records": read_mission_challenge_records(unpacked),
+            "raw_num_checkpoint_deaths": raw_deaths if raw_deaths is not None else (1 if result.returncode == 20 else 0),
         }
         sticky_record = mastery_records.get(STICKY_UNLOCKABLE.decode("ascii"))
         if sticky_record is not None:
@@ -1923,7 +1937,7 @@ def probe_game_duration(path):
                     "unlockableIsUnlocked",
                 )
             })
-        snapshot["checkpoint_death"] = result.returncode == 20
+        snapshot["checkpoint_death"] = snapshot["raw_num_checkpoint_deaths"] > 0
         return snapshot
 
     stdout = (result.stdout or "").strip()
@@ -3393,6 +3407,11 @@ class DoomEternalContext(CommonContext):
         self.previous_checkpoint_death = None
         self.checkpoint_death_by_save_slot = {}
         self.death_observation_load_epoch_by_save_slot = {}
+        self.death_consumed_tokens = set()
+        self.death_detector_initialized_slots = set()
+        self.death_consumed_in_epoch_by_save_slot = {}
+        self.awaiting_respawn_carryover_by_save_slot = {}
+        self.last_consumed_death_event_by_save_slot = {}
         self.last_duration_cache_key = None
         self.death_probe_warning = None
         self.active_save_slot = None
@@ -5864,9 +5883,6 @@ class DoomEternalContext(CommonContext):
         self.save_slot_observations[slot_directory] = {}
         self.selected_observation_slot = None
         self.select_save_observation_slot(slot_directory)
-        self.checkpoint_death_by_save_slot.pop(slot_directory, None)
-        self.death_observation_load_epoch_by_save_slot.pop(slot_directory, None)
-        self.previous_checkpoint_death = None
 
     def log_save_proof_rejected(
         self, reason, evidence_slot=None, marker_map=None, candidate_slot=None,
@@ -8482,47 +8498,91 @@ class DoomEternalContext(CommonContext):
         self.observe_mission_challenges(
             snapshot["mission_challenge_records"], selected
         )
-        died = snapshot["checkpoint_death"]
+        died = bool(snapshot.get("checkpoint_death", False))
+        raw_deaths = int(snapshot.get("raw_num_checkpoint_deaths", 1 if died else 0))
         slot_directory = selected.slot_directory
         load_epoch = self.active_save_proof_load_epoch
-        previous = self.checkpoint_death_by_save_slot.get(slot_directory)
-        previous_load_epoch = self.death_observation_load_epoch_by_save_slot.get(slot_directory)
-        if previous is None or previous_load_epoch != load_epoch:
-            baseline_reason = "first_observation" if previous is None else "load_epoch_changed"
-            self.death_observation_load_epoch_by_save_slot[slot_directory] = load_epoch
+        marker = self.read_active_map_identity()
+        current_map = marker["runtime_map"] if marker else "unknown"
+        save_mtime_ns = selected.mtime_ns
+        save_snapshot_token = f"{slot_directory}:{selected.path.name}:{save_mtime_ns}"
+        event_identity = f"{save_snapshot_token}:deaths={raw_deaths}"
+
+        logger.info(
+            "[DeathLink] DEATH_DETECTOR_OBSERVATION slot=%s map=%s load_epoch=%s "
+            "raw_num_checkpoint_deaths=%s save_snapshot_token=%s save_mtime_ns=%s",
+            slot_directory, current_map, load_epoch, raw_deaths, save_snapshot_token, save_mtime_ns,
+        )
+
+        if slot_directory not in self.death_detector_initialized_slots:
+            self.death_detector_initialized_slots.add(slot_directory)
             self.checkpoint_death_by_save_slot[slot_directory] = died
             self.previous_checkpoint_death = died
-            logger.info(
-                "[DeathLink] DETECTOR_BASELINE slot=%s path=%s load_epoch=%s "
-                "checkpoint_death=%s reason=%s",
-                slot_directory, path, load_epoch, died, baseline_reason,
-            )
+            if died:
+                self.death_consumed_tokens.add(save_snapshot_token)
+                self.awaiting_respawn_carryover_by_save_slot[slot_directory] = True
+                self.death_consumed_in_epoch_by_save_slot[slot_directory] = load_epoch
+                self.last_consumed_death_event_by_save_slot[slot_directory] = event_identity
+                logger.info(
+                    "[DeathLink] DEATH_DETECTOR_BASELINE reason=session_start_preexisting_death"
+                )
+            else:
+                self.awaiting_respawn_carryover_by_save_slot[slot_directory] = False
+                logger.info(
+                    "[DeathLink] DEATH_DETECTOR_BASELINE reason=initial_clean_baseline"
+                )
             return True
 
-        if died != previous:
-            logger.info(
-                "[DeathLink] DETECTOR_CHANGE slot=%s path=%s load_epoch=%s "
-                "checkpoint_death=%s->%s",
-                slot_directory, path, load_epoch, previous, died,
-            )
         self.checkpoint_death_by_save_slot[slot_directory] = died
         self.previous_checkpoint_death = died
-        if not died or previous:
+
+        if not died:
+            self.awaiting_respawn_carryover_by_save_slot[slot_directory] = False
             return True
 
+        if save_snapshot_token in self.death_consumed_tokens:
+            logger.info(
+                "[DeathLink] DEATH_EVIDENCE_ALREADY_CONSUMED event_identity=%s",
+                event_identity,
+            )
+            return True
+
+        if (
+            self.awaiting_respawn_carryover_by_save_slot.get(slot_directory)
+            and load_epoch != self.death_consumed_in_epoch_by_save_slot.get(slot_directory)
+        ):
+            self.death_consumed_tokens.add(save_snapshot_token)
+            self.awaiting_respawn_carryover_by_save_slot[slot_directory] = False
+            previous_death_event = (
+                self.last_consumed_death_event_by_save_slot.get(slot_directory)
+                or "unknown"
+            )
+            logger.info(
+                "[DeathLink] POST_DEATH_RESPAWN_CARRYOVER slot=%s previous_death_event=%s "
+                "new_epoch=%s raw_num_checkpoint_deaths=%s snapshot=%s action=suppressed",
+                slot_directory,
+                previous_death_event,
+                load_epoch,
+                raw_deaths,
+                save_snapshot_token,
+            )
+            return True
+
+        self.death_consumed_tokens.add(save_snapshot_token)
+        self.awaiting_respawn_carryover_by_save_slot[slot_directory] = True
+        self.death_consumed_in_epoch_by_save_slot[slot_directory] = load_epoch
+        self.last_consumed_death_event_by_save_slot[slot_directory] = event_identity
         self.transient_effect_manager.reset("death_boundary")
         logger.info(
-            "[DeathLink] LOCAL_DEATH_OBSERVED slot=%s path=%s load_epoch=%s "
-            "checkpoint_death=0->1",
-            slot_directory, path, load_epoch,
+            "[DeathLink] LOCAL_DEATH_OBSERVED event_identity=%s",
+            event_identity,
         )
         if not self.death_link_enabled:
             logger.info(
-                "[DeathLink] DETECTOR_SUPPRESSED slot=%s reason=death_link_disabled",
-                slot_directory,
+                "[DeathLink] DEATHLINK_OUTBOUND_SUPPRESSED reason=death_link_disabled"
             )
             return True
-        logger.info("[DeathLink] DETECTOR_ACCEPTED slot=%s", slot_directory)
+
         await self.report_local_death()
         return True
 

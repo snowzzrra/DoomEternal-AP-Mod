@@ -83,18 +83,6 @@ REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
 \t\t}
 """
-HAMMER_SLAM_DAMAGE_DECLS = (
-    "damage/melee/hammer_slam_aoe",
-    "damage/melee/hammer_slam_aoe_super",
-)
-HAMMER_SLAM_STAT_OVERRIDE_SOURCE = """{
-	edit = {
-		damageParms = {
-			killStat = "STAT_WEAPON_CRUCIBLE_KILL";
-		}
-	}
-}
-"""
 
 
 def _source(owner: str, path: str, expected_sha256: str) -> str:
@@ -469,17 +457,6 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
     aggregate_target.write_text(aggregate_override, encoding="utf-8")
     written_paths.append(aggregate_target.as_posix())
-    for relative in HAMMER_SLAM_DAMAGE_DECLS:
-        target = (
-            mod_root
-            / CHILD_TARGET_OWNER
-            / "generated"
-            / "decls"
-            / f"damage/{relative}.decl"
-        )
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(HAMMER_SLAM_STAT_OVERRIDE_SOURCE, encoding="utf-8")
-        written_paths.append(target.as_posix())
     return {
         "child_owner": CHILD_TARGET_OWNER,
         "aggregate_owner": AGGREGATE_TARGET_OWNER,
@@ -492,10 +469,6 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
             "source_path": AGGREGATE_LIST_PATH,
             "mission_count": len(plan_b_contracts),
             "contracts": plan_b_contracts,
-        },
-        "hammer_slam_observer": {
-            "damage_decls": list(HAMMER_SLAM_DAMAGE_DECLS),
-            "stat": "STAT_WEAPON_CRUCIBLE_KILL",
         },
         "written_paths": written_paths,
     }

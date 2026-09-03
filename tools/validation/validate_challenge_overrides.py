@@ -27,8 +27,6 @@ from tools.decls.mission_challenge_decl_builder import (
     _challenge_paths,
     _plan_b_registration_override,
     _level_blocks,
-    HAMMER_SLAM_DAMAGE_DECLS,
-    HAMMER_SLAM_STAT_OVERRIDE_SOURCE,
 )
 
 
@@ -196,16 +194,6 @@ def validate_overrides_from_mod_root(
             f"{AGGREGATE_TARGET_OWNER}: {AGGREGATE_LIST_PATH}"
         )
         return errors
-
-    for damage_decl in HAMMER_SLAM_DAMAGE_DECLS:
-        damage_path = child_decl_root / f"damage/{damage_decl}.decl"
-        if not damage_path.is_file():
-            errors.append(
-                f"Missing Hammer damage-stat override: {CHILD_TARGET_OWNER}: "
-                f"damage/{damage_decl}.decl"
-            )
-        elif damage_path.read_text(encoding="utf-8").replace("\r\n", "\n") != HAMMER_SLAM_STAT_OVERRIDE_SOURCE:
-            errors.append(f"Hammer damage-stat override drift: {damage_decl}")
 
     aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
     expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
