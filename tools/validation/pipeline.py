@@ -197,6 +197,15 @@ class MapArtifact:
     cache_hit: bool
 
 
+def _reject_duplicate_object_keys(pairs: Sequence[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate object key: {key!r}")
+        result[key] = value
+    return result
+
+
 class Pipeline:
     def __init__(self, *, no_cache: bool = False, baseline_diff: bool = False):
         self.started = time.perf_counter()
@@ -241,8 +250,11 @@ class Pipeline:
                     continue
                 for path in sorted(directory.rglob("*.json")):
                     try:
-                        json.loads(path.read_text(encoding="utf-8"))
-                    except (OSError, json.JSONDecodeError) as error:
+                        json.loads(
+                            path.read_text(encoding="utf-8"),
+                            object_pairs_hook=_reject_duplicate_object_keys,
+                        )
+                    except (OSError, json.JSONDecodeError, ValueError) as error:
                         raise ValueError(
                             f"component=json file={path.relative_to(ROOT)} "
                             f"field=parse value={error}\nReproduce:\n"

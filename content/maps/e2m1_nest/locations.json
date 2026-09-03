@@ -85,6 +85,23 @@
       "remove_original": true,
       "preserve_targets": [],
       "drop_targets": []
+    },
+    "slayer_gate_target_relay_33": {
+      "native_entity_contract": {
+        "original_targets": [
+          "slayer_gate_target_relay_31",
+          "slayer_gate_target_relay_2",
+          "slayer_gate_target_relay_3"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
     }
   },
   "secret_encounters": [
@@ -187,24 +204,5 @@
     "7770202": "Super Gore Nest - Secret Encounter - Yellow-Key Return Portal",
     "7770203": "Super Gore Nest - Secret Encounter - Below the Red Key",
     "7770488": "Super Gore Nest - Slayer Gate Complete"
-  },
-  "target_policies": {
-    "slayer_gate_target_relay_33": {
-      "native_entity_contract": {
-        "original_targets": [
-          "slayer_gate_target_relay_31",
-          "slayer_gate_target_relay_2",
-          "slayer_gate_target_relay_3"
-        ],
-        "required_snippets": [
-          "inherit = \"target/relay\";",
-          "class = \"idTarget_Count\";",
-          "count = 1;"
-        ]
-      },
-      "duplicate_policy": "native_only",
-      "no_auto_automap_helper": true,
-      "no_auto_visual": true
-    }
   }
 }

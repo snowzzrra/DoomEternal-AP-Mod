@@ -145,6 +145,21 @@
           "game_trigger_trigger_994"
         ]
       }
+    },
+    "target_relay_slayergate_4_combat_end": {
+      "native_entity_contract": {
+        "original_targets": [
+          "target_relay_slayergate_5_chest_teleport"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
     }
   },
   "secret_encounters": [
@@ -190,22 +205,5 @@
     "7770091": "Cultist Base - Secret Encounter - Cave Mancubus",
     "7770092": "Cultist Base - Secret Encounter - Torture Pit",
     "7770487": "Cultist Base - Slayer Gate Complete"
-  },
-  "target_policies": {
-    "target_relay_slayergate_4_combat_end": {
-      "native_entity_contract": {
-        "original_targets": [
-          "target_relay_slayergate_5_chest_teleport"
-        ],
-        "required_snippets": [
-          "inherit = \"target/relay\";",
-          "class = \"idTarget_Count\";",
-          "count = 1;"
-        ]
-      },
-      "duplicate_policy": "native_only",
-      "no_auto_automap_helper": true,
-      "no_auto_visual": true
-    }
   }
 }
