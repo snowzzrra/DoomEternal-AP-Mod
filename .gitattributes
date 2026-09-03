@@ -1,0 +1,3 @@
+# Enforce canonical LF line endings for project-owned DECL text sources
+data/devinv_sources/**/*.decl text eol=lf
+data/automap_native_decl_sources/**/*.decl text eol=lf

@@ -1396,5 +1396,311 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             self.assertNotIn("Launch ap_client.exe manually", text)
 
 
+class TestDevInvPortability(unittest.TestCase):
+    def test_case_a_canonical_lf_succeeds(self):
+        from tools.decls.devinv_builder import build_tag_devinv_overrides
+        overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
+        self.assertGreaterEqual(len(overrides), 6)
+
+    def test_case_b_crlf_and_c_cr_parity(self):
+        from tools.decls import devinv_builder
+        from tools.decls.devinv_builder import build_tag_devinv_overrides
+
+        repo_root = Path(__file__).resolve().parents[1]
+        manifest_path = repo_root / "data" / "devinv_sources" / "tag_dev_inv_chain.json"
+        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        overrides_lf = build_tag_devinv_overrides({}, "Combat Shotgun")
+
+        # CASE B: transform all decl files to CRLF in temporary tree
+        with tempfile.TemporaryDirectory() as tmp_crlf:
+            crlf_root = Path(tmp_crlf)
+            data_dir = crlf_root / "data" / "devinv_sources" / "tag"
+            data_dir.mkdir(parents=True)
+            for decl in (repo_root / "data" / "devinv_sources" / "tag").glob("*.decl"):
+                text = decl.read_bytes().decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+                (data_dir / decl.name).write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+
+            tmp_manifest = crlf_root / "data" / "devinv_sources" / "tag_dev_inv_chain.json"
+            tmp_manifest.write_text(json.dumps(manifest_data, indent=2), encoding="utf-8")
+
+            old_manifest = devinv_builder.TAG_DEVINV_MANIFEST
+            try:
+                devinv_builder.TAG_DEVINV_MANIFEST = tmp_manifest
+                with patch.object(Path, "resolve", side_effect=lambda self: crlf_root / self.relative_to(crlf_root) if str(self).startswith(str(crlf_root)) else self):
+                    # Also patch Path(__file__).resolve().parents[2] inside devinv_builder
+                    with patch("tools.decls.devinv_builder.Path") as mock_path_cls:
+                        def fake_path_call(*args, **kwargs):
+                            p = Path(*args, **kwargs)
+                            return p
+                        mock_path_cls.side_effect = fake_path_call
+                        mock_path_cls.__file__ = str(crlf_root / "tools" / "decls" / "devinv_builder.py")
+
+                        # Test direct canonicalization helper
+                        raw_crlf = (data_dir / "e4m1_rig.decl").read_bytes()
+                        self.assertIn(b"\r\n", raw_crlf)
+                        text_norm, bytes_norm = devinv_builder.canonical_decl_text(raw_crlf)
+                        self.assertNotIn(b"\r\n", bytes_norm)
+                        self.assertEqual(
+                            hashlib.sha256(bytes_norm).hexdigest(),
+                            manifest_data["declarations"]["e4m1_rig"]["sha256"],
+                        )
+
+                        # CASE C: lone CR
+                        raw_cr = (data_dir / "e4m1_rig.decl").read_bytes().decode("utf-8").replace("\r\n", "\n").replace("\n", "\r").encode("utf-8")
+                        _, bytes_cr = devinv_builder.canonical_decl_text(raw_cr)
+                        self.assertNotIn(b"\r", bytes_cr)
+                        self.assertEqual(bytes_cr, bytes_norm)
+            finally:
+                devinv_builder.TAG_DEVINV_MANIFEST = old_manifest
+
+    def test_case_d_semantic_source_mutation_fails(self):
+        from tools.decls.devinv_builder import canonical_decl_text
+        repo_root = Path(__file__).resolve().parents[1]
+        manifest_path = repo_root / "data" / "devinv_sources" / "tag_dev_inv_chain.json"
+        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        raw = (repo_root / "data" / "devinv_sources" / "tag" / "e4m1_rig.decl").read_bytes()
+        tampered_raw = raw.replace(b"num = 38;", b"num = 99;")
+        self.assertNotEqual(raw, tampered_raw)
+        _, tampered_bytes = canonical_decl_text(tampered_raw)
+        self.assertNotEqual(
+            hashlib.sha256(tampered_bytes).hexdigest(),
+            manifest_data["declarations"]["e4m1_rig"]["sha256"],
+        )
+
+    def test_case_e_invalid_utf8_fails(self):
+        from tools.decls.devinv_builder import canonical_decl_text
+        invalid_bytes = b"\xff\xfe\xfa\x00\x01\x02"
+        with self.assertRaises(UnicodeDecodeError):
+            canonical_decl_text(invalid_bytes)
+
+    def test_case_f_output_parity_between_newline_styles(self):
+        from tools.decls.devinv_builder import canonical_decl_text
+        sample = "edit = {\n\tline1;\n\tline2;\n}\n"
+        sample_crlf = sample.replace("\n", "\r\n").encode("utf-8")
+        sample_cr = sample.replace("\n", "\r").encode("utf-8")
+        sample_lf = sample.encode("utf-8")
+
+        text_lf, bytes_lf = canonical_decl_text(sample_lf)
+        text_crlf, bytes_crlf = canonical_decl_text(sample_crlf)
+        text_cr, bytes_cr = canonical_decl_text(sample_cr)
+
+        self.assertEqual(bytes_lf, bytes_crlf)
+        self.assertEqual(bytes_lf, bytes_cr)
+        self.assertEqual(text_lf, text_crlf)
+        self.assertEqual(text_lf, text_cr)
+
+
+class TestSandboxCompatibilityGuard(unittest.TestCase):
+    def test_case_1_sandbox_absent_no_guard_action(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            events: list[tuple[str, dict]] = []
+            with hold_sandbox(game_root, event_sink=lambda k, **p: events.append((k, p))):
+                pass
+            self.assertEqual(events, [])
+
+    def test_case_2_sandbox_present_hidden_and_restored(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            sandbox_dir = game_root / "doomSandBox"
+            sandbox_dir.mkdir()
+            sandbox_exe = sandbox_dir / "DOOMSandBox64vk.exe"
+            sandbox_exe.write_bytes(b"original_sandbox_executable_data_12345")
+            original_sha = hashlib.sha256(sandbox_exe.read_bytes()).hexdigest()
+
+            events: list[tuple[str, dict]] = []
+            with hold_sandbox(game_root, event_sink=lambda k, **p: events.append((k, p))):
+                self.assertFalse(sandbox_exe.exists(), "Sandbox must be absent during block")
+                hold_file = sandbox_dir / "DOOMSandBox64vk.exe.doom_eap_hold"
+                self.assertTrue(hold_file.is_file(), "Hold file must exist during block")
+
+            self.assertTrue(sandbox_exe.is_file(), "Sandbox must be restored after block")
+            self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), original_sha)
+            event_states = [p["state"] for _, p in events]
+            self.assertEqual(event_states, ["held", "restored"])
+
+    def test_case_3_and_4_sandbox_restored_on_failure_and_exception(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            sandbox_dir = game_root / "doomSandBox"
+            sandbox_dir.mkdir()
+            sandbox_exe = sandbox_dir / "DOOMSandBox64vk.exe"
+            sandbox_exe.write_bytes(b"sandbox_payload_for_exception_test")
+            original_sha = hashlib.sha256(sandbox_exe.read_bytes()).hexdigest()
+
+            with self.assertRaises(ZeroDivisionError):
+                with hold_sandbox(game_root):
+                    _ = 1 / 0
+
+            self.assertTrue(sandbox_exe.is_file())
+            self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), original_sha)
+
+    def test_case_5_stale_hold_crash_recovery(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            state_dir = game_root / "state"
+            state_dir.mkdir()
+            sandbox_dir = game_root / "doomSandBox"
+            sandbox_dir.mkdir()
+            hold_file = sandbox_dir / "DOOMSandBox64vk.exe.doom_eap_hold"
+            hold_file.write_bytes(b"crashed_run_sandbox_data")
+            hold_sha = hashlib.sha256(hold_file.read_bytes()).hexdigest()
+
+            tx_file = state_dir / "sandbox_guard_tx.json"
+            tx_file.write_text(json.dumps({"sha256": hold_sha, "size": len(b"crashed_run_sandbox_data")}), encoding="utf-8")
+
+            events: list[tuple[str, dict]] = []
+            with hold_sandbox(game_root, state_dir=state_dir, event_sink=lambda k, **p: events.append((k, p))):
+                pass
+
+            sandbox_exe = sandbox_dir / "DOOMSandBox64vk.exe"
+            self.assertTrue(sandbox_exe.is_file())
+            self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), hold_sha)
+            self.assertTrue(any(p.get("state") == "recovered_stale_hold" for _, p in events))
+
+    def test_case_6_ambiguous_state_fails_closed(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            sandbox_dir = game_root / "doomSandBox"
+            sandbox_dir.mkdir()
+            (sandbox_dir / "DOOMSandBox64vk.exe").write_bytes(b"exe_data")
+            (sandbox_dir / "DOOMSandBox64vk.exe.doom_eap_hold").write_bytes(b"hold_data")
+
+            with self.assertRaises(RuntimeError) as ctx:
+                with hold_sandbox(game_root):
+                    pass
+            self.assertIn("Ambiguous sandbox state", str(ctx.exception))
+            self.assertTrue((sandbox_dir / "DOOMSandBox64vk.exe").is_file())
+            self.assertTrue((sandbox_dir / "DOOMSandBox64vk.exe.doom_eap_hold").is_file())
+
+    def test_case_7_restoration_integrity_failure(self):
+        from doom_eap.launcher.launcher_platform import hold_sandbox
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            sandbox_dir = game_root / "doomSandBox"
+            sandbox_dir.mkdir()
+            sandbox_exe = sandbox_dir / "DOOMSandBox64vk.exe"
+            sandbox_exe.write_bytes(b"original_data")
+
+            with self.assertRaises(RuntimeError) as ctx:
+                with hold_sandbox(game_root):
+                    hold = sandbox_dir / "DOOMSandBox64vk.exe.doom_eap_hold"
+                    hold.write_bytes(b"tampered_data")
+            self.assertIn("integrity check failed", str(ctx.exception))
+
+    def test_case_8_paths_with_spaces_and_parentheses(self):
+        from doom_eap.launcher.launcher_platform import WindowsModInjectorAdapter, InstalledDependency, WINDOWS_INJECTOR_REQUIRED_MEMBERS
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = tmp / "Steam Library (x86)" / "steamapps" / "common" / "DOOMEternal"
+            game_root.mkdir(parents=True)
+            (game_root / "Mods").mkdir()
+            (game_root / "doomSandBox").mkdir()
+            sandbox_exe = game_root / "doomSandBox" / "DOOMSandBox64vk.exe"
+            sandbox_exe.write_bytes(b"sandbox_exe_bytes")
+
+            dep_root = tmp / "dep with spaces"
+            dep_root.mkdir(parents=True)
+            for m in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+                (dep_root / m).parent.mkdir(parents=True, exist_ok=True)
+                (dep_root / m).write_bytes(b"mock")
+            dep = InstalledDependency("EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
+
+            observed_commands: list[tuple[str, ...]] = []
+            observed_cwd: list[Path] = []
+            saw_sandbox_during_run: list[bool] = []
+
+            class FakeProc:
+                returncode = 0
+                def wait(self):
+                    return 0
+
+            def mock_opener(cmd, cwd):
+                observed_commands.append(tuple(cmd))
+                observed_cwd.append(cwd)
+                saw_sandbox_during_run.append(sandbox_exe.exists())
+                return FakeProc()
+
+            adapter = WindowsModInjectorAdapter(
+                dep,
+                state_dir=tmp / "state with spaces",
+                opener=mock_opener,
+                confirmer=lambda: True,
+            )
+
+            mod_zip = tmp / "mod.zip"
+            with zipfile.ZipFile(mod_zip, "w") as zf:
+                zf.writestr("test.txt", "mod")
+
+            result = adapter.activate(game_root, mod_zip)
+            self.assertEqual(result.state, "applied")
+            self.assertEqual(observed_cwd, [game_root])
+            # The command passed to cmd /c should be EternalModInjector.bat
+            cmd = observed_commands[0]
+            self.assertEqual(cmd[1:], ("/d", "/c", "EternalModInjector.bat"))
+            # Sandbox was hidden during opener execution
+            self.assertEqual(saw_sandbox_during_run, [False])
+            # Sandbox is restored after run
+            self.assertTrue(sandbox_exe.is_file())
+            self.assertEqual(sandbox_exe.read_bytes(), b"sandbox_exe_bytes")
+
+    def test_case_9_mock_injector_integration(self):
+        from doom_eap.launcher.launcher_platform import WindowsModInjectorAdapter, InstalledDependency, WINDOWS_INJECTOR_REQUIRED_MEMBERS
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            game_root = tmp / "DOOMEternal"
+            game_root.mkdir()
+            (game_root / "Mods").mkdir()
+            (game_root / "doomSandBox").mkdir()
+
+            normal_exe = game_root / "DOOMEternalx64vk.exe"
+            normal_exe.write_bytes(b"normal_game_executable_data")
+            normal_sha = hashlib.sha256(normal_exe.read_bytes()).hexdigest()
+
+            sandbox_exe = game_root / "doomSandBox" / "DOOMSandBox64vk.exe"
+            sandbox_exe.write_bytes(b"sandbox_executable_data")
+            sandbox_sha = hashlib.sha256(sandbox_exe.read_bytes()).hexdigest()
+
+            dep_root = tmp / "dep"
+            dep_root.mkdir()
+            for m in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+                (dep_root / m).parent.mkdir(parents=True, exist_ok=True)
+                (dep_root / m).write_bytes(b"mock")
+            dep = InstalledDependency("EternalModInjector", "2026-08-18", "mock", "url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
+
+            for exit_code in (0, 1):
+                class MockInjectorProc:
+                    def __init__(self, code):
+                        self.returncode = code
+                    def wait(self):
+                        # Verify state during process execution
+                        assert normal_exe.is_file(), "Normal executable must remain present"
+                        assert not sandbox_exe.exists(), "Sandbox executable must be absent"
+                        return self.returncode
+
+                adapter = WindowsModInjectorAdapter(
+                    dep,
+                    state_dir=tmp / "state",
+                    opener=lambda cmd, cwd: MockInjectorProc(exit_code),
+                    confirmer=lambda: True,
+                )
+
+                res = adapter.run(game_root)
+                self.assertEqual(res.returncode, exit_code)
+                # Verify normal exe unchanged
+                self.assertTrue(normal_exe.is_file())
+                self.assertEqual(hashlib.sha256(normal_exe.read_bytes()).hexdigest(), normal_sha)
+                # Verify sandbox restored
+                self.assertTrue(sandbox_exe.is_file())
+                self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), sandbox_sha)
+
+
 if __name__ == "__main__":
     unittest.main()

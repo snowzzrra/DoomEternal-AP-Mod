@@ -583,7 +583,7 @@ class IntegratedLaunchWorkflow:
                     plan.diff,
                 )
             self._emit("injector_started", command=[str(dependency.executable)])
-            result = LinuxModManagerAdapter(dependency).activate(game_root, staged)
+            result = LinuxModManagerAdapter(dependency, state_dir=self.state_dir, event_sink=self._emit).activate(game_root, staged)
             self._emit(
                 "injector_finished",
                 state=result.state,
@@ -631,7 +631,7 @@ class IntegratedLaunchWorkflow:
             local_artifact = Path(str(local_value)).expanduser() if local_value else None
             dependency = self._acquire(manager, LINUX_MOD_INJECTOR, local_artifact)
             self._emit("injector_started", command=[str(dependency.executable)], operation="uninstall")
-            result = LinuxModManagerAdapter(dependency).run(game_root)
+            result = LinuxModManagerAdapter(dependency, state_dir=self.state_dir, event_sink=self._emit).run(game_root)
             self._emit(
                 "injector_finished",
                 state=result.state,

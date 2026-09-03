@@ -48,13 +48,13 @@ def build_toy_override(mod_root: Path) -> dict:
     )
     for parent in PARENT_OWNERS:
         parent_payload = (owner_root / parent["path"]).read_bytes()
-        parent_hash = hashlib.sha256(parent_payload).hexdigest()
+        parent_text = parent_payload.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        parent_hash = hashlib.sha256(parent_text.encode("utf-8")).hexdigest()
         if parent_hash != parent["normalized_snapshot_sha256"]:
             raise ValueError(
                 f"Doom Slayer Toy parent owner hash drift for "
                 f"{parent['path']}: {parent_hash}"
             )
-        parent_text = parent_payload.decode("utf-8")
         if any(parent_text.count(value) != 1 for value in parent["required"]):
             raise ValueError(
                 f"Doom Slayer Toy parent reward chain drift for {parent['path']}"
@@ -63,10 +63,10 @@ def build_toy_override(mod_root: Path) -> dict:
         owner_root / OWNER["path"]
     )
     payload = source.read_bytes()
-    actual_hash = hashlib.sha256(payload).hexdigest()
+    text = payload.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    actual_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     if actual_hash != OWNER["normalized_snapshot_sha256"]:
         raise ValueError(f"Doom Slayer Toy owner hash drift: {actual_hash}")
-    text = payload.decode("utf-8")
     required = (
         'inherit = "propitem/collectible/toys/default";',
         'inventoryDecl = "collectible/toys/doom_slayer";',

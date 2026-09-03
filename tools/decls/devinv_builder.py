@@ -1027,6 +1027,12 @@ def validate_tag_devinv_source(source: str) -> None:
         raise ValueError(f"TAG DevInvLoadout missing required mod upgrades: {missing_upgrades}")
 
 
+def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
+    """Decode strict UTF-8 and normalize all line endings (CRLF and lone CR to LF)."""
+    text = raw_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return text, text.encode("utf-8")
+
+
 def build_tag_devinv_overrides(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
@@ -1036,7 +1042,7 @@ def build_tag_devinv_overrides(
     result: dict[str, str] = {}
     tag_root_record = manifest["declarations"]["e4m1_rig"]
     tag_root_path = Path(__file__).resolve().parents[2] / tag_root_record["source"]
-    tag_root_source = tag_root_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    tag_root_source, _ = canonical_decl_text(tag_root_path.read_bytes())
     baseline_inventory = _STARTING_INVENTORY_ANY_RE.search(tag_root_source)
     baseline_currency = _CURRENCY_BLOCK_RE.search(tag_root_source)
     if baseline_inventory is None or baseline_currency is None:
@@ -1054,9 +1060,9 @@ def build_tag_devinv_overrides(
     for declaration_key, record in manifest["declarations"].items():
         source_path = Path(__file__).resolve().parents[2] / record["source"]
         source_bytes = source_path.read_bytes()
-        if hashlib.sha256(source_bytes).hexdigest() != record["sha256"]:
+        source, canonical_bytes = canonical_decl_text(source_bytes)
+        if hashlib.sha256(canonical_bytes).hexdigest() != record["sha256"]:
             raise ValueError(f"TAG DevInv source hash drifted: {declaration_key}")
-        source = source_bytes.decode("utf-8").replace("\r\n", "\n")
         source_inventory = _STARTING_INVENTORY_ANY_RE.search(source)
         source_currency = _CURRENCY_BLOCK_RE.search(source)
         # Preserve declaration framing and unrelated fields; replace only loadout data.

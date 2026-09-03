@@ -28,7 +28,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Any, Protocol
+from typing import Any, Iterator, Protocol
 
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
@@ -1607,6 +1607,121 @@ def stage_windows_injector_toolchain(
     return batch_path
 
 
+SANDBOX_DIR_NAME = "doomSandBox"
+SANDBOX_EXE_NAME = "DOOMSandBox64vk.exe"
+SANDBOX_HOLD_SUFFIX = ".doom_eap_hold"
+SANDBOX_TRANSACTION_FILE = "sandbox_guard_tx.json"
+
+
+@contextmanager
+def hold_sandbox(
+    game_root: Path,
+    *,
+    state_dir: Path | None = None,
+    event_sink: Callable[..., None] | None = None,
+) -> Iterator[None]:
+    """Transient compatibility guard around upstream EternalModInjector execution.
+
+    Temporarily moves doomSandBox/DOOMSandBox64vk.exe out of the injector's view
+    to prevent injector crashes caused by updated sandbox hashes, while guaranteeing
+    the normal DOOMEternalx64vk.exe executable remains completely validated and
+    the sandbox executable is restored byte-for-byte in all exit scenarios.
+    """
+    sandbox_dir = game_root / SANDBOX_DIR_NAME
+    original = sandbox_dir / SANDBOX_EXE_NAME
+    hold = sandbox_dir / (SANDBOX_EXE_NAME + SANDBOX_HOLD_SUFFIX)
+    tx_file = (state_dir / SANDBOX_TRANSACTION_FILE) if state_dir is not None else None
+
+    # 1. Deterministic recovery from previous crash or stale hold
+    if not original.exists() and hold.is_file():
+        os.replace(hold, original)
+        recovered_size = original.stat().st_size
+        recovered_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+        if tx_file and tx_file.is_file():
+            try:
+                tx_data = json.loads(tx_file.read_text(encoding="utf-8"))
+                expected_sha = tx_data.get("sha256")
+                if expected_sha and recovered_sha != expected_sha:
+                    raise RuntimeError(
+                        f"Stale sandbox hold recovery integrity failure: expected SHA-256 {expected_sha}, got {recovered_sha}"
+                    )
+            finally:
+                tx_file.unlink(missing_ok=True)
+        if event_sink is not None:
+            event_sink(
+                "injector_sandbox_guard",
+                state="recovered_stale_hold",
+                verified=True,
+                sha256=recovered_sha,
+                size=recovered_size,
+            )
+
+    # 2. Ambiguous state check: fail closed without overwriting either file
+    if original.exists() and hold.exists():
+        raise RuntimeError(
+            f"Ambiguous sandbox state: both '{original}' and hold file '{hold}' exist. "
+            "Manual intervention is required to avoid data loss. Neither file was modified."
+        )
+
+    # 3. If sandbox is absent, upstream injector simply skips optional sandbox patching
+    if not original.is_file():
+        yield
+        return
+
+    # 4. Record pre-run identity
+    original_size = original.stat().st_size
+    original_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+
+    # 5. Persist transaction record in state directory if available
+    if tx_file is not None:
+        tx_file.parent.mkdir(parents=True, exist_ok=True)
+        tx_data = {
+            "original": str(original),
+            "hold": str(hold),
+            "sha256": original_sha,
+            "size": original_size,
+            "timestamp": datetime.now().isoformat(),
+        }
+        tx_file.write_text(json.dumps(tx_data, indent=2) + "\n", encoding="utf-8")
+
+    # 6. Atomically move original -> hold
+    os.replace(original, hold)
+    if event_sink is not None:
+        event_sink(
+            "injector_sandbox_guard",
+            state="held",
+            sha256=original_sha,
+            size=original_size,
+        )
+
+    # 7. Execute injector with guaranteed restoration in finally
+    try:
+        yield
+    finally:
+        if hold.is_file():
+            os.replace(hold, original)
+            restored_size = original.stat().st_size
+            restored_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+
+            if tx_file and tx_file.is_file():
+                tx_file.unlink(missing_ok=True)
+
+            if restored_sha != original_sha or restored_size != original_size:
+                raise RuntimeError(
+                    f"Sandbox restoration integrity check failed! Expected SHA-256 {original_sha} ({original_size} bytes), "
+                    f"but restored file has {restored_sha} ({restored_size} bytes)."
+                )
+
+            if event_sink is not None:
+                event_sink(
+                    "injector_sandbox_guard",
+                    state="restored",
+                    verified=True,
+                    sha256=restored_sha,
+                    size=restored_size,
+                )
+
+
 class WindowsModInjectorAdapter:
     """Stage verified EternalModInjector toolchain, launch visible batch console, track process lifetime, and request player confirmation."""
 
@@ -1701,8 +1816,10 @@ class WindowsModInjectorAdapter:
             )
 
         comspec = os.environ.get("COMSPEC", "cmd.exe")
-        command = (comspec, "/d", "/c", str(batch_executable))
-        result = self._run_process(game_root, command, staged_mod)
+        target_name = batch_executable.name if batch_executable.parent.resolve() == game_root.resolve() else str(batch_executable)
+        command = (comspec, "/d", "/c", target_name)
+        with hold_sandbox(game_root, state_dir=self.state_dir, event_sink=self.event_sink):
+            result = self._run_process(game_root, command, staged_mod)
         if operation != "uninstall" or result.state != "applied":
             return result
 
@@ -1802,8 +1919,16 @@ class LinuxModManagerAdapter:
 
     TIMEOUT_SECONDS = 15 * 60
 
-    def __init__(self, dependency: InstalledDependency):
+    def __init__(
+        self,
+        dependency: InstalledDependency,
+        *,
+        state_dir: Path | None = None,
+        event_sink: Callable[..., None] | None = None,
+    ):
         self.dependency = dependency
+        self.state_dir = state_dir
+        self.event_sink = event_sink
 
     def _prepare_tools(self, game_root: Path) -> Path:
         source_root = Path(self.dependency.root)
@@ -1857,29 +1982,30 @@ class LinuxModManagerAdapter:
         environment = os.environ.copy()
         environment.update({"skip": "1", "skip_debug_check": "1"})
         command = (str(executable),)
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=game_root,
-                env=environment,
-                text=True,
-                capture_output=True,
-                timeout=self.TIMEOUT_SECONDS,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as error:
-            return AdapterResult(
-                state="timed_out",
-                message="Mod installation timed out. Review details and try again.",
-                command=command,
-                stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
-                stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
-                details={
-                    "injector_version": self.dependency.version,
-                    "mods_path": str((game_root / "Mods").resolve()),
-                    "post_install_verification": "not_run",
-                },
-            )
+        with hold_sandbox(game_root, state_dir=self.state_dir, event_sink=self.event_sink):
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=game_root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=self.TIMEOUT_SECONDS,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as error:
+                return AdapterResult(
+                    state="timed_out",
+                    message="Mod installation timed out. Review details and try again.",
+                    command=command,
+                    stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
+                    stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
+                    details={
+                        "injector_version": self.dependency.version,
+                        "mods_path": str((game_root / "Mods").resolve()),
+                        "post_install_verification": "not_run",
+                    },
+                )
         state = "applied" if completed.returncode == 0 else "failed"
         return AdapterResult(
             state=state,

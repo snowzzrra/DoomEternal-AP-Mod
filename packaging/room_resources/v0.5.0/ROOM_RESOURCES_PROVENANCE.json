@@ -3,7 +3,7 @@
   "release_version": "0.5.0",
   "generated_from_mod_commit": "ec90a8556e01ce9a8a32eedf80dbbbf4d001d616",
   "generated_from_apworld_commit": "fcf9db52da7e216a096309f3b90981298975e14e",
-  "room_resource_input_fingerprint": "fc8eb73c8c314d41dba91de533138ba88c7bf2f580e2186a57e5ae71545ed375",
+  "room_resource_input_fingerprint": "3e644f54173b7a1ae3861826678996834372de1f6cd096ad6741e2e85ea1129e",
   "base_mod": {
     "sha256": "fbae7ce76816ef23886f48418e7c6af7ff015ddb6cc05d23b3a7cef13e2bff27",
     "size": 11299065
@@ -245,7 +245,7 @@
     "doom_eap/content/content_catalog.py": "43cccb3d03a218ce1b06d2afb085d052479444dfa977bee80256ffefc3b9dc6f",
     "doom_eap/content/__init__.py": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
     "tools/decls/rune_decl_builder.py": "883aa7dadd152780f78d6fd98ff58f1942dba08730108ec4dc9e526e838846a5",
-    "tools/decls/devinv_builder.py": "f84f1c4271476aa3ad9525c7bab4034903be4a7488da2a6b416f151fdf00e019",
+    "tools/decls/devinv_builder.py": "33cce21f18cee19a6f9b90b873b1c3f6f6478c6f0cd30a68b7a2eea104b1ebb5",
     "tools/decls/rune_slot_builder.py": "626afaa3fc7f8714793227704b475e090987ae14d338127fa1a75dcab18233cb",
     "tools/decls/mastery_decl_builder.py": "962e3c37efe89547b34680ca13da3f445558b1d5af3f23bdce07282b06498c5b",
     "tools/decls/weapon_stripping_builder.py": "17686b3c994f565f2c80fa6b128529cefc822d6bd3b024811da39f79b00b56df",
@@ -255,7 +255,7 @@
     "tools/maps/mission_complete_map_patcher.py": "111cba628ed53bb0c1435ecb25d5364cc5b1350da91a96c7452c98afa1647d1e",
     "tools/maps/map_semantic_baseline.py": "93fabcc91f0d73aabd3a8bfd51d3605c467e752407b0827f12447259a2a9c5b5",
     "tools/maps/map_preflight.py": "87c2c02771455edd02722346919af3e3da4e506fc719b6012691b4cc1820ad65",
-    "tools/maps/automap_native_decl_builder.py": "c199fdbcdc46240fd54ccab280f7e83989b1d17980d56589429c5f550d2aa01b",
+    "tools/maps/automap_native_decl_builder.py": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
     "tools/maps/hub_diff_guard.py": "05d6fd263baa7ae9a0f6aa3a4f7f4da47b3c6e9761483bee922f9cd283de8f71",
     "tools/maps/ap_map_generator.py": "94afa2d86a94ccd41c4fd281c70b98f6e44df2b36dc30611086d048873c55d28",
     "tools/maps/shell_menu_visual.py": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",

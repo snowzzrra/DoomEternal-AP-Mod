@@ -76,6 +76,19 @@ def _run_self_test(arguments: list[str]) -> int:
                 f"(frozen={getattr(sys, 'frozen', False)})"
             )
         print(f"  [OK] Bundled content catalog verified -> {bundled_content}")
+
+        # Bundled TAG DevInv source verification & compilation smoke test
+        from tools.decls.devinv_builder import build_tag_devinv_overrides
+
+        tag_overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
+        expected_tag_prefixes = (
+            "e4m1_rig", "e4m2_swamp", "e4m3_mcity",
+            "e5m1_spear", "e5m2_earth", "e5m3_hell",
+        )
+        for prefix in expected_tag_prefixes:
+            if not any(k.startswith(prefix) for k in tag_overrides):
+                raise RuntimeError(f"TAG DevInv build missing output for {prefix}")
+        print(f"  [OK] Bundled TAG DevInv overrides verified ({len(tag_overrides)} declarations)")
     except Exception as e:
         print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
         return 1
