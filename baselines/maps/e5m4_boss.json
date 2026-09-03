@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: bind final completion publisher to proven native terminal"
+    }
+  ],
+  "asset_package_contract_sha256": "43a6deca583a70d4c2c6bd4aa0941b23821e18291c7f0deeedccd3304c7fa573",
+  "byte_sha256": "db8e215470fc347daa0d2d5a725b8e9f0a8bcc4c40143183672a8ef844aad515",
+  "content_revision": "0.5.0",
+  "generated_entity_metrics": {
+    "bind_parents": 0,
+    "byte_size": 1646179,
+    "classes": 1564,
+    "entity_count": 1564,
+    "layers": 464,
+    "targets": 1260,
+    "transforms": 2650,
+    "unique_entity_names": 1564
+  },
+  "manifest_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "map_key": "e5m4_boss",
+  "physical_ap_ids": [],
+  "publisher_contract_sha256": "5c8c44194df2f1482094ea4930be5ac628e5c4eb3abe351baf6535952da643f2",
+  "runtime_location_ids": [
+    7770419
+  ],
+  "schema_version": 2,
+  "scripted_contract_sha256": "6f4f0e57986f7028a97a6216b5fa59fb9e133e6110a3f8598eb9423a336823d8",
+  "semantic_sha256": "194663d2c65ea86098e6d451db47dbdf4791312cf65c9c996815f2149fdbc656"
+}

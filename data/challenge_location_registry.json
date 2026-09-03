@@ -726,7 +726,7 @@
       "completion_owner": {
         "completion_stat": "STAT_COMPLETED_E3M2_CHALLENGE_1",
         "path": "unlockable/mission_challenge/e3m2/challenge_1.decl",
-        "sha256": "f281f5b04c1f57fb74a941f39503d088e61713eb10342b543874f4d1759c8c15"
+        "sha256": "41cc476f7d509a0ac732582126ceb0b1f1fded462aafc7ba7c4216e6f8c6b077"
       },
       "location_id": 7770358,
       "mission_key": "e3m2_hell",
@@ -1267,9 +1267,8 @@
       "name": "The Dark Lord - Defeated",
       "order": 100,
       "signal": {
-        "fallback_terminal_owner": "stage_3_target_level_transition_1",
         "kind": "map_terminal",
-        "owner": "stage_3_target_campaign_complete_1",
+        "owner": "stage_3_target_level_transition_1",
         "runtime_map": "game/dlc2/e5m4_boss/e5m4_boss"
       },
       "strategy": "map_terminal"

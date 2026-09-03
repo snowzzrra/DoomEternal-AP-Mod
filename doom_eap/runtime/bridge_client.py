@@ -1230,10 +1230,14 @@ def normalize_steam_remote_dir(path):
 
 
 def _steam_remote_candidate_score(remote):
-    duration_files = list(
-        remote.glob("GAME-AUTOSAVE*/game_duration.dat")
-    )
-    details_files = list(remote.glob("GAME-AUTOSAVE*/game.details"))
+    duration_files = [
+        p for p in remote.glob("*-AUTOSAVE*/game_duration.dat")
+        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
+    ]
+    details_files = [
+        p for p in remote.glob("*-AUTOSAVE*/game.details")
+        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
+    ]
     save_files = duration_files + details_files
 
     newest_mtime = 0
@@ -1286,10 +1290,14 @@ def _discover_steam_remote_candidates():
 
 
 def _describe_steam_remote_candidate(remote, steam_id3):
-    duration_files = list(
-        remote.glob("GAME-AUTOSAVE*/game_duration.dat")
-    )
-    details_files = list(remote.glob("GAME-AUTOSAVE*/game.details"))
+    duration_files = [
+        p for p in remote.glob("*-AUTOSAVE*/game_duration.dat")
+        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
+    ]
+    details_files = [
+        p for p in remote.glob("*-AUTOSAVE*/game.details")
+        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
+    ]
     save_files = duration_files + details_files
 
     newest = None
@@ -1582,8 +1590,8 @@ def primary_save_candidates(filename="game_duration.dat"):
         return []
 
     candidates = []
-    for path in STEAM_REMOTE_DIR.glob(f"GAME-AUTOSAVE*/{filename}"):
-        if not re.fullmatch(r"GAME-AUTOSAVE\d+", path.parent.name):
+    for path in STEAM_REMOTE_DIR.glob(f"*-AUTOSAVE*/{filename}"):
+        if not re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", path.parent.name):
             continue
         try:
             stat = path.stat()
@@ -1595,12 +1603,15 @@ def primary_save_candidates(filename="game_duration.dat"):
         candidates.append(
             PrimarySaveSelection(path.parent.name, full_path, stat.st_mtime_ns)
         )
+
+    def _slot_sort_key(selected):
+        digits = re.search(r"\d+$", selected.slot_directory)
+        slot_num = int(digits.group(0)) if digits else 0
+        return (selected.mtime_ns, slot_num)
+
     return sorted(
         candidates,
-        key=lambda selected: (
-            selected.mtime_ns,
-            int(selected.slot_directory.removeprefix("GAME-AUTOSAVE")),
-        ),
+        key=_slot_sort_key,
         reverse=True,
     )
 
@@ -1638,7 +1649,7 @@ def read_gameplay_save_evidence(path=None):
     if (
         state != "gameplay"
         or epoch < 0
-        or not re.fullmatch(r"GAME-AUTOSAVE\d+", slot_directory)
+        or not re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", slot_directory)
     ):
         return None
     return GameplaySaveEvidence(
@@ -3381,6 +3392,7 @@ class DoomEternalContext(CommonContext):
         self.death_link_mode = DEFAULT_DEATH_LINK_MODE
         self.previous_checkpoint_death = None
         self.checkpoint_death_by_save_slot = {}
+        self.death_observation_load_epoch_by_save_slot = {}
         self.last_duration_cache_key = None
         self.death_probe_warning = None
         self.active_save_slot = None
@@ -3839,6 +3851,7 @@ class DoomEternalContext(CommonContext):
     def _trigger_live_context_materialization(self):
         state = self.session_state.setdefault("context_materialization", {})
         state.pop("completed_key", None)
+        state.pop("completed_persistent_key", None)
         evidence = read_gameplay_save_evidence()
         if not self.runtime_effects_ready(evidence):
             self._pending_materialization_triggers.add("receipt")
@@ -3862,7 +3875,7 @@ class DoomEternalContext(CommonContext):
         self._materialization_completion = None
         return True
 
-    def _context_materialize_inventory(self, evidence, *, trigger="context"):
+    def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False):
         """Reconcile AP-owned persistent state for each accepted context lease."""
         if trigger is not None:
             self._pending_materialization_triggers.add(str(trigger))
@@ -3905,11 +3918,28 @@ class DoomEternalContext(CommonContext):
             str(materialization_lease or "deferred"),
             ownership_fingerprint,
         ))
-        if state.get("completed_key") == materialization_key:
+        persistent_reconciliation_key = ":".join((
+            str(self.get_ap_state_key() or "unbound"),
+            context.identity,
+            ownership_fingerprint,
+        ))
+        if not manual and state.get("completed_key") == materialization_key:
             self.pending_context_transition = None
             self._pending_materialization_triggers.clear()
             self.context_materialization_mode = "none"
             self.context_materialization_status = "completed_noop"
+            return None, None
+        if not manual and state.get("completed_persistent_key") == persistent_reconciliation_key:
+            self.pending_context_transition = None
+            self._pending_materialization_triggers.clear()
+            self.context_materialization_mode = "none"
+            self.context_materialization_status = "completed_noop"
+            state["completed_key"] = materialization_key
+            self.persist_session_state()
+            logger.info(
+                "MATERIALIZATION_SKIP reason=same_context_same_ownership_reload context=%s lease=%s",
+                context.identity, materialization_lease,
+            )
             return None, None
         if materialization_lease is None:
             deferred_key = f"{previous}:{target_campaign}:{context.identity}"
@@ -3942,7 +3972,7 @@ class DoomEternalContext(CommonContext):
             received_counts[item.item] = received_counts.get(item.item, 0) + 1
         materializable_ids = context_item_ids(context, received)
         allowed_replay_policies = {"replay_idempotent"}
-        if previous is None or cross_context:
+        if manual or previous is None or cross_context:
             allowed_replay_policies.add("replay_manual_only")
         special_mode = self._connected_slot_data.get("special_weapon")
         selected_special_ids = {
@@ -3992,7 +4022,7 @@ class DoomEternalContext(CommonContext):
             plan_ids, definitions, policies,
             reconciliation_slot_identity,
             evidence.epoch,
-            include_manual_replay=cross_context,
+            include_manual_replay=manual or cross_context or previous is None,
         )
         # Special ownership is one physical state: materialize highest selected intent.
         special_candidates = []
@@ -4091,7 +4121,55 @@ class DoomEternalContext(CommonContext):
                     support_delivery.description,
                 )
             )
-        raw_commands = tuple(plan.commands) + tuple(special_commands) + tuple(support_commands)
+        blood_punch_commands = []
+        if context.campaign != "Base" and 7770014 in received:
+            checked = getattr(self, "checked_locations", set())
+            bp_upgrades = [
+                (7770162, "perk/player/blood_punch/area_of_effect", "Doom Hunter Base"),
+                (7770290, "perk/player/blood_punch/ai_charge_rate", "Sentinel Prime"),
+                (7770411, "perk/player/blood_punch/max_charges", "Urdak"),
+            ]
+            for loc_id, perk_path, loc_name in bp_upgrades:
+                if loc_id in checked:
+                    blood_punch_commands.append(
+                        ReconciliationCommand(
+                            7770014,
+                            "Blood Punch",
+                            "replay_idempotent",
+                            loc_id,
+                            stable_spool_id(
+                                "reconcile", self.room_seed_name, self.team, self.slot,
+                                context.identity, "blood-punch-upgrade", loc_id,
+                            ),
+                            f"ai_ScriptCmdEnt player1 givePlayerPerk {perk_path}",
+                            f"Blood Punch upgrade from {loc_name}",
+                        )
+                    )
+
+        dash_commands = []
+        if context.campaign != "Base" and not slot_data.get("randomize_dash", False):
+            dash_commands.append(
+                ReconciliationCommand(
+                    7770015,
+                    "Dash",
+                    "replay_idempotent",
+                    0,
+                    stable_spool_id(
+                        "reconcile", self.room_seed_name, self.team, self.slot,
+                        context.identity, "unrandomized-dash",
+                    ),
+                    "give ability_dash",
+                    "Unrandomized Dash for TAG context",
+                )
+            )
+
+        raw_commands = (
+            tuple(plan.commands)
+            + tuple(special_commands)
+            + tuple(support_commands)
+            + tuple(blood_punch_commands)
+            + tuple(dash_commands)
+        )
         commands = []
         semantic_operations = set()
         for command in raw_commands:
@@ -4148,6 +4226,7 @@ class DoomEternalContext(CommonContext):
         )
         self.persist_session_state()
         state["completed_key"] = materialization_key
+        state["completed_persistent_key"] = persistent_reconciliation_key
         state.pop("pending_key", None)
         state.pop("pending_plan", None)
         self.persist_session_state()
@@ -5562,7 +5641,7 @@ class DoomEternalContext(CommonContext):
             parent = Path(source).parent.name
         except (TypeError, ValueError):
             parent = ""
-        if re.fullmatch(r"GAME-AUTOSAVE\d+", parent):
+        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", parent):
             return parent
         return self.active_save_slot or "<synthetic>"
 
@@ -5786,6 +5865,7 @@ class DoomEternalContext(CommonContext):
         self.selected_observation_slot = None
         self.select_save_observation_slot(slot_directory)
         self.checkpoint_death_by_save_slot.pop(slot_directory, None)
+        self.death_observation_load_epoch_by_save_slot.pop(slot_directory, None)
         self.previous_checkpoint_death = None
 
     def log_save_proof_rejected(
@@ -6070,7 +6150,7 @@ class DoomEternalContext(CommonContext):
             return fail_proof("provisional")
 
         target_slot = evidence_slot or (active.slot_directory if active else None) or candidate_slot
-        if not target_slot or not re.match(r"^GAME-AUTOSAVE[0-9]+$", target_slot):
+        if not target_slot or not re.match(r"^(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+$", target_slot):
             return fail_proof("invalid_evidence_slot")
 
         selected = primary_save_for_slot(target_slot)
@@ -6085,6 +6165,20 @@ class DoomEternalContext(CommonContext):
         if not active_map:
             return fail_proof("map_marker_unavailable")
         continue_target_map = canonical_map_name(details.get("mapName", ""))
+        marker_context = classify_runtime_context(active_map)
+        details_context = classify_runtime_context(continue_target_map)
+        cross_campaign_details_lag = bool(
+            marker_context is not None
+            and details_context is not None
+            and marker_context.campaign != details_context.campaign
+        )
+        if cross_campaign_details_lag:
+            self._record_context_evidence_rejection(
+                "cross_campaign_save_details_lag",
+                marker_context.identity,
+                details_context.identity,
+            )
+            continue_target_map = active_map
         mission_select_required = bool(
             active_map in MISSION_CHALLENGE_RUNTIME_MAPS
             and continue_target_map
@@ -6439,7 +6533,7 @@ class DoomEternalContext(CommonContext):
         self.save_slot_observations = {
             slot_directory: state
             for slot_directory, state in raw_save_observations.items()
-            if re.fullmatch(r"GAME-AUTOSAVE\d+", str(slot_directory))
+            if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", str(slot_directory))
             and isinstance(state, dict)
         }
         self.session_state["save_slot_observations"] = self.save_slot_observations
@@ -6810,13 +6904,13 @@ class DoomEternalContext(CommonContext):
         return True, None
 
     def _manual_reconcile_inventory_unlocked(self):
-        """Queue a policy-compiled manual replay without mutating AP receipt state."""
+        """Queue current-context persistent ownership without mutating AP receipt state."""
         evidence, error = self._reconciliation_eligibility(require_connection=True)
         if error:
             return None, error
         try:
-            plan = self._compile_reconciliation_plan_for_evidence(
-                evidence, include_manual_replay=True
+            plan, error = self._context_materialize_inventory(
+                evidence, trigger="manual", manual=True
             )
         except ValueError as error:
             log_item_event(
@@ -6827,9 +6921,14 @@ class DoomEternalContext(CommonContext):
                 state_key=getattr(self, "state_key", None),
             )
             return None, str(error)
+        if error:
+            return None, error
+        if plan is None:
+            return None, "current context materialization returned no plan"
 
         logger.info(
-            "RESYNC_START reason=manual epoch=%s boundary=%s",
+            "RESYNC_START reason=manual context=%s epoch=%s boundary=%s",
+            self.context_identity,
             evidence.epoch,
             self.items_processed,
         )
@@ -6848,9 +6947,6 @@ class DoomEternalContext(CommonContext):
             plan.skipped_never_replay,
             plan.skipped_manual_replay,
         )
-        queued, error = self.apply_reconciliation_plan(plan, reason="manual")
-        if not queued:
-            return None, error
         if not plan.commands:
             logger.info("RESYNC_NOOP reason=manual detail=no_commands")
         logger.info(
@@ -8387,22 +8483,47 @@ class DoomEternalContext(CommonContext):
             snapshot["mission_challenge_records"], selected
         )
         died = snapshot["checkpoint_death"]
-        previous = self.checkpoint_death_by_save_slot.get(selected.slot_directory)
-        if previous is None:
-            self.checkpoint_death_by_save_slot[selected.slot_directory] = died
+        slot_directory = selected.slot_directory
+        load_epoch = self.active_save_proof_load_epoch
+        previous = self.checkpoint_death_by_save_slot.get(slot_directory)
+        previous_load_epoch = self.death_observation_load_epoch_by_save_slot.get(slot_directory)
+        if previous is None or previous_load_epoch != load_epoch:
+            baseline_reason = "first_observation" if previous is None else "load_epoch_changed"
+            self.death_observation_load_epoch_by_save_slot[slot_directory] = load_epoch
+            self.checkpoint_death_by_save_slot[slot_directory] = died
             self.previous_checkpoint_death = died
             logger.info(
-                f"[Save] Monitoring {path} numCheckpointDeaths for DeathLink."
+                "[DeathLink] DETECTOR_BASELINE slot=%s path=%s load_epoch=%s "
+                "checkpoint_death=%s reason=%s",
+                slot_directory, path, load_epoch, died, baseline_reason,
             )
             return True
 
-        transitioned_to_dead = died and not previous
-        self.checkpoint_death_by_save_slot[selected.slot_directory] = died
+        if died != previous:
+            logger.info(
+                "[DeathLink] DETECTOR_CHANGE slot=%s path=%s load_epoch=%s "
+                "checkpoint_death=%s->%s",
+                slot_directory, path, load_epoch, previous, died,
+            )
+        self.checkpoint_death_by_save_slot[slot_directory] = died
         self.previous_checkpoint_death = died
-        if transitioned_to_dead:
-            self.transient_effect_manager.reset("death_boundary")
-            logger.info("[DeathLink] numCheckpointDeaths changed 0 -> 1.")
-            await self.report_local_death()
+        if not died or previous:
+            return True
+
+        self.transient_effect_manager.reset("death_boundary")
+        logger.info(
+            "[DeathLink] LOCAL_DEATH_OBSERVED slot=%s path=%s load_epoch=%s "
+            "checkpoint_death=0->1",
+            slot_directory, path, load_epoch,
+        )
+        if not self.death_link_enabled:
+            logger.info(
+                "[DeathLink] DETECTOR_SUPPRESSED slot=%s reason=death_link_disabled",
+                slot_directory,
+            )
+            return True
+        logger.info("[DeathLink] DETECTOR_ACCEPTED slot=%s", slot_directory)
+        await self.report_local_death()
         return True
 
     def observe_save_edges(self, observer_key, records, entries, slot_directory):
@@ -8805,10 +8926,12 @@ class DoomEternalContext(CommonContext):
         self.last_details_mtime = mtime
 
         if transitioned_to_dead:
+            logger.info("[DeathLink] LOCAL_DEATH_OBSERVED source=game.details path=%s", details_path)
             await self.report_local_death()
 
     async def report_local_death(self):
         if not self.death_link_enabled:
+            logger.info("[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=death_link_disabled")
             return
         receive_result = self.deathlink_receiver.confirm_local_death(time.monotonic())
         if receive_result.detail in {
@@ -8820,14 +8943,16 @@ class DoomEternalContext(CommonContext):
                 DEATHLINK_KILL_COALESCE_KEY, self.state_key
             )
             logger.info(
-                "[DeathLink] %s confirmed by death telemetry; linked echo suppressed (%s).",
-                (receive_result.event_id or "unknown")[:12],
+                "[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=%s event=%s",
                 receive_result.detail,
+                (receive_result.event_id or "unknown")[:12],
             )
             return
         player = self.auth or "The Doom Slayer"
         cause = random.choice(DEATHLINK_MESSAGES).format(player=player)
+        logger.info("[DeathLink] DEATHLINK_OUTBOUND_ACCEPTED cause=%s", cause)
         await self.send_death(cause)
+        logger.info("[DeathLink] DEATHLINK_SEND_CONFIRMED")
         emit_launcher_event(
             "deathlink",
             direction="sent",

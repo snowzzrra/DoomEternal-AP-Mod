@@ -590,8 +590,11 @@ from tools.release.room_payloads import (
     canonical_json, plan_map_local_states, resource_metadata, validate_room_payload_manifest,
     write_deterministic_zip, zip_directory,
 )
-from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from tools.maps.mission_complete_map_patcher import find_entity_block_bounds
+from tools.maps.mission_complete_map_patcher import (
+    patch_mission_complete_maps,
+    patch_generated_map_text,
+    find_entity_block_bounds,
+)
 from tools.maps.ap_map_generator import generate_context_marker_overlay
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.runtime.context_registry import dlc_contexts
@@ -768,28 +771,11 @@ for context in dlc_contexts():
     )
     if target.is_file():
         continue
-    runtime_document = json.loads(
-        (root / "content" / "maps" / map_key / "runtime.json").read_text(encoding="utf-8")
-    )
-    terminal_signals = [
-        record["signal"]
-        for record in runtime_document["locations"]
-        if record["strategy"] == "map_terminal"
-    ]
+    source = (root / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
     overlay_text = generate_context_marker_overlay(map_key, context.runtime_maps[0])
-    if terminal_signals:
-        source = (root / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
-        terminal_blocks = []
-        for signal in terminal_signals:
-            for owner_key in ("owner", "fallback_terminal_owner"):
-                owner = signal[owner_key]
-                bounds = find_entity_block_bounds(source, owner)
-                if bounds is None or source.count(f"entityDef {owner}") != 1:
-                    raise SystemExit(f"Context terminal owner is missing or duplicated: {map_key}/{owner}")
-                terminal_blocks.append(source[bounds[0]:bounds[1]])
-        overlay_text = "\n".join(terminal_blocks) + "\n" + overlay_text
+    full_text = source.rstrip() + "\n" + overlay_text.lstrip()
     entities = room_root / f"{map_key}-context.entities"
-    entities.write_text(overlay_text, encoding="utf-8", newline="")
+    entities.write_text(full_text, encoding="utf-8", newline="")
     target.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
 base_members = zip_directory(staged, resources / BASE_RESOURCE_NAME)

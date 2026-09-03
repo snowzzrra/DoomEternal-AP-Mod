@@ -27,7 +27,7 @@
     },
     "7770006": {
       "name": "BFG-9000",
-      "policy": "never_replay"
+      "policy": "replay_manual_only"
     },
     "7770007": {
       "name": "The Crucible",

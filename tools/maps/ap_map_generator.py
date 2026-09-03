@@ -2500,6 +2500,102 @@ def load_explicit_location_feedback(
     return explicit
 
 
+def apply_runtime_map_correctives(text: str, map_key: str) -> str:
+    """Apply focused runtime correctives for TAG maps."""
+    if map_key == "e4m1_rig":
+        bounds = find_entity_block_bounds(text, "slayer_gate_target_relay_explosion_delay1")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            new_targets = [
+                "slayer_gate_target_changelayer_slayergate_5",
+            ]
+            block = replace_targets_block(block, new_targets)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+        text = append_target_to_named_entity(
+            text,
+            "slayer_gate_target_relay_slayergate_3_chest_activate1",
+            "AP_CHECK_SLAYER_GATE_PROGRESS_SUPPORT_RUNE_1",
+        )
+
+        bounds = find_entity_block_bounds(text, "slayer_gate_target_show_1")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            block = replace_targets_block(block, [])
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+        bounds = find_entity_block_bounds(text, "slayer_gate_progress_support_rune_1")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            block = replace_targets_block(block, [])
+            block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+            block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+            if "flags = {" in block:
+                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+            else:
+                block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+    elif map_key == "e4m3_mcity":
+        bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            new_targets = [
+                "slayergate_target_changelayer_slayergate_4",
+            ]
+            block = replace_targets_block(block, new_targets)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+        text = append_target_to_named_entity(
+            text,
+            "slayergate_target_relay_destroy_nest",
+            "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY",
+        )
+
+        for show_name in (
+            "slayergate_target_show_rune_post_combat",
+            "slayergate_target_show_rune_from_cp",
+            "slayergate_target_show_rune_after_combat",
+        ):
+            bounds = find_entity_block_bounds(text, show_name)
+            if bounds:
+                block = text[bounds[0]:bounds[1]]
+                block = replace_targets_block(block, [])
+                text = text[:bounds[0]] + block + text[bounds[1]:]
+
+        bounds = find_entity_block_bounds(text, "slayergate_progress_support_rune_mcity")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            block = replace_targets_block(block, [])
+            block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+            block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+            if "flags = {" in block:
+                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+            else:
+                block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+    elif map_key == "e5m3_hell":
+        bounds = find_entity_block_bounds(text, "breach_wasteland_arena_encounter_manager_dlc2_2")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            block = block.replace('entity = "target_relay_escalation_2_done";', 'entity = "null";', 1)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+        bounds = find_entity_block_bounds(text, "breach_wasteland_arena_target_relay_esculation_second_wave_blocker_remove")
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            new_targets = [
+                "breach_wasteland_arena_target_remove_2",
+                "breach_wasteland_arena_target_remove_5",
+                "target_relay_escalation_2_done",
+            ]
+            block = replace_targets_block(block, new_targets)
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+    return text
+
+
 def generate_map(
     input_file,
     output_file,
@@ -3065,6 +3161,7 @@ def generate_map(
         + generate_ap_lifecycle_entity(map_key)
         + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
+    final_content = apply_runtime_map_correctives(final_content, map_key)
     validate_ap_lifecycle_entity(final_content, map_key)
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual and modified_count:

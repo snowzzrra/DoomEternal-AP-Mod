@@ -9,7 +9,7 @@ import json
 import re
 from pathlib import Path
 
-from doom_eap.content.content_catalog import discover_maps, load_content_catalog
+from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
     load_publisher_contracts,
@@ -370,7 +370,8 @@ def _patch_declared_terminal_text(
     publishers: tuple[PublisherContract, ...],
     text: str,
 ) -> tuple[str, dict]:
-    if text.count(f"entityDef {owner}") != 1:
+    owner_pattern = rf"\bentityDef\s+{re.escape(owner)}\s*\{{"
+    if len(re.findall(owner_pattern, text)) != 1:
         raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
     bounds = find_entity_block_bounds(text, owner)
     if bounds is None:
@@ -378,13 +379,34 @@ def _patch_declared_terminal_text(
     block = text[bounds[0]:bounds[1]]
     before = extract_target_names(block)
     compiled = compile_publishers(publishers)
+    native_owner = f"{owner}_ap_native_transition"
+    native_owner_pattern = rf"\bentityDef\s+{re.escape(native_owner)}\s*\{{"
+    if re.search(native_owner_pattern, text):
+        return text, {
+            "owner": owner,
+            "before_targets": before,
+            "after_targets": before,
+            "publishers": compiled["publishers"],
+            "preserved_native_targets": compiled["preserved_native_targets"],
+            "changed_lists": 0,
+        }
+    terminal_class = re.search(r'\bclass\s*=\s*"([^"]+)";', block)
+    is_level_transition = bool(terminal_class and terminal_class.group(1) == "idTarget_LevelTransition")
+    if not is_level_transition and before == compiled["owner_targets"]:
+        return text, {
+            "owner": owner,
+            "before_targets": before,
+            "after_targets": compiled["owner_targets"],
+            "publishers": compiled["publishers"],
+            "preserved_native_targets": compiled["preserved_native_targets"],
+            "changed_lists": 0,
+        }
     if compiled["preserved_native_targets"] != before:
         raise ValueError(
             f"{map_key}: preserved terminal targets differ from vanilla: "
             f"{compiled['preserved_native_targets']} != {before}"
         )
-    terminal_class = re.search(r'\bclass\s*=\s*"([^"]+)";', block)
-    if terminal_class and terminal_class.group(1) == "idTarget_LevelTransition":
+    if is_level_transition:
         native_owner = f"{owner}_ap_native_transition"
         native_delay = f"{owner}_ap_native_delay"
         native = block.replace(f"entityDef {owner}", f"entityDef {native_owner}", 1)
@@ -433,6 +455,8 @@ def patch_generated_map_text(map_key: str, text: str, mod_root: Path) -> tuple[s
             map_key, owner, tuple(grouped), text
         )
         audits[f"{map_key}:{owner}"] = audit
+    from tools.maps.ap_map_generator import apply_runtime_map_correctives
+    text = apply_runtime_map_correctives(text, map_key)
     return text, audits
 
 
@@ -466,7 +490,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         name: value for name, value in contracts.items()
         if isinstance(value, dict) and "map_key" in value
     }
-    unknown_keys = set(generated_maps) - {plan.key for plan in discover_maps(root)}
+    unknown_keys = set(generated_maps) - set(catalog.maps)
     if unknown_keys:
         raise ValueError(f"unknown generated map input: {sorted(unknown_keys)}")
     contract_items = {

@@ -83,27 +83,15 @@ REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
 \t\t}
 """
-HAMMER_SLAM_CHALLENGE_LOCATION_ID = 7770358
-HAMMER_SLAM_VIOLENCE_EVENT = "violenceevent/mission_challenge/die_by_the_sword_hammer_slam"
-HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH = (
-    "violenceevent/violenceevent/mission_challenge/die_by_the_sword_hammer_slam.decl"
+HAMMER_SLAM_DAMAGE_DECLS = (
+    "damage/melee/hammer_slam_aoe",
+    "damage/melee/hammer_slam_aoe_super",
 )
-HAMMER_SLAM_VIOLENCE_EVENT_SOURCE = """{
+HAMMER_SLAM_STAT_OVERRIDE_SOURCE = """{
 	edit = {
-		validInflictors = {
-			num = 1;
-			item[0] = "ENTITY_TYPE_PLAYER";
+		damageParms = {
+			killStat = "STAT_WEAPON_CRUCIBLE_KILL";
 		}
-		validVictims = {
-			num = 1;
-			item[0] = "ENTITY_TYPE_AI";
-		}
-		damageDecls = {
-			num = 2;
-			item[0] = "damage/melee/hammer_slam_aoe";
-			item[1] = "damage/melee/hammer_slam_aoe_super";
-		}
-		stat = "STAT_WEAPON_CRUCIBLE_KILL";
 	}
 }
 """
@@ -447,12 +435,6 @@ def _reward_free_override(entry: dict) -> str:
     edit = "\tedit = {\n"
     if source.count(edit) != 1:
         raise ValueError(f"{entry['name']}: edit block is missing or ambiguous")
-    hammer_event = f'violenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";'
-    if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-        if source.count(hammer_event) != 1:
-            raise ValueError(f"{entry['name']}: native Hammer observer owner drift")
-    elif hammer_event in source:
-        raise ValueError(f"{entry['name']}: Hammer observer escaped location scope")
     override = source.replace(edit, edit + REWARD_FIELD, 1)
     if "CURRENCY_PRAETOR_UPGRADE" in override or override.count("currencyToGive") != 1:
         raise ValueError(f"{entry['name']}: scoped reward suppression failed")
@@ -487,16 +469,17 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
     aggregate_target.write_text(aggregate_override, encoding="utf-8")
     written_paths.append(aggregate_target.as_posix())
-    event_target = (
-        mod_root
-        / CHILD_TARGET_OWNER
-        / "generated"
-        / "decls"
-        / HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH
-    )
-    event_target.parent.mkdir(parents=True, exist_ok=True)
-    event_target.write_text(HAMMER_SLAM_VIOLENCE_EVENT_SOURCE, encoding="utf-8")
-    written_paths.append(event_target.as_posix())
+    for relative in HAMMER_SLAM_DAMAGE_DECLS:
+        target = (
+            mod_root
+            / CHILD_TARGET_OWNER
+            / "generated"
+            / "decls"
+            / f"damage/{relative}.decl"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(HAMMER_SLAM_STAT_OVERRIDE_SOURCE, encoding="utf-8")
+        written_paths.append(target.as_posix())
     return {
         "child_owner": CHILD_TARGET_OWNER,
         "aggregate_owner": AGGREGATE_TARGET_OWNER,
@@ -511,13 +494,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
             "contracts": plan_b_contracts,
         },
         "hammer_slam_observer": {
-            "location_id": HAMMER_SLAM_CHALLENGE_LOCATION_ID,
-            "violence_event": HAMMER_SLAM_VIOLENCE_EVENT,
-            "decl_path": HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH,
-            "damage_decls": [
-                "damage/melee/hammer_slam_aoe",
-                "damage/melee/hammer_slam_aoe_super",
-            ],
+            "damage_decls": list(HAMMER_SLAM_DAMAGE_DECLS),
             "stat": "STAT_WEAPON_CRUCIBLE_KILL",
         },
         "written_paths": written_paths,

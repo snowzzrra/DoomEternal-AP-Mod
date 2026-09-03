@@ -649,27 +649,125 @@ class RoomCompiler:
         self.base_resource = base_resource
         self.payload_resource = payload_resource
         self.payload_manifest = load_room_payload_manifest(payload_manifest)
-        static_material = {
-            "schema": 1,
-            "base_mod_sha256": hashlib.sha256(base_resource.read_bytes()).hexdigest(),
-            "room_payloads_sha256": hashlib.sha256(payload_resource.read_bytes()).hexdigest(),
-            "room_payload_manifest_sha256": hashlib.sha256(
-                canonical_json(self.payload_manifest)
-            ).hexdigest(),
-            "conditional_members": {
-                self.ENHANCED_MELEE_PATH: hashlib.sha256(
-                    self.ENHANCED_MELEE_DECL
-                ).hexdigest(),
-                "fortress_battery_labels": hashlib.sha256(
-                    self.FORTRESS_BATTERY_LABEL_SPEC_PATH.read_bytes()
-                ).hexdigest(),
-            },
-        }
+        self.static_material = self.compute_static_content_material(
+            base_resource, payload_resource, self.payload_manifest
+        )
         self.static_content_digest = hashlib.sha256(
-            canonical_json(static_material)
+            canonical_json(self.static_material)
         ).hexdigest()
         self.decompressor = decompressor
         self.dependency_manager = dependency_manager
+        self.consent = consent
+
+    @classmethod
+    def compute_static_content_material(
+        cls,
+        base_resource: Path,
+        payload_resource: Path,
+        payload_manifest: object,
+    ) -> dict[str, object]:
+        from tools.release.room_payloads import canonical_json
+
+        def _file_sha(p: Path) -> str | None:
+            return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+
+        tag_decl_hashes: dict[str, str | None] = {}
+        tag_dir = ROOT / "data" / "devinv_sources" / "tag"
+        if tag_dir.is_dir():
+            for p in sorted(tag_dir.glob("*.decl")):
+                tag_decl_hashes[p.name] = _file_sha(p)
+
+        catalog_hashes: dict[str, str | None] = {}
+        catalog_dir = ROOT / "content" / "catalog"
+        if catalog_dir.is_dir():
+            for p in sorted(catalog_dir.glob("**/*.json")):
+                catalog_hashes[p.relative_to(catalog_dir).as_posix()] = _file_sha(p)
+
+        vanillamaps_hashes: dict[str, str | None] = {}
+        vanilla_dir = ROOT / "vanillamaps"
+        for m in (
+            "e4m1_rig.map", "e4m2_swamp.map", "e4m3_mcity.map",
+            "e5m1_spear.map", "e5m2_earth.map", "e5m3_hell.map",
+            "e5m4_boss.map", "hub.map"
+        ):
+            vp = vanilla_dir / m
+            if vp.is_file():
+                vanillamaps_hashes[m] = _file_sha(vp)
+
+        return {
+            "schema": 2,
+            "base_mod_sha256": _file_sha(base_resource),
+            "room_payloads_sha256": _file_sha(payload_resource),
+            "room_payload_manifest_sha256": hashlib.sha256(
+                canonical_json(payload_manifest)
+            ).hexdigest(),
+            "conditional_members": {
+                cls.ENHANCED_MELEE_PATH: hashlib.sha256(
+                    cls.ENHANCED_MELEE_DECL
+                ).hexdigest(),
+                "fortress_battery_labels": _file_sha(cls.FORTRESS_BATTERY_LABEL_SPEC_PATH),
+            },
+            "compiler_sources": {
+                "launcher_core": _file_sha(ROOT / "doom_eap" / "launcher" / "launcher_core.py"),
+                "devinv_builder": _file_sha(ROOT / "tools" / "decls" / "devinv_builder.py"),
+                "mission_complete_map_patcher": _file_sha(ROOT / "tools" / "maps" / "mission_complete_map_patcher.py"),
+                "ap_map_generator": _file_sha(ROOT / "tools" / "maps" / "ap_map_generator.py"),
+                "notification_formatting": _file_sha(ROOT / "tools" / "maps" / "notification_formatting.py"),
+                "context_registry": _file_sha(ROOT / "doom_eap" / "runtime" / "context_registry.py"),
+                "content_catalog": _file_sha(ROOT / "doom_eap" / "content" / "content_catalog.py"),
+            },
+            "devinv_sources": {
+                "tag_chain": _file_sha(ROOT / "data" / "devinv_sources" / "tag_dev_inv_chain.json"),
+                "map_sources": _file_sha(ROOT / "data" / "map_sources.json"),
+                "devinv_start_mapping": _file_sha(ROOT / "data" / "devinv_start_mapping.json"),
+                "tag_decls": tag_decl_hashes,
+            },
+            "content_catalog_data": catalog_hashes,
+            "vanillamaps": vanillamaps_hashes,
+        }
+
+    @classmethod
+    def compute_static_content_digest(
+        cls,
+        base_resource: Path,
+        payload_resource: Path,
+        payload_manifest: object,
+    ) -> str:
+        from tools.release.room_payloads import canonical_json
+        material = cls.compute_static_content_material(
+            base_resource, payload_resource, payload_manifest
+        )
+        return hashlib.sha256(canonical_json(material)).hexdigest()
+
+    @staticmethod
+    def validate_cached_package(package_path: Path, manifest: SeedManifest) -> bool:
+        """Verify that an existing generated room ZIP matches manifest and content identity."""
+        if not package_path.is_file():
+            return False
+        try:
+            with zipfile.ZipFile(package_path) as package:
+                names = set(package.namelist())
+                if "seed_manifest.json" not in names or "seed_receipt.json" not in names:
+                    return False
+                manifest_doc = json.loads(package.read("seed_manifest.json"))
+                receipt_doc = json.loads(package.read("seed_receipt.json"))
+            if not isinstance(manifest_doc, dict) or not isinstance(receipt_doc, dict):
+                return False
+            if manifest_doc.get("manifest_hash") != manifest.manifest_hash:
+                return False
+            if manifest.static_content_digest and manifest_doc.get("static_content_digest") != manifest.static_content_digest:
+                return False
+            if manifest_doc.get("seed_name") != manifest.seed_name:
+                return False
+            if manifest_doc.get("slot") != manifest.slot:
+                return False
+            if manifest_doc.get("team") != manifest.team:
+                return False
+            if receipt_doc.get("manifest_hash") != manifest.manifest_hash:
+                return False
+            return True
+        except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile):
+            return False
         self.consent = consent
 
     def _apply_placement_strings(self, assembled: dict[str, bytes], placements: tuple) -> None:
@@ -1057,16 +1155,18 @@ class RoomCompiler:
                 raise ValueError("idFileDeCompressor produced no encoded overlay")
             return compressed.read_bytes()
 
-    def build(self, manifest: SeedManifest, output_root: Path) -> Path:
+    def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
         placements = manifest.require_complete_placements()
         if manifest.static_content_digest != self.static_content_digest:
             raise ValueError("room static content identity drifted")
+        output_root.mkdir(parents=True, exist_ok=True)
+        destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
+        if not force and self.validate_cached_package(destination, manifest):
+            return destination
         assembled, selected = assemble_room_files(
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
-        output_root.mkdir(parents=True, exist_ok=True)
-        destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
         # JSON round-trip so tuple fields match what the archive stores.
         seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(manifest.options)
@@ -1095,19 +1195,30 @@ class RoomCompiler:
                     manifest.options.get("starting_weapon"),
                 ).items()
             })
+            from doom_eap.content.content_catalog import load_content_catalog
             from doom_eap.runtime.context_registry import dlc_contexts
             from tools.maps.ap_map_generator import generate_context_marker_overlay
+            from tools.maps.mission_complete_map_patcher import patch_generated_map_text
+
+            catalog = load_content_catalog()
             for context in dlc_contexts():
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
                     raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
                 overlay_member = self.payload_manifest["context_targets"].get(context.identity)
                 if not isinstance(overlay_member, str):
                     raise ValueError(f"DLC context lacks room payload target: {context.identity}")
+                map_key = context.map_keys[0]
+                spec = catalog.maps.get(map_key)
+                if spec is None:
+                    raise ValueError(f"DLC context map spec missing: {map_key}")
                 compiled_content = assembled.get(overlay_member)
                 if compiled_content is not None:
-                    continue
+                    compiled_text = self._decompress_entities_text(compiled_content, overlay_member)
+                    if "idWorldspawn" in compiled_text and "ap_publisher_" not in compiled_text:
+                        continue
+                vanilla_source = (ROOT / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
                 overlay_text = generate_context_marker_overlay(
-                    context.map_keys[0], context.runtime_maps[0]
+                    map_key, context.runtime_maps[0]
                 )
                 import re
                 marker_names = re.findall(r"\bentityDef\s+(\S+)\s*\{", overlay_text)
@@ -1115,13 +1226,10 @@ class RoomCompiler:
                     raise ValueError(
                         f"DLC context marker entity names are duplicated: {context.identity}"
                     )
+                full_text = vanilla_source.rstrip() + "\n" + overlay_text.lstrip()
                 assembled[overlay_member] = self._compress_entities_text(
-                    overlay_text
+                    full_text
                 )
-            from doom_eap.content.content_catalog import load_content_catalog
-            from tools.maps.mission_complete_map_patcher import patch_generated_map_text
-
-            catalog = load_content_catalog()
             for context in dlc_contexts():
                 map_key = context.map_keys[0]
                 spec = catalog.maps.get(map_key)

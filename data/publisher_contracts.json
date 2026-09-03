@@ -575,11 +575,11 @@
         {
           "filename": "ap_mission_dark_lord_defeated.txt",
           "marker": "AP_MISSION_EVENT_DARK_LORD_DEFEATED",
-          "owner": "stage_3_target_campaign_complete_1",
+          "owner": "stage_3_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
-          "owner": "stage_3_target_campaign_complete_1",
+          "owner": "stage_3_target_level_transition_1",
           "strategy": "terminal_owner"
         }
       ]

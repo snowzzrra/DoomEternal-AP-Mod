@@ -11,18 +11,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Suppress TAG Slayer Gate softlock targets"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.5.0: bind final completion publisher to proven native terminal"
     }
   ],
   "asset_package_contract_sha256": "ea45016b71eec3ade3e8b530ce34628823d561d2193bcc8b6da85a586bfc0d20",
-  "byte_sha256": "2c3bdd6fa6a837e0100a6cd4c70952436c13027f089d214262493723918e9de1",
+  "byte_sha256": "c04e55c4bc17cc218fd6f6c355b46bd996a5bb04966bf09dd5fd8420b8daf073",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 780,
-    "byte_size": 13992248,
+    "byte_size": 13991070,
     "classes": 12049,
     "entity_count": 12063,
     "layers": 1984,
-    "targets": 11418,
+    "targets": 11416,
     "transforms": 26004,
     "unique_entity_names": 12050
   },
@@ -48,5 +56,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "e9f31c3054b55560228a9a71699970cf04e2cbb5f0f18968ebc911c56623b936",
-  "semantic_sha256": "2901bf3c8f9342a2505f92d5a5608c4ba21ff9ada36b8937c2cea9dbfd8ace1f"
+  "semantic_sha256": "5a5dcf37bdc40d9b446fe9a2d5f54de030eabae86bc0606574f2035810f4d5e9"
 }

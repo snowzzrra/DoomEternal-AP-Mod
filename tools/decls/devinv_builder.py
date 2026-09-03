@@ -884,6 +884,149 @@ def output_path_for_map(mod_root: Path, registry_path: Path, map_key: str) -> Pa
     return mod_root / Path(resource_path).stem / SOURCE_PATH
 
 
+TAG_FORBIDDEN_MASTERIES = frozenset({
+    "perk/player/weapons/shotgun/pop_rocket_more_bombs",
+    "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
+    "perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades",
+    "perk/player/weapons/heavy_cannon/burst_detonate_mastery",
+    "perk/player/weapons/plasma_rifle/secondary_aoe_mastery",
+    "perk/player/weapons/plasma_rifle/secondary_microwave_mastery",
+    "perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal",
+    "perk/player/weapons/rocket_launcher/detonate_mastery",
+    "perk/player/weapons/rocket_launcher/lockon_mastery",
+    "perk/player/weapons/double_barrel/meat_hook_mastery",
+    "perk/player/weapons/gauss_cannon/ballista_mastery",
+    "perk/player/weapons/gauss_cannon/destroyer_charge_levels",
+    "perk/player/weapons/chaingun/turret_mastery",
+    "perk/player/weapons/chaingun/energy_shell_mastery",
+})
+
+TAG_REQUIRED_NORMAL_MOD_UPGRADES = frozenset({
+    "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
+    "perk/player/weapons/shotgun/pop_rocket_faster_recharge",
+    "perk/player/weapons/shotgun/pop_rocket_larger_explosion",
+    "perk/player/weapons/shotgun/secondary_full_auto_faster_recovery",
+    "perk/player/weapons/shotgun/secondary_full_auto_faster_charge",
+    "perk/player/weapons/shotgun/secondary_full_auto_increased_movement_speed",
+    "perk/player/weapons/heavy_cannon/bolt_action_faster_movement",
+    "perk/player/weapons/heavy_cannon/bolt_action_faster_reload",
+    "perk/player/weapons/heavy_cannon/burst_detonate_faster_charge",
+    "perk/player/weapons/heavy_cannon/burst_detonate_primary_charge",
+    "perk/player/weapons/heavy_cannon/burst_detonate_faster_recharge",
+    "perk/player/weapons/plasma_rifle/secondary_aoe_no_primary_delay",
+    "perk/player/weapons/plasma_rifle/secondary_aoe_faster_charge",
+    "perk/player/weapons/plasma_rifle/secondary_microwave_faster_charge",
+    "perk/player/weapons/plasma_rifle/secondary_microwave_max_range",
+    "perk/player/weapons/rocket_launcher/detonate_proximity_flare",
+    "perk/player/weapons/rocket_launcher/detonate_concussive",
+    "perk/player/weapons/rocket_launcher/lockon_faster_recovery",
+    "perk/player/weapons/rocket_launcher/lockon_decrease_lock_time",
+    "perk/player/weapons/double_barrel/meat_hook_faster_reload",
+    "perk/player/weapons/double_barrel/default_faster_reload",
+    "perk/player/weapons/gauss_cannon/ballista_movement",
+    "perk/player/weapons/gauss_cannon/ballista_larger_explosion",
+    "perk/player/weapons/gauss_cannon/destroyer_charge_levels_aoe",
+    "perk/player/weapons/gauss_cannon/destroyer_faster_charge_and_recovery",
+    "perk/player/weapons/chaingun/turret_faster_equip",
+    "perk/player/weapons/chaingun/turret_faster_movement",
+    "perk/player/weapons/chaingun/energy_shell_faster_recharge",
+    "perk/player/weapons/chaingun/energy_shell_dash_smash",
+})
+
+
+TAG_FORBIDDEN_AP_ITEMS = frozenset({
+    "ability_dash",
+    "weapon/player/shotgun",
+    "weapon/player/heavy_cannon",
+    "weapon/player/plasma_rifle",
+    "weapon/player/rocket_launcher",
+    "weapon/player/double_barrel",
+    "weapon/player/gauss_rifle",
+    "weapon/player/chaingun",
+    "weapon/player/bfg",
+    "weapon/player/unmaykr",
+    "weapon/player/chainsaw",
+    "weapon/player/equipment_flame_belch",
+    "weapon/player/equipment_flame_belch_right",
+    "equipmentlauncher/equipmentlauncherleft",
+    "throwable/player/frag_grenade",
+    "throwable/player/ice_bomb",
+    "ammo/sharedammopool/bfg",
+})
+
+TAG_FORBIDDEN_AP_PERKS = frozenset({
+    "perk/player/blood_punch/base",
+    "perk/player/blood_punch/area_of_effect",
+    "perk/player/blood_punch/ai_charge_rate",
+    "perk/player/blood_punch/max_charges",
+    "perk/player/weapons/shotgun/pop_rocket",
+    "perk/player/weapons/shotgun/secondary_full_auto",
+    "perk/player/weapons/heavy_cannon/bolt_action",
+    "perk/player/weapons/heavy_cannon/burst_detonate",
+    "perk/player/weapons/plasma_rifle/secondary_aoe",
+    "perk/player/weapons/plasma_rifle/secondary_microwave",
+    "perk/player/weapons/rocket_launcher/detonate",
+    "perk/player/weapons/rocket_launcher/lock_on",
+    "perk/player/weapons/gauss_cannon/ballista",
+    "perk/player/weapons/gauss_cannon/destroyer",
+    "perk/player/weapons/chaingun/turret",
+    "perk/player/weapons/chaingun/energy_shell",
+})
+
+
+def validate_tag_devinv_source(source: str) -> None:
+    """Validate that TAG DevInv loadout contains normal mod upgrades and NO masteries."""
+    for marker in (
+        "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
+        "STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED",
+        "clearAllBeforeApply = true;",
+    ):
+        if marker not in source:
+            raise ValueError(f"TAG DevInvLoadout missing required marker: {marker}")
+    if re.search(r"^[ \t]*inherit\s*=", source, re.MULTILINE):
+        raise ValueError("TAG DevInv output retained inheritance")
+    _assert_codex_dossier(source)
+
+    match = _STARTING_INVENTORY_RE.search(source)
+    if match is None:
+        raise ValueError("TAG DevInvLoadout startingInventory block is missing")
+    num_match = re.search(r"\t\t\tnum = (?P<num>\d+);", match.group("body"))
+    item_matches = list(_ITEM_BLOCK_RE.finditer(match.group("body")))
+    if num_match is None:
+        raise ValueError("TAG DevInvLoadout startingInventory num is missing")
+    declared_num = int(num_match.group("num"))
+    indices = [int(m.group("index")) for m in item_matches]
+    if indices != list(range(declared_num)):
+        raise ValueError("TAG DevInvLoadout startingInventory indices are not contiguous")
+
+    perk_paths = set()
+    item_paths = set()
+    for m in item_matches:
+        body = m.group("body")
+        perk_m = _PERK_PATH_RE.search(body)
+        if perk_m:
+            perk_paths.add(perk_m.group("path"))
+        item_m = _ITEM_PATH_RE.search(body)
+        if item_m:
+            item_paths.add(item_m.group("path"))
+
+    forbidden_items = item_paths & TAG_FORBIDDEN_AP_ITEMS
+    if forbidden_items:
+        raise ValueError(f"TAG DevInvLoadout contains forbidden AP items: {forbidden_items}")
+
+    forbidden_perks = perk_paths & (TAG_FORBIDDEN_MASTERIES | TAG_FORBIDDEN_AP_PERKS)
+    if forbidden_perks:
+        raise ValueError(f"TAG DevInvLoadout contains forbidden AP perks: {forbidden_perks}")
+
+    for p in perk_paths:
+        if p.startswith("perk/player/argent/") or p.startswith("perk/player/runes/") or p.startswith("perk/player/suit/"):
+            raise ValueError(f"TAG DevInvLoadout contains forbidden AP perk: {p}")
+
+    missing_upgrades = TAG_REQUIRED_NORMAL_MOD_UPGRADES - perk_paths
+    if missing_upgrades:
+        raise ValueError(f"TAG DevInvLoadout missing required mod upgrades: {missing_upgrades}")
+
+
 def build_tag_devinv_overrides(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
@@ -891,11 +1034,13 @@ def build_tag_devinv_overrides(
     """Build exact TAG archive overrides from project-owned declaration inputs."""
     manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
     result: dict[str, str] = {}
-    baseline = build_devinv_loadout(starting_inventory, starting_weapon)
-    baseline_inventory = _STARTING_INVENTORY_RE.search(baseline)
-    baseline_currency = _CURRENCY_BLOCK_RE.search(baseline)
+    tag_root_record = manifest["declarations"]["e4m1_rig"]
+    tag_root_path = Path(__file__).resolve().parents[2] / tag_root_record["source"]
+    tag_root_source = tag_root_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    baseline_inventory = _STARTING_INVENTORY_ANY_RE.search(tag_root_source)
+    baseline_currency = _CURRENCY_BLOCK_RE.search(tag_root_source)
     if baseline_inventory is None or baseline_currency is None:
-        raise ValueError("generated Base DevInv lacks replaceable loadout blocks")
+        raise ValueError("TAG root DevInv lacks replaceable loadout blocks")
     baseline_inventory_block = (
         "\t\tstartingInventory = {\n"
         + baseline_inventory.group("body")
@@ -974,7 +1119,7 @@ def build_tag_devinv_overrides(
         override = _INHERIT_DECL_RE.sub("", override)
         if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
             raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
-        validate_devinv_source(override, starting_inventory, starting_weapon)
+        validate_tag_devinv_source(override)
         archive = Path(record["archive"])
         map_key = record["map_key"]
         result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override

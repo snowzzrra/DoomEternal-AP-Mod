@@ -27,10 +27,8 @@ from tools.decls.mission_challenge_decl_builder import (
     _challenge_paths,
     _plan_b_registration_override,
     _level_blocks,
-    HAMMER_SLAM_CHALLENGE_LOCATION_ID,
-    HAMMER_SLAM_VIOLENCE_EVENT,
-    HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH,
-    HAMMER_SLAM_VIOLENCE_EVENT_SOURCE,
+    HAMMER_SLAM_DAMAGE_DECLS,
+    HAMMER_SLAM_STAT_OVERRIDE_SOURCE,
 )
 
 
@@ -126,16 +124,6 @@ def validate_overrides_from_files(
                     errors.append(
                         f"Override missing completion_stat {expected_stat}: {assert_path}"
                     )
-                event_reference = f'violenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";'
-                if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-                    if content.count(event_reference) != 1:
-                        errors.append(
-                            f"Hammer challenge override missing scoped violenceEvent: {assert_path}"
-                        )
-                elif event_reference in content:
-                    errors.append(
-                        f"Hammer violenceEvent escaped location scope: {assert_path}"
-                    )
                 break
 
     # Check for missing paths
@@ -189,11 +177,6 @@ def validate_overrides_from_mod_root(
                     f"Aggregate main.decl found outside {AGGREGATE_TARGET_OWNER}: "
                     f"{candidate.name}: {rel}"
                 )
-            if rel == HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH and candidate.name != CHILD_TARGET_OWNER:
-                errors.append(
-                    f"Hammer violenceEvent found outside {CHILD_TARGET_OWNER}: "
-                    f"{candidate.name}: {rel}"
-                )
             if rel.startswith("warehouseofflinecontainer/"):
                 errors.append(
                     f"Forbidden warehouse aggregate override found in {candidate.name}: {rel}"
@@ -214,14 +197,15 @@ def validate_overrides_from_mod_root(
         )
         return errors
 
-    event_path = child_decl_root / HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH
-    if not event_path.is_file():
-        errors.append(
-            f"Missing scoped Hammer violenceEvent: {CHILD_TARGET_OWNER}: "
-            f"{HAMMER_SLAM_VIOLENCE_EVENT_DECL_PATH}"
-        )
-    elif event_path.read_text(encoding="utf-8").replace("\r\n", "\n") != HAMMER_SLAM_VIOLENCE_EVENT_SOURCE:
-        errors.append("Scoped Hammer violenceEvent differs from canonical source")
+    for damage_decl in HAMMER_SLAM_DAMAGE_DECLS:
+        damage_path = child_decl_root / f"damage/{damage_decl}.decl"
+        if not damage_path.is_file():
+            errors.append(
+                f"Missing Hammer damage-stat override: {CHILD_TARGET_OWNER}: "
+                f"damage/{damage_decl}.decl"
+            )
+        elif damage_path.read_text(encoding="utf-8").replace("\r\n", "\n") != HAMMER_SLAM_STAT_OVERRIDE_SOURCE:
+            errors.append(f"Hammer damage-stat override drift: {damage_decl}")
 
     aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
     expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
@@ -362,13 +346,6 @@ def validate_vanilla_source_equivalence(
             "\tedit = {\n\t\tcurrencyToGive = {\n\t\t\tnum = 0;\n\t\t}\n",
             1,
         )
-        if entry["location_id"] == HAMMER_SLAM_CHALLENGE_LOCATION_ID:
-            if expected_override.count(
-                f'violenceEvent = "{HAMMER_SLAM_VIOLENCE_EVENT}";'
-            ) != 1:
-                errors.append(
-                    f"Vanilla child source missing scoped Hammer violenceEvent for {rel_path}"
-                )
         if override_content != expected_override:
             errors.append(
                 f"Vanilla child source template drift for {rel_path} "

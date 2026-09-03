@@ -10,8 +10,7 @@
       "signal": {
         "kind": "map_terminal",
         "runtime_map": "game/dlc2/e5m4_boss/e5m4_boss",
-        "owner": "stage_3_target_campaign_complete_1",
-        "fallback_terminal_owner": "stage_3_target_level_transition_1"
+        "owner": "stage_3_target_level_transition_1"
       },
       "order": 100,
       "category": "mission_complete"

@@ -820,7 +820,30 @@ def _item_state_summary(
     return result
 
 
-def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
+def _expected_room_compiler_digest(application_dir: Path | None = None) -> str | None:
+    try:
+        from .launcher_core import RoomCompiler, ROOT
+        candidates = []
+        if application_dir:
+            candidates.append(Path(application_dir) / "resources")
+        candidates.append(ROOT / "build" / "release" / "client" / "resources")
+        candidates.append(ROOT / "resources")
+        for res_dir in candidates:
+            base = res_dir / "base_mod.zip"
+            payload = res_dir / "room_payloads.zip"
+            manifest = res_dir / "room_payload_manifest.json"
+            if base.is_file() and payload.is_file() and manifest.is_file():
+                compiler = RoomCompiler(base, payload, manifest)
+                return compiler.static_content_digest
+    except Exception:
+        pass
+    return None
+
+
+def _room_install_receipt_summary(
+    state_dir: Path | None,
+    application_dir: Path | None = None,
+) -> dict[str, object]:
     path = state_dir / "launcher_setup.json" if state_dir else None
     result: dict[str, object] = {
         "status": "unavailable",
@@ -842,7 +865,7 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
         result["reason"] = "malformed"
         return result
     for key in (
-        "schema", "manifest_hash", "staged_mod", "staged_sha256",
+        "schema", "manifest_hash", "static_content_digest", "staged_mod", "staged_sha256",
         "room_zip_sha256", "generated_mod", "generated_sha256", "mods_path",
         "injector_version", "injector_command", "adapter_command", "injector_exit_code",
         "required_resources", "post_install_verification",
@@ -850,6 +873,16 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
     ):
         if key in document:
             result[key] = document[key]
+    expected_digest = _expected_room_compiler_digest(application_dir)
+    recorded_digest = str(document.get("static_content_digest", "")) if document.get("static_content_digest") else ""
+    if expected_digest:
+        result["expected_static_content_digest"] = expected_digest
+        result["receipt_static_content_digest"] = recorded_digest
+        result["content_identity_match"] = bool(recorded_digest and recorded_digest == expected_digest)
+        if not recorded_digest or recorded_digest != expected_digest:
+            result["content_status"] = "stale_content_identity"
+    else:
+        result["content_identity_match"] = True
     staged = document.get("staged_mod")
     expected = document.get("staged_sha256")
     if isinstance(staged, str) and staged and isinstance(expected, str) and expected:
@@ -859,7 +892,8 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
             try:
                 actual = hashlib.sha256(staged_path.read_bytes()).hexdigest()
                 result["staged_sha256_actual"] = actual
-                result["hash_match"] = actual == expected
+                content_fresh = not expected_digest or recorded_digest == expected_digest
+                result["hash_match"] = (actual == expected) and content_fresh
             except OSError:
                 result["hash_match"] = False
     result["support_evidence"] = {
@@ -880,9 +914,10 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
             try:
                 generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
                 result["generated_sha256_actual"] = generated_actual
-                result["generated_hash_match"] = generated_actual == generated_expected
+                content_fresh = not expected_digest or recorded_digest == expected_digest
+                result["generated_hash_match"] = (generated_actual == generated_expected) and content_fresh
                 if isinstance(expected, str) and expected and "staged_sha256_actual" in result:
-                    result["generated_stage_match"] = generated_actual == result["staged_sha256_actual"]
+                    result["generated_stage_match"] = (generated_actual == result["staged_sha256_actual"]) and content_fresh
             except OSError:
                 result["generated_hash_match"] = False
     result["status"] = "available"
@@ -892,6 +927,8 @@ def _room_install_receipt_summary(state_dir: Path | None) -> dict[str, object]:
 def _verify_linux_receipt(
     receipt: Mapping[str, object],
     config: Mapping[str, object],
+    *,
+    application_dir: Path | None = None,
 ) -> dict[str, object]:
     if os.name == "nt":
         return {"state": "not_applicable"}
@@ -908,6 +945,11 @@ def _verify_linux_receipt(
     generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
     if not (staged_actual == staged_expected == room_zip_expected == generated_expected == generated_actual):
         raise ValueError("generated and staged room ZIP hashes differ")
+    expected_digest = _expected_room_compiler_digest(application_dir)
+    if expected_digest:
+        recorded_digest = str(receipt.get("static_content_digest", ""))
+        if not recorded_digest or recorded_digest != expected_digest:
+            raise ValueError(f"installed package static content is stale ({recorded_digest or 'missing'} != {expected_digest})")
     raw_command = receipt.get("injector_command", receipt.get("adapter_command", ()))
     raw_resources = receipt.get("required_resources", ())
     expected_mods = str((root / "Mods").resolve())
@@ -1159,9 +1201,11 @@ def build_support_diagnostics(
                 idfile_diagnostics.update({"status": "unreadable", "error": str(error)})
             else:
                 idfile_diagnostics.update(cache_details)
+    app_val = config.get("application_dir") or getattr(paths, "application_dir", None)
+    app_dir = Path(app_val).expanduser() if app_val else None
     return {
         "item_state": _item_state_summary(config, config_path),
-        "room_install_receipt": _room_install_receipt_summary(state_dir),
+        "room_install_receipt": _room_install_receipt_summary(state_dir, app_dir),
         "game_link": _support_game_link_diagnostics(
             config, config_path, paths, processes, runtime, meathook, live=live
         ),
@@ -1298,6 +1342,10 @@ class LauncherDoctor:
         value = getattr(self.paths, "state_dir", None)
         return Path(value).expanduser().resolve() if value else None
 
+    def _application_dir(self) -> Path | None:
+        value = self.config.get("application_dir") or getattr(self.paths, "application_dir", None)
+        return Path(str(value)).expanduser().resolve() if value else None
+
     def repair_actions(self) -> tuple[RepairAction, ...]:
         """Offer actions only when launcher receipt proves ownership."""
         actions: list[RepairAction] = []
@@ -1416,7 +1464,7 @@ class LauncherDoctor:
                 return tuple(actions)
             if os.name != "nt" and adapter_state == "applied":
                 try:
-                    _verify_linux_receipt(receipt, self.config)
+                    _verify_linux_receipt(receipt, self.config, application_dir=self._application_dir())
                 except Exception as error:
                     actions.append(RepairAction(
                         "reinstall_room_mod", "Repair unverified Linux room mod",
@@ -1534,7 +1582,7 @@ class LauncherDoctor:
                 if adapter_state == "applied":
                     if os.name != "nt":
                         try:
-                            verification = _verify_linux_receipt(receipt, self.config)
+                            verification = _verify_linux_receipt(receipt, self.config, application_dir=self._application_dir())
                         except Exception as error:
                             details = {
                                 "adapter_state": adapter_state,

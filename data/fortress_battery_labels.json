@@ -16,7 +16,7 @@
     {"location_id": 7770166, "source_entity": "sentinel_battery_room_progress_mod_bot_4", "position": [25.068308, -96.836645, -5.170000], "orientation": [[-0.940380, 0.340124, 0.0], [-0.340124, -0.940380, 0.0], [0.0, 0.0, 1.0]]},
     {"location_id": 7770167, "source_entity": "progress_praetor_token_3", "position": [-42.530094, 5.642442, -19.100000], "orientation": [[0.999848, 0.017452, 0.0], [-0.017452, 0.999848, 0.0], [0.0, 0.0, 1.0]]},
     {"location_id": 7770168, "source_entity": "progress_praetor_token_4", "position": [43.660009, 5.394831, -24.920000], "orientation": [[-0.999972, -0.007435, 0.0], [0.007435, -0.999972, 0.0], [0.0, 0.0, 1.0]]},
-    {"location_id": 7770169, "source_entity": "progress_cheats_all_mastered_runes_1", "position": [95.691095, 55.634940, -9.1], "orientation": [[-0.707107, 0.707107, 0.0], [-0.707107, -0.707107, 0.0], [0.0, 0.0, 1.0]]},
+    {"location_id": 7770169, "source_entity": "progress_cheats_all_mastered_runes_1", "position": [95.691095, 55.634940, -9.1], "orientation": [[-0.700378, -0.713772, 0.0], [0.713772, -0.700378, 0.0], [0.0, 0.0, 1.0]]},
     {"location_id": 7770171, "source_entity": "progress_cheats_fully_upgraded_progression_wheel_final", "position": [0.446376, -47.550023, 15.990000], "orientation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]},
     {"location_id": 7770253, "source_entity": "interact_hub_2_battery_station_1", "position": [93.549779, 57.736074, -9.100000], "orientation": [[-0.700378, -0.713772, 0.0], [0.713772, -0.700378, 0.0], [0.0, 0.0, 1.0]]},
     {"location_id": 7770254, "source_entity": "interact_hub_2_battery_station_2", "position": [-91.864982, 85.127503, -1.800000], "orientation": [[0.667277, -0.744810, 0.0], [0.744810, 0.667277, 0.0], [0.0, 0.0, 1.0]]},

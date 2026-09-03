@@ -111,10 +111,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.0: align All Runes Cheat Code label orientation with adjacent Praetor Suit label."
     }
   ],
   "asset_package_contract_sha256": "bc7fdbb28182c177af6af7496795d6804b0c7ace5c8f8e4745bf7f157a8ac258",
-  "byte_sha256": "ac1bb500516dbfbe5d4693ea30350a0a47a2048c17cf126515dae895d5c3a93c",
+  "byte_sha256": "22dfe73e8c39a32962ab945266c77b0dff6d295a565f2af49c7968aad5311312",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 140,
@@ -153,6 +157,6 @@
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "a0a0eb9a090692f4a73dce31928b730807679b53b0db60f272e4efa2c2dc69f9",
-  "semantic_sha256": "9e38be09dbdb8ed2c48a159c5c48b831560d0e915dc45a4bcb0978704890c0da"
+  "scripted_contract_sha256": "4c79337df3eff30c3e8b07755cc07cd6af7581b65727a2bbe1759fdca4d16b78",
+  "semantic_sha256": "fb5fef63262c2308b8870310d405c3dac39175209072a785d99ce269dad7e61e"
 }

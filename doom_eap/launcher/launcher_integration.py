@@ -209,6 +209,7 @@ class IntegratedSetupRecord:
     injector_exit_code: int | None = None
     required_resources: tuple[dict[str, object], ...] = ()
     post_install_verification: str = ""
+    static_content_digest: str = ""
 
 
 @dataclass(frozen=True)
@@ -441,18 +442,16 @@ class IntegratedLaunchWorkflow:
                 reason="room mod was intentionally uninstalled",
             )
         if recorded_manifest != manifest.manifest_hash:
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed manifest belongs to another room")
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed manifest belongs to another room or build")
+        recorded_static_digest = str(receipt.get("static_content_digest", ""))
+        if recorded_static_digest and recorded_static_digest != manifest.static_content_digest:
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed package static content is out of date")
         if not staged.is_file():
             return InstallState("update_required", manifest.manifest_hash, reason="recorded installed package is missing")
         if hashlib.sha256(staged.read_bytes()).hexdigest() != expected_sha:
             return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed package hash does not match record")
-        try:
-            with zipfile.ZipFile(staged) as package:
-                package_manifest = json.loads(package.read("seed_manifest.json"))
-            if package_manifest.get("manifest_hash") != manifest.manifest_hash:
-                raise ValueError("package manifest hash does not match current room")
-        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, f"installed package validation failed: {error}")
+        if not RoomCompiler.validate_cached_package(staged, manifest):
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, "installed package embedded content identity does not match current room")
         if adapter_state != "applied":
             return InstallState("install_needed", manifest.manifest_hash, reason=f"previous install state is {adapter_state or 'unknown'}")
 
@@ -461,20 +460,25 @@ class IntegratedLaunchWorkflow:
         room_zip_sha = str(receipt.get("room_zip_sha256", expected_sha))
         if not generated_path.is_file() or not generated_sha:
             return InstallState(
-                "already_installed", manifest.manifest_hash, str(staged), steam_option,
-                readiness="blocked", readiness_reason="install record lacks generated room ZIP evidence",
+                "update_required", manifest.manifest_hash, str(staged), steam_option,
+                reason="install record lacks generated room ZIP evidence",
             )
         try:
             generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
         except OSError as error:
             return InstallState(
-                "already_installed", manifest.manifest_hash, str(staged), steam_option,
-                readiness="blocked", readiness_reason=f"generated room ZIP evidence unavailable: {error}",
+                "update_required", manifest.manifest_hash, str(staged), steam_option,
+                reason=f"generated room ZIP evidence unavailable: {error}",
             )
         if generated_actual != generated_sha or expected_sha != room_zip_sha or generated_sha != expected_sha:
             return InstallState(
-                "already_installed", manifest.manifest_hash, str(staged), steam_option,
-                readiness="blocked", readiness_reason="generated and staged room ZIP hashes differ",
+                "update_required", manifest.manifest_hash, str(staged), steam_option,
+                reason="generated and staged room ZIP hashes differ",
+            )
+        if not RoomCompiler.validate_cached_package(generated_path, manifest):
+            return InstallState(
+                "update_required", manifest.manifest_hash, str(staged), steam_option,
+                reason="generated cache embedded content identity does not match current room",
             )
 
         # Room package is verified installed. Now check live runtime prerequisites.
@@ -727,6 +731,7 @@ class IntegratedLaunchWorkflow:
             ),
             required_resources=required_resources,
             post_install_verification=str(receipt.get("post_install_verification", "")),
+            static_content_digest=str(receipt.get("static_content_digest", manifest.static_content_digest)),
         )
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
@@ -887,6 +892,7 @@ class IntegratedLaunchWorkflow:
             post_install_verification=str(
                 adapter.details.get("post_install_verification", "") if adapter.details else ""
             ),
+            static_content_digest=manifest.static_content_digest,
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != record.staged_sha256:
@@ -896,6 +902,8 @@ class IntegratedLaunchWorkflow:
                 installed_manifest = json.loads(package.read("seed_manifest.json"))
             if installed_manifest.get("manifest_hash") != manifest.manifest_hash:
                 raise ValueError("room identity differs")
+            if manifest.static_content_digest and installed_manifest.get("static_content_digest") != manifest.static_content_digest:
+                raise ValueError("room content identity differs")
         except (KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
             raise RuntimeError(f"post-install room mod validation failed: {error}") from error
         payload = {
@@ -904,6 +912,7 @@ class IntegratedLaunchWorkflow:
             "seed_name": manifest.seed_name,
             "team": manifest.team,
             "slot": manifest.slot,
+            "static_content_digest": manifest.static_content_digest,
         }
         temporary = receipt_path.with_suffix(".tmp")
         temporary.write_text(
@@ -1200,6 +1209,7 @@ class IntegratedLaunchWorkflow:
             mods_path=str((game_root / "Mods").resolve()),
             required_resources=required_resources,
             post_install_verification=str(verification.get("state", "")),
+            static_content_digest=manifest.static_content_digest,
         )
 
         payload = {
@@ -1208,6 +1218,7 @@ class IntegratedLaunchWorkflow:
             "seed_name": manifest.seed_name,
             "team": manifest.team,
             "slot": manifest.slot,
+            "static_content_digest": manifest.static_content_digest,
         }
         temporary = receipt_path.with_suffix(".tmp")
         temporary.write_text(

@@ -7,18 +7,22 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Fix Immora Wave 2 progression target"
     }
   ],
   "asset_package_contract_sha256": "4220cf0685ec649c969a0bc2d4d54387ffa58ba5fc74050c6c436dff842c0bc6",
-  "byte_sha256": "9a154b1c05ea53e32b0a8291c28eb9db729b91769486dd4b5e7638bae8c2a511",
+  "byte_sha256": "ee4a67b6c8bdb112b413c091c2d9be9e5ff6eac5bbd3c7b2c19aef461d8b711f",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 127,
-    "byte_size": 7338418,
+    "byte_size": 7338440,
     "classes": 6079,
     "entity_count": 6085,
     "layers": 955,
-    "targets": 8779,
+    "targets": 8780,
     "transforms": 11980,
     "unique_entity_names": 6080
   },
@@ -41,5 +45,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "916fd576fd7192181ef9ab486543805d5915238cc199a0ec398f54131abf826b",
-  "semantic_sha256": "6c9f071b1075e2ed2532b9a89c4a1e37f7cb77460bc2d6967e8af8113651d20f"
+  "semantic_sha256": "9e66ea0b89e2686a759582ebe4163d9672ea574964b1f68ef9af0b9d8503eb53"
 }
