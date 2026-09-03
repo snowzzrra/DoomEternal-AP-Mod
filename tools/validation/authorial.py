@@ -22,7 +22,11 @@ IDENTITY_FIELDS = {
     "content_revision": str,
     "content_schema_version": int,
     "game": str,
+    "manifest_schema_version": int,
     "release_version": str,
+    "session_mod_contract_revision": int,
+    "slot_data_revision": str,
+    "slot_data_schema_version": int,
 }
 
 
@@ -57,6 +61,8 @@ def check_authorial() -> dict[str, int]:
         value = identity[field]
         if not isinstance(value, expected_type) or isinstance(value, bool):
             raise ValueError(f"data/content_identity.json: invalid {field}")
+        if expected_type is int and value <= 0:
+            raise ValueError(f"data/content_identity.json: {field} must be positive")
     if identity["game"] != "DOOM Eternal":
         raise ValueError("data/content_identity.json: invalid game identity")
     if identity["apworld_revision"] != "0.5.0":
@@ -65,6 +71,8 @@ def check_authorial() -> dict[str, int]:
         raise ValueError("data/content_identity.json: content and release revisions diverge")
     if identity["release_version"] != "0.5.0":
         raise ValueError("data/content_identity.json: invalid release revision")
+    if not identity["slot_data_revision"]:
+        raise ValueError("data/content_identity.json: slot_data_revision must not be empty")
 
     campaign_goal = read_json(ROOT / "data/campaign_goal_contract.json")
     if campaign_goal.get("release") != identity["release_version"]:

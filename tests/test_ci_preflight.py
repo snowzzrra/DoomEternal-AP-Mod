@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -348,6 +349,107 @@ class TestCIPreflight(unittest.TestCase):
             )
             self.assertEqual(res.returncode, 0, f"Subprocess failed:\nstdout: {res.stdout}\nstderr: {res.stderr}")
             self.assertIn("ALL CHECKS PASSED", res.stdout)
+
+    def test_authorial_contract_accepts_valid_identity(self):
+        from tools.validation.authorial import check_authorial
+        counts = check_authorial()
+        self.assertIn("json_files", counts)
+        self.assertIn("items", counts)
+        self.assertIn("locations", counts)
+        self.assertIn("maps", counts)
+
+    def test_authorial_contract_rejects_divergent_keys(self):
+        from tools.validation.authorial import IDENTITY_FIELDS, read_json
+        real_id = read_json(REPO_ROOT / "data/content_identity.json")
+
+        missing_key_id = dict(real_id)
+        del missing_key_id["slot_data_revision"]
+        self.assertNotEqual(set(missing_key_id), set(IDENTITY_FIELDS))
+
+        unknown_key_id = dict(real_id)
+        unknown_key_id["unexpected_future_key"] = 123
+        self.assertNotEqual(set(unknown_key_id), set(IDENTITY_FIELDS))
+
+    def test_workflow_has_no_github_release_build(self):
+        wf_path = REPO_ROOT / ".github/workflows/cross-platform-build.yml"
+        doc = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
+        preflight_steps = doc["jobs"]["preflight"]["steps"]
+        step_runs = [s.get("run", "") for s in preflight_steps]
+
+        for run_text in step_runs:
+            self.assertNotIn("release --build", run_text, "release --build must NOT run on clean GitHub runner")
+
+    def test_workflow_validates_frozen_room_resources(self):
+        wf_path = REPO_ROOT / ".github/workflows/cross-platform-build.yml"
+        doc = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
+        preflight_steps = doc["jobs"]["preflight"]["steps"]
+        step_runs = [s.get("run", "") for s in preflight_steps]
+
+        self.assertTrue(
+            any("tools.release.prebuilt_room_resources" in run_text for run_text in step_runs),
+            "Workflow preflight must invoke tools.release.prebuilt_room_resources",
+        )
+
+    def test_prebuilt_room_resources_canonical_bundle(self):
+        from tools.release.prebuilt_room_resources import (
+            get_frozen_bundle_dir,
+            validate_prebuilt_room_resources,
+        )
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        self.assertTrue(bundle_dir.is_dir())
+        result = validate_prebuilt_room_resources(bundle_dir, repo_root=REPO_ROOT)
+        self.assertEqual(result["status"], "PASS")
+
+    def test_prebuilt_room_resources_fails_on_checksum_mismatch(self):
+        from tools.release.prebuilt_room_resources import (
+            get_frozen_bundle_dir,
+            validate_prebuilt_room_resources,
+        )
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_bundle = Path(tmpdir)
+            for p in bundle_dir.iterdir():
+                tmp_bundle.joinpath(p.name).write_bytes(p.read_bytes())
+            (tmp_bundle / "base_mod.zip").write_bytes(b"corrupted binary payload")
+
+            with self.assertRaises(ValueError) as ctx:
+                validate_prebuilt_room_resources(tmp_bundle, repo_root=REPO_ROOT)
+            self.assertIn("Checksum mismatch", str(ctx.exception))
+
+    def test_prebuilt_room_resources_fails_on_stale_fingerprint(self):
+        from tools.release.prebuilt_room_resources import (
+            get_frozen_bundle_dir,
+            validate_prebuilt_room_resources,
+        )
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_bundle = Path(tmpdir)
+            for p in bundle_dir.iterdir():
+                tmp_bundle.joinpath(p.name).write_bytes(p.read_bytes())
+            prov_path = tmp_bundle / "ROOM_RESOURCES_PROVENANCE.json"
+            doc = json.loads(prov_path.read_text(encoding="utf-8"))
+            doc["room_resource_input_fingerprint"] = "0" * 64
+            prov_path.write_text(json.dumps(doc), encoding="utf-8")
+
+            with self.assertRaises(ValueError) as ctx:
+                validate_prebuilt_room_resources(tmp_bundle, repo_root=REPO_ROOT)
+            self.assertIn("STALE ROOM RESOURCES", str(ctx.exception))
+
+    def test_room_resource_fingerprint_sensitivity(self):
+        from tools.release.prebuilt_room_resources import (
+            compute_room_resource_input_fingerprint,
+            DEPENDENCY_DIRS,
+            DEPENDENCY_FILES,
+        )
+        fp_baseline, _ = compute_room_resource_input_fingerprint(REPO_ROOT)
+        self.assertEqual(len(fp_baseline), 64)
+
+        # Confirm non-resource files are excluded from dependency sets
+        self.assertNotIn("docs", DEPENDENCY_DIRS)
+        self.assertNotIn(".github", DEPENDENCY_DIRS)
+        self.assertNotIn("tests", DEPENDENCY_DIRS)
+        self.assertNotIn(".github/workflows/ci.yml", DEPENDENCY_FILES)
+        self.assertNotIn("README.md", DEPENDENCY_FILES)
 
 
 if __name__ == "__main__":

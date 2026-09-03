@@ -62,7 +62,7 @@ jobs:
           echo "Version: ${{ inputs.version_label }}"
 
   preflight:
-    name: Full Release Gates & Room Resources
+    name: Portable Release Preflight & Verified Room Resources
     needs: resolve-metadata
     runs-on: ubuntu-latest
     steps:
@@ -87,20 +87,10 @@ jobs:
           cache: 'pip'
           cache-dependency-path: DoomEternal-AP-Mod/requirements-launcher.txt
 
-      - name: Install System Toolchains & Libraries
+      - name: Install Qt Runtime Libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 \
-            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 \
-            wine64-tools clang
-
-      - name: Install Verified idFileDeCompressor Tool
-        run: |
-          mkdir -p Tools
-          curl -sSL -o Tools/idFileDeCompressor https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/idFileDeCompressor
-          echo "8bd14670fdb5a47533c5a59e9b6e1e32eaa3f06ce8b7ad2b4a8df520348b9ab8  Tools/idFileDeCompressor" | sha256sum -c -
-          chmod +x Tools/idFileDeCompressor
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1
 
       - name: Install Python Dependencies
         run: |
@@ -125,14 +115,22 @@ jobs:
           cd DoomEternal-AP-Mod
           python -m tools.release.ci_preflight --archipelago-source ../Archipelago --repo-root .
 
-      - name: Canonical Release Pipeline (fast, package-preflight, release --build)
+      - name: Validate Authorial Content
         run: |
           cd DoomEternal-AP-Mod
-          export PYTHON=$(which python3)
-          export ARCHIPELAGO_PYTHON=$(which python3)
-          ./scripts/pipeline.sh fast
-          ./scripts/pipeline.sh package-preflight
-          ./scripts/pipeline.sh release --build
+          python -m tools.validation.authorial --check-authorial
+
+      - name: Verify APWorld Projections & Content Synchronization
+        run: |
+          cd DoomEternal-AP-Mod
+          python -m tools.content.compile_options_schema --check
+          python -m tools.content.compile_start_inventory_catalog --check
+          python -m tools.content.compile_content_catalog --check --source-only
+
+      - name: Validate and Export Hermetic Prebuilt Room Resources
+        run: |
+          cd DoomEternal-AP-Mod
+          python -m tools.release.prebuilt_room_resources --export-dir build/release/client/resources
 
       - name: Upload Room Resources Artifact
         uses: actions/upload-artifact@v4

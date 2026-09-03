@@ -71,6 +71,7 @@ def check_workflow_contract(repo_root: Path) -> None:
         "build-linux-launcher",
         "build-windows-launcher",
         "consolidate-handoff",
+        "assemble-release",
     }
     if jobs != expected_jobs:
         raise RuntimeError(f"Unexpected workflow job set: missing={expected_jobs - jobs}, extra={jobs - expected_jobs}")
@@ -162,7 +163,7 @@ def check_workflow_contract(repo_root: Path) -> None:
 
     print("  [OK] Workflow trigger is workflow_dispatch only")
     print("  [OK] Workflow permissions are contents: read")
-    print("  [OK] All 7 expected jobs present and properly sequenced")
+    print("  [OK] All 8 expected jobs present and properly sequenced")
     print("  [OK] Single-owner verify_launcher_runtime invariant verified (jobs.preflight only)")
     print("  [OK] Single-owner Ruff static analysis invariant verified (requirements-ci only)")
     print("  [OK] Module invocation python -m tools.release.build_launcher verified")

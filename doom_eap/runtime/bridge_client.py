@@ -315,6 +315,7 @@ DEATHLINK_MESSAGES = (
     "{player} was sent back to the Fortress.",
     "{player} picked a fight with Hell and lost.",
     "{player}'s ripping and tearing privileges were revoked.",
+    "{player} didn't control the buttons they pressed.",
 )
 LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
 ARCHIPELAGO_EVENT_SCHEMA = 1
