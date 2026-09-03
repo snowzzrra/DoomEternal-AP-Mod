@@ -26,7 +26,7 @@ class TestCIPreflight(unittest.TestCase):
         # Permissions are read-only
         self.assertEqual(doc.get("permissions"), {"contents": "read"})
 
-        # Expected jobs (all 7 jobs)
+        # Expected jobs (all 8 jobs)
         expected_jobs = {
             "resolve-metadata",
             "preflight",
@@ -35,6 +35,7 @@ class TestCIPreflight(unittest.TestCase):
             "build-linux-launcher",
             "build-windows-launcher",
             "consolidate-handoff",
+            "assemble-release",
         }
         self.assertEqual(set(doc["jobs"].keys()), expected_jobs)
 
@@ -169,6 +170,7 @@ class TestCIPreflight(unittest.TestCase):
             mei_dir = tmp_root / "_MEI12345"
             (mei_dir / "data").mkdir(parents=True)
             shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
+            shutil.copytree(REPO_ROOT / "content", mei_dir / "content")
 
             try:
                 sys.frozen = True
@@ -250,6 +252,7 @@ class TestCIPreflight(unittest.TestCase):
             mei_dir = tmp_root / "_MEI_PKG"
             (mei_dir / "data").mkdir(parents=True)
             shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
+            shutil.copytree(REPO_ROOT / "content", mei_dir / "content")
 
             try:
                 sys.frozen = True

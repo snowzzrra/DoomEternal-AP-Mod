@@ -79,22 +79,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and add ARC Complex Slayer Gate Complete 7770489"
     }
   ],
   "asset_package_contract_sha256": "2e588bf2d2a403e3911f57fa3f5d765568586850f45ed4af54657508382e33cb",
-  "byte_sha256": "7e599f91f9c485eb1ae9ad97686b5ed6c05fda72e96e62cc81b137097dc9cffd",
+  "byte_sha256": "ebcc24937e55beae0a575f0575ff611c3da1d4aa5dc82c0b1c27004bc4aa1ad0",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 126,
-    "byte_size": 28843593,
-    "classes": 19205,
-    "entity_count": 19209,
+    "byte_size": 28837175,
+    "classes": 19198,
+    "entity_count": 19202,
     "layers": 3694,
-    "targets": 96241,
+    "targets": 96244,
     "transforms": 40952,
-    "unique_entity_names": 19206
+    "unique_entity_names": 19199
   },
-  "manifest_sha256": "b23240f1ecc1d2cadcd0d8f25fb803acb9666afa470383c26bc9e87ae39e85f1",
+  "manifest_sha256": "a80b2c373a3fbce1325c474c55a6878e003f76a09586100ecc601212915cde6f",
   "map_key": "e2m2_base",
   "physical_ap_ids": [
     7770211,
@@ -130,11 +134,12 @@
     7770249,
     7770250,
     7770251,
-    7770252
+    7770252,
+    7770489
   ],
   "publisher_contract_sha256": "e4ad5ba9a17917e66aaf094c317043a584ab26ee663cc4301702dda89ed80cd9",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "e1038fe9a3bf6cbee2566d626d3761b5e543097d7e5c89ea783cdeb14d0b3438",
-  "semantic_sha256": "49bae345750862a7fb03b98157d1952957eb5842dcab88183d238582655dfdb7"
+  "scripted_contract_sha256": "55b573f52883bed875e87730ad03dfbce3e7942c346b99c489c99671fa4df8a1",
+  "semantic_sha256": "92b88a08d319a00a68841356803a1fad5132d3dda6bdf9da29e3108db0760e75"
 }

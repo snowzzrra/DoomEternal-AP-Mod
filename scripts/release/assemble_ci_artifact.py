@@ -505,7 +505,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Assemble public Linux and Windows release ZIPs from a GitHub Actions build handoff artifact and canonical room resources."
     )
-    parser.add_argument("handoff_artifact", type=Path, help="Path to handoff ZIP or extracted directory")
+    parser.add_argument("handoff_artifact", nargs="?", type=Path, default=None, help="Path to handoff ZIP or extracted directory")
+    parser.add_argument("--handoff", type=Path, default=None, help="Path to handoff ZIP or extracted directory")
     parser.add_argument("--room-resources-dir", type=Path, default=None, help="Path to precompiled room compiler resources")
     parser.add_argument("--version", type=str, default=None, help="Expected release version label")
     parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "build/final-release", help="Output directory")
@@ -515,7 +516,10 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    handoff_path = args.handoff_artifact.resolve()
+    handoff_arg = args.handoff or args.handoff_artifact
+    if handoff_arg is None:
+        parser.error("handoff artifact path must be provided as positional argument or via --handoff")
+    handoff_path = handoff_arg.resolve()
     if not handoff_path.exists():
         print(f"Error: Handoff artifact path not found: {handoff_path}", file=sys.stderr)
         return 1

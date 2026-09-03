@@ -87,22 +87,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and add Mars Core Slayer Gate Complete 7770490"
     }
   ],
   "asset_package_contract_sha256": "44f245d18af308a34e53a687aff0079bad3ada1dcec8663deb79a77b29501511",
-  "byte_sha256": "370f884023ecce0fc5823618af16daccba8c4f923da96f73b199cbd20af3ccc9",
+  "byte_sha256": "2e887e7f057b034db4947b6e04426bfbc2f3e489edb306dd34ce4aac021b2b67",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17097353,
-    "classes": 13813,
-    "entity_count": 13851,
+    "byte_size": 17090730,
+    "classes": 13806,
+    "entity_count": 13844,
     "layers": 7007,
-    "targets": 11407,
+    "targets": 11410,
     "transforms": 30255,
-    "unique_entity_names": 13814
+    "unique_entity_names": 13807
   },
-  "manifest_sha256": "afa9d15c03935a57a2ac6fd52c2a316dcc0ea1b5839d8a4085e2978a5acdd900",
+  "manifest_sha256": "7734014d86c1c4946b560241d9bfcbe8650f9b97fdb2c078bdab13e487a6086c",
   "map_key": "e2m3_core",
   "physical_ap_ids": [
     7770256,
@@ -132,11 +136,12 @@
     7770280,
     7770281,
     7770283,
-    7770284
+    7770284,
+    7770490
   ],
   "publisher_contract_sha256": "5b68333007af515c681165cecb856f15f1ff792282c1e229911eb52faa82bb23",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "292c89855344215df7fee2052953041ff63e8500fbe3a37b09a85428b660e71f",
-  "semantic_sha256": "29347c58c68e770d71e120cf6fd94a7a9cf5d61356cf2d4086eb722da8adf71a"
+  "scripted_contract_sha256": "c5328178b208e37dde69238adf7520d7d84c6c0582a64402bf1581d1782f8b0d",
+  "semantic_sha256": "7414d95735605bcd04065e1eeef80b6722be60bd97a793b3425dc92bd3f5da13"
 }

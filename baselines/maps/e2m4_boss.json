@@ -91,20 +91,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "reduce Extra Life trigger hitbox in Switch-Opened Wall Alcove to prevent through-wall collection"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and update Sentinel Prime publisher contracts"
     }
   ],
   "asset_package_contract_sha256": "9d979ded13ff77aa6d138e3324720a596b9a725e4a1806bd62b2c56e7ca7bbbd",
-  "byte_sha256": "6d89a66aaef01f046a895f98657e4bbaf4cef010f8b85b24058a974cfc6f1630",
+  "byte_sha256": "f59b702da8788f222b2df0b3f696a4faac493f59a5b3ea7f98c742cc2e134844",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 11,
-    "byte_size": 2752559,
-    "classes": 2921,
-    "entity_count": 2923,
+    "byte_size": 2744531,
+    "classes": 2911,
+    "entity_count": 2913,
     "layers": 125,
     "targets": 1480,
     "transforms": 5366,
-    "unique_entity_names": 2922
+    "unique_entity_names": 2912
   },
   "manifest_sha256": "331eb16dd9de476d90246045ef49dfdb6d7b9d2fb94cbbd4ecbcad66ace9e1e0",
   "map_key": "e2m4_boss",
@@ -122,11 +126,11 @@
     7770301,
     7770302
   ],
-  "publisher_contract_sha256": "086777a1394aa13d4782726594626e06dc0882bf48c3d33d7a2c40a127ba3e7c",
+  "publisher_contract_sha256": "c5462911d98adc0b79e5ec6b114f387efb03c51f33a5222a935e7b71e3a5659b",
   "runtime_location_ids": [
     7770290
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "29abb56feab4beb8ef5f9e881730b20e9978a55d031bbeb54ec51966775e2ee0",
-  "semantic_sha256": "710039889f023be3bedcffe0af073b27d44c4c2f6df730420e80e380c0bd16f0"
+  "semantic_sha256": "36e5e63084c4e771d9c73fec716eabb35d1107b076caae074d27dd205c8edc3c"
 }

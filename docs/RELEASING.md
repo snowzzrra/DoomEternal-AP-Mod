@@ -6,16 +6,15 @@ This document describes the procedure for producing official cross-platform rele
 
 ## 1. Overview & Architecture
 
-Release artifact generation is split into two phases:
+Release packages are generated through GitHub Actions:
 
-1. **GitHub Actions Build Handoff**: Compiles platform-native binaries (Linux standalone launcher on `ubuntu-latest`, Windows standalone launcher on `windows-latest`, and Windows-native `client/ap_client.exe` with MinGW/WIDL/Clang) and bundles `doometernal.apworld`.
-   - Output: A single internal developer handoff artifact (`DoomEAP-crossplatform-build-<version>-<short-mod-sha>`).
-   - GitHub Actions performs compilation only; it never creates tags or GitHub Releases.
-
-2. **Local Release Assembly**: A local, zero-compilation assembly script (`scripts/release/assemble_ci_artifact.py`) consumes the downloaded build handoff artifact and packages repository-owned assets into exactly two public release archives:
-   - `DoomEternalArchipelago-<version>-linux-x86_64.zip`
-   - `DoomEternalArchipelago-<version>-windows-x86_64.zip`
+1. **GitHub Actions Build & Release Assembly**: A single workflow run (`.github/workflows/cross-platform-build.yml`) validates the entire codebase, compiles platform binaries, bundles canonical room compiler resources, and deterministically packages both ready-to-test public archives:
+   - `DoomEternalArchipelago-<version>-windows-x86_64.zip` (standalone Windows launcher, native `client/ap_client.exe`, precompiled canonical room resources, APWorld, manifests, content, data)
+   - `DoomEternalArchipelago-<version>-linux-x86_64.zip` (standalone Linux launcher, native client, precompiled canonical room resources, APWorld, manifests, content, data)
    - `SHA256SUMS.txt`
+   - Developer handoff bundle (`DoomEAP-crossplatform-build-<version>-<short-mod-sha>`) containing intermediate binaries and room resources for audit.
+
+2. **Offline Local Assembly (Fallback / Reproducibility)**: Maintainers can also assemble or inspect release archives locally using `scripts/release/assemble_ci_artifact.py` against a downloaded handoff bundle and local canonical room resources (`build/release/client/resources/`).
 
 ---
 
@@ -37,33 +36,44 @@ Release artifact generation is split into two phases:
 2. Select **DOOM Eternal AP Cross-Platform Build**.
 3. Click **Run workflow** (`workflow_dispatch`).
 4. Provide the exact inputs:
-   - `mod_ref`: Full commit SHA or branch for `DoomEternal-AP-Mod`.
-   - `apworld_ref`: Full commit SHA or branch for `Archipelago` / `DoomEternal-AP-World`.
-   - `version_label`: Target version string (e.g., `v0.4.0-beta.4`).
-5. Run the workflow and wait for all jobs (`resolve-metadata`, `build-apworld`, `build-native-support`, `build-linux-launcher`, `build-windows-launcher`, `consolidate-handoff`) to complete successfully.
+   - `mod_ref`: Full commit SHA or branch for `DoomEternal-AP-Mod` (e.g., `main`).
+   - `apworld_ref`: Full commit SHA or branch for `Archipelago` / `DoomEternal-AP-World` (e.g., `doom_eternal`).
+   - `version_label`: Target version string (e.g., `v0.5.0`).
+5. Run the workflow. It executes all validation gates (`fast`, `package-preflight`, `release --build`), generates canonical room compiler resources, builds the native client, standalone Linux and Windows launchers, and assembles the public release packages.
 
-### Step 3: Download Build Handoff Artifact
-1. From the completed workflow run summary, download the single generated artifact:
-   `DoomEAP-crossplatform-build-<version>-<short-mod-sha>.zip`
+### Step 3: Download Public Release Artifacts
+1. From the completed workflow run summary, download the generated public release artifact:
+   `DoomEAP-release-<version>-<short-mod-sha>`
+2. The downloaded archive contains:
+   - `DoomEternalArchipelago-<version>-windows-x86_64.zip`
+   - `DoomEternalArchipelago-<version>-linux-x86_64.zip`
+   - `SHA256SUMS.txt`
 
-### Step 4: Assemble Public Release Archives Locally
-1. Run the local no-compile assembly script against the downloaded zip:
-   ```bash
-   python3 scripts/release/assemble_ci_artifact.py \
-       /path/to/DoomEAP-crossplatform-build-<version>-<short-mod-sha>.zip \
-       --version <version> \
-       --output-dir build/final-release
-   ```
-2. The script validates:
-   - `BUILD-MANIFEST.json` and `SHA256SUMS.txt` integrity in the handoff.
-   - ELF and PE magic bytes for platform executables.
-   - Package parity across shared runtime assets (`doometernal.apworld`, `client/ap_client.exe`, schemas, templates, data).
-   - Single top-level `DoomEternalArchipelago/` root in both output archives.
+### Step 4: Closed Testing & Distribution
+1. Extract or send `DoomEternalArchipelago-<version>-windows-x86_64.zip` directly to Windows testers.
+2. Testers run `DoomEternalArchipelagoLauncher.exe` directly; no local compilation or map processing is needed.
 
 ### Step 5: Publish Release
-1. The resulting public artifacts in `build/final-release/` are:
-   - `DoomEternalArchipelago-<version>-linux-x86_64.zip`
-   - `DoomEternalArchipelago-<version>-windows-x86_64.zip`
-   - `SHA256SUMS.txt`
-2. Test the generated packages as needed.
-3. Manually create the GitHub Release on `DoomEternal-AP-Mod` and upload the two platform ZIP files and `SHA256SUMS.txt`.
+1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.5.0`.
+2. Upload `DoomEternalArchipelago-<version>-windows-x86_64.zip`, `DoomEternalArchipelago-<version>-linux-x86_64.zip`, and `SHA256SUMS.txt`.
+
+---
+
+## 3. Local Assembly Tool (Reproducibility & Offline Validation)
+
+If assembling packages locally from a downloaded developer handoff artifact (`DoomEAP-crossplatform-build-*`):
+
+```bash
+python3 scripts/release/assemble_ci_artifact.py \
+    --handoff /path/to/DoomEAP-crossplatform-build-<version>-<short-mod-sha> \
+    --room-resources-dir build/release/client/resources \
+    --version v0.5.0 \
+    --output-dir build/final-release
+```
+
+The script validates:
+- `BUILD-MANIFEST.json` and `SHA256SUMS.txt` integrity in the handoff.
+- ELF and PE magic bytes for platform executables.
+- Canonical room resources (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`).
+- Package parity across shared runtime assets (`doometernal.apworld`, `client/ap_client.exe`, schemas, templates, data).
+- Single top-level `DoomEternalArchipelago/` root in both output archives.

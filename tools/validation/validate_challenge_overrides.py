@@ -245,9 +245,10 @@ def validate_overrides_from_mod_root(
             entry["location_id"] for entry in registry["mission_challenges"]
             if entry["mission_key"] == contract["mission_key"]
         )
-        if tuple(aggregate["signal"]["children"]) != real_ids or len(real_ids) != 3:
+        expected_count = 2 if contract["mission_key"] == "e3m2_hell" else 3
+        if tuple(aggregate["signal"]["children"]) != real_ids or len(real_ids) != expected_count:
             errors.append(
-                f"{contract['name']} AP aggregate children include anything except three real challenges"
+                f"{contract['name']} AP aggregate children include anything except {expected_count} real challenges"
             )
 
     if re.search(

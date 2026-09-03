@@ -377,18 +377,15 @@ def main() -> int:
             base_end_checked,
             False,
         ))
-        tag_gate_ids = {
+        all_gate_ids = {
             location_id
             for location_id, name in bridge.DOOM_LOCATION_NAMES.items()
-            if name in {
-                "UAC Atlantica Facility - Slayer Gate Complete",
-                "The Holt - Slayer Gate Complete",
-            }
+            if name.endswith(" - Slayer Gate Complete")
         }
-        if tag_gate_ids != {7770425, 7770452}:
-            raise AssertionError(f"TAG gate projection drifted: {tag_gate_ids!r}")
+        if len(all_gate_ids) != 8:
+            raise AssertionError(f"Slayer gate projection drifted: {all_gate_ids!r}")
         asyncio.run(evaluate_checked_state(
-            bridge, icon_goal, {7770414, 7770418, *tag_gate_ids}, True
+            bridge, icon_goal, {7770414, 7770418, *all_gate_ids}, True
         ))
     return 0
 

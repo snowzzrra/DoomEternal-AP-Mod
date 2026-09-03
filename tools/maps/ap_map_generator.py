@@ -740,7 +740,9 @@ def validate_target_policies(config_entities, target_policies, content):
             if not policy.get("independent_ap_trigger")
             else ()
         )
-        if policy.get("ap_touch_only"):
+        if policy.get("ap_touch_only") or (
+            policy.get("duplicate_policy") == "native_only" and "native_entity_contract" in policy
+        ):
             unused_independent = [
                 key for key in unused_independent if key != "no_auto_visual"
             ]
@@ -2812,11 +2814,17 @@ def generate_map(
 
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
-                feedback_policy = location_feedback_policy(
-                    location_feedback, ap_check_id
-                )
-                include_ap_feedback = True
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
+                if ap_check_id not in location_feedback and (
+                    target_policy.get("duplicate_policy") == "native_only"
+                    or "native_entity_contract" in target_policy
+                ):
+                    feedback_policy = "ap_only"
+                else:
+                    feedback_policy = location_feedback_policy(
+                        location_feedback, ap_check_id
+                    )
+                include_ap_feedback = True
                 if not target_policy:
                     target_policy = build_universal_physical_policy(
                         ap_check_id,

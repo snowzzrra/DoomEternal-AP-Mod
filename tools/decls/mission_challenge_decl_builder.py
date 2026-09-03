@@ -242,11 +242,20 @@ def _plan_b_registration_contracts(registry: dict) -> tuple[dict, ...]:
         contract = contracts_by_mission.get(plan["mission_key"])
         if contract is None:
             raise ValueError(f"{plan['label']} Mission Challenge registration contract is missing")
-        if len(contract["unlockables"]) != 3:
-            raise ValueError(
-                f"{plan['label']} must retain exactly three real AP challenge children"
-            )
-        contracts.append({**contract, "plan": plan})
+        mission_key = plan["mission_key"]
+        if mission_key == "e3m2_hell":
+            if len(contract["unlockables"]) != 2:
+                raise ValueError(
+                    f"{plan['label']} must retain exactly two active AP challenge children"
+                )
+            real_challenges = ("mission_challenge/e3m2/challenge_1", *contract["unlockables"])
+        else:
+            if len(contract["unlockables"]) != 3:
+                raise ValueError(
+                    f"{plan['label']} must retain exactly three real AP challenge children"
+                )
+            real_challenges = contract["unlockables"]
+        contracts.append({**contract, "plan": plan, "real_challenges": real_challenges})
     return tuple(contracts)
 
 
@@ -359,7 +368,7 @@ def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]
     for contract in contracts:
         plan = contract["plan"]
         _assert_dummy_candidate(plan)
-        expected = tuple(contract["unlockables"])
+        expected = tuple(contract["real_challenges"])
         matches = [
             (index, block)
             for index, _, _, block in _level_blocks(source)

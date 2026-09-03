@@ -95,22 +95,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and add Taras Nabad Slayer Gate Complete 7770491"
     }
   ],
   "asset_package_contract_sha256": "b6ee6a008d608fdb9b5fd4aa959b13b1d858dbab0ba6a1860fed8752ffe73450",
-  "byte_sha256": "f30dbd0757791d1e03237b2dd9f32c66418be1639be44fe767f786d02165bc00",
+  "byte_sha256": "3c630fbd82240a716152768cafcea12999b7d2abf2ad0ee2688251a0267e9d13",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 12590524,
-    "classes": 12227,
-    "entity_count": 12229,
+    "byte_size": 12583875,
+    "classes": 12220,
+    "entity_count": 12222,
     "layers": 1666,
-    "targets": 7582,
+    "targets": 7585,
     "transforms": 23368,
-    "unique_entity_names": 12228
+    "unique_entity_names": 12221
   },
-  "manifest_sha256": "22bdc54a310a561f9d41831458ec919ec9a5a6fe5fa2b2618561d49343b5523c",
+  "manifest_sha256": "d866888805a97805ca75dd8cb16185e8c471b8d18f0fbfc51f24745529d9289b",
   "map_key": "e3m1_slayer",
   "physical_ap_ids": [
     7770303,
@@ -142,7 +146,8 @@
     7770331,
     7770332,
     7770338,
-    7770339
+    7770339,
+    7770491
   ],
   "publisher_contract_sha256": "a50412649f266096bd4baa51b1112ff1284f39a4044d2f0973c97933aec1792d",
   "runtime_location_ids": [
@@ -153,6 +158,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "e8178d7bef0c9b082d084e3bdfa9f8d3759fcbb5947afcfd3337e7ef9b33133d",
-  "semantic_sha256": "0b7e61a7140c198b363f386992cb15d5f97a506733ef3a61bf116ee200d03225"
+  "scripted_contract_sha256": "64132e707822c9868d2de838c8fa4e48aba85439882ca8e33df797316716ac67",
+  "semantic_sha256": "48eb4eb72de54673d1c035ec23e9c3e9de9b602b8d2677e88dec04452bdb0e5c"
 }

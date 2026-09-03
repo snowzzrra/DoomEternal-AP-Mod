@@ -83,20 +83,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire five experimental CVar items (7770156-7770160)"
     }
   ],
   "asset_package_contract_sha256": "0b608fd92e15ea4b7d6c7d61895c0159eee990802c9b15ab7db3585cb31ed910",
-  "byte_sha256": "0e0f901412b135c81f57465a5dce4d5d609471315869bc0d5fb36ac2f7de5e48",
+  "byte_sha256": "f72f2607d30d660a8eb911842a7d5ff1718ab0f9335b742a7a8042628251b933",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 40,
-    "byte_size": 12003317,
-    "classes": 10482,
-    "entity_count": 10484,
+    "byte_size": 11995289,
+    "classes": 10472,
+    "entity_count": 10474,
     "layers": 5412,
     "targets": 18760,
     "transforms": 22242,
-    "unique_entity_names": 10483
+    "unique_entity_names": 10473
   },
   "manifest_sha256": "13eeb48eb9c1f6246400296e59dea33faa79bf50dfc0866e2e966459517282b0",
   "map_key": "e1m1_intro",
@@ -128,5 +132,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "2a83460c80d01bb359735a443306bb6088ed12dbf2e456a90b59b2d602f56da1",
-  "semantic_sha256": "79c31f01b7f79b0e840f23b9315e3d2610a53345fef608fc3bc10f48238c48e3"
+  "semantic_sha256": "b78ab702524f50a74af65145d92dd8c90abe4bee9fb294e9cf4cafb2ae298513"
 }

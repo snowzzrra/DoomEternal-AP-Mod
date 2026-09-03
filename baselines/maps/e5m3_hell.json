@@ -11,20 +11,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "Fix Immora Wave 2 progression target"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire five experimental CVar items (7770156-7770160)"
     }
   ],
   "asset_package_contract_sha256": "4220cf0685ec649c969a0bc2d4d54387ffa58ba5fc74050c6c436dff842c0bc6",
-  "byte_sha256": "ee4a67b6c8bdb112b413c091c2d9be9e5ff6eac5bbd3c7b2c19aef461d8b711f",
+  "byte_sha256": "707dbec6fcfa27dcbfca139119d3afd5a1e91316ddfdecd1a97172577eb2899e",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 127,
-    "byte_size": 7338440,
-    "classes": 6079,
-    "entity_count": 6085,
+    "byte_size": 7330140,
+    "classes": 6069,
+    "entity_count": 6075,
     "layers": 955,
     "targets": 8780,
     "transforms": 11980,
-    "unique_entity_names": 6080
+    "unique_entity_names": 6070
   },
   "manifest_sha256": "3cebdc3c2d2b84f02ef3b805bf3ba89688df35aa3c8f28c2cc3f860a50319df7",
   "map_key": "e5m3_hell",
@@ -45,5 +49,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "916fd576fd7192181ef9ab486543805d5915238cc199a0ec398f54131abf826b",
-  "semantic_sha256": "9e66ea0b89e2686a759582ebe4163d9672ea574964b1f68ef9af0b9d8503eb53"
+  "semantic_sha256": "1a651de931b5412e519921ec7afa46ca802e3a6951a957b9ca4a50e82ee1a5e9"
 }

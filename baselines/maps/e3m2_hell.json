@@ -71,20 +71,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and retire impossible Die by the Sword AP Location 7770358"
     }
   ],
   "asset_package_contract_sha256": "7a6be0a76aa25c5b6f20f8dee205b8fe057045d0edbaa860961b42e50ae6c982",
-  "byte_sha256": "e616156ea7d5871145cbd13477376e53e2269e9240cf58c40298bd85ef7d8130",
+  "byte_sha256": "92ba7ccc803e199ff275637d0ec95835cdfa231e1939ec206d1f2945814518c1",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 175,
-    "byte_size": 7390107,
-    "classes": 7685,
-    "entity_count": 7685,
+    "byte_size": 7381807,
+    "classes": 7675,
+    "entity_count": 7675,
     "layers": 451,
     "targets": 3400,
     "transforms": 15445,
-    "unique_entity_names": 7685
+    "unique_entity_names": 7675
   },
   "manifest_sha256": "7c0bbc619316382cdd08bd845b9d3663f8e29126eb796338e8e09dbc2f0cc007",
   "map_key": "e3m2_hell",
@@ -110,7 +114,6 @@
   ],
   "publisher_contract_sha256": "edba89a502113d657666a4463e2ad5b662206b2bd39b61fdefa691c8f5bb18b9",
   "runtime_location_ids": [
-    7770358,
     7770359,
     7770360,
     7770361,
@@ -118,5 +121,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "afe0beebfb8846b9d8d47a127c098d4b18726f8f040df418de481cb64d3492b2",
-  "semantic_sha256": "7db254caf895637f73427e864f17c75809243586f835501938aa4e02abca7eb6"
+  "semantic_sha256": "213a70776b394835810fa056869ea8e22d042410c021750324e17a02c9eb6726"
 }

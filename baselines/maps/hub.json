@@ -115,20 +115,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "0.5.0: align All Runes Cheat Code label orientation with adjacent Praetor Suit label."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and accept final Praetor visual model Z correction"
     }
   ],
   "asset_package_contract_sha256": "bc7fdbb28182c177af6af7496795d6804b0c7ace5c8f8e4745bf7f157a8ac258",
-  "byte_sha256": "22dfe73e8c39a32962ab945266c77b0dff6d295a565f2af49c7968aad5311312",
+  "byte_sha256": "0818d50cddf0687578b6e1709f7e0d1ee1df33018335c7174d0ffa5c9968f85c",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 140,
-    "byte_size": 4338715,
-    "classes": 4208,
-    "entity_count": 4210,
+    "byte_size": 4330415,
+    "classes": 4198,
+    "entity_count": 4200,
     "layers": 162,
     "targets": 2829,
     "transforms": 8054,
-    "unique_entity_names": 4209
+    "unique_entity_names": 4199
   },
   "manifest_sha256": "eebb418acb722f27f2ff977f174ddd1537ad0b5dc5df42dd929ca0e3b931a323",
   "map_key": "hub",
@@ -157,6 +161,6 @@
   "publisher_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "4c79337df3eff30c3e8b07755cc07cd6af7581b65727a2bbe1759fdca4d16b78",
-  "semantic_sha256": "fb5fef63262c2308b8870310d405c3dac39175209072a785d99ce269dad7e61e"
+  "scripted_contract_sha256": "4915daed92ceb67273d5ce60eb54889da349b55cd93d54f04213940209bc4308",
+  "semantic_sha256": "0e178ada02b9b4f5a6b75311d15724abb41af4543db97f3cf434b57a5f418ac1"
 }

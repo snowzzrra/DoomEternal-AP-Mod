@@ -437,14 +437,6 @@
         {
           "key": "Tyrant Trap",
           "label": "Tyrant Trap"
-        },
-        {
-          "key": "Vulnerability Trap",
-          "label": "Vulnerability Trap"
-        },
-        {
-          "key": "Weakness Trap",
-          "label": "Weakness Trap"
         }
       ],
       "default": [
@@ -461,9 +453,7 @@
         "Imp Trap",
         "Marauder Trap",
         "Revenant Trap",
-        "Tyrant Trap",
-        "Vulnerability Trap",
-        "Weakness Trap"
+        "Tyrant Trap"
       ],
       "description": "Trap types eligible for filler-padding replacement.",
       "display_name": "Enabled Traps",

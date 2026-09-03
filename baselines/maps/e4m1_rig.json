@@ -19,20 +19,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: bind final completion publisher to proven native terminal"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire five experimental CVar items (7770156-7770160)"
     }
   ],
   "asset_package_contract_sha256": "ea45016b71eec3ade3e8b530ce34628823d561d2193bcc8b6da85a586bfc0d20",
-  "byte_sha256": "c04e55c4bc17cc218fd6f6c355b46bd996a5bb04966bf09dd5fd8420b8daf073",
+  "byte_sha256": "e1d9d87af5e904d59d24aa82a058e5fe70a5f51caab43ea9e6b80c0b37aa7640",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 780,
-    "byte_size": 13991070,
-    "classes": 12049,
-    "entity_count": 12063,
+    "byte_size": 13982770,
+    "classes": 12039,
+    "entity_count": 12053,
     "layers": 1984,
     "targets": 11416,
     "transforms": 26004,
-    "unique_entity_names": 12050
+    "unique_entity_names": 12040
   },
   "manifest_sha256": "3e874b331cbbb558ada89d7855a8c984132d1dca3d0fb461765cbcd5cdcec0d9",
   "map_key": "e4m1_rig",
@@ -56,5 +60,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "e9f31c3054b55560228a9a71699970cf04e2cbb5f0f18968ebc911c56623b936",
-  "semantic_sha256": "5a5dcf37bdc40d9b446fe9a2d5f54de030eabae86bc0606574f2035810f4d5e9"
+  "semantic_sha256": "697c942b94150c2dce5b196b6b6d53825311d0e55fc61ac3dc9ef59b4e78ba65"
 }

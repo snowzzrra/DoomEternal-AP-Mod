@@ -83,22 +83,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.5.0: generate the canonical inert AP visual for the independent Rocket Launcher location."
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and add Cultist Base Slayer Gate Complete 7770487"
     }
   ],
   "asset_package_contract_sha256": "ef3a4dc42ee3979a6f025bfe3789a411a735c7d474666b114b170d5c6ec8f996",
-  "byte_sha256": "da08f78d6d785d6caceab83f60cfe9692172e1957399ed3b19393de6719f4e3c",
+  "byte_sha256": "848a5ac51c73b8343bcb4937a4413aaf6d7d8f6ae64195a8bc08831d1cf7182f",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20131739,
-    "classes": 18377,
-    "entity_count": 18377,
+    "byte_size": 20125090,
+    "classes": 18370,
+    "entity_count": 18370,
     "layers": 4819,
-    "targets": 10790,
+    "targets": 10793,
     "transforms": 37092,
-    "unique_entity_names": 18377
+    "unique_entity_names": 18370
   },
-  "manifest_sha256": "79b327131126f9cf9bbe917b42ba7ef2eb18a5c2b15c8fd2ac72ecab4685e167",
+  "manifest_sha256": "cd78e5123bc1e2f8825cd6b8ed2c3b3f12ed67924475494b882df4230c658310",
   "map_key": "e1m3_cult",
   "physical_ap_ids": [
     7770046,
@@ -126,11 +130,12 @@
     7770070,
     7770071,
     7770091,
-    7770092
+    7770092,
+    7770487
   ],
   "publisher_contract_sha256": "b80266e15ad259f4a69192c42981f4a3acb6e922bf0214b1c92de482d32e80c9",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "add7a4175af6b7c8b13c727434445d9ba2b1f8188d0cda411c9f33f9c53c68db",
-  "semantic_sha256": "9ba563f5f9f2e806e5ad335df6df8509e5dab987df7bf06fcf5707263d49a671"
+  "scripted_contract_sha256": "8737d143183eaba11632e58d75bc73df50b880c9d48f8b5351c2a369181f255b",
+  "semantic_sha256": "36d69fc83ff9285a4c5048e1ffe28566374a57ec832e0bb03c3393210882d208"
 }

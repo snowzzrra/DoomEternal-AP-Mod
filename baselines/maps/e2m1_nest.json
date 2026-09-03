@@ -75,22 +75,26 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and add Super Gore Nest Slayer Gate Complete 7770488"
     }
   ],
   "asset_package_contract_sha256": "2114d4f3c8372ca53a27512f26623011a29cb31af9600d4f8bde3b342062491c",
-  "byte_sha256": "662b9b727b7ab11d092d6b9e46824ab75a17deb573e0fd9fd14a87972d38e376",
+  "byte_sha256": "d24450cb251f65d69cf0df1d836afd0c0064d92bd76d7b9547cbf9f548f7f3f0",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 271,
-    "byte_size": 14447558,
-    "classes": 13422,
-    "entity_count": 13425,
+    "byte_size": 14440891,
+    "classes": 13415,
+    "entity_count": 13418,
     "layers": 2113,
-    "targets": 8770,
+    "targets": 8773,
     "transforms": 27372,
-    "unique_entity_names": 13423
+    "unique_entity_names": 13416
   },
-  "manifest_sha256": "0fe4872b22bc3795b8401dca6e3d78e6f984c1e69081ac745c029c532ba3222e",
+  "manifest_sha256": "41b170495d026914c14005baef9d02dbf532ddf489411dab05046c0bb7b9afda",
   "map_key": "e2m1_nest",
   "physical_ap_ids": [
     7770176,
@@ -122,11 +126,12 @@
     7770202,
     7770203,
     7770204,
-    7770205
+    7770205,
+    7770488
   ],
   "publisher_contract_sha256": "b845730d7a9a67298bba813568a624d0c1b89417e869522f5c9a3f8be9007e73",
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "719ac741fa7d8e02c15c4d4bcbcba587612051325b5fffc101f66a215a889e5b",
-  "semantic_sha256": "821d0825a7b574f481c4440a286307c3cbc4dff4aa1585722e94c766a2b12b73"
+  "scripted_contract_sha256": "1d061bb1db373d5251c233247e43a7fecaf86bf0ea1c12a8904700911be3def6",
+  "semantic_sha256": "e488f341e9648ba02e670b2217513609817b9fafdbe8a6139100cd8b82791b70"
 }

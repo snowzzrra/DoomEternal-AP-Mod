@@ -768,7 +768,6 @@ class RoomCompiler:
             return True
         except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile):
             return False
-        self.consent = consent
 
     def _apply_placement_strings(self, assembled: dict[str, bytes], placements: tuple) -> None:
         """Merge placement-aware receipt strings into the packaged locale tables."""

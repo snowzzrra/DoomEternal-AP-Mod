@@ -95,20 +95,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "enable location sent notification feedback for all checks"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "retire experimental CVar items and update Final Sin publisher contracts"
     }
   ],
   "asset_package_contract_sha256": "c60492caddbdc3b60b521189e62c243e74e6aa46bc79ad47ef1cce44c7c1fdb2",
-  "byte_sha256": "e8108d1b34e12b24ade005f9d14c98e9292463cfe1284a09acacc430ebb503ea",
+  "byte_sha256": "d0835d9ebcff62e4cf9d304aec4aa6d44cb2b33f36012d40dd3798efdafae601",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15982534,
-    "classes": 12990,
-    "entity_count": 12990,
+    "byte_size": 15974234,
+    "classes": 12980,
+    "entity_count": 12980,
     "layers": 1650,
     "targets": 45513,
     "transforms": 26188,
-    "unique_entity_names": 12990
+    "unique_entity_names": 12980
   },
   "manifest_sha256": "8c008d72eea7172e4de492887baf143ba101e755a509395e2a71eb4531df48a4",
   "map_key": "e3m4_boss",
@@ -119,11 +123,11 @@
     7770416,
     7770417
   ],
-  "publisher_contract_sha256": "5b31ad4efd0b09013ab5470dfc2595e60c61cd27497740ae4e90624746a6ecdf",
+  "publisher_contract_sha256": "2f9f97d4de80e60cb9528ede822e2428e0ff0a293b29ecbf349fa1376b1bec11",
   "runtime_location_ids": [
     7770414
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "df3956e34ead01236ded5f485c338c6f65497900dbfe5cfb6188c887739fb40f",
-  "semantic_sha256": "a102a6621eb2672f2e3eaab681517db09e884dbe06299856f06ccfc57c0e1654"
+  "semantic_sha256": "1f44438bc9788a6bbc4cd0f57b1cb32ff64d9809f617cd77865d1f40f4359bd4"
 }

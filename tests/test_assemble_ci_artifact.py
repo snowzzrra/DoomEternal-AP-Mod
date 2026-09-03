@@ -144,6 +144,9 @@ def create_synthetic_room_resources(
             "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
         ],
         "base_members": [base_file],
+        "context_targets": {
+            "test_context": base_file,
+        },
         "maps": {
             "e1m1_intro": {
                 "option_keys": ["randomize_chainsaw"],
