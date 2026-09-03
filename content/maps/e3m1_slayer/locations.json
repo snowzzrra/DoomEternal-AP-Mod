@@ -31,7 +31,8 @@
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_11_1": 7770329,
     "AP_CHECK_PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1": 7770330,
     "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M1": 7770338,
-    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1": 7770339
+    "AP_CHECK_PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1": 7770339,
+    "AP_CHECK_TARGET_RELAY_SLAYERGATE_4_COMBAT_END": 7770491
   },
   "names": {
     "7770303": "Taras Nabad - Sentinel Crystal - Broken-Bridge Lower Room",
@@ -63,7 +64,8 @@
     "7770338": "Taras Nabad - Mastery Token - Archvile Courtyard Button Gate",
     "7770339": "Taras Nabad - Mastery Token - Crucible Room Opposite Walkway",
     "7770331": "Taras Nabad - Secret Encounter - Archvile Courtyard Breakable Wall",
-    "7770332": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall"
+    "7770332": "Taras Nabad - Secret Encounter - Post-Swim Breakable Wall",
+    "7770491": "Taras Nabad - Slayer Gate Complete"
   },
   "location_feedback": {
     "default_policy": "ap_only"
@@ -109,6 +111,22 @@
         "inventory",
         "perk"
       ]
+    },
+    "target_relay_slayergate_4_combat_end": {
+      "native_entity_contract": {
+        "original_targets": [
+          "target_changelayer_slayergate_3",
+          "target_relay_slayergate_5_chest_teleport"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
     }
   },
   "target_removals": {

@@ -34,7 +34,8 @@
     "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_1": 7770249,
     "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_2": 7770250,
     "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_3": 7770251,
-    "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_4": 7770252
+    "AP_CHECK_ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_4": 7770252,
+    "AP_CHECK_GAMEPLAY_TARGET_RELAY_SLAYERGATE_4_COMBAT_END1": 7770489
   },
   "location_feedback": {
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_FIRE_1": {
@@ -186,6 +187,27 @@
     "7770251": "ARC Complex - Dr. Elena Richardson Log - Garage Side-Room Console",
     "7770252": "ARC Complex - Dr. Elena Richardson Log - ARC Building Entrance Console",
     "7770242": "ARC Complex - Secret Encounter - Samuel Hayden Gap",
-    "7770243": "ARC Complex - Secret Encounter - Generator Room"
+    "7770243": "ARC Complex - Secret Encounter - Generator Room",
+    "7770489": "ARC Complex - Slayer Gate Complete"
+  },
+  "target_policies": {
+    "gameplay_target_relay_slayergate_4_combat_end1": {
+      "native_entity_contract": {
+        "original_targets": [
+          "gameplay_target_changelayer_slayergate_2",
+          "gameplay_target_relay_slayergate_5_chest_teleport1",
+          "gameplay_encounter_trigger_exit_slayergate",
+          "gameplay_target_remove_teleport_2"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
+    }
   }
 }

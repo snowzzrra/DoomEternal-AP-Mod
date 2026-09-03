@@ -815,7 +815,7 @@ def validate_target_policies(config_entities, target_policies, content):
                 )
             if not any(
                 token in evidence
-                for token in ("whenToSave =", "saveType =", "stat =")
+                for token in ("whenToSave =", "saveType =", "stat =", "class = \"idTarget_Count\";")
             ):
                 raise ValueError(
                     f"native_entity_contract lacks a save writer: {entity_name}"

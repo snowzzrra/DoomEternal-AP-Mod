@@ -483,7 +483,7 @@
       "policy": "replay_manual_only"
     },
     "7770148": {
-      "name": "Slayer Gate Key UAC Atlantica",
+      "name": "Slayer Gate Key UAC Atlantica Facility",
       "policy": "replay_idempotent"
     },
     "7770149": {
@@ -513,11 +513,6 @@
     "7770155": {
       "name": "Slayer Gate Key Taras Nabad",
       "policy": "replay_idempotent"
-    },
-    "7770156": {"name": "Damage Boost", "policy": "never_replay", "receipt_feedback": "ap"},
-    "7770157": {"name": "Damage Resistance", "policy": "never_replay", "receipt_feedback": "ap"},
-    "7770158": {"name": "Infinite Ammo", "policy": "never_replay", "receipt_feedback": "ap"},
-    "7770159": {"name": "Weakness Trap", "policy": "never_replay", "receipt_feedback": "ap"},
-    "7770160": {"name": "Vulnerability Trap", "policy": "never_replay", "receipt_feedback": "ap"}
+    }
   }
 }

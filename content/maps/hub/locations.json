@@ -292,7 +292,7 @@
         58.45,
         -11.3
       ],
-      "independent_visual_z_offset": -0.5,
+      "independent_visual_z_offset": 0.5,
       "native_entity_contract": {
         "original_targets": [],
         "remove_block": "stateStats",

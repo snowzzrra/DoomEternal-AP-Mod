@@ -1634,7 +1634,8 @@
     "Exultia - Hell - Ichor Expanse": [
       7770045,
       7770089,
-      7770090
+      7770090,
+      7770486
     ],
     "Exultia - Hell - Isle of Torment": [
       7770042,
@@ -1691,7 +1692,8 @@
     "Cultist Base - Promenade of Culling": [
       7770071,
       7770091,
-      7770092
+      7770092,
+      7770487
     ],
     "Cultist Base - Station of Anointment": [
       7770069,
@@ -1776,7 +1778,8 @@
       7770200,
       7770201,
       7770205,
-      7770203
+      7770203,
+      7770488
     ],
     "Super Gore Nest - Upper Area - Vorus Medical Plaza": [],
     "Super Gore Nest - Lower Area - Pumping Station C": [],
@@ -1835,7 +1838,8 @@
     ],
     "ARC Complex - Convention Parking": [
       7770237,
-      7770248
+      7770248,
+      7770489
     ],
     "ARC Complex - Challenges - Mission Challenges": [
       7770244,
@@ -1885,7 +1889,8 @@
       7770276,
       7770278,
       7770279,
-      7770280
+      7770280,
+      7770490
     ],
     "Mars Core - Challenges - Mission Challenges": [
       7770285,
@@ -1938,7 +1943,8 @@
       7770327,
       7770328,
       7770329,
-      7770330
+      7770330,
+      7770491
     ],
     "Taras Nabad - Atrium Plaza": [],
     "Taras Nabad - Slayer Creation Chamber": [],
@@ -1990,7 +1996,6 @@
       7770362
     ],
     "Nekravol - Challenges - Mission Challenges": [
-      7770358,
       7770359,
       7770360,
       7770361

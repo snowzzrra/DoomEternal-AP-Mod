@@ -25,7 +25,7 @@
         "7770145": {"name": "Break Blast", "kind": "rune", "representations": [{"field": "perk", "path": "perk/player/runes/dlc/weakpoint_concussive_blast", "flags": ["isRune"]}]},
         "7770146": {"name": "Desperate Punch", "kind": "rune", "representations": [{"field": "perk", "path": "perk/player/runes/dlc/blood_punch_low_health_bonus_damage", "flags": ["isRune"]}]},
         "7770147": {"name": "Take Back", "kind": "rune", "representations": [{"field": "perk", "path": "perk/player/runes/dlc/extra_life_refund", "flags": ["isRune"]}]},
-        "7770148": {"name": "Slayer Gate Key UAC Atlantica", "kind": "key", "map_key": "e4m1_rig", "representations": [{"field": "item", "path": "map_objects/keycard/slayer_key"}]},
+        "7770148": {"name": "Slayer Gate Key UAC Atlantica Facility", "kind": "key", "map_key": "e4m1_rig", "representations": [{"field": "item", "path": "map_objects/keycard/slayer_key"}]},
         "7770149": {"name": "Slayer Gate Key The Holt", "kind": "key", "map_key": "e4m3_mcity", "representations": [{"field": "item", "path": "map_objects/keycard/slayer_key"}]},
         "7770150": {"name": "Slayer Gate Key Exultia", "kind": "key", "map_key": "e1m2_war", "representations": [{"field": "item", "path": "map_objects/keycard/slayer_key"}]},
         "7770151": {"name": "Slayer Gate Key Cultist Base", "kind": "key", "map_key": "e1m3_cult", "representations": [{"field": "item", "path": "map_objects/keycard/slayer_key"}]},

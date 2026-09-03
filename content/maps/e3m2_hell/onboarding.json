@@ -22,6 +22,17 @@
     "packagemapspec_sha256": "82e6981fa6b83a7134c306cb3e3ff5e5f02567ccaf173fa737144b2f087a62c6",
     "priority_rule": "lowest packagemapspec files-array index wins"
   },
+  "reserved_ids": [
+    {
+      "id": 7770358,
+      "status": "tombstoned",
+      "content": "Nekravol - Mission Challenge - Die by the Sword",
+      "public": false,
+      "generated": false,
+      "reusable": false,
+      "reason": "STAT_WEAPON_CRUCIBLE_KILL cannot be reliably advanced under Legacy Injector architecture; retired for v0.5 release"
+    }
+  ],
   "category_audit": {
     "praetor_suit_tokens": 3,
     "sentinel_batteries": 0,
@@ -35,7 +46,7 @@
     "slayer_keys": 0,
     "mastery_tokens": 2,
     "secret_encounters": 2,
-    "mission_challenges": 3,
+    "mission_challenges": 2,
     "all_challenges_aggregate": 1,
     "mission_complete": 1,
     "automap_stations_excluded": 1
@@ -281,8 +292,8 @@
         "STAT_WEAPON_CRUCIBLE_KILL >= 2"
       ],
       "vanilla_reward": "CURRENCY_PRAETOR_UPGRADE",
-      "decision": "include",
-      "reason": "native durable unlockable record; inherited currency neutralized"
+      "decision": "exclude",
+      "reason": "STAT_WEAPON_CRUCIBLE_KILL cannot be reliably advanced under Legacy Injector architecture; retired for v0.5 release"
     },
     {
       "entity": "unlockable/mission_challenge/e3m2/challenge_2.decl",
@@ -311,7 +322,6 @@
       "class": "AP aggregate",
       "transform": null,
       "target_chain": [
-        7770358,
         7770359,
         7770360
       ],

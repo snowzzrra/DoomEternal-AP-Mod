@@ -9079,8 +9079,6 @@ class DoomEternalContext(CommonContext):
         if "Acquire the Unmaykr" in requirements:
             objective_ids.add(GOAL_ENDPOINT_LOCATION_IDS["Acquire the Unmaykr"])
         for requirement in requirements - {"Acquire the Unmaykr"}:
-            if requirement == "Complete All Slayer Gates":
-                objective_ids.add(GOAL_ENDPOINT_LOCATION_IDS["Acquire the Unmaykr"])
             suffix = GOAL_REQUIREMENT_SUFFIXES[requirement]
             objective_ids.update(
                 location_id

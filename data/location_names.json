@@ -309,7 +309,6 @@
     "7770355": "Nekravol - Sentinel Crystal - Opening Wall-Cannon Fork",
     "7770356": "Nekravol - Secret Encounter - Prison-Cage Gap",
     "7770357": "Nekravol - Secret Encounter - Green-Skull Gate Return",
-    "7770358": "Nekravol - Mission Challenge - Die by the Sword",
     "7770359": "Nekravol - Mission Challenge - Tricks and Traps",
     "7770360": "Nekravol - Mission Challenge - Doom Hunt",
     "7770361": "Nekravol - All Mission Challenges Completed",
@@ -436,7 +435,13 @@
     "7770482": "Immora - Extra Life - Plateau Battle 2-Up",
     "7770483": "Immora - Escalation Encounter Wave 1",
     "7770484": "Immora - Escalation Encounter Wave 2",
-    "7770485": "Immora - Mission Complete"
+    "7770485": "Immora - Mission Complete",
+    "7770486": "Exultia - Slayer Gate Complete",
+    "7770487": "Cultist Base - Slayer Gate Complete",
+    "7770488": "Super Gore Nest - Slayer Gate Complete",
+    "7770489": "ARC Complex - Slayer Gate Complete",
+    "7770490": "Mars Core - Slayer Gate Complete",
+    "7770491": "Taras Nabad - Slayer Gate Complete"
   },
   "schema_version": 1,
   "source": "content/maps/*/locations.json + runtime.json"

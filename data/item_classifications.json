@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 7,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "e7e1dd16b4637982e062b49685ecb128e43f49a4cb0da20399021c396cb71293",
+  "source_sha256": "911ef5d72b18cd9ebac01680eb50248ef720fe9a522e9fb1e40addeea09741b5",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -469,7 +469,7 @@
       "classification": 2
     },
     "7770148": {
-      "name": "Slayer Gate Key UAC Atlantica",
+      "name": "Slayer Gate Key UAC Atlantica Facility",
       "classification": 1
     },
     "7770149": {
@@ -500,11 +500,6 @@
       "name": "Slayer Gate Key Taras Nabad",
       "classification": 1
     },
-    "7770156": {"name": "Damage Boost", "classification": 0},
-    "7770157": {"name": "Damage Resistance", "classification": 0},
-    "7770158": {"name": "Infinite Ammo", "classification": 0},
-    "7770159": {"name": "Weakness Trap", "classification": 4},
-    "7770160": {"name": "Vulnerability Trap", "classification": 4},
     "7770900": {
       "name": "Combat Shotgun",
       "classification": 1

@@ -128,51 +128,6 @@
             "replay_policy": "never_replay",
             "receipt_feedback": "ap",
             "start_inventory_eligible": false
-        },
-        "7770156": {
-            "name": "Damage Boost",
-            "runtime_family": "transient_effect",
-            "runtime_primitive": "transient_effect",
-            "runtime_effect": {"type": "transient_effect", "name": "damage_boost", "cvar": "g_damageScaleAllToAI", "factor": 1.50, "duration_seconds": 20},
-            "replay_policy": "never_replay",
-            "receipt_feedback": "ap",
-            "start_inventory_eligible": false
-        },
-        "7770157": {
-            "name": "Damage Resistance",
-            "runtime_family": "transient_effect",
-            "runtime_primitive": "transient_effect",
-            "runtime_effect": {"type": "transient_effect", "name": "damage_resistance", "cvar": "g_damageScaleAllToSlayer", "factor": 0.65, "duration_seconds": 20},
-            "replay_policy": "never_replay",
-            "receipt_feedback": "ap",
-            "start_inventory_eligible": false
-        },
-        "7770158": {
-            "name": "Infinite Ammo",
-            "runtime_family": "transient_effect",
-            "runtime_primitive": "transient_effect",
-            "runtime_effect": {"type": "transient_effect", "name": "infinite_ammo", "cvar": "g_infiniteAmmo", "factor": 1, "duration_seconds": 10},
-            "replay_policy": "never_replay",
-            "receipt_feedback": "ap",
-            "start_inventory_eligible": false
-        },
-        "7770159": {
-            "name": "Weakness Trap",
-            "runtime_family": "transient_effect",
-            "runtime_primitive": "transient_effect",
-            "runtime_effect": {"type": "transient_effect", "name": "weakness_trap", "cvar": "g_damageScaleAllToAI", "factor": 0.70, "duration_seconds": 12},
-            "replay_policy": "never_replay",
-            "receipt_feedback": "ap",
-            "start_inventory_eligible": false
-        },
-        "7770160": {
-            "name": "Vulnerability Trap",
-            "runtime_family": "transient_effect",
-            "runtime_primitive": "transient_effect",
-            "runtime_effect": {"type": "transient_effect", "name": "vulnerability_trap", "cvar": "g_damageScaleAllToSlayer", "factor": 1.35, "duration_seconds": 12},
-            "replay_policy": "never_replay",
-            "receipt_feedback": "ap",
-            "start_inventory_eligible": false
         }
     }
 }

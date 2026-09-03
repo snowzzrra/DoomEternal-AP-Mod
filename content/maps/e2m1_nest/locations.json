@@ -30,7 +30,8 @@
     "AP_CHECK_PICKUPS_PROGRESS_CHEATS_INFINITE_AMMO_1": 7770200,
     "AP_CHECK_GAME_PICKUP_WEAPON_CHAINGUN_1": 7770201,
     "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1144181771_E2M1": 7770204,
-    "AP_CHECK_SLAYER_GATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770205
+    "AP_CHECK_SLAYER_GATE_PICKUP_KEYCARD_SLAYER_KEY_1": 7770205,
+    "AP_CHECK_SLAYER_GATE_TARGET_RELAY_33": 7770488
   },
   "location_feedback": {
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_SOLDIER_SHIELD_1": {
@@ -184,6 +185,26 @@
     "7770204": "Super Gore Nest - Sentinel Crystal - Yellow-Key Story Path",
     "7770205": "Super Gore Nest - Slayer Key - Blue-Vent Upper Route",
     "7770202": "Super Gore Nest - Secret Encounter - Yellow-Key Return Portal",
-    "7770203": "Super Gore Nest - Secret Encounter - Below the Red Key"
+    "7770203": "Super Gore Nest - Secret Encounter - Below the Red Key",
+    "7770488": "Super Gore Nest - Slayer Gate Complete"
+  },
+  "target_policies": {
+    "slayer_gate_target_relay_33": {
+      "native_entity_contract": {
+        "original_targets": [
+          "slayer_gate_target_relay_31",
+          "slayer_gate_target_relay_2",
+          "slayer_gate_target_relay_3"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
+    }
   }
 }

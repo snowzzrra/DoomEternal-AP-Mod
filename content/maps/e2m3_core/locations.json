@@ -28,7 +28,8 @@
     "AP_CHECK_PHOBOS_PROGRESS_CODEX_1": 7770278,
     "AP_CHECK_HELL_CHUNK_2_PROGRESS_CODEX_1": 7770279,
     "AP_CHECK_SLAYER_ARENA_PICKUP_KEYCARD_SLAYER_KEY_1": 7770280,
-    "AP_CHECK_SLAYER_GATE_PROGRESS_ARGENT_CELL_1_1335273921_E2M3": 7770281
+    "AP_CHECK_SLAYER_GATE_PROGRESS_ARGENT_CELL_1_1335273921_E2M3": 7770281,
+    "AP_CHECK_SLAYER_ARENA_TARGET_RELAY_SLAYERGATE_4_COMBAT_END": 7770490
   },
   "location_feedback": {},
   "neutralize_pickups": [
@@ -71,6 +72,24 @@
       "remove_original": true,
       "preserve_targets": [],
       "drop_targets": []
+    },
+    "slayer_arena_target_relay_slayergate_4_combat_end": {
+      "native_entity_contract": {
+        "original_targets": [
+          "gameplay_trigger_teleport_fade_slayergate_2",
+          "slayer_arena_encounter_trigger_exit_slayer_gate_dummy",
+          "slayer_arena_target_relay_slayergate_",
+          "slayer_arena_target_relay_slayergate_3_chest_activate"
+        ],
+        "required_snippets": [
+          "inherit = \"target/relay\";",
+          "class = \"idTarget_Count\";",
+          "count = 1;"
+        ]
+      },
+      "duplicate_policy": "native_only",
+      "no_auto_automap_helper": true,
+      "no_auto_visual": true
     }
   },
   "remove_entities": [],
@@ -119,6 +138,7 @@
     "7770280": "Mars Core - Slayer Key - Tentacle Vent",
     "7770281": "Mars Core - Sentinel Crystal - Flying-Island Blue-Vent Landing",
     "7770283": "Mars Core - Secret Encounter - Post-BFG Cracked-Wall Side Room",
-    "7770284": "Mars Core - Secret Encounter - Tentacle Portal Arena"
+    "7770284": "Mars Core - Secret Encounter - Tentacle Portal Arena",
+    "7770490": "Mars Core - Slayer Gate Complete"
   }
 }

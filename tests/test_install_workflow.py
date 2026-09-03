@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import hashlib
 import io
 import json
@@ -480,11 +481,14 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
                 mock_activate.return_value = AdapterResult(state="applied", message="ok", command=["mock"])
 
                 fake_generated = base_dir / "generated.zip"
-                manifest = LaunchWorkflow().manifest_for(_snapshot())
+                mock_digest = "1" * 64
+                manifest = LaunchWorkflow().manifest_for(_snapshot(), static_content_digest=mock_digest)
                 with zipfile.ZipFile(fake_generated, "w") as zf:
-                    zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+                    zf.writestr("seed_manifest.json", json.dumps(asdict(manifest)))
+                    zf.writestr("seed_receipt.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
 
                 with patch.object(RoomCompiler, "__init__", return_value=None), \
+                     patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
                      patch.object(RoomCompiler, "build", return_value=fake_generated):
                     record = workflow.execute(_snapshot())
                     self.assertEqual(record.adapter_state, "applied")
@@ -529,8 +533,11 @@ class TestMeathookPrerequisiteGate(unittest.TestCase):
                 consent=lambda _spec: False,  # User declines consent
             )
 
-            with self.assertRaises(RuntimeError) as ctx:
-                workflow.execute(_snapshot())
+            mock_digest = "0" * 64
+            with patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True):
+                with self.assertRaises(RuntimeError) as ctx:
+                    workflow.execute(_snapshot())
 
             self.assertIn("Game Link download was not approved", str(ctx.exception))
             # Assert zero mutations
@@ -1026,9 +1033,11 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
             )
 
             fake_generated = tmp / "generated.zip"
-            manifest = LaunchWorkflow().manifest_for(_snapshot())
+            mock_digest = "2" * 64
+            manifest = LaunchWorkflow().manifest_for(_snapshot(), static_content_digest=mock_digest)
             with zipfile.ZipFile(fake_generated, "w") as zf:
-                zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+                zf.writestr("seed_manifest.json", json.dumps(asdict(manifest)))
+                zf.writestr("seed_receipt.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
 
             class FakeProcess:
                 returncode = 0
@@ -1040,6 +1049,7 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
                  patch("doom_eap.launcher.launcher_integration.WINDOWS_MOD_INJECTOR", spec_injector), \
                  patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook), \
                  patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
                  patch.object(RoomCompiler, "build", return_value=fake_generated), \
                  patch("subprocess.Popen", return_value=FakeProcess()):
                 record = workflow.execute(_snapshot())
@@ -1088,12 +1098,15 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
             )
 
             fake_generated = tmp / "generated.zip"
-            manifest = LaunchWorkflow().manifest_for(_snapshot())
+            mock_digest = "3" * 64
+            manifest = LaunchWorkflow().manifest_for(_snapshot(), static_content_digest=mock_digest)
             with zipfile.ZipFile(fake_generated, "w") as zf:
-                zf.writestr("seed_manifest.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
+                zf.writestr("seed_manifest.json", json.dumps(asdict(manifest)))
+                zf.writestr("seed_receipt.json", json.dumps({"manifest_hash": manifest.manifest_hash}))
 
             with patch("doom_eap.launcher.launcher_platform.MEATHOOK", spec_meathook), \
                  patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
                  patch.object(RoomCompiler, "build", return_value=fake_generated):
                 record = workflow.execute(_snapshot())
 
@@ -1119,8 +1132,9 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
                 self.assertEqual(state_after.readiness, "ready")
 
                 # Doctor now reports OK
-                report_after = doctor.run()
-                self.assertTrue(report_after.ok)
+                with patch("doom_eap.launcher.launcher_doctor._verify_linux_receipt", return_value={"state": "not_applicable"}):
+                    report_after = doctor.run()
+                    self.assertTrue(report_after.ok)
 
 
 class TestWindowsNativeClientLifecycle(unittest.TestCase):

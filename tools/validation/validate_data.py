@@ -824,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         errors.append(f"Packaged location names invalid: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
-    reserved_location_ids = {7770055, 7770068}
+    reserved_location_ids = {7770055, 7770068, 7770358}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
     if reused_location_ids:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
