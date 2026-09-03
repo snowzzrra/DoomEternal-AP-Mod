@@ -451,6 +451,30 @@ class TestCIPreflight(unittest.TestCase):
         self.assertNotIn(".github/workflows/ci.yml", DEPENDENCY_FILES)
         self.assertNotIn("README.md", DEPENDENCY_FILES)
 
+    def test_requirements_ci_contains_schema_pin(self):
+        req_ci = (REPO_ROOT / "requirements-ci.txt").read_text(encoding="utf-8")
+        self.assertIn("schema==0.7.8", req_ci)
+
+    def test_workflow_preflight_dependency_contract(self):
+        wf_path = REPO_ROOT / ".github/workflows/cross-platform-build.yml"
+        doc = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
+        preflight_steps = doc["jobs"]["preflight"]["steps"]
+
+        # Cache key includes requirements-ci.txt
+        setup_py = next(s for s in preflight_steps if "setup-python" in s.get("uses", ""))
+        cache_paths = setup_py["with"]["cache-dependency-path"]
+        self.assertIn("requirements-ci.txt", cache_paths)
+        self.assertIn("requirements-launcher.txt", cache_paths)
+
+        # Pip install step includes requirements-ci and pip check before projections
+        step_runs = [s.get("run", "") for s in preflight_steps]
+        install_step = next(r for r in step_runs if "requirements-ci.txt" in r)
+        self.assertIn("pip check", install_step)
+
+        # Confirm no full Archipelago requirements installation anywhere
+        raw_wf = wf_path.read_text(encoding="utf-8")
+        self.assertNotIn("Archipelago/requirements.txt", raw_wf)
+
 
 if __name__ == "__main__":
     unittest.main()

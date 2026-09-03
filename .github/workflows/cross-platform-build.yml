@@ -85,7 +85,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: DoomEternal-AP-Mod/requirements-launcher.txt
+          cache-dependency-path: |
+            DoomEternal-AP-Mod/requirements-launcher.txt
+            DoomEternal-AP-Mod/requirements-ci.txt
 
       - name: Install Qt Runtime Libraries
         run: |
@@ -98,6 +100,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
           python -m pip install -r requirements-ci.txt
+          python -m pip check
 
       - name: Static Undefined Name Check (F821/F822/F823)
         run: |
@@ -540,7 +543,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: DoomEternal-AP-Mod/requirements-launcher.txt
+          cache-dependency-path: |
+            DoomEternal-AP-Mod/requirements-launcher.txt
+            DoomEternal-AP-Mod/requirements-ci.txt
 
       - name: Install Python Dependencies
         run: |
@@ -548,6 +553,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
           python -m pip install -r requirements-ci.txt
+          python -m pip check
 
       - name: Download Build Handoff Artifact
         uses: actions/download-artifact@v4
