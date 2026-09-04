@@ -154,7 +154,87 @@ def _run_self_test(arguments: list[str]) -> int:
         print(f"  [FAIL] LauncherController / LauncherUI instantiation failed: {e}", file=sys.stderr)
         return 1
 
-    # 4. Assembled-package validation (if package present or explicitly requested)
+    # 3b. Windows filesystem corrective smoke: publish helper, dependency
+    # cache-hit lock release, no-game doctor, and unique support-bundle names.
+    try:
+        import hashlib
+        import time
+
+        from doom_eap.launcher.launcher_doctor import LauncherDoctor, write_support_bundle
+        from doom_eap.launcher.launcher_platform import DependencyManager, DependencySpec, publish_file
+
+        with tempfile.TemporaryDirectory(prefix="doomeap_selftest_fs_") as tmp_str:
+            tmp_root = Path(tmp_str)
+            env_override = {
+                "XDG_CONFIG_HOME": str(tmp_root / "config"),
+                "XDG_STATE_HOME": str(tmp_root / "state"),
+                "XDG_DATA_HOME": str(tmp_root / "data"),
+                "APPDATA": str(tmp_root / "config"),
+                "LOCALAPPDATA": str(tmp_root / "state"),
+            }
+            for key, value in env_override.items():
+                Path(value).mkdir(parents=True, exist_ok=True)
+            old_env = {k: os.environ.get(k) for k in env_override}
+            try:
+                for k, v in env_override.items():
+                    os.environ[k] = v
+
+                incoming = tmp_root / "payload.incoming"
+                incoming.write_bytes(b"selftest")
+                final = tmp_root / "payload.bin"
+                publish_file(incoming, final, operation="selftest_publish")
+                if final.read_bytes() != b"selftest" or incoming.exists():
+                    raise RuntimeError("publish_file round-trip failed")
+                print("  [OK] publish_file round-trip verified")
+
+                content = b"selftest_dependency"
+                artifact = tmp_root / "SelfTestTool.dll"
+                artifact.write_bytes(content)
+                spec = DependencySpec(
+                    name="SelfTestTool",
+                    version="1.0",
+                    url="https://example.com/SelfTestTool.dll",
+                    sha256=hashlib.sha256(content).hexdigest(),
+                    executable_glob="SelfTestTool.dll",
+                    archive_type="file",
+                )
+                manager = DependencyManager(tmp_root / "deps")
+                installed = manager.acquire(
+                    spec, consent=lambda _s: True, local_artifact=artifact
+                )
+
+                def _refuse_consent(_s):
+                    raise RuntimeError("cache hit must not request consent")
+
+                cached = manager.acquire(spec, consent=_refuse_consent)
+                if cached.executable != installed.executable:
+                    raise RuntimeError("dependency cache-hit mismatch")
+                if manager.inspect(spec) is None:
+                    raise RuntimeError("dependency lock not released after cache hit")
+                print("  [OK] dependency cache-hit lock release verified")
+
+                report = LauncherDoctor(config={}).run()
+                if not report.diagnostics:
+                    raise RuntimeError("no-game doctor run produced no diagnostics")
+                bundle = tmp_root / "support.zip"
+                first = write_support_bundle(
+                    bundle, report, logs=["self-test"], session_start=time.time()
+                )
+                second = write_support_bundle(
+                    bundle, report, logs=["self-test"], session_start=0.0
+                )
+                if first != bundle or second == bundle or not second.is_file():
+                    raise RuntimeError("support-bundle unique naming failed")
+                print("  [OK] no-game doctor and unique support bundle verified")
+            finally:
+                for k, v in old_env.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+    except Exception as e:
+        print(f"  [FAIL] Filesystem corrective self-test failed: {e}", file=sys.stderr)
+        return 1
     app_dir = application_directory()
     is_assembled = (app_dir / "RELEASE_MANIFEST.json").is_file() or (app_dir / "client" / "data" / "options_schema.json").is_file()
 

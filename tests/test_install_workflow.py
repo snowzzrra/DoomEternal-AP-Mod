@@ -2,6 +2,7 @@ from dataclasses import asdict
 import hashlib
 import io
 import json
+import multiprocessing
 import os
 import shutil
 import ssl
@@ -32,12 +33,13 @@ from doom_eap.launcher.launcher_doctor import (
     _log_freshness,
     write_support_bundle,
 )
-from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
+from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, setup_failure_payload
 from doom_eap.launcher.launcher_platform import (
     WINDOWS_INJECTOR_REQUIRED_MEMBERS,
     WINDOWS_MOD_INJECTOR,
     DependencyManager,
     DependencySpec,
+    FilePublicationError,
     InstalledDependency,
     PrerequisiteStatus,
     UrlDownloadTransport,
@@ -47,6 +49,7 @@ from doom_eap.launcher.launcher_platform import (
     is_transient_download_error,
     probe_meathook,
     probe_runtime_prerequisites,
+    publish_file,
     stage_windows_injector_toolchain,
 )
 
@@ -1700,6 +1703,225 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
                 # Verify sandbox restored
                 self.assertTrue(sandbox_exe.is_file())
                 self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), sandbox_sha)
+
+
+def _acquire_cache_entry_worker(payload):
+    """Multiprocessing target: acquire one file dependency from a shared cache root."""
+    from pathlib import Path
+
+    from doom_eap.launcher.launcher_platform import DependencyManager, DependencySpec
+
+    manager = DependencyManager(Path(payload["root"]))
+    spec = DependencySpec(**payload["spec"])
+    installed = manager.acquire(
+        spec,
+        consent=lambda _s: True,
+        local_artifact=Path(payload["artifact"]),
+    )
+    return installed.executable
+
+
+class TestWindowsFilesystemCorrective(unittest.TestCase):
+    """Cache-hit, cross-process, no-game, and publication coverage for Errno 13."""
+
+    def _file_spec(self, tmp: Path, name="CacheTool", version="1.0"):
+        artifact = tmp / f"{name}.dll"
+        content = f"{name}_bytes_{version}".encode("utf-8")
+        artifact.write_bytes(content)
+        spec = DependencySpec(
+            name=name,
+            version=version,
+            url=f"https://example.com/{name}.dll",
+            sha256=hashlib.sha256(content).hexdigest(),
+            executable_glob=f"{name}.dll",
+            archive_type="file",
+        )
+        return spec, artifact
+
+    def test_cache_hit_needs_no_consent_and_releases_lock(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            spec, artifact = self._file_spec(tmp)
+            manager = DependencyManager(tmp / "deps")
+            installed = manager.acquire(spec, consent=lambda _s: True, local_artifact=artifact)
+
+            def _refuse_consent(_s):
+                raise AssertionError("cache hit must not request consent")
+
+            cached = manager.acquire(spec, consent=_refuse_consent)
+            self.assertEqual(cached.executable, installed.executable)
+
+            # A follow-up guarded inspection must complete: the cache-hit
+            # return path released the cross-process lock.
+            inspected = manager.inspect(spec)
+            self.assertIsNotNone(inspected)
+            assert inspected is not None
+            self.assertEqual(inspected.executable, installed.executable)
+
+    def test_concurrent_threads_serialize_cache_publication(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            spec, artifact = self._file_spec(tmp)
+            errors: list = []
+
+            def _worker():
+                try:
+                    DependencyManager(tmp / "deps").acquire(
+                        spec, consent=lambda _s: True, local_artifact=artifact
+                    )
+                except Exception as error:  # pragma: no cover - failure path
+                    errors.append(error)
+
+            threads = [threading.Thread(target=_worker) for _ in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=120)
+                self.assertFalse(thread.is_alive())
+            self.assertEqual(errors, [])
+            installed = DependencyManager(tmp / "deps").inspect(spec)
+            self.assertIsNotNone(installed)
+
+    def test_cross_process_acquisition_serializes(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            spec, artifact = self._file_spec(tmp)
+            payload = {
+                "root": str(tmp / "deps"),
+                "artifact": str(artifact),
+                "spec": {
+                    "name": spec.name,
+                    "version": spec.version,
+                    "url": spec.url,
+                    "sha256": spec.sha256,
+                    "executable_glob": spec.executable_glob,
+                    "archive_type": spec.archive_type,
+                },
+            }
+            context = multiprocessing.get_context("spawn")
+            with context.Pool(processes=2) as pool:
+                results = pool.map_async(
+                    _acquire_cache_entry_worker, [payload, payload]
+                ).get(timeout=180)
+            self.assertEqual(len(results), 2)
+            self.assertEqual(results[0], results[1])
+            self.assertTrue(Path(results[0]).is_file())
+
+    def test_publish_file_moves_bytes_and_reports_rich_errors(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            source = tmp / "incoming.bin"
+            source.write_bytes(b"published_bytes")
+            destination = tmp / "final.bin"
+            publish_file(source, destination, operation="test_publish")
+            self.assertEqual(destination.read_bytes(), b"published_bytes")
+            self.assertFalse(source.exists())
+
+            missing = tmp / "absent.bin"
+            with self.assertRaises(FilePublicationError) as ctx:
+                publish_file(missing, tmp / "never.bin", operation="test_publish_missing")
+            error = ctx.exception
+            self.assertEqual(error.operation, "test_publish_missing")
+            self.assertIsNotNone(error.source_path)
+            self.assertIsNotNone(error.destination_path)
+            self.assertIn("test_publish_missing", str(error))
+
+    def test_publication_stress_many_files(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            errors: list = []
+
+            def _worker(worker_id: int):
+                try:
+                    for index in range(10):
+                        source = tmp / f"stress-{worker_id}-{index}.incoming"
+                        source.write_bytes(f"{worker_id}:{index}".encode("utf-8"))
+                        destination = tmp / "out" / f"stress-{worker_id}-{index}.bin"
+                        publish_file(source, destination, operation="test_stress")
+                        assert destination.read_bytes() == f"{worker_id}:{index}".encode(
+                            "utf-8"
+                        )
+                except Exception as error:  # pragma: no cover - failure path
+                    errors.append(error)
+
+            threads = [threading.Thread(target=_worker, args=(wid,)) for wid in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=120)
+                self.assertFalse(thread.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(len(list((tmp / "out").iterdir())), 40)
+
+    def test_setup_failure_payload_carries_filesystem_fields(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            source = tmp / "incoming.bin"
+            source.write_bytes(b"x")
+            destination = tmp / "final.bin"
+            try:
+                publish_file(source, destination, operation="room_package_publish")
+            except FilePublicationError:  # pragma: no cover - Linux publishes fine
+                pass
+            cause = OSError(13, "Permission denied")
+            error = FilePublicationError(
+                "room_package_publish",
+                source,
+                destination,
+                attempts=3,
+                cause=cause,
+            )
+            payload = setup_failure_payload(error, phase="room_package")
+            self.assertEqual(payload["errno"], 13)
+            self.assertEqual(payload["operation"], "room_package_publish")
+            self.assertIn("final.bin", str(payload["destination_path"]))
+            self.assertIn("room_package_publish", str(payload["message"]))
+
+    def test_doctor_runs_without_game_and_bundle_filename_is_unique(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            report = LauncherDoctor(config={}).run()
+            self.assertIsInstance(report, DoctorReport)
+            self.assertTrue(report.diagnostics)
+
+            destination = tmp / "support.zip"
+            first = write_support_bundle(
+                destination, report, logs=["no game configured"], session_start=time.time()
+            )
+            self.assertEqual(first, destination)
+            second = write_support_bundle(
+                destination, report, logs=["retry after failure"], session_start=time.time()
+            )
+            self.assertNotEqual(second, destination)
+            self.assertTrue(destination.is_file())
+            self.assertTrue(second.is_file())
+            for bundle in (destination, second):
+                with zipfile.ZipFile(bundle) as archive:
+                    self.assertIn("doctor.json", archive.namelist())
+
+    def test_controller_support_bundle_without_game(self):
+        import doom_eap.launcher.launcher_controller as lc
+
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            app_dir = tmp / "app"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            data_dir = app_dir / "data"
+            data_dir.mkdir(parents=True, exist_ok=True)
+            schema_src = Path(__file__).parents[1] / "data" / "options_schema.json"
+            if schema_src.is_file():
+                shutil.copy(schema_src, data_dir / "options_schema.json")
+            controller = lc.LauncherController(application_dir=app_dir)
+            try:
+                controller.config = {}
+                bundle = controller.create_support_bundle(
+                    tmp / "support.zip", logs=["no game installed"]
+                )
+                self.assertTrue(bundle.is_file())
+                with zipfile.ZipFile(bundle) as archive:
+                    self.assertIn("doctor.json", archive.namelist())
+            finally:
+                controller.close()
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ from .launcher_platform import (
     PrerequisiteStatus,
     detect_doom_processes,
     probe_meathook,
+    publish_file,
     redact_secrets,
     resolve_doom_config_path,
     validate_game_root,
@@ -1226,9 +1227,22 @@ def write_support_bundle(
     support_condump: Mapping[str, object] | None = None,
     support_diagnostics: Mapping[str, object] | None = None,
 ) -> Path:
-    """Write bounded diagnostics and redacted logs with freshness metadata."""
+    """Write bounded diagnostics and redacted logs with freshness metadata.
+
+    The destination is never clobbered: when it already exists a UTC
+    timestamped sibling is used instead, so repeated support reports cannot
+    collide with a locked or in-use previous bundle.
+    """
     destination = destination.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        candidate = destination.with_name(f"{destination.stem}_{stamp}{destination.suffix}")
+        counter = 2
+        while candidate.exists():
+            candidate = destination.with_name(f"{destination.stem}_{stamp}_{counter}{destination.suffix}")
+            counter += 1
+        destination = candidate
     tails, provenance = _support_log_tails(
         config, paths, application_dir, session_start=session_start
     )
@@ -1308,7 +1322,7 @@ def write_support_bundle(
             archive.writestr(name, tail)
         if condump_content is not None:
             archive.writestr("AP_SUPPORT_FILE.txt", condump_content)
-    os.replace(temporary, destination)
+    publish_file(temporary, destination, operation="support_bundle_publish")
     return destination
 
 
@@ -1380,8 +1394,18 @@ class LauncherDoctor:
         selected_spec = idfile_decompressor_spec()
         if data_dir is not None and selected_spec is not None:
             codec_manager = DependencyManager(data_dir / "dependencies")
-            if codec_manager.platform_supported(selected_spec):
-                if codec_manager.inspect(selected_spec) is None:
+            try:
+                codec_supported = codec_manager.platform_supported(selected_spec)
+                codec_inspected = codec_manager.inspect(selected_spec) if codec_supported else None
+                codec_legacy_present = (
+                    not codec_supported and codec_manager.cache_present(selected_spec)
+                )
+            except (OSError, TimeoutError, RuntimeError):
+                codec_supported = False
+                codec_inspected = None
+                codec_legacy_present = False
+            if codec_supported:
+                if codec_inspected is None:
                     actions.append(RepairAction(
                         "repair_idfile_decompressor",
                         "Repair idFileDeCompressor cache",
@@ -1400,7 +1424,7 @@ class LauncherDoctor:
                         True,
                         "Room package repair reacquires tool after consent.",
                     ))
-            elif codec_manager.cache_present(selected_spec):
+            elif codec_legacy_present:
                 actions.append(RepairAction(
                     "remove_idfile_decompressor",
                     "Remove unsupported idFileDeCompressor cache",
@@ -1506,7 +1530,7 @@ class LauncherDoctor:
         backup = backups / "launcher_setup.json"
         if backup.exists():
             raise ValueError("repair backup already exists; restore or remove it first")
-        os.replace(receipt, backup)
+        publish_file(receipt, backup, operation="archive_install_record")
         return backup
 
     def restore_archived_install_record(self) -> Path:
@@ -1517,7 +1541,7 @@ class LauncherDoctor:
         receipt = state_dir / "launcher_setup.json"
         if not backup.is_file() or receipt.exists():
             raise ValueError("install record rollback is unavailable")
-        os.replace(backup, receipt)
+        publish_file(backup, receipt, operation="restore_install_record")
         return receipt
 
     def run(self) -> DoctorReport:
@@ -1627,7 +1651,15 @@ class LauncherDoctor:
             checks.append(Diagnostic("mod_injection", "not_applicable", "No room package receipt is available"))
             checks.append(Diagnostic("windows_mod_installer", "not_applicable", "No room package receipt is available"))
 
-        actions = self.repair_actions()
+        try:
+            actions = self.repair_actions()
+        except Exception as error:
+            actions = ()
+            checks.append(Diagnostic(
+                "room_mod",
+                "invalid",
+                f"room repair inspection is unavailable: {type(error).__name__}: {error}",
+            ))
         room_actions = tuple(
             action for action in actions
             if action.action_id in {

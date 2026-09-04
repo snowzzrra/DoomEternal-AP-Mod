@@ -355,6 +355,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
+      - name: Windows Filesystem Corrective Gate
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/test_install_workflow.py::TestWindowsFilesystemCorrective -q
+
       - name: Build Windows Frozen Launcher
         run: |
           python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher

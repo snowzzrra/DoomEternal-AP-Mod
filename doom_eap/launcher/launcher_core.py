@@ -28,7 +28,7 @@ from tools.decls.devinv_builder import (
     build_tag_devinv_overrides,
     output_path_for_map,
 )
-from .launcher_platform import IDFILE_DECOMPRESSOR
+from .launcher_platform import IDFILE_DECOMPRESSOR, publish_file
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -1254,7 +1254,15 @@ class RoomCompiler:
         if not manifest.static_precompile:
             self._apply_placement_entities(assembled, placements)
             self._apply_placement_strings(assembled, placements)
-        write_deterministic_zip(assembled, destination)
+        incoming = destination.with_name(f".{destination.name}.incoming")
+        try:
+            write_deterministic_zip(assembled, incoming)
+            publish_file(incoming, destination, operation="room_package_publish")
+        finally:
+            try:
+                incoming.unlink()
+            except OSError:
+                pass
         with zipfile.ZipFile(destination) as output:
             expected = set(assembled)
             if set(output.namelist()) != expected:
@@ -1315,7 +1323,7 @@ class InstallPlan:
         self.target.mkdir(parents=True, exist_ok=True)
         temporary = self._record_path().with_suffix(".tmp")
         temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, self._record_path())
+        publish_file(temporary, self._record_path(), operation="install_record_publish")
 
     def install(self, record: InstallRecord, *, fail_after: int | None = None) -> InstallRecord:
         files = sorted(path for path in self.source.rglob("*") if path.is_file())
@@ -1356,7 +1364,7 @@ class InstallPlan:
                     shutil.copy2(destination, backup)
                 incoming = destination.with_name(f".{destination.name}.incoming")
                 shutil.copy2(source_path, incoming)
-                os.replace(incoming, destination)
+                publish_file(incoming, destination, operation="install_file_publish")
                 applied.append(relative)
                 if fail_after is not None and index >= fail_after:
                     raise RuntimeError("injected install failure")
@@ -1365,7 +1373,7 @@ class InstallPlan:
                 destination = self.target / relative
                 backup = rollback / relative
                 if backup.exists():
-                    os.replace(backup, destination)
+                    publish_file(backup, destination, operation="install_rollback_restore")
                 else:
                     destination.unlink(missing_ok=True)
             record.state = "failed"
@@ -1386,7 +1394,7 @@ class InstallPlan:
             backup = rollback / relative if rollback else None
             if backup is not None and backup.exists():
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(backup, destination)
+                publish_file(backup, destination, operation="install_rollback_restore")
             else:
                 destination.unlink(missing_ok=True)
         record.state = "failed"
@@ -1687,7 +1695,7 @@ class LaunchWorkflow:
                 temporary.write(json.dumps(config, indent=2, sort_keys=True) + "\n")
                 temporary.flush()
                 os.fsync(temporary.fileno())
-            os.replace(temporary_name, path)
+            publish_file(temporary_name, path, operation="client_config_publish")
         finally:
             if temporary_name is not None:
                 Path(temporary_name).unlink(missing_ok=True)

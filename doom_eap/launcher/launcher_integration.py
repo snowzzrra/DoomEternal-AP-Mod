@@ -31,6 +31,7 @@ from .launcher_platform import (
     idfile_decompressor_spec,
     probe_meathook,
     probe_runtime_prerequisites,
+    publish_file,
     stage_room_mod,
     verify_linux_mod_installation,
 )
@@ -164,6 +165,20 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "raw_message": raw_message,
         "technical_error_type": type(error).__name__,
         "technical_message": raw_message,
+        "errno": getattr(error, "cause_errno", getattr(error, "errno", None)),
+        "winerror": getattr(error, "cause_winerror", getattr(error, "winerror", None)),
+        "filename": getattr(
+            error, "cause_filename", getattr(error, "filename", None)
+        )
+        or getattr(error, "source_path", None),
+        "filename2": getattr(
+            error, "cause_filename2", getattr(error, "filename2", None)
+        )
+        or getattr(error, "destination_path", None),
+        "operation": getattr(error, "operation", None),
+        "source_path": getattr(error, "source_path", None),
+        "destination_path": getattr(error, "destination_path", None),
+        "attempt_count": getattr(error, "attempt_count", None),
         "stage": phase or "setup",
         "failure_domain": failure_domain,
         "recovery_action": recovery_action,
@@ -919,7 +934,7 @@ class IntegratedLaunchWorkflow:
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, receipt_path)
+        publish_file(temporary, receipt_path, operation="setup_receipt_publish")
         if adapter.state == "manual_install_required":
             self._emit(
                 "manual_install_required",
@@ -983,7 +998,7 @@ class IntegratedLaunchWorkflow:
         temporary = receipt_path.with_suffix(".tmp")
         try:
             temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            os.replace(temporary, receipt_path)
+            publish_file(temporary, receipt_path, operation="uninstall_attention_publish")
         except Exception as error:
             try:
                 temporary.unlink()
@@ -1003,7 +1018,7 @@ class IntegratedLaunchWorkflow:
             )
             try:
                 temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-                os.replace(temporary, receipt_path)
+                publish_file(temporary, receipt_path, operation="uninstall_failed_publish")
             except Exception as error:
                 try:
                     temporary.unlink()
@@ -1120,7 +1135,7 @@ class IntegratedLaunchWorkflow:
         )
         try:
             temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            os.replace(temporary, receipt_path)
+            publish_file(temporary, receipt_path, operation="uninstall_receipt_publish")
         except Exception as error:
             try:
                 temporary.unlink()
@@ -1225,7 +1240,7 @@ class IntegratedLaunchWorkflow:
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, receipt_path)
+        publish_file(temporary, receipt_path, operation="manual_confirm_publish")
         return record
 
 

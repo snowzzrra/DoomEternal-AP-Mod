@@ -468,6 +468,158 @@ def probe_runtime_prerequisites(
     return RuntimePrerequisiteReport(tuple(checks))
 
 
+ERROR_ACCESS_DENIED = 5
+ERROR_SHARING_VIOLATION = 32
+ERROR_LOCK_VIOLATION = 33
+_WINDOWS_TRANSIENT_WINERRORS = frozenset({ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION})
+_WINDOWS_MUTEX_TIMEOUT_MS = 30000
+_WINDOWS_PUBLISH_RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8, 1.0)
+
+
+class FilePublicationError(OSError):
+    """Rich failure for launcher-owned temp/incoming file publication.
+
+    Carries operation, source, destination, and attempt count alongside the
+    underlying errno/winerror/filename evidence. Never includes secrets.
+    """
+
+    def __init__(
+        self,
+        operation: object,
+        source: Path | str,
+        destination: Path | str,
+        attempts: int,
+        *,
+        cause: BaseException | None = None,
+    ):
+        self.operation = str(operation)
+        self.source_path = str(source)
+        self.destination_path = str(destination)
+        self.attempt_count = int(attempts)
+        self.cause_errno = getattr(cause, "errno", None) if cause is not None else None
+        self.cause_winerror = getattr(cause, "winerror", None) if cause is not None else None
+        self.cause_filename = getattr(cause, "filename", None) if cause is not None else None
+        self.cause_filename2 = getattr(cause, "filename2", None) if cause is not None else None
+        detail = f"{type(cause).__name__}: {cause}" if cause is not None else "unknown error"
+        message = (
+            "Windows file publication failed: "
+            f"operation={self.operation} "
+            f"source={self.source_path} "
+            f"destination={self.destination_path} "
+            f"errno={self.cause_errno} "
+            f"winerror={self.cause_winerror} "
+            f"attempts={self.attempt_count} "
+            f"({detail})"
+        )
+        super().__init__(message)
+        # NOTE: OSError core fields (errno/filename) are deliberately left
+        # unset: assigning them post-hoc makes OSError.__str__ discard the
+        # rich message above and reformat as "[Errno N] None: ...". Filesystem
+        # evidence stays available via the cause_* attributes instead.
+        if cause is not None:
+            self.__cause__ = cause
+
+
+def _is_transient_windows_publish_error(error: OSError) -> bool:
+    """Classify Windows sharing/access failures safe for bounded publication retry."""
+    if getattr(error, "winerror", None) in _WINDOWS_TRANSIENT_WINERRORS:
+        return True
+    return isinstance(error, PermissionError) and getattr(error, "errno", None) == 13
+
+
+def publish_file(
+    source: Path | str,
+    destination: Path | str,
+    *,
+    operation: str,
+    timeout: float = 3.0,
+) -> Path:
+    """Publish a launcher-owned temp/incoming file to its final destination.
+
+    Same-filesystem atomic os.replace remains the mechanism. Linux behavior is
+    effectively unchanged (single attempt). On Windows only, transient
+    sharing/access failures (winerror 5/32/33, errno 13) are retried with
+    bounded backoff totaling at most ~timeout seconds. Only use where the
+    launcher owns source and publication and retrying the replace is safe.
+    """
+    source_path = Path(source)
+    destination_path = Path(destination)
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    attempts = 0
+    delays = _WINDOWS_PUBLISH_RETRY_DELAYS if os.name == "nt" else ()
+    deadline = time.monotonic() + max(0.0, timeout)
+    delay_index = 0
+    while True:
+        attempts += 1
+        try:
+            os.replace(source_path, destination_path)
+            return destination_path
+        except OSError as error:
+            retryable = os.name == "nt" and _is_transient_windows_publish_error(error)
+            wait = delays[min(delay_index, len(delays) - 1)] if retryable and delays else 0.0
+            delay_index += 1
+            if not retryable or time.monotonic() + wait > deadline:
+                raise FilePublicationError(operation, source_path, destination_path, attempts, cause=error) from error
+            time.sleep(wait)
+
+
+def _dependency_mutex_name(root: Path | str, cache_key: str) -> str:
+    """Derive the Local\\ session mutex name serializing one dependency cache entry."""
+    identity = f"{Path(root).resolve()}|{cache_key}"
+    return "Local\\DoomEAP.DependencyCache." + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def _acquire_windows_mutex(name: str, timeout_ms: int = _WINDOWS_MUTEX_TIMEOUT_MS) -> tuple[int, bool]:
+    """Acquire a named Windows mutex. Returns (handle, abandoned)."""
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    kernel32.WaitForSingleObject.restype = ctypes.c_uint32
+    kernel32.GetLastError.argtypes = []
+    kernel32.GetLastError.restype = ctypes.c_uint32
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_bool
+
+    handle = kernel32.CreateMutexW(None, False, name)
+    if not handle:
+        code = kernel32.GetLastError()
+        error = OSError(f"Windows dependency cache lock creation failed: name={name} winerror={code}")
+        error.winerror = code  # type: ignore[attr-defined]
+        raise error
+    result = kernel32.WaitForSingleObject(handle, timeout_ms)
+    if result == 0x0:
+        return int(handle), False
+    if result == 0x80:
+        return int(handle), True
+    kernel32.CloseHandle(handle)
+    if result == 0x102:
+        raise TimeoutError(
+            f"Windows dependency cache lock timeout: name={name} timeout_ms={timeout_ms}"
+        )
+    code = kernel32.GetLastError()
+    error = OSError(f"Windows dependency cache lock wait failed: name={name} winerror={code}")
+    error.winerror = code  # type: ignore[attr-defined]
+    raise error
+
+
+def _release_windows_mutex(handle: int) -> None:
+    """Release a named Windows mutex handle. CloseHandle always runs."""
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    kernel32.ReleaseMutex.argtypes = [ctypes.c_void_p]
+    kernel32.ReleaseMutex.restype = ctypes.c_bool
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_bool
+    try:
+        kernel32.ReleaseMutex(ctypes.c_void_p(handle))
+    finally:
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+
+
 @dataclass(frozen=True)
 class DependencySpec:
     name: str
@@ -664,7 +816,7 @@ def install_meathook(
             raise RuntimeError(
                 f"Staged Meathook DLL hash mismatch: expected {MEATHOOK.sha256}, got {incoming_sha}"
             )
-        os.replace(incoming, dll_path)
+        publish_file(incoming, dll_path, operation="meathook_publish")
     except Exception as error:
         incoming.unlink(missing_ok=True)
         raise RuntimeError(f"Failed to install Game Link runtime into DOOM folder: {error}") from error
@@ -757,7 +909,7 @@ class DependencyManager:
             destination = self._acquisition_path(spec)
             temporary = destination.with_suffix(".tmp")
             temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            os.replace(temporary, destination)
+            publish_file(temporary, destination, operation="dependency_diagnostic_receipt")
         except OSError:
             pass
         if self.diagnostic_sink is not None:
@@ -772,30 +924,43 @@ class DependencyManager:
 
     @contextmanager
     def _cache_lock(self, spec: DependencySpec):
-        """Serialize cache inspection and publication across launcher processes."""
+        """Serialize cache inspection and publication across launcher processes.
+
+        Windows uses a named session mutex (Local\\ + sha256 of cache root and
+        entry identity) with a 30s wait. Byte-range locks on a buffered handle
+        cannot serialize here because the diagnostic receipt write closes the
+        handle before the guarded section exits. Linux keeps fcntl.flock.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
-        lock_path = self.root / f".{self._cache_key(spec)}.lock"
+        cache_key = self._cache_key(spec)
+        if os.name == "nt":
+            mutex_name = _dependency_mutex_name(self.root, cache_key)
+            handle, abandoned = _acquire_windows_mutex(mutex_name)
+            if abandoned and self.diagnostic_sink is not None:
+                try:
+                    self.diagnostic_sink("dependency_diagnostic", {
+                        "name": spec.name,
+                        "version": spec.version,
+                        "platform": self._platform_name(),
+                        "state": "cache_lock_abandoned",
+                        "source_url": spec.url,
+                    })
+                except Exception:
+                    pass
+            try:
+                yield
+            finally:
+                _release_windows_mutex(handle)
+            return
+        lock_path = self.root / f".{cache_key}.lock"
         with lock_path.open("a+b") as lock:
-            if os.name == "nt":
-                import msvcrt
+            import fcntl
 
-                lock.seek(0)
-                lock.write(b"0")
-                lock.flush()
-                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-                try:
-                    yield
-                finally:
-                    lock.seek(0)
-                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-                try:
-                    yield
-                finally:
-                    fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -972,8 +1137,8 @@ class DependencyManager:
         receipt["executable"] = str((destination / relative_executable).resolve())
         incoming_receipt = legacy / f".{self.RECEIPT}.incoming"
         incoming_receipt.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(incoming_receipt, receipt_path)
-        os.replace(legacy, destination)
+        publish_file(incoming_receipt, receipt_path, operation="dependency_receipt_publish")
+        publish_file(legacy, destination, operation="dependency_legacy_promote")
 
     def acquire(
         self,
@@ -1082,12 +1247,12 @@ class DependencyManager:
                     else:
                         previous.unlink()
                 if destination.exists():
-                    os.replace(destination, previous)
+                    publish_file(destination, previous, operation="dependency_rotate")
                 try:
-                    os.replace(staged, destination)
+                    publish_file(staged, destination, operation="dependency_publish")
                 except Exception:
                     if previous.exists() and not destination.exists():
-                        os.replace(previous, destination)
+                        publish_file(previous, destination, operation="dependency_rollback")
                     raise
                 if previous.exists():
                     shutil.rmtree(previous) if previous.is_dir() else previous.unlink()
@@ -1409,7 +1574,7 @@ def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
     destination = mods / mod_zip.name
     incoming = destination.with_name(f".{destination.name}.incoming")
     shutil.copy2(mod_zip, incoming)
-    os.replace(incoming, destination)
+    publish_file(incoming, destination, operation="room_mod_stage")
     return destination
 
 
@@ -1489,7 +1654,7 @@ def stage_room_mod(
     ownership_receipt.parent.mkdir(parents=True, exist_ok=True)
     temporary = ownership_receipt.with_suffix(f"{ownership_receipt.suffix}.tmp")
     temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, ownership_receipt)
+    publish_file(temporary, ownership_receipt, operation="room_receipt_publish")
     return staged
 
 
@@ -1582,7 +1747,7 @@ def stage_windows_injector_toolchain(
             incoming.write_bytes(src_bytes)
             if hashlib.sha256(incoming.read_bytes()).hexdigest() != src_sha:
                 raise RuntimeError(f"staging validation failed for {rel_path}")
-            os.replace(incoming, dest)
+            publish_file(incoming, dest, operation="injector_stage")
         finally:
             if incoming.exists():
                 try:
@@ -1634,7 +1799,7 @@ def hold_sandbox(
 
     # 1. Deterministic recovery from previous crash or stale hold
     if not original.exists() and hold.is_file():
-        os.replace(hold, original)
+        publish_file(hold, original, operation="sandbox_recover")
         recovered_size = original.stat().st_size
         recovered_sha = hashlib.sha256(original.read_bytes()).hexdigest()
         if tx_file and tx_file.is_file():
@@ -1685,7 +1850,7 @@ def hold_sandbox(
         tx_file.write_text(json.dumps(tx_data, indent=2) + "\n", encoding="utf-8")
 
     # 6. Atomically move original -> hold
-    os.replace(original, hold)
+    publish_file(original, hold, operation="sandbox_hold")
     if event_sink is not None:
         event_sink(
             "injector_sandbox_guard",
@@ -1699,7 +1864,7 @@ def hold_sandbox(
         yield
     finally:
         if hold.is_file():
-            os.replace(hold, original)
+            publish_file(hold, original, operation="sandbox_restore")
             restored_size = original.stat().st_size
             restored_sha = hashlib.sha256(original.read_bytes()).hexdigest()
 
@@ -2673,7 +2838,7 @@ class SteamLaunchOptionsManager:
         payload = {"app_id": DOOM_ETERNAL_APP_ID, "launch_options": plan.previous}
         temporary = backup_path.with_suffix(f"{backup_path.suffix}.tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        os.replace(temporary, backup_path)
+        publish_file(temporary, backup_path, operation="steam_backup_publish")
         return plan.proposed
 
     @staticmethod
@@ -2755,15 +2920,15 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
     path = path.resolve()
     temporary = path.with_name(f".{path.name}.doomeap_{os.getpid()}_{hashlib.sha256(content).hexdigest()[:8]}.tmp")
     try:
-        with open(temporary, "wb") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temporary, path)
+        with open(temporary, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        publish_file(temporary, path, operation="atomic_bytes_publish")
     finally:
         try:
             temporary.unlink()
-        except FileNotFoundError:
+        except OSError:
             pass
 
 

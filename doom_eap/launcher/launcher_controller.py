@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
 from .launcher_core import LaunchWorkflow, RoomSnapshot
-from .launcher_doctor import DoctorReport, LauncherDoctor, write_support_bundle
+from .launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor, write_support_bundle
 from .launcher_integration import (
     IntegratedLaunchWorkflow,
     IntegratedSetupRecord,
@@ -47,6 +47,7 @@ from .launcher_platform import (
     migrate_legacy_launcher_data,
     probe_meathook,
     probe_runtime_prerequisites,
+    publish_file,
     read_handshake_probe,
     redact_secrets,
     resolve_doom_config_path,
@@ -361,7 +362,7 @@ class LauncherController:
             json.dumps(self.config, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, self.config_path)
+        publish_file(temporary, self.config_path, operation="launcher_config_publish")
 
     def ensure_ammo_refill_keybind(self, *, force_check: bool = False) -> Path | None:
         """Write AP-owned Ammo Refill hotkey state and clean stale config binds."""
@@ -706,11 +707,39 @@ class LauncherController:
         raise ValueError("unsupported repair action")
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
-        support_condump = self._request_support_condump()
+        """Collect a support bundle without requiring a healthy game install.
+
+        Condump capture and doctor inspection are both best-effort: either may
+        degrade to an unavailable marker while the bundle still records logs,
+        configuration evidence, and the last setup failure.
+        """
+        try:
+            support_condump: dict[str, object] | None = self._request_support_condump()
+        except Exception as error:
+            support_condump = {
+                "status": "unavailable",
+                "reason": f"{type(error).__name__}: {error}",
+            }
+        try:
+            report = self.run_doctor()
+        except Exception as error:
+            report = DoctorReport(
+                LauncherDoctor.VERSION,
+                (Diagnostic(
+                    "support",
+                    "attention",
+                    f"doctor inspection is unavailable: {type(error).__name__}: {error}",
+                ),),
+                "needs_attention",
+                "",
+                "",
+                f"Support bundle collected without a doctor report: {error}",
+                {},
+            )
         diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
         bundle = write_support_bundle(
             destination,
-            self.run_doctor(),
+            report,
             logs=diagnostic_logs,
             config=self.config,
             paths=self.user_paths,
