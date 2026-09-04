@@ -395,7 +395,7 @@ class TestCIPreflight(unittest.TestCase):
             get_frozen_bundle_dir,
             validate_prebuilt_room_resources,
         )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
         self.assertTrue(bundle_dir.is_dir())
         result = validate_prebuilt_room_resources(bundle_dir, repo_root=REPO_ROOT)
         self.assertEqual(result["status"], "PASS")
@@ -405,7 +405,7 @@ class TestCIPreflight(unittest.TestCase):
             get_frozen_bundle_dir,
             validate_prebuilt_room_resources,
         )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_bundle = Path(tmpdir)
             for p in bundle_dir.iterdir():
@@ -421,7 +421,7 @@ class TestCIPreflight(unittest.TestCase):
             get_frozen_bundle_dir,
             validate_prebuilt_room_resources,
         )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.0")
+        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_bundle = Path(tmpdir)
             for p in bundle_dir.iterdir():

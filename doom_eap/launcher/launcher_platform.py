@@ -559,7 +559,7 @@ class RuntimePrerequisiteReport:
 
     @property
     def ok(self) -> bool:
-        """All mandatory 0.5.0 runtime prerequisites must be satisfied."""
+        """All mandatory 0.5.1 runtime prerequisites must be satisfied."""
         mandatory_keys = {"game", "meathook", "client_runtime"}
         return all(
             check.ok
@@ -719,7 +719,7 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe all mandatory and advisory 0.5.0 runtime prerequisites."""
+    """Probe all mandatory and advisory 0.5.1 runtime prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
     # 1. Game installation check
@@ -974,11 +974,12 @@ WINDOWS_INJECTOR_REQUIRED_MEMBERS: tuple[str, ...] = (
 
 WINDOWS_MOD_INJECTOR = DependencySpec(
     name="EternalModInjector",
-    version="2026-08-18",
-    url="https://gamebanana.com/dl/1788872",
-    sha256="94d2e04783800e983222f90b8eb304d02fc216e43c3a71f39cd324f5f1970a84",
+    version="2026-09-04",
+    url="https://gamebanana.com/dl/1806698",
+    sha256="129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480",
     executable_glob="**/EternalModInjector.bat",
     archive_type="zip",
+    expected_size=5182673,
 )
 
 # Compatibility alias
@@ -2208,6 +2209,46 @@ def hold_sandbox(
                 )
 
 
+def recover_stale_sandbox_hold(
+    game_root: Path,
+    *,
+    state_dir: Path | None = None,
+    event_sink: Callable[..., None] | None = None,
+) -> None:
+    sandbox_dir = game_root / SANDBOX_DIR_NAME
+    original = sandbox_dir / SANDBOX_EXE_NAME
+    hold = sandbox_dir / (SANDBOX_EXE_NAME + SANDBOX_HOLD_SUFFIX)
+    tx_file = (state_dir / SANDBOX_TRANSACTION_FILE) if state_dir is not None else None
+    if original.exists() and hold.exists():
+        raise RuntimeError(
+            f"Ambiguous sandbox state: both '{original}' and hold file '{hold}' exist. "
+            "Manual intervention is required to avoid data loss. Neither file was modified."
+        )
+    if original.exists() or not hold.is_file():
+        return
+    publish_file(hold, original, operation="sandbox_recover")
+    recovered_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+    recovered_size = original.stat().st_size
+    if tx_file is not None and tx_file.is_file():
+        try:
+            tx_data = json.loads(tx_file.read_text(encoding="utf-8"))
+            expected_sha = tx_data.get("sha256")
+            if expected_sha and recovered_sha != expected_sha:
+                raise RuntimeError(
+                    f"Stale sandbox hold recovery integrity failure: expected SHA-256 {expected_sha}, got {recovered_sha}"
+                )
+        finally:
+            tx_file.unlink(missing_ok=True)
+    if event_sink is not None:
+        event_sink(
+            "injector_sandbox_guard",
+            state="recovered_stale_hold",
+            verified=True,
+            sha256=recovered_sha,
+            size=recovered_size,
+        )
+
+
 class WindowsModInjectorAdapter:
     """Stage verified EternalModInjector toolchain, launch visible batch console, track process lifetime, and request player confirmation."""
 
@@ -2289,6 +2330,14 @@ class WindowsModInjectorAdapter:
         uninstall_confirmation: Callable[[], bool] | None = None,
     ) -> AdapterResult:
         try:
+            recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Could not recover stale sandbox hold left by an older launcher build: {error}.",
+                details={"staging_error": str(error)},
+            )
+        try:
             batch_executable = stage_windows_injector_toolchain(
                 self.dependency,
                 game_root,
@@ -2304,8 +2353,9 @@ class WindowsModInjectorAdapter:
         comspec = os.environ.get("COMSPEC", "cmd.exe")
         target_name = batch_executable.name if batch_executable.parent.resolve() == game_root.resolve() else str(batch_executable)
         command = (comspec, "/d", "/c", target_name)
-        with hold_sandbox(game_root, state_dir=self.state_dir, event_sink=self.event_sink):
-            result = self._run_process(game_root, command, staged_mod)
+        # The current Windows injector supports doomSandBox/DOOMSandBox64vk.exe
+        # directly, so the sandbox stays in place for the whole invocation.
+        result = self._run_process(game_root, command, staged_mod)
         if operation != "uninstall" or result.state != "applied":
             return result
 

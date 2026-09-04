@@ -249,16 +249,21 @@ def load_room_payload_manifest(
     return document
 
 
+def dlc_mission_map_keys() -> set[str]:
+    """Return catalog map keys whose AP mission content requires DLC missions."""
+    from doom_eap.content.content_catalog import load_content_catalog
+
+    return {
+        spec.key for spec in load_content_catalog().maps.values()
+        if spec.requires_dlc_content
+    }
+
+
 def select_room_payloads(document: Mapping[str, Any], options: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     selected: dict[str, dict[str, Any]] = {}
     dlc_map_keys: set[str] = set()
-    if not options.get("use_dlc_content", True):
-        from doom_eap.content.content_catalog import load_content_catalog
-
-        dlc_map_keys = {
-            spec.key for spec in load_content_catalog().maps.values()
-            if spec.requires_dlc_content
-        }
+    if not options.get("use_dlc_content", True) or not options.get("include_dlc_missions", True):
+        dlc_map_keys = dlc_mission_map_keys()
     for map_key, record in document["maps"].items():
         if map_key in dlc_map_keys:
             continue

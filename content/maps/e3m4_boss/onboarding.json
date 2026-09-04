@@ -133,7 +133,7 @@
   },
   "campaign_goal": {
     "schema_version": 1,
-    "release": "0.5.0",
+    "release": "0.5.1",
     "publisher_key": "final_sin_mission_complete",
     "event_filename": "ap_mission_final_sin_complete.txt",
     "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",

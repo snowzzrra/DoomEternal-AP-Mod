@@ -8,7 +8,7 @@ This document describes the procedure for producing official cross-platform rele
 
 Release packages are generated through GitHub Actions:
 
-1. **Frozen Canonical Room Resources**: Prebuilt room compiler resources (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`) reside in `packaging/room_resources/v0.5.0/` along with `ROOM_RESOURCES_PROVENANCE.json` and `SHA256SUMS.txt`. These resources represent the boundary between local game-authorial compilation (requiring vanilla map and entity decl sources) and portable CI package assembly. GitHub Actions validates these resources against a deterministic content input fingerprint over all versioned gameplay/content sources before packaging them.
+1. **Frozen Canonical Room Resources**: Prebuilt room compiler resources (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`) reside in `packaging/room_resources/v0.5.1/` along with `ROOM_RESOURCES_PROVENANCE.json` and `SHA256SUMS.txt`. These resources represent the boundary between local game-authorial compilation (requiring vanilla map and entity decl sources) and portable CI package assembly. GitHub Actions validates these resources against a deterministic content input fingerprint over all versioned gameplay/content sources before packaging them.
 
 2. **GitHub Actions Build & Release Assembly**: A single workflow run (`.github/workflows/cross-platform-build.yml`) verifies authorial content and APWorld projection contracts, validates frozen room resources against the content input fingerprint, builds native components and platform launchers, and packages both ready-to-test public archives:
    - `DoomEternalArchipelago-<version>-windows-x86_64.zip` (standalone Windows launcher, native `client/ap_client.exe`, precompiled canonical room resources, APWorld, manifests, content, data)
@@ -16,7 +16,7 @@ Release packages are generated through GitHub Actions:
    - `SHA256SUMS.txt`
    - Developer handoff bundle (`DoomEAP-crossplatform-build-<version>-<short-mod-sha>`) containing intermediate binaries and room resources for audit.
 
-3. **Offline Local Assembly (Fallback / Reproducibility)**: Maintainers can also assemble or inspect release archives locally using `scripts/release/assemble_ci_artifact.py` against a downloaded handoff bundle and local canonical room resources (`packaging/room_resources/v0.5.0/` or `build/release/client/resources/`).
+3. **Offline Local Assembly (Fallback / Reproducibility)**: Maintainers can also assemble or inspect release archives locally using `scripts/release/assemble_ci_artifact.py` against a downloaded handoff bundle and local canonical room resources (`packaging/room_resources/v0.5.1/` or `build/release/client/resources/`).
 
 ---
 
@@ -41,7 +41,7 @@ Release packages are generated through GitHub Actions:
 4. Provide the exact inputs:
    - `mod_ref`: Full commit SHA or branch for `DoomEternal-AP-Mod` (e.g., `main`).
    - `apworld_ref`: Full commit SHA or branch for `Archipelago` / `DoomEternal-AP-World` (e.g., `doom_eternal`).
-   - `version_label`: Target version string (e.g., `v0.5.0`).
+   - `version_label`: Target version string (e.g., `v0.5.1`).
 5. Run the workflow. It executes portable release preflight gates, validates frozen room compiler resources against the content input fingerprint, builds the native client and standalone platform launchers, and assembles the public release packages.
 
 ### Step 3: Download Public Release Artifacts
@@ -57,7 +57,7 @@ Release packages are generated through GitHub Actions:
 2. Testers run `DoomEternalArchipelagoLauncher.exe` directly; no local compilation or map processing is needed.
 
 ### Step 5: Publish Release
-1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.5.0`.
+1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.5.1`.
 2. Upload `DoomEternalArchipelago-<version>-windows-x86_64.zip`, `DoomEternalArchipelago-<version>-linux-x86_64.zip`, and `SHA256SUMS.txt`.
 
 ---
@@ -70,7 +70,7 @@ If assembling packages locally from a downloaded developer handoff artifact (`Do
 python3 scripts/release/assemble_ci_artifact.py \
     --handoff /path/to/DoomEAP-crossplatform-build-<version>-<short-mod-sha> \
     --room-resources-dir build/release/client/resources \
-    --version v0.5.0 \
+    --version v0.5.1 \
     --output-dir build/final-release
 ```
 
@@ -93,9 +93,9 @@ When a modification touches versioned gameplay, maps, or content sources that al
    ```
 2. Copy the regenerated canonical room resources to the versioned packaging directory:
    ```bash
-   cp build/release/client/resources/base_mod.zip packaging/room_resources/v0.5.0/
-   cp build/release/client/resources/room_payloads.zip packaging/room_resources/v0.5.0/
-   cp build/release/client/resources/room_payload_manifest.json packaging/room_resources/v0.5.0/
+   cp build/release/client/resources/base_mod.zip packaging/room_resources/v0.5.1/
+   cp build/release/client/resources/room_payloads.zip packaging/room_resources/v0.5.1/
+   cp build/release/client/resources/room_payload_manifest.json packaging/room_resources/v0.5.1/
    ```
 3. Update `ROOM_RESOURCES_PROVENANCE.json` and `SHA256SUMS.txt` using the updated content input fingerprint and file hashes.
 4. Verify the frozen bundle:

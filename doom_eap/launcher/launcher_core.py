@@ -148,6 +148,7 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
     slot_data.update(raw)
     boolean_keys = (
         "use_dlc_content",
+        "include_dlc_missions",
         "enhanced_melee_damage",
         "randomize_chainsaw",
         "randomize_dash",
@@ -156,8 +157,12 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
         REVEAL_AP_LOCATIONS_OPTION_KEY,
     )
     for key in boolean_keys:
+        if key not in slot_data:
+            raise ValueError(f"Connected.slot_data.{key} is required")
         if not isinstance(slot_data[key], bool):
             raise ValueError(f"Connected.slot_data.{key} must be boolean")
+    if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
+        raise ValueError("Connected.slot_data.include_dlc_missions requires use_dlc_content")
     if slot_data["dlc_logic_timing"] not in {"Late Game", "From the Beginning"}:
         raise ValueError("Connected.slot_data.dlc_logic_timing is invalid")
     if slot_data["goal"] not in GOAL_VALUES:
@@ -401,6 +406,13 @@ class SeedManifest:
             raise ValueError(
                 f"manifest option {REVEAL_AP_LOCATIONS_OPTION_KEY} must be boolean"
             )
+        normalized_options.setdefault("use_dlc_content", True)
+        normalized_options.setdefault("include_dlc_missions", True)
+        for key in ("use_dlc_content", "include_dlc_missions"):
+            if not isinstance(normalized_options[key], bool):
+                raise ValueError(f"manifest option {key} must be boolean")
+        if normalized_options["include_dlc_missions"] and not normalized_options["use_dlc_content"]:
+            raise ValueError("manifest option include_dlc_missions requires use_dlc_content")
         project_room_config(normalized_options)
         if "starting_inventory" in normalized_options:
             inventory = normalized_options["starting_inventory"]
@@ -529,6 +541,7 @@ class SeedManifest:
             slot=snapshot.slot,
             options={
                 "use_dlc_content": slot_data["use_dlc_content"],
+                "include_dlc_missions": slot_data["include_dlc_missions"],
                 "dlc_logic_timing": slot_data["dlc_logic_timing"],
                 "goal": slot_data["goal"],
                 "goal_endpoint_event": slot_data["goal_endpoint_event"],
@@ -1155,7 +1168,7 @@ class RoomCompiler:
             return compressed.read_bytes()
 
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
-        from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
+        from tools.release.room_payloads import assemble_room_files, canonical_json, dlc_mission_map_keys, write_deterministic_zip
         placements = manifest.require_complete_placements()
         if manifest.static_content_digest != self.static_content_digest:
             raise ValueError("room static content identity drifted")
@@ -1200,6 +1213,13 @@ class RoomCompiler:
             from tools.maps.mission_complete_map_patcher import patch_generated_map_text
 
             catalog = load_content_catalog()
+            # DLC mission AP content is scoped by include_dlc_missions; DLC
+            # gameplay/context support stays scoped by use_dlc_content. Excluded
+            # TAG mission maps were already dropped from assembled payloads, so
+            # their overlay members rebuild as vanilla + marker support without
+            # location publishers, while the publisher patch below skips them.
+            include_dlc_missions = manifest.options.get("include_dlc_missions", True)
+            excluded_mission_maps = set() if include_dlc_missions else dlc_mission_map_keys()
             for context in dlc_contexts():
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
                     raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
@@ -1233,6 +1253,8 @@ class RoomCompiler:
                 map_key = context.map_keys[0]
                 spec = catalog.maps.get(map_key)
                 if spec is None or not spec.requires_dlc_content:
+                    continue
+                if map_key in excluded_mission_maps:
                     continue
                 member = self.payload_manifest["context_targets"][context.identity]
                 compiled_content = assembled.get(member)
@@ -1461,6 +1483,7 @@ class ModCompiler:
             spec for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
             and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
+            and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
         )
         for map_spec in campaign_maps:
             map_key = map_spec.key
@@ -1478,6 +1501,7 @@ class ModCompiler:
             spec.key for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
             and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
+            and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
         }
         if map_key not in campaign_keys:
             raise ValueError(

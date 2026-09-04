@@ -685,14 +685,15 @@ class TestUrlDownloadTransportRetries(unittest.TestCase):
 
     def test_windows_specs(self):
         self.assertEqual(WINDOWS_MOD_INJECTOR.name, "EternalModInjector")
-        self.assertEqual(WINDOWS_MOD_INJECTOR.version, "2026-08-18")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.version, "2026-09-04")
         self.assertEqual(WINDOWS_MOD_INJECTOR.archive_type, "zip")
         self.assertEqual(
             WINDOWS_MOD_INJECTOR.sha256,
-            "94d2e04783800e983222f90b8eb304d02fc216e43c3a71f39cd324f5f1970a84",
+            "129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480",
         )
-        self.assertEqual(WINDOWS_MOD_INJECTOR.url, "https://gamebanana.com/dl/1788872")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.url, "https://gamebanana.com/dl/1806698")
         self.assertEqual(WINDOWS_MOD_INJECTOR.executable_glob, "**/EternalModInjector.bat")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.expected_size, 5182673)
         self.assertEqual(len(WINDOWS_INJECTOR_REQUIRED_MEMBERS), 14)
         self.assertIn("EternalModInjector.bat", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
         self.assertIn("EternalModManager.exe", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
@@ -709,7 +710,7 @@ class TestWindowsToolchainStaging(unittest.TestCase):
             member_path.write_bytes(f"content_of_{member}".encode("utf-8"))
         bat_path = root / "EternalModInjector.bat"
         return InstalledDependency(
-            "EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(root), str(bat_path)
+            "EternalModInjector", "2026-09-04", "mock_sha", "mock_url", str(root), str(bat_path)
         )
 
     def test_staging_on_clean_game_root(self):
@@ -803,7 +804,7 @@ class TestWindowsToolchainStaging(unittest.TestCase):
             (dep_root / "EternalModInjector.bat").write_bytes(b"batch")
             # Missing other 13 files
             dep = InstalledDependency(
-                "EternalModInjector", "2026-08-18", "sha", "url", str(dep_root), str(dep_root / "EternalModInjector.bat")
+                "EternalModInjector", "2026-09-04", "sha", "url", str(dep_root), str(dep_root / "EternalModInjector.bat")
             )
             game_root = tmp / "game"
             game_root.mkdir()
@@ -821,7 +822,7 @@ class TestWindowsModInjectorAdapter(unittest.TestCase):
             member_path.write_bytes(f"content_of_{member}".encode("utf-8"))
         bat_path = root / "EternalModInjector.bat"
         return InstalledDependency(
-            "EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(root), str(bat_path)
+            "EternalModInjector", "2026-09-04", "mock_sha", "mock_url", str(root), str(bat_path)
         )
 
     def test_adapter_launches_batch_waits_for_exit_and_requests_confirmation_yes(self):
@@ -1001,7 +1002,7 @@ class TestWindowsEndToEndAndDoctor(unittest.TestCase):
             self._create_mock_injector_zip(injector_zip)
             injector_sha = hashlib.sha256(injector_zip.read_bytes()).hexdigest()
             spec_injector = DependencySpec(
-                "EternalModInjector", "2026-08-18", "https://example.com/emi", injector_sha, "**/EternalModInjector.bat", "zip"
+                "EternalModInjector", "2026-09-04", "https://example.com/emi", injector_sha, "**/EternalModInjector.bat", "zip"
             )
 
             meathook_sha = hashlib.sha256(b"mock_meathook").hexdigest()
@@ -1614,7 +1615,7 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
             for m in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
                 (dep_root / m).parent.mkdir(parents=True, exist_ok=True)
                 (dep_root / m).write_bytes(b"mock")
-            dep = InstalledDependency("EternalModInjector", "2026-08-18", "mock_sha", "mock_url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
+            dep = InstalledDependency("EternalModInjector", "2026-09-04", "mock_sha", "mock_url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
 
             observed_commands: list[tuple[str, ...]] = []
             observed_cwd: list[Path] = []
@@ -1648,9 +1649,12 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
             # The command passed to cmd /c should be EternalModInjector.bat
             cmd = observed_commands[0]
             self.assertEqual(cmd[1:], ("/d", "/c", "EternalModInjector.bat"))
-            # Sandbox was hidden during opener execution
-            self.assertEqual(saw_sandbox_during_run, [False])
-            # Sandbox is restored after run
+            # Sandbox remains in place during opener execution
+            self.assertEqual(saw_sandbox_during_run, [True])
+            # No hold file or guard transaction is created by the Windows flow
+            self.assertFalse((game_root / "doomSandBox" / "DOOMSandBox64vk.exe.doom_eap_hold").exists())
+            self.assertFalse((tmp / "state with spaces" / "sandbox_guard_tx.json").exists())
+            # Sandbox is untouched after run
             self.assertTrue(sandbox_exe.is_file())
             self.assertEqual(sandbox_exe.read_bytes(), b"sandbox_exe_bytes")
 
@@ -1676,7 +1680,7 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
             for m in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
                 (dep_root / m).parent.mkdir(parents=True, exist_ok=True)
                 (dep_root / m).write_bytes(b"mock")
-            dep = InstalledDependency("EternalModInjector", "2026-08-18", "mock", "url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
+            dep = InstalledDependency("EternalModInjector", "2026-09-04", "mock", "url", str(dep_root), str(dep_root / "EternalModInjector.bat"))
 
             for exit_code in (0, 1):
                 class MockInjectorProc:
@@ -1685,7 +1689,8 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
                     def wait(self):
                         # Verify state during process execution
                         assert normal_exe.is_file(), "Normal executable must remain present"
-                        assert not sandbox_exe.exists(), "Sandbox executable must be absent"
+                        assert sandbox_exe.is_file(), "Sandbox executable must remain present"
+                        assert sandbox_exe.read_bytes() == b"sandbox_executable_data", "Sandbox bytes must be unchanged"
                         return self.returncode
 
                 adapter = WindowsModInjectorAdapter(
@@ -1700,9 +1705,11 @@ class TestSandboxCompatibilityGuard(unittest.TestCase):
                 # Verify normal exe unchanged
                 self.assertTrue(normal_exe.is_file())
                 self.assertEqual(hashlib.sha256(normal_exe.read_bytes()).hexdigest(), normal_sha)
-                # Verify sandbox restored
+                # Verify sandbox still in place and unchanged; no hold artifacts
                 self.assertTrue(sandbox_exe.is_file())
                 self.assertEqual(hashlib.sha256(sandbox_exe.read_bytes()).hexdigest(), sandbox_sha)
+                self.assertFalse((game_root / "doomSandBox" / "DOOMSandBox64vk.exe.doom_eap_hold").exists())
+                self.assertFalse((tmp / "state" / "sandbox_guard_tx.json").exists())
 
 
 def _acquire_cache_entry_worker(payload):

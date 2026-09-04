@@ -293,13 +293,20 @@ Repair/Fix, and a sanitized support report.
 - Reveal AP Locations on Automap, mission replay Fast Travel and single-burst DeathLink.
 - Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
 
-### 0.5.0 Beta — The Full Saga — CURRENT
+### 0.5.0 Beta — The Full Saga — DONE
 
 - Base Campaign, The Ancient Gods Part One, and The Ancient Gods Part Two form
   one 19-mission Archipelago world with global inventory and completion flow.
 - DLC-specific gear, mission logic, generation, runtime, and validation are in scope.
 
-### 0.6.x Beta — Random Mission Order + Sentinel Core
+### 0.5.1 Beta — Release Corrective
+
+- Base Campaign with DLC content packages Base locations only; room scope
+  follows `include_dlc_missions` exactly.
+- Windows pins EternalModInjector `2026-09-04` (GameBanana download `1806698`)
+  with direct sandbox support and no sandbox hold workaround.
+
+### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
 
 - Create an alternative to meathook to better fit Archipelago needs.
 - Remove all meathook-dependent architecture and work on a new, proprietary, DLL.
@@ -354,7 +361,7 @@ Repair/Fix, and a sanitized support report.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model
   and overall very useful help.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
-  logo used by the AP client and the main menu marker.
+  logo used by the AP client, the main menu marker and the repository preview.
 
 ## 7. License
 

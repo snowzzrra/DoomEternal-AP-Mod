@@ -14,9 +14,9 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.5.0)'
+        description: 'Release version label (e.g. v0.5.1)'
         required: true
-        default: 'v0.5.0'
+        default: 'v0.5.1'
         type: string
 
 permissions:

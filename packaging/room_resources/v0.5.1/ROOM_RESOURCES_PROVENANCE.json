@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "release_version": "0.5.0",
-  "generated_from_mod_commit": "ec90a8556e01ce9a8a32eedf80dbbbf4d001d616",
+  "release_version": "0.5.1",
+  "generated_from_mod_commit": "c520c9c57d2d33705041d9c20b2c19ac3ab1d94d",
   "generated_from_apworld_commit": "fcf9db52da7e216a096309f3b90981298975e14e",
-  "room_resource_input_fingerprint": "3e644f54173b7a1ae3861826678996834372de1f6cd096ad6741e2e85ea1129e",
+  "room_resource_input_fingerprint": "1dc22969e0b82b031567043b1714b9bcfcd7fd423290dc435eb90768b7585031",
   "base_mod": {
-    "sha256": "fbae7ce76816ef23886f48418e7c6af7ff015ddb6cc05d23b3a7cef13e2bff27",
+    "sha256": "4e4fda821ac2ae572276f042727b916650bbf22ce94c5752c9cb888f7cd46c21",
     "size": 11299065
   },
   "room_payloads": {
@@ -91,7 +91,7 @@
     "content/maps/e3m4_boss/publishers.json": "f755f76655a8281ab06ad3ce0deb13983f49abb50b31d4cd5c5c7b37cb449099",
     "content/maps/e3m4_boss/descriptor.json": "8130905419292cf7ee833caecf7570a1b2a2b7bb1c1dd673af83a96ea9265cd7",
     "content/maps/e3m4_boss/locations.json": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587",
-    "content/maps/e3m4_boss/onboarding.json": "5913653aa42d41f699ccb50cab40bce72dc10c64dfe9529271136645c22ef8e9",
+    "content/maps/e3m4_boss/onboarding.json": "742da9582005413db3a1be6c501f0da9cf4daf7ab7f318aa77cc67932e338385",
     "content/maps/e3m4_boss/runtime.json": "6f8234d7ba21f2774e23303df2598e8336651ae2ab344034ce77ac59782e690c",
     "content/maps/e1m4_boss/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
     "content/maps/e1m4_boss/publishers.json": "d15f0e346830055a5797c11ba59c19da7b60354d6cf8270c3ede253c561b894a",
@@ -263,9 +263,9 @@
     "tools/maps/automap_baseline_guard.py": "33099506fc8357cd628aec634db8dc570878a72cc65016e4d1aa97daa7f5f808",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/maps/logic_decl_patcher.py": "052cd8344a4385d71b4fb2000697ec4f9e0cf82fffcee75c2b4b727c3a832fab",
-    "data/campaign_goal_contract.json": "4b7ae4cfc5d077c835e0586bb1c3deacb29b1237a513ae749736de1c23ec793f",
+    "data/campaign_goal_contract.json": "fc183a3d33108700ad95b3d81460f51c2f18cd21778fc8ceee1b532173df6220",
     "data/checked_location_visuals.json": "30b536cf292f4caefcc84e948abb1b5c5234eff617b3aeab8073f04ec3fe4878",
-    "data/content_identity.json": "332f3d38b42d0d84b15439c923728e31e134fcf4d2118b9a6e945bda045bd7e3",
+    "data/content_identity.json": "66cd3976883de66dba34cfdbae88ab428ee08e9a6a5faaf5c4790fcf7d2b7c43",
     "data/items.json": "026ea538a768e31ce9db512c1497c6ebe356029fcf57f4e10a4464ac7e150c09",
     "data/item_classifications.json": "8c524dc0e71283caa1215ba09341e7ebfe38fcc364556acb3d50b3cfabc5392a",
     "data/item_replay_policies.json": "e6f4791fafa12335458e6eeb5d5063937925cefb0903c0bb6821f770a2491792",
@@ -277,6 +277,6 @@
     "data/start_inventory_catalog.json": "7e15567281cfa3bd2585f8122799331ad74bb9a1520732d5333b27b41f4c0eda",
     "tools/content/compile_content_catalog.py": "46d258c1bfb8918ecd519858946dfc4a96f47db1578a0d57bb6e3ddff124a7c9",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
-    "tools/release/room_payloads.py": "47684d40538aaecd9a866508e3ffd95eb0592e866eafc6b2c81359987f13cf4f"
+    "tools/release/room_payloads.py": "3f810d8615ee3642f1705f85098926c922e4c081618f261a612523d3e8b66de3"
   }
 }

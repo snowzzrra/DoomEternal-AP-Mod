@@ -92,7 +92,7 @@ def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tu
     return fingerprint, files_to_hash
 
 
-def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = "v0.5.0") -> Path:
+def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = "v0.5.1") -> Path:
     root = (repo_root or REPO_ROOT).resolve()
     version_dir = version if version.startswith("v") else f"v{version}"
     return root / "packaging" / "room_resources" / version_dir
@@ -101,7 +101,7 @@ def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = "v0.5.0"
 def validate_prebuilt_room_resources(
     bundle_dir: Path,
     repo_root: Path | None = None,
-    expected_version: str = "0.5.0",
+    expected_version: str = "0.5.1",
 ) -> dict[str, Any]:
     """Validate frozen room compiler resources against the current content input fingerprint and schema contracts."""
     root = (repo_root or REPO_ROOT).resolve()
@@ -212,7 +212,7 @@ def export_prebuilt_room_resources(
     bundle_dir: Path,
     target_dir: Path,
     repo_root: Path | None = None,
-    expected_version: str = "0.5.0",
+    expected_version: str = "0.5.1",
 ) -> dict[str, Any]:
     """Validate frozen room resources and export them to target directory."""
     result = validate_prebuilt_room_resources(
@@ -237,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="Validate frozen room resources bundle")
     parser.add_argument("--export-dir", type=Path, default=None, help="Export validated room resources to directory")
     parser.add_argument("--bundle-dir", type=Path, default=None, help="Path to frozen room resources bundle")
-    parser.add_argument("--version", type=str, default="0.5.0", help="Expected release version")
+    parser.add_argument("--version", type=str, default="0.5.1", help="Expected release version")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Repository root path")
 
     args = parser.parse_args(argv)

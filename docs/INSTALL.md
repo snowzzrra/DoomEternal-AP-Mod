@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.5.0
+# Install DOOM Eternal Archipelago 0.5.1
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.5.0** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.5.1** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -29,7 +29,7 @@ SHA-256 before installation. An official verified artifact may be supplied inste
 
 Pinned dependencies:
 
-- **Windows EternalModInjector:** provider GameBanana, download `1788872`, version `2026-08-18`, SHA-256 `94d2cfd62cdb86ae93c480054e7b160edc4f73b63efdf66fbf826df3eb7a0a84`;
+- **Windows EternalModInjector:** provider GameBanana, download `1806698`, version `2026-09-04`, SHA-256 `129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480`;
 - **Linux EternalModInjectorShell:** provider EternalBasher GitHub releases, version `6.66-rev3.13`, SHA-256 `79874b20834ba3e0a8e94c67cab5f7f80af7c57e53035c4ec5075f7f28174935`;
 - **Meathook:** version `7.2`, SHA-256 `02c715f60482bf9727a0464c560575478a13c032db6522547864405a8dd8cdab`.
 
@@ -116,7 +116,7 @@ If automatic installation is unavailable, install the mod loader manually:
 1. Close DOOM Eternal if it is running.
 2. Open the EternalModInjector Windows page:
    [https://gamebanana.com/tools/7475](https://gamebanana.com/tools/7475)
-3. Download the current Windows EternalModInjector archive (`eternalmodinjector_19e3b.zip`).
+3. Download the current Windows EternalModInjector archive (`eternalmodinjector_33208.zip`).
 4. Extract the contents of the archive directly into your DOOM Eternal installation folder.
    The resulting files in your DOOM Eternal installation folder must include:
    - `EternalModInjector.bat`
@@ -182,7 +182,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.0** identifies public launcher, APWorld, room package, and generated content.
+Version **0.5.1** identifies public launcher, room package, and generated content (APWorld remains 0.5.0).
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|
