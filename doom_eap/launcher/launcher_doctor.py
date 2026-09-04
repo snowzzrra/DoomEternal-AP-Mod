@@ -1233,7 +1233,7 @@ def write_support_bundle(
     timestamped sibling is used instead, so repeated support reports cannot
     collide with a locked or in-use previous bundle.
     """
-    destination = destination.expanduser().resolve()
+    destination = destination.expanduser().absolute()
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
