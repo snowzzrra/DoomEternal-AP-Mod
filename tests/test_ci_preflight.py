@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 import yaml
@@ -474,6 +475,216 @@ class TestCIPreflight(unittest.TestCase):
         # Confirm no full Archipelago requirements installation anywhere
         raw_wf = wf_path.read_text(encoding="utf-8")
         self.assertNotIn("Archipelago/requirements.txt", raw_wf)
+
+
+class TestFrozenRoomCompilerDlcScope(unittest.TestCase):
+    """Frozen room-compiler DLC mission-scope regression tests.
+
+    Proves that when include_dlc_missions=False:
+    1. Compilation succeeds in a frozen runtime lacking authorial vanillamaps/.
+    2. RoomCompiler makes zero attempts to open authorial DLC mission maps
+       (e4m1_rig, e4m2_swamp, e4m3_mcity, e5m1_spear, e5m2_earth, e5m3_hell, e5m4_boss).
+    3. Location 7770425 and TAG mission notifications are absent.
+    4. TAG DevInv overrides and DLC gameplay support remain available.
+    5. Full Saga (content ON, missions ON) retains DLC map compilation and 7770425.
+    6. Base pure (content OFF, missions OFF) compiles without vanillamaps/.
+    7. Invalid combination (content OFF, missions ON) is rejected fail-closed.
+    """
+
+    EXCLUDED_DLC_MAPS = frozenset({
+        "e4m1_rig.map",
+        "e4m2_swamp.map",
+        "e4m3_mcity.map",
+        "e5m1_spear.map",
+        "e5m2_earth.map",
+        "e5m3_hell.map",
+        "e5m4_boss.map",
+    })
+
+    def setUp(self):
+        from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
+
+        self.bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
+        self.decompressor = REPO_ROOT.parent / "Tools" / "idFileDeCompressor"
+        if not self.decompressor.is_file():
+            self.skipTest(f"idFileDeCompressor binary not found at {self.decompressor}")
+
+    def _make_compiler(self):
+        from doom_eap.launcher.launcher_core import RoomCompiler
+
+        return RoomCompiler(
+            self.bundle_dir / "base_mod.zip",
+            self.bundle_dir / "room_payloads.zip",
+            self.bundle_dir / "room_payload_manifest.json",
+            decompressor=self.decompressor,
+        )
+
+    def test_frozen_like_runtime_zero_dlc_map_access(self):
+        """Prove compilation succeeds without vanillamaps/ and never attempts to open authorial DLC maps."""
+        import doom_eap.launcher.launcher_core as lc
+        from doom_eap.launcher.launcher_core import SeedManifest
+
+        with tempfile.TemporaryDirectory() as tmp_root_str:
+            fake_root = Path(tmp_root_str)
+            shutil.copytree(REPO_ROOT / "content", fake_root / "content")
+            shutil.copytree(REPO_ROOT / "data", fake_root / "data")
+            shutil.copytree(REPO_ROOT / "manifests", fake_root / "manifests")
+            self.assertFalse((fake_root / "vanillamaps").exists())
+
+            compiler = self._make_compiler()
+
+            dlc_maps_opened = []
+            orig_read_text = Path.read_text
+
+            def spy_read_text(path_obj, *args, **kwargs):
+                if path_obj.name in self.EXCLUDED_DLC_MAPS:
+                    dlc_maps_opened.append(path_obj.name)
+                return orig_read_text(path_obj, *args, **kwargs)
+
+            orig_open = Path.open
+
+            def spy_open(path_obj, *args, **kwargs):
+                if path_obj.name in self.EXCLUDED_DLC_MAPS:
+                    dlc_maps_opened.append(path_obj.name)
+                return orig_open(path_obj, *args, **kwargs)
+
+            with patch.object(lc, "ROOT", fake_root), \
+                 patch.object(Path, "read_text", spy_read_text), \
+                 patch.object(Path, "open", spy_open):
+                manifest = SeedManifest.create(
+                    seed_name="test_frozen_base_dlc",
+                    team=0,
+                    slot=1,
+                    options={
+                        "use_dlc_content": True,
+                        "include_dlc_missions": False,
+                        "dlc_logic_timing": False,
+                        "goal": "Kill the Icon of Sin",
+                        "goal_endpoint_event": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
+                        "additional_victory_requirements": [],
+                        "starting_inventory": {},
+                        "starting_weapon": None,
+                    },
+                    active_location_ids=(),
+                    static_content_digest=compiler.static_content_digest,
+                    static_precompile=True,
+                )
+                with tempfile.TemporaryDirectory() as tmp_out:
+                    dest = Path(tmp_out) / "out.zip"
+                    built = compiler.build(manifest, dest)
+                    self.assertTrue(built.is_file())
+
+                    # Negative access assertion: zero attempts to open any excluded DLC mission map
+                    self.assertEqual(dlc_maps_opened, [], "Must make zero attempts to open excluded DLC mission maps")
+
+                    with zipfile.ZipFile(built) as z:
+                        names = z.namelist()
+                        # DLC content (TAG DevInv overrides) remains present
+                        self.assertTrue(any("devinvloadout/dlc" in n for n in names))
+                        # Excluded TAG location notifications remain absent
+                        all_entities = "".join(
+                            compiler._decompress_entities_text(z.read(n), n)
+                            for n in names if n.endswith(".entities")
+                        )
+                        self.assertNotIn("ap_notify_location_7770425", all_entities)
+
+    def test_full_saga_paired_retains_dlc_content_and_7770425(self):
+        """Full Saga (content ON, missions ON) compiles DLC mission maps and retains 7770425."""
+        from doom_eap.launcher.launcher_core import SeedManifest
+
+        compiler = self._make_compiler()
+        manifest = SeedManifest.create(
+            seed_name="test_full_saga",
+            team=0,
+            slot=1,
+            options={
+                "use_dlc_content": True,
+                "include_dlc_missions": True,
+                "dlc_logic_timing": False,
+                "goal": "Complete the Full Saga",
+                "goal_endpoint_event": "AP_MISSION_EVENT_DARK_LORD_COMPLETE",
+                "additional_victory_requirements": [],
+                "starting_inventory": {},
+                "starting_weapon": None,
+            },
+            active_location_ids=(),
+            static_content_digest=compiler.static_content_digest,
+            static_precompile=True,
+        )
+        with tempfile.TemporaryDirectory() as tmp_out:
+            dest = Path(tmp_out) / "out.zip"
+            built = compiler.build(manifest, dest)
+            self.assertTrue(built.is_file())
+            with zipfile.ZipFile(built) as z:
+                names = z.namelist()
+                all_entities = "".join(
+                    compiler._decompress_entities_text(z.read(n), n)
+                    for n in names if n.endswith(".entities")
+                )
+                self.assertIn("ap_notify_location_7770425", all_entities)
+
+    def test_base_pure_compiles_without_vanillamaps(self):
+        """Base pure (content OFF, missions OFF) compiles cleanly without vanillamaps/."""
+        import doom_eap.launcher.launcher_core as lc
+        from doom_eap.launcher.launcher_core import SeedManifest
+
+        with tempfile.TemporaryDirectory() as tmp_root_str:
+            fake_root = Path(tmp_root_str)
+            shutil.copytree(REPO_ROOT / "content", fake_root / "content")
+            shutil.copytree(REPO_ROOT / "data", fake_root / "data")
+            shutil.copytree(REPO_ROOT / "manifests", fake_root / "manifests")
+            self.assertFalse((fake_root / "vanillamaps").exists())
+
+            compiler = self._make_compiler()
+            with patch.object(lc, "ROOT", fake_root):
+                manifest = SeedManifest.create(
+                    seed_name="test_base_pure",
+                    team=0,
+                    slot=1,
+                    options={
+                        "use_dlc_content": False,
+                        "include_dlc_missions": False,
+                        "dlc_logic_timing": False,
+                        "goal": "Kill the Icon of Sin",
+                        "goal_endpoint_event": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
+                        "additional_victory_requirements": [],
+                        "starting_inventory": {},
+                        "starting_weapon": None,
+                    },
+                    active_location_ids=(),
+                    static_content_digest=compiler.static_content_digest,
+                    static_precompile=True,
+                )
+                with tempfile.TemporaryDirectory() as tmp_out:
+                    dest = Path(tmp_out) / "out.zip"
+                    built = compiler.build(manifest, dest)
+                    self.assertTrue(built.is_file())
+
+    def test_invalid_option_combination_rejected(self):
+        """use_dlc_content=False with include_dlc_missions=True is invalid and rejected fail-closed."""
+        from doom_eap.launcher.launcher_core import SeedManifest
+
+        compiler = self._make_compiler()
+        with self.assertRaises(ValueError) as ctx:
+            SeedManifest.create(
+                seed_name="test_invalid",
+                team=0,
+                slot=1,
+                options={
+                    "use_dlc_content": False,
+                    "include_dlc_missions": True,
+                    "dlc_logic_timing": False,
+                    "goal": "Kill the Icon of Sin",
+                    "goal_endpoint_event": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
+                    "additional_victory_requirements": [],
+                    "starting_inventory": {},
+                    "starting_weapon": None,
+                },
+                active_location_ids=(),
+                static_content_digest=compiler.static_content_digest,
+                static_precompile=True,
+            )
+        self.assertIn("include_dlc_missions requires use_dlc_content", str(ctx.exception))
 
 
 if __name__ == "__main__":

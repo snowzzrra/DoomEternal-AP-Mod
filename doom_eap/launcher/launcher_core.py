@@ -1227,6 +1227,8 @@ class RoomCompiler:
                 if not isinstance(overlay_member, str):
                     raise ValueError(f"DLC context lacks room payload target: {context.identity}")
                 map_key = context.map_keys[0]
+                if map_key in excluded_mission_maps:
+                    continue
                 spec = catalog.maps.get(map_key)
                 if spec is None:
                     raise ValueError(f"DLC context map spec missing: {map_key}")
