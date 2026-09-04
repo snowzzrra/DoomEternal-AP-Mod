@@ -38,10 +38,12 @@ from .launcher_platform import (
     AMMO_HOTKEY_STATE_HEADER,
     AMMO_REFILL_BIND_COMMAND,
     GameLinkResult,
+    SavedGamesSelection,
     SteamInstallationLocator,
     cleanup_legacy_doomeap_cfg,
     cleanup_stale_doom_config_bind,
     detect_doom_processes,
+    doom_saved_games_base,
     launch_doom_via_steam,
     launcher_user_paths,
     migrate_legacy_launcher_data,
@@ -51,6 +53,7 @@ from .launcher_platform import (
     read_handshake_probe,
     redact_secrets,
     resolve_doom_config_path,
+    select_saved_games_dir,
     validate_game_root,
     validate_save_directory,
     write_ammo_refill_hotkey_state,
@@ -413,36 +416,83 @@ class LauncherController:
             runtime_config=self.config,
         )
 
+    def resolve_saved_games_dir(
+        self,
+        *,
+        configured: object = None,
+        game_root: Path | str | None = None,
+        known_base: Path | str | None = None,
+    ) -> SavedGamesSelection:
+        """Resolve the single effective Saved Games base with self-heal evidence.
+
+        A configured path with valid .../id Software/DOOMEternal/base shape is
+        preserved. A stale configured path (launcher/client directory, game
+        installation, wrong shape, or missing) never becomes authority: the
+        canonical Known-Folder/Proton base wins, then a single live-writer
+        candidate, otherwise selection fails closed.
+        """
+        value = configured if configured is not None else self.config.get("save_games_dir")
+        root_value = game_root
+        if root_value is None:
+            for key in ("game_root", "doom_base_dir"):
+                candidate = self.config.get(key)
+                if candidate and str(candidate):
+                    root_value = candidate
+                    break
+        root_path: Path | None = None
+        if root_value is not None:
+            try:
+                root_path = Path(str(root_value)).expanduser()
+                if root_path.name.casefold() == "base":
+                    root_path = root_path.parent
+            except (OSError, TypeError, ValueError, RuntimeError):
+                root_path = None
+        known = Path(str(known_base)).expanduser() if known_base is not None else None
+        if known is None:
+            try:
+                known = doom_saved_games_base(game_root=root_path)
+            except (OSError, TypeError, ValueError, RuntimeError):
+                known = None
+        client_dir = self.client_dir if self.client_dir != self.application_dir else None
+        return select_saved_games_dir(
+            str(value) if value is not None and str(value) else None,
+            known_base=known,
+            app_dir=self.application_dir,
+            client_dir=client_dir,
+            game_root=root_path,
+            game_running=self.is_game_running(),
+        )
+
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
-        configured_saves: Path | None = None
-        configured_value = self.config.get("save_games_dir")
-        if configured_value:
-            try:
-                configured_saves = validate_save_directory(Path(str(configured_value)))
-            except (OSError, TypeError, ValueError):
-                configured_saves = None
         installations, sentinel = SteamInstallationLocator().inspect_discovery()
         found["game_discovery"] = asdict(sentinel)
+        game_root_value: Path | None = None
         if len(installations) == 1:
             installation = installations[0]
+            game_root_value = installation.game_root
             found["game_root"] = str(installation.game_root)
             found["doom_base_dir"] = str(installation.game_root / "base")
-            if os.name != "nt" and configured_saves is None:
-                saves = (
-                    installation.library_root
-                    / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games"
-                    / "id Software/DOOMEternal/base"
-                )
-                if saves.is_dir():
-                    found["save_games_dir"] = str(saves)
         elif len(installations) > 1:
             found["ambiguous_game_roots"] = [str(item.game_root) for item in installations]
 
-        if os.name == "nt" and configured_saves is None and "save_games_dir" not in found:
-            saves = Path.home() / "Saved Games/id Software/DOOMEternal/base"
-            if saves.is_dir():
-                found["save_games_dir"] = str(saves)
+        selection = self.resolve_saved_games_dir(game_root=game_root_value)
+        if selection.path is not None:
+            found["save_games_dir"] = str(selection.path)
+        if selection.repaired and selection.path is not None:
+            found["save_games_repair"] = {
+                "previous_path": selection.previous_path,
+                "selected_path": str(selection.path),
+                "source": selection.source,
+                "reason": selection.reason,
+            }
+            self.emit(
+                "SAVED_GAMES_PATH_REPAIRED",
+                previous_path=selection.previous_path,
+                selected_path=str(selection.path),
+                source=selection.source,
+                reason=selection.reason,
+            )
 
         remote_candidates: list[Path] = []
         for root in SteamInstallationLocator.default_roots():

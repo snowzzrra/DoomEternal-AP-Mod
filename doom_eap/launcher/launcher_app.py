@@ -226,6 +226,26 @@ def _run_self_test(arguments: list[str]) -> int:
                 if first != bundle or second == bundle or not second.is_file():
                     raise RuntimeError("support-bundle unique naming failed")
                 print("  [OK] no-game doctor and unique support bundle verified")
+
+                from doom_eap.launcher.launcher_platform import select_saved_games_dir
+
+                extract = tmp_root / "Downloads" / "DoomEternalArchipelago"
+                extract.mkdir(parents=True, exist_ok=True)
+                canonical = (
+                    tmp_root / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+                )
+                canonical.mkdir(parents=True, exist_ok=True)
+                stale = select_saved_games_dir(
+                    str(extract), known_base=canonical, app_dir=extract.parent
+                )
+                if stale.path != canonical or not stale.repaired:
+                    raise RuntimeError("stale Saved Games config was not self-healed")
+                closed = select_saved_games_dir(
+                    str(extract), known_base=None, app_dir=extract.parent
+                )
+                if closed.path is not None:
+                    raise RuntimeError("launcher dir must never be Saved Games authority")
+                print("  [OK] Saved Games authority self-heal verified")
             finally:
                 for k, v in old_env.items():
                     if v is None:

@@ -621,27 +621,67 @@ def normalize_doom_base_dir(path):
     )
 
 
+SAVE_GAMES_SELECTION: dict[str, object] | None = None
+
+
 def normalize_save_games_dir(path):
-    selected = Path(path).expanduser()
-    candidates = [selected]
-    name = selected.name.lower()
-    parent_name = selected.parent.name.lower()
-    grandparent_name = selected.parent.parent.name.lower()
-    if name == "base" and parent_name == "doometernal" and grandparent_name == "id software":
-        candidates.insert(0, selected)
-    elif name == "doometernal":
-        candidates.insert(0, selected / "base")
-    elif name == "id software":
-        candidates.insert(0, selected / "DOOMEternal" / "base")
-    else:
-        candidates.insert(0, selected / "id Software" / "DOOMEternal" / "base")
-    for candidate in candidates:
-        if candidate.is_dir():
-            return str(candidate)
-    raise ValueError(
-        "Expected the DOOM Eternal save base directory, for example "
-        "C:/Users/<user>/Saved Games/id Software/DOOMEternal/base"
+    from doom_eap.launcher.launcher_platform import (
+        doom_saved_games_base,
+        select_saved_games_dir,
     )
+
+    global SAVE_GAMES_SELECTION
+    SAVE_GAMES_SELECTION = None
+    selected = Path(path).expanduser()
+    name = selected.name.lower()
+    if name == "base" and selected.parent.name.lower() == "doometernal" and selected.parent.parent.name.lower() == "id software":
+        probe = selected
+    elif name == "doometernal":
+        probe = selected / "base"
+    elif name == "id software":
+        probe = selected / "DOOMEternal" / "base"
+    else:
+        shaped = selected / "id Software" / "DOOMEternal" / "base"
+        probe = shaped if shaped.is_dir() else selected
+    game_root = None
+    try:
+        doom_base = globals().get("DOOM_BASE_DIR") or (config or {}).get("doom_base_dir")
+        if doom_base:
+            game_root = Path(doom_base).expanduser()
+            if game_root.name.casefold() == "base":
+                game_root = game_root.parent
+    except (OSError, TypeError, ValueError, RuntimeError):
+        game_root = None
+    known = None
+    try:
+        known = doom_saved_games_base(game_root=game_root)
+    except (OSError, TypeError, ValueError, RuntimeError):
+        known = None
+    selection = select_saved_games_dir(
+        str(probe),
+        known_base=known,
+        app_dir=APPLICATION_DIR,
+        game_root=game_root,
+    )
+    if selection.path is None:
+        rejected = "; ".join(
+            f"{item.get('path')} ({item.get('reason')})"
+            for item in selection.rejected[:4]
+        )
+        raise ValueError(
+            "Expected the DOOM Eternal save base directory, for example "
+            "C:/Users/<user>/Saved Games/id Software/DOOMEternal/base. "
+            f"Selection failed: {selection.reason}."
+            + (f" Rejected: {rejected}." if rejected else "")
+        )
+    SAVE_GAMES_SELECTION = {
+        "selected_path": str(selection.path),
+        "source": selection.source,
+        "reason": selection.reason,
+        "repaired": selection.repaired,
+        "previous_path": selection.previous_path,
+    }
+    return str(selection.path)
 
 
 config = load_config()
@@ -667,8 +707,13 @@ if "doom_base_dir" in config and "save_games_dir" in config:
     try:
         DOOM_BASE_DIR = normalize_doom_base_dir(config["doom_base_dir"])
         SAVE_GAMES_DIR = normalize_save_games_dir(config["save_games_dir"])
-        SAVE_GAMES_SELECTION_SOURCE = "config.save_games_dir"
-        SAVE_GAMES_SELECTION_REASON = "configured path normalized to existing Saved Games base"
+        SAVE_GAMES_SELECTION_SOURCE = str(
+            (SAVE_GAMES_SELECTION or {}).get("source") or "config.save_games_dir"
+        )
+        SAVE_GAMES_SELECTION_REASON = str(
+            (SAVE_GAMES_SELECTION or {}).get("reason")
+            or "configured path normalized to existing Saved Games base"
+        )
     except ValueError as error:
         abort_setup(f"{CONFIG_FILE} has invalid paths: {error}")
     if (

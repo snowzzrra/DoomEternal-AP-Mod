@@ -49,6 +49,8 @@ from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
 from .launcher_platform import (
+    doom_saved_games_base,
+    is_saved_games_base_shape,
     probe_meathook,
     redact_secrets,
 )
@@ -1827,7 +1829,18 @@ class LauncherUI(QMainWindow):
             self.game_root.setText(value)
 
     def _browse_saves(self) -> None:
-        value = QFileDialog.getExistingDirectory(self, "Select DOOM Eternal save folder")
+        start_dir = ""
+        try:
+            current = self.saves_root.text().strip()
+            if current and is_saved_games_base_shape(current):
+                start_dir = current
+            else:
+                canonical = doom_saved_games_base()
+                if canonical is not None and canonical.is_dir():
+                    start_dir = str(canonical)
+        except (OSError, TypeError, ValueError, RuntimeError):
+            start_dir = ""
+        value = QFileDialog.getExistingDirectory(self, "Select DOOM Eternal save folder", start_dir)
         if value:
             self.saves_root.setText(value)
 

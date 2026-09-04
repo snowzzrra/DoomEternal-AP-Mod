@@ -18,14 +18,19 @@ from .launcher_integration import UNINSTALL_OWNED_STATES
 from .launcher_platform import (
     AMMO_HOTKEY_STATE_FILENAME,
     AMMO_REFILL_BIND_COMMAND,
+    SavedGamesSelection,
+    doom_saved_games_base,
     idfile_decompressor_spec,
     DependencyManager,
     PrerequisiteStatus,
     detect_doom_processes,
+    is_saved_games_base_shape,
     probe_meathook,
     publish_file,
     redact_secrets,
     resolve_doom_config_path,
+    saved_games_shape_verdict,
+    select_saved_games_dir,
     validate_game_root,
     verify_linux_mod_installation,
 )
@@ -571,7 +576,12 @@ def _recent_relevant_files(root: Path) -> list[dict[str, object]]:
     return entries
 
 
-def _saved_games_candidates(config: Mapping[str, object], root: Path | None) -> tuple[Path, ...]:
+def _saved_games_candidates(
+    config: Mapping[str, object],
+    root: Path | None,
+    *,
+    known: Path | None = None,
+) -> tuple[Path, ...]:
     candidates: list[Path] = []
     configured = config.get("save_games_dir")
     if configured:
@@ -580,6 +590,8 @@ def _saved_games_candidates(config: Mapping[str, object], root: Path | None) -> 
             candidates.extend((selected, selected.parent, selected.parent.parent))
         except (OSError, TypeError, ValueError):
             pass
+    if known is not None:
+        candidates.append(known)
     candidates.append(Path.home() / "Saved Games" / "id Software" / "DOOMEternal" / "base")
     if root is not None:
         for parent in (root, *root.parents):
@@ -591,16 +603,43 @@ def _saved_games_candidates(config: Mapping[str, object], root: Path | None) -> 
     return tuple(dict.fromkeys(path.expanduser() for path in candidates))
 
 
-def _saved_games_diagnostics(config: Mapping[str, object], root: Path | None, processes: Sequence[Mapping[str, object]]) -> dict[str, object]:
-    selected_value = config.get("save_games_dir")
-    selected_error: str | None = None
+def _saved_games_diagnostics(
+    config: Mapping[str, object],
+    root: Path | None,
+    processes: Sequence[Mapping[str, object]],
+    *,
+    app_dir: Path | str | None = None,
+    client_dir: Path | str | None = None,
+) -> dict[str, object]:
+    configured_value = config.get("save_games_dir")
+    game_root = root.parent if root is not None and root.name.casefold() == "base" else root
+    known: Path | None = None
     try:
-        selected = Path(str(selected_value)).expanduser() if selected_value else None
+        known = doom_saved_games_base(game_root=game_root)
+    except (OSError, TypeError, ValueError, RuntimeError):
+        known = None
+    game_detected = any(
+        str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}
+        for item in processes
+    )
+    selection: SavedGamesSelection | None = None
+    try:
+        selection = select_saved_games_dir(
+            str(configured_value) if configured_value else None,
+            known_base=known,
+            app_dir=app_dir,
+            client_dir=client_dir,
+            game_root=game_root,
+            game_running=game_detected,
+        )
     except (OSError, TypeError, ValueError, RuntimeError) as error:
-        selected = None
-        selected_error = f"configured Saved Games path unavailable: {type(error).__name__}: {error}"[:256]
+        selection = None
+        selection_error = f"Saved Games selection unavailable: {type(error).__name__}: {error}"[:256]
+    else:
+        selection_error = None
+    selected = Path(str(selection.path)) if selection is not None and selection.path else None
     candidates = []
-    for path in _saved_games_candidates(config, root)[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]:
+    for path in _saved_games_candidates(config, root, known=known)[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]:
         try:
             is_dir = path.is_dir()
         except (OSError, ValueError, RuntimeError):
@@ -614,7 +653,24 @@ def _saved_games_diagnostics(config: Mapping[str, object], root: Path | None, pr
             "path": str(path),
             "exists": is_dir,
             "selected": selected is not None and path == selected,
-            "relationship": "configured" if selected is not None and path == selected else "discovered_candidate",
+            "relationship": (
+                "configured"
+                if selection is not None
+                and selection.source == "configured_saved_games_dir"
+                and selected is not None
+                and path == selected
+                else "canonical_known_folder"
+                if selection is not None
+                and selection.source in {"canonical_saved_games_base", "live_writer_evidence", "single_viable_candidate"}
+                and selected is not None
+                and path == selected
+                else "rejected_stale_config"
+                if selection is not None
+                and selection.previous_path is not None
+                and str(path) == selection.previous_path
+                else "discovered_candidate"
+            ),
+            "shape_verdict": saved_games_shape_verdict(path),
             "markers": {
                 "ap_active_map": _marker_files(path, "ap_active_map") if is_dir else [{"path": str(path), "exists": False, "error": "candidate is not an accessible directory"}],
                 "ap_telemetry": _marker_files(path, "ap_telemetry") if is_dir else [{"path": str(path), "exists": False, "error": "candidate is not an accessible directory"}],
@@ -630,25 +686,19 @@ def _saved_games_diagnostics(config: Mapping[str, object], root: Path | None, pr
                 "DOOM process not detected"
             ),
         })
-    source = "configured_save_games_dir" if selected_value else "unconfigured"
-    try:
-        selected_exists = selected is not None and selected.is_dir()
-    except (OSError, ValueError, RuntimeError):
-        selected_exists = False
-    if selected_value and selected is not None and selected_exists:
-        reason = "launcher configuration value; selected directory exists"
-    elif selected_value:
-        reason = "launcher configuration value; selected directory is missing"
-    else:
-        reason = "no effective Saved Games path"
     result: dict[str, object] = {
         "effective_path": str(selected) if selected else None,
-        "source": source,
-        "reason": reason,
+        "configured_path": str(configured_value) if configured_value else None,
+        "source": selection.source if selection is not None else "unresolved",
+        "reason": selection.reason if selection is not None else "no effective Saved Games path",
+        "repaired": bool(selection is not None and selection.repaired),
+        "previous_path": selection.previous_path if selection is not None else None,
+        "live_evidence": list(selection.live_evidence) if selection is not None else [],
+        "rejected": selection.rejected if selection is not None else [],
         "candidates": candidates,
     }
-    if selected_error:
-        result["selection_error"] = selected_error
+    if selection_error:
+        result["selection_error"] = selection_error
     return result
 
 
@@ -681,7 +731,7 @@ def _queue_diagnostics(base: Path | None) -> dict[str, object]:
     return result
 
 
-def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None, paths: object | None, processes: Sequence[Mapping[str, object]]) -> dict[str, object]:
+def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None, paths: object | None, processes: Sequence[Mapping[str, object]], *, app_dir: Path | str | None = None) -> dict[str, object]:
     base_error: str | None = None
     try:
         base = doom_base_dir_from_config(config)
@@ -689,6 +739,14 @@ def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None,
         base = None
         base_error = f"base path unavailable: {type(error).__name__}: {error}"[:256]
     save = config.get("save_games_dir")
+    client_dir: Path | str | None = None
+    if app_dir is not None:
+        try:
+            packaged_client = Path(str(app_dir)).expanduser() / "client"
+            if packaged_client.is_dir():
+                client_dir = packaged_client
+        except (OSError, TypeError, ValueError, RuntimeError):
+            client_dir = None
     details = {
         "config_file": str(config_path) if config_path else None,
         "doom_base_dir": str(base) if base else None,
@@ -696,7 +754,7 @@ def _runtime_diagnostics(config: Mapping[str, object], config_path: Path | None,
         "INV_DUMP_DIR": str(save) if save else None,
         "STEAM_REMOTE_DIR": str(config.get("steam_remote_dir")) if config.get("steam_remote_dir") else None,
         "STEAM_ID3": config.get("steam_id3"),
-        "path_selection": _saved_games_diagnostics(config, base, processes),
+        "path_selection": _saved_games_diagnostics(config, base, processes, app_dir=app_dir, client_dir=client_dir),
         "queue": _queue_diagnostics(base),
         "markers": {},
         "materialization": {},
@@ -1578,7 +1636,7 @@ class LauncherDoctor:
             "runtime_paths",
             "ok",
             "effective runtime paths and path-selection evidence collected",
-            _runtime_diagnostics(self.config, self.config_path, self.paths, processes),
+            _runtime_diagnostics(self.config, self.config_path, self.paths, processes, app_dir=self._application_dir()),
         ))
         runtime_details = checks[-1].details if isinstance(checks[-1].details, Mapping) else {}
         support_diagnostics = build_support_diagnostics(
@@ -1597,6 +1655,7 @@ class LauncherDoctor:
         state_dir = self._state_dir()
         receipt_path = (state_dir / "launcher_setup.json") if state_dir else None
         room_uninstall_state = ""
+        room_receipt_applied = False
         if receipt_path and receipt_path.is_file():
             try:
                 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -1625,9 +1684,11 @@ class LauncherDoctor:
                             }
                             checks.append(Diagnostic("mod_injection", "ok", "Linux mod installation applied and verified", details))
                             checks.append(Diagnostic("windows_mod_installer", "ok", "Linux mod installation applied and verified", details))
+                            room_receipt_applied = True
                     else:
                         checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
                         checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                        room_receipt_applied = True
                 elif adapter_state in UNINSTALL_OWNED_STATES:
                     details = {"adapter_state": adapter_state, "installation_mode": mode}
                     if adapter_state == "uninstalled":
@@ -1682,6 +1743,13 @@ class LauncherDoctor:
                     else "Room package uninstall requires attention; automatic reinstall is disabled"
                 ),
                 {"adapter_state": room_uninstall_state},
+            ))
+        elif room_receipt_applied:
+            checks.append(Diagnostic(
+                "room_mod",
+                "ok",
+                "Room package verified from persisted installation receipt",
+                {"adapter_state": "applied", "receipt": str(receipt_path) if receipt_path else None},
             ))
         else:
             checks.append(Diagnostic("room_mod", "not_applicable", "Room package verification is unavailable without a receipt"))

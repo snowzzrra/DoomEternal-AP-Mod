@@ -208,7 +208,328 @@ def validate_save_directory(path: Path) -> Path:
     root = path.expanduser().resolve()
     if not root.is_dir():
         raise ValueError(f"invalid DOOM Eternal save directory: {root}")
+    if not is_saved_games_base_shape(root):
+        raise ValueError(
+            "invalid DOOM Eternal save directory: expected the Saved Games base "
+            f"(.../id Software/DOOMEternal/base), got: {root}"
+        )
     return root
+
+
+SAVED_GAMES_PROVIDER = "id Software"
+SAVED_GAMES_TITLE = "DOOMEternal"
+SAVED_GAMES_LEAF = "base"
+SAVED_GAMES_LEAF_CHAIN = (SAVED_GAMES_PROVIDER, SAVED_GAMES_TITLE, SAVED_GAMES_LEAF)
+FOLDERID_SAVED_GAMES = "{4C5C32FF-BB9D-43B9-B382-325F2A56FE60}"
+LIVE_WRITER_FRESHNESS_SECONDS = 24.0 * 3600.0
+SAVED_GAMES_MARKER_PREFIXES = ("ap_active_map", "ap_event_", "ap_telemetry")
+
+
+def _saved_games_norm(path: Path | str, *, platform: str) -> str:
+    text = os.path.abspath(os.path.expanduser(str(path)))
+    if platform == "nt":
+        text = os.path.normcase(text)
+    return text.rstrip("\\/")
+
+
+def _is_within_directory(child: Path | str, parent: Path | str, *, platform: str) -> bool:
+    child_text = _saved_games_norm(child, platform=platform)
+    parent_text = _saved_games_norm(parent, platform=platform)
+    if child_text == parent_text:
+        return True
+    return child_text.startswith(parent_text + ("\\" if platform == "nt" else "/"))
+
+
+def is_saved_games_base_shape(path: Path | str, *, platform: str | None = None) -> bool:
+    """Check the .../id Software/DOOMEternal/base leaf chain without touching disk."""
+    target = platform if platform is not None else os.name
+    parts = [part for part in Path(str(path)).expanduser().parts if part not in ("", "/", "\\")]
+    chain = parts[-3:] if len(parts) >= 3 else []
+    if target == "nt":
+        chain = [part.casefold() for part in chain]
+        expected = [part.casefold() for part in SAVED_GAMES_LEAF_CHAIN]
+    else:
+        expected = list(SAVED_GAMES_LEAF_CHAIN)
+    return chain == expected
+
+
+def saved_games_shape_verdict(path: Path | str, *, platform: str | None = None) -> str:
+    """Classify a configured Saved Games path without side effects."""
+    target = platform if platform is not None else os.name
+    try:
+        expanded = Path(str(path)).expanduser()
+    except (OSError, TypeError, ValueError, RuntimeError):
+        return "unparseable"
+    if not _saved_games_norm(expanded, platform=target):
+        return "unparseable"
+    try:
+        if not expanded.is_dir():
+            return "not_a_directory" if expanded.exists() else "missing"
+    except (OSError, ValueError, RuntimeError):
+        return "inaccessible"
+    if not is_saved_games_base_shape(expanded, platform=target):
+        return "invalid_saved_games_shape"
+    return "valid_saved_games_base"
+
+
+def known_folder_saved_games(
+    *,
+    platform: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Path | None:
+    """Return FOLDERID_SavedGames on Windows; None elsewhere or on failure."""
+    target = platform if platform is not None else os.name
+    env = environ if environ is not None else os.environ
+    override = env.get("DOOMEAP_SAVED_GAMES")
+    if override:
+        candidate = Path(override).expanduser()
+        return candidate
+    if target != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
+
+        class _GUID(ctypes.Structure):
+            _fields_ = [
+                ("Data1", wintypes.DWORD),
+                ("Data2", wintypes.WORD),
+                ("Data3", wintypes.WORD),
+                ("Data4", wintypes.BYTE * 8),
+            ]
+
+        guid = _GUID()
+        ole32 = ctypes.windll.ole32  # type: ignore[attr-defined]
+        if ole32.CLSIDFromString(FOLDERID_SAVED_GAMES, ctypes.byref(guid)) != 0:
+            return None
+        buffer = wintypes.LPWSTR()
+        if shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(buffer)) != 0:
+            return None
+        try:
+            value = buffer.value
+        finally:
+            ole32.CoTaskMemFree(buffer)
+        if not value:
+            return None
+        return Path(value)
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def doom_saved_games_base(
+    *,
+    platform: str | None = None,
+    home: Path | str | None = None,
+    known_folder: Path | str | None = None,
+    game_root: Path | str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Path | None:
+    """Return the canonical Saved Games base without probing arbitrary directories."""
+    target = platform if platform is not None else os.name
+    if target == "nt":
+        folder = Path(known_folder).expanduser() if known_folder is not None else known_folder_saved_games(platform=target, environ=environ)
+        if folder is None:
+            base_home = Path(home).expanduser() if home is not None else Path.home()
+            folder = base_home / "Saved Games"
+        return folder / SAVED_GAMES_PROVIDER / SAVED_GAMES_TITLE / SAVED_GAMES_LEAF
+    if game_root is None:
+        return None
+    try:
+        root = Path(str(game_root)).expanduser()
+    except (OSError, TypeError, ValueError, RuntimeError):
+        return None
+    for parent in (root, *root.parents):
+        if parent.name.casefold() == "steamapps":
+            return (
+                parent.parent
+                / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games"
+                / SAVED_GAMES_PROVIDER
+                / SAVED_GAMES_TITLE
+                / SAVED_GAMES_LEAF
+            )
+    return None
+
+
+def saved_games_live_markers(
+    directory: Path | str,
+    *,
+    now: float | None = None,
+    freshness_seconds: float = LIVE_WRITER_FRESHNESS_SECONDS,
+) -> tuple[str, ...]:
+    """Return fresh AP writer marker names; never reads file contents or sizes."""
+    try:
+        root = Path(str(directory)).expanduser()
+        if not root.is_dir():
+            return ()
+    except (OSError, TypeError, ValueError, RuntimeError):
+        return ()
+    cutoff = (now if now is not None else time.time()) - max(0.0, freshness_seconds)
+    live: list[str] = []
+    try:
+        names = sorted(path.name for path in root.iterdir() if path.is_file())
+    except (OSError, ValueError, RuntimeError):
+        return ()
+    for name in names:
+        if not name.startswith(SAVED_GAMES_MARKER_PREFIXES):
+            continue
+        try:
+            if (root / name).stat().st_mtime >= cutoff:
+                live.append(name)
+        except (OSError, ValueError, RuntimeError):
+            continue
+        if len(live) >= 24:
+            break
+    return tuple(live)
+
+
+@dataclass(frozen=True)
+class SavedGamesSelection:
+    path: Path | None
+    source: str
+    reason: str
+    repaired: bool = False
+    previous_path: str | None = None
+    rejected: tuple[dict[str, object], ...] = ()
+    live_evidence: tuple[str, ...] = ()
+
+
+def select_saved_games_dir(
+    configured: Path | str | None,
+    *,
+    candidates: Sequence[Path | str] = (),
+    known_base: Path | str | None = None,
+    app_dir: Path | str | None = None,
+    client_dir: Path | str | None = None,
+    game_root: Path | str | None = None,
+    platform: str | None = None,
+    now: float | None = None,
+    game_running: bool = False,
+) -> SavedGamesSelection:
+    """Deterministically resolve the single effective Saved Games base.
+
+    A configured path with valid .../id Software/DOOMEternal/base shape is
+    always preserved. Anything else (missing, wrong shape, or inside the
+    launcher application/client directory or the game installation) is never
+    used as authority; the canonical Known-Folder/Proton base wins, then a
+    single live-writer candidate, otherwise selection fails closed.
+    """
+    target = platform if platform is not None else os.name
+    forbidden = [
+        str(scope)
+        for scope in (app_dir, client_dir, game_root)
+        if scope is not None and str(scope)
+    ]
+    rejected: list[dict[str, object]] = []
+
+    def _reject(candidate: object, reason: str) -> None:
+        rejected.append({"path": str(candidate), "reason": reason})
+
+    configured_text = str(configured) if configured is not None and str(configured) else None
+    configured_path = Path(configured_text).expanduser() if configured_text else None
+    configured_verdict = saved_games_shape_verdict(configured_path, platform=target) if configured_path else "unconfigured"
+    configured_forbidden = bool(
+        configured_path is not None
+        and any(_is_within_directory(configured_path, scope, platform=target) for scope in forbidden)
+    )
+    if configured_forbidden and configured_path is not None:
+        if str(app_dir) and _is_within_directory(configured_path, str(app_dir), platform=target):
+            configured_verdict = "application_directory_not_saved_games"
+        elif str(client_dir) and _is_within_directory(configured_path, str(client_dir), platform=target):
+            configured_verdict = "application_directory_not_saved_games"
+        else:
+            configured_verdict = "game_installation_not_saved_games"
+    if configured_text is not None:
+        _reject(configured_text, configured_verdict if configured_verdict != "valid_saved_games_base" or configured_forbidden else "configured")
+    configured_usable = (
+        configured_path is not None
+        and configured_verdict == "valid_saved_games_base"
+        and not configured_forbidden
+    )
+    try:
+        configured_exists = bool(configured_path is not None and configured_path.is_dir())
+    except (OSError, ValueError, RuntimeError):
+        configured_exists = False
+    if configured_usable and configured_exists and configured_path is not None:
+        return SavedGamesSelection(
+            path=configured_path,
+            source="configured_saved_games_dir",
+            reason="configured Saved Games base has valid shape and exists",
+            rejected=tuple(rejected),
+        )
+
+    ordered: list[Path] = []
+    seen: set[str] = set()
+    for raw in ((known_base,) if known_base is not None else ()) + tuple(candidates):
+        if raw is None or not str(raw):
+            continue
+        try:
+            candidate = Path(str(raw)).expanduser()
+        except (OSError, TypeError, ValueError, RuntimeError):
+            _reject(raw, "unparseable")
+            continue
+        key = _saved_games_norm(candidate, platform=target)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(candidate)
+
+    viable: list[Path] = []
+    live: dict[str, tuple[str, ...]] = {}
+    for candidate in ordered:
+        verdict = saved_games_shape_verdict(candidate, platform=target)
+        if verdict != "valid_saved_games_base":
+            _reject(str(candidate), verdict)
+            continue
+        if any(_is_within_directory(candidate, scope, platform=target) for scope in forbidden):
+            _reject(str(candidate), "application_directory_not_saved_games")
+            continue
+        viable.append(candidate)
+        markers = saved_games_live_markers(candidate, now=now)
+        if markers:
+            live[_saved_games_norm(candidate, platform=target)] = markers
+
+    known_key = _saved_games_norm(Path(str(known_base)).expanduser(), platform=target) if known_base else None
+    known_viable = next((item for item in viable if _saved_games_norm(item, platform=target) == known_key), None) if known_key else None
+    if known_viable is not None:
+        return SavedGamesSelection(
+            path=known_viable,
+            source="canonical_saved_games_base",
+            reason="canonical Saved Games base selected over invalid configured path",
+            repaired=configured_text is not None,
+            previous_path=configured_text,
+            rejected=tuple(rejected),
+            live_evidence=live.get(_saved_games_norm(known_viable, platform=target), ()),
+        )
+    live_viable = [item for item in viable if _saved_games_norm(item, platform=target) in live]
+    if len(live_viable) == 1 and (len(viable) == 1 or game_running):
+        only = live_viable[0]
+        return SavedGamesSelection(
+            path=only,
+            source="live_writer_evidence",
+            reason="single live AP writer candidate selected over invalid configured path",
+            repaired=configured_text is not None,
+            previous_path=configured_text,
+            rejected=tuple(rejected),
+            live_evidence=live.get(_saved_games_norm(only, platform=target), ()),
+        )
+    if len(viable) == 1 and configured_text is None:
+        only = viable[0]
+        return SavedGamesSelection(
+            path=only,
+            source="single_viable_candidate",
+            reason="no configured path; single viable candidate selected",
+            rejected=tuple(rejected),
+            live_evidence=live.get(_saved_games_norm(only, platform=target), ()),
+        )
+    if not viable:
+        reason = "no_marker_evidence" if configured_text is None else "stale_config_no_viable_candidate"
+        if len(rejected) > 1 and configured_text is not None:
+            reason = "ambiguous" if any(str(item.get("path")) != configured_text for item in rejected) else reason
+        return SavedGamesSelection(path=None, source="unresolved", reason=reason, rejected=tuple(rejected))
+    return SavedGamesSelection(path=None, source="unresolved", reason="ambiguous", rejected=tuple(rejected))
 
 
 class PrerequisiteStatus(str, Enum):

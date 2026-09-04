@@ -58,9 +58,11 @@ def install_ap_stubs() -> None:
     sys.modules["NetUtils"] = net
 
 
-def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path):
+def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path, saves_base: Path):
     config = base_dir.parent / "ap_config.json"
-    config.write_text(json.dumps({"doom_base_dir": str(base_dir), "save_games_dir": str(base_dir)}), encoding="utf-8")
+    # The Saved Games base is its own authority, never the game installation
+    # base, even when both exist side by side in a fixture.
+    config.write_text(json.dumps({"doom_base_dir": str(base_dir), "save_games_dir": str(saves_base)}), encoding="utf-8")
     os.environ["DOOM_AP_CONFIG_FILE"] = str(config)
     os.environ["XDG_STATE_HOME"] = str(state_dir)
     install_ap_stubs()
@@ -260,8 +262,10 @@ def main() -> int:
         base = game / "base"
         (base / "classicwads").mkdir(parents=True)
         (game / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
+        saves_base = Path(directory) / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+        saves_base.mkdir(parents=True)
         old_state_home = os.environ.get("XDG_STATE_HOME")
-        bridge = load_bridge(client_dir, base, Path(directory) / "state")
+        bridge = load_bridge(client_dir, base, Path(directory) / "state", saves_base)
         if old_state_home is None:
             os.environ.pop("XDG_STATE_HOME", None)
         else:
