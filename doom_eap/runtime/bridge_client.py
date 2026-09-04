@@ -4440,6 +4440,13 @@ class DoomEternalContext(CommonContext):
         )
         emit_launcher_event("ammo_refill", status=status, **payload)
 
+    def _refresh_ammo_refill_receipt_projection(self, item_id):
+        if item_id != AMMO_REFILL_ITEM_ID:
+            return False
+        self._refresh_ammo_refill_charge()
+        self._emit_ammo_refill_balance(source="item_received")
+        return True
+
     def _ammo_refill_overflow_target(self):
         consumed = getattr(self, "_ammo_server_consumed", None)
         discarded = getattr(self, "_ammo_server_discarded", None)
@@ -5558,6 +5565,7 @@ class DoomEternalContext(CommonContext):
                     self._record_processed_receipt(network_item)
                     self.items_processed += 1
                     self.persist_session_state()
+                    self._refresh_ammo_refill_receipt_projection(item_id)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,

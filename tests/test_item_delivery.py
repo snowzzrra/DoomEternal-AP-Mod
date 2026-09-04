@@ -611,3 +611,77 @@ def test_launcher_hints_report_malformed_nonempty_payload(monkeypatch, caplog):
     assert "HINTS_DATA_REJECTED" in caplog.text
     assert "source_type=list" in caplog.text
     assert "rejected=2" in caplog.text
+
+
+def _ammo_context(monkeypatch):
+    context = _context()
+    context._ammo_server_consumed = 0
+    context._ammo_server_discarded = 0
+    context._ammo_refill_discard_pending_target = None
+    context._ammo_refill_overflow_task = None
+    context._ammo_refill_available = None
+    emitted = []
+    monkeypatch.setattr(
+        bridge,
+        "emit_launcher_event",
+        lambda event_type, **payload: emitted.append((event_type, payload)),
+    )
+    return context, emitted
+
+
+def test_ammo_refill_receipt_refreshes_counter_immediately(monkeypatch):
+    context, emitted = _ammo_context(monkeypatch)
+    context.items_received = [NetworkItem(7770024, 0, 1, 0)]
+
+    assert context._refresh_ammo_refill_receipt_projection(7770024) is True
+    assert context._ammo_refill_available == 1
+    assert len(emitted) == 1
+    event_type, payload = emitted[0]
+    assert event_type == "ammo_refill"
+    assert payload["status"] == "ready"
+    assert payload["available"] == 1
+    assert payload["source"] == "item_received"
+    assert payload["status"] not in {"used", "empty", "blocked", "error"}
+
+    context.items_received.append(NetworkItem(7770024, 0, 1, 0))
+    assert context._refresh_ammo_refill_receipt_projection(7770024) is True
+    assert context._ammo_refill_available == 2
+    assert emitted[-1][1]["available"] == 2
+
+
+def test_ammo_refill_counter_follows_consumed_and_never_negative(monkeypatch):
+    context, emitted = _ammo_context(monkeypatch)
+    context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(3)]
+    assert context._refresh_ammo_refill_receipt_projection(7770024) is True
+    assert context._ammo_refill_available == 3
+
+    context._ammo_server_consumed = 1
+    assert context._refresh_ammo_refill_charge() == 2
+    context._ammo_server_consumed = 2
+    assert context._refresh_ammo_refill_charge() == 1
+    context._ammo_server_consumed = 5
+    assert context._refresh_ammo_refill_charge() == 0
+
+
+def test_ammo_refill_receipt_projection_ignores_other_items(monkeypatch):
+    context, emitted = _ammo_context(monkeypatch)
+    assert context._refresh_ammo_refill_receipt_projection(7770004) is False
+    assert emitted == []
+    assert context._ammo_refill_available is None
+
+
+def test_ammo_refill_reconnect_reconstructs_balance_without_replay(monkeypatch):
+    context, emitted = _ammo_context(monkeypatch)
+    context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(3)]
+    context._ammo_server_consumed = 1
+    assert context._refresh_ammo_refill_receipt_projection(7770024) is True
+    assert context._ammo_refill_available == 2
+    assert bridge.ITEM_REPLAY_POLICIES[7770024].policy == "never_replay"
+    assert len(context.items_received) == 3
+
+
+def test_ammo_refill_capacity_caps_fourth_receipt(monkeypatch):
+    context, emitted = _ammo_context(monkeypatch)
+    context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(4)]
+    assert context._refresh_ammo_refill_receipt_projection(7770024) is True
+    assert context._ammo_refill_available == bridge.AMMO_REFILL_CAPACITY == 3

@@ -38,6 +38,9 @@ private:
     std::string token_;
     int vk_;
     bool wasDown_;
+    bool latched_ = false;
+    DWORD releaseStartTick_ = 0;
+    static constexpr DWORD kReleaseStabilizeMs = 120;
     DWORD lastConfigCheckTick_;
     FILETIME lastWriteTime_;
     bool fileExisted_;

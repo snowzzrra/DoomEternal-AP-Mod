@@ -125,6 +125,8 @@ void AmmoHotkeyHandler::CheckConfigFile() {
             token_ = "UNBOUND";
             vk_ = 0;
             wasDown_ = false;
+            latched_ = false;
+            releaseStartTick_ = 0;
             if (log_) {
                 log_("AMMO_HOTKEY_CONFIG token=UNBOUND state=disabled");
             }
@@ -165,6 +167,8 @@ void AmmoHotkeyHandler::CheckConfigFile() {
         token_ = newToken;
         vk_ = newVk;
         wasDown_ = false;
+        latched_ = false;
+        releaseStartTick_ = 0;
         if (log_) {
             if (vk_ != 0) {
                 log_(
@@ -198,11 +202,33 @@ void AmmoHotkeyHandler::Poll(
 
     if (vk_ == 0) {
         wasDown_ = false;
+        latched_ = false;
+        releaseStartTick_ = 0;
         return;
     }
 
     const SHORT keyState = GetAsyncKeyState(vk_);
     const bool isDown = (keyState & 0x8000) != 0;
+
+    if (latched_) {
+        wasDown_ = isDown;
+        if (isDown) {
+            releaseStartTick_ = 0;
+            return;
+        }
+        if (releaseStartTick_ == 0) {
+            releaseStartTick_ = now;
+            return;
+        }
+        if (now - releaseStartTick_ < kReleaseStabilizeMs) {
+            return;
+        }
+        latched_ = false;
+        releaseStartTick_ = 0;
+        wasDown_ = false;
+        return;
+    }
+
     const bool risingEdge = isDown && !wasDown_;
     wasDown_ = isDown;
 
@@ -222,10 +248,13 @@ void AmmoHotkeyHandler::Poll(
             + " foreground=" + (foreground ? "true" : "false")
             + " session=" + (session ? "true" : "false")
             + " rpc_ready=" + (rpcReady ? "true" : "false")
-            + " rpc_armed=" + (armed ? "true" : "false")
+            + " rpc_armed=" + (rpcArmed ? "true" : "false")
             + " safe=" + (safe ? "true" : "false")
         );
     }
+
+    latched_ = true;
+    releaseStartTick_ = 0;
 
     if (foreground && session && rpcReady && armed && safe) {
         const std::string command = "condump AP_REFILL_REQUEST.txt";
