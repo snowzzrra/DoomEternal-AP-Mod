@@ -899,13 +899,13 @@
     {
       "location_id": 7770381,
       "current_name": "Nekravol Part II - Secret Encounter 1",
-      "contextual_name": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms",
+      "contextual_name": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall",
       "map": "Nekravol Part II"
     },
     {
       "location_id": 7770382,
       "current_name": "Nekravol Part II - Secret Encounter 2",
-      "contextual_name": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall",
+      "contextual_name": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms",
       "map": "Nekravol Part II"
     },
     {
@@ -929,7 +929,7 @@
     {
       "location_id": 7770393,
       "current_name": "Urdak - Extra Life 2",
-      "contextual_name": "Urdak - Extra Life - Eighth-Arena Breakable Wall",
+      "contextual_name": "Urdak - Extra Life - Water-Filled Icon Room",
       "map": "Urdak"
     },
     {
@@ -959,7 +959,7 @@
     {
       "location_id": 7770399,
       "current_name": "Urdak - Extra Life 3",
-      "contextual_name": "Urdak - Extra Life - Water-Filled Icon Room",
+      "contextual_name": "Urdak - Extra Life - Eighth-Arena Breakable Wall",
       "map": "Urdak"
     },
     {

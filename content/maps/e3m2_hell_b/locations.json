@@ -42,8 +42,8 @@
     "7770378": "Nekravol Part II - Praetor Suit Token - Final Arena Elevator Undercroft",
     "7770379": "Nekravol Part II - Praetor Suit Token - Post-Boost-Pad Back Room",
     "7770380": "Nekravol Part II - Praetor Suit Token - Blue-Energy Room Breakable Wall",
-    "7770381": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms",
-    "7770382": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall"
+    "7770381": "Nekravol Part II - Secret Encounter - Dread Knight Wall Hall",
+    "7770382": "Nekravol Part II - Secret Encounter - Starting Bridge Side Platforms"
   },
   "location_feedback": {
     "default_policy": "ap_only"

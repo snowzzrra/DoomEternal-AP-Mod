@@ -1,5 +1,5 @@
 {
-  "authoritative_fingerprint": "6f222e9cb4c44125c53f238847f24541229c60a157bc60ca92937d557a7e7082",
+  "authoritative_fingerprint": "5494724020e52daa795e6216adebf37fe3b1bcba754d169a55c5dc1336a2b3a4",
   "catalog_fingerprint": "f6a7a5d0e82ad9543f94704adbe778c3a146c6c7b3a2b0959b9030e477817759",
   "compiler_revision": 4,
   "content_revision": "0.5.0",
@@ -5582,7 +5582,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "GAME_PROGRESS_ARGENT_CELL_1_498834914",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5610,7 +5610,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5638,7 +5638,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5666,7 +5666,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5694,7 +5694,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5722,7 +5722,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5750,7 +5750,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5778,7 +5778,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5806,7 +5806,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5834,7 +5834,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5862,7 +5862,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5890,7 +5890,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5905,8 +5905,8 @@
       "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
       "source_identity": {
         "descriptor_sha256": "2ccc126f96653572759f0b288f56451f26c1e1f8b9cb4547318d41a8251e8f05",
-        "location_descriptor_sha256": "a50d445bef2d67e569913ff26f3ee1181c4a3eb329b01f91a6ea55c2d9f8128a",
-        "policy_sha256": "f156f1ab1d21b023d0587a7a4823864ce640ab0e3a178a719e8f17c3e22dd712",
+        "location_descriptor_sha256": "bf79dea711b6bb76d6441b316a82c06efc4a52da71ab47cb3ab227218b85568f",
+        "policy_sha256": "1bb7ea453a7b694e0dd0dce83df702c1e64888ab466bf7ed6369ffed2e0f6c52",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/sp/e3m1_slayer/e3m1_slayer.entities",
@@ -5918,7 +5918,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_GOO_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5946,7 +5946,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_MARAUDER_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -5974,7 +5974,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_PAIN_ELEMENTAL_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6002,7 +6002,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6030,7 +6030,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_2_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6058,7 +6058,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6086,7 +6086,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6114,7 +6114,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_5_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6142,7 +6142,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_6_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6170,7 +6170,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CODEX_7_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6198,7 +6198,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_POWERUP_INFINITE_OVERDRIVE_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6226,7 +6226,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_10_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6254,7 +6254,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_11_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6282,7 +6282,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6306,7 +6306,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "SECRET_ENCOUNTER_E3M1_1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6330,7 +6330,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "SECRET_ENCOUNTER_E3M1_2",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6358,7 +6358,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6386,7 +6386,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_3_E3M1",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6410,7 +6410,7 @@
         "resource_sha256": "323dc940fcc8e4197654962126165998aa9a13d17b39effe50662e3365c764c1",
         "source_entity": "TARGET_RELAY_SLAYERGATE_4_COMBAT_END",
         "source_file": "content/maps/e3m1_slayer/locations.json",
-        "source_sha256": "03dd2647eb318109e4037c055bdbffdc17248140fcd28e79e6dca7c1ca5ea4fa"
+        "source_sha256": "345b2895347b414508af702fca1483b3b1154e14b5cb244ba5f979a95287c992"
       }
     },
     {
@@ -6934,7 +6934,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PICKUP_COLLECTIBLE_TOYS_TYRANT_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -6962,7 +6962,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PROGRESS_CODEX_3_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -6990,7 +6990,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PROGRESS_CODEX_2_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7018,7 +7018,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PROGRESS_CODEX_1_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7046,7 +7046,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7074,7 +7074,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_14_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7102,7 +7102,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PROGRESS_MASTERY_TOKEN_WEAPON_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7130,7 +7130,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_CONFETTI_INSTAGIB_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7158,7 +7158,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_13_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7186,7 +7186,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_DREADKNIGHT_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7214,7 +7214,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_ONE_SHOT_STAGGER_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7242,7 +7242,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7270,7 +7270,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "PICKUPS_PROGRESS_ARGENT_CELL_1_693519488_E3M2_B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7298,7 +7298,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PICKUP_COLLECTIBLE_TOYS_ARCHVILE_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7326,7 +7326,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7354,7 +7354,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PROGRESS_PRAETOR_TOKEN_4_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7382,7 +7382,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "GAME_PROGRESS_PRAETOR_TOKEN_3_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7410,7 +7410,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "VIS_PROGRESS_PRAETOR_TOKEN_1_E3M2B",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7421,7 +7421,7 @@
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
-        "location_descriptor_sha256": "9878d182c4d036c587eea9661efab947c297b74c5c403048b799cbaad57132c0",
+        "location_descriptor_sha256": "e03ebcf3f7ead8a1b18ee8f050a84e787fe1ed5b38259c4b83be1c5e53ce4e53",
         "policy_sha256": "c19aeb579d6237efe7ed1a8fc608db229eff2fb2cfc2a0f50c3c14afff729eb5",
         "resolved_policy": "secret_encounter",
         "resource": {
@@ -7434,7 +7434,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "SECRET_ENCOUNTER_E3M2_B_1",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7445,7 +7445,7 @@
       "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
       "source_identity": {
         "descriptor_sha256": "33b6389f47e3e9f49b4c8e946c6a6141bfa6a50abd9ff28de876de4d11ed9b46",
-        "location_descriptor_sha256": "69fb74854ffbe3a5cb124bd4c79ca688147181efded06188685a0c19e3490935",
+        "location_descriptor_sha256": "c2468d654aa05836f4ba05ee64253510c16d67714ba7d3069cecc6a4afed7400",
         "policy_sha256": "e94c5c1f3c1318123d013887be5d01566c28b26997c6ddf3c5af973ce3767df8",
         "resolved_policy": "secret_encounter",
         "resource": {
@@ -7458,7 +7458,7 @@
         "resource_sha256": "4268d9772288c4256d039159da4ed458a47fe38f1432f76339ece28d69e4cc9e",
         "source_entity": "SECRET_ENCOUNTER_E3M2_B_2",
         "source_file": "content/maps/e3m2_hell_b/locations.json",
-        "source_sha256": "9c8842a8a333d0cc05d93124a6d535bb78e7345d09aefb75af7c67db553a23ab"
+        "source_sha256": "f13b143cd9d3b41f81846b5ce68de8cef6725496ee6a74c4ad3b8594662c0d05"
       }
     },
     {
@@ -7486,7 +7486,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "EXIT_MAINTENANCE_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7514,7 +7514,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "BLUE_CONTROL_TOWER_PROGRESS_CHEATS_POWERUP_INFINITE_BERSERK_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7542,7 +7542,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7570,7 +7570,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PROGRESS_MASTERY_TOKEN_WEAPON_1_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7598,7 +7598,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_KHAN_MAYKR_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7613,7 +7613,7 @@
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
-        "location_descriptor_sha256": "69ea2b0f2f419accdb6ca1076925da54847615a367c898481ed959f04eb7ed94",
+        "location_descriptor_sha256": "6edaea5715724dca4162faa21b067028c10b0756f9923a90247d756ffce38010",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
         "resource": {
@@ -7626,7 +7626,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7654,7 +7654,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_MAYKR_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7682,7 +7682,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_15_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7710,7 +7710,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_16_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7738,7 +7738,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PROGRESS_PRAETOR_TOKEN_6_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7766,7 +7766,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PROGRESS_PRAETOR_TOKEN_1_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7781,7 +7781,7 @@
       "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
       "source_identity": {
         "descriptor_sha256": "c13445deb53c2d01bc9e23312737df2777e1b2ca6dad78ed223c34a21717a537",
-        "location_descriptor_sha256": "4083c74e6f5d2284cc7b6b59958dadeb1784cb32438692eb5b5a1b4cff72ae8a",
+        "location_descriptor_sha256": "7bc96130331142b7a38bd254b8442ec06fea89c2ff34ac191474ce10d9d1c80a",
         "policy_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "resolved_policy": "generated_universal",
         "resource": {
@@ -7794,7 +7794,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M4",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7822,7 +7822,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "TEMP_ALL_SCRIPTING_PICKUP_COLLECTIBLE_TOYS_PINKY_SPECTRE_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7850,7 +7850,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "CODEX_PROGRESS_CODEX_4_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7878,7 +7878,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "CODEX_PROGRESS_CODEX_2_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7906,7 +7906,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "CODEX_PROGRESS_CODEX_5_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7934,7 +7934,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "CODEX_PROGRESS_CODEX_3_E3M3",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7958,7 +7958,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "SECRET_ENCOUNTER_E3M3_1",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {
@@ -7982,7 +7982,7 @@
         "resource_sha256": "337822a39cc014d9cce67a6a0f6c620b1d911842b41018691291a0e23f40498f",
         "source_entity": "SECRET_ENCOUNTER_E3M3_2",
         "source_file": "content/maps/e3m3_maykr/locations.json",
-        "source_sha256": "0adefdc0c1582aa5e4f5882f1ad2bd8decf0feea06c8cce857ecb35eba471f15"
+        "source_sha256": "19df9860e2cbf5a7244a9cedf9b69c2b2813f7d160077194689b7959b6277bf0"
       }
     },
     {

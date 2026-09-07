@@ -1406,6 +1406,44 @@ class TestDevInvPortability(unittest.TestCase):
         overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
         self.assertGreaterEqual(len(overrides), 6)
 
+    def test_build_tag_devinv_overrides_includes_required_blood_punch_perks(self):
+        from tools.decls.devinv_builder import (
+            build_tag_devinv_overrides,
+            validate_tag_devinv_source,
+        )
+
+        overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
+        self.assertGreaterEqual(len(overrides), 6)
+        expected_perks = {
+            "perk/player/blood_punch/area_of_effect",
+            "perk/player/blood_punch/ai_charge_rate",
+            "perk/player/blood_punch/max_charges",
+        }
+        for path, decl_text in overrides.items():
+            for perk in expected_perks:
+                self.assertIn(perk, decl_text, f"Missing {perk} in {path}")
+            self.assertNotIn("perk/player/blood_punch/base", decl_text, f"Unconditionally granted blood_punch/base in {path}")
+            validate_tag_devinv_source(decl_text)
+
+    def test_validator_fails_if_blood_punch_perk_is_missing(self):
+        from tools.decls.devinv_builder import (
+            build_tag_devinv_overrides,
+            validate_tag_devinv_source,
+        )
+
+        overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
+        sample_decl = next(iter(overrides.values()))
+        tampered = sample_decl.replace('perk = "perk/player/blood_punch/area_of_effect";', 'perk = "perk/player/other";')
+        with self.assertRaises(ValueError):
+            validate_tag_devinv_source(tampered)
+
+    def test_base_campaign_devinv_loadout_builder_unaltered(self):
+        from tools.decls.devinv_builder import build_devinv_loadout
+
+        base_decl = build_devinv_loadout({}, "Combat Shotgun")
+        self.assertIn("startingInventory", base_decl)
+        self.assertIn("weapon/player/shotgun", base_decl)
+
     def test_case_b_crlf_and_c_cr_parity(self):
         from tools.decls import devinv_builder
         from tools.decls.devinv_builder import build_tag_devinv_overrides
@@ -1929,6 +1967,28 @@ class TestWindowsFilesystemCorrective(unittest.TestCase):
                     self.assertIn("doctor.json", archive.namelist())
             finally:
                 controller.close()
+
+
+class TestLinuxInjectorSettingsEnforcement(unittest.TestCase):
+    def test_configure_first_run_enforces_settings_when_file_exists(self):
+        from doom_eap.launcher.launcher_platform import LinuxModManagerAdapter
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            game_root = Path(temp_dir)
+            settings_file = game_root / "EternalModInjector Settings.txt"
+            settings_file.write_text(":AUTO_UPDATE=1\n:AUTO_LAUNCH_GAME=1\n:SOME_OTHER_SETTING=1\n", encoding="utf-8")
+
+            LinuxModManagerAdapter._configure_first_run(game_root)
+
+            content = settings_file.read_text(encoding="utf-8")
+            self.assertIn(":AUTO_UPDATE=0", content)
+            self.assertIn(":AUTO_LAUNCH_GAME=0", content)
+            self.assertIn(":SOME_OTHER_SETTING=1", content)
+            self.assertNotIn(":AUTO_UPDATE=1", content)
+            self.assertNotIn(":AUTO_LAUNCH_GAME=1", content)
+        finally:
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
