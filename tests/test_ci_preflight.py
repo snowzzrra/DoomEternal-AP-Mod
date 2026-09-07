@@ -67,10 +67,11 @@ class TestCIPreflight(unittest.TestCase):
         self.assertIn("DoomEternalArchipelagoLauncher --self-test", content)
         self.assertIn("DoomEternalArchipelagoLauncher.exe --self-test", content)
 
-        # Native job installs wine64-tools and runs linkability preflight
-        self.assertIn("wine64-tools", content)
-        self.assertIn("Native Toolchain & Linkability Preflight", content)
-        self.assertIn("RpcExceptionFilter", content)
+        # Native client is built directly on a Windows runner with MSVC/MIDL.
+        native_job = doc["jobs"]["build-native-support"]
+        self.assertEqual(native_job["runs-on"], "windows-latest")
+        self.assertIn("client_windows.ps1", content)
+        self.assertIn("MSVC x64", native_job["name"])
 
         # Consolidate job sets chmod +x before test -x
         chmod_idx = content.find("chmod +x linux/DoomEternalArchipelagoLauncher")

@@ -204,9 +204,9 @@ jobs:
           retention-days: 1
 
   build-native-support:
-    name: Build Native Client (x86_64-w64-mingw32)
+    name: Build Native Client (MSVC x64)
     needs: [resolve-metadata, preflight]
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout MOD repository
         uses: actions/checkout@v4
@@ -219,46 +219,18 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install MinGW, Clang, and WIDL toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 wine64-tools clang
-          command -v widl
-
-      - name: Native Toolchain & Linkability Preflight
-        run: |
-          command -v widl
-          command -v x86_64-w64-mingw32-gcc
-          command -v x86_64-w64-mingw32-g++
-          command -v clang
-          command -v x86_64-w64-mingw32-strip
-          command -v x86_64-w64-mingw32-objdump
-          echo "--> Checking required MinGW import libraries..."
-          for lib in librpcrt4.a libbcrypt.a libversion.a; do
-            p=$(x86_64-w64-mingw32-gcc -print-file-name=$lib)
-            if [ "$p" = "$lib" ] || [ ! -f "$p" ]; then
-              echo "Error: Missing required MinGW import library: $lib" >&2
-              exit 1
-            fi
-            echo "  [OK] $lib -> $p"
-          done
-          echo "--> Checking RpcExceptionFilter in librpcrt4.a..."
-          LIBRPCRT4=$(x86_64-w64-mingw32-gcc -print-file-name=librpcrt4.a)
-          x86_64-w64-mingw32-nm -A "$LIBRPCRT4" | grep -E "RpcExceptionFilter|I_RpcExceptionFilter"
-
       - name: Build and Validate Native Client
-        run: |
-          bash scripts/build/client.sh build/release/build/client
+        shell: pwsh
+        run: .\scripts\build\client_windows.ps1 -OutputDir build\release\build\client
 
       - name: Verify Native Binaries
+        shell: pwsh
         run: |
-          test -f build/release/build/client/ap_client.exe
-          test "$(dd if=build/release/build/client/ap_client.exe bs=2 count=1 2>/dev/null)" = "MZ"
-          mkdir -p build/artifacts/client
-          cp build/release/build/client/ap_client.exe build/artifacts/client/
-          if [ -f build/release/build/client/save_death_probe.exe ]; then
-            cp build/release/build/client/save_death_probe.exe build/artifacts/client/
-          fi
+          $client = 'build/release/build/client/ap_client.exe'
+          if (-not (Test-Path -LiteralPath $client) -or [IO.File]::ReadAllBytes($client)[0..1] -ne [byte[]](0x4d, 0x5a)) { throw "Invalid native client: $client" }
+          New-Item -ItemType Directory -Force build/artifacts/client | Out-Null
+          Copy-Item $client build/artifacts/client/
+          if (Test-Path -LiteralPath 'build/release/build/client/save_death_probe.exe') { Copy-Item build/release/build/client/save_death_probe.exe build/artifacts/client/ }
 
       - name: Upload Native Client Artifact
         uses: actions/upload-artifact@v4
@@ -354,10 +326,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
+          python -m pip install -r requirements-ci.txt
 
       - name: Windows Filesystem Corrective Gate
         run: |
-          python -m pip install pytest
           python -m pytest tests/test_install_workflow.py::TestWindowsFilesystemCorrective -q
 
       - name: Build Windows Frozen Launcher
@@ -365,14 +337,16 @@ jobs:
           python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
 
       - name: Validate Windows Frozen Launcher
-        shell: bash
+        shell: pwsh
         timeout-minutes: 1
         run: |
-          python -c 'from pathlib import Path; p = Path("build/release/DoomEternalArchipelagoLauncher.exe"); assert p.is_file() and p.read_bytes()[:2] == b"MZ", "Invalid Windows launcher"'
-          echo "--> Running frozen Windows launcher self-test..."
-          build/release/DoomEternalArchipelagoLauncher.exe --self-test
-          mkdir -p build/artifacts/windows
-          cp build/release/DoomEternalArchipelagoLauncher.exe build/artifacts/windows/
+          $launcher = 'build/release/DoomEternalArchipelagoLauncher.exe'
+          if (-not (Test-Path -LiteralPath $launcher) -or [IO.File]::ReadAllBytes($launcher)[0..1] -ne [byte[]](0x4d, 0x5a)) { throw "Invalid Windows launcher" }
+          Write-Output '--> Running frozen Windows launcher self-test...'
+          & $launcher --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Windows launcher self-test failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force build/artifacts/windows | Out-Null
+          Copy-Item $launcher build/artifacts/windows/
 
       - name: Upload Windows Launcher Artifact
         uses: actions/upload-artifact@v4
@@ -496,7 +470,7 @@ jobs:
                   "python_version_windows": "3.12",
                   "pyinstaller_version_linux": "PyInstaller (requirements-launcher.txt)",
                   "pyinstaller_version_windows": "PyInstaller (requirements-launcher.txt)",
-                  "native_client_toolchain_identity": "x86_64-w64-mingw32-gcc / widl / clang",
+                  "native_client_toolchain_identity": "MSVC x64 / MIDL",
               },
               "files": files_record,
           }

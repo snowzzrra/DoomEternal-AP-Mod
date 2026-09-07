@@ -1272,6 +1272,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
 
     def test_windows_launch_game_ensures_native_client_then_launches_steam(self):
         order = []
+        self.controller.connected_room = True
         fake_prereqs = MagicMock(ok=True)
         with patch.object(self.controller, "_ensure_native_client", side_effect=lambda **kw: order.append("ensure_client") or True), \
              patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \
@@ -1283,6 +1284,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             mock_steam.assert_called_once()
 
     def test_windows_launch_game_fails_closed_when_ensure_fails(self):
+        self.controller.connected_room = True
         fake_prereqs = MagicMock(ok=True)
         with patch.object(self.controller, "_ensure_native_client", return_value=False), \
              patch.object(launcher_controller_mod, "validate_game_root", return_value=self.game_root), \

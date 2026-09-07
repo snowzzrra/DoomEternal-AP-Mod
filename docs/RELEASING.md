@@ -44,6 +44,21 @@ Release packages are generated through GitHub Actions:
    - `version_label`: Target version string (e.g., `v0.5.1`).
 5. Run the workflow. It executes portable release preflight gates, validates frozen room compiler resources against the content input fingerprint, builds the native client and standalone platform launchers, and assembles the public release packages.
 
+### Native Windows build
+
+The native client is built on Windows with Visual Studio 2022 Build Tools and
+the Desktop development with C++ workload. From PowerShell, run:
+
+```powershell
+python -m pip install -r ..\Archipelago\requirements.txt -r requirements.txt -r requirements-launcher.txt -r requirements-ci.txt
+.\scripts\build\client_windows.ps1 -OutputDir build\release\build\client
+```
+
+The script locates the MSVC x64 toolchain, generates the RPC client stubs with
+MIDL, and writes `ap_client.exe` and `save_death_probe.exe` under the release
+build directory. It does not require WSL, Git Bash, Distrobox, Wine, or a
+Linux container.
+
 ### Step 3: Download Public Release Artifacts
 1. From the completed workflow run summary, download the generated public release artifact:
    `DoomEAP-release-<version>-<short-mod-sha>`

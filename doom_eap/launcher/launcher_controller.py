@@ -536,7 +536,7 @@ class LauncherController:
         if not prereqs.ok:
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
-        if target_platform == "nt":
+        if target_platform == "nt" and self.connected_room:
             if not self._ensure_native_client(platform=target_platform):
                 raise RuntimeError(
                     "Game integration helper could not start. Review the launcher warning "
