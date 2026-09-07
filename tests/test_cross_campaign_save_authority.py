@@ -75,6 +75,7 @@ def _create_test_context():
     context.fast_travel_eligibility_snapshot = None
     context.fast_travel_last_transition = None
     context.automap_cleanup_epoch = None
+    context.automap_cleanup_session = "test_cleanup_session"
     context.automap_cleanup_submitted = set()
     context.automap_cleanup_retry = {}
     context.automap_cleanup_status = {}
@@ -360,12 +361,47 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
         self.assertEqual(context.cached_map_identity["gameplay_epoch"], "3:300")
         self.assertEqual(context.automap_cleanup_epoch, "3:300")
 
+        context.checked_locations = {7770363}
         sent = []
         with patch.object(self.bc, "send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True), \
              patch.object(self.bc, "rpc_execution_enabled", return_value=True):
             context.reconcile_checked_automap_cleanup("test_reload")
 
         self.assertEqual(context.automap_cleanup_epoch, "3:300")
+        self.assertTrue(any("ap_hide_location_visual_7770363" in cmd for cmd, _ in sent))
+        self.assertIn(("3:300", "room:test:1", "game/sp/e3m2_hell_b/e3m2_hell_b", "7770363"), context.automap_cleanup_submitted)
+
+    def test_stale_dlc_evidence_slot_discarded_in_base_campaign(self):
+        context = _create_test_context()
+        context.active_save_slot = "DLC1-AUTOSAVE1"
+        context.active_save_proof_authoritative = True
+
+        base_candidate = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/GAME-AUTOSAVE1/game_duration.dat"), 1000)
+        dlc_candidate = PrimarySaveSelection("DLC1-AUTOSAVE1", Path("/fake/DLC1-AUTOSAVE1/game_duration.dat"), 2000)
+
+        def mock_candidates_fn(filename="game_duration.dat", slot_prefix=None):
+            if slot_prefix == "GAME-AUTOSAVE":
+                return [base_candidate]
+            if slot_prefix == "DLC1-AUTOSAVE":
+                return [dlc_candidate]
+            return [dlc_candidate, base_candidate]
+
+        def mock_primary_for_slot(slot):
+            return base_candidate if slot == "GAME-AUTOSAVE1" else (dlc_candidate if slot == "DLC1-AUTOSAVE1" else None)
+
+        # Stale evidence still reporting DLC1-AUTOSAVE1 despite active map being Base campaign
+        evidence = GameplaySaveEvidence("gameplay", 5, "DLC1-AUTOSAVE1", "game/sp/e1m2_battle/e1m2_battle", native_safe=True)
+
+        with patch.object(self.bc, "primary_save_candidates", side_effect=mock_candidates_fn), \
+             patch.object(self.bc, "primary_save_for_slot", side_effect=mock_primary_for_slot), \
+             patch.object(self.bc, "read_gameplay_save_evidence", return_value=evidence), \
+             patch.object(self.bc, "read_game_details_for_selection", return_value={"mapName": "game/sp/e1m2_battle/e1m2_battle", "_mtime_ns": 1000}), \
+             patch.object(context, "read_active_map_identity", return_value={"runtime_map": "game/sp/e1m2_battle/e1m2_battle", "map_key": "e1m2_war"}):
+            selected = context.update_save_slot_lifecycle()
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.slot_directory, "GAME-AUTOSAVE1")
+        self.assertEqual(context.active_save_slot, "GAME-AUTOSAVE1")
 
     def test_resync_eligibility_with_newly_authoritative_save(self):
         context = _create_test_context()

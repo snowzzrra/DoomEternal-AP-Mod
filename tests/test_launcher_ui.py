@@ -204,12 +204,23 @@ class TestLauncherUIConstruction(unittest.TestCase):
     def test_activity_table_pruning_and_selection_retention(self):
         ui = LauncherUI(self.controller)
         try:
-            for i in range(105):
+            for i in range(100):
                 ui._activity_event({"type": "chat_sent", "text": f"message {i}"})
             self.assertEqual(ui.activity.rowCount(), 100)
-            ui.activity.selectRow(99)
-            ui._activity_event({"type": "chat_sent", "text": "new message triggering prune"})
+
+            # Test 1: Selecting row 50 and inserting should shift selection to row 51
+            ui.activity.setCurrentCell(50, 0)
+            self.assertEqual(ui.activity.currentRow(), 50)
+            ui._activity_event({"type": "chat_sent", "text": "shift message"})
             self.assertEqual(ui.activity.rowCount(), 100)
+            self.assertEqual(ui.activity.currentRow(), 51)
+
+            # Test 2: Selecting row 99 and inserting prunes row 99 (shifted to 100) and clears selection cleanly
+            ui.activity.setCurrentCell(99, 0)
+            self.assertEqual(ui.activity.currentRow(), 99)
+            ui._activity_event({"type": "chat_sent", "text": "prune message"})
+            self.assertEqual(ui.activity.rowCount(), 100)
+            self.assertEqual(ui.activity.currentRow(), -1)
         finally:
             ui.timer.stop()
             ui.close()

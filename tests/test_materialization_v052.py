@@ -145,11 +145,10 @@ class TestChainsawHistoricalOwnership(unittest.TestCase):
 
 
 class TestBloodPunchDLC(unittest.TestCase):
-    def test_build_tag_devinv_overrides_includes_all_blood_punch_perks(self):
+    def test_build_tag_devinv_overrides_includes_required_blood_punch_perks(self):
         overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
         self.assertGreaterEqual(len(overrides), 6)
         expected_perks = {
-            "perk/player/blood_punch/base",
             "perk/player/blood_punch/area_of_effect",
             "perk/player/blood_punch/ai_charge_rate",
             "perk/player/blood_punch/max_charges",
@@ -157,12 +156,13 @@ class TestBloodPunchDLC(unittest.TestCase):
         for path, decl_text in overrides.items():
             for perk in expected_perks:
                 self.assertIn(perk, decl_text, f"Missing {perk} in {path}")
+            self.assertNotIn("perk/player/blood_punch/base", decl_text, f"Unconditionally granted blood_punch/base in {path}")
             validate_tag_devinv_source(decl_text)
 
     def test_validator_fails_if_blood_punch_perk_is_missing(self):
         overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
         sample_decl = next(iter(overrides.values()))
-        tampered = sample_decl.replace('perk = "perk/player/blood_punch/base";', 'perk = "perk/player/other";')
+        tampered = sample_decl.replace('perk = "perk/player/blood_punch/area_of_effect";', 'perk = "perk/player/other";')
         with self.assertRaises(ValueError):
             validate_tag_devinv_source(tampered)
 
@@ -434,6 +434,99 @@ class TestDarkLordGoalAuthority(unittest.TestCase):
         self.assertTrue(getattr(ctx, "goal_dispatch_sent", True))
         self.assertEqual(len(dispatched_messages), 1)
         self.assertEqual(dispatched_messages[0]["status"], bridge_client.ClientStatus.CLIENT_GOAL)
+
+
+
+class TestLinuxInjectorSettingsEnforcement(unittest.TestCase):
+    def test_configure_first_run_enforces_settings_when_file_exists(self):
+        from doom_eap.launcher.launcher_platform import LinuxModManagerAdapter
+        import tempfile
+        import shutil
+        from pathlib import Path
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            game_root = Path(temp_dir)
+            settings_file = game_root / "EternalModInjector Settings.txt"
+            settings_file.write_text(":AUTO_UPDATE=1\n:AUTO_LAUNCH_GAME=1\n:SOME_OTHER_SETTING=1\n", encoding="utf-8")
+
+            LinuxModManagerAdapter._configure_first_run(game_root)
+
+            content = settings_file.read_text(encoding="utf-8")
+            self.assertIn(":AUTO_UPDATE=0", content)
+            self.assertIn(":AUTO_LAUNCH_GAME=0", content)
+            self.assertIn(":SOME_OTHER_SETTING=1", content)
+            self.assertNotIn(":AUTO_UPDATE=1", content)
+            self.assertNotIn(":AUTO_LAUNCH_GAME=1", content)
+        finally:
+            shutil.rmtree(temp_dir)
+
+
+class TestTag1FastTravelNeutralization(unittest.TestCase):
+    def test_vanilla_fast_travel_unlock_entities_stripped(self):
+        from tools.maps.ap_map_generator import remove_balanced_entity_blocks
+        sample_map = (
+            'entity {\n'
+            '\tentityDef fast_travel_trigger_unlock_fast_travel {\n'
+            '\t\titem[0] = "fast_travel_target_fast_travel_unlock_2";\n'
+            '\t}\n'
+            '}\n'
+            'entity {\n'
+            '\tentityDef fast_travel_target_fast_travel_unlock_2 {\n'
+            '\t\tinherit = "target/fast_travel_unlock";\n'
+            '\t\tclass = "idTarget_FastTravelUnlock";\n'
+            '\t}\n'
+            '}\n'
+            'entity {\n'
+            '\tentityDef fasttravel_target_fast_travel_unlock_1 {\n'
+            '\t\tinherit = "target/fast_travel_unlock";\n'
+            '\t\tclass = "idTarget_FastTravelUnlock";\n'
+            '\t}\n'
+            '}\n'
+            'entity {\n'
+            '\tentityDef player_start {\n'
+            '\t\tclass = "idPlayerStart";\n'
+            '\t}\n'
+            '}\n'
+        )
+        content = remove_balanced_entity_blocks(sample_map, "fast_travel_target_fast_travel_unlock_2")
+        content = remove_balanced_entity_blocks(content, "fasttravel_target_fast_travel_unlock_1")
+        self.assertNotIn("entityDef fast_travel_target_fast_travel_unlock_2", content)
+        self.assertNotIn("entityDef fasttravel_target_fast_travel_unlock_1", content)
+        self.assertIn("entityDef player_start", content)
+        self.assertIn("entityDef fast_travel_trigger_unlock_fast_travel", content)
+
+    def test_blood_swamps_first_visit_no_fast_travel_vs_replay_eligible(self):
+        ctx_swamp = _create_test_context(campaign="TAG1", map_key="e4m2_swamp", runtime_map="game/dlc/e4m2_swamp/e4m2_swamp")
+        # First visit: uncompleted mission -> no fast travel
+        ctx_swamp.checked_locations = set()
+        snapshot_swamp = ctx_swamp.snapshot_fast_travel_eligibility(refresh=True)
+        self.assertIsNone(snapshot_swamp)
+        self.assertFalse(ctx_swamp.fast_travel_epoch_state.get("completed_before_epoch"))
+        self.assertEqual(ctx_swamp.fast_travel_epoch_state.get("ineligible_reason"), "not_completed_before_epoch")
+
+        # Replay visit: completed mission (7770443) -> fast travel eligible
+        ctx_swamp.checked_locations = {7770443}
+        snapshot_swamp_replay = ctx_swamp.snapshot_fast_travel_eligibility(refresh=True)
+        self.assertIsNotNone(snapshot_swamp_replay)
+        self.assertTrue(ctx_swamp.fast_travel_epoch_state.get("completed_before_epoch"))
+        self.assertEqual(snapshot_swamp_replay[1], "e4m2_swamp")
+
+    def test_the_holt_first_visit_no_fast_travel_vs_replay_eligible(self):
+        ctx_holt = _create_test_context(campaign="TAG1", map_key="e4m3_mcity", runtime_map="game/dlc/e4m3_mcity/e4m3_mcity")
+        # First visit: uncompleted mission -> no fast travel
+        ctx_holt.checked_locations = set()
+        snapshot_holt = ctx_holt.snapshot_fast_travel_eligibility(refresh=True)
+        self.assertIsNone(snapshot_holt)
+        self.assertFalse(ctx_holt.fast_travel_epoch_state.get("completed_before_epoch"))
+        self.assertEqual(ctx_holt.fast_travel_epoch_state.get("ineligible_reason"), "not_completed_before_epoch")
+
+        # Replay visit: completed mission (7770457) -> fast travel eligible
+        ctx_holt.checked_locations = {7770457}
+        snapshot_holt_replay = ctx_holt.snapshot_fast_travel_eligibility(refresh=True)
+        self.assertIsNotNone(snapshot_holt_replay)
+        self.assertTrue(ctx_holt.fast_travel_epoch_state.get("completed_before_epoch"))
+        self.assertEqual(snapshot_holt_replay[1], "e4m3_mcity")
 
 
 if __name__ == "__main__":

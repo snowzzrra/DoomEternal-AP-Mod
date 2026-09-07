@@ -2444,6 +2444,7 @@ class LauncherUI(QMainWindow):
                 self.activity.setCurrentCell(target_row, selected_col)
             else:
                 self.activity.clearSelection()
+                self.activity.setCurrentCell(-1, -1)
         if was_at_top:
             scroll.setValue(scroll.minimum())
         else:

@@ -2489,28 +2489,49 @@ class LinuxModManagerAdapter:
     def _configure_first_run(game_root: Path) -> None:
         """Configure InjectorShell for explicit launcher-controlled startup."""
         config = game_root / "EternalModInjector Settings.txt"
-        if config.is_file():
+        if not config.is_file():
+            config.write_text(
+                "\n".join(
+                    (
+                        ":ASSET_VERSION=2026-04-03",
+                        ":AUTO_LAUNCH_GAME=0",
+                        ":GAME_PARAMETERS=",
+                        ":HAS_CHECKED_RESOURCES=0",
+                        ":HAS_READ_FIRST_TIME=1",
+                        ":RESET_BACKUPS=0",
+                        ":AUTO_UPDATE=0",
+                        ":VERBOSE=0",
+                        ":SLOW=0",
+                        ":COMPRESS_TEXTURES=0",
+                        ":DISABLE_MULTITHREADING=0",
+                        ":ONLINE_SAFE=0",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
             return
-        config.write_text(
-            "\n".join(
-                (
-                    ":ASSET_VERSION=2026-04-03",
-                    ":AUTO_LAUNCH_GAME=0",
-                    ":GAME_PARAMETERS=",
-                    ":HAS_CHECKED_RESOURCES=0",
-                    ":HAS_READ_FIRST_TIME=1",
-                    ":RESET_BACKUPS=0",
-                    ":AUTO_UPDATE=0",
-                    ":VERBOSE=0",
-                    ":SLOW=0",
-                    ":COMPRESS_TEXTURES=0",
-                    ":DISABLE_MULTITHREADING=0",
-                    ":ONLINE_SAFE=0",
-                    "",
-                )
-            ),
-            encoding="utf-8",
-        )
+
+        content = config.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        has_auto_update, has_auto_launch = False, False
+        new_lines = []
+        for line in lines:
+            if line.startswith(":AUTO_UPDATE="):
+                new_lines.append(":AUTO_UPDATE=0")
+                has_auto_update = True
+            elif line.startswith(":AUTO_LAUNCH_GAME="):
+                new_lines.append(":AUTO_LAUNCH_GAME=0")
+                has_auto_launch = True
+            else:
+                new_lines.append(line)
+
+        if not has_auto_update:
+            new_lines.append(":AUTO_UPDATE=0")
+        if not has_auto_launch:
+            new_lines.append(":AUTO_LAUNCH_GAME=0")
+
+        config.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
     def run(self, game_root: Path) -> AdapterResult:
         try:

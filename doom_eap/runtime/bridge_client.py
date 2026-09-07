@@ -7950,7 +7950,7 @@ class DoomEternalContext(CommonContext):
                 continue
             command_id = stable_spool_id(
                 "automap-cleanup",
-                self.automap_cleanup_session,
+                getattr(self, "automap_cleanup_session", "session"),
                 room_identity,
                 map_name,
                 location_id,

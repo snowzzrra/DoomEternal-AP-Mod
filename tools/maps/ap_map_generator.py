@@ -2770,6 +2770,8 @@ def generate_map(
     content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
     content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock_native")
     content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock")
+    content = remove_balanced_entity_blocks(content, "fast_travel_target_fast_travel_unlock_2")
+    content = remove_balanced_entity_blocks(content, "fasttravel_target_fast_travel_unlock_1")
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
