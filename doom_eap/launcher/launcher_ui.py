@@ -6,6 +6,7 @@ import html
 import os
 import queue
 import re
+import threading
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -1071,7 +1072,7 @@ class LauncherUI(QMainWindow):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
-        for key in ("goal", "special_weapon"):
+        for key in ("goal", "special_weapon", "starting_weapon", "dlc_logic_timing"):
             control = self.option_controls.get(key)
             if isinstance(control, QComboBox):
                 cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
@@ -2342,8 +2343,16 @@ class LauncherUI(QMainWindow):
         action = actions[0]
         prompt = f"{action.title}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action.changes) + f"\n\nRollback: {action.rollback}"
         if QMessageBox.question(self, "Apply repair", prompt) != QMessageBox.StandardButton.Yes: return
-        try: self.doctor_action.setText(str(self.controller.apply_repair(action.key)))
-        except Exception as error: self._append_log(f"Repair error: {error}")
+        self.doctor_action.setText("Applying repair...")
+
+        def _run_repair() -> None:
+            try:
+                msg = str(self.controller.apply_repair(action.key))
+                self.controller.emit("ui_repair_result", message=msg, success=True)
+            except Exception as error:
+                self.controller.emit("ui_repair_result", message=f"Repair error: {error}", success=False)
+
+        threading.Thread(target=_run_repair, name="DoomDoctorRepair", daemon=True).start()
 
     def _poll_events(self) -> None:
         while True:
@@ -2408,9 +2417,10 @@ class LauncherUI(QMainWindow):
             return
         segment, color, detail = normalized
         scroll = self.activity.verticalScrollBar()
-        was_at_top = scroll.value() == scroll.minimum()
-        anchor = self.activity.itemAt(self.activity.viewport().rect().topLeft())
-        selected = self.activity.currentItem()
+        scroll_val = scroll.value()
+        was_at_top = scroll_val == scroll.minimum()
+        selected_row = self.activity.currentRow()
+        selected_col = max(0, self.activity.currentColumn())
         row = 0
         self.activity.insertRow(row)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
@@ -2428,12 +2438,16 @@ class LauncherUI(QMainWindow):
             self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
         while self.activity.rowCount() > 100:
             self.activity.removeRow(self.activity.rowCount() - 1)
+        if selected_row >= 0:
+            target_row = selected_row + 1
+            if target_row < self.activity.rowCount():
+                self.activity.setCurrentCell(target_row, selected_col)
+            else:
+                self.activity.clearSelection()
         if was_at_top:
             scroll.setValue(scroll.minimum())
-        elif anchor is not None and self.activity.row(anchor) >= 0:
-            self.activity.scrollToItem(anchor, QTableWidget.ScrollHint.PositionAtTop)
-        if selected is not None and self.activity.row(selected) >= 0:
-            self.activity.setCurrentItem(selected)
+        else:
+            scroll.setValue(scroll_val + 1)
 
     def _normalize_activity_event(
         self, event: dict[str, object]
@@ -2491,6 +2505,12 @@ class LauncherUI(QMainWindow):
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
+        if kind == "ui_repair_result":
+            msg = str(event.get("message", ""))
+            self.doctor_action.setText(msg)
+            if not event.get("success", False):
+                self._append_log(msg)
+            return
         if kind == "log":
             self._append_log(str(event.get("message", "")))
             return

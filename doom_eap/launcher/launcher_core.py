@@ -1760,7 +1760,7 @@ class LaunchWorkflow:
 
 
 def validate_game(game_root: Path, meathook_path: Path, client_dir: Path, saves_dir: Path) -> None:
-    required = [game_root / "DOOMEternalx64vk.exe", game_root / "base" / "classicwads", meathook_path, client_dir / "bridge_client.py", saves_dir]
+    required = [game_root / "DOOMEternalx64vk.exe", game_root / "base", meathook_path, client_dir / "bridge_client.py", saves_dir]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise ValueError("missing required game/install paths: " + ", ".join(missing))

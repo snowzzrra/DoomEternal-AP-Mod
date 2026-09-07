@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import traceback
+import types
 import uuid
 from collections import deque
 from pathlib import Path
@@ -91,8 +92,10 @@ from doom_eap.runtime.rune_reconciliation import (
 )
 from doom_eap.runtime.context_registry import (
     CONTEXT_BY_IDENTITY,
+    GATE_KEY_TO_MAP,
     GOAL_CAPABILITIES,
     SUPPORT_RUNE_IDS,
+    TAG_SPECIAL_CAPABILITY,
     classify_runtime_context,
     context_item_ids,
     evaluate_dlc_availability,
@@ -267,6 +270,10 @@ def _doom_location_names():
 
 
 DOOM_LOCATION_NAMES = _doom_location_names()
+HELL_ON_EARTH_LOCATION_IDS = frozenset(
+    loc_id for loc_id, name in DOOM_LOCATION_NAMES.items()
+    if name.startswith("Hell on Earth - ")
+)
 GOAL_ENDPOINT_LOCATION_IDS = {
     "Acquire the Unmaykr": 7770418,
     "Kill the Icon of Sin": 7770414,
@@ -603,16 +610,15 @@ def normalize_doom_base_dir(path):
         base_dir = selected / "base"
 
     executable = game_root / "DOOMEternalx64vk.exe"
-    classicwads = base_dir / "classicwads"
 
-    if executable.is_file() and classicwads.is_dir():
+    if executable.is_file() and base_dir.is_dir():
         return str(base_dir)
 
     raise ValueError(
         "Expected either the DOOM Eternal installation directory or its base "
         "directory.\n"
         f"Checked executable: {executable}\n"
-        f"Checked classicwads: {classicwads}\n"
+        f"Checked base directory: {base_dir}\n"
         "Examples:\n"
         "  Windows: D:/SteamLibrary/steamapps/common/DOOMEternal\n"
         "  Windows: D:/SteamLibrary/steamapps/common/DOOMEternal/base\n"
@@ -772,8 +778,8 @@ else:
         (
             "Could not validate the DOOM Eternal installation. Select either "
             ".../DOOMEternal or .../DOOMEternal/base. "
-            "DOOMEternalx64vk.exe must be in DOOMEternal and classicwads "
-            "must be inside DOOMEternal/base."
+            "DOOMEternalx64vk.exe must be in DOOMEternal and base "
+            "folder must exist."
         ),
     )
 
@@ -1626,7 +1632,22 @@ class GameplaySaveEvidence(NamedTuple):
     native_safe: bool = False
 
 
-def primary_save_candidates(filename="game_duration.dat"):
+def expected_save_prefix_for_campaign(campaign: str | None) -> str | None:
+    """Map campaign identifier to canonical save slot prefix."""
+    if not campaign:
+        return None
+    if campaign == "Base":
+        return "GAME-AUTOSAVE"
+    if campaign in ("TAG1", "ARC"):
+        return "DLC1-AUTOSAVE"
+    if campaign in ("TAG2", "Dark Lord"):
+        return "DLC2-AUTOSAVE"
+    if campaign == "Horde":
+        return "HORDE-AUTOSAVE"
+    return None
+
+
+def primary_save_candidates(filename="game_duration.dat", slot_prefix=None):
     """Return valid primary slots newest-first."""
     if (
         STEAM_REMOTE_DIR is None
@@ -1636,8 +1657,11 @@ def primary_save_candidates(filename="game_duration.dat"):
         return []
 
     candidates = []
-    for path in STEAM_REMOTE_DIR.glob(f"*-AUTOSAVE*/{filename}"):
+    glob_pattern = f"{slot_prefix}*/{filename}" if slot_prefix else f"*-AUTOSAVE*/{filename}"
+    for path in STEAM_REMOTE_DIR.glob(glob_pattern):
         if not re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", path.parent.name):
+            continue
+        if slot_prefix and not path.parent.name.startswith(slot_prefix):
             continue
         try:
             stat = path.stat()
@@ -3976,7 +4000,23 @@ class DoomEternalContext(CommonContext):
         previous = transition[0] if transition is not None else self.context_campaign
         target_campaign = transition[1] if transition is not None else context.campaign
         materialization_lease = self._active_materialization_lease(context)
-        ownership_fingerprint = receipt_history_fingerprint(self.items_received)
+        received_items = list(self.items_received[: self.items_processed])
+        randomize_chainsaw = bool(slot_data.get("randomize_chainsaw", False))
+        checked = set(getattr(self, "checked_locations", ())) | set(getattr(self, "locations_checked", ()))
+        has_hoe_check = any(
+            loc in HELL_ON_EARTH_LOCATION_IDS
+            or (isinstance(loc, str) and loc.isdigit() and int(loc) in HELL_ON_EARTH_LOCATION_IDS)
+            for loc in checked
+        )
+        if (
+            not randomize_chainsaw
+            and has_hoe_check
+            and not any(item.item == 7770010 for item in received_items)
+        ):
+            received_items.append(
+                types.SimpleNamespace(item=7770010, location=0, player=self.slot)
+            )
+        ownership_fingerprint = receipt_history_fingerprint(received_items)
         materialization_key = ":".join((
             str(self.get_ap_state_key() or "unbound"),
             context.identity,
@@ -3994,7 +4034,44 @@ class DoomEternalContext(CommonContext):
             self.context_materialization_mode = "none"
             self.context_materialization_status = "completed_noop"
             return None, None
+        received = {item.item for item in received_items}
+        active_gate_keys = [
+            item_id for item_id, map_key in GATE_KEY_TO_MAP.items()
+            if map_key in context.map_keys and item_id in received
+        ]
         if not manual and state.get("completed_persistent_key") == persistent_reconciliation_key:
+            if (
+                active_gate_keys
+                and materialization_lease is not None
+                and state.get("completed_gate_key_lease") != materialization_lease
+            ):
+                gate_key_plan = compile_reconciliation_plan(
+                    active_gate_keys,
+                    {k: ITEM_ID_TO_COMMAND[k] for k in active_gate_keys},
+                    {k: ITEM_REPLAY_POLICIES[k] for k in active_gate_keys},
+                    stable_spool_id("context", self.room_seed_name, self.team, self.slot, context.identity),
+                    evidence.epoch,
+                    include_manual_replay=True,
+                )
+                self.apply_reconciliation_plan(
+                    gate_key_plan,
+                    reason="gate_key_epoch_rematerialization",
+                    materialization_lease=materialization_lease,
+                    context_identity=context.identity,
+                )
+                state["completed_gate_key_lease"] = materialization_lease
+                state["completed_key"] = materialization_key
+                self.persist_session_state()
+                self.pending_context_transition = None
+                self._pending_materialization_triggers.clear()
+                self.context_materialization_mode = "same_context"
+                self.context_materialization_status = "gate_key_rematerialized"
+                logger.info(
+                    "GATE_KEY_REMATERIALIZE context=%s lease=%s keys=%s",
+                    context.identity, materialization_lease, active_gate_keys,
+                )
+                return gate_key_plan, None
+
             self.pending_context_transition = None
             self._pending_materialization_triggers.clear()
             self.context_materialization_mode = "none"
@@ -4030,8 +4107,6 @@ class DoomEternalContext(CommonContext):
         if cross_context:
             self._pending_materialization_triggers.add("context")
         self.context_materialization_mode = "cross_context" if cross_context else "same_context"
-        received_items = self.items_received[: self.items_processed]
-        received = {item.item for item in received_items}
         received_counts = {}
         for item in received_items:
             received_counts[item.item] = received_counts.get(item.item, 0) + 1
@@ -4157,6 +4232,30 @@ class DoomEternalContext(CommonContext):
                         deliveries.description,
                     )
                 )
+            has_hammer = (item_id == 7770009) or (item_id == 7770901 and physical_stage >= 2) or (item_id == 7770902 and physical_stage >= 1)
+            if has_hammer and context.campaign in ("TAG2", "Dark Lord") and context.supports(TAG_SPECIAL_CAPABILITY):
+                hammer_upgrades = (
+                    ("ammo_drops_upgraded", "perk/player/weapons/hammer/ammo_drops_upgraded"),
+                    ("armor_and_health_drops_upgraded", "perk/player/weapons/hammer/armor_and_health_drops_upgraded"),
+                )
+                existing_cmd_strings = {cmd.command for cmd in special_commands}
+                for upgrade_key, perk_path in hammer_upgrades:
+                    cmd_str = f"ai_ScriptCmdEnt player1 givePlayerPerk {perk_path}"
+                    if cmd_str not in existing_cmd_strings:
+                        special_commands.append(
+                            ReconciliationCommand(
+                                item_id,
+                                policy.name,
+                                policy.policy,
+                                physical_stage,
+                                stable_spool_id(
+                                    "reconcile", self.room_seed_name, self.team, self.slot,
+                                    context.identity, "special", physical_stage, f"hammer-upgrade-{upgrade_key}",
+                                ),
+                                cmd_str,
+                                f"Sentinel Hammer upgrade: {upgrade_key}",
+                            )
+                        )
             logger.info(
                 "SPECIAL_WEAPON_PLAN item=%s owned_count=%s resolved_stage=%s context=%s ops=%s",
                 item_id, count, selected_special_stage, context.identity, len(special_commands),
@@ -4292,6 +4391,7 @@ class DoomEternalContext(CommonContext):
         self.persist_session_state()
         state["completed_key"] = materialization_key
         state["completed_persistent_key"] = persistent_reconciliation_key
+        state["completed_gate_key_lease"] = materialization_lease
         state.pop("pending_key", None)
         state.pop("pending_plan", None)
         self.persist_session_state()
@@ -5820,13 +5920,57 @@ class DoomEternalContext(CommonContext):
         return True
 
     def advance_known_map_materialization(self, evidence):
-        """Advance epoch from a fresh native load edge without changing map identity."""
+        """Advance epoch from a fresh native load edge or transition."""
         cached = getattr(self, "cached_map_identity", None)
-        if (
-            not isinstance(cached, dict)
-            or evidence is None
-            or getattr(evidence, "state", None) != "gameplay"
-        ):
+        if not isinstance(cached, dict):
+            if evidence is None or getattr(evidence, "state", None) != "gameplay":
+                return False
+            evidence_epoch = getattr(evidence, "epoch", None)
+            if isinstance(evidence_epoch, bool) or not isinstance(evidence_epoch, int):
+                return False
+            new_runtime_map = canonical_map_name(getattr(evidence, "map_name", ""))
+            new_map_key = _catalog_map_key(new_runtime_map)
+            if new_map_key is None or getattr(evidence, "provisional", False):
+                return False
+            evidence_mtime = gameplay_evidence_mtime_ns()
+            epoch = build_materialization_epoch(evidence_epoch, evidence_mtime)
+            if not valid_materialization_epoch(epoch):
+                return False
+            lease = getattr(self, "runtime_observation_lease", None)
+            if lease is not None:
+                lease.observe_gameplay_loaded(evidence_mtime)
+            self.invalidate_active_save_proof()
+            self.fast_travel_eligibility_snapshot = None
+            self.fast_travel_epoch_state = None
+            self.fast_travel_last_transition = None
+            self.fast_travel_submitted.clear()
+            self.mission_select_observation_map = None
+            self.mission_select_observation_epoch = None
+            marker_data = {
+                "map_key": new_map_key,
+                "runtime_map": new_runtime_map,
+                "marker": f"AP_MAP_START_{new_map_key.upper()}",
+                "mtime_ns": evidence_mtime,
+                "path": None,
+                "native_gameplay_epoch": evidence_epoch,
+                "gameplay_epoch": epoch,
+                "evidence_mtime_ns": evidence_mtime,
+                "evidence_epoch": evidence_epoch,
+                "materialization_evidence_epoch": evidence_epoch,
+                "secondary_materialization": False,
+            }
+            self.accept_map_identity(marker_data, evidence_epoch)
+            self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+            self.advance_automap_cleanup_epoch()
+            logger.info(
+                "[MAP] MAP_INITIALIZE_EVIDENCE map=%s epoch=%s runtime_map=%s",
+                new_map_key,
+                epoch,
+                new_runtime_map,
+            )
+            return True
+
+        if evidence is None or getattr(evidence, "state", None) != "gameplay":
             return False
         evidence_epoch = getattr(evidence, "epoch", None)
         if isinstance(evidence_epoch, bool) or not isinstance(evidence_epoch, int):
@@ -5834,7 +5978,48 @@ class DoomEternalContext(CommonContext):
         if canonical_map_name(getattr(evidence, "map_name", "")) != canonical_map_name(
             cached.get("runtime_map", "")
         ):
-            return False
+            new_runtime_map = canonical_map_name(getattr(evidence, "map_name", ""))
+            new_map_key = _catalog_map_key(new_runtime_map)
+            if new_map_key is None or getattr(evidence, "provisional", False):
+                return False
+            evidence_mtime = gameplay_evidence_mtime_ns()
+            epoch = build_materialization_epoch(evidence_epoch, evidence_mtime)
+            if not valid_materialization_epoch(epoch):
+                return False
+            lease = getattr(self, "runtime_observation_lease", None)
+            if lease is not None:
+                lease.observe_gameplay_loaded(evidence_mtime)
+            self.invalidate_active_save_proof()
+            self.fast_travel_eligibility_snapshot = None
+            self.fast_travel_epoch_state = None
+            self.fast_travel_last_transition = None
+            self.fast_travel_submitted.clear()
+            self.mission_select_observation_map = None
+            self.mission_select_observation_epoch = None
+            marker_data = {
+                "map_key": new_map_key,
+                "runtime_map": new_runtime_map,
+                "marker": f"AP_MAP_START_{new_map_key.upper()}",
+                "mtime_ns": evidence_mtime,
+                "path": None,
+                "native_gameplay_epoch": evidence_epoch,
+                "gameplay_epoch": epoch,
+                "evidence_mtime_ns": evidence_mtime,
+                "evidence_epoch": evidence_epoch,
+                "materialization_evidence_epoch": evidence_epoch,
+                "secondary_materialization": False,
+            }
+            self.accept_map_identity(marker_data, evidence_epoch)
+            self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+            self.advance_automap_cleanup_epoch()
+            logger.info(
+                "[MAP] MAP_TRANSITION_EVIDENCE map=%s epoch=%s runtime_map=%s",
+                new_map_key,
+                epoch,
+                new_runtime_map,
+            )
+            return True
+
         bound_epoch = cached.get("materialization_evidence_epoch")
         if bound_epoch is None:
             cached["materialization_evidence_epoch"] = evidence_epoch
@@ -5879,6 +6064,7 @@ class DoomEternalContext(CommonContext):
         }
         self.accept_map_identity(marker_data, evidence_epoch)
         self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+        self.advance_automap_cleanup_epoch()
         logger.info(
             "[MAP] MATERIALIZATION_EPOCH_SECONDARY map=%s epoch=%s "
             "source=native_same_map_load_edge evidence_provisional=%s",
@@ -6013,6 +6199,10 @@ class DoomEternalContext(CommonContext):
             for key in ("map_key", "runtime_map", "gameplay_epoch")
         ):
             self.transient_effect_manager.reset("map_transition")
+            self.fast_travel_eligibility_snapshot = None
+            self.fast_travel_epoch_state = None
+            self.fast_travel_submitted.clear()
+            self.fast_travel_last_transition = None
         marker_data = {
             **marker_data,
             "evidence_epoch": evidence_epoch,
@@ -6037,7 +6227,7 @@ class DoomEternalContext(CommonContext):
             pending_level_ready.setdefault(
                 materialized_epoch, marker_data.get("path")
             )
-        marker_mtime = marker_data["mtime_ns"]
+        marker_mtime = marker_data.get("mtime_ns", 0)
         if self.last_accepted_marker_mtime != marker_mtime:
             self.last_accepted_marker_mtime = marker_mtime
             self.last_accepted_map_evidence_epoch = evidence_epoch
@@ -6104,24 +6294,21 @@ class DoomEternalContext(CommonContext):
 
     def update_save_slot_lifecycle(self):
         """Keep an authoritative slot through transient samples; prove switches."""
-        candidates = primary_save_candidates()
-        for selected in candidates:
-            token = (str(selected.path), selected.mtime_ns)
-            if self.save_candidate_tokens.get(selected.slot_directory) != token:
-                self.save_candidate_tokens[selected.slot_directory] = token
-                logger.info(
-                    "SAVE_SLOT_CANDIDATE slot=%s path=%s mtime_ns=%s",
-                    selected.slot_directory,
-                    selected.path,
-                    selected.mtime_ns,
-                )
-
         evidence = read_gameplay_save_evidence()
         self.ingest_visible_runtime_lifecycle(evidence=evidence)
         marker = self.read_active_map_identity(evidence=evidence)
         marker_map = marker["runtime_map"] if marker else None
+        marker_context = classify_runtime_context(marker_map) if marker_map else None
+        active_campaign = marker_context.campaign if marker_context else None
+        expected_prefix = expected_save_prefix_for_campaign(active_campaign)
+
+        if expected_prefix and self.active_save_slot and not self.active_save_slot.startswith(expected_prefix):
+            self.invalidate_active_save_proof()
+            self.active_save_slot = None
+            self.active_save_path = None
+            self.active_native_evidence_epoch = None
+
         if marker_map and evidence and getattr(evidence, "map_name", None):
-            marker_context = classify_runtime_context(marker_map)
             evidence_context = classify_runtime_context(evidence.map_name)
             if (
                 marker_context is not None
@@ -6135,7 +6322,25 @@ class DoomEternalContext(CommonContext):
                 )
 
         evidence_slot = evidence.slot_directory if (evidence and getattr(evidence, "slot_directory", None)) else None
+        if expected_prefix and evidence_slot and not evidence_slot.startswith(expected_prefix):
+            evidence_slot = None
         evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
+
+        candidates = (
+            primary_save_candidates(slot_prefix=expected_prefix)
+            if expected_prefix
+            else primary_save_candidates()
+        )
+        for selected in candidates:
+            token = (str(selected.path), selected.mtime_ns)
+            if self.save_candidate_tokens.get(selected.slot_directory) != token:
+                self.save_candidate_tokens[selected.slot_directory] = token
+                logger.info(
+                    "SAVE_SLOT_CANDIDATE slot=%s path=%s mtime_ns=%s",
+                    selected.slot_directory,
+                    selected.path,
+                    selected.mtime_ns,
+                )
 
         lease = getattr(self, "runtime_observation_lease", None)
         lease_epoch = lease.gameplay_loaded_ns if (lease and getattr(lease, "gameplay_loaded_ns", None)) else None
@@ -6220,6 +6425,8 @@ class DoomEternalContext(CommonContext):
             return fail_proof("provisional")
 
         target_slot = evidence_slot or (active.slot_directory if active else None) or candidate_slot
+        if expected_prefix and target_slot and not target_slot.startswith(expected_prefix):
+            target_slot = candidate_slot
         if not target_slot or not re.match(r"^(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+$", target_slot):
             return fail_proof("invalid_evidence_slot")
 
@@ -7517,7 +7724,8 @@ class DoomEternalContext(CommonContext):
         existing = getattr(self, "fast_travel_epoch_state", None)
         if (
             isinstance(existing, dict)
-            and existing.get("epoch") is not None
+            and existing.get("epoch") == epoch
+            and existing.get("map_key") == marker_data.get("map_key")
             and not refresh
         ):
             return getattr(self, "fast_travel_eligibility_snapshot", None)

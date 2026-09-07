@@ -127,7 +127,6 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
     authoritative = (
         base.is_dir()
         and (base / "game").is_dir()
-        and (base / "classicwads").is_dir()
         and (game_root / "DOOMEternalx64vk.exe").is_file()
     )
     if not authoritative:

@@ -974,12 +974,12 @@ WINDOWS_INJECTOR_REQUIRED_MEMBERS: tuple[str, ...] = (
 
 WINDOWS_MOD_INJECTOR = DependencySpec(
     name="EternalModInjector",
-    version="2026-09-04",
-    url="https://gamebanana.com/dl/1806698",
-    sha256="129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480",
+    version="2026-09-05",
+    url="https://gamebanana.com/dl/1807733",
+    sha256="1319a0e9d419c132b54a0cb842dae9aa62a35143d673be666937948fc7aa7bbc",
     executable_glob="**/EternalModInjector.bat",
     archive_type="zip",
-    expected_size=5182673,
+    expected_size=5182675,
 )
 
 # Compatibility alias
@@ -2513,35 +2513,42 @@ class LinuxModManagerAdapter:
         )
 
     def run(self, game_root: Path) -> AdapterResult:
+        try:
+            recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
+        except Exception as error:
+            return AdapterResult(
+                state="failed",
+                message=f"Could not recover stale sandbox hold: {error}.",
+                details={"staging_error": str(error)},
+            )
         executable = self._prepare_tools(game_root)
         self._configure_first_run(game_root)
         environment = os.environ.copy()
         environment.update({"skip": "1", "skip_debug_check": "1"})
         command = (str(executable),)
-        with hold_sandbox(game_root, state_dir=self.state_dir, event_sink=self.event_sink):
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=game_root,
-                    env=environment,
-                    text=True,
-                    capture_output=True,
-                    timeout=self.TIMEOUT_SECONDS,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as error:
-                return AdapterResult(
-                    state="timed_out",
-                    message="Mod installation timed out. Review details and try again.",
-                    command=command,
-                    stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
-                    stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
-                    details={
-                        "injector_version": self.dependency.version,
-                        "mods_path": str((game_root / "Mods").resolve()),
-                        "post_install_verification": "not_run",
-                    },
-                )
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=game_root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=self.TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return AdapterResult(
+                state="timed_out",
+                message="Mod installation timed out. Review details and try again.",
+                command=command,
+                stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
+                stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
+                details={
+                    "injector_version": self.dependency.version,
+                    "mods_path": str((game_root / "Mods").resolve()),
+                    "post_install_verification": "not_run",
+                },
+            )
         state = "applied" if completed.returncode == 0 else "failed"
         return AdapterResult(
             state=state,

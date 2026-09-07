@@ -170,11 +170,13 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
         "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "APPDATA", "LOCALAPPDATA",
     )
     orig_env = {k: os.environ.get(k) for k in env_keys}
+    orig_bridge = sys.modules.get("doom_eap.runtime.bridge_client")
+    orig_controller = sys.modules.get("doom_eap.launcher.launcher_controller")
 
     with tempfile.TemporaryDirectory(prefix="doomeap_preflight_hermetic_") as tmp_dir_str:
         tmp_dir = Path(tmp_dir_str)
         fake_doom = tmp_dir / "fake-doom"
-        (fake_doom / "base" / "classicwads").mkdir(parents=True, exist_ok=True)
+        (fake_doom / "base").mkdir(parents=True, exist_ok=True)
         (fake_doom / "DOOMEternalx64vk.exe").write_bytes(b"")
         fake_saves = tmp_dir / "fake-saves" / "id Software" / "DOOMEternal" / "base"
         fake_saves.mkdir(parents=True, exist_ok=True)
@@ -298,9 +300,16 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-            # Clear bridge and launcher modules so caller does not retain temporary paths
-            sys.modules.pop("doom_eap.runtime.bridge_client", None)
-            sys.modules.pop("doom_eap.launcher.launcher_controller", None)
+            # Restore bridge and launcher modules to clean state
+            if orig_bridge is not None:
+                sys.modules["doom_eap.runtime.bridge_client"] = orig_bridge
+            else:
+                sys.modules.pop("doom_eap.runtime.bridge_client", None)
+
+            if orig_controller is not None:
+                sys.modules["doom_eap.launcher.launcher_controller"] = orig_controller
+            else:
+                sys.modules.pop("doom_eap.launcher.launcher_controller", None)
 
     print("\nStandalone runtime preflight verification: ALL CHECKS PASSED.")
 

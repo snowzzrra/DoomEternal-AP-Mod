@@ -23,6 +23,9 @@ inline bool ReceiptDispatchReady(
     std::uint32_t now,
     std::uint32_t nextAttempt
 ) {
+    if (nextAttempt == 0) {
+        return true;
+    }
     return static_cast<std::int32_t>(now - nextAttempt) >= 0;
 }
 

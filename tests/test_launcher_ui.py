@@ -201,6 +201,89 @@ class TestLauncherUIConstruction(unittest.TestCase):
             ui.deleteLater()
             self.app.processEvents()
 
+    def test_activity_table_pruning_and_selection_retention(self):
+        ui = LauncherUI(self.controller)
+        try:
+            for i in range(105):
+                ui._activity_event({"type": "chat_sent", "text": f"message {i}"})
+            self.assertEqual(ui.activity.rowCount(), 100)
+            ui.activity.selectRow(99)
+            ui._activity_event({"type": "chat_sent", "text": "new message triggering prune"})
+            self.assertEqual(ui.activity.rowCount(), 100)
+        finally:
+            ui.timer.stop()
+            ui.close()
+            ui.deleteLater()
+            self.app.processEvents()
+
+    def test_starting_weapon_refreshes_effective_config(self):
+        ui = LauncherUI(self.controller)
+        try:
+            ui._show_page(3)
+            control = ui.option_controls.get("starting_weapon")
+            self.assertIsNotNone(control)
+            from PySide6.QtWidgets import QComboBox
+            self.assertIsInstance(control, QComboBox)
+            combo = control
+            if combo.count() > 1:
+                new_index = 1 if combo.currentIndex() == 0 else 0
+                expected_text = combo.itemText(new_index)
+                combo.setCurrentIndex(new_index)
+                self.assertEqual(ui.effective_config_values["starting"].text(), expected_text)
+        finally:
+            ui.timer.stop()
+            ui.close()
+            ui.deleteLater()
+            self.app.processEvents()
+
+    def test_ui_repair_result_updates_doctor_action(self):
+        ui = LauncherUI(self.controller)
+        try:
+            ui._handle_event({
+                "type": "ui_repair_result",
+                "message": "Repair applied successfully",
+                "success": True,
+            })
+            self.assertEqual(ui.doctor_action.text(), "Repair applied successfully")
+        finally:
+            ui.timer.stop()
+            ui.close()
+            ui.deleteLater()
+            self.app.processEvents()
+
+
+class TestGamePathValidationWithoutClassicwads(unittest.TestCase):
+    def test_normalize_and_validate_game_without_classicwads(self):
+        import sys
+        repo_root = Path(__file__).resolve().parents[1]
+        archipelago_root = (repo_root.parent / "Archipelago").resolve()
+        if str(archipelago_root) not in sys.path:
+            sys.path.insert(0, str(archipelago_root))
+        from doom_eap.runtime.bridge_client import normalize_doom_base_dir
+        from doom_eap.launcher.launcher_core import validate_game
+        from doom_eap.runtime.context_registry import evaluate_dlc_availability
+        with tempfile.TemporaryDirectory() as tmp_str:
+            game_root = Path(tmp_str)
+            (game_root / "DOOMEternalx64vk.exe").write_bytes(b"")
+            base = game_root / "base"
+            base.mkdir()
+            (base / "game").mkdir()
+            normalized = normalize_doom_base_dir(game_root)
+            self.assertEqual(Path(normalized).resolve(), base.resolve())
+
+            meathook = game_root / "XINPUT1_3.dll"
+            meathook.write_bytes(b"")
+            client_dir = game_root / "client"
+            client_dir.mkdir()
+            (client_dir / "bridge_client.py").write_bytes(b"")
+            saves_dir = game_root / "saves"
+            saves_dir.mkdir()
+
+            validate_game(game_root, meathook, client_dir, saves_dir)
+
+            dlc_evidence = evaluate_dlc_availability(game_root)
+            self.assertNotEqual(dlc_evidence.status, "unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1160,7 +1160,7 @@ private:
                 continue;
             }
             const std::string directoryName = entry.path().filename().string();
-            if (!std::regex_match(directoryName, std::regex("GAME-AUTOSAVE[0-9]+"))) {
+            if (!std::regex_match(directoryName, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
                 continue;
             }
 
@@ -1216,7 +1216,7 @@ private:
                 continue;
             }
             const std::string slot = entry.path().filename().string();
-            if (!std::regex_match(slot, std::regex("GAME-AUTOSAVE[0-9]+"))) {
+            if (!std::regex_match(slot, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
                 continue;
             }
             const std::filesystem::path detailsPath = entry.path() / "game.details";
@@ -1260,7 +1260,7 @@ private:
     }
 
     std::optional<SaveSnapshot> ReadSlotSnapshot(const std::string& slotDirectory) {
-        if (!std::regex_match(slotDirectory, std::regex("GAME-AUTOSAVE[0-9]+"))) {
+        if (!std::regex_match(slotDirectory, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
             return std::nullopt;
         }
         std::error_code error;

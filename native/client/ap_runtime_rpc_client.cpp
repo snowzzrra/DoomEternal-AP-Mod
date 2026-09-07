@@ -256,10 +256,11 @@ bool ApRuntimeRpcClient::PollHealth()
     const std::string saved_command_id = command_id_;
     command_id_ = "-";
     const DWORD now = GetTickCount();
-    if (!TickReached(now, next_health_tick_)) {
+    if (has_next_health_tick_ && !TickReached(now, next_health_tick_)) {
         command_id_ = saved_command_id;
         return ready_;
     }
+    has_next_health_tick_ = true;
     next_health_tick_ = now + kHealthInterval;
     DWORD start = 0; unsigned long long call = 0;
     if (!Prepare("health", &start, &call)) { ready_ = false; command_id_ = saved_command_id; return false; }

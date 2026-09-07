@@ -955,10 +955,6 @@ TAG_FORBIDDEN_AP_ITEMS = frozenset({
 })
 
 TAG_FORBIDDEN_AP_PERKS = frozenset({
-    "perk/player/blood_punch/base",
-    "perk/player/blood_punch/area_of_effect",
-    "perk/player/blood_punch/ai_charge_rate",
-    "perk/player/blood_punch/max_charges",
     "perk/player/weapons/shotgun/pop_rocket",
     "perk/player/weapons/shotgun/secondary_full_auto",
     "perk/player/weapons/heavy_cannon/bolt_action",
@@ -972,6 +968,20 @@ TAG_FORBIDDEN_AP_PERKS = frozenset({
     "perk/player/weapons/chaingun/turret",
     "perk/player/weapons/chaingun/energy_shell",
 })
+
+TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
+    "perk/player/blood_punch/base",
+    "perk/player/blood_punch/area_of_effect",
+    "perk/player/blood_punch/ai_charge_rate",
+    "perk/player/blood_punch/max_charges",
+})
+
+TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
+    '\t\t\t\tperk = "perk/player/blood_punch/base";\n\t\t\t\tequip = true;',
+    '\t\t\t\tperk = "perk/player/blood_punch/area_of_effect";\n\t\t\t\tequip = true;',
+    '\t\t\t\tperk = "perk/player/blood_punch/ai_charge_rate";\n\t\t\t\tequip = true;',
+    '\t\t\t\tperk = "perk/player/blood_punch/max_charges";\n\t\t\t\tequip = true;',
+)
 
 
 def validate_tag_devinv_source(source: str) -> None:
@@ -1026,6 +1036,10 @@ def validate_tag_devinv_source(source: str) -> None:
     if missing_upgrades:
         raise ValueError(f"TAG DevInvLoadout missing required mod upgrades: {missing_upgrades}")
 
+    missing_bp = TAG_REQUIRED_BLOOD_PUNCH_PERKS - perk_paths
+    if missing_bp:
+        raise ValueError(f"TAG DevInvLoadout missing required Blood Punch perks: {missing_bp}")
+
 
 def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
     """Decode strict UTF-8 and normalize all line endings (CRLF and lone CR to LF)."""
@@ -1047,9 +1061,13 @@ def build_tag_devinv_overrides(
     baseline_currency = _CURRENCY_BLOCK_RE.search(tag_root_source)
     if baseline_inventory is None or baseline_currency is None:
         raise ValueError("TAG root DevInv lacks replaceable loadout blocks")
+    existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))]
+    all_bodies = existing_bodies[:4] + list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS) + existing_bodies[4:]
+    new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
+    baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)
     baseline_inventory_block = (
         "\t\tstartingInventory = {\n"
-        + baseline_inventory.group("body")
+        + baseline_body
         + "\n\t\t}"
     )
     baseline_currency_block = (

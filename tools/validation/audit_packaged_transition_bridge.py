@@ -260,7 +260,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as directory:
         game = Path(directory) / "DOOMEternal"
         base = game / "base"
-        (base / "classicwads").mkdir(parents=True)
+        base.mkdir(parents=True)
         (game / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
         saves_base = Path(directory) / "Saved Games" / "id Software" / "DOOMEternal" / "base"
         saves_base.mkdir(parents=True)

@@ -685,15 +685,15 @@ class TestUrlDownloadTransportRetries(unittest.TestCase):
 
     def test_windows_specs(self):
         self.assertEqual(WINDOWS_MOD_INJECTOR.name, "EternalModInjector")
-        self.assertEqual(WINDOWS_MOD_INJECTOR.version, "2026-09-04")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.version, "2026-09-05")
         self.assertEqual(WINDOWS_MOD_INJECTOR.archive_type, "zip")
         self.assertEqual(
             WINDOWS_MOD_INJECTOR.sha256,
-            "129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480",
+            "1319a0e9d419c132b54a0cb842dae9aa62a35143d673be666937948fc7aa7bbc",
         )
-        self.assertEqual(WINDOWS_MOD_INJECTOR.url, "https://gamebanana.com/dl/1806698")
+        self.assertEqual(WINDOWS_MOD_INJECTOR.url, "https://gamebanana.com/dl/1807733")
         self.assertEqual(WINDOWS_MOD_INJECTOR.executable_glob, "**/EternalModInjector.bat")
-        self.assertEqual(WINDOWS_MOD_INJECTOR.expected_size, 5182673)
+        self.assertEqual(WINDOWS_MOD_INJECTOR.expected_size, 5182675)
         self.assertEqual(len(WINDOWS_INJECTOR_REQUIRED_MEMBERS), 14)
         self.assertIn("EternalModInjector.bat", WINDOWS_INJECTOR_REQUIRED_MEMBERS)
         self.assertIn("EternalModManager.exe", WINDOWS_INJECTOR_REQUIRED_MEMBERS)

@@ -36,6 +36,7 @@ private:
     RPC_BINDING_HANDLE binding_ = nullptr;
     RPC_CSTR string_binding_ = nullptr;
     bool ready_ = false;
+    bool has_next_health_tick_ = false;
     DWORD next_health_tick_ = 0;
     DWORD status_ = RPC_S_OK;
     ApRpcResult result_ = AP_RPC_NONE;
