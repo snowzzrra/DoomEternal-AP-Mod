@@ -4,6 +4,8 @@
 > This project is a beta, not a finished 1.0 release. Windows and Linux/Proton
 > are supported.
 
+Found a bug? Use **Report a Problem** in the launcher or [open a GitHub issue](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
+
 [What gets randomized](#1-what-gets-randomized) · [Player options](#2-player-options) · [Installation](#3-installation) · [How it works](#4-how-it-works) · [Version scope](#5-version-scope) · [Credits](#6-credits) · [License](#7-license)
 
 ## 1. What gets randomized
@@ -23,6 +25,13 @@ Randomized progression includes:
 - reconnect-safe permanent inventory, checked-location cleanup, native Fast Travel on completed mission replays, and room-specific map packages.
 
 Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, displays session activity, and provides setup checks, repair actions, logs, and support reports. After setup, start DOOM Eternal normally through Steam and keep launcher open.
+
+### Reporting problems
+
+DoomEAP is beta, and bug reports are welcome. In the launcher, open **Help → Report a Problem**.
+The launcher creates a sanitized Support Report, opens the GitHub bug form, and highlights the report in Windows Explorer.
+Briefly describe what happened, drag the report into the issue, and submit. You generally do not need to collect technical details yourself.
+If the launcher cannot generate a report, you can still report the problem through the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
 
 ## 2. Player options
 

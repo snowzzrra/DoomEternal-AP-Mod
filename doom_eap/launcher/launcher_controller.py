@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
-from .launcher_core import LaunchWorkflow, RoomSnapshot
+from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
 from .launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor, write_support_bundle
 from .launcher_integration import (
     IntegratedLaunchWorkflow,
@@ -787,6 +787,38 @@ class LauncherController:
                 {},
             )
         diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
+        with self._lifecycle_lock:
+            room = dict(self.setup._last_event or {})
+            connected = self.connected_room
+        slot_data = room.get("slot_data")
+        slot_data = slot_data if isinstance(slot_data, dict) else {}
+        option_keys = set(ROOM_SLOT_DEFAULTS) | {
+            option["key"] for option in self.options_schema.get("options", [])
+            if isinstance(option, dict) and isinstance(option.get("key"), str)
+        }
+        support_diagnostics = {
+            **report.support_diagnostics,
+            "session": {
+                "connected": connected,
+                "identity_source": "connected" if connected else "last_known" if room else "unavailable",
+                "seed_name": room.get("seed_name"),
+                "slot": room.get("slot"),
+                "team": room.get("team"),
+                # Keep options and contract identity; omit placements/protocol history.
+                "slot_data": {
+                    key: value for key, value in slot_data.items()
+                    if key in option_keys or key in {
+                        "death_link", "death_link_mode", "slot_data_version",
+                        "slot_data_schema_version", "slot_data_revision", "apworld_revision", "release_version",
+                        "content_revision", "capabilities",
+                    }
+                },
+            },
+        }
+        try:
+            support_diagnostics["release"] = release_identity()
+        except Exception:
+            support_diagnostics["release"] = {"status": "unavailable"}
         bundle = write_support_bundle(
             destination,
             report,
@@ -797,6 +829,7 @@ class LauncherController:
             session_start=self.session_start_time,
             last_setup_failure=self.last_setup_failure,
             support_condump=support_condump,
+            support_diagnostics=support_diagnostics,
         )
         self.emit("support_bundle_ready", path=str(bundle))
         return bundle

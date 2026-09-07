@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import json
 import os
+import platform
 import re
 import time
 import zipfile
@@ -100,21 +101,36 @@ class DoctorReport:
 
 
 def _safe_path(value: object) -> str:
-    return str(value)
+    text = str(value)
+    # Handle native, slash-separated, and JSON-escaped Windows profile paths,
+    # including profiles belonging to someone other than the current account.
+    text = re.sub(r"(?i)([a-z]:[\\/]+Users[\\/]+)[^\\/\r\n\"<>]+", r"\1[USER]", text)
+    text = re.sub(r"(/(?:home|Users)/)[^/\r\n\"<>]+", r"\1[USER]", text)
+    return text
+
+
+def _sanitize_support_text(text: str) -> str:
+    fields = "|".join(sorted(_CREDENTIAL_FIELDS, key=len, reverse=True))
+    text = re.sub(
+        rf"""(?ix)(["']?\b(?:[\w-]+_)?(?:{fields})["']?\s*[=:]\s*)
+        (?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:Bearer|Basic)\s+\S+|[^\s&,;}}]+)""",
+        r"\1[REDACTED]",
+        text,
+    )
+    text = re.sub(r"(?i)(\b(?:wss?|https?)://)[^/\s@]+@", r"\1[REDACTED]@", text)
+    return redact_secrets(_safe_path(text))
 
 
 def sanitize_support_value(value: object, *, key: str = "") -> object:
-    lowered = key.casefold()
-    if lowered in _CREDENTIAL_FIELDS:
+    lowered = key.casefold().replace("-", "_")
+    if lowered in _CREDENTIAL_FIELDS or any(lowered.endswith("_" + field) for field in _CREDENTIAL_FIELDS):
         return "[REDACTED]"
     if isinstance(value, Mapping):
-        return {str(name): sanitize_support_value(item, key=str(name)) for name, item in value.items()}
+        return {_sanitize_support_text(str(name)): sanitize_support_value(item, key=str(name)) for name, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [sanitize_support_value(item, key=key) for item in value]
-    if isinstance(value, Path) or (isinstance(value, str) and ("path" in lowered or "dir" in lowered or "root" in lowered)):
-        return _safe_path(value)
-    if isinstance(value, str):
-        return redact_secrets(_safe_path(value))
+    if isinstance(value, (Path, str)):
+        return _sanitize_support_text(str(value))
     return value
 
 
@@ -228,7 +244,7 @@ def _read_log_tail(path: Path, limit: int = SUPPORT_LOG_TAIL_BYTES) -> str | Non
             if line_start < 0:
                 return None
             payload = payload[line_start + 1 :]
-        text = redact_secrets(_safe_path(payload.decode("utf-8", errors="replace")))
+        text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
         encoded = text.encode("utf-8")
         if len(encoded) > limit:
             encoded = encoded[-limit:]
@@ -355,7 +371,7 @@ def _read_support_log(path: Path) -> str | None:
                 source.seek(max(0, size - head_size))
                 tail = source.read(head_size)
                 payload = head + b"\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
-        text = redact_secrets(_safe_path(payload.decode("utf-8", errors="replace")))
+        text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
         return text[: SUPPORT_LOG_MAX_BYTES + 128]
     except (OSError, UnicodeError):
         return None
@@ -1305,6 +1321,12 @@ def write_support_bundle(
         config, paths, application_dir, session_start=session_start
     )
     payload = sanitize_support_bundle(report.document())
+    payload["system"] = {
+        "os": platform.system(),
+        "os_release": platform.release(),
+        "os_version": platform.version(),
+        "architecture": platform.machine(),
+    }
     payload["log_provenance"] = sanitize_support_value(provenance)
     if last_setup_failure is not None:
         payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
@@ -1331,7 +1353,7 @@ def write_support_bundle(
                 source_bytes = head + separator + tail
                 truncation = "head_tail"
                 omitted_bytes = source_size - len(head) - len(tail)
-            condump_content = redact_secrets(
+            condump_content = _sanitize_support_text(
                 source_bytes.decode("utf-8", errors="replace")
             )
             condump_metadata.update({
@@ -1351,7 +1373,7 @@ def write_support_bundle(
     if support_diagnostics is not None:
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     safe_logs = _bound_support_text(
-        "\n".join(redact_secrets(_safe_path(str(line))) for line in logs)
+        "\n".join(_sanitize_support_text(str(line)) for line in logs)
     )
     if safe_logs:
         if "launcher.log" in tails:

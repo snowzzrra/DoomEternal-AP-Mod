@@ -49,6 +49,7 @@ from doom_eap.content.options_foundation import load_start_inventory_catalog, su
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
+from .launcher_reporting import report_problem
 from .launcher_platform import (
     doom_saved_games_base,
     is_saved_games_base_shape,
@@ -1225,6 +1226,10 @@ class LauncherUI(QMainWindow):
         head.setContentsMargins(24, 20, 24, 20)
         head.addWidget(self._label("HELP", "title"))
         head.addWidget(self._label("Check your setup, fix common problems, or create a support report.", "muted"))
+        report_button = QPushButton("Report a Problem")
+        report_button.setObjectName("primary")
+        report_button.clicked.connect(self._report_problem)
+        head.addWidget(report_button)
         layout.addWidget(header)
         card = self._card()
         card_layout = QVBoxLayout(card)
@@ -2322,6 +2327,16 @@ class LauncherUI(QMainWindow):
             self._append_log(", ".join(f"{key}={value}" for key, value in result.items()))
         except Exception as error:
             self._append_log(f"Game connection check error: {error}")
+
+    def _report_problem(self) -> None:
+        result = report_problem(self.controller, logs=self.log.toPlainText().splitlines())
+        self.doctor_action.setText(result.message)
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Report a Problem")
+        dialog.setTextFormat(Qt.TextFormat.PlainText)
+        dialog.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        dialog.setText(result.message)
+        dialog.exec()
 
     def _save_support_bundle(self) -> None:
         try:
