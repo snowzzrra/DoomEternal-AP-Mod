@@ -343,7 +343,7 @@ jobs:
           $launcher = 'build/release/DoomEternalArchipelagoLauncher.exe'
           if (-not (Test-Path -LiteralPath $launcher) -or [IO.File]::ReadAllBytes($launcher)[0..1] -ne [byte[]](0x4d, 0x5a)) { throw "Invalid Windows launcher" }
           Write-Output '--> Running frozen Windows launcher self-test...'
-          & $launcher --self-test
+          & build/release/DoomEternalArchipelagoLauncher.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw "Windows launcher self-test failed with exit code $LASTEXITCODE" }
           New-Item -ItemType Directory -Force build/artifacts/windows | Out-Null
           Copy-Item $launcher build/artifacts/windows/

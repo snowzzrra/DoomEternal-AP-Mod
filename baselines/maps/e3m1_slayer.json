@@ -99,10 +99,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add Taras Nabad Slayer Gate Complete 7770491"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Update independent size in e3m1_slayer"
     }
   ],
   "asset_package_contract_sha256": "b6ee6a008d608fdb9b5fd4aa959b13b1d858dbab0ba6a1860fed8752ffe73450",
-  "byte_sha256": "3c630fbd82240a716152768cafcea12999b7d2abf2ad0ee2688251a0267e9d13",
+  "byte_sha256": "3c2504425d1dd86c20bcc4e22d56086163e73178192f829a7a565128f0da02d6",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 298,
@@ -158,6 +162,6 @@
     7770337
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "64132e707822c9868d2de838c8fa4e48aba85439882ca8e33df797316716ac67",
-  "semantic_sha256": "48eb4eb72de54673d1c035ec23e9c3e9de9b602b8d2677e88dec04452bdb0e5c"
+  "scripted_contract_sha256": "e9a8509b8767afe17a830895aa7c9099c689a7f6f048cfe9b8c7fa35c9813f82",
+  "semantic_sha256": "585822ab82dc27eaa6a8aeb61d8f4f6605274bc1012615b00667832d94a2b6dd"
 }

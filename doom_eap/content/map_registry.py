@@ -60,8 +60,8 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
             "source_file": spec.source_file,
             "source_sha256": spec.source_sha256,
             "source_owner": raw.get("source_owner", spec.source_file),
-            "level_config": str(spec.level_config_path.relative_to(root)),
-            "manifest": str(spec.manifest_path.relative_to(root)),
+            "level_config": spec.level_config_path.relative_to(root).as_posix(),
+            "manifest": spec.manifest_path.relative_to(root).as_posix(),
             "generated_output": raw["generated_output"],
             "runtime_map": spec.runtime_map,
             "resource_path": spec.resource_path,
@@ -69,7 +69,7 @@ def _catalog_registry(root: Path = ROOT) -> dict[str, Any]:
             "resource_priority": spec.resource_priority,
             "relative_entities_path": spec.relative_entities_path,
             "supported_game_revision": spec.supported_game_revision,
-            "onboarding_audit": str(spec.onboarding_path.relative_to(root)),
+            "onboarding_audit": spec.onboarding_path.relative_to(root).as_posix(),
         })
     return {
         "schema_version": 1,

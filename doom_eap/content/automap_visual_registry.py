@@ -137,7 +137,7 @@ def build_authorial_registry(root: Path) -> dict[str, Any]:
         else:
             resolved = _resolved_visual_policy(location.location_id, thaw_content(location.policy))
         source_identity = {
-            "source_file": str(source_path.relative_to(root)),
+            "source_file": source_path.relative_to(root).as_posix(),
             "source_sha256": _sha256(source_path),
             "descriptor_sha256": _sha256(root / "content" / "maps" / location.map_key / "descriptor.json"),
             "resource": _resource_identity(spec),

@@ -138,9 +138,7 @@ def remove_balanced_entity_blocks(content, name_prefix):
         if m.start() < pos:
             continue
         result.append(content[pos:m.start()])
-        depth = 2
-        if "layers" in m.group(0):
-            depth = 3
+        depth = m.group(0).count('{') - m.group(0).count('}')
 
         i = m.end()
         while depth > 0 and i < len(content):
@@ -2770,8 +2768,6 @@ def generate_map(
     content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
     content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock_native")
     content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock")
-    content = remove_balanced_entity_blocks(content, "fast_travel_target_fast_travel_unlock_2")
-    content = remove_balanced_entity_blocks(content, "fasttravel_target_fast_travel_unlock_1")
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
