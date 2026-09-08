@@ -11,27 +11,10 @@ from pinned providers after player consent and verifies each SHA-256.
 Game and runtime prerequisites:
 
 - DOOM Eternal (Steam installation);
-- [Meathook](https://github.com/brongo/m3337ho0o0ok) v7.2 (`XINPUT1_3.dll` in the DOOM Eternal installation root directory, acquired and verified automatically by the launcher);
 - `doometernal.apworld`;
 - `DoomEternalArchipelagoLauncher` on Linux or
   `DoomEternalArchipelagoLauncher.exe` on Windows;
 - the bundled `client/` support runtime and verified mod templates.
-
-Supported external mod injectors:
-
-- **Windows:** [EternalModInjector](https://gamebanana.com/tools/7475) (Community mod injector toolchain);
-- **Linux/Proton:**
-  [EternalModInjectorShell](https://github.com/leveste/EternalBasher)
-  6.66-rev3.13.
-
-Launcher requests consent before acquiring pinned dependencies (Meathook v7.2 and the platform mod injector) and verifies
-SHA-256 before installation. An official verified artifact may be supplied instead.
-
-Pinned dependencies:
-
-- **Windows EternalModInjector:** provider GameBanana, download `1806698`, version `2026-09-04`, SHA-256 `129dadc3eff808f5212bb0107aa713ef11a447111ff02b8c87b6c6c755a42480`;
-- **Linux EternalModInjectorShell:** provider EternalBasher GitHub releases, version `6.66-rev3.13`, SHA-256 `79874b20834ba3e0a8e94c67cab5f7f80af7c57e53035c4ec5075f7f28174935`;
-- **Meathook:** version `7.2`, SHA-256 `02c715f60482bf9727a0464c560575478a13c032db6522547864405a8dd8cdab`.
 
 ## Install APWorld
 
@@ -168,12 +151,11 @@ executable directly through Wine.
 Meathook under Proton requires this Steam launch option:
 
 ```text
-WINEDLLOVERRIDES="XINPUT1_3=n,b" %command%
+WINEDLLOVERRIDES="XINPUT1_3=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
 ```
 
-Launcher preserves existing custom arguments and existing
-`WINEDLLOVERRIDES`, keeps one `%command%`, and shows the proposed result. Copy
-the option into DOOM Eternal's Steam **Properties → Launch Options**.
+Change the path to your client and copy the option 
+into DOOM Eternal's Steam **Properties → Launch Options**.
 
 ## Stop and resume safely
 
