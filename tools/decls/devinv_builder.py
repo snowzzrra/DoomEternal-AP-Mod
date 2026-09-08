@@ -982,10 +982,7 @@ TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
 )
 
 
-def validate_tag_devinv_source(
-    source: str,
-    starting_weapon: str | None = None,
-) -> None:
+def validate_tag_devinv_source(source: str) -> None:
     """Validate that TAG DevInv loadout contains normal mod upgrades and NO masteries."""
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
@@ -1021,35 +1018,7 @@ def validate_tag_devinv_source(
         if item_m:
             item_paths.add(item_m.group("path"))
 
-    mapping = _mapping_by_name(load_devinv_mapping())
-    starting_weapon_paths = {
-        mapping[name]["representations"][0]["path"]
-        for name in STARTING_WEAPON_NAMES
-    }
-    if starting_weapon is not None and starting_weapon not in STARTING_WEAPON_NAMES:
-        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
-    selected_weapon_path = (
-        mapping[starting_weapon]["representations"][0]["path"]
-        if starting_weapon is not None else None
-    )
-    weapon_matches = []
-    for item_match in item_matches:
-        item_path_match = _ITEM_PATH_RE.search(item_match.group("body"))
-        if item_path_match and item_path_match.group("path") in starting_weapon_paths:
-            weapon_matches.append((item_path_match.group("path"), item_match.group("body")))
-    if len(weapon_matches) > 1:
-        raise ValueError("TAG DevInvLoadout contains multiple Starting Weapon entries")
-    if starting_weapon is not None:
-        if len(weapon_matches) != 1 or weapon_matches[0][0] != selected_weapon_path:
-            raise ValueError("TAG DevInvLoadout does not contain exactly the selected Starting Weapon")
-    if weapon_matches and "equip = true;" not in weapon_matches[0][1]:
-        raise ValueError("TAG DevInvLoadout Starting Weapon is not equipped")
-    allowed_weapon_paths = (
-        {selected_weapon_path}
-        if selected_weapon_path is not None
-        else {path for path, _body in weapon_matches}
-    )
-    forbidden_items = item_paths & (TAG_FORBIDDEN_AP_ITEMS - allowed_weapon_paths)
+    forbidden_items = item_paths & TAG_FORBIDDEN_AP_ITEMS
     if forbidden_items:
         raise ValueError(f"TAG DevInvLoadout contains forbidden AP items: {forbidden_items}")
 
@@ -1081,11 +1050,6 @@ def build_tag_devinv_overrides(
     starting_weapon: str | None = None,
 ) -> dict[str, str]:
     """Build exact TAG archive overrides from project-owned declaration inputs."""
-    if starting_weapon is not None and (
-        not isinstance(starting_weapon, str) or starting_weapon not in STARTING_WEAPON_NAMES
-    ):
-        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
-    mapping = _mapping_by_name(load_devinv_mapping())
     manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
     result: dict[str, str] = {}
     tag_root_record = manifest["declarations"]["e4m1_rig"]
@@ -1097,12 +1061,6 @@ def build_tag_devinv_overrides(
         raise ValueError("TAG root DevInv lacks replaceable loadout blocks")
     existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))]
     all_bodies = existing_bodies[:4] + list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS) + existing_bodies[4:]
-    if starting_weapon is not None:
-        representation = mapping[starting_weapon]["representations"][0]
-        all_bodies.append(
-            f'\t\t\t\t{representation["field"]} = "{representation["path"]}";\n'
-            "\t\t\t\tequip = true;"
-        )
     new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
     baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)
     baseline_inventory_block = (
@@ -1183,7 +1141,7 @@ def build_tag_devinv_overrides(
         override = _INHERIT_DECL_RE.sub("", override)
         if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
             raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
-        validate_tag_devinv_source(override, starting_weapon)
+        validate_tag_devinv_source(override)
         archive = Path(record["archive"])
         map_key = record["map_key"]
         result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override

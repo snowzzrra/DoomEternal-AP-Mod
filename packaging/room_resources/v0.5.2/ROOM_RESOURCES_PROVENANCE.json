@@ -15,7 +15,7 @@
     "sha256": "29f75e654f9f85b655b0d26033ca434677489ad2813731902a396040b718ef4c",
     "size": 2202477
   },
-  "room_resource_input_fingerprint": "7857bf2a116d2f588efd9047f1a80ba78604fb19c44ec089f51b50a86ab003af",
+  "room_resource_input_fingerprint": "32ca0fa4d4eb48a26b154d0f3d556b114ee41805465bed3b0b5712f49b734c7c",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -259,7 +259,7 @@
     "tools/content/compile_content_catalog.py": "46d258c1bfb8918ecd519858946dfc4a96f47db1578a0d57bb6e3ddff124a7c9",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/decls/devinv_builder.py": "7bd4c6e621022f072e3c533cb52fee1a151f4469a45015553b4721a04410c7ce",
+    "tools/decls/devinv_builder.py": "2408b79480db088930d8010fcd916abadf9167c1f5e54a9b4e76ab0ad8ee2a49",
     "tools/decls/mastery_decl_builder.py": "962e3c37efe89547b34680ca13da3f445558b1d5af3f23bdce07282b06498c5b",
     "tools/decls/mission_challenge_decl_builder.py": "5a17ae4bdc807dbe5d46e6bd8b783315254dc5c6f833032cde75c9fdcf007979",
     "tools/decls/rune_decl_builder.py": "883aa7dadd152780f78d6fd98ff58f1942dba08730108ec4dc9e526e838846a5",

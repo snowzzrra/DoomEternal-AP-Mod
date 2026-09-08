@@ -20,6 +20,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 import zipfile
 from itertools import product
 from pathlib import Path
@@ -63,7 +64,7 @@ def sha256_file(path: Path) -> str:
 
 
 def write_deterministic_zip(source_dir: Path, output_zip_path: Path, prefix: str = "DoomEternalArchipelago") -> None:
-    """Create a deterministic zip archive from a source directory under a single root prefix."""
+    """Create a zip archive from a source directory under a single root prefix."""
     output_zip_path.parent.mkdir(parents=True, exist_ok=True)
     temp_zip = output_zip_path.with_suffix(".tmp.zip")
 
@@ -78,8 +79,8 @@ def write_deterministic_zip(source_dir: Path, output_zip_path: Path, prefix: str
     with zipfile.ZipFile(temp_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for arcname, file_path in files_to_add:
             zinfo = zipfile.ZipInfo(arcname)
-            zinfo.date_time = (2026, 1, 1, 0, 0, 0)
             st = file_path.stat()
+            zinfo.date_time = time.localtime(st.st_mtime)[:6]
             if bool(st.st_mode & stat.S_IXUSR):
                 zinfo.external_attr = (0o755 | stat.S_IFREG) << 16
             else:

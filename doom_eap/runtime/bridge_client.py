@@ -811,6 +811,7 @@ FAST_TRAVEL_UNLOCK = "FAST_TRAVEL_UNLOCK"
 VALID_MAP_ENTITY_OPERATIONS = frozenset({CHECKED_VISUAL_HIDE, FAST_TRAVEL_UNLOCK})
 MATERIALIZATION_LEASE_HEADER = "AP_MATERIALIZATION_LEASE_V1"
 MATERIALIZATION_LEASE_MARKER = "active_materialization_lease"
+TAG_INVENTORY_SETTLE_SECONDS = 1.0
 RPC_GATE_PATH = os.path.join(DOOM_BASE_DIR, "ap_rpc_enabled")
 GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
 INV_DUMP_DIR = SAVE_GAMES_DIR
@@ -2342,7 +2343,14 @@ def publish_materialization_lease(epoch):
             file.write(contents)
             file.flush()
             os.fsync(file.fileno())
-        os.replace(temporary, marker)
+        for attempt in range(5):
+            try:
+                os.replace(temporary, marker)
+                break
+            except (PermissionError, OSError):
+                if attempt == 4:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
         logger.info("[Queue] Published materialization lease: %s", epoch)
         return True
     except (OSError, UnicodeError) as error:
@@ -3524,6 +3532,7 @@ class DoomEternalContext(CommonContext):
         self.pending_level_ready = {}
         self.completed_level_ready_epochs = set()
         self.level_ready_in_flight = set()
+        self.inventory_settled_level_ready_epochs = set()
         self.session_map_completion_states = {}
         self.last_observer_lease_block = None
         self.save_candidate_tokens = {}
@@ -3985,7 +3994,8 @@ class DoomEternalContext(CommonContext):
             return False
         duration_ms = max(0, int((time.monotonic() - completion["started_at"]) * 1000))
         logger.info(
-            "MATERIALIZATION_COMPLETE context=%s lease=%s queued_ops=%s duration_to_last_ack_ms=%s",
+            "MATERIALIZATION_DISPATCH_COMPLETE context=%s lease=%s queued_ops=%s "
+            "duration_to_last_ack_ms=%s semantic_state=command_consumed_unverified",
             completion["context"], completion["lease"], len(command_ids), duration_ms,
         )
         self._materialization_completion = None
@@ -4050,11 +4060,9 @@ class DoomEternalContext(CommonContext):
             str(materialization_lease or "deferred"),
             ownership_fingerprint,
         ))
-        persistent_reconciliation_key = ":".join((
-            str(self.get_ap_state_key() or "unbound"),
-            context.identity,
-            ownership_fingerprint,
-        ))
+        # TAG DevInv clears physical inventory on every load. Persistent
+        # ownership therefore needs one reconciliation per accepted lease.
+        persistent_reconciliation_key = materialization_key
         if not manual and state.get("completed_key") == materialization_key:
             self.pending_context_transition = None
             self._pending_materialization_triggers.clear()
@@ -4138,9 +4146,7 @@ class DoomEternalContext(CommonContext):
         for item in received_items:
             received_counts[item.item] = received_counts.get(item.item, 0) + 1
         materializable_ids = context_item_ids(context, received)
-        allowed_replay_policies = {"replay_idempotent"}
-        if manual or previous is None or cross_context:
-            allowed_replay_policies.add("replay_manual_only")
+        allowed_replay_policies = {"replay_idempotent", "replay_manual_only"}
         special_mode = self._connected_slot_data.get("special_weapon")
         selected_special_ids = {
             "progressive_special_weapon": {7770901},
@@ -4168,7 +4174,7 @@ class DoomEternalContext(CommonContext):
             or item_id in {7770007, 7770009, 7770901, 7770902}
             or (
                 item_id in capacity_ids
-                and (previous is None or cross_context)
+                and materialization_lease is not None
             )
         )
         selected_ids = tuple(sorted(set(selected_ids)))
@@ -4180,25 +4186,6 @@ class DoomEternalContext(CommonContext):
             item_id for item_id in selected_receipts
             if item_id not in SUPPORT_RUNE_IDS and item_id not in special_ids
         )
-        if context.campaign != "Base":
-            starting_weapon = slot_data.get("starting_weapon")
-            by_name = {
-                entry["name"]: item_id
-                for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()
-            }
-            starting_weapon_id = by_name.get(starting_weapon)
-            if (
-                starting_weapon_id is not None
-                and start_inventory_eligible(starting_weapon_id)
-            ):
-                skipped_starting_weapon = False
-                filtered_plan_ids = []
-                for item_id in plan_ids:
-                    if item_id == starting_weapon_id and not skipped_starting_weapon:
-                        skipped_starting_weapon = True
-                        continue
-                    filtered_plan_ids.append(item_id)
-                plan_ids = tuple(filtered_plan_ids)
         definitions = {item_id: ITEM_ID_TO_COMMAND[item_id] for item_id in set(plan_ids)}
         policies = {item_id: ITEM_REPLAY_POLICIES[item_id] for item_id in set(plan_ids)}
         reconciliation_slot_identity = stable_spool_id(
@@ -4208,7 +4195,7 @@ class DoomEternalContext(CommonContext):
             plan_ids, definitions, policies,
             reconciliation_slot_identity,
             evidence.epoch,
-            include_manual_replay=manual or cross_context or previous is None,
+            include_manual_replay=True,
         )
         # Special ownership is one physical state: materialize highest selected intent.
         special_candidates = []
@@ -4419,7 +4406,7 @@ class DoomEternalContext(CommonContext):
             len(raw_commands),
             len(commands),
             len(commands),
-            str(cross_context).lower(),
+            "true",
         )
         queued, error = self.apply_reconciliation_plan(
             plan,
@@ -4431,6 +4418,10 @@ class DoomEternalContext(CommonContext):
             self.context_materialization_status = "blocked"
             self.context_materialization_block = error
             return None, error
+        gate_key_reload = bool(
+            active_gate_keys
+            and state.get("completed_gate_key_lease") not in (None, materialization_lease)
+        )
         state.update(
             context_identity=context.identity,
             campaign=context.campaign,
@@ -4459,7 +4450,11 @@ class DoomEternalContext(CommonContext):
             "command_ids": tuple(command.spool_id for command in commands),
             "started_at": time.monotonic(),
         } if commands else None
-        self.context_materialization_status = "complete" if commands else "noop"
+        self.context_materialization_status = (
+            "gate_key_rematerialized"
+            if gate_key_reload
+            else "complete" if commands else "noop"
+        )
         self.context_materialization_block = None
         logger.info("CONTEXT_MATERIALIZATION context=%s previous=%s commands=%s", context.identity, previous, len(commands))
         return plan, None
@@ -7984,6 +7979,36 @@ class DoomEternalContext(CommonContext):
         try:
             if not rpc_execution_enabled():
                 set_rpc_execution(True)
+            settled_epochs = getattr(
+                self, "inventory_settled_level_ready_epochs", set()
+            )
+            self.inventory_settled_level_ready_epochs = settled_epochs
+            if (
+                active_context is not None
+                and active_context.campaign != "Base"
+                and epoch not in settled_epochs
+            ):
+                logger.info(
+                    "[Context] TAG_INVENTORY_SETTLE epoch=%s delay_ms=%s",
+                    epoch,
+                    int(TAG_INVENTORY_SETTLE_SECONDS * 1000),
+                )
+                await asyncio.sleep(TAG_INVENTORY_SETTLE_SECONDS)
+                evidence = read_gameplay_save_evidence()
+                self.read_active_map_identity(evidence=evidence)
+                current_marker = getattr(self, "cached_map_identity", None)
+                if (
+                    not self.runtime_effects_ready(evidence)
+                    or not isinstance(current_marker, dict)
+                    or current_marker.get("gameplay_epoch") != epoch
+                ):
+                    logger.info(
+                        "[Context] LEVEL_READY_PENDING reason=inventory_settle_invalidated "
+                        "epoch=%s",
+                        epoch,
+                    )
+                    return False
+                settled_epochs.add(epoch)
             reconciliation_epoch = self.advance_reconciliation_epoch("level_ready")
             logger.info(
                 "[RPC] Level-ready signal received (%s). RPC armed; "

@@ -461,6 +461,7 @@ class LauncherUI(QMainWindow):
             QFrame#hero QPushButton {{ background:#17241d; border:1px solid #526446; }}
             QFrame#hero QPushButton:hover {{ background:#263322; border-color:{self.COLORS['doom']}; }}
             QFrame#hero QPushButton:disabled {{ color:#718087; background:#131e24; border-color:#2d3d44; }}
+            QFrame#hero QPushButton#primary {{ color:#ffffff; }}
             QFrame#hero QPushButton#danger {{ background:#522226; border-color:#b9494e; color:#fff1f1; }}
             QFrame#hero QPushButton#danger:hover {{ background:#743037; border-color:#ff7676; }}
             QFrame#hero QPushButton#danger:disabled {{ background:#26292d; border-color:#3a3e43; color:#777d84; }}
@@ -1459,6 +1460,7 @@ class LauncherUI(QMainWindow):
         self.hero_detail.setText(detail)
         self.hero_action.setText(action)
         self.hero_action.setEnabled(enabled)
+        self.hero_action.setVisible(True)
         self.top_state.setText(state)
 
     def _set_setup_state(self, state: str, detail: str = "") -> None:

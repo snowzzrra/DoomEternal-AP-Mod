@@ -1919,6 +1919,7 @@ bool IsTelemetryJob(const CommandJob& job) {
 }
 
 bool IsSilentMaintenanceJob(const CommandJob& job) {
+    if (job.executionClass == CommandExecutionClass::PlayerRuntime) return false;
     const std::string commandId = CommandIdFromPath(job.path);
     return StartsWith(commandId, "reconcile-")
         || commandId.find("-reconcile-") != std::string::npos
