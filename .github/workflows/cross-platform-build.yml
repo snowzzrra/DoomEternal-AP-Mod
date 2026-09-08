@@ -166,6 +166,13 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Python Dependencies
+        run: |
+          cd DoomEternal-AP-Mod
+          python -m pip install -r requirements-launcher.txt
+          python -m pip install -r requirements-ci.txt
+          python -m pip check
+
       - name: Package doometernal.apworld
         run: |
           cd DoomEternal-AP-Mod
