@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.5.1
+# Install DOOM Eternal Archipelago 0.5.2
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.5.1** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.5.2** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -182,7 +182,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.1** identifies public launcher, room package, and generated content (APWorld remains 0.5.0).
+Version **0.5.2** identifies public launcher, room package, and generated content (APWorld remains 0.5.0).
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|

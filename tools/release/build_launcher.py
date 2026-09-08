@@ -161,7 +161,15 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         command[-1:-1] = ["--exclude-module", excluded_module]
     if os.name == "nt":
         command[-1:-1] = ["--hide-console", "hide-early"]
-    subprocess.run(command, check=True, cwd=REPO_ROOT)
+    build_environment = os.environ.copy()
+    if os.name == "nt":
+        system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        build_environment["PATH"] = os.pathsep.join((
+            str(system_root / "System32"),
+            str(system_root),
+            str(system_root / "System32" / "Wbem"),
+        ))
+    subprocess.run(command, check=True, cwd=REPO_ROOT, env=build_environment)
     executable = output_dir / (f"{name}.exe" if os.name == "nt" else name)
     if not executable.is_file():
         raise RuntimeError(f"PyInstaller did not produce {executable}")

@@ -21,12 +21,12 @@ void __RPC_USER MIDL_user_free(void* pointer)
 
 void ApRpcSetImplicitBinding(RPC_BINDING_HANDLE binding)
 {
-    ap_runtime_rpc__MIDL_AutoBindHandle = binding;
+    ap_runtime_rpc_binding_handle = binding;
 }
 
 void ApRpcClearImplicitBinding(void)
 {
-    ap_runtime_rpc__MIDL_AutoBindHandle = NULL;
+    ap_runtime_rpc_binding_handle = NULL;
 }
 
 RPC_STATUS ApRpcExecute(RPC_BINDING_HANDLE binding, unsigned char* command)

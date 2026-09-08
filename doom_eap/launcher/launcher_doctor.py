@@ -1407,7 +1407,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.5.1"
+    VERSION = "0.5.2"
 
     def __init__(
         self,
@@ -1696,7 +1696,6 @@ class LauncherDoctor:
                                 "verification_error": str(error),
                             }
                             checks.append(Diagnostic("mod_injection", "failed", "Linux mod installation evidence is not verified", details))
-                            checks.append(Diagnostic("windows_mod_installer", "failed", "Linux mod installation evidence is not verified", details))
                         else:
                             details = {
                                 "adapter_state": adapter_state,
@@ -1705,7 +1704,6 @@ class LauncherDoctor:
                                 "required_resources": verification.get("required_resources", ()),
                             }
                             checks.append(Diagnostic("mod_injection", "ok", "Linux mod installation applied and verified", details))
-                            checks.append(Diagnostic("windows_mod_installer", "ok", "Linux mod installation applied and verified", details))
                             room_receipt_applied = True
                     else:
                         checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
@@ -1720,19 +1718,27 @@ class LauncherDoctor:
                         status = "attention"
                         message = "Room mod uninstall requires attention; automatic reinstall is disabled"
                     checks.append(Diagnostic("mod_injection", status, message, details))
-                    checks.append(Diagnostic("windows_mod_installer", status, message, details))
+                    if os.name == "nt":
+                        checks.append(Diagnostic("windows_mod_installer", status, message, details))
                 elif adapter_state == "manual_install_required":
                     checks.append(Diagnostic("mod_injection", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"adapter_state": adapter_state, "installation_mode": mode}))
-                    checks.append(Diagnostic("windows_mod_installer", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"installation_mode": mode, "adapter_state": adapter_state}))
+                    if os.name == "nt":
+                        checks.append(Diagnostic("windows_mod_installer", "failed", "Windows mod installation requires manual setup in INSTALL.md", {"installation_mode": mode, "adapter_state": adapter_state}))
                 else:
                     checks.append(Diagnostic("mod_injection", "failed", f"Mod installation has not been applied (state: {adapter_state or 'unknown'})", {"adapter_state": adapter_state, "installation_mode": mode}))
-                    checks.append(Diagnostic("windows_mod_installer", "failed", f"Windows mod installer is not ready (state: {adapter_state or 'unknown'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                    if os.name == "nt":
+                        checks.append(Diagnostic("windows_mod_installer", "failed", f"Windows mod installer is not ready (state: {adapter_state or 'unknown'})", {"installation_mode": mode, "adapter_state": adapter_state}))
             except Exception:
                 checks.append(Diagnostic("mod_injection", "invalid", "Could not parse launcher setup record"))
-                checks.append(Diagnostic("windows_mod_installer", "invalid", "Could not parse launcher setup record"))
+                if os.name == "nt":
+                    checks.append(Diagnostic("windows_mod_installer", "invalid", "Could not parse launcher setup record"))
         else:
             checks.append(Diagnostic("mod_injection", "not_applicable", "No room package receipt is available"))
-            checks.append(Diagnostic("windows_mod_installer", "not_applicable", "No room package receipt is available"))
+            if os.name == "nt":
+                checks.append(Diagnostic("windows_mod_installer", "not_applicable", "No room package receipt is available"))
+
+        if os.name != "nt":
+            checks.append(Diagnostic("windows_mod_installer", "not_applicable", "Windows-only diagnostic"))
 
         try:
             actions = self.repair_actions()

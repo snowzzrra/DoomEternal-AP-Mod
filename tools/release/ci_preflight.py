@@ -151,10 +151,13 @@ def check_workflow_contract(repo_root: Path) -> None:
                 f"install({install_idx}) < build({build_idx}) < selftest({selftest_idx}) < upload({upload_idx})"
             )
 
-    # 8. Check that wine64-tools is installed in build-native-support
-    raw_text = wf_path.read_text(encoding="utf-8")
-    if "wine64-tools" not in raw_text:
-        raise RuntimeError("Workflow native job must install wine64-tools for WIDL support")
+    # 8. Check that the native support job uses the canonical Windows/MSVC builder.
+    native_job = doc["jobs"]["build-native-support"]
+    if native_job.get("runs-on") != "windows-latest":
+        raise RuntimeError("Workflow native job must run on windows-latest")
+    native_runs = [step.get("run", "") for step in native_job.get("steps", [])]
+    if not any("scripts/build/client_windows.ps1" in run.replace("\\", "/") for run in native_runs):
+        raise RuntimeError("Workflow native job must invoke scripts/build/client_windows.ps1")
 
     # 9. Check apworld_ref default
     apworld_default = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {}).get("apworld_ref", {}).get("default")
@@ -168,6 +171,7 @@ def check_workflow_contract(repo_root: Path) -> None:
     print("  [OK] Single-owner Ruff static analysis invariant verified (requirements-ci only)")
     print("  [OK] Module invocation python -m tools.release.build_launcher verified")
     print("  [OK] Step ordering invariant (install < build < selftest < upload) verified")
+    print("  [OK] Windows/MSVC native client build invariant verified")
 
 
 def check_runtime_imports(repo_root: Path, archipelago_source: Path) -> None:

@@ -1,7 +1,7 @@
 [
     uuid(1c9ca7c8-d421-482d-b85d-79fac33b2658),
     version(1.0),
-    implicit_handle(handle_t ap_runtime_rpc__MIDL_AutoBindHandle)
+    implicit_handle(handle_t ap_runtime_rpc_binding_handle)
 ]
 interface ap_runtime_rpc
 {

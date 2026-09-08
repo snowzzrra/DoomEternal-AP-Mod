@@ -87,10 +87,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire five experimental CVar items (7770156-7770160)"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "0.5.2: shrink location 7770020 independent trigger to 1.3 map units"
     }
   ],
   "asset_package_contract_sha256": "0b608fd92e15ea4b7d6c7d61895c0159eee990802c9b15ab7db3585cb31ed910",
-  "byte_sha256": "f72f2607d30d660a8eb911842a7d5ff1718ab0f9335b742a7a8042628251b933",
+  "byte_sha256": "068ff5adec652ea2219221042777dce0e9d09ef37b05f8eaaffa7d0a5acbb9a3",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 40,
@@ -131,6 +135,6 @@
     7770122
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "2a83460c80d01bb359735a443306bb6088ed12dbf2e456a90b59b2d602f56da1",
-  "semantic_sha256": "b78ab702524f50a74af65145d92dd8c90abe4bee9fb294e9cf4cafb2ae298513"
+  "scripted_contract_sha256": "9e6f8a32e8a15a6dc8405dcb7d34f135a53984ac2a19e1ca374bac5a031925c8",
+  "semantic_sha256": "954e25880e0b9d9cdf318337eb2fa1778c339eaef57a8b8ad7ee169577591a33"
 }

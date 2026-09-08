@@ -1,4 +1,5 @@
 ruff==0.9.9
+pytest>=9,<10
 PyYAML==6.0.3
 schema==0.7.8
 setuptools>=75,<81

@@ -24,7 +24,7 @@ function Invoke-NativeBuild {
 
     $clientDirectory = Join-Path $RepositoryRoot "native\\client"
     $idl = Join-Path $clientDirectory "ap_runtime_rpc.idl"
-    & midl.exe /nologo /env x64 /Oicf /client stub /out $rpcDirectory $idl
+    & midl.exe /nologo /env x64 /Oicf /app_config /client stub /out $rpcDirectory $idl
     if ($LASTEXITCODE -ne 0) { throw "MIDL failed with exit code $LASTEXITCODE" }
 
     $rpcHeader = Join-Path $rpcDirectory "ap_runtime_rpc.h"
@@ -33,8 +33,8 @@ function Invoke-NativeBuild {
         throw "MIDL did not generate the required RPC client files."
     }
 
-    $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/D_M_AMD64", "/I$RepositoryRoot", "/I$rpcDirectory", "/c")
-    $compileC = @("/nologo", "/O2", "/MT", "/D_M_AMD64", "/I$RepositoryRoot", "/I$rpcDirectory", "/TC", "/c")
+    $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/c")
+    $compileC = @("/nologo", "/O2", "/MT", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/TC", "/c")
     $sources = @(
         "ap_client_exe.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
         "ap_runtime_rpc_client.cpp", "ap_rpc_health_state.cpp", "ammo_hotkey.cpp"
@@ -67,16 +67,27 @@ function Invoke-NativeBuild {
             throw "Native build produced an invalid PE file: $output"
         }
     }
-    & dumpbin.exe /headers $clientOutput | Select-String -Quiet "machine \(x64\)"
-    if (-not $?) { throw "ap_client.exe is not an x64 PE binary" }
-    & dumpbin.exe /imports $clientOutput | Select-String -Quiet "RPCRT4.dll"
-    if (-not $?) { throw "ap_client.exe is missing its RPCRT4 import" }
+    $headers = & dumpbin.exe /headers $clientOutput
+    $headersExitCode = $LASTEXITCODE
+    if ($headersExitCode -ne 0) { throw "dumpbin /headers failed with exit code $headersExitCode" }
+    $isX64 = [bool]($headers | Select-String -Pattern "machine \(x64\)" -Quiet)
+    if (-not $isX64) { throw "ap_client.exe is not an x64 PE binary" }
+
+    $imports = & dumpbin.exe /imports $clientOutput
+    $importsExitCode = $LASTEXITCODE
+    if ($importsExitCode -ne 0) { throw "dumpbin /imports failed with exit code $importsExitCode" }
+    $importsRpcrt4 = [bool]($imports | Select-String -Pattern "RPCRT4.dll" -Quiet)
+    if (-not $importsRpcrt4) { throw "ap_client.exe is missing its RPCRT4 import" }
     Write-Output "NATIVE_CLIENT windows-msvc output=$BuildDirectory"
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
 $releaseRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "build\\release"))
-$buildDirectory = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
+$buildDirectory = if ([IO.Path]::IsPathRooted($OutputDir)) {
+    [IO.Path]::GetFullPath($OutputDir)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
+}
 if (-not $buildDirectory.StartsWith($releaseRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Native build output must remain under $releaseRoot"
 }
@@ -89,7 +100,11 @@ if (-not $UseCurrentToolchain) {
     if (-not $vswhere) {
         throw "Visual Studio Build Tools were not found. Install Visual Studio 2022 Build Tools with Desktop development with C++."
     }
-    $installation = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+    $installation = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    if ($LASTEXITCODE -ne 0 -or -not $installation) {
+        throw "Visual Studio Build Tools x64 components were not found. Install the Desktop development with C++ workload."
+    }
+    $installation = $installation.Trim()
     $developerCommand = Join-Path $installation "Common7\\Tools\\VsDevCmd.bat"
     if (-not $installation -or -not (Test-Path -LiteralPath $developerCommand)) {
         throw "Visual Studio Build Tools x64 components were not found. Install the Desktop development with C++ workload."

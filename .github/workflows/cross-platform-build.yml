@@ -14,9 +14,9 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.5.1)'
+        description: 'Release version label (e.g. v0.5.2)'
         required: true
-        default: 'v0.5.1'
+        default: 'v0.5.2'
         type: string
 
 permissions:
@@ -227,7 +227,9 @@ jobs:
         shell: pwsh
         run: |
           $client = 'build/release/build/client/ap_client.exe'
-          if (-not (Test-Path -LiteralPath $client) -or [IO.File]::ReadAllBytes($client)[0..1] -ne [byte[]](0x4d, 0x5a)) { throw "Invalid native client: $client" }
+          if (-not (Test-Path -LiteralPath $client)) { throw "Native client was not produced: $client" }
+          $clientBytes = [IO.File]::ReadAllBytes($client)
+          if ($clientBytes.Length -lt 2 -or $clientBytes[0] -ne 0x4d -or $clientBytes[1] -ne 0x5a) { throw "Invalid native client: $client" }
           New-Item -ItemType Directory -Force build/artifacts/client | Out-Null
           Copy-Item $client build/artifacts/client/
           if (Test-Path -LiteralPath 'build/release/build/client/save_death_probe.exe') { Copy-Item build/release/build/client/save_death_probe.exe build/artifacts/client/ }
@@ -341,7 +343,9 @@ jobs:
         timeout-minutes: 1
         run: |
           $launcher = 'build/release/DoomEternalArchipelagoLauncher.exe'
-          if (-not (Test-Path -LiteralPath $launcher) -or [IO.File]::ReadAllBytes($launcher)[0..1] -ne [byte[]](0x4d, 0x5a)) { throw "Invalid Windows launcher" }
+          if (-not (Test-Path -LiteralPath $launcher)) { throw "Windows launcher was not produced" }
+          $launcherBytes = [IO.File]::ReadAllBytes($launcher)
+          if ($launcherBytes.Length -lt 2 -or $launcherBytes[0] -ne 0x4d -or $launcherBytes[1] -ne 0x5a) { throw "Invalid Windows launcher" }
           Write-Output '--> Running frozen Windows launcher self-test...'
           & build/release/DoomEternalArchipelagoLauncher.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw "Windows launcher self-test failed with exit code $LASTEXITCODE" }

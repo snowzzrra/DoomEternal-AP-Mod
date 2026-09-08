@@ -733,9 +733,10 @@ def validate_target_policies(config_entities, target_policies, content):
             "independent_size", "independent_targets", "independent_visual",
             "completion_targets", "no_auto_visual", "preserve_layers", "bind_parent",
         }
+        universal_size_override = set(policy) == {"independent_size"}
         unused_independent = sorted(
             set(policy) & independent_only
-            if not policy.get("independent_ap_trigger")
+            if not policy.get("independent_ap_trigger") and not universal_size_override
             else ()
         )
         if policy.get("ap_touch_only") or (
@@ -2502,7 +2503,13 @@ def load_explicit_location_feedback(
 
 def apply_runtime_map_correctives(text: str, map_key: str) -> str:
     """Apply focused runtime correctives for TAG maps."""
-    if map_key == "e4m1_rig":
+    if map_key == "e4m2_swamp":
+        text = remove_balanced_entity_blocks(
+            text,
+            "fast_travel_target_fast_travel_unlock_2",
+        )
+
+    elif map_key == "e4m1_rig":
         bounds = find_entity_block_bounds(text, "slayer_gate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]
@@ -2537,6 +2544,11 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             text = text[:bounds[0]] + block + text[bounds[1]:]
 
     elif map_key == "e4m3_mcity":
+        text = remove_balanced_entity_blocks(
+            text,
+            "fasttravel_target_fast_travel_unlock_1",
+        )
+
         bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]
@@ -2834,6 +2846,19 @@ def generate_map(
                             "preserve_visual_layers": preserve_visual_layers,
                         },
                     )
+                elif set(target_policy) == {"independent_size"}:
+                    size_override = target_policy["independent_size"]
+                    target_policy = build_universal_physical_policy(
+                        ap_check_id,
+                        location_id,
+                        block,
+                        default_visual_model,
+                        policy={
+                            "preserve_rotation": preserve_rotation,
+                            "preserve_visual_layers": preserve_visual_layers,
+                        },
+                    )
+                    target_policy["independent_size"] = size_override
                 elif is_sentinel_crystal_source(block) and not target_policy.get(
                     "independent_ap_trigger"
                 ):

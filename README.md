@@ -308,7 +308,7 @@ Repair/Fix, and a sanitized support report.
   one 19-mission Archipelago world with global inventory and completion flow.
 - DLC-specific gear, mission logic, generation, runtime, and validation are in scope.
 
-### 0.5.1 Beta — Release Corrective
+### 0.5.1-2 Beta — Release Correctives
 
 - Base Campaign with DLC content packages Base locations only; room scope
   follows `include_dlc_missions` exactly.
