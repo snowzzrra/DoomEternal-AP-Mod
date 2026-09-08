@@ -700,6 +700,7 @@ if AP_SOURCE_PATH:
 
 import colorama  # noqa: E402
 import Utils  # noqa: E402
+import CommonClient as APCommonClient  # noqa: E402
 from CommonClient import (  # noqa: E402
     ClientCommandProcessor,
     CommonContext,
@@ -3574,6 +3575,8 @@ class DoomEternalContext(CommonContext):
         self.fast_travel_epoch_state = None
         self.fast_travel_last_transition = None
         self._launcher_connection_failure_reported = False
+        self._room_session_established = False
+        self._launcher_connection_loss_reported = False
 
     def on_print_json(self, args: dict):
         try:
@@ -3730,7 +3733,10 @@ class DoomEternalContext(CommonContext):
             manager.reset(reason)
         invalidate_queue_session_namespace(reason)
 
-    def _report_launcher_connection_failure(self, message):
+    def _report_launcher_connection_failure(
+        self, message, *, code="connection_failed", reason_codes=None,
+        technical_message=None,
+    ):
         if (
             not LAUNCHER_EVENTS_ENABLED
             or self._launcher_connection_failure_reported
@@ -3739,8 +3745,10 @@ class DoomEternalContext(CommonContext):
         self._launcher_connection_failure_reported = True
         emit_launcher_event(
             "error",
-            code="connection_failed",
+            code=code,
             message=message,
+            technical_message=technical_message or message,
+            reason_codes=list(reason_codes or ()),
         )
         self.disconnected_intentionally = True
         self.cancel_autoreconnect()
@@ -4415,7 +4423,17 @@ class DoomEternalContext(CommonContext):
         self.deathlink_receiver.abandon(time.monotonic(), "disconnect")
         discard_queued_coalesced_command(DEATHLINK_KILL_COALESCE_KEY, state_key)
         super().handle_connection_loss(msg)
-        self._report_launcher_connection_failure(msg)
+        if self._room_session_established:
+            if LAUNCHER_EVENTS_ENABLED and not self._launcher_connection_loss_reported:
+                self._launcher_connection_loss_reported = True
+                emit_launcher_event(
+                    "connection_lost",
+                    code="connection_closed",
+                    message="The room connection was interrupted; reconnecting automatically.",
+                    technical_message=msg,
+                )
+        else:
+            self._report_launcher_connection_failure(msg, technical_message=msg)
 
     async def connection_closed(self):
         state_key = self.state_key
@@ -4430,9 +4448,18 @@ class DoomEternalContext(CommonContext):
             and not self.exit_event.is_set()
         )
         await super().connection_closed()
-        if unexpected_launcher_close:
+        if unexpected_launcher_close and not self._room_session_established:
             self._report_launcher_connection_failure(
-                "Disconnected from the Archipelago server"
+                "Disconnected from the Archipelago server",
+                code="connection_closed",
+            )
+        elif unexpected_launcher_close and not self._launcher_connection_loss_reported:
+            self._launcher_connection_loss_reported = True
+            emit_launcher_event(
+                "connection_lost",
+                code="connection_closed",
+                message="The room connection was interrupted; reconnecting automatically.",
+                technical_message="Disconnected from the Archipelago server",
             )
 
     def queue_dev_commands(self, commands, action):
@@ -4465,6 +4492,14 @@ class DoomEternalContext(CommonContext):
         )
 
     async def server_auth(self, password_requested: bool = False):
+        if password_requested and LAUNCHER_EVENTS_ENABLED:
+            self._report_launcher_connection_failure(
+                "The room requires a password, or the supplied password was rejected.",
+                code="invalid_password",
+                reason_codes=["InvalidPassword"],
+                technical_message="Archipelago requested password authentication",
+            )
+            return
         if password_requested and not self.password:
             await super().server_auth(password_requested)
         await self.get_username()
@@ -4991,6 +5026,8 @@ class DoomEternalContext(CommonContext):
         elif cmd == "ReceivedItems":
             self._on_received_items_packet(args)
         elif cmd == "Connected":
+            self._room_session_established = True
+            self._launcher_connection_loss_reported = False
             previous_state_key = self.state_key
             self.initialize_item_state()
             if previous_state_key and previous_state_key != self.state_key:
@@ -5011,11 +5048,10 @@ class DoomEternalContext(CommonContext):
             except ValueError as error:
                 message = f"Unsupported DOOM Eternal 0.5-D slot contract: {error}"
                 logger.error("[Contract] Connected slot rejected: %s", error)
-                emit_launcher_event(
-                    "archipelago",
-                    schema=ARCHIPELAGO_EVENT_SCHEMA,
-                    plain=message,
-                    segments=[{"type": "text", "text": message}],
+                self._report_launcher_connection_failure(
+                    message,
+                    code="room_incompatible",
+                    technical_message=message,
                 )
                 return
             self._connected_slot_data = slot_data
@@ -5115,8 +5151,14 @@ class DoomEternalContext(CommonContext):
                 self._emit_launcher_hints("DATA_RECEIVED" if cmd == "Retrieved" else "UPDATED")
         elif cmd == "ConnectionRefused":
             self.reset_queue_session_authority("connection_refused")
+            reasons = args.get("errors", [])
+            if not isinstance(reasons, (list, tuple)):
+                reasons = [reasons]
             self._report_launcher_connection_failure(
-                "Archipelago connection was refused"
+                "Archipelago rejected the room login.",
+                code="connection_refused",
+                reason_codes=reasons,
+                technical_message="ConnectionRefused: " + ", ".join(map(str, reasons)),
             )
         elif cmd == "RoomUpdate" and "checked_locations" in args:
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
@@ -5150,7 +5192,9 @@ class DoomEternalContext(CommonContext):
         self._placement_scout_failed = True
         self.server_checked_locations_ready = False
         logger.error("[Placement] SCOUT_REJECTED %s", message)
-        self._report_launcher_connection_failure(message)
+        self._report_launcher_connection_failure(
+            message, code="malformed_server_data", technical_message=message
+        )
 
     async def _scout_active_locations(self):
         try:
@@ -6299,17 +6343,29 @@ class DoomEternalContext(CommonContext):
         marker = self.read_active_map_identity(evidence=evidence)
         marker_map = marker["runtime_map"] if marker else None
         marker_context = classify_runtime_context(marker_map) if marker_map else None
-        active_campaign = marker_context.campaign if marker_context else None
+        evidence_context = None
+        if (
+            evidence
+            and evidence.state == "gameplay"
+            and getattr(evidence, "native_safe", False)
+            and getattr(evidence, "map_name", None)
+        ):
+            evidence_context = classify_runtime_context(evidence.map_name)
+        transition_context = marker_context or evidence_context
+        active_campaign = transition_context.campaign if transition_context else None
         expected_prefix = expected_save_prefix_for_campaign(active_campaign)
 
-        if expected_prefix and self.active_save_slot and not self.active_save_slot.startswith(expected_prefix):
+        active_family_mismatch = bool(
+            expected_prefix
+            and self.active_save_slot
+            and not self.active_save_slot.startswith(expected_prefix)
+        )
+        prior_evidence_epoch = getattr(self, "active_save_proof_evidence_epoch", None)
+        if active_family_mismatch:
             self.invalidate_active_save_proof()
-            self.active_save_slot = None
-            self.active_save_path = None
             self.active_native_evidence_epoch = None
 
         if marker_map and evidence and getattr(evidence, "map_name", None):
-            evidence_context = classify_runtime_context(evidence.map_name)
             if (
                 marker_context is not None
                 and evidence_context is not None
@@ -6362,6 +6418,22 @@ class DoomEternalContext(CommonContext):
             and active
             and newest.slot_directory != active.slot_directory
             and newest.mtime_ns > active.mtime_ns
+        )
+        provisional_family_switch = bool(
+            evidence
+            and evidence.state == "gameplay"
+            and evidence.provisional
+            and evidence.native_safe
+            and marker is None
+            and evidence_context is not None
+            and expected_prefix
+            and active_family_mismatch
+            and newest
+            and newest.slot_directory.startswith(expected_prefix)
+            and active
+            and newest.mtime_ns > active.mtime_ns
+            and evidence_epoch is not None
+            and evidence_epoch != prior_evidence_epoch
         )
 
         def fail_proof(reason):
@@ -6418,11 +6490,12 @@ class DoomEternalContext(CommonContext):
             return fail_proof("menu")
 
         if evidence and evidence.provisional and marker is None:
-            continued = continue_authoritative_active()
-            if continued is not None:
-                self.reconcile_fast_travel_unlock("save_proof")
-                return continued
-            return fail_proof("provisional")
+            if not provisional_family_switch:
+                continued = continue_authoritative_active()
+                if continued is not None:
+                    self.reconcile_fast_travel_unlock("save_proof")
+                    return continued
+                return fail_proof("provisional")
 
         target_slot = evidence_slot or (active.slot_directory if active else None) or candidate_slot
         if expected_prefix and target_slot and not target_slot.startswith(expected_prefix):
@@ -6438,7 +6511,11 @@ class DoomEternalContext(CommonContext):
         if not details:
             return fail_proof("no_game_details")
 
-        active_map = marker_map
+        active_map = marker_map or (
+            canonical_map_name(evidence.map_name)
+            if provisional_family_switch and evidence
+            else None
+        )
         if not active_map:
             return fail_proof("map_marker_unavailable")
         continue_target_map = canonical_map_name(details.get("mapName", ""))
@@ -6525,7 +6602,11 @@ class DoomEternalContext(CommonContext):
                 proof_evidence_epoch,
                 selected.mtime_ns,
                 details_token,
-                proof="non_provisional_fresh_map_match",
+                proof=(
+                    "provisional_cross_campaign_load_edge"
+                    if provisional_family_switch
+                    else "non_provisional_fresh_map_match"
+                ),
             )
             self.activate_save_selection(selected)
             self.active_native_evidence_epoch = proof_evidence_epoch
@@ -6534,6 +6615,34 @@ class DoomEternalContext(CommonContext):
             self.active_save_proof_evidence_epoch = proof_evidence_epoch
             self.active_save_proof_load_epoch = proof_load_epoch
             self.runtime_observers_frozen = False
+            if provisional_family_switch:
+                evidence_mtime = gameplay_evidence_mtime_ns()
+                materialization_epoch = build_materialization_epoch(
+                    evidence_epoch, evidence_mtime
+                )
+                if lease is not None:
+                    lease.observe_gameplay_loaded(evidence_mtime)
+                marker_data = {
+                    "map_key": _catalog_map_key(active_map),
+                    "runtime_map": active_map,
+                    "marker": f"AP_MAP_START_{_catalog_map_key(active_map).upper()}",
+                    "mtime_ns": evidence_mtime,
+                    "path": None,
+                    "native_gameplay_epoch": evidence_epoch,
+                    "gameplay_epoch": materialization_epoch,
+                    "evidence_mtime_ns": evidence_mtime,
+                    "evidence_epoch": evidence_epoch,
+                    "materialization_evidence_epoch": evidence_epoch,
+                    "secondary_materialization": False,
+                }
+                self.accept_map_identity(marker_data, evidence_epoch)
+                self.snapshot_fast_travel_eligibility(marker_data=marker_data)
+                self.advance_automap_cleanup_epoch()
+                logger.info(
+                    "[MAP] MAP_TRANSITION_EVIDENCE map=%s epoch=%s runtime_map=%s "
+                    "source=provisional_cross_campaign_load_edge",
+                    marker_data["map_key"], materialization_epoch, active_map,
+                )
             self.arm_final_sin_completion_candidate(
                 selected, details, active_map, proof_load_epoch
             )
@@ -10235,12 +10344,29 @@ async def amain(launch_args=None):
         logger.info(f"Auto-connecting to {args.connect} as {args.name}...")
         emit_launcher_event("connecting")
 
+    if LAUNCHER_EVENTS_ENABLED:
+        original_process_server_cmd = APCommonClient.process_server_cmd
+
+        async def launcher_process_server_cmd(client_ctx, package):
+            # CommonClient handles ConnectionRefused before calling on_package,
+            # and raises away its machine-readable reason. The launcher owns the
+            # retry UX, so preserve that packet before CommonClient can flatten it.
+            if package.get("cmd") == "ConnectionRefused":
+                client_ctx.on_package("ConnectionRefused", package)
+                return
+            await original_process_server_cmd(client_ctx, package)
+
+        APCommonClient.process_server_cmd = launcher_process_server_cmd
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
     def report_server_stop(task):
         if ctx.exit_event.is_set():
             ctx.reset_queue_session_authority("server_loop_stopped")
             return
         ctx.reset_queue_session_authority("server_loop_stopped")
+        if ctx._room_session_established and not ctx.disconnected_intentionally:
+            # CommonClient owns autoreconnect after an established session.
+            # connection_lost already describes this outage to the launcher.
+            return
         try:
             error = task.exception()
         except asyncio.CancelledError:

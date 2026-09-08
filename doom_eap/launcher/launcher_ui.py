@@ -7,6 +7,7 @@ import os
 import queue
 import re
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,7 @@ from PySide6.QtWidgets import (
 from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
+from .connection_errors import enrich_connection_failure
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
 from .launcher_reporting import report_problem
 from .launcher_platform import (
@@ -416,6 +418,8 @@ class LauncherUI(QMainWindow):
         self.room_event: dict[str, object] = {}
         self._room_connected = False
         self._connection_pending = False
+        self._shown_connection_error_attempts: set[int] = set()
+        self._event_poll_scheduled = False
         self._setup_state = "disconnected"
         self._previous_setup_state = ""
         self._resolved_consent_requests: set[str] = set()
@@ -440,6 +444,9 @@ class LauncherUI(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._poll_events)
         self.timer.start(75)
+        self.lifecycle_timer = QTimer(self)
+        self.lifecycle_timer.timeout.connect(self._poll_slow_state)
+        self.lifecycle_timer.start(1000)
 
     def _configure_style(self) -> None:
         self.setStyleSheet(f"""
@@ -746,6 +753,9 @@ class LauncherUI(QMainWindow):
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
         layout.addWidget(self.join_button, 10, 1, 1, 2)
+        self.join_error = self._label("", "warning")
+        self.join_error.hide()
+        layout.addWidget(self.join_error, 11, 0, 1, 3)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -945,8 +955,10 @@ class LauncherUI(QMainWindow):
         self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.activity.setAlternatingRowColors(True)
         self.activity.verticalHeader().hide()
-        self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.activity.setColumnWidth(0, 86)
+        self.activity.setColumnWidth(1, 132)
         self.activity.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.activity, 1)
         return card
@@ -1650,9 +1662,27 @@ class LauncherUI(QMainWindow):
         try:
             self.controller.connect(endpoint=self.server.text(), slot=self.slot.text(), password=self.password.text(), game_root=self.game_root.text(), saves_root=self.saves_root.text())
         except Exception as error:
-            self._set_home("CHECK ROOM DETAILS", str(error), "JOIN ROOM", "CONNECTION FAILED")
-            self._activity_event({"type": "connection_input_error", "message": str(error)})
+            raw = str(error)
+            if "server address" in raw.casefold() or "player name" in raw.casefold():
+                event = enrich_connection_failure(
+                    {
+                        "type": "error",
+                        "code": "missing_slot" if "player name" in raw.casefold() else "malformed_address",
+                        "technical_message": raw,
+                    },
+                    attempt_id=self.controller.connection_attempt_id,
+                )
+                self.controller.last_connection_error = dict(event)
+                self._show_connection_failure(event)
+            else:
+                self._append_log(f"Local setup input error: {type(error).__name__}: {raw}")
+                self.join_error.setText(f"Game setup needs attention. {raw}")
+                self.join_error.show()
+                self._set_home("CHECK GAME SETUP", raw, "JOIN ROOM", "SETUP REQUIRED")
+                QMessageBox.warning(self, "Game setup needs attention", raw)
+            self._activity_event({"type": "connection_input_error", "message": raw})
             return
+        self.join_error.hide()
         self._connection_pending = True
         self._set_connection_controls(False)
         self._set_connection_badge("CONNECTING", False)
@@ -2370,11 +2400,20 @@ class LauncherUI(QMainWindow):
         threading.Thread(target=_run_repair, name="DoomDoctorRepair", daemon=True).start()
 
     def _poll_events(self) -> None:
-        while True:
+        self._event_poll_scheduled = False
+        started = time.perf_counter()
+        processed = 0
+        while processed < 100 and (time.perf_counter() - started) < 0.005:
             try: event = self.controller.events.get_nowait()
             except queue.Empty: break
             self.controller.process_event(event)
             self._present_event(event)
+            processed += 1
+        if not self.controller.events.empty() and not self._event_poll_scheduled:
+            self._event_poll_scheduled = True
+            QTimer.singleShot(0, self._poll_events)
+
+    def _poll_slow_state(self) -> None:
         self.controller.poll_game_lifecycle()
         self._refresh_native_health()
 
@@ -2448,7 +2487,7 @@ class LauncherUI(QMainWindow):
             detail_label.setWordWrap(True)
             detail_label.setText(self._archipelago_activity_detail(event))
             self.activity.setCellWidget(row, 2, detail_label)
-            self.activity.resizeRowToContents(row)
+            self.activity.setRowHeight(row, 38)
         else:
             self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
         while self.activity.rowCount() > 100:
@@ -2606,6 +2645,7 @@ class LauncherUI(QMainWindow):
             return
         if kind == "connected":
             self._connection_pending = False; self._room_connected = True
+            self.join_error.hide()
             self._set_connection_controls(False); self._render_room(event)
             self.uninstall_button.setEnabled(True)
             self._set_status("mod", "checking", self.COLORS["ap"])
@@ -2788,18 +2828,56 @@ class LauncherUI(QMainWindow):
                 self._set_status(key, "waiting", self.COLORS["muted"])
             self._set_setup_state("disconnected")
             self._set_home("SESSION ENDED", "Update room details or reconnect.", "JOIN A ROOM", "OFFLINE")
+        elif kind == "connection_lost":
+            self._set_connection_badge("RECONNECTING", False)
+            self._set_status("ap", "reconnecting", self.COLORS["warn"])
+            self._set_home(
+                "ROOM CONNECTION INTERRUPTED",
+                "DoomEAP is reconnecting in the background. Gameplay state is preserved.",
+                "VIEW SESSION", "RECONNECTING", enabled=True,
+            )
+            self._append_log("Archipelago connection interrupted; automatic reconnect remains active: " + str(event.get("technical_message") or event.get("message") or "connection closed"))
         elif kind in {"setup_failed", "error"}:
             message = str(event.get("message", "Unknown error"))
             self._append_log(f"{kind}: {message}")
             if not self._room_connected:
-                self._connection_pending = False; self._set_connection_controls(True); self._set_connection_badge("FAILED", False)
-                self._set_home("CONNECTION FAILED", message, "RETRY JOIN", "CONNECTION FAILED")
+                if kind == "error" and event.get("failure_domain") == "archipelago_connection":
+                    self._show_connection_failure(event)
+                else:
+                    self._connection_pending = False; self._set_connection_controls(True); self._set_connection_badge("FAILED", False)
+                    self._set_home("SETUP FAILED", message, "RETRY JOIN", "SETUP FAILED")
+                    title = str(event.get("user_title") or "Game setup failed")
+                    player_message = str(event.get("user_message") or message)
+                    action = str(event.get("user_action") or event.get("recovery_action") or "Check Setup and try again.")
+                    self.join_error.setText(f"{title}. {player_message} {action}")
+                    self.join_error.show()
+                    attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
+                    if attempt_id not in self._shown_connection_error_attempts:
+                        self._shown_connection_error_attempts.add(attempt_id)
+                        QMessageBox.warning(self, title, f"{player_message}\n\n{action}")
             else:
                 package_failure = self._is_room_package_failure(event, message)
                 self._set_status("mod" if package_failure else "rpc", "failed", self.COLORS["bad"])
                 self._set_setup_state(self._room_package_issue_state(message) if package_failure else "failed")
         elif kind == "warning":
             self._append_log("Warning: " + str(event.get("message", "")))
+
+    def _show_connection_failure(self, event: dict[str, object]) -> None:
+        attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
+        title = str(event.get("title") or "Could not connect to the room")
+        message = str(event.get("message") or "The Archipelago connection failed.")
+        action = str(event.get("action") or "Check the room details and try again.")
+        player_copy = f"{message}\n\n{action}"
+        self._connection_pending = False
+        self._set_connection_controls(True)
+        self._set_connection_badge("FAILED", False)
+        self.join_error.setText(f"{title}. {message} {action}")
+        self.join_error.show()
+        self._set_home(title.upper(), f"{message} {action}", "RETRY JOIN", "CONNECTION FAILED")
+        self._show_page(1)
+        if attempt_id not in self._shown_connection_error_attempts:
+            self._shown_connection_error_attempts.add(attempt_id)
+            QMessageBox.warning(self, title, player_copy)
 
     def _append_log(self, text: str) -> None:
         sanitized = redact_secrets(text).replace("\r", " ").strip()
@@ -2830,6 +2908,8 @@ class LauncherUI(QMainWindow):
     def closeEvent(self, event) -> None:
         if self._qt_application is not None:
             self._qt_application.removeEventFilter(self)
+        self.timer.stop()
+        self.lifecycle_timer.stop()
         try: self.controller.close()
         finally: event.accept()
 

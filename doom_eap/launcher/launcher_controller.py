@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 
+from .connection_errors import enrich_connection_failure, validate_server_address
 from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
 from .launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor, write_support_bundle
 from .launcher_integration import (
@@ -160,6 +161,8 @@ class LauncherController:
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
         self.last_setup_failure: dict[str, object] | None = None
+        self.last_connection_error: dict[str, object] | None = None
+        self.connection_attempt_id = 0
         self.last_room_package_issue: dict[str, object] | None = None
         self.session_start_time = time.time()
         self._consent_lock = threading.Lock()
@@ -187,6 +190,10 @@ class LauncherController:
         self._last_native_health: dict[str, object] | None = None
         self._native_client_process: subprocess.Popen | None = None
         self._last_game_running: bool = False
+        self._game_lifecycle_sample: bool | None = None
+        self._game_lifecycle_sample_lock = threading.Lock()
+        self._game_lifecycle_stop = threading.Event()
+        self._game_lifecycle_thread: threading.Thread | None = None
 
     def _native_start_failure(
         self,
@@ -828,6 +835,7 @@ class LauncherController:
             application_dir=self.client_dir,
             session_start=self.session_start_time,
             last_setup_failure=self.last_setup_failure,
+            last_connection_error=self.last_connection_error,
             support_condump=support_condump,
             support_diagnostics=support_diagnostics,
         )
@@ -955,6 +963,7 @@ class LauncherController:
         for key in (
             "endpoint", "slot", "seed_name", "state", "code", "reason", "message",
             "raw_message", "technical_message", "failure_domain", "recovery_action",
+            "category", "attempt_id", "reason_codes",
         ):
             if key in event and event[key] not in (None, ""):
                 fields.append(f"{key}={event[key]}")
@@ -964,6 +973,9 @@ class LauncherController:
         self, supervisor: BridgeSupervisor, event: dict[str, object]
     ) -> None:
         kind = str(event.get("type", ""))
+        if kind == "error" and not event.get("failure_domain"):
+            event = enrich_connection_failure(event, attempt_id=self.connection_attempt_id)
+            self.last_connection_error = dict(event)
         if kind == "setup_failed" and not event.get("failure_domain"):
             event = {
                 **event,
@@ -972,6 +984,8 @@ class LauncherController:
                     phase="game_setup",
                 ),
             }
+        if kind == "setup_failed" and not event.get("attempt_id"):
+            event = {**event, "attempt_id": self.connection_attempt_id}
         stop_failed_worker = False
         pending: dict[str, str] | None = None
         emit_event = True
@@ -989,6 +1003,7 @@ class LauncherController:
                 else:
                     self.state = LauncherState.CONNECTED
                     self.last_setup_failure = None
+                    self.last_connection_error = None
                     self.last_room_package_issue = None
             elif kind in {"error", "setup_failed"}:
                 if (
@@ -1225,8 +1240,12 @@ class LauncherController:
         game_root: str,
         saves_root: str,
     ) -> None:
-        if not endpoint.strip() or not slot.strip():
-            raise ValueError("server address and slot are required")
+        self.connection_attempt_id += 1
+        if not endpoint.strip():
+            raise ValueError("server address is required")
+        if not slot.strip():
+            raise ValueError("player name is required")
+        endpoint = validate_server_address(endpoint)
         try:
             game = validate_game_root(Path(game_root))
             saves = validate_save_directory(Path(saves_root))
@@ -1234,7 +1253,7 @@ class LauncherController:
             raise ValueError(str(error)) from error
         self.save_config(
             {
-                "server_address": endpoint.strip(),
+                "server_address": endpoint,
                 "slot": slot.strip(),
                 "game_root": str(game),
                 "doom_base_dir": str(game / "base"),
@@ -1243,7 +1262,7 @@ class LauncherController:
         )
         self.ensure_ammo_refill_config()
         connection = {
-            "endpoint": endpoint.strip(),
+            "endpoint": endpoint,
             "slot": slot.strip(),
             "password": password,
         }
@@ -1329,11 +1348,29 @@ class LauncherController:
         supervisor.send_chat(text)
 
     def poll_game_lifecycle(self) -> None:
-        """Track game process lifecycle and clean stale config bindings on game exit."""
-        current_running = self.is_game_running()
+        """Consume cached process state and clean stale bindings on game exit."""
+        if self._game_lifecycle_thread is None:
+            self._game_lifecycle_thread = threading.Thread(
+                target=self._sample_game_lifecycle,
+                name="DoomLifecycleSampler",
+                daemon=True,
+            )
+            self._game_lifecycle_thread.start()
+        with self._game_lifecycle_sample_lock:
+            current_running = self._game_lifecycle_sample
+        if current_running is None:
+            return
         if self._last_game_running and not current_running:
             cleanup_stale_doom_config_bind(self.config, is_game_running=False)
         self._last_game_running = current_running
+
+    def _sample_game_lifecycle(self) -> None:
+        """Run the slow Windows process enumeration away from the Qt thread."""
+        while not self._game_lifecycle_stop.is_set():
+            current_running = self.is_game_running()
+            with self._game_lifecycle_sample_lock:
+                self._game_lifecycle_sample = current_running
+            self._game_lifecycle_stop.wait(1.0)
 
     def set_ammo_refill_keybind(self, keybind: str) -> None:
         try:
@@ -1463,5 +1500,9 @@ class LauncherController:
         raise RuntimeError("no supported terminal emulator found for interactive injector")
 
     def close(self) -> None:
+        self._game_lifecycle_stop.set()
+        lifecycle_thread = self._game_lifecycle_thread
+        if lifecycle_thread is not None and lifecycle_thread.is_alive():
+            lifecycle_thread.join(timeout=1.0)
         self._stop_native_client()
         self.disconnect()

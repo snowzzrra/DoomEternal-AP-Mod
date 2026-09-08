@@ -976,9 +976,9 @@ TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
 })
 
 TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
-    '\t\t\t\tperk = "perk/player/blood_punch/area_of_effect";\n\t\t\t\tequip = true;',
-    '\t\t\t\tperk = "perk/player/blood_punch/ai_charge_rate";\n\t\t\t\tequip = true;',
-    '\t\t\t\tperk = "perk/player/blood_punch/max_charges";\n\t\t\t\tequip = true;',
+    '\t\t\t\tperk = "perk/player/blood_punch/area_of_effect";',
+    '\t\t\t\tperk = "perk/player/blood_punch/ai_charge_rate";',
+    '\t\t\t\tperk = "perk/player/blood_punch/max_charges";',
 )
 
 

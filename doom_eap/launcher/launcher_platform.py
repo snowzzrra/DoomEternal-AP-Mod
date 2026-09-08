@@ -24,6 +24,7 @@ import urllib.request
 import webbrowser
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
+from functools import lru_cache
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -33,6 +34,13 @@ from typing import Any, Iterator, Protocol
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
+
+
+@lru_cache(maxsize=32)
+def _sha256_file_identity(path: str, size: int, modified_ns: int, created_ns: int) -> str:
+    """Hash immutable file identity once; metadata changes invalidate the entry."""
+    del size, modified_ns, created_ns
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def create_secure_ssl_context(cafile: str | None = None) -> ssl.SSLContext:
@@ -631,7 +639,8 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
         )
 
     try:
-        size = dll_path.stat().st_size
+        dll_stat = dll_path.stat()
+        size = dll_stat.st_size
     except OSError as error:
         return PrerequisiteCheck(
             key="meathook",
@@ -662,7 +671,9 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
         )
 
     try:
-        actual_sha = hashlib.sha256(dll_path.read_bytes()).hexdigest()
+        actual_sha = _sha256_file_identity(
+            str(dll_path.resolve()), size, dll_stat.st_mtime_ns, dll_stat.st_ctime_ns
+        )
     except OSError as error:
         return PrerequisiteCheck(
             key="meathook",

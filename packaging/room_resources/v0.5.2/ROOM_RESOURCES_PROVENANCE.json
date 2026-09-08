@@ -4,7 +4,7 @@
     "size": 11298039
   },
   "generated_from_apworld_commit": "9cb821b7429dba8b14092d50f55d786397e38521",
-  "generated_from_mod_commit": "660c06caff87286bbbdf3deaa4e04e778bb00a5a",
+  "generated_from_mod_commit": "e3a0ac5c20b6830ee495c1f4f9e1380bbdcb976f",
   "inputs_count": 260,
   "release_version": "0.5.2",
   "room_payload_manifest": {
@@ -15,7 +15,7 @@
     "sha256": "29f75e654f9f85b655b0d26033ca434677489ad2813731902a396040b718ef4c",
     "size": 2202477
   },
-  "room_resource_input_fingerprint": "7a64570bfe656babceb3cc7594406cde02749268aa5ecf9e62dbc0dd46622ef5",
+  "room_resource_input_fingerprint": "3832ccdd60e608eff9cc7a7a37ac6130d8c8b393457f7d237eae32aac1542f87",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -259,7 +259,7 @@
     "tools/content/compile_content_catalog.py": "46d258c1bfb8918ecd519858946dfc4a96f47db1578a0d57bb6e3ddff124a7c9",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/decls/devinv_builder.py": "646c412e59db48fd168dc949165a8ed1590437eca556c4fed5165c1ef92dd641",
+    "tools/decls/devinv_builder.py": "2408b79480db088930d8010fcd916abadf9167c1f5e54a9b4e76ab0ad8ee2a49",
     "tools/decls/mastery_decl_builder.py": "962e3c37efe89547b34680ca13da3f445558b1d5af3f23bdce07282b06498c5b",
     "tools/decls/mission_challenge_decl_builder.py": "5a17ae4bdc807dbe5d46e6bd8b783315254dc5c6f833032cde75c9fdcf007979",
     "tools/decls/rune_decl_builder.py": "883aa7dadd152780f78d6fd98ff58f1942dba08730108ec4dc9e526e838846a5",

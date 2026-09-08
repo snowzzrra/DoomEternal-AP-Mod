@@ -1298,6 +1298,7 @@ def write_support_bundle(
     application_dir: Path | None = None,
     session_start: float | None = None,
     last_setup_failure: Mapping[str, object] | None = None,
+    last_connection_error: Mapping[str, object] | None = None,
     support_condump: Mapping[str, object] | None = None,
     support_diagnostics: Mapping[str, object] | None = None,
 ) -> Path:
@@ -1330,6 +1331,8 @@ def write_support_bundle(
     payload["log_provenance"] = sanitize_support_value(provenance)
     if last_setup_failure is not None:
         payload["last_setup_failure"] = sanitize_support_value(dict(last_setup_failure))
+    if last_connection_error is not None:
+        payload["last_connection_error"] = sanitize_support_value(dict(last_connection_error))
     condump_content = None
     condump_metadata = dict(support_condump or {})
     support_path = condump_metadata.get("path")
