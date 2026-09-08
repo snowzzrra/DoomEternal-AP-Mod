@@ -2081,12 +2081,31 @@ def received_item_classification(item_id, network_classification):
 RUNTIME_LOCATIONS_FILE = REPO_ROOT / "data" / "runtime_locations.json"
 with open(RUNTIME_LOCATIONS_FILE, encoding="utf-8") as f:
     RUNTIME_LOCATIONS = json.load(f)
+EXULTIA_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
+    "Exultia - Mission Complete"
+]
 CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Cultist Base - Mission Complete"
 ]
 DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
     "Doom Hunter Base - Mission Complete"
 ]
+
+
+def should_materialize_dash(
+    randomize_dash,
+    received,
+    checked_locations,
+    server_checked_ready,
+):
+    if randomize_dash:
+        return 7770015 in received
+    return bool(
+        server_checked_ready
+        and EXULTIA_COMPLETE_LOCATION in checked_locations
+    )
+
+
 CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
 OBSERVER_REGISTRY_REVISION = observer_registry_revision(CHALLENGE_LOCATION_REGISTRY)
 WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
@@ -4161,6 +4180,25 @@ class DoomEternalContext(CommonContext):
             item_id for item_id in selected_receipts
             if item_id not in SUPPORT_RUNE_IDS and item_id not in special_ids
         )
+        if context.campaign != "Base":
+            starting_weapon = slot_data.get("starting_weapon")
+            by_name = {
+                entry["name"]: item_id
+                for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()
+            }
+            starting_weapon_id = by_name.get(starting_weapon)
+            if (
+                starting_weapon_id is not None
+                and start_inventory_eligible(starting_weapon_id)
+            ):
+                skipped_starting_weapon = False
+                filtered_plan_ids = []
+                for item_id in plan_ids:
+                    if item_id == starting_weapon_id and not skipped_starting_weapon:
+                        skipped_starting_weapon = True
+                        continue
+                    filtered_plan_ids.append(item_id)
+                plan_ids = tuple(filtered_plan_ids)
         definitions = {item_id: ITEM_ID_TO_COMMAND[item_id] for item_id in set(plan_ids)}
         policies = {item_id: ITEM_REPLAY_POLICIES[item_id] for item_id in set(plan_ids)}
         reconciliation_slot_identity = stable_spool_id(
@@ -4319,7 +4357,17 @@ class DoomEternalContext(CommonContext):
                     )
 
         dash_commands = []
-        if context.campaign != "Base" and not slot_data.get("randomize_dash", False):
+        randomize_dash = bool(slot_data.get("randomize_dash", False))
+        if (
+            context.campaign != "Base"
+            and not randomize_dash
+            and should_materialize_dash(
+                randomize_dash,
+                received,
+                getattr(self, "checked_locations", ()),
+                getattr(self, "server_checked_locations_ready", False),
+            )
+        ):
             dash_commands.append(
                 ReconciliationCommand(
                     7770015,
@@ -4331,7 +4379,7 @@ class DoomEternalContext(CommonContext):
                         context.identity, "unrandomized-dash",
                     ),
                     "give ability_dash",
-                    "Unrandomized Dash for TAG context",
+                    "Vanilla Dash proven by Exultia mission completion",
                 )
             )
 

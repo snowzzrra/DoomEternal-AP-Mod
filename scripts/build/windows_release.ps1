@@ -59,7 +59,9 @@ Push-Location $repoRoot
 try {
     Invoke-Python @("-c", "import yaml, bsdiff4, PyInstaller, PySide6; print('PYTHON_DEPENDENCIES ok')")
     Invoke-Python @("-m", "tools.release.ci_preflight", "--archipelago-source", $archipelago, "--repo-root", $repoRoot)
-    Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--check", "--repo-root", $repoRoot)
+    if (-not $RebuildRoomResources) {
+        Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--check", "--repo-root", $repoRoot)
+    }
     & (Join-Path $PSScriptRoot "client_windows.ps1") -Preflight
     if ($LASTEXITCODE -ne 0) { throw "MSVC preflight failed" }
     if ($Preflight) {
@@ -93,7 +95,17 @@ try {
 
     $releaseRoot = Join-Path $repoRoot "build\release"
     $handoff = Join-Path $releaseRoot "handoff"
-    if (Test-Path -LiteralPath $handoff) { Remove-Item -LiteralPath $handoff -Recurse -Force }
+    if (Test-Path -LiteralPath $handoff) {
+        try {
+            Remove-Item -LiteralPath $handoff -Recurse -Force -ErrorAction Stop
+        } catch {
+            $handoff = Join-Path $releaseRoot "handoff-$PID"
+            if (Test-Path -LiteralPath $handoff) {
+                Remove-Item -LiteralPath $handoff -Recurse -Force
+            }
+            Write-Warning "Previous handoff is not removable; using isolated handoff: $handoff"
+        }
+    }
     $resources = Join-Path $handoff "shared\resources"
     $clientBuild = Join-Path $releaseRoot "build\client"
     $clientHandoff = Join-Path $handoff "shared\client"

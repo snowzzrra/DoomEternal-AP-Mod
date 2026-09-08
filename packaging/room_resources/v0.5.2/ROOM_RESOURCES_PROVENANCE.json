@@ -3,8 +3,8 @@
     "sha256": "adafa51e832b193636fce637424929730136564f4032884ee783e09c751f837d",
     "size": 11298039
   },
-  "generated_from_apworld_commit": "9cb821b7429dba8b14092d50f55d786397e38521",
-  "generated_from_mod_commit": "e3a0ac5c20b6830ee495c1f4f9e1380bbdcb976f",
+  "generated_from_apworld_commit": "b290e50910ee0d29c189f6228b3c52f9abf4cc82",
+  "generated_from_mod_commit": "da4ea811d964e61d116fc5c8da35ef10899d52da",
   "inputs_count": 260,
   "release_version": "0.5.2",
   "room_payload_manifest": {
@@ -15,7 +15,7 @@
     "sha256": "29f75e654f9f85b655b0d26033ca434677489ad2813731902a396040b718ef4c",
     "size": 2202477
   },
-  "room_resource_input_fingerprint": "3832ccdd60e608eff9cc7a7a37ac6130d8c8b393457f7d237eae32aac1542f87",
+  "room_resource_input_fingerprint": "7857bf2a116d2f588efd9047f1a80ba78604fb19c44ec089f51b50a86ab003af",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -156,7 +156,7 @@
     "data/location_names.json": "8bbaaa99566bdd6f516144721f4626ade84f176ca22ea8e0de3327041db2503a",
     "data/map_sources.json": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
     "data/mission_complete_map_contracts.json": "954b3408fece734062c045e05f1af95388a08b1530a9d8764801ddb017b64e30",
-    "data/options_schema.json": "b67e7c8f8b5afccfb630b7c08b34948bf2795b07bfacf772dfef2aa6fd899825",
+    "data/options_schema.json": "eee97aa6acc68605bca1a136306e7c853213fae79ead97aa19a4dbe4eb57fc8e",
     "data/publisher_contracts.json": "ebe0a8722fea9eb06c5be5d864a3136585c36b2a131a9e593ab23f59033f77e4",
     "data/start_inventory_catalog.json": "7e15567281cfa3bd2585f8122799331ad74bb9a1520732d5333b27b41f4c0eda",
     "doom_eap/content/__init__.py": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
@@ -259,7 +259,7 @@
     "tools/content/compile_content_catalog.py": "46d258c1bfb8918ecd519858946dfc4a96f47db1578a0d57bb6e3ddff124a7c9",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/decls/devinv_builder.py": "2408b79480db088930d8010fcd916abadf9167c1f5e54a9b4e76ab0ad8ee2a49",
+    "tools/decls/devinv_builder.py": "7bd4c6e621022f072e3c533cb52fee1a151f4469a45015553b4721a04410c7ce",
     "tools/decls/mastery_decl_builder.py": "962e3c37efe89547b34680ca13da3f445558b1d5af3f23bdce07282b06498c5b",
     "tools/decls/mission_challenge_decl_builder.py": "5a17ae4bdc807dbe5d46e6bd8b783315254dc5c6f833032cde75c9fdcf007979",
     "tools/decls/rune_decl_builder.py": "883aa7dadd152780f78d6fd98ff58f1942dba08730108ec4dc9e526e838846a5",
