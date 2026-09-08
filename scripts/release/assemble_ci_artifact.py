@@ -90,7 +90,7 @@ def write_deterministic_zip(source_dir: Path, output_zip_path: Path, prefix: str
     temp_zip.replace(output_zip_path)
 
 
-def validate_handoff_structure(handoff_dir: Path) -> dict[str, Any]:
+def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dict[str, Any]:
     """Validate handoff artifact files and manifest."""
     manifest_path = handoff_dir / "BUILD-MANIFEST.json"
     if not manifest_path.is_file():
@@ -119,19 +119,21 @@ def validate_handoff_structure(handoff_dir: Path) -> dict[str, Any]:
                         f"Checksum mismatch in handoff for {rel_path}: expected {expected_hash}, got {actual_hash}"
                     )
 
-    linux_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
-    if not linux_launcher.is_file():
-        raise ValueError(f"Missing Linux launcher at {linux_launcher}")
-    linux_magic = linux_launcher.read_bytes()[:4]
-    if linux_magic != b"\x7fELF":
-        raise ValueError(f"Linux launcher at {linux_launcher} does not have valid ELF magic (got {linux_magic!r})")
+    if platform in {"linux", "both"}:
+        linux_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
+        if not linux_launcher.is_file():
+            raise ValueError(f"Missing Linux launcher at {linux_launcher}")
+        linux_magic = linux_launcher.read_bytes()[:4]
+        if linux_magic != b"\x7fELF":
+            raise ValueError(f"Linux launcher at {linux_launcher} does not have valid ELF magic (got {linux_magic!r})")
 
-    win_launcher = handoff_dir / "windows" / "DoomEternalArchipelagoLauncher.exe"
-    if not win_launcher.is_file():
-        raise ValueError(f"Missing Windows launcher at {win_launcher}")
-    win_magic = win_launcher.read_bytes()[:2]
-    if win_magic != b"MZ":
-        raise ValueError(f"Windows launcher at {win_launcher} does not have valid MZ magic (got {win_magic!r})")
+    if platform in {"windows", "both"}:
+        win_launcher = handoff_dir / "windows" / "DoomEternalArchipelagoLauncher.exe"
+        if not win_launcher.is_file():
+            raise ValueError(f"Missing Windows launcher at {win_launcher}")
+        win_magic = win_launcher.read_bytes()[:2]
+        if win_magic != b"MZ":
+            raise ValueError(f"Windows launcher at {win_launcher} does not have valid MZ magic (got {win_magic!r})")
 
     apworld_file = handoff_dir / "shared" / "doometernal.apworld"
     if not apworld_file.is_file():
@@ -513,6 +515,8 @@ def main() -> int:
     parser.add_argument("--expect-mod-sha", type=str, default=None, help="Expected MOD commit SHA")
     parser.add_argument("--expect-apworld-sha", type=str, default=None, help="Expected APWorld commit SHA")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Path to DoomEternal-AP-Mod repository root")
+    parser.add_argument("--platform", choices=("windows", "linux", "both"), default="both",
+                        help="Build one platform locally, or preserve the cross-platform CI default")
 
     args = parser.parse_args()
 
@@ -557,7 +561,7 @@ def main() -> int:
             return 1
 
         print("--> Validating handoff artifact...")
-        manifest = validate_handoff_structure(extracted_handoff)
+        manifest = validate_handoff_structure(extracted_handoff, args.platform)
         version_label = manifest.get("version_label", "v0.5.2")
 
         if args.version and args.version != version_label:
@@ -571,37 +575,35 @@ def main() -> int:
         if args.expect_apworld_sha and not apworld_sha.startswith(args.expect_apworld_sha):
             raise ValueError(f"APWorld SHA mismatch: handoff says {apworld_sha}, expected {args.expect_apworld_sha}")
 
-        print(f"--> Building Linux release staging tree ({version_label})...")
-        linux_stage = assemble_platform_release("linux", extracted_handoff, repo_root, resources_dir, manifest, temp_stage)
+        stages: dict[str, Path] = {}
+        platforms = ("linux", "windows") if args.platform == "both" else (args.platform,)
+        for platform_name in platforms:
+            print(f"--> Building {platform_name} release staging tree ({version_label})...")
+            stages[platform_name] = assemble_platform_release(
+                platform_name, extracted_handoff, repo_root, resources_dir, manifest, temp_stage
+            )
+        if args.platform == "both":
+            print("--> Running platform parity audit...")
+            audit_platform_parity(stages["linux"], stages["windows"])
 
-        print(f"--> Building Windows release staging tree ({version_label})...")
-        windows_stage = assemble_platform_release("windows", extracted_handoff, repo_root, resources_dir, manifest, temp_stage)
-
-        print("--> Running platform parity audit...")
-        audit_platform_parity(linux_stage, windows_stage)
-
-        linux_zip_name = f"DoomEternalArchipelago-{version_label}-linux-x86_64.zip"
-        windows_zip_name = f"DoomEternalArchipelago-{version_label}-windows-x86_64.zip"
-
-        linux_zip_path = output_dir / linux_zip_name
-        windows_zip_path = output_dir / windows_zip_name
-
-        print(f"--> Creating {linux_zip_name}...")
-        write_deterministic_zip(linux_stage, linux_zip_path)
-        audit_final_zip(linux_zip_path, "linux", repo_root=repo_root)
-
-        print(f"--> Creating {windows_zip_name}...")
-        write_deterministic_zip(windows_stage, windows_zip_path)
-        audit_final_zip(windows_zip_path, "windows", repo_root=repo_root)
+        archives: list[Path] = []
+        for platform_name in platforms:
+            archive = output_dir / f"DoomEternalArchipelago-{version_label}-{platform_name}-x86_64.zip"
+            print(f"--> Creating {archive.name}...")
+            write_deterministic_zip(stages[platform_name], archive)
+            audit_final_zip(archive, platform_name, repo_root=repo_root)
+            archives.append(archive)
 
         sums_file = output_dir / "SHA256SUMS.txt"
-        sums_content = f"{sha256_file(linux_zip_path)}  {linux_zip_name}\n{sha256_file(windows_zip_path)}  {windows_zip_name}\n"
-        sums_file.write_text(sums_content, encoding="utf-8")
+        sums_file.write_text(
+            "".join(f"{sha256_file(path)}  {path.name}\n" for path in archives),
+            encoding="utf-8", newline="\n",
+        )
 
         print("\n=======================================================")
         print("PUBLIC RELEASE PACKAGES ASSEMBLED SUCCESSFULLY!")
-        print(f"Linux ZIP:    {linux_zip_path} ({linux_zip_path.stat().st_size} bytes)")
-        print(f"Windows ZIP:  {windows_zip_path} ({windows_zip_path.stat().st_size} bytes)")
+        for archive in archives:
+            print(f"Release ZIP:  {archive} ({archive.stat().st_size} bytes)")
         print(f"Checksums:    {sums_file}")
         print("=======================================================")
 

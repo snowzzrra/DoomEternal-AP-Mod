@@ -1,18 +1,23 @@
 [CmdletBinding()]
 param(
     [string]$OutputDir = "build\\release\\build\\client",
-    [switch]$UseCurrentToolchain
+    [switch]$UseCurrentToolchain,
+    [switch]$Preflight
 )
 
 $ErrorActionPreference = "Stop"
 
 function Invoke-NativeBuild {
-    param([string]$RepositoryRoot, [string]$BuildDirectory)
+    param([string]$RepositoryRoot, [string]$BuildDirectory, [switch]$PreflightOnly)
 
     foreach ($tool in "cl.exe", "link.exe", "midl.exe", "dumpbin.exe") {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
             throw "MSVC x64 toolchain is not active: missing $tool. Install Visual Studio 2022 Build Tools with Desktop development with C++."
         }
+    }
+    if ($PreflightOnly) {
+        Write-Output "NATIVE_CLIENT_PREFLIGHT toolchain=msvc-x64 status=PASS"
+        return
     }
 
     if (Test-Path -LiteralPath $BuildDirectory) {
@@ -109,10 +114,11 @@ if (-not $UseCurrentToolchain) {
     if (-not $installation -or -not (Test-Path -LiteralPath $developerCommand)) {
         throw "Visual Studio Build Tools x64 components were not found. Install the Desktop development with C++ workload."
     }
-    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -UseCurrentToolchain' -f $developerCommand, $PSCommandPath, $buildDirectory
+    $preflightArgument = if ($Preflight) { " -Preflight" } else { "" }
+    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -UseCurrentToolchain{3}' -f $developerCommand, $PSCommandPath, $buildDirectory, $preflightArgument
     & cmd.exe /d /s /c $command
     if ($LASTEXITCODE -ne 0) { throw "Native Windows build failed with exit code $LASTEXITCODE" }
     exit 0
 }
 
-Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory
+Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory -PreflightOnly:$Preflight

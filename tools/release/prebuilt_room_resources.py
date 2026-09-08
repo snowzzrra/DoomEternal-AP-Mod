@@ -232,6 +232,46 @@ def export_prebuilt_room_resources(
     return result
 
 
+def publish_prebuilt_room_resources(
+    source_dir: Path, bundle_dir: Path, *, repo_root: Path, expected_version: str,
+    mod_commit: str, apworld_commit: str,
+) -> dict[str, Any]:
+    """Publish compiler outputs as the canonical, fingerprinted authorial boundary."""
+    source = source_dir.resolve()
+    bundle = bundle_dir.resolve()
+    for filename in CANONICAL_RESOURCE_FILENAMES:
+        if not (source / filename).is_file():
+            raise ValueError(f"room compiler output missing: {source / filename}")
+    fingerprint, source_hashes = compute_room_resource_input_fingerprint(repo_root)
+    bundle.mkdir(parents=True, exist_ok=True)
+    for filename in CANONICAL_RESOURCE_FILENAMES:
+        shutil.copy2(source / filename, bundle / filename)
+    records = {
+        filename: {"sha256": sha256_file(bundle / filename), "size": (bundle / filename).stat().st_size}
+        for filename in CANONICAL_RESOURCE_FILENAMES
+    }
+    provenance = {
+        "schema_version": 1,
+        "release_version": expected_version.lstrip("v"),
+        "generated_from_mod_commit": mod_commit,
+        "generated_from_apworld_commit": apworld_commit,
+        "room_resource_input_fingerprint": fingerprint,
+        "inputs_count": len(source_hashes),
+        "source_hashes": source_hashes,
+        "base_mod": records["base_mod.zip"],
+        "room_payloads": records["room_payloads.zip"],
+        "room_payload_manifest": records["room_payload_manifest.json"],
+    }
+    (bundle / "ROOM_RESOURCES_PROVENANCE.json").write_text(
+        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
+    (bundle / "SHA256SUMS.txt").write_text(
+        "".join(f"{records[name]['sha256']}  {name}\n" for name in CANONICAL_RESOURCE_FILENAMES),
+        encoding="utf-8", newline="\n",
+    )
+    return validate_prebuilt_room_resources(bundle, repo_root, expected_version)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate or export prebuilt room compiler resources.")
     parser.add_argument("--check", action="store_true", help="Validate frozen room resources bundle")
@@ -239,13 +279,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bundle-dir", type=Path, default=None, help="Path to frozen room resources bundle")
     parser.add_argument("--version", type=str, default="0.5.2", help="Expected release version")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Repository root path")
+    parser.add_argument("--publish-from", type=Path, help="Publish compiler outputs into the canonical bundle")
+    parser.add_argument("--mod-commit")
+    parser.add_argument("--apworld-commit")
 
     args = parser.parse_args(argv)
     repo_root = args.repo_root.resolve()
     bundle_dir = (args.bundle_dir or get_frozen_bundle_dir(repo_root, args.version)).resolve()
 
     try:
-        if args.export_dir is not None:
+        if args.publish_from is not None:
+            if not args.mod_commit or not args.apworld_commit:
+                parser.error("--publish-from requires --mod-commit and --apworld-commit")
+            res = publish_prebuilt_room_resources(
+                args.publish_from, bundle_dir, repo_root=repo_root, expected_version=args.version,
+                mod_commit=args.mod_commit, apworld_commit=args.apworld_commit,
+            )
+        elif args.export_dir is not None:
             res = export_prebuilt_room_resources(
                 bundle_dir=bundle_dir,
                 target_dir=args.export_dir,

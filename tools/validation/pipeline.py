@@ -733,7 +733,9 @@ class Pipeline:
         if not tests:
             return
         env = os.environ.copy()
-        env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}:{env.get('PYTHONPATH', '')}"
+        env["PYTHONPATH"] = os.pathsep.join(
+            value for value in (str(ARCHIPELAGO), str(ROOT), env.get("PYTHONPATH", "")) if value
+        )
         env["SKIP_REQUIREMENTS_UPDATE"] = "1"
         command = [sys.executable, "-m", "pytest"]
         command.extend(tests)
@@ -865,6 +867,13 @@ class Pipeline:
 
     def playtest(self) -> None:
         """Create a candidate through cheap checks, materialization, and artifact smoke."""
+        if os.name == "nt":
+            with self.timed("windows-assembler"):
+                _run([
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                    str(ROOT / "scripts" / "build" / "windows_release.ps1"),
+                ])
+            return
         self.preflight()
         self.materialize_compiled_content()
         self.package_preflight()
@@ -888,9 +897,9 @@ class Pipeline:
             self.preflight()
             self.apworld_contract_smoke()
             with self.timed("seed-smoke-generate"):
-                python = ARCHIPELAGO / ".venv" / "bin" / "python"
+                python = self._archipelago_python()
                 env = os.environ.copy()
-                env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
+                env["PYTHONPATH"] = os.pathsep.join((str(ARCHIPELAGO), str(ROOT)))
                 env["SKIP_REQUIREMENTS_UPDATE"] = "1"
                 smoke_root = CACHE_ROOT / "seed-smoke"
                 smoke_root.mkdir(parents=True, exist_ok=True)
@@ -1120,9 +1129,9 @@ class Pipeline:
 
     def apworld_contract_smoke(self, tests: Sequence[str] = ()) -> None:
         with self.timed("apworld-contract"):
-            python = ARCHIPELAGO / ".venv" / "bin" / "python"
+            python = self._archipelago_python()
             env = os.environ.copy()
-            env["PYTHONPATH"] = f"{ARCHIPELAGO}:{ROOT}"
+            env["PYTHONPATH"] = os.pathsep.join((str(ARCHIPELAGO), str(ROOT)))
             env["AP_TEST_WORLDS"] = "doometernal"
             contract = (
                 "from worlds.doometernal import DoomEternalWorld; "
@@ -1137,6 +1146,25 @@ class Pipeline:
             )
             if tests:
                 self._run_focused_tests(tests)
+
+    @staticmethod
+    def _archipelago_python() -> Path:
+        configured = os.environ.get("ARCHIPELAGO_PYTHON")
+        candidates = [Path(configured)] if configured else []
+        if os.name == "nt":
+            candidates.extend((
+                ROOT.parent / ".venv-windows" / "Scripts" / "python.exe",
+                ARCHIPELAGO / ".venv-windows" / "Scripts" / "python.exe",
+                Path(sys.executable),
+            ))
+        else:
+            candidates.extend((ARCHIPELAGO / ".venv" / "bin" / "python", Path(sys.executable)))
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate.resolve()
+        raise RuntimeError(
+            "No Archipelago-capable Python found; set ARCHIPELAGO_PYTHON to the canonical interpreter"
+        )
 
     def release(
         self,
@@ -1164,7 +1192,14 @@ class Pipeline:
             env["AP_PIPELINE_RECEIPT"] = str(receipt)
             env["AP_PIPELINE_ARTIFACT_ROOT"] = document["artifact_root"]
             env["AP_PIPELINE_DEEP_AUDIT"] = "1"
-            _run(["bash", "scripts/build/playable_test.sh"], env=env)
+            if os.name == "nt":
+                _run([
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                    str(ROOT / "scripts" / "build" / "windows_release.ps1"),
+                    "-SkipValidation", "-PipelineReceipt", str(receipt),
+                ], env=env)
+            else:
+                _run(["bash", "scripts/build/playable_test.sh"], env=env)
             self.package_preflight()
         return receipt, artifacts
 

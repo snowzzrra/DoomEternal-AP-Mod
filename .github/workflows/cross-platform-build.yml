@@ -147,11 +147,19 @@ jobs:
     needs: [resolve-metadata, preflight]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout MOD repository
+        uses: actions/checkout@v4
+        with:
+          repository: snowzzrra/DoomEternal-AP-Mod
+          ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
+          path: DoomEternal-AP-Mod
+
       - name: Checkout APWorld repository
         uses: actions/checkout@v4
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
+          path: Archipelago
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -160,47 +168,17 @@ jobs:
 
       - name: Package doometernal.apworld
         run: |
-          python3 - <<'PY'
-          import os
-          import stat
-          import zipfile
-          from pathlib import Path
-
-          world_dir = Path("worlds/doometernal")
-          if not (world_dir / "__init__.py").is_file():
-            raise RuntimeError(f"worlds/doometernal/__init__.py not found in {Path.cwd()}")
-
-          out_dir = Path("build/artifacts")
-          out_dir.mkdir(parents=True, exist_ok=True)
-          out_zip = out_dir / "doometernal.apworld"
-
-          forbidden = {".git", "__pycache__", ".pytest_cache", ".serena", "test", "tests", ".cache"}
-          files_to_add = []
-          for root, dirs, files in os.walk(world_dir):
-            dirs[:] = sorted([d for d in dirs if d not in forbidden])
-            for f in sorted(files):
-              if f.endswith((".pyc", ".pyo")) or f.startswith("."):
-                continue
-              full_path = Path(root) / f
-              rel_path = full_path.relative_to(world_dir.parent).as_posix()
-              files_to_add.append((rel_path, full_path))
-
-          with zipfile.ZipFile(out_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            for arcname, full_path in files_to_add:
-              zinfo = zipfile.ZipInfo(arcname)
-              zinfo.date_time = (2026, 1, 1, 0, 0, 0)
-              zinfo.external_attr = (0o644 | stat.S_IFREG) << 16
-              zinfo.compress_type = zipfile.ZIP_DEFLATED
-              zf.writestr(zinfo, full_path.read_bytes())
-
-          print(f"APWorld created: {out_zip} ({out_zip.stat().st_size} bytes, {len(files_to_add)} files)")
-          PY
+          cd DoomEternal-AP-Mod
+          python -m tools.release.apworld_cache \
+            --output build/artifacts/doometernal.apworld \
+            --archipelago-source ../Archipelago \
+            --archipelago-python "$(command -v python)"
 
       - name: Upload APWorld Artifact
         uses: actions/upload-artifact@v4
         with:
           name: apworld-artifact
-          path: build/artifacts/doometernal.apworld
+          path: DoomEternal-AP-Mod/build/artifacts/doometernal.apworld
           retention-days: 1
 
   build-native-support:
@@ -370,6 +348,18 @@ jobs:
       - build-windows-launcher
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout MOD repository
+        uses: actions/checkout@v4
+        with:
+          repository: snowzzrra/DoomEternal-AP-Mod
+          ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
+          path: DoomEternal-AP-Mod
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Create Handoff Directory Structure
         run: |
           mkdir -p DoomEAP-build-handoff/linux
@@ -409,88 +399,21 @@ jobs:
 
       - name: Generate Manifest and Checksums
         run: |
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
+          cd DoomEternal-AP-Mod
+          python -m tools.release.handoff \
+            --root ../DoomEAP-build-handoff \
+            --version '${{ needs.resolve-metadata.outputs.version_label }}' \
+            --mod-ref '${{ github.event.inputs.mod_ref }}' \
+            --mod-sha '${{ needs.resolve-metadata.outputs.mod_resolved_sha }}' \
+            --apworld-ref '${{ github.event.inputs.apworld_ref }}' \
+            --apworld-sha '${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}' \
+            --platform both
 
-          handoff_dir = Path("DoomEAP-build-handoff")
-          
-          # Check required files
-          lin_launcher = handoff_dir / "linux/DoomEternalArchipelagoLauncher"
-          win_launcher = handoff_dir / "windows/DoomEternalArchipelagoLauncher.exe"
-          apworld = handoff_dir / "shared/doometernal.apworld"
-          ap_client = handoff_dir / "shared/client/ap_client.exe"
-          base_mod = handoff_dir / "shared/resources/base_mod.zip"
-          payloads = handoff_dir / "shared/resources/room_payloads.zip"
-          room_manifest = handoff_dir / "shared/resources/room_payload_manifest.json"
-
-          for f in [lin_launcher, win_launcher, apworld, ap_client, base_mod, payloads, room_manifest]:
-            if not f.is_file():
-              raise RuntimeError(f"Missing required handoff file: {f}")
-
-          def sha256(p: Path) -> str:
-            h = hashlib.sha256()
-            with p.open("rb") as fp:
-              while chunk := fp.read(65536):
-                h.update(chunk)
-            return h.hexdigest()
-
-          files_record = []
-          sums_lines = []
-          for root, _, files in os.walk(handoff_dir):
-            for f in sorted(files):
-              if f in {"BUILD-MANIFEST.json", "SHA256SUMS.txt"}:
-                continue
-              p = Path(root) / f
-              rel = p.relative_to(handoff_dir).as_posix()
-              digest = sha256(p)
-              size = p.stat().st_size
-              role = "launcher" if "Launcher" in f else ("apworld" if f.endswith(".apworld") else ("room-resource" if "resources" in rel else "native-client"))
-              files_record.append({
-                  "path": rel,
-                  "sha256": digest,
-                  "size": size,
-                  "role": role,
-              })
-              sums_lines.append(f"{digest}  {rel}")
-
-          manifest = {
-              "schema_version": 1,
-              "version_label": "${{ needs.resolve-metadata.outputs.version_label }}",
-              "mod": {
-                  "requested_ref": "${{ github.event.inputs.mod_ref }}",
-                  "resolved_sha": "${{ needs.resolve-metadata.outputs.mod_resolved_sha }}",
-              },
-              "apworld": {
-                  "requested_ref": "${{ github.event.inputs.apworld_ref }}",
-                  "resolved_sha": "${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}",
-              },
-              "build": {
-                  "linux_runner": "ubuntu-latest",
-                  "windows_runner": "windows-latest",
-                  "python_version_linux": "3.12",
-                  "python_version_windows": "3.12",
-                  "pyinstaller_version_linux": "PyInstaller (requirements-launcher.txt)",
-                  "pyinstaller_version_windows": "PyInstaller (requirements-launcher.txt)",
-                  "native_client_toolchain_identity": "MSVC x64 / MIDL",
-              },
-              "files": files_record,
-          }
-
-          (handoff_dir / "BUILD-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-          (handoff_dir / "SHA256SUMS.txt").write_text("\n".join(sums_lines) + "\n", encoding="utf-8")
-          print("BUILD-MANIFEST.json and SHA256SUMS.txt generated successfully.")
-          PY
-
-      - name: Validate Handoff Integrity
+      - name: Restore Linux Launcher Executable Bit
         run: |
           cd DoomEAP-build-handoff
-          sha256sum -c SHA256SUMS.txt
           chmod +x linux/DoomEternalArchipelagoLauncher
           test -x linux/DoomEternalArchipelagoLauncher
-          echo "Handoff bundle validated successfully."
 
       - name: Upload Cross-Platform Build Handoff Artifact
         uses: actions/upload-artifact@v4

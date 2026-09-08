@@ -9,14 +9,19 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import zipfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from tools.release.build_cache import content_key, publish, restore
+
+APWORLD_ZIP_EPOCH = (2026, 1, 1, 0, 0, 0)
 
 
 def _sha256(path: Path) -> str:
@@ -133,6 +138,38 @@ def apworld_fingerprint(apworld_root: Path) -> str:
     ).hexdigest()
 
 
+def canonicalize_native_apworld(path: Path) -> None:
+    """Normalize metadata only after Archipelago's native builder chose content."""
+    with zipfile.ZipFile(path, "r") as source:
+        infos = source.infolist()
+        names = [info.filename for info in infos]
+        if len(names) != len(set(names)):
+            raise RuntimeError("native APWorld contains duplicate members")
+        members = {info.filename: source.read(info) for info in infos if not info.is_dir()}
+
+    manifest_name = "doometernal/archipelago.json"
+    if manifest_name not in members:
+        raise RuntimeError(f"native APWorld is missing {manifest_name}")
+    manifest = json.loads(members[manifest_name].decode("utf-8"))
+    if (
+        manifest.get("game") != "DOOM Eternal"
+        or manifest.get("compatible_version") != 7
+        or not isinstance(manifest.get("version"), int)
+    ):
+        raise RuntimeError(f"native APWorld manifest contract is invalid: {manifest!r}")
+    if any(Path(name).is_absolute() or ".." in Path(name).parts for name in members):
+        raise RuntimeError("native APWorld contains an unsafe member")
+
+    temporary = path.with_suffix(".canonicalizing")
+    with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as output:
+        for name in sorted(members):
+            info = zipfile.ZipInfo(name, APWORLD_ZIP_EPOCH)
+            info.external_attr = (0o100644 << 16)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            output.writestr(info, members[name])
+    temporary.replace(path)
+
+
 def plan_apworld_build(
     *,
     python: str,
@@ -213,8 +250,12 @@ def build_apworld(
         ],
         config={
             "command": "Launcher.py Build APWorlds -- DOOM Eternal --skip_open_folder",
-            "python": archipelago_python,
+            "python": str(Path(archipelago_python).resolve()),
             "python_identity": python_identity,
+            "platform": sys.platform,
+            "os": os.name,
+            "machine": platform.machine(),
+            "architecture": platform.architecture()[0],
         },
     )
     cache_root = cache_root or Path(os.environ.get("AP_BUILD_CACHE_ROOT", REPO_ROOT / ".cache/ap-build"))
@@ -226,6 +267,8 @@ def build_apworld(
     print(f"APWORLD cache=miss reason={reason} key={key}")
     candidate = archipelago_source / "build/apworlds/doometernal.apworld"
     candidate.unlink(missing_ok=True)
+    build_env = os.environ.copy()
+    build_env["SKIP_REQUIREMENTS_UPDATE"] = "1"
     subprocess.run(
         (
             archipelago_python,
@@ -237,9 +280,11 @@ def build_apworld(
         ),
         check=True,
         cwd=archipelago_source,
+        env=build_env,
     )
     if not candidate.is_file() or candidate.is_symlink():
         raise RuntimeError(f"canonical APWorld build did not produce {candidate}")
+    canonicalize_native_apworld(candidate)
     output.unlink(missing_ok=True)
     shutil.copyfile(candidate, output)
     publish(cache_root, "apworld", key, output.parent, (output.name,))
