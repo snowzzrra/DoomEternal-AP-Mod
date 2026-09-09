@@ -7,16 +7,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-def discard_unclaimed_command(queue_dir, coalesce_key: str) -> bool:
-    """Remove only producer-owned .cmd; consumer exclusively owns .processing."""
-    command = queue_dir / f"{coalesce_key}.cmd"
-    try:
-        command.unlink()
-    except FileNotFoundError:
-        return False
-    return True
-
-
 class ReceiveState(str, Enum):
     RECEIVED = "RECEIVED"
     WAITING_FOR_SAFE_GAMEPLAY = "WAITING_FOR_SAFE_GAMEPLAY"

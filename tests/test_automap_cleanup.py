@@ -1,3 +1,4 @@
+import importlib
 import sys
 import time
 from pathlib import Path
@@ -10,41 +11,37 @@ if str(ARCHIPELAGO_ROOT) not in sys.path:
     sys.path.insert(0, str(ARCHIPELAGO_ROOT))
 
 from doom_eap.runtime.bridge_client import (
-    DoomEternalContext,
     MAP_ENTITY_SAFE,
     CHECKED_VISUAL_HIDE,
 )
 
 
 def _create_test_context():
-    context = object.__new__(DoomEternalContext)
+    # Runtime verification deliberately reloads this module; patch and construct
+    # the same current module instead of retaining an earlier class's globals.
+    bridge = importlib.import_module("doom_eap.runtime.bridge_client")
+    context = object.__new__(bridge.DoomEternalContext)
     context.state_key = "room:test:1"
     context.session_state = {}
     context.runtime_effects_ready = lambda *args, **kwargs: True
     context.get_ap_state_key = lambda: "room:test:1"
     context.server_checked_locations_ready = True
     context.checked_locations = {7770021}
-    context.automap_cleanup_session = "test_sess"
-    context.automap_cleanup_epoch = None
-    context.automap_cleanup_submitted = set()
-    context.automap_cleanup_retry = {}
-    context.automap_cleanup_status = {}
-    context.automap_local_cleanup_owned = set()
-    context.cached_map_identity = None
-    context.current_map_name = None
+    context.checked_visuals = bridge.CheckedVisuals(bridge.KNOWN_CATALOG_MAPS, bridge.AUTOMAP_VISUALS_BY_MAP, "test_sess", bridge.logger)
+    context.runtime_lifecycle = bridge.RuntimeLifecycle()
     return context
 
 
 class TestAutomapCleanup(unittest.TestCase):
     def test_current_exultia_marker_plus_stale_hub_epoch_submits_only_with_exultia_epoch(self):
         context = _create_test_context()
-        context.automap_cleanup_epoch = "2:1788279760388090513"
-        context.cached_map_identity = {
+        context.checked_visuals.advance_epoch("2:1788279760388090513")
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": "3:1788279760388090599",
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
-        }
-        context.current_map_name = "game/sp/e1m2_battle/e1m2_battle"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e1m2_battle/e1m2_battle"})
 
         sent = []
         with patch("doom_eap.runtime.bridge_client.send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True):
@@ -61,12 +58,12 @@ class TestAutomapCleanup(unittest.TestCase):
 
     def test_map_marker_mismatch_writes_no_spool(self):
         context = _create_test_context()
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": "3:1788279760388090599",
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
-        }
-        context.current_map_name = "game/sp/hub/hub"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/hub/hub"})
 
         sent = []
         with patch("doom_eap.runtime.bridge_client.send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True):
@@ -78,12 +75,12 @@ class TestAutomapCleanup(unittest.TestCase):
 
     def test_failed_queue_submission_retries_after_backoff(self):
         context = _create_test_context()
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": "3:1788279760388090599",
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
-        }
-        context.current_map_name = "game/sp/e1m2_battle/e1m2_battle"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e1m2_battle/e1m2_battle"})
 
         sent_count = 0
         def fake_send_command_fail(*args, **kwargs):
@@ -120,12 +117,12 @@ class TestAutomapCleanup(unittest.TestCase):
 
     def test_successful_queue_submission_remains_terminal_across_events(self):
         context = _create_test_context()
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": "3:1788279760388090599",
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
-        }
-        context.current_map_name = "game/sp/e1m2_battle/e1m2_battle"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e1m2_battle/e1m2_battle"})
 
         sent = []
         with patch("doom_eap.runtime.bridge_client.send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True):
@@ -145,12 +142,12 @@ class TestAutomapCleanup(unittest.TestCase):
 
     def test_new_gameplay_epoch_permits_one_new_submission(self):
         context = _create_test_context()
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": "3:1788279760388090599",
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
-        }
-        context.current_map_name = "game/sp/e1m2_battle/e1m2_battle"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e1m2_battle/e1m2_battle"})
 
         sent = []
         with patch("doom_eap.runtime.bridge_client.send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True):
@@ -165,11 +162,11 @@ class TestAutomapCleanup(unittest.TestCase):
                 self.assertEqual(len(sent), 1)
 
                 # Transition to Epoch 2
-                context.cached_map_identity = {
+                context.runtime_lifecycle.accept_marker({
                     "gameplay_epoch": "4:1788279760388099999",
                     "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
                     "map_key": "e1m2_war",
-                }
+                }, None)
                 self.assertTrue(context.reconcile_checked_automap_cleanup("epoch2"))
                 self.assertEqual(len(sent), 2)
                 self.assertEqual(sent[1][1]["materialization_lease"], "4:1788279760388099999")
@@ -181,15 +178,15 @@ class TestAutomapCleanup(unittest.TestCase):
     def test_local_pickup_cleanup_ownership_suppresses_reconciliation(self):
         context = _create_test_context()
         epoch = "3:1788279760388090599"
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "gameplay_epoch": epoch,
             "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
             "map_key": "e1m2_war",
             "mtime_ns": 1000,
-        }
-        context.automap_cleanup_epoch = epoch
-        context.current_map_name = "game/sp/e1m2_battle/e1m2_battle"
-        context.automap_local_cleanup_owned.add((epoch, 7770021))
+        }, None)
+        context.checked_visuals.advance_epoch(epoch)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e1m2_battle/e1m2_battle"})
+        context.checked_visuals.record_local_ownership(7770021, map_identity=context.runtime_lifecycle.map_identity, room_identity=context.get_ap_state_key(), event_mtime=1000)
 
         sent = []
         with patch("doom_eap.runtime.bridge_client.send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True):

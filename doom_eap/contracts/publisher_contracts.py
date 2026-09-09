@@ -1,17 +1,12 @@
-"""Declarative runtime publisher contracts shared by compiler and bridge."""
+"""Pure publisher models and validation shared by compiler and runtime."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ROOT = REPO_ROOT
-CONTRACT_PATH = REPO_ROOT / "data" / "publisher_contracts.json"
 TRIGGER_STRATEGIES = frozenset({"native_transition", "map_event_file", "terminal_owner"})
 EFFECT_STRATEGIES = frozenset({
     "location_check", "campaign_goal", "preserved_native_target",
@@ -163,16 +158,6 @@ def publisher_contracts_from_document(
     return tuple(result)
 
 
-def load_publisher_contracts(path: Path | None = None) -> tuple[PublisherContract, ...]:
-    if path is None and (ROOT / "content" / "maps").is_dir():
-        from doom_eap.content.content_catalog import load_content_catalog
-        return load_content_catalog().publishers
-    path = path or CONTRACT_PATH
-    return publisher_contracts_from_document(
-        json.loads(path.read_text(encoding="utf-8"))
-    )
-
-
 def publisher_contracts_document(publishers) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -236,3 +221,44 @@ def map_publishers_for_owner(
         ),
         key=lambda publisher: publisher.key,
     ))
+
+
+class PublisherEngine:
+    """Generic publisher discovery; effect execution remains caller-owned."""
+
+    def __init__(self, publishers: tuple[PublisherContract, ...]):
+        self.publishers = publishers
+        self.publishers_by_trigger = publishers_by_trigger(publishers)
+
+    def observe(
+        self,
+        strategy: str,
+        payload: Mapping[str, Any],
+    ) -> tuple[PublisherContract, ...]:
+        return self.publishers_by_trigger.get(trigger_key(strategy, payload), ())
+
+
+def effect_acknowledged(
+    effect: Mapping,
+    checked_locations: Iterable[int],
+    goal_sent: bool,
+) -> bool:
+    strategy = effect["strategy"]
+    if strategy == "location_check":
+        return effect["location_id"] in checked_locations
+    if strategy == "campaign_goal":
+        return goal_sent
+    if strategy == "preserved_native_target":
+        return True
+    raise ValueError(f"unsupported publisher effect: {strategy}")
+
+
+def publisher_acknowledged(
+    publisher: PublisherContract,
+    checked_locations: Iterable[int],
+    goal_sent: bool,
+) -> bool:
+    checked = set(checked_locations)
+    return all(effect_acknowledged(effect, checked, goal_sent) for effect in publisher.effects)
+
+

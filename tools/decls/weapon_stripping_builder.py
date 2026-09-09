@@ -138,7 +138,7 @@ def main() -> int:
     args = parser.parse_args()
     audit = build_weapon_stripping_overrides(args.mod_root)
     args.audit_output.parent.mkdir(parents=True, exist_ok=True)
-    args.audit_output.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     return 0
 
 

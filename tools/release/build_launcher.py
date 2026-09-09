@@ -120,6 +120,11 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
 
     build_root = RELEASE_ROOT / "build/launcher"
     build_root.mkdir(parents=True, exist_ok=True)
+    from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
+    import json
+    source_identity = build_root / "compiler_source_identity.json"
+    source_identity.write_text(json.dumps(compiler_source_document(capture_compiler_sources(REPO_ROOT)),
+                                          sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     data_separator = os.pathsep
     command = [
         sys.executable,
@@ -151,6 +156,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
         "--add-data",
         f"{REPO_ROOT / 'content'}{data_separator}content",
+        "--add-data",
+        f"{source_identity}{data_separator}data",
         "--collect-data",
         "certifi",
         "--copy-metadata",

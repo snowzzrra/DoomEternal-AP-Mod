@@ -134,9 +134,10 @@ class TestNativeRpcTimingSemantics:
 
     def test_cpp_queue_policy_native_execution(self):
         """Compile and execute rpc_queue_policy.h against native C++ types if g++ is available."""
-        cxx = shutil.which("g++")
+        msvc = shutil.which("cl.exe")
+        cxx = msvc or shutil.which("g++")
         if not cxx:
-            pytest.skip("g++ not available on host")
+            pytest.skip("MSVC or g++ not available on host")
 
         source = """#include <cassert>
 #include <cstdint>
@@ -198,15 +199,17 @@ int main() {
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             source_file = temp_path / "test_main.cpp"
-            binary_file = temp_path / "test_bin"
+            binary_file = temp_path / ("test_bin.exe" if msvc else "test_bin")
             source_file.write_text(source, encoding="utf-8")
 
             build_res = subprocess.run(
-                [cxx, "-std=c++17", f"-I{REPO_ROOT}", str(source_file), "-o", str(binary_file)],
+                ([cxx, "/nologo", "/std:c++17", "/EHsc", f"/I{REPO_ROOT}", str(source_file),
+                  f"/Fe{binary_file}", f"/Fo{temp_path / 'test_main.obj'}"] if msvc else
+                 [cxx, "-std=c++17", f"-I{REPO_ROOT}", str(source_file), "-o", str(binary_file)]),
                 capture_output=True,
                 text=True,
             )
-            assert build_res.returncode == 0, f"C++ compilation failed: {build_res.stderr}"
+            assert build_res.returncode == 0, f"C++ compilation failed: {build_res.stdout}\n{build_res.stderr}"
 
             run_res = subprocess.run([str(binary_file)], capture_output=True, text=True)
             assert run_res.returncode == 0, f"C++ test execution failed: {run_res.stderr}"

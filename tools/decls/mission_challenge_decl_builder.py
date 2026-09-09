@@ -451,7 +451,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         relative = entry["completion_owner"]["path"]
         target = mod_root / CHILD_TARGET_OWNER / "generated" / "decls" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(_reward_free_override(entry), encoding="utf-8")
+        target.write_text(_reward_free_override(entry), encoding="utf-8", newline="\n")
         written_paths.append(target.as_posix())
     if len(written_paths) != len(entries) or len(written_paths) != len(set(written_paths)):
         raise ValueError("Mission Challenge override set is incomplete or has duplicates")
@@ -464,7 +464,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         / AGGREGATE_LIST_PATH
     )
     aggregate_target.parent.mkdir(parents=True, exist_ok=True)
-    aggregate_target.write_text(aggregate_override, encoding="utf-8")
+    aggregate_target.write_text(aggregate_override, encoding="utf-8", newline="\n")
     written_paths.append(aggregate_target.as_posix())
     return {
         "child_owner": CHILD_TARGET_OWNER,
@@ -489,7 +489,7 @@ def main() -> int:
     parser.add_argument("--audit-output", type=Path, required=True)
     args = parser.parse_args()
     audit = build_mission_challenge_overrides(args.mod_root)
-    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     return 0
 
 

@@ -89,6 +89,11 @@ def _run_self_test(arguments: list[str]) -> int:
             if not any(k.startswith(prefix) for k in tag_overrides):
                 raise RuntimeError(f"TAG DevInv build missing output for {prefix}")
         print(f"  [OK] Bundled TAG DevInv overrides verified ({len(tag_overrides)} declarations)")
+        from doom_eap.content.compiler_identity import load_compiler_source_identity
+        compiler_identity = load_compiler_source_identity(bundle_dir, frozen=getattr(sys, "frozen", False))
+        if "doom_eap/launcher/launcher_core.py" not in compiler_identity["source_hashes"]:
+            raise RuntimeError("Bundled compiler identity omits launcher_core")
+        print(f"  [OK] Compiler source identity verified ({len(compiler_identity['source_hashes'])} modules)")
     except Exception as e:
         print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
         return 1

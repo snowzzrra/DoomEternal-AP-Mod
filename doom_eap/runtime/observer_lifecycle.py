@@ -142,22 +142,6 @@ SAVE_OBSERVER_POLICY = EvidencePolicy(
 )
 
 
-def unlockable_record_complete(record: Mapping, signal: Mapping) -> bool:
-    expected_count = signal.get("rule_0_statCount")
-    return (
-        int(record.get("numUnlockableRules", -1)) == signal["numUnlockableRules"]
-        and record.get("rule_0_statname") == signal["rule_0_statname"]
-        and (
-            expected_count is None
-            or int(record.get("rule_0_statCount", -1)) >= expected_count
-        )
-        and int(record.get("rule_0_statDuration", -1))
-        == signal["rule_0_statDuration"]
-        and bool(record.get("rule_0_satisfied", False))
-        is signal["rule_0_satisfied"]
-        and bool(record.get("unlockableIsUnlocked", False))
-        is signal["unlockableIsUnlocked"]
-    )
 
 
 def doom_process_running() -> bool:
@@ -266,74 +250,3 @@ def observer_registry_revision(registry_path: Path | Mapping) -> str:
     }
     encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
-
-
-class SaveObserverBaselineStore:
-    """Persistent false→true edges bound to AP identity and Doom save slot."""
-
-    def __init__(self, state: dict):
-        self.state = state.setdefault("observer_baselines", {})
-
-    @staticmethod
-    def binding_key(
-        *,
-        session_identity: str,
-        team: int,
-        slot: int,
-        doom_save_slot: str,
-        registry_revision: str,
-    ) -> str:
-        return "|".join(
-            (
-                session_identity,
-                str(team),
-                str(slot),
-                doom_save_slot,
-                registry_revision,
-            )
-        )
-
-    def observe(
-        self,
-        *,
-        binding_key: str,
-        observer_key: str,
-        records: Mapping[str, bool],
-        acknowledged_records: set[str],
-    ) -> tuple[set[str], bool, set[str]]:
-        binding = self.state.get(binding_key)
-        created = binding is None
-        if binding is None:
-            binding = self.state[binding_key] = {
-                "observers": {},
-                "registry_revision": binding_key.rsplit("|", 1)[-1],
-            }
-        observers = binding["observers"]
-        observer = observers.get(observer_key)
-        if observer is None:
-            observer = observers[observer_key] = {
-                "baseline_preexisting": sorted(
-                    key for key, complete in records.items() if complete
-                ),
-                "last_observed": {
-                    key: bool(complete) for key, complete in records.items()
-                },
-                "pending_edges": [],
-            }
-            return set(), True, set()
-
-        previous = observer.setdefault("last_observed", {})
-        pending = set(observer.setdefault("pending_edges", []))
-        pending.difference_update(acknowledged_records)
-        new_edges: set[str] = set()
-        for key, complete in records.items():
-            current = bool(complete)
-            if key not in previous:
-                previous[key] = current
-                continue
-            if current and not bool(previous[key]):
-                pending.add(key)
-                new_edges.add(key)
-            previous[key] = current
-        observer["pending_edges"] = sorted(pending)
-        return pending, created, new_edges

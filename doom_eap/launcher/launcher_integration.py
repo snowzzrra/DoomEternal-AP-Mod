@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 import json
 import os
 import shutil
@@ -14,6 +15,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
+from .launcher_workers import LauncherJob, LauncherWorkCancelled, LauncherWorkers
+from .launcher_interactions import LauncherInteractions, ScopedInteractions
 from .launcher_platform import (
     IDFILE_DECOMPRESSOR_LINUX,
     IDFILE_DECOMPRESSOR_WINDOWS,
@@ -277,6 +280,41 @@ class IntegratedLaunchWorkflow:
         self.confirmation = confirmation or (lambda: False)
         self.uninstall_confirmation = uninstall_confirmation or (lambda: False)
         self._failure_phase = "game_setup"
+        self._configuration_snapshot: dict[str, object] | None = None
+        self._job: LauncherJob | None = None
+
+    def for_job(self, job: LauncherJob, event_sink: EventSink,
+                interactions: ScopedInteractions) -> IntegratedLaunchWorkflow:
+        """Bind an adapter operation to one captured configuration and job lifetime."""
+        job.check()
+        configuration = deepcopy(self._config())
+        job.check()
+
+        workflow = IntegratedLaunchWorkflow(
+            self.application_dir, self.state_dir, self.config_path,
+            data_dir=self.data_dir, platform_name=self.platform_name,
+            event_sink=lambda kind, payload: event_sink(kind, job.event(payload)),
+            consent=interactions.consent,
+            confirmation=interactions.confirmation,
+            uninstall_confirmation=interactions.uninstall_confirmation,
+        )
+        workflow._configuration_snapshot = configuration
+        workflow._job = job
+        return workflow
+
+    def check_cancelled(self) -> None:
+        if self._job is not None:
+            self._job.check()
+
+    def _publish_client_config(self, **kwargs) -> Path:
+        def write():
+            return self.base_workflow.write_client_config(self.application_dir, **kwargs)
+        return self._job.publish(write) if self._job is not None else write()
+
+    def _publish_receipt(self, temporary: Path, receipt: Path, *, operation: str):
+        def write():
+            return publish_file(temporary, receipt, operation=operation)
+        return self._job.publish(write) if self._job is not None else write()
 
     def _room_compiler(
         self,
@@ -305,6 +343,9 @@ class IntegratedLaunchWorkflow:
         self.event_sink(kind, payload)
 
     def _config(self) -> dict[str, object]:
+        self.check_cancelled()
+        if self._configuration_snapshot is not None:
+            return deepcopy(self._configuration_snapshot)
         document = json.loads(self.config_path.read_text(encoding="utf-8"))
         if not isinstance(document, dict):
             raise ValueError("launcher configuration must contain an object")
@@ -757,8 +798,8 @@ class IntegratedLaunchWorkflow:
         pre_install_state = self.install_state(snapshot)
         cached = self._cached_linux_install(snapshot, pre_install_state)
         if cached is not None:
-            runtime_config = self.base_workflow.write_client_config(
-                self.application_dir,
+            self.check_cancelled()
+            runtime_config = self._publish_client_config(
                 endpoint=endpoint or str(config.get("server_address") or ""),
                 manifest_hash=cached.manifest_hash,
                 runtime_config=config,
@@ -849,8 +890,8 @@ class IntegratedLaunchWorkflow:
             self.state_dir / "generated_mods",
         )
         generated_sha256 = hashlib.sha256(generated.read_bytes()).hexdigest()
-        runtime_config = self.base_workflow.write_client_config(
-            self.application_dir,
+        self.check_cancelled()
+        runtime_config = self._publish_client_config(
             endpoint=endpoint or str(config.get("server_address") or ""),
             manifest_hash=manifest.manifest_hash,
             runtime_config=config,
@@ -929,12 +970,13 @@ class IntegratedLaunchWorkflow:
             "slot": manifest.slot,
             "static_content_digest": manifest.static_content_digest,
         }
+        self.check_cancelled()
         temporary = receipt_path.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        publish_file(temporary, receipt_path, operation="setup_receipt_publish")
+        self._publish_receipt(temporary, receipt_path, operation="setup_receipt_publish")
         if adapter.state == "manual_install_required":
             self._emit(
                 "manual_install_required",
@@ -983,6 +1025,7 @@ class IntegratedLaunchWorkflow:
         except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
             raise RuntimeError(f"Cannot uninstall room mod safely: {error}") from error
 
+        self.check_cancelled()
         quarantine_dir = self.state_dir / "uninstall-quarantine"
         quarantine_dir.mkdir(parents=True, exist_ok=True)
         quarantine = quarantine_dir / f"{staged.name}.{time.time_ns()}.zip"
@@ -998,7 +1041,7 @@ class IntegratedLaunchWorkflow:
         temporary = receipt_path.with_suffix(".tmp")
         try:
             temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            publish_file(temporary, receipt_path, operation="uninstall_attention_publish")
+            self._publish_receipt(temporary, receipt_path, operation="uninstall_attention_publish")
         except Exception as error:
             try:
                 temporary.unlink()
@@ -1018,7 +1061,7 @@ class IntegratedLaunchWorkflow:
             )
             try:
                 temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-                publish_file(temporary, receipt_path, operation="uninstall_failed_publish")
+                self._publish_receipt(temporary, receipt_path, operation="uninstall_failed_publish")
             except Exception as error:
                 try:
                     temporary.unlink()
@@ -1135,7 +1178,7 @@ class IntegratedLaunchWorkflow:
         )
         try:
             temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            publish_file(temporary, receipt_path, operation="uninstall_receipt_publish")
+            self._publish_receipt(temporary, receipt_path, operation="uninstall_receipt_publish")
         except Exception as error:
             try:
                 temporary.unlink()
@@ -1240,7 +1283,7 @@ class IntegratedLaunchWorkflow:
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        publish_file(temporary, receipt_path, operation="manual_confirm_publish")
+        self._publish_receipt(temporary, receipt_path, operation="manual_confirm_publish")
         return record
 
 
@@ -1251,27 +1294,53 @@ class RoomSetupCoordinator:
         self,
         workflow: IntegratedLaunchWorkflow,
         event_sink: EventSink,
-        result_sink: Callable[[IntegratedSetupRecord], None],
+        result_sink: Callable[[IntegratedSetupRecord, int], None],
+        workers: LauncherWorkers,
+        interactions: LauncherInteractions,
     ):
         self.workflow = workflow
         self.event_sink = event_sink
         self.result_sink = result_sink
         self._state_lock = threading.Lock()
-        self._worker_lock = threading.Lock()
+        self.workers = workers
+        self.interactions = interactions
         self._active: set[tuple[object, ...]] = set()
         self._completed: set[tuple[object, ...]] = set()
-        self._uninstall_active = False
+        self._uninstall_active: int | None = None
         self._last_event: dict[str, object] | None = None
+        self._room_active = False
+
+    @property
+    def last_event(self) -> dict[str, object] | None:
+        with self._state_lock:
+            return deepcopy(self._last_event)
+
+    @property
+    def current_event(self) -> dict[str, object] | None:
+        with self._state_lock:
+            return deepcopy(self._last_event) if self._room_active else None
+
+    def invalidate(self) -> None:
+        with self._state_lock:
+            self.workers.invalidate()
+            self._room_active = False
+            self._active.clear()
+            self._uninstall_active = None
 
     def observe(self, event: dict[str, object]) -> bool:
         if event.get("type") != "connected":
             return False
         with self._state_lock:
-            self._last_event = dict(event)
+            if self._last_event is not None and self.room_key(self._last_event) != self.room_key(event):
+                self.workers.invalidate()
+                self._active.clear()
+                self._uninstall_active = None
+            self._last_event = deepcopy(event)
+            self._room_active = True
         return True
 
     @staticmethod
-    def _key(event: dict[str, object]) -> tuple[object, ...]:
+    def room_key(event: dict[str, object]) -> tuple[object, ...]:
         return (
             event.get("seed_name"),
             event.get("team"),
@@ -1319,64 +1388,79 @@ class RoomSetupCoordinator:
         **payload: object,
     ) -> None:
         context = self._room_event_context(event)
+        context["launcher_job_generation"] = self.workers.generation
         context.update(payload)
         self.event_sink(kind, context)
 
-    def submit(self, event: dict[str, object], *, force: bool = False) -> bool:
+    def submit(self, event: dict[str, object], *, force: bool = False, generation: int | None = None) -> bool:
         if event.get("type") != "connected":
             return False
-        key = self._key(event)
+        if generation is not None and not self.workers.accepts(generation):
+            return False
+        event = deepcopy(event)
+        self.observe(event)
+        key = self.room_key(event)
+        generation = self.workers.generation if generation is None else generation
+        active_key = (generation, key)
         with self._state_lock:
-            self._last_event = dict(event)
-            if key in self._active or (key in self._completed and not force):
+            if active_key in self._active or (key in self._completed and not force):
                 return False
             if force:
                 self._completed.discard(key)
-            self._active.add(key)
+            self._active.add(active_key)
         self._emit_room_event(
             "ROOM_INSTALL_ACTION_REQUESTED",
             event,
             explicit=bool(event.get("explicit", not force)),
             source=event.get("source", "coordinator"),
         )
-        self.event_sink("setup_started", {"seed_name": event.get("seed_name")})
+        self.event_sink("setup_started", {"seed_name": event.get("seed_name"), "launcher_job_generation": generation})
 
-        def worker() -> None:
+        def worker(job: LauncherJob) -> None:
+            workflow = self.workflow
+
+            def emit(kind, payload):
+                self.event_sink(kind, job.event(payload))
+
+            def room_event(kind, source, **payload):
+                job.check()
+                self._emit_room_event(kind, source, launcher_job_generation=job.generation, **payload)
+
             try:
-                with self._worker_lock:
-                    try:
-                        snapshot = RoomSnapshot.from_event(event)
-                    except Exception as error:
-                        self.event_sink(
-                            "setup_failed",
-                            setup_failure_payload(error, phase="room_snapshot"),
-                        )
-                        self._emit_room_event(
-                            "ROOM_INSTALL_RESULT",
-                            event,
-                            result="failure",
-                            state="failed",
-                            error_type=type(error).__name__,
-                            message=str(error),
-                        )
-                        return
-                    self._emit_room_event(
-                        "ROOM_INSTALL_PLAN",
+                workflow = self.workflow.for_job(job, self.event_sink, self.interactions.for_job(job))
+                try:
+                    snapshot = RoomSnapshot.from_event(event)
+                except Exception as error:
+                    emit(
+                        "setup_failed",
+                        setup_failure_payload(error, phase="room_snapshot"),
+                    )
+                    room_event(
+                        "ROOM_INSTALL_RESULT",
                         event,
-                        plan="compile_stage_inject",
-                        adapter_state=self._receipt_context().get("adapter_state", ""),
+                        result="failure",
+                        state="failed",
+                        error_type=type(error).__name__,
+                        message=str(error),
                     )
-                    self._emit_room_event(
-                        "ROOM_INSTALL_TRANSITION",
-                        event,
-                        phase="starting",
-                        state="installing",
-                    )
-                    record = self.workflow.execute(
-                        snapshot,
-                        str(event.get("endpoint") or ""),
-                    )
-                self._emit_room_event(
+                    return
+                room_event(
+                    "ROOM_INSTALL_PLAN",
+                    event,
+                    plan="compile_stage_inject",
+                    adapter_state=self._receipt_context().get("adapter_state", ""),
+                )
+                room_event(
+                    "ROOM_INSTALL_TRANSITION",
+                    event,
+                    phase="starting",
+                    state="installing",
+                )
+                record = workflow.execute(
+                    snapshot,
+                    str(event.get("endpoint") or ""),
+                )
+                room_event(
                     "ROOM_INSTALL_TRANSITION",
                     event,
                     phase="finished",
@@ -1385,8 +1469,8 @@ class RoomSetupCoordinator:
                     manifest_hash=record.manifest_hash,
                 )
                 if record.adapter_state == "manual_install_required":
-                    self.result_sink(record)
-                    self.event_sink(
+                    self.result_sink(record, job.generation)
+                    emit(
                         "manual_install_required",
                         {
                             "manifest_hash": record.manifest_hash,
@@ -1396,7 +1480,7 @@ class RoomSetupCoordinator:
                             "guide_url": "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
                         },
                     )
-                    self._emit_room_event(
+                    room_event(
                         "ROOM_INSTALL_RESULT",
                         event,
                         result="attention",
@@ -1409,9 +1493,10 @@ class RoomSetupCoordinator:
                 if record.adapter_state != "applied":
                     raise RuntimeError(record.adapter_message or "Mod setup was not applied.")
                 with self._state_lock:
+                    job.check()
                     self._completed.add(key)
-                self.result_sink(record)
-                self.event_sink(
+                self.result_sink(record, job.generation)
+                emit(
                     "setup_ready",
                     {
                         "manifest_hash": record.manifest_hash,
@@ -1422,7 +1507,7 @@ class RoomSetupCoordinator:
                         "steam_launch_option": record.steam_launch_option,
                     },
                 )
-                self._emit_room_event(
+                room_event(
                     "ROOM_INSTALL_RESULT",
                     event,
                     result="success",
@@ -1431,15 +1516,17 @@ class RoomSetupCoordinator:
                     manifest_hash=record.manifest_hash,
                     new_install=record.new_install,
                 )
+            except LauncherWorkCancelled:
+                raise
             except Exception as error:
-                self.event_sink(
+                emit(
                     "setup_failed",
                     setup_failure_payload(
                         error,
-                        phase=str(getattr(self.workflow, "_failure_phase", "")),
+                        phase=str(getattr(workflow, "_failure_phase", "")),
                     ),
                 )
-                self._emit_room_event(
+                room_event(
                     "ROOM_INSTALL_RESULT",
                     event,
                     result="failure",
@@ -1449,31 +1536,42 @@ class RoomSetupCoordinator:
                 )
             finally:
                 with self._state_lock:
-                    self._active.discard(key)
+                    self._active.discard(active_key)
 
-        threading.Thread(target=worker, name="DoomRoomSetup", daemon=True).start()
-        return True
+        accepted = self.workers.submit(('setup', key), worker, generation=generation)
+        if not accepted:
+            with self._state_lock:
+                self._active.discard(active_key)
+        return accepted
 
-    def start(self, *, force: bool = False) -> bool:
+    def start(self, *, force: bool = False, generation: int | None = None) -> bool:
         with self._state_lock:
+            if not self._room_active:
+                return False
             event = dict(self._last_event) if self._last_event else None
-        return self.submit(event, force=force) if event else False
+        return self.submit(event, force=force, generation=generation) if event else False
 
     def retry(self) -> bool:
         with self._state_lock:
+            if not self._room_active:
+                return False
             event = dict(self._last_event) if self._last_event else None
         return self.submit(event, force=True) if event else False
 
-    def submit_uninstall(self, event: dict[str, object]) -> bool:
+    def submit_uninstall(self, event: dict[str, object], *, generation: int | None = None) -> bool:
         """Run uninstall on coordinator worker, sharing setup serialization lock."""
         if event.get("type") != "connected":
             return False
-        key = self._key(event)
+        if generation is not None and not self.workers.accepts(generation):
+            return False
+        event = deepcopy(event)
+        self.observe(event)
+        key = self.room_key(event)
+        generation = self.workers.generation if generation is None else generation
         with self._state_lock:
-            self._last_event = dict(event)
-            if self._uninstall_active:
+            if self._uninstall_active == generation:
                 return False
-            self._uninstall_active = True
+            self._uninstall_active = generation
         self._emit_room_event(
             "ROOM_UNINSTALL_ACTION_REQUESTED",
             event,
@@ -1481,34 +1579,43 @@ class RoomSetupCoordinator:
             source=event.get("source", "coordinator"),
         )
 
-        def worker() -> None:
+        def worker(job: LauncherJob) -> None:
+            workflow = self.workflow
+
+            def emit(kind, payload):
+                self.event_sink(kind, job.event(payload))
+
+            def room_event(kind, source, **payload):
+                job.check()
+                self._emit_room_event(kind, source, launcher_job_generation=job.generation, **payload)
+
             try:
-                self.event_sink(
+                workflow = self.workflow.for_job(job, self.event_sink, self.interactions.for_job(job))
+                emit(
                     "uninstall_queued",
                     {},
                 )
-                with self._worker_lock:
-                    snapshot = RoomSnapshot.from_event(event)
-                    manifest = self.workflow._manifest_for(snapshot)
-                    self._emit_room_event(
-                        "ROOM_UNINSTALL_PLAN",
-                        event,
-                        plan="quarantine_remove_injector_cleanup",
-                        adapter_state=self._receipt_context().get("adapter_state", ""),
-                    )
-                    self._emit_room_event(
-                        "ROOM_UNINSTALL_TRANSITION",
-                        event,
-                        phase="starting",
-                        state="uninstalling",
-                        manifest_hash=manifest.manifest_hash,
-                    )
-                    self.event_sink(
-                        "uninstall_started",
-                        {"manifest_hash": manifest.manifest_hash},
-                    )
-                    result = self.workflow.uninstall(snapshot)
-                self._emit_room_event(
+                snapshot = RoomSnapshot.from_event(event)
+                manifest = workflow._manifest_for(snapshot)
+                room_event(
+                    "ROOM_UNINSTALL_PLAN",
+                    event,
+                    plan="quarantine_remove_injector_cleanup",
+                    adapter_state=self._receipt_context().get("adapter_state", ""),
+                )
+                room_event(
+                    "ROOM_UNINSTALL_TRANSITION",
+                    event,
+                    phase="starting",
+                    state="uninstalling",
+                    manifest_hash=manifest.manifest_hash,
+                )
+                emit(
+                    "uninstall_started",
+                    {"manifest_hash": manifest.manifest_hash},
+                )
+                result = workflow.uninstall(snapshot)
+                room_event(
                     "ROOM_UNINSTALL_TRANSITION",
                     event,
                     phase="finished",
@@ -1518,12 +1625,13 @@ class RoomSetupCoordinator:
                 )
                 if result.state == "uninstalled":
                     with self._state_lock:
+                        job.check()
                         self._completed.discard(key)
-                self.event_sink(
+                emit(
                     "uninstall_complete" if result.state == "uninstalled" else "uninstall_attention",
                     {**asdict(result), "manifest_hash": result.manifest_hash},
                 )
-                self._emit_room_event(
+                room_event(
                     "ROOM_UNINSTALL_RESULT",
                     event,
                     result="success" if result.state == "uninstalled" else "attention",
@@ -1532,8 +1640,10 @@ class RoomSetupCoordinator:
                     manifest_hash=result.manifest_hash,
                     message=result.message,
                 )
+            except LauncherWorkCancelled:
+                raise
             except Exception as error:
-                self.event_sink(
+                emit(
                     "uninstall_failed",
                     {
                         "state": "attention",
@@ -1542,7 +1652,7 @@ class RoomSetupCoordinator:
                         "message": str(error),
                     },
                 )
-                self._emit_room_event(
+                room_event(
                     "ROOM_UNINSTALL_RESULT",
                     event,
                     result="failure",
@@ -1552,7 +1662,12 @@ class RoomSetupCoordinator:
                 )
             finally:
                 with self._state_lock:
-                    self._uninstall_active = False
+                    if self._uninstall_active == generation:
+                        self._uninstall_active = None
 
-        threading.Thread(target=worker, name="DoomRoomUninstall", daemon=True).start()
-        return True
+        accepted = self.workers.submit(('uninstall', key), worker, generation=generation)
+        if not accepted:
+            with self._state_lock:
+                if self._uninstall_active == generation:
+                    self._uninstall_active = None
+        return accepted

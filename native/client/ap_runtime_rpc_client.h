@@ -1,14 +1,12 @@
 #pragma once
 
+#include "command_transport.h"
 #include <rpc.h>
 #include <windows.h>
 #include <functional>
 #include <string>
 
-enum ApRpcResult { AP_RPC_NONE, AP_RPC_PIPE_MISSING, AP_RPC_PIPE_BUSY,
-    AP_RPC_WAIT_TIMEOUT, AP_RPC_DELIVERED, AP_RPC_EXCEPTION, AP_RPC_UNKNOWN };
-
-class ApRuntimeRpcClient {
+class ApRuntimeRpcClient : public CommandTransport {
 public:
     using LogCallback = std::function<void(const std::string&)>;
     ApRuntimeRpcClient();
@@ -20,17 +18,17 @@ public:
     void SetLogCallback(LogCallback callback);
     bool Initialize();
     bool PollHealth();
-    bool Ready() const;
-    bool ExecuteConsoleCommand(const std::string& command);
+    bool Ready() const override;
+    bool ExecuteConsoleCommand(const std::string& command) override;
     unsigned long long AttachmentEpoch() const;
-    bool RequestEntityLoad(const std::string& path, bool begin, int size = 0);
-    bool RetrieveEntities(unsigned char* data, size_t* capacity);
+    bool RequestEntityLoad(const std::string& path, bool begin, int size = 0) override;
+    bool RetrieveEntities(unsigned char* data, size_t* capacity) override;
     bool Checkpoint(int* size, unsigned char* data, int capacity);
     bool Spawn(int* size, unsigned char* data, int capacity);
-    void SetCurrentCommandId(const std::string& id);
+    void SetCurrentCommandId(const std::string& id) override;
     std::string CurrentCommandId() const;
-    ApRpcResult LastResult() const;
-    DWORD LastTransportStatus() const;
+    ApRpcResult LastResult() const override;
+    DWORD LastTransportStatus() const override;
 
 private:
     RPC_BINDING_HANDLE binding_ = nullptr;

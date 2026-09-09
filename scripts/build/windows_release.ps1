@@ -74,16 +74,19 @@ try {
         if (-not $MapSources) { $MapSources = Join-Path $repoRoot "data\map_sources.json" }
         if (-not $Compressor) { $Compressor = Join-Path $workspace "Tools\idFileDeCompressor" }
         $roomOutput = Join-Path $repoRoot "build\room-resources"
+        $roomSourceState = Join-Path $repoRoot "build\room-source-state.json"
+        Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $roomSourceState)
         Invoke-Python @("-m", "tools.release.build_room_resources", "--repo-root", $repoRoot,
             "--staged-mod", $StagedMod, "--work-dir", (Join-Path $repoRoot "build\room-work"),
             "--compressor", $Compressor, "--map-sources", $MapSources, "--output-dir", $roomOutput,
             "--cache-root", (Join-Path $workspace ".cache\doomeap\room-payloads"))
+        Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $roomSourceState, "--verify")
         if ($PublishRoomResources) {
             $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
             $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
             Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--publish-from", $roomOutput,
                 "--repo-root", $repoRoot, "--version", "0.5.2", "--mod-commit", $modSha,
-                "--apworld-commit", $apSha)
+                "--apworld-commit", $apSha, "--source-state", $roomSourceState)
         }
         Write-Output "ROOM_RESOURCE_MAINTENANCE status=PASS output=$roomOutput published=$PublishRoomResources"
         exit 0
@@ -111,6 +114,8 @@ try {
     $clientHandoff = Join-Path $handoff "shared\client"
     $launcherHandoff = Join-Path $handoff "windows"
     New-Item -ItemType Directory -Force $resources, $clientHandoff, $launcherHandoff | Out-Null
+    $buildSourceState = Join-Path $releaseRoot "build\source-state.json"
+    Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $buildSourceState)
 
     Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--export-dir", $resources, "--repo-root", $repoRoot)
     Invoke-Python @("-m", "tools.release.apworld_cache", "--output", (Join-Path $handoff "shared\doometernal.apworld"), "--archipelago-source", $archipelago, "--archipelago-python", $pythonExe)
@@ -126,7 +131,8 @@ try {
 
     $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
     $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
-    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.5.2", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows")
+    Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $buildSourceState, "--verify")
+    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.5.2", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows", "--source-state", $buildSourceState)
     Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.5.2", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
     Write-Output "WINDOWS_RELEASE status=PASS output=$(Join-Path $repoRoot 'build\final-release')"
 } finally {

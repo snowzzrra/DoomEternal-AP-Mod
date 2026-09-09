@@ -6,7 +6,6 @@ import html
 import os
 import queue
 import re
-import threading
 import time
 import webbrowser
 from datetime import datetime
@@ -51,11 +50,9 @@ from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .connection_errors import enrich_connection_failure
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
-from .launcher_reporting import report_problem
 from .launcher_platform import (
     doom_saved_games_base,
     is_saved_games_base_shape,
-    probe_meathook,
     redact_secrets,
 )
 
@@ -1525,6 +1522,7 @@ class LauncherUI(QMainWindow):
         elif self._setup_state == "manual_install_required":
             self._open_manual_install_guide()
         elif self._setup_state == "game_link_update_needed":
+            generation = self.controller.operation_generation
             confirm = QMessageBox.question(
                 self,
                 "Repair game integration",
@@ -1537,8 +1535,8 @@ class LauncherUI(QMainWindow):
             )
             if confirm == QMessageBox.StandardButton.Yes:
                 try:
-                    self.controller.install_game_link(force_repair=True)
-                    self._prepare(force=True)
+                    if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
+                        self._set_setup_state("installing", "Repairing game integration...")
                 except Exception as error:
                     self._append_log(f"Game integration repair error: {error}")
                     self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
@@ -1571,6 +1569,7 @@ class LauncherUI(QMainWindow):
 
     def _confirm_manual_installation(self) -> None:
         """Prompt user confirmation for manual mod installation completion."""
+        generation = self.controller.operation_generation
         reply = QMessageBox.question(
             self,
             "Confirm Manual Installation",
@@ -1581,7 +1580,7 @@ class LauncherUI(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.controller.confirm_manual_installation()
+                self.controller.confirm_manual_installation(generation=generation)
                 self._append_log("Manual mod installation confirmed.")
             except Exception as error:
                 self._append_log(f"Manual installation confirmation error: {error}")
@@ -1715,6 +1714,7 @@ class LauncherUI(QMainWindow):
     def _uninstall_room_package(self) -> None:
         if not self._room_connected:
             return
+        generation = self.controller.operation_generation
         confirmation = QMessageBox.question(
             self,
             "Uninstall room package",
@@ -1724,11 +1724,13 @@ class LauncherUI(QMainWindow):
         )
         if confirmation != QMessageBox.StandardButton.Yes:
             return
+        if self.controller.operation_generation != generation:
+            return
         self.uninstall_button.setEnabled(False)
         self.doctor_room_status.setText("UNINSTALL REQUESTED")
         self.doctor_room_evidence.setText("Waiting to queue room package removal.")
         try:
-            self.controller.uninstall_setup()
+            self.controller.uninstall_setup(generation=generation)
         except Exception:
             self.uninstall_button.setEnabled(self._room_connected)
             self.doctor_room_status.setText("UNINSTALL NEEDS ATTENTION")
@@ -1755,10 +1757,11 @@ class LauncherUI(QMainWindow):
         if self._setup_state in {"installing", "updating"}:
             self._append_log("Room mod setup is already active.")
             return
+        generation = self.controller.operation_generation
         if QMessageBox.question(self, "Confirm room package", "Prepare and install package bound to this room?") != QMessageBox.StandardButton.Yes:
             return
         try:
-            started = self.controller.reinstall_setup() if force else self.controller.prepare_setup()
+            started = self.controller.reinstall_setup(generation=generation) if force else self.controller.prepare_setup(generation=generation)
             if not started:
                 self._append_log("Setup is already active or room is unavailable.")
                 return
@@ -2293,12 +2296,7 @@ class LauncherUI(QMainWindow):
         dialog.exec()
 
     def _run_doctor(self) -> None:
-        try:
-            self._render_doctor_report(self.controller.run_doctor().document())
-        except Exception as error:
-            self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
-            self.doctor_evidence.setText("Setup could not be checked. Try again or save a support report.")
-            self._append_log(f"Setup check error: {error}")
+        self.controller.request_doctor()
 
     def _render_doctor_report(self, report: object) -> None:
         if not isinstance(report, dict):
@@ -2361,45 +2359,38 @@ class LauncherUI(QMainWindow):
             self._append_log(f"Game connection check error: {error}")
 
     def _report_problem(self) -> None:
-        result = report_problem(self.controller, logs=self.log.toPlainText().splitlines())
-        self.doctor_action.setText(result.message)
+        self.controller.request_problem_report(logs=self.log.toPlainText().splitlines())
+
+    def _present_problem_report(self, message) -> None:
+        self.doctor_action.setText(message)
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Report a Problem")
         dialog.setTextFormat(Qt.TextFormat.PlainText)
         dialog.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        dialog.setText(result.message)
+        dialog.setText(message)
         dialog.exec()
 
     def _save_support_bundle(self) -> None:
-        try:
-            path = self.controller.create_support_bundle(Path.home() / "DOOM-Eternal-Archipelago-support.zip", logs=self.log.toPlainText().splitlines())
-            self.doctor_action.setText(f"Support report saved: {path}")
-        except Exception as error: self._append_log(f"Support bundle error: {error}")
+        self.controller.request_support_bundle(
+            Path.home() / "DOOM-Eternal-Archipelago-support.zip",
+            logs=self.log.toPlainText().splitlines(),
+        )
 
     def _preview_repairs(self) -> None:
         if self._setup_state in {"package_failed", "package_incompatible"}:
             self._prepare(force=True)
             return
-        try: actions = self.controller.repair_preview()
-        except Exception as error:
-            self._append_log(f"Repair preview error: {error}")
-            return
+        self.controller.request_doctor(preview=True)
+
+    def _present_repair_preview(self, actions, generation) -> None:
         if not actions:
             self.doctor_action.setText("No safe repair is needed.")
             return
         action = actions[0]
-        prompt = f"{action.title}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action.changes) + f"\n\nRollback: {action.rollback}"
+        prompt = f"{action['title']}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action['changes']) + f"\n\nRollback: {action['rollback']}"
         if QMessageBox.question(self, "Apply repair", prompt) != QMessageBox.StandardButton.Yes: return
-        self.doctor_action.setText("Applying repair...")
-
-        def _run_repair() -> None:
-            try:
-                msg = str(self.controller.apply_repair(action.key))
-                self.controller.emit("ui_repair_result", message=msg, success=True)
-            except Exception as error:
-                self.controller.emit("ui_repair_result", message=f"Repair error: {error}", success=False)
-
-        threading.Thread(target=_run_repair, name="DoomDoctorRepair", daemon=True).start()
+        if self.controller.request_repair(action['key'], generation=generation):
+            self.doctor_action.setText("Applying repair...")
 
     def _poll_events(self) -> None:
         self._event_poll_scheduled = False
@@ -2408,8 +2399,8 @@ class LauncherUI(QMainWindow):
         while processed < 100 and (time.perf_counter() - started) < 0.005:
             try: event = self.controller.events.get_nowait()
             except queue.Empty: break
-            self.controller.process_event(event)
-            self._present_event(event)
+            if self.controller.process_event(event) is not False:
+                self._present_event(event)
             processed += 1
         if not self.controller.events.empty() and not self._event_poll_scheduled:
             self._event_poll_scheduled = True
@@ -2420,30 +2411,26 @@ class LauncherUI(QMainWindow):
         self._refresh_native_health()
 
     def _refresh_native_health(self) -> None:
-        game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-        root = Path(str(game_root)).expanduser().resolve() if game_root else None
-        meathook = probe_meathook(root)
+        self.controller.request_integration_status()
+
+    def _render_native_health(self, event) -> None:
         if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
-            if meathook.ok:
+            if event["meathook_ok"]:
                 self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._set_setup_state("ready")
             else:
                 self._set_status("rpc", "needs setup", self.COLORS["warn"])
-                target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                 if self._setup_state != target_state:
-                    self._set_setup_state(target_state, meathook.message)
+                    self._set_setup_state(target_state, event["meathook_message"])
                 return
-        elif self._setup_state == "ready" and not meathook.ok:
+        elif self._setup_state == "ready" and not event["meathook_ok"]:
             self._set_status("rpc", "needs setup", self.COLORS["warn"])
-            target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
-            self._set_setup_state(target_state, meathook.message)
+            target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+            self._set_setup_state(target_state, event["meathook_message"])
             return
 
-        try:
-            health = self.controller.native_health()
-            state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
-        except Exception:
-            state = "not_ready"
+        state = event["native_state"]
         if state == "ready":
             presentation = ("ready", self.COLORS["good"])
         elif state == "degraded":
@@ -2562,6 +2549,40 @@ class LauncherUI(QMainWindow):
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
+        if kind == "support_bundle_ready":
+            self.doctor_action.setText(f"Support report saved: {event.get('path', '')}")
+            return
+        if kind == "support_bundle_failed":
+            self._append_log(f"Support bundle error: {event.get('message', '')}")
+            return
+        if kind == "problem_report_ready":
+            self._present_problem_report(event["message"])
+            return
+        if kind == "integration_status":
+            self._render_native_health(event)
+            return
+        if kind == "doctor_report":
+            self._render_doctor_report(event.get("report"))
+            return
+        if kind == "repair_preview_result":
+            self._present_repair_preview(event.get("actions", ()), event["launcher_job_generation"])
+            return
+        if kind == "doctor_failed":
+            if event.get("preview"):
+                self._append_log(f"Repair preview error: {event.get('message', '')}")
+            else:
+                self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
+                self.doctor_evidence.setText("Setup could not be checked. Try again or save a support report.")
+                self._append_log(f"Setup check error: {event.get('message', '')}")
+            return
+        if kind == "integration_repair_result":
+            if event.get("success", False):
+                self._set_setup_state("game_link_update_needed")
+                self._prepare(force=True)
+            else:
+                self._append_log(str(event.get("message", "")))
+                self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
+            return
         if kind == "ui_repair_result":
             msg = str(event.get("message", ""))
             self.doctor_action.setText(msg)
@@ -2691,10 +2712,7 @@ class LauncherUI(QMainWindow):
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-                    root = Path(str(game_root)).expanduser().resolve() if game_root else None
-                    meathook = probe_meathook(root)
-                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                     self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
@@ -2727,13 +2745,10 @@ class LauncherUI(QMainWindow):
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
                 self._clear_drift()
-                game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-                root = Path(str(game_root)).expanduser().resolve() if game_root else None
-                meathook = probe_meathook(root)
-                if not meathook.ok:
+                if not event["meathook_ok"]:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                     self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])

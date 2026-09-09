@@ -41,7 +41,7 @@ function Invoke-NativeBuild {
     $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/c")
     $compileC = @("/nologo", "/O2", "/MT", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/TC", "/c")
     $sources = @(
-        "ap_client_exe.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
+        "ap_client_exe.cpp", "command_queue.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
         "ap_runtime_rpc_client.cpp", "ap_rpc_health_state.cpp", "ammo_hotkey.cpp"
     )
     $objects = @()
@@ -63,7 +63,8 @@ function Invoke-NativeBuild {
     if ($LASTEXITCODE -ne 0) { throw "MSVC linker failed creating ap_client.exe" }
 
     $probeOutput = Join-Path $BuildDirectory "save_death_probe.exe"
-    & cl.exe /nologo /std:c++17 /O2 /MT /EHsc (Join-Path $RepositoryRoot "native\\probes\\save_death_probe.cpp") "/Fe$probeOutput"
+    $probeObject = Join-Path $BuildDirectory "save_death_probe.obj"
+    & cl.exe /nologo /std:c++17 /O2 /MT /EHsc (Join-Path $RepositoryRoot "native\\probes\\save_death_probe.cpp") "/Fe$probeOutput" "/Fo$probeObject"
     if ($LASTEXITCODE -ne 0) { throw "MSVC failed creating save_death_probe.exe" }
 
     foreach ($output in $clientOutput, $probeOutput) {

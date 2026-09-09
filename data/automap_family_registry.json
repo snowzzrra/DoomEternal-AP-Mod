@@ -157,7 +157,8 @@
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
       "automap_properties": [
-        "extra_life"
+          "extra_life",
+          "extra_life_2up"
       ],
       "dossier_total_owner": null,
       "collected_state_writer": "native sp_extra_life useable transaction",
@@ -203,6 +204,19 @@
       "safe_cut": null,
       "vanilla_automap": true,
       "vanilla_exploration": true
+    },
+    "support_runes": {
+      "match": {"inherit_prefixes": ["progress/support_rune"]},
+      "vanilla_class": "idInteractable_Rune",
+      "automap_marker_source": "original entity automapPropertiesDecl",
+      "automap_properties": ["rune_support"],
+      "dossier_total_owner": null,
+      "collected_state_writer": null,
+      "reward_edge": null,
+      "safe_cut": null,
+      "vanilla_automap": true,
+      "vanilla_exploration": null,
+      "notes": "Static source identification; this validator does not establish native registration or Dossier effects."
     },
     "slayer_keys": {
       "match": {

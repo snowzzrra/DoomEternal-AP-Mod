@@ -12,7 +12,6 @@ from pathlib import Path
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
-    load_publisher_contracts,
     map_publishers_for_owner,
 )
 from tools.maps.ap_map_generator import (

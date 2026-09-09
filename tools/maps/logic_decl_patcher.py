@@ -147,7 +147,7 @@ def main() -> int:
     snapshot = patch_contract(args.contracts, args.location, args.output)
     if args.snapshot:
         args.snapshot.parent.mkdir(parents=True, exist_ok=True)
-        args.snapshot.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        args.snapshot.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(snapshot, sort_keys=True))
     return 0
 

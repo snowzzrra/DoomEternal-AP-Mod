@@ -1,3 +1,4 @@
+from unittest.mock import Mock
 import asyncio
 import enum
 import importlib
@@ -7,6 +8,8 @@ from collections import deque, namedtuple
 from functools import wraps
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+
+import pytest
 
 NetworkItem = namedtuple("NetworkItem", "item location player flags")
 
@@ -123,29 +126,53 @@ async def test_launcher_control_forwards_supervisor_chat_frame(monkeypatch, tmp_
 
 def _context(items=(), *, processed=0, ready=True):
     context = object.__new__(bridge.DoomEternalContext)
+    context.exit_event = asyncio.Event()
+    context.physical_checks = bridge.PhysicalChecks(bridge.logger)
+    context.level_ready = bridge.LevelReady(bridge.logger)
+    context.session_tasks = bridge.SessionTasks()
+    context.location_setup = bridge.LocationSetup(bridge.logger)
+    context.protocol_feed = bridge.ProtocolFeed()
+    context.receipt_delivery = bridge.ReceiptDelivery(bridge.logger)
+    context.save_checks = bridge.SaveChecks(bridge.WEAPON_MASTERY_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bridge.ALL_MISSION_CHALLENGES_ENTRIES, bridge.logger)
+    context.goals = bridge.GoalProgress(bridge.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge.CULTIST_BASE_MAP, bridge.logger)
+    context.publisher_dispatch = bridge.PublisherDispatch(bridge.PUBLISHERS, context.goals, bridge.logger)
+    context.deathlink = bridge.DeathLinkSession(bridge.DeathLinkReceiver(), bridge.DEATHLINK_MESSAGES, lambda *a, **kw: bridge.emit_launcher_event(*a, **kw), bridge.logger)
+    context.ammo = bridge.AmmoRefill(
+        bridge.AmmoCommandPublication(bridge.send_command, bridge.discard_queued_coalesced_command,
+                                      bridge.rpc_execution_enabled, bridge.set_rpc_execution, bridge.logger),
+        bridge.AmmoStorage(context.send_msgs),
+        lambda *args, **kwargs: bridge.emit_launcher_event(*args, **kwargs), bridge.logger,
+    )
+    context.ammo_requests = bridge.AmmoRequestPump(context.ammo, context.request_ammo_refill, context.exit_event, bridge.logger)
     context.items_received = list(items)
-    context.items_processed = processed
+    context.receipt_session = bridge.ReceiptSession(processed_boundary=processed)
+    context.runtime_lifecycle = bridge.RuntimeLifecycle()
     context.item_state_ready = ready
     context._item_delivery_lock = asyncio.Lock()
     context._item_delivery_task = None
     context._item_delivery_wakeup = False
     context._item_delivery_waiting_for_state = False
-    context._packet_received_ranges = deque(maxlen=bridge.PACKET_TIMING_RANGE_LIMIT)
-    context._item_session_generation = 1
+    context.receipt_session.begin_rebind()
     context.state_key = "room:0:1"
     context.session_state = {"receipt_history": {"receipt_ids": [], "receipt_counts": {}}}
+    context.receipt_delivery.bind(context.session_state)
+    context.materialization = bridge.MaterializationCoordinator(bridge.logger)
+    context.runes = bridge.RuneReconciliation(bridge.logger)
+    context.runes.bind(context.session_state.setdefault("rune_reconciliation", {}), context.session_state.setdefault("perk_reconciliation", {"epoch": 0, "delivered": {}}))
+    context.bootstrap = bridge.Bootstrap(bridge.logger)
+    context.bootstrap.bind(context.session_state.setdefault("bootstrap", {"actions": {}}))
+    context.materialization.bind(context.session_state.setdefault("context_materialization", {}))
     context.client_state = {"version": bridge.CLIENT_STATE_VERSION, "sessions": {}}
     context.item_delivery_blocked = False
     context.item_delivery_blocked_info = None
     context.item_names = {}
+    context.location_names = {}
     context.player_names = {1: "Self", 2: "Remote"}
     context.slot = 1
     context.team = 0
     context.slot_info = {}
     context.locations_info = {}
     context.slot_concerns_self = lambda player: player == context.slot
-    context.current_map_name = None
-    context.active_save_slot = None
     context.output = lambda *_args, **_kwargs: None
     context.persist_session_state = lambda: None
     context.onboard_bootstrap = lambda *_args, **_kwargs: None
@@ -153,22 +180,11 @@ def _context(items=(), *, processed=0, ready=True):
     context.delivery_item_name = lambda item_id: f"item-{item_id}"
     context._record_processed_receipt = lambda item: None
     context.observe_received_item_history = lambda: SimpleNamespace(duplicates=())
-    context.fast_travel_submitted = set()
-    context.fast_travel_eligibility_snapshot = None
-    context.fast_travel_epoch_state = None
-    context.fast_travel_last_transition = None
-    context.cached_map_identity = None
-    context.pending_map_identity = None
-    context.pending_level_ready = {}
-    context.completed_level_ready_epochs = set()
-    context.last_accepted_marker_mtime = 0
-    context.last_accepted_map_evidence_epoch = None
+    context.fast_travel = bridge.FastTravel(bridge.KNOWN_CATALOG_MAPS, bridge.FAST_TRAVEL_MAP_KEYS, bridge.FAST_TRAVEL_MISSION_COMPLETE_IDS, bridge.logger)
+    context.runtime_lifecycle.observe_marker_timestamp(0, None)
     context.last_marker_reject_reason = None
-    context.active_save_proof_authoritative = False
-    context.active_save_proof_slot = None
-    context.active_save_proof_evidence_epoch = None
-    context.active_save_proof_load_epoch = None
-    context.runtime_observers_frozen = False
+    context.save_observer = bridge.SaveObserver()
+    context.save_observer.set_frozen(False)
     context.invalidate_map_identity = bridge.DoomEternalContext.invalidate_map_identity.__get__(context)
     context.invalidate_active_save_proof = bridge.DoomEternalContext.invalidate_active_save_proof.__get__(context)
     context.snapshot_fast_travel_eligibility = bridge.DoomEternalContext.snapshot_fast_travel_eligibility.__get__(context)
@@ -316,6 +332,95 @@ async def test_reconnect_overlap_silent_and_new_tail_delivered():
     assert context.items_processed == 4
 
 
+@pytest.mark.parametrize("same_room", [False, True])
+@_run_async
+async def test_receipt_delivery_stops_after_rebind_at_batch_yield(monkeypatch, same_room):
+    context = _context([NetworkItem(8, 8, 1, 0), NetworkItem(9, 9, 1, 0)])
+    calls = []
+    _spool(context, calls)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {8: "simple", 9: "simple"})
+    monkeypatch.setattr(bridge, "ITEM_DELIVERY_BATCH_SIZE", 1)
+
+    async def rebind(_delay):
+        if same_room:
+            context.receipt_session.begin_rebind()
+        else:
+            context.state_key = "another-room:0:1"
+
+    monkeypatch.setattr(bridge.asyncio, "sleep", rebind)
+    assert not await context.process_pending_item_receipts("packet")
+    assert calls == [(0, 8)]
+    assert context.items_processed == 1
+
+
+@_run_async
+async def test_identical_receipt_occurrences_deliver_once_each_with_real_history_writer(monkeypatch):
+    receipt = NetworkItem(8, -2, 1, 0)
+    context = _context([receipt, receipt])
+    context._record_processed_receipt = bridge.DoomEternalContext._record_processed_receipt.__get__(context)
+    context.observe_received_item_history = bridge.DoomEternalContext.observe_received_item_history.__get__(context)
+    calls = []
+    _spool(context, calls)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {8: "simple"})
+    assert await context.process_pending_item_receipts("packet")
+    assert await context.process_pending_item_receipts("reconnect")
+    assert calls == [(0, 8), (1, 8)]
+    assert context.items_processed == 2
+    assert context.session_state["receipt_history"]["receipt_counts"] == {bridge.receipt_identity(receipt): 2}
+
+
+@_run_async
+async def test_starting_materialization_suppresses_only_matching_occurrences(monkeypatch):
+    receipt = NetworkItem(8, -2, 1, 0)
+    context = _context([receipt, receipt, receipt])
+    context.receipt_session.configure_starting_materialization(
+        starting_inventory={"Item": 2}, starting_weapon=None,
+        item_identity={8: {"name": "Item"}}, processed_receipts=(), eligible=lambda _item: True,
+    )
+    calls = []
+    _spool(context, calls)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {8: "simple"})
+    assert await context.process_pending_item_receipts("packet")
+    assert context.items_processed == 3
+    assert calls == [(2, 8)]
+
+
+def test_packet_timing_preserves_history_tail_and_index_zero_clear(monkeypatch):
+    receipt = NetworkItem(8, -2, 1, 0)
+    context = _context([receipt, receipt], processed=1)
+    context._schedule_item_delivery = lambda _trigger: None
+    context._schedule_ammo_refill_overflow_normalization = lambda _trigger: None
+    monkeypatch.setattr(bridge.time, "monotonic_ns", lambda: 42)
+    context._on_received_items_packet({"index": 0, "items": [receipt, receipt]})
+    assert context._packet_received_timestamp(1) == 42
+    assert not context._packet_receipt_is_live_tail(1)
+    context.items_received.append(receipt)
+    context._on_received_items_packet({"index": 2, "items": [receipt]})
+    assert context._packet_receipt_is_live_tail(2)
+    context._on_received_items_packet({"index": True, "items": [receipt]})
+    assert context._packet_receipt_is_live_tail(2)
+    context.items_received = []
+    context._on_received_items_packet({"index": 0, "items": []})
+    assert context._packet_received_timestamp(0) is None
+    assert context.items_processed == 1
+
+
+def test_authored_marker_parser_uses_last_record_and_exact_catalog_identity(tmp_path):
+    path = tmp_path / "marker.txt"
+    valid = "AP_ACTIVE_MAP_V1 map_key=e1m1_intro runtime_map=game/sp/e1m1_intro/e1m1_intro marker=AP_MAP_START_E1M1_INTRO"
+    for text in ("", valid + "\n" + valid.replace("marker=AP_MAP_START_E1M1_INTRO", "marker=WRONG"),
+                 valid.replace("map_key=e1m1_intro", "map_key=e1m2_war"),
+                 valid.replace("game/sp/e1m1_intro/e1m1_intro", "game/unknown")):
+        path.write_text(text, encoding="utf-8")
+        assert bridge.parse_active_map_marker(path, 123) is None
+    path.write_text(valid.replace(" runtime_map=", "; runtime_map=").replace(" marker=", "; marker=") + ";", encoding="utf-8")
+    parsed = bridge.parse_active_map_marker(path, 123)
+    assert parsed == {
+        "map_key": "e1m1_intro", "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
+        "marker": "AP_MAP_START_E1M1_INTRO", "mtime_ns": 123, "path": path,
+    }
+
+
 def test_set_rpc_execution_enable_and_disable_lifecycle(tmp_path, monkeypatch):
     gate_file = tmp_path / "ap_rpc_enabled"
     monkeypatch.setattr(bridge, "RPC_GATE_PATH", str(gate_file))
@@ -366,7 +471,7 @@ def test_active_map_marker_lifecycle_and_cleanup(tmp_path, monkeypatch):
     assert len(markers) == 2
 
     ctx = _context([])
-    ctx.last_accepted_marker_mtime = 0
+    ctx.runtime_lifecycle.observe_marker_timestamp(0, None)
     accepted = ctx.ingest_visible_runtime_lifecycle()
     assert accepted is True
     assert ctx.cached_map_identity["map_key"] == "e1m1_intro"
@@ -407,6 +512,24 @@ def test_cleanup_active_map_markers_delete_failure_does_not_crash(tmp_path, monk
 @_run_async
 async def test_launcher_chat_uses_commonclient_say_payload():
     context = object.__new__(bridge.DoomEternalContext)
+    context.exit_event = asyncio.Event()
+    context.physical_checks = bridge.PhysicalChecks(bridge.logger)
+    context.level_ready = bridge.LevelReady(bridge.logger)
+    context.session_tasks = bridge.SessionTasks()
+    context.location_setup = bridge.LocationSetup(bridge.logger)
+    context.protocol_feed = bridge.ProtocolFeed()
+    context.receipt_delivery = bridge.ReceiptDelivery(bridge.logger)
+    context.save_checks = bridge.SaveChecks(bridge.WEAPON_MASTERY_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bridge.ALL_MISSION_CHALLENGES_ENTRIES, bridge.logger)
+    context.goals = bridge.GoalProgress(bridge.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge.CULTIST_BASE_MAP, bridge.logger)
+    context.publisher_dispatch = bridge.PublisherDispatch(bridge.PUBLISHERS, context.goals, bridge.logger)
+    context.deathlink = bridge.DeathLinkSession(bridge.DeathLinkReceiver(), bridge.DEATHLINK_MESSAGES, lambda *a, **kw: bridge.emit_launcher_event(*a, **kw), bridge.logger)
+    context.ammo = bridge.AmmoRefill(
+        bridge.AmmoCommandPublication(bridge.send_command, bridge.discard_queued_coalesced_command,
+                                      bridge.rpc_execution_enabled, bridge.set_rpc_execution, bridge.logger),
+        bridge.AmmoStorage(context.send_msgs),
+        lambda *args, **kwargs: bridge.emit_launcher_event(*args, **kwargs), bridge.logger,
+    )
+    context.ammo_requests = bridge.AmmoRequestPump(context.ammo, context.request_ammo_refill, context.exit_event, bridge.logger)
     context.server = SimpleNamespace(socket=SimpleNamespace(open=True, closed=False))
     context.on_user_say = lambda text: text
     sent = []
@@ -421,6 +544,25 @@ async def test_launcher_chat_uses_commonclient_say_payload():
 
 def _hint_context(*, team=1, slot=2, seed="test-seed"):
     context = object.__new__(bridge.DoomEternalContext)
+    context.item_state_ready = False
+    context.exit_event = asyncio.Event()
+    context.physical_checks = bridge.PhysicalChecks(bridge.logger)
+    context.level_ready = bridge.LevelReady(bridge.logger)
+    context.session_tasks = bridge.SessionTasks()
+    context.location_setup = bridge.LocationSetup(bridge.logger)
+    context.protocol_feed = bridge.ProtocolFeed()
+    context.receipt_delivery = bridge.ReceiptDelivery(bridge.logger)
+    context.save_checks = bridge.SaveChecks(bridge.WEAPON_MASTERY_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_BY_UNLOCKABLE, bridge.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bridge.ALL_MISSION_CHALLENGES_ENTRIES, bridge.logger)
+    context.goals = bridge.GoalProgress(bridge.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge.CULTIST_BASE_MAP, bridge.logger)
+    context.publisher_dispatch = bridge.PublisherDispatch(bridge.PUBLISHERS, context.goals, bridge.logger)
+    context.deathlink = bridge.DeathLinkSession(bridge.DeathLinkReceiver(), bridge.DEATHLINK_MESSAGES, lambda *a, **kw: bridge.emit_launcher_event(*a, **kw), bridge.logger)
+    context.ammo = bridge.AmmoRefill(
+        bridge.AmmoCommandPublication(bridge.send_command, bridge.discard_queued_coalesced_command,
+                                      bridge.rpc_execution_enabled, bridge.set_rpc_execution, bridge.logger),
+        bridge.AmmoStorage(context.send_msgs),
+        lambda *args, **kwargs: bridge.emit_launcher_event(*args, **kwargs), bridge.logger,
+    )
+    context.ammo_requests = bridge.AmmoRequestPump(context.ammo, context.request_ammo_refill, context.exit_event, bridge.logger)
     context.team = team
     context.slot = slot
     context.room_seed_name = seed
@@ -476,12 +618,11 @@ async def test_launcher_hints_follow_canonical_storage_package_order(monkeypatch
     monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
     context.state_key = None
     context.initialize_item_state = lambda: None
-    context.deathlink_receiver = SimpleNamespace(configure_mode=lambda _mode: None)
     context.onboard_bootstrap = lambda _reason: None
     context.reconcile_checked_automap_cleanup = lambda _reason: None
     context.reconcile_fast_travel_unlock = lambda _reason: None
     context._item_delivery_wakeup = False
-    context.items_processed = 0
+    context.receipt_session = bridge.ReceiptSession()
     context.items_received = []
     context.auth = "Doom Slayer"
     context.game = "Doom Eternal"
@@ -502,7 +643,11 @@ async def test_launcher_hints_follow_canonical_storage_package_order(monkeypatch
     context.update_death_link = noop
     context.check_mission_challenge_locations = noop
     context.send_msgs = send_msgs
-    monkeypatch.setattr(bridge.asyncio, "create_task", lambda coroutine: coroutine.close())
+    def close_task(coroutine):
+        coroutine.close()
+        return Mock()
+
+    monkeypatch.setattr(bridge.asyncio, "create_task", close_task)
 
     process_server_cmd = _local_archipelago_packet_handler()
     await process_server_cmd(context, {
@@ -615,11 +760,9 @@ def test_launcher_hints_report_malformed_nonempty_payload(monkeypatch, caplog):
 
 def _ammo_context(monkeypatch):
     context = _context()
-    context._ammo_server_consumed = 0
-    context._ammo_server_discarded = 0
-    context._ammo_refill_discard_pending_target = None
-    context._ammo_refill_overflow_task = None
-    context._ammo_refill_available = None
+    context.ammo.bind(context.state_key)
+    context.ammo.consume_discarded(0)
+    context.ammo.consume_consumed(0)
     emitted = []
     monkeypatch.setattr(
         bridge,
@@ -634,7 +777,7 @@ def test_ammo_refill_receipt_refreshes_counter_immediately(monkeypatch):
     context.items_received = [NetworkItem(7770024, 0, 1, 0)]
 
     assert context._refresh_ammo_refill_receipt_projection(7770024) is True
-    assert context._ammo_refill_available == 1
+    assert context.ammo.available == 1
     assert len(emitted) == 1
     event_type, payload = emitted[0]
     assert event_type == "ammo_refill"
@@ -645,7 +788,7 @@ def test_ammo_refill_receipt_refreshes_counter_immediately(monkeypatch):
 
     context.items_received.append(NetworkItem(7770024, 0, 1, 0))
     assert context._refresh_ammo_refill_receipt_projection(7770024) is True
-    assert context._ammo_refill_available == 2
+    assert context.ammo.available == 2
     assert emitted[-1][1]["available"] == 2
 
 
@@ -653,13 +796,13 @@ def test_ammo_refill_counter_follows_consumed_and_never_negative(monkeypatch):
     context, emitted = _ammo_context(monkeypatch)
     context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(3)]
     assert context._refresh_ammo_refill_receipt_projection(7770024) is True
-    assert context._ammo_refill_available == 3
+    assert context.ammo.available == 3
 
-    context._ammo_server_consumed = 1
+    context.ammo.consume_consumed(1)
     assert context._refresh_ammo_refill_charge() == 2
-    context._ammo_server_consumed = 2
+    context.ammo.consume_consumed(2)
     assert context._refresh_ammo_refill_charge() == 1
-    context._ammo_server_consumed = 5
+    context.ammo.consume_consumed(5)
     assert context._refresh_ammo_refill_charge() == 0
 
 
@@ -667,15 +810,15 @@ def test_ammo_refill_receipt_projection_ignores_other_items(monkeypatch):
     context, emitted = _ammo_context(monkeypatch)
     assert context._refresh_ammo_refill_receipt_projection(7770004) is False
     assert emitted == []
-    assert context._ammo_refill_available is None
+    assert context.ammo.available == 0
 
 
 def test_ammo_refill_reconnect_reconstructs_balance_without_replay(monkeypatch):
     context, emitted = _ammo_context(monkeypatch)
     context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(3)]
-    context._ammo_server_consumed = 1
+    context.ammo.consume_consumed(1)
     assert context._refresh_ammo_refill_receipt_projection(7770024) is True
-    assert context._ammo_refill_available == 2
+    assert context.ammo.available == 2
     assert bridge.ITEM_REPLAY_POLICIES[7770024].policy == "never_replay"
     assert len(context.items_received) == 3
 
@@ -684,4 +827,4 @@ def test_ammo_refill_capacity_caps_fourth_receipt(monkeypatch):
     context, emitted = _ammo_context(monkeypatch)
     context.items_received = [NetworkItem(7770024, 0, 1, 0) for _ in range(4)]
     assert context._refresh_ammo_refill_receipt_projection(7770024) is True
-    assert context._ammo_refill_available == bridge.AMMO_REFILL_CAPACITY == 3
+    assert context.ammo.available == bridge.AMMO_REFILL_CAPACITY == 3

@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+
+from doom_eap.contracts.runtime_context import DlcEvidence, RuntimeContext
+from doom_eap.runtime.lifecycle import RuntimeLifecycle
+from doom_eap.contracts.materialization import (
+    SUPPORT_RUNE_CAPABILITY, TAG_SPECIAL_CAPABILITY, SUPPORT_RUNE_IDS,
+    TAG_SPECIAL_IDS, CRUCIBLE_ID, GATE_KEY_TO_MAP, context_item_ids, support_rune_commands,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -14,9 +20,7 @@ SLOT_DATA_REVISION = str(json.loads(
     (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
 )["slot_data_revision"])
 CAPABILITY_CROSS_CAMPAIGN = "cross_campaign_materialization_v1"
-SUPPORT_RUNE_CAPABILITY = "support_runes_v1"
 TAG_CAPABILITY = "tag_context_v1"
-TAG_SPECIAL_CAPABILITY = "tag_special_v1"
 GOAL_CAPABILITIES = frozenset({"goal_events_v1", "goal_endpoint_events_v1"})
 GOAL_VALUES = frozenset({
     "Acquire the Unmaykr",
@@ -33,50 +37,6 @@ VICTORY_REQUIREMENT_VALUES = frozenset({
     "Complete All Weapon Mastery Challenges",
     "Acquire the Unmaykr",
 })
-SUPPORT_RUNE_IDS = frozenset({7770145, 7770146, 7770147})
-TAG_SPECIAL_IDS = frozenset({7770009, 7770902})
-CRUCIBLE_ID = 7770007
-GATE_KEY_TO_MAP = {
-    7770148: "e4m1_rig",
-    7770149: "e4m3_mcity",
-    7770150: "e1m2_war",
-    7770151: "e1m3_cult",
-    7770152: "e2m1_nest",
-    7770153: "e2m2_base",
-    7770154: "e2m3_core",
-    7770155: "e3m1_slayer",
-}
-
-
-@dataclass(frozen=True)
-class RuntimeContext:
-    identity: str
-    campaign: str
-    runtime_maps: tuple[str, ...]
-    map_keys: tuple[str, ...]
-    capabilities: frozenset[str]
-
-    def supports(self, capability: str) -> bool:
-        return capability in self.capabilities
-
-
-@dataclass(frozen=True)
-class DlcEvidence:
-    status: str
-    reason: str
-    checked_paths: tuple[str, ...]
-
-    @property
-    def blocks_enabled(self) -> bool:
-        return self.status == "missing"
-
-    def report(self) -> dict[str, Any]:
-        return {
-            "status": self.status,
-            "reason": self.reason,
-            "checked_paths": list(self.checked_paths),
-            "blocks_enabled": self.blocks_enabled,
-        }
 
 
 def _load_registry() -> tuple[RuntimeContext, ...]:
@@ -110,6 +70,14 @@ def classify_runtime_context(runtime_map: str, *, base_maps: Iterable[str] = ())
     if context is not None:
         return context
     return None
+
+
+def resolve_context_evidence(marker_map, evidence_map, *, materialization_suspended, base_maps=()):
+    """Supply authored context data to the lifecycle selection policy."""
+    return RuntimeLifecycle.resolve_context(
+        marker_map, evidence_map, materialization_suspended=materialization_suspended,
+        contexts_by_map=CONTEXT_BY_MAP,
+    )
 
 
 def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
@@ -198,36 +166,6 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
         ):
             raise ValueError("additional_victory_requirements is invalid")
     return dict(slot_data)
-
-
-def context_item_ids(context: RuntimeContext, received_item_ids: Iterable[int]) -> tuple[int, ...]:
-    """Select only materializable owned IDs for active context."""
-    selected = []
-    for item_id in received_item_ids:
-        if item_id in SUPPORT_RUNE_IDS and not context.supports(SUPPORT_RUNE_CAPABILITY):
-            continue
-        if item_id in TAG_SPECIAL_IDS and not context.supports(TAG_SPECIAL_CAPABILITY):
-            continue
-        if item_id == 7770901 and not context.supports("special_weapon_v1"):
-            continue
-        if item_id == CRUCIBLE_ID and not context.supports("crucible_v1"):
-            continue
-        if item_id in GATE_KEY_TO_MAP:
-            target_map = GATE_KEY_TO_MAP[item_id]
-            if target_map not in context.map_keys:
-                continue
-        selected.append(item_id)
-    return tuple(selected)
-
-
-def support_rune_commands(received_item_ids: Iterable[int], context: RuntimeContext) -> tuple[int, ...]:
-    if not context.supports(SUPPORT_RUNE_CAPABILITY):
-        return ()
-    return tuple(
-        item_id
-        for item_id in sorted(set(received_item_ids))
-        if item_id in SUPPORT_RUNE_IDS
-    )
 
 
 def dlc_contexts() -> tuple[RuntimeContext, ...]:

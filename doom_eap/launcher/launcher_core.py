@@ -29,6 +29,7 @@ from tools.decls.devinv_builder import (
     output_path_for_map,
 )
 from .launcher_platform import IDFILE_DECOMPRESSOR, publish_file
+from doom_eap.content.compiler_identity import load_compiler_source_identity
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -680,8 +681,13 @@ class RoomCompiler:
         payload_manifest: object,
     ) -> dict[str, object]:
         from tools.release.room_payloads import canonical_json
+        import sys
+
+        compiler_identity = load_compiler_source_identity(ROOT, frozen=getattr(sys, "frozen", False))
 
         def _file_sha(p: Path) -> str | None:
+            if p.suffix == ".py":
+                return compiler_identity["source_hashes"].get(p.relative_to(ROOT).as_posix())
             return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
 
         tag_decl_hashes: dict[str, str | None] = {}
@@ -721,8 +727,12 @@ class RoomCompiler:
                 "fortress_battery_labels": _file_sha(cls.FORTRESS_BATTERY_LABEL_SPEC_PATH),
             },
             "compiler_sources": {
+                "closure_sha256": compiler_identity["fingerprint"],
                 "launcher_core": _file_sha(ROOT / "doom_eap" / "launcher" / "launcher_core.py"),
                 "devinv_builder": _file_sha(ROOT / "tools" / "decls" / "devinv_builder.py"),
+                "tag_prerequisites": _file_sha(ROOT / "doom_eap" / "contracts" / "tag_prerequisites.py"),
+                "runtime_context": _file_sha(ROOT / "doom_eap" / "contracts" / "runtime_context.py"),
+                "lifecycle": _file_sha(ROOT / "doom_eap" / "runtime" / "lifecycle.py"),
                 "mission_complete_map_patcher": _file_sha(ROOT / "tools" / "maps" / "mission_complete_map_patcher.py"),
                 "ap_map_generator": _file_sha(ROOT / "tools" / "maps" / "ap_map_generator.py"),
                 "notification_formatting": _file_sha(ROOT / "tools" / "maps" / "notification_formatting.py"),
@@ -1152,7 +1162,7 @@ class RoomCompiler:
             temporary_dir = Path(temporary)
             decoded = temporary_dir / "decoded.entities"
             compressed = temporary_dir / "compressed.entities"
-            decoded.write_text(text, encoding="utf-8")
+            decoded.write_text(text, encoding="utf-8", newline="\n")
             try:
                 subprocess.run(
                     [str(decompressor), "--compress", str(decoded), str(compressed)],
@@ -1346,7 +1356,7 @@ class InstallPlan:
     def _write_record(self, record: InstallRecord) -> None:
         self.target.mkdir(parents=True, exist_ok=True)
         temporary = self._record_path().with_suffix(".tmp")
-        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         publish_file(temporary, self._record_path(), operation="install_record_publish")
 
     def install(self, record: InstallRecord, *, fail_after: int | None = None) -> InstallRecord:
@@ -1458,13 +1468,13 @@ class ModCompiler:
         room_config = project_room_config(manifest.options)
         (output_root / "seed_manifest.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        , newline="\n")
         if not manifest.static_precompile:
             placement_metadata = [record.document() for record in manifest.placements]
             (output_root / "placement_metadata.json").write_text(
                 json.dumps(placement_metadata, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
-            )
+            newline="\n")
             (output_root / "placement_string_inputs.json").write_text(
                 json.dumps(
                     [
@@ -1475,10 +1485,10 @@ class ModCompiler:
                     sort_keys=True,
                 ) + "\n",
                 encoding="utf-8",
-            )
+            newline="\n")
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        , newline="\n")
         from doom_eap.content.content_catalog import load_content_catalog
 
         campaign_maps = tuple(
@@ -1492,7 +1502,7 @@ class ModCompiler:
             projected = self.project_map_config(manifest, map_key)
             (output_root / f"{map_key}.locations.json").write_text(
                 json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            , newline="\n")
         return output_root
 
     def project_map_config(self, manifest: SeedManifest, map_key: str) -> dict[str, Any]:
@@ -1545,7 +1555,7 @@ class ModCompiler:
             config_path = staged / f"{map_key}.locations.json"
             config_path.write_text(
                 json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            , newline="\n")
             generate_map(
                 vanilla_entities,
                 output_entities,
@@ -1569,7 +1579,7 @@ class ModCompiler:
         output_entities.with_suffix(".seed.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
-        )
+        newline="\n")
         return output_entities
 
 

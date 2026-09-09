@@ -7,13 +7,24 @@ import subprocess
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
+
+from .launcher_workers import LauncherJob, LauncherWorkCancelled
 
 PROBLEM_URL = "https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new?template=problem.yml"
 
 
 class SupportReportGenerator(Protocol):
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path: ...
+
+
+@dataclass(frozen=True)
+class ScopedSupportReport:
+    create: Callable[..., Path]
+    job: LauncherJob
+
+    def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None) -> Path:
+        return self.create(destination, logs=logs, job=self.job)
 
 
 def reveal_support_report(path: Path) -> bool:
@@ -31,16 +42,22 @@ class ProblemReport:
     message: str
 
 
-def report_problem(controller: SupportReportGenerator, *, logs: list[str]) -> ProblemReport:
+def report_problem(controller: SupportReportGenerator, *, logs: list[str], job: LauncherJob | None = None) -> ProblemReport:
+    if job is not None:
+        job.check()
     path = None
     try:
         path = controller.create_support_bundle(
             Path.home() / "DOOM-Eternal-Archipelago-support.zip", logs=logs,
         )
         messages = ["Support Report created."]
+    except LauncherWorkCancelled:
+        raise
     except Exception:
         messages = ["Support Report generation failed. You can still report the problem without it."]
 
+    if job is not None:
+        job.check()
     try:
         browser_opened = bool(webbrowser.open(PROBLEM_URL))
     except Exception:
@@ -50,6 +67,8 @@ def report_problem(controller: SupportReportGenerator, *, logs: list[str]) -> Pr
     else:
         messages.append(f"Could not open your browser. Copy and open this link:\n{PROBLEM_URL}")
 
+    if job is not None:
+        job.check()
     if path is not None:
         try:
             revealed = reveal_support_report(path)

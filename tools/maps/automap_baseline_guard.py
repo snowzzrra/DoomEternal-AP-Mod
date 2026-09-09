@@ -10,6 +10,16 @@ from pathlib import Path
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds, generate_map
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def find_check_source(content, ap_check, entities):
+    """The producer's declared _B checks share their primary pickup source."""
+    entity_name = ap_check.removeprefix("AP_CHECK_").lower()
+    bounds = find_entity_block_bounds(content, entity_name)
+    if bounds is None and ap_check.endswith("_B") and ap_check[:-2] in entities:
+        entity_name = ap_check[:-2].removeprefix("AP_CHECK_").lower()
+        bounds = find_entity_block_bounds(content, entity_name)
+    return entity_name, bounds
 PROTOTYPE_ENTITIES = {
     "mech_street_pickup_collectible_toys_doomguy_1",
     "mech_street_progress_mod_bot_1_e1m1",
@@ -82,8 +92,7 @@ def assert_separate_automap_helper_guard() -> int:
                     f"{sorted(helper_names)} != {sorted(expected_names)}"
                 )
             for ap_check, location_id in config["entities"].items():
-                entity_name = ap_check.removeprefix("AP_CHECK_").lower()
-                source_bounds = find_entity_block_bounds(source_text, entity_name)
+                entity_name, source_bounds = find_check_source(source_text, ap_check, config["entities"])
                 helper_bounds = find_entity_block_bounds(
                     generated, f"ap_automap_location_{location_id}"
                 )
@@ -95,9 +104,10 @@ def assert_separate_automap_helper_guard() -> int:
                     if helper_bounds is not None:
                         raise ValueError(f"Redundant Automap helper retained: {map_key}/{location_id}")
                     generated_bounds = find_entity_block_bounds(generated, entity_name)
-                    if generated_bounds is None:
+                    removed_original = target_policy.get("remove_original") and target_policy.get("independent_ap_trigger")
+                    if generated_bounds is None and not removed_original:
                         raise ValueError(f"Native marker source missing: {map_key}/{location_id}")
-                    generated_owner = generated[generated_bounds[0]:generated_bounds[1]]
+                    generated_owner = generated[generated_bounds[0]:generated_bounds[1]] if generated_bounds else ""
                     marker_owner = generated_owner
                     if _scalar(generated_owner, "automapPropertiesDecl") is None:
                         visual_name = target_policy.get(
@@ -106,7 +116,12 @@ def assert_separate_automap_helper_guard() -> int:
                         visual_bounds = find_entity_block_bounds(generated, visual_name)
                         if visual_bounds is not None:
                             marker_owner = generated[visual_bounds[0]:visual_bounds[1]]
-                    if _scalar(marker_owner, "automapPropertiesDecl") != _expected_decl(source_block):
+                        elif removed_original:
+                            raise ValueError(f"Independent marker source missing: {map_key}/{location_id}")
+                    expected_decl = _scalar(source_block, "automapPropertiesDecl")
+                    if target_policy.get("independent_ap_trigger"):
+                        expected_decl = target_policy.get("independent_automap_properties_decl", _expected_decl(source_block))
+                    if _scalar(marker_owner, "automapPropertiesDecl") != expected_decl:
                         raise ValueError(f"Native Automap marker drift: {map_key}/{location_id}")
                     checked += 1
                     continue

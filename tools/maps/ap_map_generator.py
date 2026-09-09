@@ -1953,6 +1953,16 @@ def location_feedback_policy(location_feedback, ap_check_id):
     return policy
 
 
+def resolve_location_feedback_policy(location_feedback, ap_check_id, target_policy):
+    """Native-contract checks have the established AP-only feedback boundary."""
+    if ap_check_id not in location_feedback and (
+        target_policy.get("duplicate_policy") == "native_only"
+        or "native_entity_contract" in target_policy
+    ):
+        return "ap_only"
+    return location_feedback_policy(location_feedback, ap_check_id)
+
+
 def generate_item_notification(item_id, subtext_key, classification, stage=None, slot=None):
     """Generate the one classification-selected received-item notification."""
     style = notification_style_for_item(item_id, classification)
@@ -2825,15 +2835,9 @@ def generate_map(
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
-                if ap_check_id not in location_feedback and (
-                    target_policy.get("duplicate_policy") == "native_only"
-                    or "native_entity_contract" in target_policy
-                ):
-                    feedback_policy = "ap_only"
-                else:
-                    feedback_policy = location_feedback_policy(
-                        location_feedback, ap_check_id
-                    )
+                feedback_policy = resolve_location_feedback_policy(
+                    location_feedback, ap_check_id, target_policy
+                )
                 include_ap_feedback = True
                 if not target_policy:
                     target_policy = build_universal_physical_policy(

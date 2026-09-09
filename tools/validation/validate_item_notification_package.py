@@ -232,8 +232,18 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("client identity notification capability diverges from build mode")
     load_release_manifest(manifest_path, package_root=manifest_path.parent)
-    bridge = (client_dir / "bridge_client.py").read_text(encoding="utf-8")
-    if "bridge_identity.json" not in bridge or "receipt=ENABLE_ITEM_NOTIFICATIONS" not in bridge:
+    runtime_dir = client_dir / "doom_eap" / "runtime"
+    bridge = (runtime_dir / "bridge_client.py").read_text(encoding="utf-8")
+    receipt_policy = (runtime_dir / "receipt_delivery.py").read_text(encoding="utf-8")
+    if (
+        "bridge_identity.json" not in bridge
+        or "compile_receipt_plan(" not in bridge
+        or "ENABLE_ITEM_NOTIFICATIONS" not in bridge
+        or not all(token in receipt_policy for token in (
+            "request.intent == NEW_RECEIPT", "receipt_feedback == AP_RECEIPT_FEEDBACK",
+            "notification_slot=facts.notification_slot if receipt else None",
+        ))
+    ):
         raise AssertionError("packaged bridge lacks capability-gated receipt routing")
 
     if receipts:

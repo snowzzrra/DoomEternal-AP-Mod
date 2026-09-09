@@ -13,6 +13,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -247,6 +248,8 @@ def build_apworld(
             ("worlds/__init__.py", archipelago_source / "worlds/__init__.py"),
             ("worlds/AutoWorld.py", archipelago_source / "worlds/AutoWorld.py"),
             ("worlds/Files.py", archipelago_source / "worlds/Files.py"),
+            ("worlds/LauncherComponents.py", archipelago_source / "worlds/LauncherComponents.py"),
+            ("data/GLOBAL.apignore", archipelago_source / "data/GLOBAL.apignore"),
         ],
         config={
             "command": "Launcher.py Build APWorlds -- DOOM Eternal --skip_open_folder",
@@ -265,28 +268,30 @@ def build_apworld(
         print(f"APWORLD cache=hit key={key}")
         return output
     print(f"APWORLD cache=miss reason={reason} key={key}")
-    candidate = archipelago_source / "build/apworlds/doometernal.apworld"
-    candidate.unlink(missing_ok=True)
     build_env = os.environ.copy()
     build_env["SKIP_REQUIREMENTS_UPDATE"] = "1"
-    subprocess.run(
-        (
-            archipelago_python,
-            str(archipelago_source / "Launcher.py"),
-            "Build APWorlds",
-            "--",
-            "DOOM Eternal",
-            "--skip_open_folder",
-        ),
-        check=True,
-        cwd=archipelago_source,
-        env=build_env,
-    )
-    if not candidate.is_file() or candidate.is_symlink():
-        raise RuntimeError(f"canonical APWorld build did not produce {candidate}")
-    canonicalize_native_apworld(candidate)
-    output.unlink(missing_ok=True)
-    shutil.copyfile(candidate, output)
+    # The canonical builder uses cwd/worlds and cwd/build. Stage its unchanged
+    # inputs instead of deleting an existing candidate in the AP checkout.
+    with tempfile.TemporaryDirectory(prefix="apworld-build-", dir=output.parent) as temporary:
+        work = Path(temporary)
+        shutil.copytree(archipelago_source / "worlds/doometernal", work / "worlds/doometernal")
+        subprocess.run(
+            (archipelago_python, "-c", """
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import Utils
+Utils.user_path.cached_path = sys.argv[2]
+from worlds.LauncherComponents import _build_apworlds
+os.chdir(sys.argv[2])
+_build_apworlds("DOOM Eternal", "--skip_open_folder")
+""", str(archipelago_source), str(work)),
+            check=True, cwd=work, env=build_env,
+        )
+        candidate = work / "build/apworlds/doometernal.apworld"
+        if not candidate.is_file() or candidate.is_symlink():
+            raise RuntimeError(f"canonical APWorld build did not produce {candidate}")
+        canonicalize_native_apworld(candidate)
+        shutil.copyfile(candidate, output)
     publish(cache_root, "apworld", key, output.parent, (output.name,))
     restored, restore_reason = restore(cache_root, "apworld", key, output.parent, (output.name,))
     if not restored:

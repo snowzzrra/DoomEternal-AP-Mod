@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any
 
 from doom_eap.content.content_catalog import RUNTIME_STRATEGIES
+from doom_eap.contracts.runtime_context import canonical_map_name
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -24,13 +25,6 @@ MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY = {
     "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
     "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
 }
-
-
-def canonical_map_name(name: str | None) -> str | None:
-    if not name:
-        return name
-    normalized = str(name).strip().replace("\\", "/").rstrip("/")
-    return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
 
 
 def _thaw(value: Any) -> Any:

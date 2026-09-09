@@ -45,7 +45,7 @@ from tools.maps.ap_map_generator import (
     generate_target_relay,
     validate_target_policies,
 )
-from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
+from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard, find_check_source
 from tools.maps.hub_diff_guard import assert_hub_diff_classified
 from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
 
@@ -362,8 +362,7 @@ def validate_automap_family_registry(
             encoding="utf-8"
         )
         for ap_check, location_id in config.get("entities", {}).items():
-            entity_name = ap_check.removeprefix("AP_CHECK_").lower()
-            bounds = find_entity_block_bounds(source_text, entity_name)
+            entity_name, bounds = find_check_source(source_text, ap_check, config["entities"])
             if bounds is None:
                 errors.append(f"Automap source entity missing: {map_key}/{entity_name}")
                 continue
@@ -379,6 +378,16 @@ def validate_automap_family_registry(
                     )
                 ]
                 if len(matches) != 1:
+                    policy = config.get("target_policies", {}).get(entity_name, {})
+                    contract = policy.get("native_entity_contract")
+                    if isinstance(contract, dict) and policy.get("no_auto_automap_helper") is True:
+                        try:
+                            ap_map_generator.apply_native_entity_contract(block, contract)
+                        except ValueError as exc:
+                            errors.append(f"Native Automap owner contract drift: {map_key}/{location_id}: {exc}")
+                        else:
+                            classified[location_id] = "explicit_native_contract"
+                        continue
                     errors.append(
                         f"Automap family coverage for {location_id}/{entity_name}: {matches}"
                     )
@@ -1021,8 +1030,9 @@ def main(argv: list[str] | None = None) -> int:
         config_data = read_json(path)
         if prohibited_praetor_policy in config_data:
             errors.append(f"Retired Praetor policy remains in {path.name}")
-        if config_data.get("map_key") != map_key:
-            errors.append(f"Missing or divergent map_key in {path.name}")
+        descriptor = read_json(path.with_name("descriptor.json"))
+        if descriptor.get("key") != map_key or config_data.get("map_key", map_key) != map_key:
+            errors.append(f"Divergent catalog/config map identity: {map_key}/{path.relative_to(ROOT)}")
         config = dict(config_data.get("entities", {}))
         for ap_check in config:
             if "PRAETOR" not in ap_check:
@@ -1039,7 +1049,7 @@ def main(argv: list[str] | None = None) -> int:
                 or not policy.get("remove_original")
                 or set(policy) - {
                     "independent_ap_trigger", "remove_original", "drop_targets",
-                    "preserve_targets",
+                    "preserve_targets", "independent_size",
                 }
             ):
                 errors.append(
@@ -1068,9 +1078,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"Unknown location feedback keys in {path.name}: "
                 f"{unknown_feedback}"
             )
-        default_feedback = sorted(
-            declared_checks - set(feedback)
-        )
+        default_feedback = []
+        for ap_check in sorted(declared_checks - set(feedback)):
+            policy = config_data.get("target_policies", {}).get(ap_check.removeprefix("AP_CHECK_").lower(), {})
+            try:
+                ap_map_generator.resolve_location_feedback_policy(feedback, ap_check, policy)
+            except ValueError:
+                default_feedback.append(ap_check)
         if default_feedback:
             errors.append(
                 f"{path.name} has public-package default feedback policies: "
@@ -1105,9 +1119,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 290:
+    if physical_location_count != 350:
         errors.append(
-            f"Expected 290 physical entity locations, found {physical_location_count}"
+            f"Expected 350 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -1269,9 +1283,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": len(item_ids),
-        "locations": 369,
-        "map_checks": 307,
-        "runtime_locations": 62,
+        "locations": len(location_ids),
+        "map_checks": len(manifest_location_id_set),
+        "runtime_locations": len(runtime_locations),
         "runtime_goals": 1,
         "route_sentinel_batteries": 18,
     }:
@@ -1367,6 +1381,10 @@ def main(argv: list[str] | None = None) -> int:
         (ROOT / "native" / "client" / name).read_text(encoding="utf-8", errors="ignore")
         for name in (
             "ap_client_exe.cpp",
+            "command_queue.cpp",
+            "command_queue.h",
+            "command_queue_contracts.h",
+            "command_transport.h",
             "game_state_probe.cpp",
             "game_state_probe.h",
             "ap_runtime_rpc_client.cpp",
@@ -1380,7 +1398,7 @@ def main(argv: list[str] | None = None) -> int:
     normalized_idl = re.sub(r"\s+", " ", rpc_idl).strip()
     if any(fragment not in normalized_idl for fragment in
            ("1c9ca7c8-d421-482d-b85d-79fac33b2658", "version(1.0)",
-            "implicit_handle(handle_t ap_runtime_rpc__MIDL_AutoBindHandle)")):
+            "implicit_handle(handle_t ap_runtime_rpc_binding_handle)")):
         errors.append("AP runtime RPC IDL is missing required interface metadata")
     if "explicit_handle" in normalized_idl:
         errors.append("AP runtime RPC IDL must use implicit binding")

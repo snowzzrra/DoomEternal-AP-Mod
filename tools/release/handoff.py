@@ -20,6 +20,7 @@ def _sha256(path: Path) -> str:
 def write_handoff_manifest(
     root: Path, *, version: str, mod_sha: str, apworld_sha: str, platform: str = "both",
     mod_ref: str | None = None, apworld_ref: str | None = None,
+    source_state: dict | None = None,
 ) -> Path:
     root = root.resolve()
     required = [
@@ -62,7 +63,12 @@ def write_handoff_manifest(
         "files": records,
     }
     path = root / "BUILD-MANIFEST.json"
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if source_state is not None:
+        from tools.release.source_provenance import source_origin
+        for project, ancestor in (("mod", mod_sha), ("apworld", apworld_sha)):
+            manifest[project] = source_origin(ancestor, source_state[project])
+        manifest["build"]["source_mode"] = "working_tree_snapshot"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     (root / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8", newline="\n")
     for record in records:
         candidate = root / str(record["path"])
@@ -80,11 +86,13 @@ def main() -> int:
     parser.add_argument("--apworld-sha", required=True)
     parser.add_argument("--mod-ref")
     parser.add_argument("--apworld-ref")
+    parser.add_argument("--source-state", type=Path)
     parser.add_argument("--platform", choices=("windows", "linux", "both"), default="both")
     args = parser.parse_args()
     write_handoff_manifest(args.root, version=args.version, mod_sha=args.mod_sha,
                            apworld_sha=args.apworld_sha, platform=args.platform,
-                           mod_ref=args.mod_ref, apworld_ref=args.apworld_ref)
+                           mod_ref=args.mod_ref, apworld_ref=args.apworld_ref,
+                           source_state=json.loads(args.source_state.read_text(encoding="utf-8")) if args.source_state else None)
     return 0
 
 

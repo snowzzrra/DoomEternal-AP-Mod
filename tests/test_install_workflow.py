@@ -9,6 +9,7 @@ import ssl
 import tarfile
 import tempfile
 import threading
+from types import SimpleNamespace
 import time
 import unittest
 import zipfile
@@ -1196,6 +1197,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
         }
 
     def tearDown(self):
+        self.controller.close()
         self.meathook_patcher.stop()
         for k, v in self.old_env.items():
             if v is None:
@@ -1254,6 +1256,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             mock_ensure.assert_called_once()
 
     def test_windows_native_client_started_on_already_installed_room(self):
+        finished = threading.Event()
         fake_snapshot = _snapshot()
         fake_state = MagicMock(
             state="already_installed",
@@ -1264,10 +1267,12 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             reason="",
             readiness_reason="",
         )
-        with patch.object(self.controller.workflow, "install_state", return_value=fake_state), \
+        with patch.object(self.controller.workflow, "for_job", return_value=self.controller.workflow), \
+             patch.object(self.controller.workflow, "install_state", return_value=fake_state), \
              patch("doom_eap.launcher.launcher_core.RoomSnapshot.from_event", return_value=fake_snapshot), \
-             patch.object(self.controller, "_ensure_native_client") as mock_ensure:
+             patch.object(self.controller, "_ensure_native_client", side_effect=lambda **kw: finished.set()) as mock_ensure:
             self.controller.process_event({"type": "connected"})
+            self.assertTrue(finished.wait(3))
             mock_ensure.assert_called_once()
 
     def test_windows_launch_game_ensures_native_client_then_launches_steam(self):
@@ -1305,6 +1310,116 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
             self.assertEqual(url, "steam://rungameid/782330")
             mock_steam.assert_called_once()
             mock_ensure.assert_not_called()
+
+    def test_stale_supervisor_error_cannot_replace_current_connection_diagnostics(self):
+        self.controller.supervisor = MagicMock()
+        previous = {"message": "current attempt failure", "attempt_id": 7}
+        self.controller.last_connection_error = previous
+        self.controller.connection_attempt_id = 7
+        old_supervisor = MagicMock()
+        with patch.object(self.controller, "_stop_native_client") as stop_native:
+            self.controller._worker_event(old_supervisor, {"type": "error", "message": "old worker failure"})
+        self.assertIs(self.controller.last_connection_error, previous)
+        self.assertTrue(self.controller.events.empty())
+        stop_native.assert_not_called()
+        old_supervisor.stop.assert_not_called()
+
+    def test_worker_log_is_scoped_before_diagnostics_and_queue_publication(self):
+        self.controller.supervisor = MagicMock()
+        self.controller._supervisor_attempt = 7
+        before = list(self.controller.diagnostic_history)
+        self.controller._worker_log(MagicMock(), "retired output")
+        self.assertEqual(list(self.controller.diagnostic_history), before)
+        self.assertTrue(self.controller.events.empty())
+        self.controller._worker_log(self.controller.supervisor, "current output")
+        self.assertEqual(self.controller.events.get_nowait(), {
+            "type": "log", "message": "current output", "attempt_id": 7,
+        })
+
+    def test_retired_dialog_cannot_start_repair_or_confirm_a_different_room(self):
+        generation = self.controller.operation_generation
+        self.controller.workers.invalidate()
+        with patch.object(self.controller.workflow, "for_job") as scoped, \
+             patch.object(self.controller, "ensure_ammo_refill_config") as configure:
+            self.assertFalse(self.controller.request_repair("repair_game_link", generation=generation))
+            self.assertFalse(self.controller.confirm_manual_installation(generation=generation))
+            self.assertFalse(self.controller.prepare_setup(generation=generation))
+            self.assertFalse(self.controller.reinstall_setup(generation=generation))
+            with self.assertRaisesRegex(RuntimeError, "Room changed"):
+                self.controller.uninstall_setup(generation=generation)
+        scoped.assert_not_called()
+        configure.assert_not_called()
+
+    def test_repair_setup_callback_does_not_hold_lifecycle_lock(self):
+        def start(**kwargs):
+            acquired = self.controller._lifecycle_lock.acquire(blocking=False)
+            self.assertTrue(acquired, "setup callbacks must be able to publish controller events")
+            if acquired:
+                self.controller._lifecycle_lock.release()
+            self.assertEqual(kwargs, {"force": True, "generation": self.controller.operation_generation})
+            return True
+        with patch.object(self.controller.setup, "start", side_effect=start):
+            self.assertTrue(self.controller._queue_repair_setup(
+                SimpleNamespace(generation=self.controller.operation_generation)))
+
+    def test_late_doctor_does_not_publish_to_replacement_connection(self):
+        entered, release, completed = threading.Event(), threading.Event(), threading.Event()
+
+        def run():
+            entered.set()
+            self.assertTrue(release.wait(3))
+            return SimpleNamespace(document=lambda: {"old": True})
+
+        try:
+            with patch.object(launcher_controller_mod, "LauncherDoctor") as doctor, \
+                 patch.object(self.controller, "_live_support_diagnostics", return_value={}):
+                doctor.return_value.run.side_effect = run
+                self.assertTrue(self.controller.request_doctor())
+                self.assertTrue(entered.wait(3))
+                self.controller.workers.invalidate()
+                release.set()
+                self.assertTrue(self.controller.workers.submit("sentinel", lambda job: completed.set()))
+                self.assertTrue(completed.wait(3))
+            self.assertTrue(self.controller.events.empty())
+        finally:
+            release.set()
+
+    def test_qt_repair_completion_and_retired_dialog_keep_current_scope(self):
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        from doom_eap.launcher.launcher_ui import LauncherUI
+
+        app = QApplication.instance() or QApplication([])
+        with patch.object(self.controller, "is_game_running", return_value=False):
+            window = LauncherUI(self.controller)
+        try:
+            window._set_setup_state("installing")
+            observed = []
+            with patch.object(window, "_prepare", side_effect=lambda **kwargs: observed.append(window._setup_state)) as prepare:
+                window._handle_event({"type": "integration_repair_result", "success": True})
+            prepare.assert_called_once_with(force=True)
+            self.assertEqual(observed, ["game_link_update_needed"])
+
+            generation = self.controller.operation_generation
+            def confirm(*args, **kwargs):
+                self.controller.workers.invalidate()
+                return QMessageBox.StandardButton.Yes
+            with patch.object(QMessageBox, "question", side_effect=confirm), \
+                 patch.object(self.controller.workflow, "for_job") as scoped:
+                window._present_repair_preview([
+                    {"key": "repair_game_link", "title": "Repair", "changes": ["replace verified runtime"], "rollback": "backup"}
+                ], generation)
+            scoped.assert_not_called()
+
+            while not self.controller.events.empty():
+                self.controller.events.get_nowait()
+            self.controller.events.put({"type": "doctor_report", "launcher_job_generation": generation, "report": {}})
+            with patch.object(window, "_present_event") as present:
+                window._poll_events()
+            present.assert_not_called()
+        finally:
+            window.close()
+            window.deleteLater()
+            app.processEvents()
 
     def test_worker_error_path_stops_native_client_without_deadlock(self):
         fake_supervisor = MagicMock()

@@ -75,10 +75,14 @@ def _assert_proven_observer(masteries: list[dict]) -> None:
         "check_weapon_mastery_locations",
         "read_weapon_mastery_records",
         "mastery_save_file",
+    )
+    decoder = (ROOT / "doom_eap" / "runtime" / "save_records.py").read_text(encoding="utf-8")
+    decoder_required = (
+        "read_unlockable_record",
         "UnlockableManager_0_1_2",
         "unlockableIsUnlocked",
     )
-    if not all(token in bridge for token in required):
+    if not all(token in bridge for token in required) or not all(token in decoder for token in decoder_required):
         raise ValueError("refusing to strip mastery rewards without save reader/send path")
 
 
@@ -110,7 +114,7 @@ def build_mastery_overrides(mod_root: Path) -> dict:
         for relative, text in outputs.items():
             target = mod_root / OWNER / "generated" / "decls" / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text, encoding="utf-8")
+            target.write_text(text, encoding="utf-8", newline="\n")
             written_paths.append(target.as_posix())
     if len(written_paths) != 26 or len(written_paths) != len(set(written_paths)):
         raise ValueError("base mastery override set is incomplete or overlapping")
@@ -134,7 +138,7 @@ def main() -> int:
     parser.add_argument("--audit-output", type=Path, required=True)
     args = parser.parse_args()
     audit = build_mastery_overrides(args.mod_root)
-    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     return 0
 
 

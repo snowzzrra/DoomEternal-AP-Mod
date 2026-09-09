@@ -35,7 +35,7 @@ def build_rune_override(mod_root: Path) -> dict:
         raise ValueError("Rune owner must contain exactly one existing menu gate")
     target = mod_root / RUNE_OWNER["container"] / "generated" / "decls" / RUNE_OWNER["path"]
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text.replace(GATE_LINE, "", 1), encoding="utf-8")
+    target.write_text(text.replace(GATE_LINE, "", 1), encoding="utf-8", newline="\n")
     return {"owner": RUNE_OWNER, "written_path": target.as_posix()}
 
 
@@ -45,7 +45,7 @@ def main() -> int:
     parser.add_argument("--audit-output", type=Path, required=True)
     args = parser.parse_args()
     audit = build_rune_override(args.mod_root)
-    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     return 0
 
 

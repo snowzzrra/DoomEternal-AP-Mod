@@ -27,12 +27,12 @@
     "rune_page": "ap_bootstrap_v2_rune_page"
   },
   "counts": {
-    "items": 132,
-    "locations": 369,
-    "map_checks": 307,
+    "items": 127,
+    "locations": 442,
+    "map_checks": 374,
     "route_sentinel_batteries": 18,
     "runtime_goals": 1,
-    "runtime_locations": 62
+    "runtime_locations": 68
   },
   "family_primitives": {
     "currency": "currency_grant_direct",

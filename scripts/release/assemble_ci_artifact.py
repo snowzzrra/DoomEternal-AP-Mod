@@ -91,6 +91,16 @@ def write_deterministic_zip(source_dir: Path, output_zip_path: Path, prefix: str
     temp_zip.replace(output_zip_path)
 
 
+def source_ancestry(manifest: dict, project: str) -> str:
+    record = manifest.get(project, {})
+    if manifest.get("build", {}).get("source_mode") == "working_tree_snapshot":
+        from tools.release.source_provenance import source_origin
+        if source_origin(record.get("base_commit_sha", ""), record.get("source_state", {})) != record:
+            raise ValueError(f"Invalid {project} working-tree provenance")
+        return record["base_commit_sha"]
+    return record.get("resolved_sha", "")
+
+
 def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dict[str, Any]:
     """Validate handoff artifact files and manifest."""
     manifest_path = handoff_dir / "BUILD-MANIFEST.json"
@@ -384,6 +394,10 @@ def assemble_platform_release(
         "apworld_commit_sha": manifest.get("apworld", {}).get("resolved_sha", "unknown"),
         "build": manifest.get("build", {}),
     }
+    if manifest.get("build", {}).get("source_mode") == "working_tree_snapshot":
+        provenance_doc.pop("mod_commit_sha")
+        provenance_doc.pop("apworld_commit_sha")
+        provenance_doc["source_state"] = {key: manifest[key] for key in ("mod", "apworld")}
     (client_dir / "BUILD-PROVENANCE.json").write_text(
         json.dumps(provenance_doc, indent=2) + "\n", encoding="utf-8"
     )
@@ -568,11 +582,11 @@ def main() -> int:
         if args.version and args.version != version_label:
             raise ValueError(f"Version mismatch: handoff says {version_label}, expected {args.version}")
 
-        mod_sha = manifest.get("mod", {}).get("resolved_sha", "")
+        mod_sha = source_ancestry(manifest, "mod")
         if args.expect_mod_sha and not mod_sha.startswith(args.expect_mod_sha):
             raise ValueError(f"MOD SHA mismatch: handoff says {mod_sha}, expected {args.expect_mod_sha}")
 
-        apworld_sha = manifest.get("apworld", {}).get("resolved_sha", "")
+        apworld_sha = source_ancestry(manifest, "apworld")
         if args.expect_apworld_sha and not apworld_sha.startswith(args.expect_apworld_sha):
             raise ValueError(f"APWorld SHA mismatch: handoff says {apworld_sha}, expected {args.expect_apworld_sha}")
 

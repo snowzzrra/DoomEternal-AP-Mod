@@ -174,6 +174,9 @@ class TestCIPreflight(unittest.TestCase):
             (mei_dir / "data").mkdir(parents=True)
             shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
             shutil.copytree(REPO_ROOT / "content", mei_dir / "content")
+            from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
+            (mei_dir / "data/compiler_source_identity.json").write_text(
+                json.dumps(compiler_source_document(capture_compiler_sources(REPO_ROOT))), encoding="utf-8")
 
             try:
                 sys.frozen = True
@@ -256,6 +259,9 @@ class TestCIPreflight(unittest.TestCase):
             (mei_dir / "data").mkdir(parents=True)
             shutil.copy2(REPO_ROOT / "data/options_schema.json", mei_dir / "data/options_schema.json")
             shutil.copytree(REPO_ROOT / "content", mei_dir / "content")
+            from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
+            (mei_dir / "data/compiler_source_identity.json").write_text(
+                json.dumps(compiler_source_document(capture_compiler_sources(REPO_ROOT))), encoding="utf-8")
 
             try:
                 sys.frozen = True
@@ -392,49 +398,53 @@ class TestCIPreflight(unittest.TestCase):
             "Workflow preflight must invoke tools.release.prebuilt_room_resources",
         )
 
-    def test_prebuilt_room_resources_canonical_bundle(self):
+    @staticmethod
+    def _published_resource_fixture(output):
+        """Exercise the metadata producer on pinned payload fixtures, not claim a compiler build."""
         from tools.release.prebuilt_room_resources import (
-            get_frozen_bundle_dir,
-            validate_prebuilt_room_resources,
+            CANONICAL_RESOURCE_FILENAMES, METADATA_FILENAMES,
+            get_frozen_bundle_dir, publish_prebuilt_room_resources,
         )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
-        self.assertTrue(bundle_dir.is_dir())
-        result = validate_prebuilt_room_resources(bundle_dir, repo_root=REPO_ROOT)
-        self.assertEqual(result["status"], "PASS")
+        from tools.release.room_resource_checkout import stage_room_resource_files
+        source = output.parent / "prepared"
+        stage_room_resource_files(
+            get_frozen_bundle_dir(REPO_ROOT), source, REPO_ROOT,
+            (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES),
+        )
+        return publish_prebuilt_room_resources(
+            source, output, repo_root=REPO_ROOT, expected_version="0.5.2",
+            mod_commit="metadata-producer-fixture", apworld_commit="metadata-producer-fixture",
+        )
+
+    def test_prebuilt_room_resources_canonical_bundle(self):
+        from tools.release.prebuilt_room_resources import validate_prebuilt_room_resources
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = Path(tmpdir) / "published"
+            self._published_resource_fixture(bundle)
+            result = validate_prebuilt_room_resources(bundle, repo_root=REPO_ROOT)
+            self.assertEqual(result["status"], "PASS")
 
     def test_prebuilt_room_resources_fails_on_checksum_mismatch(self):
-        from tools.release.prebuilt_room_resources import (
-            get_frozen_bundle_dir,
-            validate_prebuilt_room_resources,
-        )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
+        from tools.release.prebuilt_room_resources import validate_prebuilt_room_resources
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_bundle = Path(tmpdir)
-            for p in bundle_dir.iterdir():
-                tmp_bundle.joinpath(p.name).write_bytes(p.read_bytes())
-            (tmp_bundle / "base_mod.zip").write_bytes(b"corrupted binary payload")
-
+            bundle = Path(tmpdir) / "published"
+            self._published_resource_fixture(bundle)
+            (bundle / "base_mod.zip").write_bytes(b"corrupted binary payload")
             with self.assertRaises(ValueError) as ctx:
-                validate_prebuilt_room_resources(tmp_bundle, repo_root=REPO_ROOT)
+                validate_prebuilt_room_resources(bundle, repo_root=REPO_ROOT)
             self.assertIn("Checksum mismatch", str(ctx.exception))
 
     def test_prebuilt_room_resources_fails_on_stale_fingerprint(self):
-        from tools.release.prebuilt_room_resources import (
-            get_frozen_bundle_dir,
-            validate_prebuilt_room_resources,
-        )
-        bundle_dir = get_frozen_bundle_dir(REPO_ROOT, "v0.5.1")
+        from tools.release.prebuilt_room_resources import validate_prebuilt_room_resources
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_bundle = Path(tmpdir)
-            for p in bundle_dir.iterdir():
-                tmp_bundle.joinpath(p.name).write_bytes(p.read_bytes())
-            prov_path = tmp_bundle / "ROOM_RESOURCES_PROVENANCE.json"
-            doc = json.loads(prov_path.read_text(encoding="utf-8"))
+            bundle = Path(tmpdir) / "published"
+            self._published_resource_fixture(bundle)
+            provenance = bundle / "ROOM_RESOURCES_PROVENANCE.json"
+            doc = json.loads(provenance.read_text(encoding="utf-8"))
             doc["room_resource_input_fingerprint"] = "0" * 64
-            prov_path.write_text(json.dumps(doc), encoding="utf-8")
-
+            provenance.write_text(json.dumps(doc), encoding="utf-8", newline="\n")
             with self.assertRaises(ValueError) as ctx:
-                validate_prebuilt_room_resources(tmp_bundle, repo_root=REPO_ROOT)
+                validate_prebuilt_room_resources(bundle, repo_root=REPO_ROOT)
             self.assertIn("STALE ROOM RESOURCES", str(ctx.exception))
 
     def test_room_resource_fingerprint_sensitivity(self):

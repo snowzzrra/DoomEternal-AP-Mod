@@ -1,3 +1,4 @@
+from unittest.mock import Mock
 import asyncio
 import json
 import os
@@ -13,6 +14,7 @@ if str(ARCHIPELAGO_ROOT) not in sys.path:
     sys.path.insert(0, str(ARCHIPELAGO_ROOT))
 
 import doom_eap.runtime.bridge_client as bridge_client
+from doom_eap.contracts.save_observation import SaveReadinessSnapshot
 from doom_eap.runtime.bridge_client import (
     GameplaySaveEvidence,
     PrimarySaveSelection,
@@ -31,60 +33,56 @@ def _active_bridge_client():
 def _create_test_context():
     bc = _active_bridge_client()
     context = object.__new__(bc.DoomEternalContext)
+    context.locations_checked = set()
+    context.server_locations = set()
+    context.server = None
+    context.exit_event = asyncio.Event()
+    context.physical_checks = bc.PhysicalChecks(bc.logger)
+    context.level_ready = bc.LevelReady(bc.logger)
+    context.session_tasks = bc.SessionTasks()
+    context.location_setup = bc.LocationSetup(bc.logger)
+    context.protocol_feed = bc.ProtocolFeed()
+    context.receipt_delivery = bc.ReceiptDelivery(bc.logger)
+    context.save_checks = bc.SaveChecks(bc.WEAPON_MASTERY_BY_UNLOCKABLE, bc.MISSION_CHALLENGE_BY_UNLOCKABLE, bc.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bc.ALL_MISSION_CHALLENGES_ENTRIES, bc.logger)
+    context.goals = bc.GoalProgress(bc.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bc.CULTIST_BASE_MAP, bc.logger)
+    context.publisher_dispatch = bc.PublisherDispatch(bc.PUBLISHERS, context.goals, bc.logger)
+    context.deathlink = bc.DeathLinkSession(bc.DeathLinkReceiver(), bc.DEATHLINK_MESSAGES, lambda *a, **kw: bc.emit_launcher_event(*a, **kw), bc.logger)
+    context.ammo = bc.AmmoRefill(
+        bc.AmmoCommandPublication(bc.send_command, bc.discard_queued_coalesced_command,
+                                      bc.rpc_execution_enabled, bc.set_rpc_execution, bc.logger),
+        bc.AmmoStorage(context.send_msgs),
+        lambda *args, **kwargs: bc.emit_launcher_event(*args, **kwargs), bc.logger,
+    )
+    context.deathlink.configure(True)
+    context.ammo_requests = bc.AmmoRequestPump(context.ammo, context.request_ammo_refill, context.exit_event, bc.logger)
+    context.base_directory = bc.DOOM_BASE_DIR
     context.state_key = "room:test:1"
+    context.runtime_lifecycle = bc.RuntimeLifecycle()
     context.team = 0
     context.slot = 1
     context.room_seed_name = "test_seed"
     context.session_state = {}
+    context.receipt_delivery.bind(context.session_state)
+    context.materialization = bc.MaterializationCoordinator(bc.logger)
+    context.runes = bc.RuneReconciliation(bc.logger)
+    context.runes.bind(context.session_state.setdefault("rune_reconciliation", {}), context.session_state.setdefault("perk_reconciliation", {"epoch": 0, "delivered": {}}))
+    context.bootstrap = bc.Bootstrap(bc.logger)
+    context.bootstrap.bind(context.session_state.setdefault("bootstrap", {"actions": {}}))
+    context.materialization.bind(context.session_state.setdefault("context_materialization", {}))
     context.client_state = {"version": 1, "sessions": {}}
     context.items_received = []
-    context.items_processed = 0
+    context.receipt_session = bc.ReceiptSession()
     context.item_state_ready = True
-    context.save_candidate_tokens = {}
-    context.save_slot_observations = {}
-    context.selected_observation_slot = None
-    context.active_save_slot = None
-    context.active_save_path = None
-    context.active_save_token = None
-    context.active_native_evidence_epoch = None
-    context.active_save_proof_evidence_epoch = None
-    context.active_save_proof_load_epoch = None
-    context.active_save_proof_authoritative = False
-    context.active_save_proof_slot = None
-    context.runtime_observers_frozen = True
-    context.mission_select_observation_map = None
-    context.mission_select_observation_epoch = None
+    context.death_observer = bc.DeathObservation(bc.logger)
+    context.save_observer = bc.SaveObserver()
     context.last_observer_lease_block = None
     context.last_save_proof_rejection = None
-    context.last_accepted_marker_mtime = 0
-    context.last_accepted_map_evidence_epoch = None
+    context.runtime_lifecycle.observe_marker_timestamp(0, None)
     context.last_marker_reject_reason = None
-    context.last_duration_cache_key = None
-    context.death_probe_warning = None
-    context.death_link_enabled = True
-    context.cached_map_identity = None
-    context.pending_map_identity = None
-    context.current_map_name = None
     context.runtime_observation_lease = None
     context.transient_effect_manager = SimpleNamespace(reset=lambda *args: None)
-    context.checkpoint_death_by_save_slot = {}
-    context.death_detector_initialized_slots = set()
-    context.death_consumed_tokens = set()
-    context.awaiting_respawn_carryover_by_save_slot = {}
-    context.death_consumed_in_epoch_by_save_slot = {}
-    context.last_consumed_death_event_by_save_slot = {}
-    context.fast_travel_submitted = {}
-    context.fast_travel_epoch_state = None
-    context.fast_travel_eligibility_snapshot = None
-    context.fast_travel_last_transition = None
-    context.automap_cleanup_epoch = None
-    context.automap_cleanup_session = "test_cleanup_session"
-    context.automap_cleanup_submitted = set()
-    context.automap_cleanup_retry = {}
-    context.automap_cleanup_status = {}
-    context.automap_local_cleanup_owned = set()
-    context.completed_level_ready_epochs = set()
-    context.pending_level_ready = {}
+    context.fast_travel = _active_bridge_client().FastTravel(_active_bridge_client().KNOWN_CATALOG_MAPS, _active_bridge_client().FAST_TRAVEL_MAP_KEYS, _active_bridge_client().FAST_TRAVEL_MISSION_COMPLETE_IDS, _active_bridge_client().logger)
+    context.checked_visuals = _active_bridge_client().CheckedVisuals(_active_bridge_client().KNOWN_CATALOG_MAPS, _active_bridge_client().AUTOMAP_VISUALS_BY_MAP, "test_sess", _active_bridge_client().logger)
     context.server_checked_locations_ready = True
     context.checked_locations = set()
     context._item_delivery_lock = asyncio.Lock()
@@ -98,6 +96,244 @@ def _create_test_context():
     return context
 
 
+def test_context_selection_preserves_marker_precedence_and_suspension():
+    context = _create_test_context()
+    rejected = []
+    resets = []
+    context._record_context_evidence_rejection = lambda *args: rejected.append(args)
+    context.transient_effect_manager = SimpleNamespace(reset=lambda reason, *_: resets.append(reason))
+    context.runtime_lifecycle.accept_marker({"runtime_map": "game/dlc/e4m1_rig/e4m1_rig"}, None)
+    evidence = SimpleNamespace(map_name="game/dlc2/e5m1_spear/e5m1_spear")
+
+    selected = context._refresh_runtime_context({}, evidence)
+    assert selected.campaign == "TAG1"
+    assert context.pending_context_transition == ("Unknown", "TAG1")
+    assert rejected[0][0] == "accepted_marker_authority"
+    assert resets == ["context_transition"]
+
+    context.runtime_lifecycle.suspend_marker(None, "fixture")
+    selected = context._refresh_runtime_context({}, evidence)
+    assert selected.campaign == "TAG2"
+    assert context.pending_context_transition == ("TAG1", "TAG2")
+    assert resets == ["context_transition", "context_transition"]
+
+    retained = context._refresh_runtime_context({}, SimpleNamespace(map_name="unknown"))
+    assert retained is selected
+    assert context.pending_context_transition == ("TAG1", "TAG2")
+    assert len(resets) == 2
+
+
+def test_context_snapshot_is_immutable_and_preserves_transition_log_lifetime():
+    from dataclasses import FrozenInstanceError
+    import pytest
+
+    bc = _active_bridge_client()
+    lifecycle = bc.RuntimeLifecycle()
+    original = lifecycle.snapshot
+    context = bc.classify_runtime_context("game/dlc/e4m1_rig/e4m1_rig")
+    transition = lifecycle.bind_context(context)
+    assert original.identity == "unknown"
+    assert lifecycle.snapshot.identity == context.identity
+    assert lifecycle.snapshot.pending_transition is None
+    assert lifecycle.record_transition(transition, context.identity)
+    assert not lifecycle.record_transition(transition, context.identity)
+    with pytest.raises(FrozenInstanceError):
+        lifecycle.snapshot.campaign = "Base"
+
+    lifecycle.complete_transition()
+    assert lifecycle.snapshot.pending_transition is None
+    lifecycle.clear_context()
+    transition = lifecycle.bind_context(context)
+    assert not lifecycle.record_transition(transition, context.identity)
+    lifecycle.clear_context(clear_log=True)
+    transition = lifecycle.bind_context(context)
+    assert lifecycle.record_transition(transition, context.identity)
+
+
+def test_lifecycle_marker_snapshots_do_not_alias_inputs_or_advance_epochs():
+    import pytest
+
+    lifecycle = _active_bridge_client().RuntimeLifecycle()
+    marker = {"runtime_map": "game/sp/e3m2_hell/e3m2_hell", "gameplay_epoch": "1:100"}
+    lifecycle.stage_marker(marker)
+    pending = lifecycle.map_identity
+    assert pending.cached_marker is None
+    assert pending.pending_marker["evidence_epoch"] is None
+    accepted = lifecycle.accept_marker(marker, 2)
+    marker["gameplay_epoch"] = "changed"
+    assert accepted["gameplay_epoch"] == "1:100"
+    with pytest.raises(TypeError):
+        accepted["gameplay_epoch"] = "changed"
+    lifecycle.bind_materialization_evidence(3)
+    assert accepted["evidence_epoch"] == 2
+    assert lifecycle.map_identity.cached_marker["evidence_epoch"] == 3
+    assert lifecycle.map_identity.cached_marker["gameplay_epoch"] == "1:100"
+    lifecycle.suspend_marker(4, "provisional")
+    assert lifecycle.map_identity.current_map is None
+    assert lifecycle.map_identity.cached_marker["materialization_suspended"]
+    assert lifecycle.map_identity.pending_marker is None
+    assert pending.pending_marker is not None
+    lifecycle.clear_map()
+    assert lifecycle.map_identity.cached_marker is None
+
+
+def test_native_load_policy_separates_admission_timestamp_and_acceptance():
+    lifecycle = _active_bridge_client().RuntimeLifecycle()
+    hub = "game/hub/hub"
+    tag = "game/dlc/e4m1_rig/e4m1_rig"
+    catalog = {"hub": hub, "rig": tag}
+
+    def evidence(epoch=1, map_name=hub, state="gameplay", provisional=False):
+        return SimpleNamespace(epoch=epoch, map_name=map_name, state=state, provisional=provisional)
+
+    for rejected in (None, evidence(state="menu"), evidence(epoch=True),
+                     evidence(map_name="unknown"), evidence(provisional=True)):
+        assert lifecycle.classify_native_load(rejected, catalog) is None
+    initial = lifecycle.classify_native_load(evidence(map_name="game/sp/hub/hub"), catalog)
+    assert initial.action == "initialize"
+    for timestamp in (None, True, -1):
+        assert lifecycle.native_marker_proposal(initial, timestamp) is None
+    marker = lifecycle.native_marker_proposal(initial, 100)
+    assert marker["gameplay_epoch"] == "1:100"
+    assert lifecycle.map_identity.cached_marker is None
+    lifecycle.accept_marker(marker, 1)
+    assert lifecycle.classify_native_load(evidence(), catalog) is None
+    assert lifecycle.classify_native_load(evidence(epoch=0), catalog) is None
+    assert lifecycle.classify_native_load(evidence(epoch=2, provisional=True), catalog).action == "suspend"
+    reload = lifecycle.classify_native_load(evidence(epoch=2), catalog)
+    assert reload.action == "reload"
+    proposal = lifecycle.native_marker_proposal(reload, 200)
+    assert proposal["secondary_materialization"] is True
+    assert proposal["mtime_ns"] == 100
+    assert proposal["evidence_mtime_ns"] == 200
+    assert lifecycle.map_identity.cached_marker["gameplay_epoch"] == "1:100"
+    assert lifecycle.classify_native_load(evidence(epoch=2, map_name=tag, provisional=True), catalog) is None
+    assert lifecycle.classify_native_load(evidence(epoch=2, map_name=tag), catalog).action == "transition"
+
+
+def test_authored_timestamp_decisions_preserve_process_and_marker_bounds():
+    lifecycle = _active_bridge_client().RuntimeLifecycle()
+    lifecycle.observe_marker_timestamp(200, 1)
+    lifecycle.stage_marker({"runtime_map": "game/hub/hub", "mtime_ns": 250})
+    assert lifecycle.authored_timestamp_action(251, 300) == "ignore"
+    assert lifecycle.authored_timestamp_action(250, 100) == "native_fallback"
+    assert lifecycle.authored_timestamp_action(251, 100) == "parse"
+    lifecycle.clear_pending_marker()
+    assert lifecycle.authored_timestamp_action(201, None) == "parse"
+    lifecycle.accept_marker({"runtime_map": "game/hub/hub", "mtime_ns": 400}, 2)
+    assert lifecycle.authored_timestamp_action(400, 100) == "native_fallback"
+    proposal = lifecycle.authored_marker_proposal({"runtime_map": "game/hub/hub"}, 500, None, True)
+    assert proposal["gameplay_epoch"] == "500:500"
+    assert proposal["evidence_epoch"] is True
+    assert proposal["materialization_evidence_epoch"] is None
+    assert lifecycle.map_identity.cached_marker["mtime_ns"] == 400
+
+
+def test_first_same_map_evidence_binds_without_advancing_gameplay_epoch():
+    context = _create_test_context()
+    runtime_map = "game/sp/e3m2_hell/e3m2_hell"
+    context.runtime_lifecycle.accept_marker({
+        "runtime_map": runtime_map, "map_key": "e3m2_hell",
+        "gameplay_epoch": "1:100", "mtime_ns": 100,
+    }, None)
+    evidence = GameplaySaveEvidence("gameplay", 2, "GAME-AUTOSAVE1", runtime_map, native_safe=True)
+    assert not context.advance_known_map_materialization(evidence)
+    assert context.cached_map_identity["materialization_evidence_epoch"] == 2
+    assert context.cached_map_identity["evidence_epoch"] == 2
+    assert context.cached_map_identity["gameplay_epoch"] == "1:100"
+    stale = GameplaySaveEvidence("gameplay", 1, "GAME-AUTOSAVE1", runtime_map, native_safe=True)
+    assert not context.advance_known_map_materialization(stale)
+    assert context.cached_map_identity["materialization_evidence_epoch"] == 2
+
+
+def test_marker_acceptance_and_lease_publication_are_distinct():
+    context = _create_test_context()
+    marker = {
+        "runtime_map": "game/sp/e3m2_hell/e3m2_hell", "map_key": "e3m2_hell",
+        "gameplay_epoch": "2:100", "mtime_ns": 100, "path": None,
+    }
+    with patch.object(_active_bridge_client(), "publish_materialization_lease", return_value=False):
+        accepted = context.accept_map_identity(marker, 2)
+    assert context.cached_map_identity == accepted
+    assert context.current_map_name == marker["runtime_map"]
+    assert context.published_materialization_lease is None
+    assert context.pending_level_ready == {"2:100": None}
+    assert context.last_accepted_map_evidence_epoch == 2
+    with patch.object(_active_bridge_client(), "publish_materialization_lease", return_value=True):
+        context.accept_map_identity(marker, 3)
+    assert context.published_materialization_lease == "2:100"
+    assert context.cached_map_identity["evidence_epoch"] == 3
+    assert context.last_accepted_map_evidence_epoch == 2
+
+
+def test_provisional_family_switch_requires_native_safety_and_fresher_candidate(monkeypatch):
+    bc = _active_bridge_client()
+    target_map = "game/dlc/e4m1_rig/e4m1_rig"
+    for native_safe, candidate_mtime, accepted in ((True, 200, True), (False, 200, False), (True, 100, False)):
+        ctx = _create_test_context()
+        old = SimpleNamespace(slot_directory="GAME-AUTOSAVE1", path=Path("old.dat"), mtime_ns=100)
+        selected = SimpleNamespace(slot_directory="DLC1-AUTOSAVE1", path=Path("new.dat"), mtime_ns=candidate_mtime)
+        ctx.save_observer = bc.SaveObserver(SaveReadinessSnapshot(evidence_epoch=1))
+        ctx.save_observer.update_selection(slot=old.slot_directory, path=str(old.path))
+        ctx.read_active_map_identity = lambda **kwargs: None
+        evidence = SimpleNamespace(state="gameplay", epoch=2, map_name=target_map,
+                                   slot_directory=selected.slot_directory, provisional=True, native_safe=native_safe)
+        events = []
+        ctx.log_save_proof_accepted = lambda *args, **kwargs: events.append("proof")
+
+        def activate(selection):
+            events.append("activate")
+            ctx.save_observer.update_selection(slot=selection.slot_directory, path=str(selection.path))
+
+        ctx.activate_save_selection = activate
+        monkeypatch.setattr(bc, "read_gameplay_save_evidence", lambda: evidence)
+        monkeypatch.setattr(bc, "primary_save_candidates", lambda **kwargs: [selected])
+        monkeypatch.setattr(bc, "primary_save_for_slot", lambda slot: old if slot == old.slot_directory else selected)
+        monkeypatch.setattr(bc, "read_game_details_for_selection", lambda selection: {"mapName": target_map})
+        monkeypatch.setattr(bc, "gameplay_evidence_mtime_ns", lambda: 210)
+        monkeypatch.setattr(bc, "publish_materialization_lease", lambda epoch: events.append("publish") or True)
+
+        assert ctx.runtime_lifecycle.classify_native_load(evidence, bc.KNOWN_CATALOG_MAPS) is None
+        result = ctx.update_save_slot_lifecycle()
+        if accepted:
+            assert result is selected
+            assert events == ["proof", "activate", "publish"]
+            assert ctx.cached_map_identity["runtime_map"] == target_map
+            assert ctx.cached_map_identity["gameplay_epoch"] == "2:210"
+            assert ctx.active_save_proof_authoritative
+        else:
+            assert result is None
+            assert ctx.cached_map_identity is None
+            assert events == []
+
+
+def test_goal_file_batch_stops_after_rebind_and_preserves_unconsumed_file(tmp_path, monkeypatch):
+    from doom_eap.contracts.publisher_contracts import PublisherContract, PublisherEngine
+
+    bc = _active_bridge_client()
+    context = _create_test_context()
+    contracts = tuple(
+        PublisherContract(key, "map", ({"strategy": "map_event_file", "filename": "event.txt", "marker": "MARK"},),
+                          ({"strategy": "location_check", "location_id": index},), "room", "first_success_wins")
+        for index, key in enumerate(("first", "second"), 1)
+    )
+    monkeypatch.setattr(bc, "PUBLISHER_ENGINE", PublisherEngine(contracts))
+    monkeypatch.setattr(bc, "INV_DUMP_DIR", str(tmp_path))
+    monkeypatch.setattr(bc, "goal_event_files", lambda: [])
+    path = tmp_path / "event.txt"
+    path.write_text("MARK")
+    sent = []
+
+    async def publish(ctx, publisher, *_):
+        sent.append(publisher.key)
+        ctx.receipt_session.begin_rebind()
+        return True
+
+    monkeypatch.setattr(bc.DoomEternalContext, "execute_publisher", publish)
+    assert asyncio.run(context.check_campaign_goal_event())
+    assert sent == ["first"] and path.read_text() == "MARK"
+
+
 def _create_materialization_context(campaign="TAG1", map_key="e4m1_rig", runtime_map="game/dlc/e4m1_rig/e4m1_rig"):
     bc = _active_bridge_client()
     if 7770010 not in bc.ITEM_ID_TO_COMMAND:
@@ -106,27 +342,56 @@ def _create_materialization_context(campaign="TAG1", map_key="e4m1_rig", runtime
                 int(k): v for k, v in json.load(f).items()
             }
     context = object.__new__(bc.DoomEternalContext)
+    context.locations_checked = set()
+    context.server_locations = set()
+    context.server = None
+    context.exit_event = asyncio.Event()
+    context.physical_checks = bc.PhysicalChecks(bc.logger)
+    context.level_ready = bc.LevelReady(bc.logger)
+    context.session_tasks = bc.SessionTasks()
+    context.location_setup = bc.LocationSetup(bc.logger)
+    context.protocol_feed = bc.ProtocolFeed()
+    context.receipt_delivery = bc.ReceiptDelivery(bc.logger)
+    context.save_checks = bc.SaveChecks(bc.WEAPON_MASTERY_BY_UNLOCKABLE, bc.MISSION_CHALLENGE_BY_UNLOCKABLE, bc.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bc.ALL_MISSION_CHALLENGES_ENTRIES, bc.logger)
+    context.goals = bc.GoalProgress(bc.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bc.CULTIST_BASE_MAP, bc.logger)
+    context.publisher_dispatch = bc.PublisherDispatch(bc.PUBLISHERS, context.goals, bc.logger)
+    context.deathlink = bc.DeathLinkSession(bc.DeathLinkReceiver(), bc.DEATHLINK_MESSAGES, lambda *a, **kw: bc.emit_launcher_event(*a, **kw), bc.logger)
+    context.ammo = bc.AmmoRefill(
+        bc.AmmoCommandPublication(bc.send_command, bc.discard_queued_coalesced_command,
+                                      bc.rpc_execution_enabled, bc.set_rpc_execution, bc.logger),
+        bc.AmmoStorage(context.send_msgs),
+        lambda *args, **kwargs: bc.emit_launcher_event(*args, **kwargs), bc.logger,
+    )
+    context.deathlink.configure(True)
+    context.ammo_requests = bc.AmmoRequestPump(context.ammo, context.request_ammo_refill, context.exit_event, bc.logger)
+    context.base_directory = bc.DOOM_BASE_DIR
     context.state_key = "room:test:1"
     context.team = 0
     context.slot = 1
     context.room_seed_name = "test_seed"
     context.session_state = {}
+    context.receipt_delivery.bind(context.session_state)
     context.client_state = {"version": 1, "sessions": {}}
     context.items_received = []
-    context.items_processed = 0
+    context.receipt_session = bc.ReceiptSession()
     context.item_state_ready = True
     context.server_checked_locations_ready = True
     context.checked_locations = set()
     context.locations_checked = set()
-    context._pending_materialization_triggers = set()
-    context.pending_context_transition = None
-    context.context_campaign = campaign
-    context.published_materialization_lease = "1:1"
-    context.cached_map_identity = {
+    context.materialization = bc.MaterializationCoordinator(bc.logger)
+    context.runes = bc.RuneReconciliation(bc.logger)
+    context.runes.bind(context.session_state.setdefault("rune_reconciliation", {}), context.session_state.setdefault("perk_reconciliation", {"epoch": 0, "delivered": {}}))
+    context.bootstrap = bc.Bootstrap(bc.logger)
+    context.bootstrap.bind(context.session_state.setdefault("bootstrap", {"actions": {}}))
+    context.materialization.bind(context.session_state.setdefault("context_materialization", {}))
+    from doom_eap.contracts.runtime_context import RuntimeContextSnapshot
+    context.runtime_lifecycle = bc.RuntimeLifecycle(RuntimeContextSnapshot(campaign=campaign))
+    context.runtime_lifecycle.record_lease_publication("1:1", True)
+    context.runtime_lifecycle.accept_marker({
         "gameplay_epoch": "1:1",
         "runtime_map": runtime_map,
         "map_key": map_key,
-    }
+    }, None)
     context._connected_slot_data = {
         "slot_data_version": 1,
         "slot_data_revision": "0.5-D",
@@ -140,11 +405,10 @@ def _create_materialization_context(campaign="TAG1", map_key="e4m1_rig", runtime
     context.get_ap_state_key = lambda: "room:test:1"
     context.persist_session_state = lambda: None
     context.runtime_effects_ready = lambda *args, **kwargs: True
-    context.active_save_slot = "DLC1-AUTOSAVE1"
-    context.fast_travel_submitted = {}
-    context.fast_travel_epoch_state = None
-    context.fast_travel_eligibility_snapshot = None
-    context.fast_travel_last_transition = None
+    context.death_observer = bc.DeathObservation(bc.logger)
+    context.save_observer = bc.SaveObserver()
+    context.save_observer.update_selection(slot="DLC1-AUTOSAVE1")
+    context.fast_travel = _active_bridge_client().FastTravel(_active_bridge_client().KNOWN_CATALOG_MAPS, _active_bridge_client().FAST_TRAVEL_MAP_KEYS, _active_bridge_client().FAST_TRAVEL_MISSION_COMPLETE_IDS, _active_bridge_client().logger)
     return context
 
 
@@ -183,10 +447,8 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
 
     def test_base_to_tag1_switches_to_dlc1_autosave(self):
         context = _create_test_context()
-        context.active_save_slot = "GAME-AUTOSAVE1"
-        context.active_save_path = "/fake/GAME-AUTOSAVE1/game_duration.dat"
-        context.active_save_proof_authoritative = True
-        context.active_save_proof_slot = "GAME-AUTOSAVE1"
+        context.save_observer.update_selection(slot="GAME-AUTOSAVE1", path="/fake/GAME-AUTOSAVE1/game_duration.dat")
+        context.save_observer.activate_slot("GAME-AUTOSAVE1")
 
         dlc_candidate = PrimarySaveSelection("DLC1-AUTOSAVE1", Path("/fake/DLC1-AUTOSAVE1/game_duration.dat"), 2000)
         base_candidate = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/GAME-AUTOSAVE1/game_duration.dat"), 1000)
@@ -217,11 +479,9 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
 
     def test_tag1_to_base_switches_back_without_restart(self):
         context = _create_test_context()
-        context.active_save_slot = "DLC1-AUTOSAVE1"
-        context.active_save_path = "/fake/DLC1-AUTOSAVE1/game_duration.dat"
-        context.active_save_proof_authoritative = True
-        context.active_save_proof_slot = "DLC1-AUTOSAVE1"
-        context.selected_observation_slot = "DLC1-AUTOSAVE1"
+        context.save_observer.update_selection(slot="DLC1-AUTOSAVE1", path="/fake/DLC1-AUTOSAVE1/game_duration.dat")
+        context.save_observer.activate_slot("DLC1-AUTOSAVE1")
+        context.save_observer.select_observation_slot("DLC1-AUTOSAVE1")
 
         dlc_candidate = PrimarySaveSelection("DLC1-AUTOSAVE1", Path("/fake/DLC1-AUTOSAVE1/game_duration.dat"), 3000)
         base_candidate = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/GAME-AUTOSAVE1/game_duration.dat"), 2500)
@@ -252,10 +512,8 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
 
     def test_tag1_to_tag2_direct_transition(self):
         context = _create_test_context()
-        context.active_save_slot = "DLC1-AUTOSAVE1"
-        context.active_save_path = "/fake/DLC1-AUTOSAVE1/game_duration.dat"
-        context.active_save_proof_authoritative = True
-        context.active_save_proof_slot = "DLC1-AUTOSAVE1"
+        context.save_observer.update_selection(slot="DLC1-AUTOSAVE1", path="/fake/DLC1-AUTOSAVE1/game_duration.dat")
+        context.save_observer.activate_slot("DLC1-AUTOSAVE1")
 
         dlc1_candidate = PrimarySaveSelection("DLC1-AUTOSAVE1", Path("/fake/DLC1-AUTOSAVE1/game_duration.dat"), 3000)
         dlc2_candidate = PrimarySaveSelection("DLC2-AUTOSAVE1", Path("/fake/DLC2-AUTOSAVE1/game_duration.dat"), 3100)
@@ -312,10 +570,8 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
 
     def test_mission_challenge_observation_after_dlc_return_to_base(self):
         context = _create_test_context()
-        context.active_save_slot = "DLC1-AUTOSAVE1"
-        context.active_save_path = "/fake/DLC1-AUTOSAVE1/game_duration.dat"
-        context.active_save_proof_authoritative = True
-        context.active_save_proof_slot = "DLC1-AUTOSAVE1"
+        context.save_observer.update_selection(slot="DLC1-AUTOSAVE1", path="/fake/DLC1-AUTOSAVE1/game_duration.dat")
+        context.save_observer.activate_slot("DLC1-AUTOSAVE1")
 
         base_candidate = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/GAME-AUTOSAVE1/game_duration.dat"), 5000)
 
@@ -335,7 +591,7 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
         self.assertEqual(context.selected_observation_slot, "GAME-AUTOSAVE1")
 
         observed_slots = []
-        with patch.object(context, "observe_save_edges", side_effect=lambda key, recs, entries, slot: observed_slots.append(slot) or set()):
+        with patch.object(self.bc.SaveCheckObservations, "observe_edges", side_effect=lambda key, recs, entries, slot: observed_slots.append(slot) or set()):
             context.observe_mission_challenges({}, base_candidate)
 
         self.assertIn("GAME-AUTOSAVE1", observed_slots)
@@ -357,21 +613,49 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
             result = asyncio.run(context.check_game_duration_death())
 
         self.assertTrue(result)
-        self.assertIn("DLC1-AUTOSAVE1", context.checkpoint_death_by_save_slot)
-        self.assertTrue(context.checkpoint_death_by_save_slot["DLC1-AUTOSAVE1"])
+        self.assertIn("DLC1-AUTOSAVE1", context.death_observer.checkpoints)
+        self.assertTrue(context.death_observer.checkpoints["DLC1-AUTOSAVE1"])
+
+    def test_late_duration_result_cannot_observe_rebound_session_or_reloaded_save(self):
+        for invalidation in ("receipt", "proof"):
+            for fails in (False, True):
+                context = _create_test_context()
+                selected = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/game_duration.dat"), 7)
+                context.save_observer.accept_proof(selected.slot_directory, 1, 1)
+
+                async def decode_late(*args):
+                    if invalidation == "receipt":
+                        context.receipt_session.begin_rebind()
+                    else:
+                        context.save_observer.invalidate_proof()
+                        context.save_observer.accept_proof(selected.slot_directory, 1, 1)
+                    if fails:
+                        raise OSError("old read failed")
+                    return {"mastery_records": {}, "mission_challenge_records": {}, "checkpoint_death": True}
+
+                with patch.object(context, "update_save_slot_lifecycle", return_value=selected), \
+                     patch.object(self.bc.asyncio, "to_thread", side_effect=decode_late), \
+                     patch.object(context, "observe_weapon_masteries") as mastery, \
+                     patch.object(context, "observe_mission_challenges") as challenges:
+                    self.assertTrue(asyncio.run(context.check_game_duration_death()))
+                mastery.assert_not_called()
+                challenges.assert_not_called()
+                self.assertFalse(context.save_observer.duration_is_current(selected))
+                self.assertEqual(context.death_observer.checkpoints, {})
+                self.assertIsNone(context.death_observer.warning)
 
     def test_nekravol_part1_to_part2_transition_does_not_inherit_fast_travel(self):
         context = _create_test_context()
         context.checked_locations = {7770362}
 
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "map_key": "e3m2_hell",
             "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
             "gameplay_epoch": "1:100",
             "mtime_ns": 100,
             "materialization_evidence_epoch": 1,
-        }
-        context.current_map_name = "game/sp/e3m2_hell/e3m2_hell"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e3m2_hell/e3m2_hell"})
         snapshot_p1 = context.snapshot_fast_travel_eligibility(context.cached_map_identity)
         self.assertIsNotNone(snapshot_p1)
         self.assertEqual(snapshot_p1[1], "e3m2_hell")
@@ -379,7 +663,11 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
         evidence = GameplaySaveEvidence(
             "gameplay", 2, "GAME-AUTOSAVE1", "game/sp/e3m2_hell_b/e3m2_hell_b", native_safe=True
         )
-        transitioned = context.advance_known_map_materialization(evidence)
+        with patch.object(_active_bridge_client(), "gameplay_evidence_mtime_ns", return_value=None):
+            self.assertFalse(context.advance_known_map_materialization(evidence))
+        self.assertEqual(context.cached_map_identity["gameplay_epoch"], "1:100")
+        with patch.object(_active_bridge_client(), "gameplay_evidence_mtime_ns", return_value=200):
+            transitioned = context.advance_known_map_materialization(evidence)
         self.assertTrue(transitioned)
         self.assertEqual(context.cached_map_identity["map_key"], "e3m2_hell_b")
         self.assertEqual(context.current_map_name, "game/sp/e3m2_hell_b/e3m2_hell_b")
@@ -391,17 +679,41 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
         self.assertFalse(state["completed_before_epoch"])
         self.assertEqual(state["ineligible_reason"], "not_completed_before_epoch")
 
+    def test_room_update_refresh_preserves_existing_late_and_current_visit_completion_behavior(self):
+        # v0.5.2 refresh does not distinguish late initial history from this visit's
+        # server-confirmed completion. P-1 preserves that behavior without inventing a rule.
+        for initial_history in (None, set()):
+            context = _create_test_context()
+            context.checked_locations = initial_history
+            context.runtime_lifecycle.accept_marker({
+                "map_key": "e3m2_hell", "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
+                "gameplay_epoch": "1:100", "mtime_ns": 100,
+            }, None)
+            self.assertIsNone(context.snapshot_fast_travel_eligibility())
+            context.checked_locations = set()
+            context.reconcile_checked_automap_cleanup = lambda *args: None
+            async def no_checks():
+                return None
+            context.check_mission_challenge_locations = no_checks
+            def close_task(coroutine):
+                coroutine.close()
+                return Mock()
+            with patch.object(self.bc.asyncio, "create_task", side_effect=close_task):
+                context.on_package("RoomUpdate", {"checked_locations": [7770362]})
+            self.assertTrue(context.fast_travel_epoch_state["completed_before_epoch"])
+            self.assertIsNotNone(context.fast_travel_eligibility_snapshot)
+
     def test_nekravol_part2_reload_preserves_map_epoch_and_cleanup(self):
         context = _create_test_context()
-        context.cached_map_identity = {
+        context.runtime_lifecycle.accept_marker({
             "map_key": "e3m2_hell_b",
             "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
             "gameplay_epoch": "2:200",
             "mtime_ns": 200,
             "materialization_evidence_epoch": 2,
-        }
-        context.current_map_name = "game/sp/e3m2_hell_b/e3m2_hell_b"
-        context.automap_cleanup_epoch = "2:200"
+        }, None)
+        context.runtime_lifecycle.project_current_map({"runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b"})
+        context.checked_visuals.advance_epoch("2:200")
 
         evidence = GameplaySaveEvidence(
             "gameplay", 3, "GAME-AUTOSAVE1", "game/sp/e3m2_hell_b/e3m2_hell_b", native_safe=True
@@ -422,12 +734,17 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
 
         self.assertEqual(context.automap_cleanup_epoch, "3:300")
         self.assertTrue(any("ap_hide_location_visual_7770363" in cmd for cmd, _ in sent))
-        self.assertIn(("3:300", "room:test:1", "game/sp/e3m2_hell_b/e3m2_hell_b", "7770363"), context.automap_cleanup_submitted)
+        self.assertEqual(context.automap_cleanup_status[("3:300", "room:test:1", "game/sp/e3m2_hell_b/e3m2_hell_b", "7770363")], "SUBMITTED")
+        with patch.object(self.bc, "send_command", side_effect=lambda cmd, **kwargs: sent.append((cmd, kwargs)) or True), \
+             patch.object(self.bc, "rpc_execution_enabled", return_value=True):
+            count = len(sent)
+            context.reconcile_checked_automap_cleanup("same_epoch")
+            self.assertEqual(len(sent), count)
 
     def test_stale_dlc_evidence_slot_discarded_in_base_campaign(self):
         context = _create_test_context()
-        context.active_save_slot = "DLC1-AUTOSAVE1"
-        context.active_save_proof_authoritative = True
+        context.save_observer = _active_bridge_client().SaveObserver(SaveReadinessSnapshot(authoritative=True))
+        context.save_observer.update_selection(slot="DLC1-AUTOSAVE1")
 
         base_candidate = PrimarySaveSelection("GAME-AUTOSAVE1", Path("/fake/GAME-AUTOSAVE1/game_duration.dat"), 1000)
         dlc_candidate = PrimarySaveSelection("DLC1-AUTOSAVE1", Path("/fake/DLC1-AUTOSAVE1/game_duration.dat"), 2000)
@@ -460,15 +777,14 @@ class TestCrossCampaignSaveAuthority(unittest.TestCase):
         context = _create_test_context()
         context.server = SimpleNamespace(socket=SimpleNamespace(closed=False))
         context._queue_session_authoritative = True
-        context.active_save_slot = "GAME-AUTOSAVE1"
-        context.active_native_evidence_epoch = 1
-        context.published_materialization_lease = "1:100"
-        context.cached_map_identity = {
+        context.save_observer.update_selection(slot="GAME-AUTOSAVE1", native_evidence_epoch=1)
+        context.runtime_lifecycle.record_lease_publication("1:100", True)
+        context.runtime_lifecycle.accept_marker({
             "map_key": "e1m1_intro",
             "runtime_map": "game/sp/e1m1_intro/e1m1_intro",
             "gameplay_epoch": "1:100",
             "mtime_ns": 100,
-        }
+        }, None)
         evidence = GameplaySaveEvidence("gameplay", 1, "GAME-AUTOSAVE1", "game/sp/e1m1_intro/e1m1_intro", native_safe=True)
 
         with patch.object(self.bc, "read_gameplay_save_evidence", return_value=evidence), \
@@ -536,7 +852,7 @@ class TestChainsawHistoricalOwnership(unittest.TestCase):
         ctx = _create_materialization_context(campaign="TAG1", map_key="e4m1_rig", runtime_map="game/dlc/e4m1_rig/e4m1_rig")
         ctx._connected_slot_data["randomize_chainsaw"] = True
         ctx.items_received = [NetworkItem(item=7770010, location=0, player=1, flags=0)]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -555,13 +871,13 @@ class TestChainsawHistoricalOwnership(unittest.TestCase):
 class TestSentinelHammerTAG2Upgrades(unittest.TestCase):
     def test_legitimate_hammer_in_tag2_includes_upgrade_perks(self):
         ctx = _create_materialization_context(campaign="TAG2", map_key="e5m1_spear", runtime_map="game/dlc2/e5m1_spear/e5m1_spear")
-        ctx.published_materialization_lease = "1:1"
-        ctx.cached_map_identity["gameplay_epoch"] = "1:1"
+        ctx.runtime_lifecycle.record_lease_publication("1:1", True)
+        ctx.runtime_lifecycle.accept_marker({**ctx.cached_map_identity, "gameplay_epoch": "1:1"}, None)
         ctx.items_received = [
             NetworkItem(item=7770901, location=0, player=1, flags=0),
             NetworkItem(item=7770901, location=1, player=1, flags=0),
         ]
-        ctx.items_processed = 2
+        ctx.receipt_session.restore_boundary(2)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -580,7 +896,7 @@ class TestSentinelHammerTAG2Upgrades(unittest.TestCase):
         ctx.items_received = [
             NetworkItem(item=7770901, location=0, player=1, flags=0),
         ]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -597,7 +913,7 @@ class TestSentinelHammerTAG2Upgrades(unittest.TestCase):
             NetworkItem(item=7770901, location=0, player=1, flags=0),
             NetworkItem(item=7770901, location=1, player=1, flags=0),
         ]
-        ctx.items_processed = 2
+        ctx.receipt_session.restore_boundary(2)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -613,7 +929,7 @@ class TestSlayerGateKeyRematerialization(unittest.TestCase):
     def test_cultist_base_gate_key_delivered_on_initial_materialization(self):
         ctx = _create_materialization_context(campaign="Base", map_key="e1m3_cult", runtime_map="game/sp/e1m3_cult/e1m3_cult")
         ctx.items_received = [NetworkItem(item=7770151, location=0, player=1, flags=0)]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -631,7 +947,7 @@ class TestSlayerGateKeyRematerialization(unittest.TestCase):
     def test_same_stable_epoch_does_not_spam_gate_key(self):
         ctx = _create_materialization_context(campaign="Base", map_key="e1m3_cult", runtime_map="game/sp/e1m3_cult/e1m3_cult")
         ctx.items_received = [NetworkItem(item=7770151, location=0, player=1, flags=0)]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         with patch("doom_eap.runtime.bridge_client.send_command", return_value=True):
@@ -650,14 +966,14 @@ class TestSlayerGateKeyRematerialization(unittest.TestCase):
     def test_new_reloaded_map_epoch_rematerializes_owned_gate_key(self):
         ctx = _create_materialization_context(campaign="Base", map_key="e1m3_cult", runtime_map="game/sp/e1m3_cult/e1m3_cult")
         ctx.items_received = [NetworkItem(item=7770151, location=0, player=1, flags=0)]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         with patch("doom_eap.runtime.bridge_client.send_command", return_value=True):
             ctx._context_materialize_inventory(evidence, trigger="context")
 
-        ctx.published_materialization_lease = "2:1"
-        ctx.cached_map_identity["gameplay_epoch"] = "2:1"
+        ctx.runtime_lifecycle.record_lease_publication("2:1", True)
+        ctx.runtime_lifecycle.accept_marker({**ctx.cached_map_identity, "gameplay_epoch": "2:1"}, None)
         evidence_reload = SimpleNamespace(epoch=2, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -676,7 +992,7 @@ class TestSlayerGateKeyRematerialization(unittest.TestCase):
     def test_unowned_gate_key_never_granted(self):
         ctx = _create_materialization_context(campaign="Base", map_key="e1m3_cult", runtime_map="game/sp/e1m3_cult/e1m3_cult")
         ctx.items_received = []
-        ctx.items_processed = 0
+        ctx.receipt_session.restore_boundary(0)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         sent_commands = []
@@ -689,15 +1005,15 @@ class TestSlayerGateKeyRematerialization(unittest.TestCase):
     def test_generic_gate_key_audit_exultia_key(self):
         ctx = _create_materialization_context(campaign="Base", map_key="e1m2_war", runtime_map="game/sp/e1m2_battle/e1m2_battle")
         ctx.items_received = [NetworkItem(item=7770150, location=0, player=1, flags=0)]
-        ctx.items_processed = 1
+        ctx.receipt_session.restore_boundary(1)
         evidence = SimpleNamespace(epoch=1, state="gameplay", native_safe=True)
 
         with patch("doom_eap.runtime.bridge_client.send_command", return_value=True):
             plan, error = ctx._context_materialize_inventory(evidence, trigger="context")
         self.assertIsNotNone(plan)
 
-        ctx.published_materialization_lease = "2:1"
-        ctx.cached_map_identity["gameplay_epoch"] = "2:1"
+        ctx.runtime_lifecycle.record_lease_publication("2:1", True)
+        ctx.runtime_lifecycle.accept_marker({**ctx.cached_map_identity, "gameplay_epoch": "2:1"}, None)
         evidence_reload = SimpleNamespace(epoch=2, state="gameplay", native_safe=True)
 
         sent_commands = []

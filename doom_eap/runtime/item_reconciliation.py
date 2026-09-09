@@ -1,16 +1,24 @@
-"""Pure, fail-closed item history observation and reconciliation compiler."""
+"""Receipt history ownership, immutable observation and reconciliation compiler."""
 
 import copy
 import hashlib
 import json
 import re
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from doom_eap.contracts.foundation import compile_item_delivery_plan
+from doom_eap.contracts.receipt_delivery import (
+    NEW_RECEIPT, HISTORICAL_OWNERSHIP, RECONCILIATION_REPAIR, PRESENTATION_REPAIR,
+)
+from doom_eap.contracts.tag_prerequisites import AUTHORED_TAG_PREREQUISITES
+from doom_eap.contracts.ownership import (
+    CompletionUpgrade, DerivedOwnershipFact, EffectiveOwnership, ReceiptSessionToken,
+    StartingMaterializationFact,
+)
 
 REPLAY_IDEMPOTENT = "replay_idempotent"
 REPLAY_MANUAL_ONLY = "replay_manual_only"
@@ -18,10 +26,6 @@ SPECIAL_PROGRESSIVE = "special_progressive"
 NEVER_REPLAY = "never_replay"
 AP_RECEIPT_FEEDBACK = "ap"
 NATIVE_ONLY_RECEIPT_FEEDBACK = "native_only"
-NEW_RECEIPT = "new_receipt"
-HISTORICAL_OWNERSHIP = "historical_ownership"
-RECONCILIATION_REPAIR = "reconciliation_repair"
-PRESENTATION_REPAIR = "presentation_repair"
 DELIVERY_INTENTS = frozenset(
     {
         NEW_RECEIPT,
@@ -31,6 +35,7 @@ DELIVERY_INTENTS = frozenset(
     }
 )
 CLIENT_STATE_VERSION = 2
+PACKET_TIMING_RANGE_LIMIT = 256
 SUPPORTED_POLICIES = frozenset(
     {REPLAY_IDEMPOTENT, REPLAY_MANUAL_ONLY, SPECIAL_PROGRESSIVE, NEVER_REPLAY}
 )
@@ -38,6 +43,126 @@ SUPPORTED_RECEIPT_FEEDBACK = frozenset(
     {AP_RECEIPT_FEEDBACK, NATIVE_ONLY_RECEIPT_FEEDBACK}
 )
 MATERIALIZATION_EPOCH_PATTERN = re.compile(r"[0-9]+:[0-9]+")
+
+
+class ReceiptSession:
+    """Process-local receipt rebind authority, independent of gameplay epochs."""
+
+    def __init__(self, *, processed_boundary=0):
+        self._generation = 0
+        self._pending = set()
+        self._processed_boundary = processed_boundary
+        self._starting_counts = {}
+        self._starting_materialization = ()
+        self._packet_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
+
+    def observe_packet(self, start_index, item_count, authoritative_count, timestamp_ns):
+        accepted_start = (
+            start_index
+            if isinstance(start_index, int) and not isinstance(start_index, bool) and start_index >= 0
+            else None
+        )
+        if accepted_start is None:
+            start_index = max(0, authoritative_count - item_count)
+        accepted = (
+            accepted_start is not None and accepted_start <= authoritative_count
+            and accepted_start + item_count == authoritative_count
+        )
+        if accepted and accepted_start == 0:
+            self._packet_ranges.clear()
+        if accepted and item_count and accepted_start is not None:
+            self._packet_ranges.append((
+                accepted_start, accepted_start + item_count, timestamp_ns,
+                accepted_start >= self._processed_boundary,
+            ))
+        return start_index, accepted
+
+    def packet_timestamp(self, receipt_index):
+        for start, end, timestamp_ns, _live in reversed(self._packet_ranges):
+            if start <= receipt_index < end:
+                return timestamp_ns
+        return None
+
+    def packet_is_live_tail(self, receipt_index):
+        for start, end, _timestamp_ns, live in reversed(self._packet_ranges):
+            if start <= receipt_index < end:
+                return live is True
+        return False
+
+    def clear_packet_ranges(self):
+        self._packet_ranges.clear()
+
+    def prune_processed_packets(self):
+        self._packet_ranges = deque(
+            (entry for entry in self._packet_ranges if entry[1] > self._processed_boundary),
+            maxlen=PACKET_TIMING_RANGE_LIMIT,
+        )
+
+    @property
+    def starting_materialization(self):
+        return self._starting_materialization
+
+    def configure_starting_materialization(
+        self, *, starting_inventory, starting_weapon, item_identity,
+        processed_receipts, eligible,
+    ):
+        materialized = {}
+        facts = []
+        if isinstance(starting_inventory, dict):
+            by_name = {entry["name"]: item_id for item_id, entry in item_identity.items()}
+            for name, quantity in starting_inventory.items():
+                if (
+                    name in by_name and eligible(by_name[name])
+                    and isinstance(quantity, int) and quantity > 0
+                ):
+                    item_id = by_name[name]
+                    materialized[item_id] = materialized.get(item_id, 0) + quantity
+                    facts.append(StartingMaterializationFact(item_id, quantity, "starting_inventory"))
+        if isinstance(starting_weapon, str):
+            by_name = {entry["name"]: item_id for item_id, entry in item_identity.items()}
+            if starting_weapon in by_name:
+                item_id = by_name[starting_weapon]
+                if eligible(item_id):
+                    materialized[item_id] = materialized.get(item_id, 0) + 1
+                    facts.append(StartingMaterializationFact(item_id, 1, "starting_weapon"))
+        for receipt in processed_receipts:
+            item_id = receipt.item
+            if materialized.get(item_id, 0) > 0:
+                materialized[item_id] -= 1
+        self._starting_counts = materialized
+        self._starting_materialization = tuple(facts)
+
+    def consume_starting_materialization(self, item_id):
+        if self._starting_counts.get(item_id, 0) > 0:
+            self._starting_counts[item_id] -= 1
+            return True
+        return False
+
+    @property
+    def processed_boundary(self):
+        return self._processed_boundary
+
+    def restore_boundary(self, processed_boundary):
+        self._processed_boundary = processed_boundary
+
+    def advance(self):
+        self._processed_boundary += 1
+
+    def begin_rebind(self):
+        self._generation += 1
+        self._pending.clear()
+
+    def capture(self, state_key):
+        return ReceiptSessionToken(state_key, self._generation)
+
+    def is_current(self, token, state_key):
+        return token.state_key == state_key and token.generation == self._generation
+
+    def was_observed(self, key):
+        return key in self._pending
+
+    def note_observation(self, key):
+        self._pending.add(key)
 
 
 @dataclass(frozen=True)
@@ -120,6 +245,42 @@ class ReceivedItemsObservation:
     def historical_authoritative_item_ids(self) -> tuple[int, ...]:
         """Processed ownership only, preserving authoritative receipt order."""
         return self._deduplicated_item_ids(self.historical)
+
+
+def receipt_item_ids(received_items) -> tuple[int, ...]:
+    """Snapshot indexed AP IDs without deduplicating legitimate occurrences."""
+    return tuple(receipt.item for receipt in received_items)
+
+
+def progressive_receipt_stage(item_ids, item_id, item_index, excluded_indices, definition):
+    """Resolve a stage for the caller's validated nonnegative receipt index."""
+    effective_count = sum(
+        1 for index, received_id in enumerate(item_ids[:item_index + 1])
+        if index not in excluded_indices and received_id == item_id
+    )
+    stage = max(effective_count - 1, 0)
+    if (
+        isinstance(definition, dict)
+        and definition.get("type") in {"progressive_perk", "progressive_item"}
+    ):
+        perks = definition.get("perks")
+        stage = min(stage, len(perks) - 1) if isinstance(perks, list) and perks else 0
+    return stage
+
+
+def fresh_receipt_owned_count(item_ids, item_id, item_index, boundary, excluded_indices):
+    if (
+        isinstance(item_index, bool)
+        or not isinstance(item_index, int)
+        or item_index < boundary
+        or item_index >= len(item_ids)
+        or item_ids[item_index] != item_id
+    ):
+        return None
+    return sum(
+        1 for index, received_id in enumerate(item_ids[boundary:item_index + 1], boundary)
+        if index not in excluded_indices and received_id == item_id
+    )
 
 
 def _field(receipt: Any, name: str) -> Any:
@@ -273,6 +434,149 @@ def receipt_history_fingerprint(received_items: Iterable[Any]) -> str:
         )
     payload = json.dumps(records, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def effective_ownership(
+    processed_receipts, *, randomize_chainsaw, randomize_dash,
+    checked_locations, local_checked_locations, server_checked_ready,
+    hell_on_earth_locations, exultia_complete_location, slot,
+) -> EffectiveOwnership:
+    """Project vanilla facts without manufacturing authoritative AP receipts."""
+    receipts = tuple(processed_receipts)
+    item_ids = tuple(receipt_item_id(receipt) for receipt in receipts)
+    checked = set(checked_locations) | set(local_checked_locations)
+    has_hoe_check = any(
+        loc in hell_on_earth_locations
+        or (isinstance(loc, str) and loc.isdigit() and int(loc) in hell_on_earth_locations)
+        for loc in checked
+    )
+    vanilla_chainsaw = not randomize_chainsaw and has_hoe_check and 7770010 not in item_ids
+    vanilla_dash = bool(
+        not randomize_dash and server_checked_ready
+        and exultia_complete_location in checked_locations
+    )
+    facts = []
+    if vanilla_chainsaw:
+        facts.append(DerivedOwnershipFact(7770010, "unrandomized_chainsaw_server_or_local_hoe_check"))
+    if vanilla_dash:
+        facts.append(DerivedOwnershipFact(7770015, "unrandomized_dash_server_exultia_complete"))
+    upgrades = tuple(
+        CompletionUpgrade(location_id, perk_path, mission_name)
+        for location_id, perk_path, mission_name in (
+            (7770162, "perk/player/blood_punch/area_of_effect", "Doom Hunter Base"),
+            (7770290, "perk/player/blood_punch/ai_charge_rate", "Sentinel Prime"),
+            (7770411, "perk/player/blood_punch/max_charges", "Urdak"),
+        )
+        if 7770014 in item_ids and location_id in checked_locations
+    )
+    records = [
+        {"index": index, "item_id": receipt_item_id(receipt), "receipt_id": receipt_identity(receipt)}
+        for index, receipt in enumerate(receipts)
+    ]
+    if vanilla_chainsaw:
+        # Keep existing persisted materialization keys, not a synthetic ReceivedItems entry.
+        records.append({
+            "index": len(records), "item_id": 7770010,
+            "receipt_id": "network:" + json.dumps([0, slot, 7770010, None], separators=(",", ":")),
+        })
+    fingerprint = hashlib.sha256(
+        json.dumps(records, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return EffectiveOwnership(
+        item_ids, item_ids + ((7770010,) if vanilla_chainsaw else ()), tuple(facts),
+        vanilla_dash, upgrades, fingerprint, AUTHORED_TAG_PREREQUISITES,
+    )
+
+
+def processed_receipt_counts(session):
+    """Read the occurrence ledger, retaining existing malformed-container repair."""
+    history = session.setdefault("receipt_history", {})
+    if not isinstance(history, dict):
+        history = {}
+        session["receipt_history"] = history
+    receipt_counts = history.get("receipt_counts", {})
+    if not isinstance(receipt_counts, dict):
+        receipt_counts = {}
+        history["receipt_counts"] = receipt_counts
+    return {
+        value: count for value, count in receipt_counts.items()
+        if isinstance(value, str) and value and isinstance(count, int)
+        and not isinstance(count, bool) and count > 0
+    }
+
+
+def record_processed_receipt(session, network_item):
+    """Record one occurrence; boundary advancement remains a distinct operation."""
+    history = session.setdefault("receipt_history", {})
+    item_ids = history.setdefault("receipt_item_ids", [])
+    if not isinstance(item_ids, list):
+        item_ids = []
+        history["receipt_item_ids"] = item_ids
+    item_ids.append(network_item.item)
+    receipt_id = receipt_identity(network_item)
+    if receipt_id is None:
+        return
+    receipt_counts = history.setdefault("receipt_counts", {})
+    if not isinstance(receipt_counts, dict):
+        receipt_counts = {}
+        history["receipt_counts"] = receipt_counts
+    receipt_counts[receipt_id] = receipt_counts.get(receipt_id, 0) + 1
+    receipt_ids = history.setdefault("receipt_ids", [])
+    if not isinstance(receipt_ids, list):
+        receipt_ids = []
+        history["receipt_ids"] = receipt_ids
+    receipt_ids.append(receipt_id)
+
+
+def validate_session_receipt_prefix(session, received_items, boundary):
+    history = session.setdefault("receipt_history", {})
+    return validate_receipt_history_prefix(received_items, boundary, history)
+
+
+def project_receipt_history(session, received_items, boundary, observation):
+    """Project a validated observation without replacing accumulated occurrences."""
+    history = session.setdefault("receipt_history", {})
+    owned_item_ids = sorted(set(observation.receipt_item_ids))
+    ordered_receipt_ids = [
+        receipt_id
+        for receipt_id in (receipt_identity(receipt) for receipt in received_items[:boundary])
+        if receipt_id is not None
+    ]
+    changed = (
+        history.get("processed_boundary") != boundary
+        or history.get("highest_observed_index") != observation.highest_observed_index
+        or history.get("owned_item_ids") != owned_item_ids
+        or history.get("receipt_item_ids") != list(observation.receipt_item_ids[:boundary])
+        or history.get("receipt_ids") != ordered_receipt_ids
+    )
+    history["processed_boundary"] = boundary
+    history["highest_observed_index"] = observation.highest_observed_index
+    history["owned_item_ids"] = owned_item_ids
+    history["receipt_item_ids"] = list(observation.receipt_item_ids[:boundary])
+    history["receipt_ids"] = ordered_receipt_ids
+    return changed
+
+
+def project_receipt_boundary(session, processed_items):
+    """Own the receipt fields projected at the existing session commit boundary."""
+    session["processed_items"] = processed_items
+    history = session.setdefault("receipt_history", {})
+    if not isinstance(history, dict):
+        history = {}
+        session["receipt_history"] = history
+    history["processed_boundary"] = processed_items
+
+
+def reset_receipt_history(session):
+    session["processed_items"] = 0
+    session["receipt_history"] = {
+        "processed_boundary": 0,
+        "highest_observed_index": -1,
+        "receipt_ids": [],
+        "receipt_counts": {},
+        "receipt_item_ids": [],
+        "owned_item_ids": [],
+    }
 
 
 def _safe_nonnegative_int(value: Any, default: int) -> int:

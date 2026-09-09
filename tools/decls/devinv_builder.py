@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from doom_eap.content.map_registry import load_map_registry
+from doom_eap.contracts.tag_prerequisites import (
+    TAG_REQUIRED_NORMAL_MOD_UPGRADES, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+)
 
 SOURCE_OWNER = "gameresources"
 SOURCE_PATH = "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl"
@@ -901,39 +904,6 @@ TAG_FORBIDDEN_MASTERIES = frozenset({
     "perk/player/weapons/chaingun/energy_shell_mastery",
 })
 
-TAG_REQUIRED_NORMAL_MOD_UPGRADES = frozenset({
-    "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
-    "perk/player/weapons/shotgun/pop_rocket_faster_recharge",
-    "perk/player/weapons/shotgun/pop_rocket_larger_explosion",
-    "perk/player/weapons/shotgun/secondary_full_auto_faster_recovery",
-    "perk/player/weapons/shotgun/secondary_full_auto_faster_charge",
-    "perk/player/weapons/shotgun/secondary_full_auto_increased_movement_speed",
-    "perk/player/weapons/heavy_cannon/bolt_action_faster_movement",
-    "perk/player/weapons/heavy_cannon/bolt_action_faster_reload",
-    "perk/player/weapons/heavy_cannon/burst_detonate_faster_charge",
-    "perk/player/weapons/heavy_cannon/burst_detonate_primary_charge",
-    "perk/player/weapons/heavy_cannon/burst_detonate_faster_recharge",
-    "perk/player/weapons/plasma_rifle/secondary_aoe_no_primary_delay",
-    "perk/player/weapons/plasma_rifle/secondary_aoe_faster_charge",
-    "perk/player/weapons/plasma_rifle/secondary_microwave_faster_charge",
-    "perk/player/weapons/plasma_rifle/secondary_microwave_max_range",
-    "perk/player/weapons/rocket_launcher/detonate_proximity_flare",
-    "perk/player/weapons/rocket_launcher/detonate_concussive",
-    "perk/player/weapons/rocket_launcher/lockon_faster_recovery",
-    "perk/player/weapons/rocket_launcher/lockon_decrease_lock_time",
-    "perk/player/weapons/double_barrel/meat_hook_faster_reload",
-    "perk/player/weapons/double_barrel/default_faster_reload",
-    "perk/player/weapons/gauss_cannon/ballista_movement",
-    "perk/player/weapons/gauss_cannon/ballista_larger_explosion",
-    "perk/player/weapons/gauss_cannon/destroyer_charge_levels_aoe",
-    "perk/player/weapons/gauss_cannon/destroyer_faster_charge_and_recovery",
-    "perk/player/weapons/chaingun/turret_faster_equip",
-    "perk/player/weapons/chaingun/turret_faster_movement",
-    "perk/player/weapons/chaingun/energy_shell_faster_recharge",
-    "perk/player/weapons/chaingun/energy_shell_dash_smash",
-})
-
-
 TAG_FORBIDDEN_AP_ITEMS = frozenset({
     "ability_dash",
     "weapon/player/shotgun",
@@ -967,12 +937,6 @@ TAG_FORBIDDEN_AP_PERKS = frozenset({
     "perk/player/weapons/gauss_cannon/destroyer",
     "perk/player/weapons/chaingun/turret",
     "perk/player/weapons/chaingun/energy_shell",
-})
-
-TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
-    "perk/player/blood_punch/area_of_effect",
-    "perk/player/blood_punch/ai_charge_rate",
-    "perk/player/blood_punch/max_charges",
 })
 
 TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
@@ -1168,7 +1132,7 @@ def main() -> None:
 
     output_path = output_path_for_map(args.mod_root, args.map_registry, args.map_key)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(override, encoding="utf-8")
+    output_path.write_text(override, encoding="utf-8", newline="\n")
 
     audit = {
         "source_path": SOURCE_PATH,
@@ -1182,7 +1146,7 @@ def main() -> None:
         "clearAllBeforeApply_preserved": True,
         "currencyToGive_preserved": True,
     }
-    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"DevInvLoadout patched: {output_path}")
 
 

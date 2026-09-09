@@ -1,17 +1,23 @@
 from collections import namedtuple
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
+
+import pytest
 
 from doom_eap.runtime.item_reconciliation import (
     NEVER_REPLAY,
     REPLAY_IDEMPOTENT,
     ReplayPolicy,
+    ReceiptSession,
     compile_reconciliation_plan,
+    effective_ownership,
     migrate_client_state,
     migrate_legacy_session_key,
     normalize_session_state,
     observe_received_items,
+    receipt_history_fingerprint,
 )
 
 Receipt = namedtuple("Receipt", "item location player flags")
@@ -217,3 +223,118 @@ def test_identity_state_is_separate_per_room():
 
     assert state["sessions"]["room-a:0:1"]["processed_items"] == 3
     assert state["sessions"]["room-b:0:1"]["processed_items"] == 9
+
+
+def test_effective_ownership_keeps_ap_receipts_and_legacy_fingerprint_separate():
+    receipts = [Receipt(7770014, 100, 1, 0), Receipt(77, -2, 1, 0), Receipt(77, -2, 1, 0)]
+    ownership = effective_ownership(
+        receipts, randomize_chainsaw=False, randomize_dash=False,
+        checked_locations=frozenset({7770162, 55}), local_checked_locations=frozenset({"7770002"}),
+        server_checked_ready=True, hell_on_earth_locations=frozenset({7770002}),
+        exultia_complete_location=55, slot=1,
+    )
+    assert ownership.ap_item_ids == (7770014, 77, 77)
+    assert ownership.reconciliation_item_ids == (7770014, 77, 77, 7770010)
+    assert [fact.item_id for fact in ownership.derived_facts] == [7770010, 7770015]
+    assert ownership.vanilla_dash
+    assert [upgrade.location_id for upgrade in ownership.blood_punch_upgrades] == [7770162]
+    # This is the pre-P-1 cache-key oracle, not a receipt emitted by the new domain.
+    legacy_key = receipt_history_fingerprint([
+        *receipts, SimpleNamespace(item=7770010, location=0, player=1),
+    ])
+    assert ownership.materialization_fingerprint == legacy_key
+    assert len(receipts) == 3
+    receipts.clear()
+    assert ownership.ap_item_ids == (7770014, 77, 77)
+    with pytest.raises(FrozenInstanceError):
+        ownership.vanilla_dash = False
+
+
+@pytest.mark.parametrize("randomized,ap_chainsaw", [(False, False), (True, False), (False, True), (True, True)])
+def test_effective_ownership_does_not_promote_local_checks_to_dash_or_blood_punch(randomized, ap_chainsaw):
+    receipts = [Receipt(7770010, 100, 1, 0)] if ap_chainsaw else []
+    ownership = effective_ownership(
+        receipts, randomize_chainsaw=randomized, randomize_dash=False,
+        checked_locations=frozenset(), local_checked_locations=frozenset({7770002, 55, 7770162}),
+        server_checked_ready=True, hell_on_earth_locations=frozenset({7770002}),
+        exultia_complete_location=55, slot=1,
+    )
+    assert not ownership.vanilla_dash
+    assert ownership.blood_punch_upgrades == ()
+    derived_chainsaw = not randomized and not ap_chainsaw
+    assert len(ownership.derived_facts) == int(derived_chainsaw)
+    if not derived_chainsaw:
+        assert ownership.materialization_fingerprint == receipt_history_fingerprint(receipts)
+
+
+def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
+    session = ReceiptSession()
+    key = ("room", 0, "receipt")
+    token = session.capture("room")
+    session.note_observation(key)
+    assert session.was_observed(key)
+    assert session.is_current(token, "room")
+    assert not session.is_current(token, "other-room")
+    session.advance()
+    assert session.processed_boundary == 1
+    session.begin_rebind()
+    assert session.processed_boundary == 1
+    assert not session.was_observed(key)
+    assert not session.is_current(token, "room")
+    assert session.is_current(session.capture("room"), "room")
+    session.restore_boundary(7)
+    assert session.processed_boundary == 7
+    with pytest.raises(FrozenInstanceError):
+        token.generation = 10
+
+
+def test_starting_materialization_tracks_sources_and_subtracts_processed_occurrences():
+    session = ReceiptSession()
+    receipt = Receipt(8, -2, 1, 0)
+    inputs = dict(
+        starting_inventory={"Item": 2}, starting_weapon="Item",
+        item_identity={8: {"name": "Item"}}, eligible=lambda _item: True,
+    )
+    session.configure_starting_materialization(**inputs, processed_receipts=[receipt, receipt])
+    assert [(fact.item_id, fact.quantity, fact.provenance) for fact in session.starting_materialization] == [
+        (8, 2, "starting_inventory"), (8, 1, "starting_weapon"),
+    ]
+    assert session.consume_starting_materialization(8)
+    assert not session.consume_starting_materialization(8)
+    session.begin_rebind()
+    assert not session.consume_starting_materialization(8)
+    session.configure_starting_materialization(**inputs, processed_receipts=[receipt] * 3)
+    assert not session.consume_starting_materialization(8)
+    with pytest.raises(FrozenInstanceError):
+        session.starting_materialization[0].quantity = 9
+
+
+def test_starting_materialization_preserves_existing_quantity_and_eligibility_rules():
+    session = ReceiptSession()
+    session.configure_starting_materialization(
+        starting_inventory={"A": True, "B": -1, "C": "2", "Excluded": 4, "Unknown": 1},
+        starting_weapon="Excluded",
+        item_identity={1: {"name": "A"}, 2: {"name": "B"}, 3: {"name": "C"}, 4: {"name": "Excluded"}},
+        eligible=lambda item: item != 4, processed_receipts=(),
+    )
+    assert session.consume_starting_materialization(1)  # bool was accepted as int by the original parser.
+    assert not session.consume_starting_materialization(1)
+    assert not any(session.consume_starting_materialization(item) for item in (2, 3, 4))
+
+
+def test_receipt_packet_ranges_are_bounded_and_pruned_without_rebind_reset():
+    session = ReceiptSession()
+    for index in range(257):
+        assert session.observe_packet(index, 1, index + 1, 100 + index) == (index, True)
+    assert session.packet_timestamp(0) is None
+    assert session.packet_timestamp(1) == 101
+    assert session.observe_packet(True, 1, 300, 999) == (299, False)
+    assert session.packet_timestamp(256) == 356
+    session.restore_boundary(128)
+    session.prune_processed_packets()
+    assert session.packet_timestamp(127) is None
+    assert session.packet_timestamp(128) == 228
+    session.begin_rebind()
+    assert session.packet_timestamp(128) == 228
+    session.clear_packet_ranges()
+    assert session.packet_timestamp(128) is None
