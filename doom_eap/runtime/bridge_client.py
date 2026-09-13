@@ -642,7 +642,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 7
+ITEM_MAPPING_REVISION = 8
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -3465,6 +3465,14 @@ class DoomEternalContext(CommonContext):
                 )
                 return False
 
+            if self.session_state.get("weapon_points") is not None:
+                try:
+                    owner, authoritative = self.weapon_points_receipt_owner()
+                    owner.reconcile(authoritative)
+                except (RuntimeError, OSError, ValueError) as error:
+                    logger.error("[WUP] Native checkpoint reconciliation blocked: %s", error)
+                    self.item_delivery_blocked = True
+                    return False
             batch_count = 0
             fresh_receipt_boundary = self.items_processed
             while len(self.items_received) > self.items_processed:
@@ -3588,6 +3596,16 @@ class DoomEternalContext(CommonContext):
                         mapping_revision=ITEM_MAPPING_REVISION,
                     )
                     break
+
+                if item_id == 7770903:
+                    try:
+                        self._apply_weapon_points_receipt(item_index, network_item)
+                    except (RuntimeError, OSError, ValueError) as error:
+                        logger.error("[WUP] Receipt %s blocked: %s", item_index, error)
+                        self.item_delivery_blocked = True
+                        return False
+                    logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
+                    continue
 
                 if item_id in TRANSIENT_EFFECTS:
                     live_tail_receipt = self._packet_receipt_is_live_tail(item_index)
@@ -4714,6 +4732,31 @@ class DoomEternalContext(CommonContext):
         self._queue_session_authoritative = True
         self.check_and_update_event_session()
 
+    def weapon_points_receipt_owner(self):
+        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointReceipts, namespace_id
+        identity = doom_process_identity()
+        if not identity or not identity.startswith("windows:"):
+            raise RuntimeError("Weapon Points require a qualified Windows game process")
+        namespace = namespace_id(self.room_seed_name, self.team, self.slot,
+                                 self._connected_slot_data.get("native_generation_fingerprint", ""))
+        probe = Path(os.environ.get("SENTINEL_PROBE", REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe"))
+        link = SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
+        authoritative = {index: receipt_identity(item) for index, item in enumerate(self.items_received)
+                         if item.item == 7770903}
+        return WeaponPointReceipts(self.session_state, self.persist_session_state, link, namespace), authoritative
+
+    def _apply_weapon_points_receipt(self, index, item):
+        received_item_classification(7770903, item.flags)
+        owner, authoritative = self.weapon_points_receipt_owner()
+        owner.deliver(index, receipt_identity(item), authoritative)
+        if ENABLE_ITEM_NOTIFICATIONS:
+            accepted, description = self.spool_deferred_receipt_notification(7770903, index)
+            if not accepted:
+                raise RuntimeError(description)
+        self._record_processed_receipt(item)
+        self.receipt_session.advance()
+        self.persist_session_state()
+
     def persist_session_state(self):
         if not self.item_state_ready:
             return
@@ -5442,6 +5485,8 @@ class DoomEternalContext(CommonContext):
         excluded_receipt_indices=None,
         context_identity=None,
     ):
+        if item_id == 7770903:
+            return False, "Weapon Upgrade Points require confirmed Sentinel execution"
         if getattr(self, "_queue_session_authoritative", self.item_state_ready) is False:
             return False, "queue session is not bound to current connection"
         if not ensure_queue_session_namespace(self.state_key):

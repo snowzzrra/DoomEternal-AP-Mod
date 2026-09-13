@@ -87,20 +87,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add Cultist Base Slayer Gate Complete 7770487"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "ef3a4dc42ee3979a6f025bfe3789a411a735c7d474666b114b170d5c6ec8f996",
-  "byte_sha256": "848a5ac51c73b8343bcb4937a4413aaf6d7d8f6ae64195a8bc08831d1cf7182f",
+  "byte_sha256": "93723ba066a535fd55db6ed86945ce9903a19c9f175efbd2f4e1459760164ede",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 1180,
-    "byte_size": 20125090,
-    "classes": 18370,
-    "entity_count": 18370,
+    "byte_size": 20126612,
+    "classes": 18372,
+    "entity_count": 18372,
     "layers": 4819,
     "targets": 10793,
     "transforms": 37092,
-    "unique_entity_names": 18370
+    "unique_entity_names": 18372
   },
   "manifest_sha256": "cd78e5123bc1e2f8825cd6b8ed2c3b3f12ed67924475494b882df4230c658310",
   "map_key": "e1m3_cult",
@@ -137,5 +141,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "8737d143183eaba11632e58d75bc73df50b880c9d48f8b5351c2a369181f255b",
-  "semantic_sha256": "36d69fc83ff9285a4c5048e1ffe28566374a57ec832e0bb03c3393210882d208"
+  "semantic_sha256": "c602af51a8c236ff148a6485f68d0f4ccc2d09d822ae92697b061c517a1d6f0d"
 }

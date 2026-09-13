@@ -256,5 +256,9 @@
     "7770152": "give map_objects/keycard/slayer_key",
     "7770153": "give map_objects/keycard/slayer_key",
     "7770154": "give map_objects/keycard/slayer_key",
-    "7770155": "give map_objects/keycard/slayer_key"
+    "7770155": "give map_objects/keycard/slayer_key",
+    "7770903": {
+        "type": "native_weapon_upgrade_points",
+        "amount": 3
+    }
 }

@@ -95,20 +95,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and update Sentinel Prime publisher contracts"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "9d979ded13ff77aa6d138e3324720a596b9a725e4a1806bd62b2c56e7ca7bbbd",
-  "byte_sha256": "f59b702da8788f222b2df0b3f696a4faac493f59a5b3ea7f98c742cc2e134844",
+  "byte_sha256": "2b8b4cd95702d79ee7289c1b142ff0265fff684ca39057ef3c6d009ca250750a",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 11,
-    "byte_size": 2744531,
-    "classes": 2911,
-    "entity_count": 2913,
+    "byte_size": 2746001,
+    "classes": 2913,
+    "entity_count": 2915,
     "layers": 125,
     "targets": 1480,
     "transforms": 5366,
-    "unique_entity_names": 2912
+    "unique_entity_names": 2914
   },
   "manifest_sha256": "331eb16dd9de476d90246045ef49dfdb6d7b9d2fb94cbbd4ecbcad66ace9e1e0",
   "map_key": "e2m4_boss",
@@ -132,5 +136,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "29abb56feab4beb8ef5f9e881730b20e9978a55d031bbeb54ec51966775e2ee0",
-  "semantic_sha256": "36e5e63084c4e771d9c73fec716eabb35d1107b076caae074d27dd205c8edc3c"
+  "semantic_sha256": "c6b1d522b244908c7cf38c42082243a3a81cc1b7a0bf1eddcf0dd4b45bd84c50"
 }

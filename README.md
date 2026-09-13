@@ -317,8 +317,8 @@ Repair/Fix, and a sanitized support report.
 
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
 
-- Create an alternative to meathook to better fit Archipelago needs.
-- Remove all meathook-dependent architecture and work on a new, proprietary, DLL.
+- Develop Sentinel Core as an independent open-source native integration project for Archipelago.
+- Follow an evidence-led Hybrid direction: Meathook may retain its proven RPC role. Windows bootstrap/coexistence smoke has passed; future hooks and broader platform integration still require validation.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 

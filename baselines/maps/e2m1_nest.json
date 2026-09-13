@@ -79,20 +79,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add Super Gore Nest Slayer Gate Complete 7770488"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "2114d4f3c8372ca53a27512f26623011a29cb31af9600d4f8bde3b342062491c",
-  "byte_sha256": "d24450cb251f65d69cf0df1d836afd0c0064d92bd76d7b9547cbf9f548f7f3f0",
+  "byte_sha256": "fd0314f5a76e9d8c9561573df9ef16c2a581adeb9947f72d86900c7ff73f032a",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 271,
-    "byte_size": 14440891,
-    "classes": 13415,
-    "entity_count": 13418,
+    "byte_size": 14442413,
+    "classes": 13417,
+    "entity_count": 13420,
     "layers": 2113,
     "targets": 8773,
     "transforms": 27372,
-    "unique_entity_names": 13416
+    "unique_entity_names": 13418
   },
   "manifest_sha256": "41b170495d026914c14005baef9d02dbf532ddf489411dab05046c0bb7b9afda",
   "map_key": "e2m1_nest",
@@ -133,5 +137,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "1d061bb1db373d5251c233247e43a7fecaf86bf0ea1c12a8904700911be3def6",
-  "semantic_sha256": "e488f341e9648ba02e670b2217513609817b9fafdbe8a6139100cd8b82791b70"
+  "semantic_sha256": "248fc5962084c08961c37083bbb60efe741051cd725c368d8a364d9d8675cd8e"
 }

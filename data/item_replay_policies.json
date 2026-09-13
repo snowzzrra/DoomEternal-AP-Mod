@@ -513,6 +513,10 @@
     "7770155": {
       "name": "Slayer Gate Key Taras Nabad",
       "policy": "replay_idempotent"
+    },
+    "7770903": {
+      "name": "Weapon Upgrade Points (3)",
+      "policy": "never_replay"
     }
   }
 }

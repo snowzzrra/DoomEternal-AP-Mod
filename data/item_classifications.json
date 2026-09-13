@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "item_mapping_revision": 7,
+  "item_mapping_revision": 8,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "911ef5d72b18cd9ebac01680eb50248ef720fe9a522e9fb1e40addeea09741b5",
+  "source_sha256": "cf381098170b0f4122f49b8bc2901fee9f17ec4ea6805221837d22c3cb9ce4c5",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -511,6 +511,10 @@
     "7770902": {
       "name": "Progressive Sentinel Hammer",
       "classification": 1
+    },
+    "7770903": {
+      "name": "Weapon Upgrade Points (3)",
+      "classification": 2
     }
   }
 }

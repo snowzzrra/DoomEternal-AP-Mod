@@ -789,7 +789,7 @@ def main(argv: list[str] | None = None) -> int:
         classification_path = ROOT / "data" / "item_classifications.json"
         classification_document = read_json(classification_path)
         classification_identity = load_item_classification_identity(classification_path)
-        if classification_document.get("item_mapping_revision") != 7:
+        if classification_document.get("item_mapping_revision") != 8:
             errors.append("Packaged item classification revision drifted")
         if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
             errors.append(
@@ -1516,6 +1516,10 @@ def main(argv: list[str] | None = None) -> int:
     for item_id, command_value in commands.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
+            if command_type == "native_weapon_upgrade_points":
+                if item_id != 7770903 or command_value != {"type": "native_weapon_upgrade_points", "amount": 3}:
+                    errors.append(f"Invalid typed Weapon Upgrade Point mapping: {item_id}")
+                continue
             if command_type == "no_op":
                 continue
             if command_type in {"progressive_perk", "progressive_item"}:

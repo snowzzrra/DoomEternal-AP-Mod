@@ -83,20 +83,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add ARC Complex Slayer Gate Complete 7770489"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "2e588bf2d2a403e3911f57fa3f5d765568586850f45ed4af54657508382e33cb",
-  "byte_sha256": "ebcc24937e55beae0a575f0575ff611c3da1d4aa5dc82c0b1c27004bc4aa1ad0",
+  "byte_sha256": "2ca45c924cebe081d7e6dc027a40a1136648e31dd7f308c139f9265d4b443bc5",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 126,
-    "byte_size": 28837175,
-    "classes": 19198,
-    "entity_count": 19202,
+    "byte_size": 28838645,
+    "classes": 19200,
+    "entity_count": 19204,
     "layers": 3694,
     "targets": 96244,
     "transforms": 40952,
-    "unique_entity_names": 19199
+    "unique_entity_names": 19201
   },
   "manifest_sha256": "a80b2c373a3fbce1325c474c55a6878e003f76a09586100ecc601212915cde6f",
   "map_key": "e2m2_base",
@@ -141,5 +145,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "55b573f52883bed875e87730ad03dfbce3e7942c346b99c489c99671fa4df8a1",
-  "semantic_sha256": "92b88a08d319a00a68841356803a1fad5132d3dda6bdf9da29e3108db0760e75"
+  "semantic_sha256": "84e0de4d2341b4032da69ec37c432694167209d96da1d9431dff02861b69f566"
 }

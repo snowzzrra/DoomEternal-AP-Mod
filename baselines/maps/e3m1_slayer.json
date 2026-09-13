@@ -103,20 +103,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "Update independent size in e3m1_slayer"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "b6ee6a008d608fdb9b5fd4aa959b13b1d858dbab0ba6a1860fed8752ffe73450",
-  "byte_sha256": "3c2504425d1dd86c20bcc4e22d56086163e73178192f829a7a565128f0da02d6",
+  "byte_sha256": "13df1682ae2d35486387021a3a7ef3e83ce37343166fd60e8079c50d4469c627",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 298,
-    "byte_size": 12583875,
-    "classes": 12220,
-    "entity_count": 12222,
+    "byte_size": 12585397,
+    "classes": 12222,
+    "entity_count": 12224,
     "layers": 1666,
     "targets": 7585,
     "transforms": 23368,
-    "unique_entity_names": 12221
+    "unique_entity_names": 12223
   },
   "manifest_sha256": "d866888805a97805ca75dd8cb16185e8c471b8d18f0fbfc51f24745529d9289b",
   "map_key": "e3m1_slayer",
@@ -163,5 +167,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "e9a8509b8767afe17a830895aa7c9099c689a7f6f048cfe9b8c7fa35c9813f82",
-  "semantic_sha256": "585822ab82dc27eaa6a8aeb61d8f4f6605274bc1012615b00667832d94a2b6dd"
+  "semantic_sha256": "0ae1b64b05ede0d0a481b8f9fb3a89972157923159496888ae2ac892a39d1cd9"
 }

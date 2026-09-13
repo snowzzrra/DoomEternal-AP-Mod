@@ -75,20 +75,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and retire impossible Die by the Sword AP Location 7770358"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "7a6be0a76aa25c5b6f20f8dee205b8fe057045d0edbaa860961b42e50ae6c982",
-  "byte_sha256": "92ba7ccc803e199ff275637d0ec95835cdfa231e1939ec206d1f2945814518c1",
+  "byte_sha256": "c771594592859a6c933b3fa17fbe2cfc58e4f30dfb048fa2b1101b52558f7d63",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 175,
-    "byte_size": 7381807,
-    "classes": 7675,
-    "entity_count": 7675,
+    "byte_size": 7383329,
+    "classes": 7677,
+    "entity_count": 7677,
     "layers": 451,
     "targets": 3400,
     "transforms": 15445,
-    "unique_entity_names": 7675
+    "unique_entity_names": 7677
   },
   "manifest_sha256": "7c0bbc619316382cdd08bd845b9d3663f8e29126eb796338e8e09dbc2f0cc007",
   "map_key": "e3m2_hell",
@@ -121,5 +125,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "afe0beebfb8846b9d8d47a127c098d4b18726f8f040df418de481cb64d3492b2",
-  "semantic_sha256": "213a70776b394835810fa056869ea8e22d042410c021750324e17a02c9eb6726"
+  "semantic_sha256": "c0f527dc3690807f406b8f5eccf3967ff8f79e7a6205b8fff0f7a8e4dd7de53d"
 }

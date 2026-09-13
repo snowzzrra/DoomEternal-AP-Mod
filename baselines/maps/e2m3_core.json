@@ -91,20 +91,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add Mars Core Slayer Gate Complete 7770490"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "44f245d18af308a34e53a687aff0079bad3ada1dcec8663deb79a77b29501511",
-  "byte_sha256": "2e887e7f057b034db4947b6e04426bfbc2f3e489edb306dd34ce4aac021b2b67",
+  "byte_sha256": "8162c1e3633a95502aac87e5ebd1e3218075cac21368b93bf222c24accdee9cd",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 347,
-    "byte_size": 17090730,
-    "classes": 13806,
-    "entity_count": 13844,
+    "byte_size": 17092252,
+    "classes": 13808,
+    "entity_count": 13846,
     "layers": 7007,
     "targets": 11410,
     "transforms": 30255,
-    "unique_entity_names": 13807
+    "unique_entity_names": 13809
   },
   "manifest_sha256": "7734014d86c1c4946b560241d9bfcbe8650f9b97fdb2c078bdab13e487a6086c",
   "map_key": "e2m3_core",
@@ -143,5 +147,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "c5328178b208e37dde69238adf7520d7d84c6c0582a64402bf1581d1782f8b0d",
-  "semantic_sha256": "7414d95735605bcd04065e1eeef80b6722be60bd97a793b3425dc92bd3f5da13"
+  "semantic_sha256": "c9bf4a6a539cfaf03e53a91480633967d61c25c44ce60a2ff78cb4d55acf4778"
 }

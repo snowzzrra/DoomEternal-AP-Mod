@@ -119,20 +119,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and accept final Praetor visual model Z correction"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "bc7fdbb28182c177af6af7496795d6804b0c7ace5c8f8e4745bf7f157a8ac258",
-  "byte_sha256": "0818d50cddf0687578b6e1709f7e0d1ee1df33018335c7174d0ffa5c9968f85c",
+  "byte_sha256": "be1c065c4466db56ffd729a0e9cfe7b983c5c7e4a0ce4be00e0b1a4b2bbc5c27",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 140,
-    "byte_size": 4330415,
-    "classes": 4198,
-    "entity_count": 4200,
+    "byte_size": 4331937,
+    "classes": 4200,
+    "entity_count": 4202,
     "layers": 162,
     "targets": 2829,
     "transforms": 8054,
-    "unique_entity_names": 4199
+    "unique_entity_names": 4201
   },
   "manifest_sha256": "eebb418acb722f27f2ff977f174ddd1537ad0b5dc5df42dd929ca0e3b931a323",
   "map_key": "hub",
@@ -162,5 +166,5 @@
   "runtime_location_ids": [],
   "schema_version": 2,
   "scripted_contract_sha256": "4915daed92ceb67273d5ce60eb54889da349b55cd93d54f04213940209bc4308",
-  "semantic_sha256": "0e178ada02b9b4f5a6b75311d15724abb41af4543db97f3cf434b57a5f418ac1"
+  "semantic_sha256": "0b652832b915c482f8a8ce99044a4ad5be38b976892570b69d866893c28f84cd"
 }

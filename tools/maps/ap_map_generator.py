@@ -2232,7 +2232,7 @@ def generate_rpc_command_entities(
     for item_id, command_value in items_dict.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
-            if command_type == "no_op":
+            if command_type in {"no_op", "native_weapon_upgrade_points"}:
                 continue
             if command_type == "transient_effect":
                 continue

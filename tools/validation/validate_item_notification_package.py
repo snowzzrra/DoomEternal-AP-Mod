@@ -366,7 +366,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             classification["classification"] if isinstance(classification, dict) else classification,
         )
         definition = all_commands[str(item_id)]
-        if isinstance(definition, dict) and definition.get("type") == "transient_effect":
+        if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
             continue
         if isinstance(definition, dict) and definition.get("type") in {
             "progressive_perk", "progressive_item",

@@ -99,20 +99,24 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and update Final Sin publisher contracts"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "c60492caddbdc3b60b521189e62c243e74e6aa46bc79ad47ef1cce44c7c1fdb2",
-  "byte_sha256": "d0835d9ebcff62e4cf9d304aec4aa6d44cb2b33f36012d40dd3798efdafae601",
+  "byte_sha256": "4710fe8aa2c4b47f6d5bc35b7d15fab289210c676b3f094342a0128ea672f9d4",
   "content_revision": "0.5.0",
   "generated_entity_metrics": {
     "bind_parents": 2,
-    "byte_size": 15974234,
-    "classes": 12980,
-    "entity_count": 12980,
+    "byte_size": 15975756,
+    "classes": 12982,
+    "entity_count": 12982,
     "layers": 1650,
     "targets": 45513,
     "transforms": 26188,
-    "unique_entity_names": 12980
+    "unique_entity_names": 12982
   },
   "manifest_sha256": "8c008d72eea7172e4de492887baf143ba101e755a509395e2a71eb4531df48a4",
   "map_key": "e3m4_boss",
@@ -129,5 +133,5 @@
   ],
   "schema_version": 2,
   "scripted_contract_sha256": "df3956e34ead01236ded5f485c338c6f65497900dbfe5cfb6188c887739fb40f",
-  "semantic_sha256": "1f44438bc9788a6bbc4cd0f57b1cb32ff64d9809f617cd77865d1f40f4359bd4"
+  "semantic_sha256": "b603a2a78c2dc4ee44cc4e483c9f7aa831560a3ab84e385a25584ac1f13bc762"
 }

@@ -111,7 +111,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 127, "locations": 442, "map_checks": 374, "runtime_locations": 68, "runtime_goals": 1, "route_sentinel_batteries": 18},
+    "counts": {"items": 128, "locations": 442, "map_checks": 374, "runtime_locations": 68, "runtime_goals": 1, "route_sentinel_batteries": 18},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "progressive_item": "target_command", "physical_pickup_spawn": "physical_pickup_spawn", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "transient_effect": "transient_effect", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -503,6 +503,7 @@ def classify_item_definition(definition: Any) -> str:
             "currency": "currency",
             "no_op": "no_op",
             "transient_effect": "transient_effect",
+            "native_weapon_upgrade_points": "native_weapon_upgrade_points",
         }.get(definition.get("type"), "unknown")
     if not isinstance(definition, str):
         return "unknown"
@@ -537,6 +538,16 @@ def compile_item_delivery_plan(
         raise ValueError(f"Unknown item ID: {item_id}")
     definition = definitions[item_id]
     family = classify_item_definition(definition)
+    if family == "native_weapon_upgrade_points":
+        # Notification-only DECL plan. The receipt owner must confirm Sentinel
+        # execution separately; no RPC/currency entity can materialize WUP.
+        commands = ()
+        if receipt:
+            if classification is None:
+                raise ValueError(f"Received item {item_id} requires classification")
+            entity = notification_entity_name(item_id, classification, slot=notification_slot)
+            commands = (DeliveryCommand(entity, f"ai_ScriptCmdEnt {entity} activate", 0),)
+        return DeliveryPlan(item_id, family, "sentinel.weapon_points.v1", commands, None, "Weapon Upgrade Points (3)")
     try:
         # Delivery uses the authored family contract; active-map discovery is unrelated.
         primitive_id = DELIVERY_CONTRACTS["family_primitives"][family]
