@@ -4,6 +4,7 @@ from doom_eap.runtime.physical_checks import PhysicalChecks
 from doom_eap.runtime.task_supervision import SessionTasks
 from doom_eap.runtime.level_ready import LevelReady
 from doom_eap.runtime.location_setup import LocationSetup
+from doom_eap.runtime.unified_campaign import UnifiedCampaign, ACCESS_IDS, STAGES
 from doom_eap.runtime.location_names import resolve_placement_records
 from doom_eap.runtime.protocol_feed import ProtocolFeed, hints_key
 import asyncio
@@ -3220,7 +3221,7 @@ class DoomEternalContext(CommonContext):
             try:
                 slot_data = validate_slot_contract(slot_data)
             except ValueError as error:
-                message = f"Unsupported DOOM Eternal 0.5-D slot contract: {error}"
+                message = f"Unsupported DOOM Eternal Phase6 slot contract: {error}"
                 logger.error("[Contract] Connected slot rejected: %s", error)
                 self._report_launcher_connection_failure(
                     message,
@@ -3229,6 +3230,7 @@ class DoomEternalContext(CommonContext):
                 )
                 return
             self._connected_slot_data = slot_data
+            self.unified_campaign = UnifiedCampaign(slot_data, self.session_state, self.persist_session_state)
             self.goals.connected(self.persist_session_state)
             self._refresh_runtime_context(slot_data)
             self.deathlink.configure(slot_data.get("death_link", False))
@@ -3575,6 +3577,13 @@ class DoomEternalContext(CommonContext):
                     bridge_revision=BRIDGE_REVISION,
                     protocol_version=BRIDGE_PROTOCOL,
                 )
+                if item_id in ACCESS_IDS:
+                    self._record_processed_receipt(network_item)
+                    self.receipt_session.advance()
+                    self.persist_session_state()
+                    logger.info("[Campaign] Access receipt acknowledged: index=%s stage=%s", item_index, ACCESS_IDS[item_id])
+                    continue
+
                 if item_id not in ITEM_ID_TO_COMMAND:
                     logger.error(
                         f"[To Game] No command mapping for item {item_id}; delivery paused. "
@@ -4195,6 +4204,73 @@ class DoomEternalContext(CommonContext):
             proof,
         )
 
+    def admitted_campaign_save(self, filename="game_duration.dat"):
+        try:
+            link = self.native_game_link()
+            native_root = link.admitted_save_root()
+            self.save_observer.bind_ap_provider(link.namespace, native_root)
+            return save_files.admitted_ap_save(STEAM_REMOTE_DIR, native_root, filename)
+        except (RuntimeError, OSError, ValueError) as error:
+            reason = str(error)
+            if getattr(self, "_last_ap_save_refusal", None) != reason:
+                logger.info("[Campaign] Save observation unavailable: %s", reason)
+                self._last_ap_save_refusal = reason
+            return None
+
+    def campaign_projection(self):
+        return self.unified_campaign.snapshot(self.checked_locations, self.items_received)
+
+    async def synchronize_campaign_menu(self):
+        if not getattr(self, "server_checked_locations_ready", False) or not hasattr(self, "unified_campaign"):
+            return
+        from doom_eap.runtime.campaign_menu import CampaignMenu
+        if not hasattr(self, "_campaign_menu"):
+            self._campaign_menu = CampaignMenu()
+        try:
+            projection = self.campaign_projection()
+            result = await asyncio.to_thread(self._campaign_menu.synchronize, self.native_game_link(), projection)
+            self.synchronize_fortress_phase(projection)
+            selected = result["selected_stage"]
+            if selected:
+                self.unified_campaign.select(selected, projection)
+            status = (result["committed_revision"], result["rendered_revision"], selected, result["loaded_stage"])
+            if getattr(self, "_campaign_menu_status", None) != status:
+                logger.info("[Campaign] Native menu committed=%s rendered=%s selected=%s loaded=%s", *status)
+                self._campaign_menu_status = status
+            self._campaign_menu_refusal = None
+        except (RuntimeError, OSError, ValueError, KeyError) as error:
+            reason = str(error)
+            if getattr(self, "_campaign_menu_refusal", None) != reason:
+                logger.info("[Campaign] Native menu pending: %s", reason)
+                self._campaign_menu_refusal = reason
+
+    def synchronize_fortress_phase(self, projection):
+        """Project server chronology after native arrival, including stage exits.
+
+        This never loads a map. The existing native queue/lifecycle owns entity
+        execution and rejects a command after its materialization lease expires.
+        """
+        evidence = read_gameplay_save_evidence()
+        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not self.authored_map_runtime_ready(evidence):
+            return
+        lease = self._active_materialization_lease()
+        phase = projection["fortress_phase"]
+        identity = (self.state_key, lease, phase)
+        if getattr(self, "_fortress_phase_publication", None) == identity:
+            return
+        commands = [f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate"]
+        # Newly activated content layers can contain previously checked visuals.
+        # Reapply the existing catalog-owned hide targets in this same native
+        # command, after layer activation, without resetting reconciliation.
+        for code, entry in sorted(AUTOMAP_VISUALS_BY_MAP.get("hub", {}).items()):
+            if entry["location_id"] in self.checked_locations and entry["classification"] == "visible_cleanup":
+                commands.append(f'ai_ScriptCmdEnt {entry["reconciliation_entity"]} activate')
+        if send_command("; ".join(commands),
+                        coalesce_key=f"fortress-{lease}-phase{phase}", state_key=self.state_key,
+                        materialization_lease=lease, already_queued_ok=True):
+            self._fortress_phase_publication = identity
+            logger.info("[Campaign] Fortress phase=%s queued for lease=%s; native execution pending", phase, lease)
+
     def update_save_slot_lifecycle(self):
         """Keep an authoritative slot through transient samples; prove switches."""
         evidence = read_gameplay_save_evidence()
@@ -4212,7 +4288,7 @@ class DoomEternalContext(CommonContext):
             evidence_context = classify_runtime_context(evidence.map_name)
         transition_context = marker_context or evidence_context
         active_campaign = transition_context.campaign if transition_context else None
-        expected_prefix = expected_save_prefix_for_campaign(active_campaign)
+        expected_prefix = "GAME-"  # Physical AP save family is independent of content.
 
         active_family_mismatch, prior_evidence_epoch = self.save_observer.observe_expected_family(expected_prefix)
 
@@ -4233,11 +4309,8 @@ class DoomEternalContext(CommonContext):
             evidence_slot = None
         evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
 
-        candidates = (
-            primary_save_candidates(slot_prefix=expected_prefix)
-            if expected_prefix
-            else primary_save_candidates()
-        )
+        admitted = self.admitted_campaign_save()
+        candidates = [admitted] if admitted else []
         for selected in candidates:
             if self.save_observer.observe_candidate(selected):
                 logger.info(
@@ -4258,7 +4331,7 @@ class DoomEternalContext(CommonContext):
         proof_load_epoch = lease_epoch
 
         newest = candidates[0] if candidates else None
-        active = primary_save_for_slot(self.active_save_slot) if self.active_save_slot else None
+        active = admitted if admitted and admitted.slot_directory == self.active_save_slot else None
         candidate_slot = newest.slot_directory if newest else None
         candidate_mtime = newest.mtime_ns if newest else 0
 
@@ -4304,7 +4377,7 @@ class DoomEternalContext(CommonContext):
             self.reconcile_fast_travel_unlock("save_proof")
             return decision.continued
 
-        selected = primary_save_for_slot(decision.target_slot)
+        selected = admitted if admitted and admitted.slot_directory == decision.target_slot else None
         if selected is None:
             return fail_proof("no_gameplay_evidence")
 
@@ -4732,20 +4805,24 @@ class DoomEternalContext(CommonContext):
         self._queue_session_authoritative = True
         self.check_and_update_event_session()
 
-    def weapon_points_receipt_owner(self):
-        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointReceipts, namespace_id
+    def native_game_link(self):
+        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, namespace_id
         identity = doom_process_identity()
         if not identity or not identity.startswith("windows:"):
-            raise RuntimeError("Weapon Points require a qualified Windows game process")
+            raise RuntimeError("Sentinel requires a qualified Windows game process")
         namespace = namespace_id(self.room_seed_name, self.team, self.slot,
                                  self._connected_slot_data.get("native_generation_fingerprint", ""))
         default_probe = (APPLICATION_DIR / "sentinel_probe.exe" if getattr(sys, "frozen", False)
-                         else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
+                         else REPO_ROOT.parent / "Sentinel-Core/build/windows/bin/Release/sentinel_probe.exe")
         probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
-        link = SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
+        return SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
+
+    def weapon_points_receipt_owner(self):
+        from doom_eap.runtime.weapon_points import WeaponPointReceipts
+        link = self.native_game_link()
         authoritative = {index: receipt_identity(item) for index, item in enumerate(self.items_received)
                          if item.item == 7770903}
-        return WeaponPointReceipts(self.session_state, self.persist_session_state, link, namespace), authoritative
+        return WeaponPointReceipts(self.session_state, self.persist_session_state, link, link.namespace), authoritative
 
     def _apply_weapon_points_receipt(self, index, item):
         received_item_classification(7770903, item.flags)
@@ -5441,6 +5518,8 @@ class DoomEternalContext(CommonContext):
             BRIDGE_PROTOCOL, packet_received_ns, materialization_lease, context_identity)
 
     def delivery_item_name(self, item_id):
+        if item_id in ACCESS_IDS:
+            return STAGES[ACCESS_IDS[item_id]]["name"] + " Access"
         identity = ITEM_CLASSIFICATION_IDENTITY.get(item_id)
         if identity is not None:
             return identity["name"]
@@ -5698,6 +5777,9 @@ class DoomEternalContext(CommonContext):
         return CheckPublication(self.send_msgs, self.locations_checked.add, ClientStatus.CLIENT_GOAL)
 
     async def evaluate_campaign_goal(self, source_description):
+        if not hasattr(self, "unified_campaign") or not self.unified_campaign.goal_admitted(
+                self.checked_locations, self.items_received):
+            return False
         return await self.goals.evaluate(
             source_description, GOAL_POLICY.objective_ids(getattr(self, "_connected_slot_data", {})),
             DoomEternalContext.check_observation(self), DoomEternalContext.check_publication(self),
@@ -5853,7 +5935,9 @@ class DoomEternalContext(CommonContext):
             return False
         if not self.goals.candidate_slot_allowed(self.active_save_proof_authoritative, self.active_save_proof_slot):
             return False
-        selected = primary_save_for_slot(candidate["slot"])
+        selected = self.admitted_campaign_save()
+        if selected and selected.slot_directory != candidate["slot"]:
+            selected = None
         details = read_game_details_for_selection(selected) if selected else None
         decision = self.goals.observe_candidate(selected, details)
         if decision == "publish":
@@ -6044,6 +6128,7 @@ class DoomEternalContext(CommonContext):
 
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
+                    await self.synchronize_campaign_menu()
                     evidence = read_gameplay_save_evidence()
                     if getattr(evidence, "state", None) == "not_running":
                         self.reset_transient_effects("game_exit")

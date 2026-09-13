@@ -54,5 +54,8 @@
     ],
     "virtual_locations": []
   },
-  "order": 0
+  "order": 0,
+  "campaign_return_owners": [
+    "citadel_target_level_transition_3"
+  ]
 }

@@ -1,0 +1,55 @@
+{
+	edit = {
+		displayName = "#str_code_mainmenu_dlc2_name";
+		doomEternalSku = "DOOM_ETERNAL_SKU_DLC2";
+		saveSlots = {
+			num = 3;
+			item[0] = 6;
+			item[1] = 7;
+			item[2] = 8;
+		}
+		devMenuOption = "devmenuoption/new_campaign_dlc2";
+		codexTree = "campaign/dlc2";
+		introTextCrawl = "campaign/dlc2/intro";
+		credits = "dlc2";
+		notInstalledDialog = "GDM_DLC2_ENTITLEMENT_NOT_INSTALLED";
+		purchaseInfo = {
+			liveTileId = "upsell_dlc_2";
+			fallbackLiveTile = "purchasedialog/dlc2";
+		}
+		gameCompleteInfo = {
+			saveTitle = "#str_code_save_game_completed_GHOST76412";
+			saveImage = "art/ui/map_menu_images/campaign/game_completed_dlc2";
+			canContinue = false;
+		}
+		dossierOptions = {
+			showDossierCurrency = false;
+			showDossierMissionChallenge = false;
+		}
+		cheatCodeOptions = {
+			unlockAll = true;
+			numColumns = 4;
+			skusAvailable = "CHEATCODE_SKU_DLC2";
+		}
+		missionSelectList = "missionlist_dlc2";
+		masterLevels = {
+			num = 1;
+			item[0] = "e5m1_spear_masterlevel";
+		}
+		newCampaignPopups = {
+			num = 2;
+			item[0] = {
+				pc = "offline/newCampaign";
+				xb = "offline/newCampaign";
+				ps = "offline/newCampaign";
+				nx = "offline/newCampaign";
+			}
+			item[1] = {
+				pc = "offline/remapControls";
+				xb = "offline/remapControls_xb";
+				ps = "offline/remapControls_ps";
+				nx = "offline/remapControls_nx";
+			}
+		}
+	}
+}

@@ -94,5 +94,8 @@
     ],
     "virtual_locations": []
   },
-  "order": 15
+  "order": 15,
+  "campaign_return_owners": [
+    "checkpoint_target_level_transition_1"
+  ]
 }

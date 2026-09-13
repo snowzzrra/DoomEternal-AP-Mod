@@ -114,7 +114,7 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate MOD-facing 0.5-D identity and exact option contract."""
+    """Validate the new-seed Phase6 identity and exact option contract."""
     if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
         raise ValueError(f"slot_data_revision must be {SLOT_DATA_REVISION}")
     required = slot_data.get("required_capabilities")
@@ -165,6 +165,8 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
             or len(requirements) != len(set(requirements))
         ):
             raise ValueError("additional_victory_requirements is invalid")
+    from .unified_campaign import validate_plan
+    validate_plan(slot_data)
     return dict(slot_data)
 
 

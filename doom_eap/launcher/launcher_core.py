@@ -44,7 +44,8 @@ SLOT_DATA_REVISION = str(_CONTRACT_IDENTITY["slot_data_revision"])
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
-    "slot_data_v4",
+    "slot_data_v5",
+    "unified_campaign_v1",
     "dlc_missions_v1",
     "goal_events_v1",
     "goal_endpoint_events_v1",
@@ -436,7 +437,8 @@ class SeedManifest:
         )
         required_capabilities = {
             "room_mod_v2",
-            "slot_data_v4",
+            "slot_data_v5",
+            "unified_campaign_v1",
             "dlc_missions_v1",
             "goal_events_v1",
             "goal_endpoint_events_v1",
@@ -541,6 +543,8 @@ class SeedManifest:
             team=snapshot.team,
             slot=snapshot.slot,
             options={
+                "campaign_plan": slot_data["campaign_plan"],
+                "native_generation_fingerprint": slot_data["native_generation_fingerprint"],
                 "use_dlc_content": slot_data["use_dlc_content"],
                 "include_dlc_missions": slot_data["include_dlc_missions"],
                 "dlc_logic_timing": slot_data["dlc_logic_timing"],
@@ -1209,6 +1213,14 @@ class RoomCompiler:
             manifest.options.get("starting_weapon"),
         )
         assembled[devinv_path] = devinv_source.encode("utf-8")
+        # Native NewGame still selects sp/e1m1 DevInv; Core redirects its first
+        # map to Fortress. The destination archive must own that room override.
+        hub_devinv_path = output_path_for_map(
+            Path("."), ROOT / "data" / "map_sources.json", "hub"
+        ).as_posix()
+        assembled[hub_devinv_path] = devinv_source.encode("utf-8")
+        from tools.decls.campaign_builder import build_campaign_overrides
+        assembled.update(build_campaign_overrides(assembled["hub_patch2/EternalMod/assetsinfo/hub.json"]))
         if manifest.options.get("use_dlc_content", True):
             assembled.update({
                 path: source.encode("utf-8")

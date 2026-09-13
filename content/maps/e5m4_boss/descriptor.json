@@ -27,5 +27,8 @@
     "connections": [],
     "virtual_locations": []
   },
-  "order": 20
+  "order": 20,
+  "campaign_return_owners": [
+    "stage_3_target_level_transition_1"
+  ]
 }

@@ -85,12 +85,7 @@
       "signal": {
         "kind": "map_terminal",
         "runtime_map": "game/sp/e3m2_hell/e3m2_hell",
-        "owner": "game_target_relay_28",
-        "fallback": {
-          "kind": "native_transition",
-          "from": "game/sp/e3m2_hell/e3m2_hell",
-          "to": "game/sp/e3m2_hell_b/e3m2_hell_b"
-        }
+        "owner": "game_target_relay_28"
       },
       "order": 50
     }

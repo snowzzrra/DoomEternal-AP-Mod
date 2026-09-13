@@ -44,8 +44,8 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
         if process.returncode or result.get("result") != "ok":
             raise WeaponPointsBlocked(f"Sentinel refused: {result}")
-        if result.get("core_version") != "0.7.0":
-            raise WeaponPointsBlocked("Weapon Points require the Core 0.7.0 candidate")
+        if result.get("core_version") != "0.8.0":
+            raise WeaponPointsBlocked("Weapon Points require the Core 0.8.0 candidate")
         return result
 
     def _execute(self, amount=0, expected=0):
@@ -86,6 +86,15 @@ class SentinelWeaponPoints:
 
     def observe(self):
         return self._execute()
+
+    def admitted_save_root(self):
+        """Observe the exact provider admitted for this AP identity; never scan vanilla."""
+        facts = self._run(["--pid", str(self.pid), "--save-admission", "--json"])
+        if (facts.get("namespace_id") != self.namespace or not facts.get("accepting_requests")
+                or not facts.get("route_retained") or facts.get("state") != "admitted"
+                or facts.get("native_root") != "ap-" + self.namespace[:40]):
+            raise WeaponPointsBlocked("AP save provider is not admitted for this identity")
+        return facts["native_root"]
 
     def grant_weapon_upgrade_points(self, amount, expected_gained):
         if type(amount) is not int or amount <= 0 or amount > 117:

@@ -10,11 +10,6 @@
           "owner": "e2m4_endoflevel_transition",
           "filename": "ap_mission_sentinel_prime_complete.txt",
           "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE"
-        },
-        {
-          "strategy": "native_transition",
-          "from_map": "game/sp/e2m4_boss/e2m4_boss",
-          "to_map": "game/hub/hub"
         }
       ],
       "effects": [

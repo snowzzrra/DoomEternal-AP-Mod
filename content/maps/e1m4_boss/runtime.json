@@ -6,7 +6,8 @@
       "location_id": 7770162,
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
+        "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
+        "owner": "checkpoints_target_relay_65"
       },
       "mission_key": "e1m4_boss",
       "category": "mission_complete",

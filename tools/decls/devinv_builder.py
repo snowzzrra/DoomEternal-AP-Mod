@@ -13,7 +13,7 @@ from typing import Any
 
 from doom_eap.content.map_registry import load_map_registry
 from doom_eap.contracts.tag_prerequisites import (
-    TAG_REQUIRED_NORMAL_MOD_UPGRADES, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+    TAG_PAID_NORMAL_MOD_UPGRADES, TAG_REQUIRED_ENGINE_PERKS, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
 )
 
 SOURCE_OWNER = "gameresources"
@@ -947,7 +947,7 @@ TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
 
 
 def validate_tag_devinv_source(source: str) -> None:
-    """Validate that TAG DevInv loadout contains normal mod upgrades and NO masteries."""
+    """Keep authored engine prerequisites; paid upgrades belong to native WUP purchases."""
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
         "STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED",
@@ -994,9 +994,12 @@ def validate_tag_devinv_source(source: str) -> None:
         if p.startswith("perk/player/argent/") or p.startswith("perk/player/runes/") or p.startswith("perk/player/suit/"):
             raise ValueError(f"TAG DevInvLoadout contains forbidden AP perk: {p}")
 
-    missing_upgrades = TAG_REQUIRED_NORMAL_MOD_UPGRADES - perk_paths
-    if missing_upgrades:
-        raise ValueError(f"TAG DevInvLoadout missing required mod upgrades: {missing_upgrades}")
+    pregranted = TAG_PAID_NORMAL_MOD_UPGRADES & perk_paths
+    if pregranted:
+        raise ValueError(f"TAG DevInvLoadout pregrants paid WUP upgrades: {pregranted}")
+    missing_engine = TAG_REQUIRED_ENGINE_PERKS - perk_paths
+    if missing_engine:
+        raise ValueError(f"TAG DevInvLoadout missing authored engine perks: {missing_engine}")
 
     missing_bp = TAG_REQUIRED_BLOOD_PUNCH_PERKS - perk_paths
     if missing_bp:
@@ -1023,7 +1026,9 @@ def build_tag_devinv_overrides(
     baseline_currency = _CURRENCY_BLOCK_RE.search(tag_root_source)
     if baseline_inventory is None or baseline_currency is None:
         raise ValueError("TAG root DevInv lacks replaceable loadout blocks")
-    existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))]
+    existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))
+                       if not ((perk := _PERK_PATH_RE.search(m.group("body"))) and
+                               perk.group("path") in TAG_PAID_NORMAL_MOD_UPGRADES)]
     all_bodies = existing_bodies[:4] + list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS) + existing_bodies[4:]
     new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
     baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)

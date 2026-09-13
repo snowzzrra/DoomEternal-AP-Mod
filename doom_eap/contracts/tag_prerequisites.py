@@ -3,8 +3,7 @@
 from dataclasses import dataclass
 
 
-TAG_REQUIRED_NORMAL_MOD_UPGRADES = frozenset({
-    "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
+TAG_PAID_NORMAL_MOD_UPGRADES = frozenset({
     "perk/player/weapons/shotgun/pop_rocket_faster_recharge",
     "perk/player/weapons/shotgun/pop_rocket_larger_explosion",
     "perk/player/weapons/shotgun/secondary_full_auto_faster_recovery",
@@ -35,6 +34,13 @@ TAG_REQUIRED_NORMAL_MOD_UPGRADES = frozenset({
     "perk/player/weapons/chaingun/energy_shell_dash_smash",
 })
 
+# Separate from the 28 paid WUP nodes. The supported patch2 declaration marks
+# this authored weak-point modifier componentSave=false; retain it independently
+# of purchases until a separate engine requirement change is justified.
+TAG_REQUIRED_ENGINE_PERKS = frozenset({
+    "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
+})
+
 TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
     "perk/player/blood_punch/area_of_effect",
     "perk/player/blood_punch/ai_charge_rate",
@@ -44,11 +50,11 @@ TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
 
 @dataclass(frozen=True)
 class AuthoredTagPrerequisites:
-    normal_mod_upgrades: frozenset[str]
+    engine_perks: frozenset[str]
     blood_punch_perks: frozenset[str]
     provenance: str = "authored_tag_devinv"
 
 
 AUTHORED_TAG_PREREQUISITES = AuthoredTagPrerequisites(
-    TAG_REQUIRED_NORMAL_MOD_UPGRADES, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+    TAG_REQUIRED_ENGINE_PERKS, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
 )

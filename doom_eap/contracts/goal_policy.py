@@ -49,13 +49,8 @@ class GoalPolicy:
         active_names = self._active_goal_location_names(slot_data)
         objective_ids = {self._endpoint_ids[goal]}
         if goal == "Complete the Full Saga":
-            objective_ids.update({7770418, 7770414, 7770419})
-            objective_ids.update(
-                location_id
-                for location_id, location_name in self._locations.items()
-                if location_name in active_names
-                and location_name.endswith(" - Mission Complete")
-            )
+            final = slot_data['campaign_plan']['goal_stage']
+            objective_ids = {{'e3m4_boss': 7770414, 'e5m4_boss': 7770419}[final]}
         if "Acquire the Unmaykr" in requirements:
             objective_ids.add(self._endpoint_ids["Acquire the Unmaykr"])
         for requirement in requirements - {"Acquire the Unmaykr"}:
@@ -66,5 +61,4 @@ class GoalPolicy:
                 if location_name in active_names and suffix in location_name
             )
         return frozenset(objective_ids)
-
 

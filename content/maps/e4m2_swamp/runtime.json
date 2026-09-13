@@ -9,7 +9,8 @@
       "mission_key": "e4m2_swamp",
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp"
+        "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp",
+        "owner": "checkpoint_target_level_transition_1"
       },
       "order": 15
     }

@@ -3197,6 +3197,9 @@ def generate_map(
         + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
     final_content = apply_runtime_map_correctives(final_content, map_key)
+    if map_key == "hub":
+        from tools.maps.fortress_campaign import project_fortress
+        final_content = project_fortress(final_content, level_config)
     validate_ap_lifecycle_entity(final_content, map_key)
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual and modified_count:

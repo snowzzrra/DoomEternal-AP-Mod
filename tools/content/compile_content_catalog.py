@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
+from doom_eap.content.campaign_stages import campaign_stages
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
@@ -115,7 +116,9 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         ]
     )
     lines.extend(f"    {string(item.name)}," for item in catalog.runtime_locations)
-    lines.extend(["})", ""])
+    lines.extend(["})", "", "CAMPAIGN_STAGES = ("])
+    lines.extend(f"    {stage!r}," for stage in campaign_stages(catalog))
+    lines.extend([")", ""])
     return "\n".join(lines)
 
 
@@ -154,6 +157,8 @@ def _compile_catalog(
             changed_paths.append(path)
 
     write_artifact(output, rendered)
+    write_artifact(catalog.root / "data" / "campaign_stages.json",
+                   json.dumps(campaign_stages(catalog), indent=2) + "\n")
 
     if source_only:
         return tuple(changed_paths)
@@ -164,7 +169,7 @@ def _compile_catalog(
     staging_gen = output_root / "generated_content.py"
     write_artifact(staging_gen, rendered)
 
-    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json"]:
+    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json", "campaign_stages.json"]:
         src = catalog.root / "data" / json_name
         if src.exists():
             content_bytes = src.read_bytes()

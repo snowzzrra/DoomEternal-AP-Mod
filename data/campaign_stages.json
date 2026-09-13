@@ -1,0 +1,422 @@
+[
+  {
+    "id": "e1m1_intro",
+    "name": "Hell on Earth",
+    "source": "base",
+    "map": "game/sp/e1m1_intro/e1m1_intro",
+    "kind": "mission",
+    "completion": "Hell on Earth - Mission Complete",
+    "completion_id": 7770122,
+    "entry_region": "Hell on Earth - Barge - Hell Priest Barge",
+    "regions": [
+      "Hell on Earth - Barge - Hell Priest Barge",
+      "Hell on Earth - City - Midtown",
+      "Hell on Earth - City - Ravaged Cathedral",
+      "Hell on Earth - City - Downtown",
+      "Hell on Earth - City - Metro Station",
+      "Hell on Earth - Citadel - Citadel of Hell"
+    ],
+    "access_id": 7771000,
+    "native_index": 0
+  },
+  {
+    "id": "e1m2_war",
+    "name": "Exultia",
+    "source": "base",
+    "map": "game/sp/e1m2_battle/e1m2_battle",
+    "kind": "mission",
+    "completion": "Exultia - Mission Complete",
+    "completion_id": 7770123,
+    "entry_region": "Exultia - Exultia - Mourning Spire",
+    "regions": [
+      "Exultia - Exultia - Mourning Spire",
+      "Exultia - Exultia - Central Rotunda",
+      "Exultia - Exultia - Belphegor's Gate",
+      "Exultia - Exultia - Dour Slough",
+      "Exultia - Hell - Precipice of Recompense",
+      "Exultia - Hell - Ichor Expanse",
+      "Exultia - Hell - Isle of Torment"
+    ],
+    "access_id": 7771001,
+    "native_index": 1
+  },
+  {
+    "id": "e1m3_cult",
+    "name": "Cultist Base",
+    "source": "base",
+    "map": "game/sp/e1m3_cult/e1m3_cult",
+    "kind": "mission",
+    "completion": "Cultist Base - Mission Complete",
+    "completion_id": 7770124,
+    "entry_region": "Cultist Base - Grotto of Penance",
+    "regions": [
+      "Cultist Base - Grotto of Penance",
+      "Cultist Base - Station of Inquisition",
+      "Cultist Base - Basilica of Adjuration",
+      "Cultist Base - Forge of Transfiguration",
+      "Cultist Base - Promenade of Culling",
+      "Cultist Base - Station of Anointment",
+      "Cultist Base - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771002,
+    "native_index": 2
+  },
+  {
+    "id": "e1m4_boss",
+    "name": "Doom Hunter Base",
+    "source": "base",
+    "map": "game/sp/e1m4_boss/e1m4_boss",
+    "kind": "mission",
+    "completion": "Doom Hunter Base - Mission Complete",
+    "completion_id": 7770162,
+    "entry_region": "Doom Hunter Base - Station of Redemption",
+    "regions": [
+      "Doom Hunter Base - Station of Redemption",
+      "Doom Hunter Base - Lazarus Generators",
+      "Doom Hunter Base - Tower of Baphomet",
+      "Doom Hunter Base - Skies of Stigmata",
+      "Doom Hunter Base - Chamber of Penance",
+      "Doom Hunter Base - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771003,
+    "native_index": 3
+  },
+  {
+    "id": "e2m1_nest",
+    "name": "Super Gore Nest",
+    "source": "base",
+    "map": "game/sp/e2m1_nest/e2m1_nest",
+    "kind": "mission",
+    "completion": "Super Gore Nest - Mission Complete",
+    "completion_id": 7770210,
+    "entry_region": "Super Gore Nest - Upper Area - Mixom Square",
+    "regions": [
+      "Super Gore Nest - Upper Area - Mixom Square",
+      "Super Gore Nest - Upper Area - Star Mall",
+      "Super Gore Nest - Upper Area - Vermilion Canal",
+      "Super Gore Nest - Upper Area - Vorus Medical Plaza",
+      "Super Gore Nest - Lower Area - Pumping Station C",
+      "Super Gore Nest - Lower Area - Toxin Refinery",
+      "Super Gore Nest - Lower Area - Argent Energy Station",
+      "Super Gore Nest - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771004,
+    "native_index": 4
+  },
+  {
+    "id": "e2m2_base",
+    "name": "ARC Complex",
+    "source": "base",
+    "map": "game/sp/e2m2_base/e2m2_base",
+    "kind": "mission",
+    "completion": "ARC Complex - Mission Complete",
+    "completion_id": 7770248,
+    "entry_region": "ARC Complex - Emerson Hotel",
+    "regions": [
+      "ARC Complex - Emerson Hotel",
+      "ARC Complex - Mario's Restaurant",
+      "ARC Complex - ARC Turret",
+      "ARC Complex - The Waste Tunnels",
+      "ARC Complex - Vargo Convention Center",
+      "ARC Complex - Atrium Offices",
+      "ARC Complex - Moring Aeronautics",
+      "ARC Complex - Convention Parking",
+      "ARC Complex - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771005,
+    "native_index": 5
+  },
+  {
+    "id": "e2m3_core",
+    "name": "Mars Core",
+    "source": "base",
+    "map": "game/sp/e2m3_core/e2m3_core",
+    "kind": "mission",
+    "completion": "Mars Core - Mission Complete",
+    "completion_id": 7770289,
+    "entry_region": "Mars Core - Phobos - Phobos Teleport Station",
+    "regions": [
+      "Mars Core - Phobos - Phobos Teleport Station",
+      "Mars Core - Phobos - BFG-10000 Gun Deck",
+      "Mars Core - UAC - BFG-10000 Ventilation",
+      "Mars Core - UAC - UAC Outpost LD",
+      "Mars Core - UAC - Alpha Labs",
+      "Mars Core - Meteor - Martian Chunks",
+      "Mars Core - Meteor - UAC Transmission Tower",
+      "Mars Core - Meteor - Delta Labs",
+      "Mars Core - Hell - Temple of Sin",
+      "Mars Core - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771006,
+    "native_index": 6
+  },
+  {
+    "id": "e2m4_boss",
+    "name": "Sentinel Prime",
+    "source": "base",
+    "map": "game/sp/e2m4_boss/e2m4_boss",
+    "kind": "mission",
+    "completion": "Sentinel Prime - Mission Complete",
+    "completion_id": 7770290,
+    "entry_region": "Sentinel Prime - Holy Pathway",
+    "regions": [
+      "Sentinel Prime - Holy Pathway",
+      "Sentinel Prime - Altar",
+      "Sentinel Prime - Training Hall",
+      "Sentinel Prime - Dungeons"
+    ],
+    "access_id": 7771007,
+    "native_index": 7
+  },
+  {
+    "id": "e3m1_slayer",
+    "name": "Taras Nabad",
+    "source": "base",
+    "map": "game/sp/e3m1_slayer/e3m1_slayer",
+    "kind": "mission",
+    "completion": "Taras Nabad - Mission Complete",
+    "completion_id": 7770337,
+    "entry_region": "Taras Nabad - City Outskirts",
+    "regions": [
+      "Taras Nabad - City Outskirts",
+      "Taras Nabad - Atrium Plaza",
+      "Taras Nabad - Slayer Creation Chamber",
+      "Taras Nabad - Catacombs",
+      "Taras Nabad - Fallen Titan",
+      "Taras Nabad - Skyline",
+      "Taras Nabad - Throne Room",
+      "Taras Nabad - Central Power Core",
+      "Taras Nabad - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771008,
+    "native_index": 8
+  },
+  {
+    "id": "e3m2_hell",
+    "name": "Nekravol",
+    "source": "base",
+    "map": "game/sp/e3m2_hell/e3m2_hell",
+    "kind": "mission",
+    "completion": "Nekravol - Mission Complete",
+    "completion_id": 7770362,
+    "entry_region": "Nekravol - Pain's Basin",
+    "regions": [
+      "Nekravol - Pain's Basin",
+      "Nekravol - The Mill",
+      "Nekravol - Passage of the Damned",
+      "Nekravol - Halls of Torment",
+      "Nekravol - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771009,
+    "native_index": 9
+  },
+  {
+    "id": "e3m2_hell_b",
+    "name": "Nekravol Part II",
+    "source": "base",
+    "map": "game/sp/e3m2_hell_b/e3m2_hell_b",
+    "kind": "mission",
+    "completion": "Nekravol Part II - Mission Complete",
+    "completion_id": 7770387,
+    "entry_region": "Nekravol Part II - Corpse Conveyor",
+    "regions": [
+      "Nekravol Part II - Corpse Conveyor",
+      "Nekravol Part II - Soul Extraction",
+      "Nekravol Part II - Demon Foundry",
+      "Nekravol Part II - Soul Ascent",
+      "Nekravol Part II - Soul Converter",
+      "Nekravol Part II - Argent Transmitter",
+      "Nekravol Part II - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771010,
+    "native_index": 10
+  },
+  {
+    "id": "e3m3_maykr",
+    "name": "Urdak",
+    "source": "base",
+    "map": "game/sp/e3m3_maykr/e3m3_maykr",
+    "kind": "mission",
+    "completion": "Urdak - Mission Complete",
+    "completion_id": 7770411,
+    "entry_region": "Urdak - Infernal Demodulator",
+    "regions": [
+      "Urdak - Infernal Demodulator",
+      "Urdak - The Sanctuary",
+      "Urdak - Guardians of Sanctuary",
+      "Urdak - Abyss of Sanctuary",
+      "Urdak - Dimensional Lacerator",
+      "Urdak - Perse Harmonizer",
+      "Urdak - Xanthous Harmonizer",
+      "Urdak - Challenges - Mission Challenges"
+    ],
+    "access_id": 7771011,
+    "native_index": 11
+  },
+  {
+    "id": "e3m4_boss",
+    "name": "Final Sin",
+    "source": "base",
+    "map": "game/sp/e3m4_boss/e3m4_boss",
+    "kind": "mission",
+    "completion": "Final Sin - Mission Complete",
+    "completion_id": 7770414,
+    "entry_region": "Final Sin - Starstruct Industries",
+    "regions": [
+      "Final Sin - Starstruct Industries",
+      "Final Sin - Viris West",
+      "Final Sin - Oriiion, Inc.",
+      "Final Sin - Mall Hotel",
+      "Final Sin - South Station"
+    ],
+    "access_id": 7771012,
+    "native_index": 12
+  },
+  {
+    "id": "e4m1_rig",
+    "name": "UAC Atlantica Facility",
+    "source": "tag1",
+    "map": "game/dlc/e4m1_rig/e4m1_rig",
+    "kind": "mission",
+    "completion": "UAC Atlantica Facility - Mission Complete",
+    "completion_id": 7770432,
+    "entry_region": "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+    "regions": [
+      "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower",
+      "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+      "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard",
+      "UAC Atlantica Facility - Underwater Facility"
+    ],
+    "access_id": 7771013,
+    "native_index": 13
+  },
+  {
+    "id": "e4m2_swamp",
+    "name": "The Blood Swamps",
+    "source": "tag1",
+    "map": "game/dlc/e4m2_swamp/e4m2_swamp",
+    "kind": "mission",
+    "completion": "The Blood Swamps - Mission Complete",
+    "completion_id": 7770443,
+    "entry_region": "The Blood Swamps - Swamp Entrance",
+    "regions": [
+      "The Blood Swamps - Swamp Entrance",
+      "The Blood Swamps - Underworld Crossroad",
+      "The Blood Swamps - Sunken Courtyard",
+      "The Blood Swamps - Betruger Castle",
+      "The Blood Swamps - Forest of the Torch",
+      "The Blood Swamps - Ishii Castle Gate",
+      "The Blood Swamps - Ishii Castle Keep"
+    ],
+    "access_id": 7771014,
+    "native_index": 14
+  },
+  {
+    "id": "e4m3_mcity",
+    "name": "The Holt",
+    "source": "tag1",
+    "map": "game/dlc/e4m3_mcity/e4m3_mcity",
+    "kind": "mission",
+    "completion": "The Holt - Mission Complete",
+    "completion_id": 7770457,
+    "entry_region": "The Holt - Tranquility",
+    "regions": [
+      "The Holt - Tranquility",
+      "The Holt - Crimson Forest",
+      "The Holt - Maykr Pillars",
+      "The Holt - Ivory Path",
+      "The Holt - Pantheon of Khans",
+      "The Holt - Holy Chamber"
+    ],
+    "access_id": 7771015,
+    "native_index": 15
+  },
+  {
+    "id": "e5m1_spear",
+    "name": "The World Spear",
+    "source": "tag2",
+    "map": "game/dlc2/e5m1_spear/e5m1_spear",
+    "kind": "mission",
+    "completion": "The World Spear - Mission Complete",
+    "completion_id": 7770465,
+    "entry_region": "The World Spear - Sentinel Village - Village Outskirts",
+    "regions": [
+      "The World Spear - Sentinel Village - Village Outskirts",
+      "The World Spear - Sentinel Village - Village Entrance",
+      "The World Spear - Sentinel Village - Sentinel Village",
+      "The World Spear - Sentinel Village - Village Sanctum",
+      "The World Spear - Sentinel Village - Ancient Tower",
+      "The World Spear - Sentinel Village - Ancient Bridge",
+      "The World Spear - Sentinel Mountain - Mountain Forest",
+      "The World Spear - Sentinel Mountain - Mountain Cliffs",
+      "The World Spear - Sentinel Mountain - Mountain Ruins",
+      "The World Spear - Sentinel Mountain - Nether Lake",
+      "The World Spear - World Spear - Spear Entrance",
+      "The World Spear - World Spear - Spear Pits",
+      "The World Spear - World Spear - Shard Altar"
+    ],
+    "access_id": 7771016,
+    "native_index": 16
+  },
+  {
+    "id": "e5m2_earth",
+    "name": "Reclaimed Earth",
+    "source": "tag2",
+    "map": "game/dlc2/e5m2_earth/e5m2_earth",
+    "kind": "mission",
+    "completion": "Reclaimed Earth - Mission Complete",
+    "completion_id": 7770475,
+    "entry_region": "Reclaimed Earth - City Entrance",
+    "regions": [
+      "Reclaimed Earth - City Entrance",
+      "Reclaimed Earth - Reclaimed Train Stop",
+      "Reclaimed Earth - Overgrown Offices",
+      "Reclaimed Earth - Upper Overgrown Offices",
+      "Reclaimed Earth - Lockdown",
+      "Reclaimed Earth - Gate of Divum"
+    ],
+    "access_id": 7771017,
+    "native_index": 17
+  },
+  {
+    "id": "e5m3_hell",
+    "name": "Immora",
+    "source": "tag2",
+    "map": "game/dlc2/e5m3_hell/e5m3_hell",
+    "kind": "mission",
+    "completion": "Immora - Mission Complete",
+    "completion_id": 7770485,
+    "entry_region": "Immora - Immora Assault - Battlefield",
+    "regions": [
+      "Immora - Immora Assault - Battlefield",
+      "Immora - Immora Assault - Plateau Battle",
+      "Immora - Immora Assault - Walls of Immora",
+      "Immora - Immora Assault - Breach",
+      "Immora - Immora Assault - Bridge Platform",
+      "Immora - Immora Assault - Tower Seige",
+      "Immora - Immora Interior - Escape Platform",
+      "Immora - Final Plunge - Final Plunge"
+    ],
+    "access_id": 7771018,
+    "native_index": 18
+  },
+  {
+    "id": "e5m4_boss",
+    "name": "The Dark Lord",
+    "source": "tag2",
+    "map": "game/dlc2/e5m4_boss/e5m4_boss",
+    "kind": "boss",
+    "completion": "The Dark Lord - Defeated",
+    "completion_id": 7770419,
+    "entry_region": "Immora - The Dark Lord",
+    "regions": [
+      "Immora - The Dark Lord"
+    ],
+    "access_id": 7771019,
+    "native_index": 19
+  }
+]

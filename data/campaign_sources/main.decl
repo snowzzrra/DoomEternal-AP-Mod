@@ -1,0 +1,46 @@
+{
+	edit = {
+		displayName = "#str_code_mainmenu_campaign_name";
+		saveSlots = {
+			num = 3;
+			item[1] = 1;
+			item[2] = 2;
+		}
+		devMenuOption = "devmenuoption/new_campaign";
+		codexTree = "campaign/main";
+		credits = "credits";
+		purchaseInfo = {
+			liveTileId = "upsell_campaign";
+			fallbackLiveTile = "purchasedialog/main";
+		}
+		gameCompleteInfo = {
+			saveTitle = "#str_code_save_game_completed_GHOST76412";
+			saveImage = "art/ui/map_menu_images/campaign/game_completed";
+			rewardInfo = "campaigncompleterewards/main";
+		}
+		missionSelectList = "missionlist";
+		masterLevels = {
+			num = 5;
+			item[0] = "e1m3_cult_masterlevel";
+			item[1] = "e2m1_nest_masterlevel_remix";
+			item[2] = "e2m2_base_masterlevel";
+			item[3] = "e2m3_core_masterlevel";
+			item[4] = "e3m1_slayer_masterlevel";
+		}
+		newCampaignPopups = {
+			num = 2;
+			item[0] = {
+				pc = "offline/newcampaign";
+				xb = "offline/newcampaign";
+				ps = "offline/newcampaign";
+				nx = "offline/newcampaign";
+			}
+			item[1] = {
+				pc = "offline/remapcontrols";
+				xb = "offline/remapcontrols_xb";
+				ps = "offline/remapcontrols_ps";
+				nx = "offline/remapcontrols_nx";
+			}
+		}
+	}
+}

@@ -330,15 +330,14 @@ def _patch_sentinel_prime_end(
         publisher for publisher in publishers
         if publisher.key == "sentinel_prime_mission_complete"
     )
-    transition = mission_publisher.triggers_for("native_transition")[0]
     event = mission_publisher.triggers_for("map_event_file")[0]
     return {
         "source_path": mission["source_path"],
         "source_sha256": source_sha,
         "owner": mission["owner"],
         "native_owner": mission["native_owner"],
-        "runtime_map": transition["from_map"],
-        "destination_map": transition["to_map"],
+        "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+        "destination_map": "maps/game/hub/hub.map",
         "before_targets": [],
         "after_targets": compiled["owner_targets"],
         "location_id": mission["location_id"],
@@ -532,7 +531,17 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{contract['map_key']}: standard AP event count drift")
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
+    from tools.maps.unified_campaign import project_stage_return
+    catalog = load_content_catalog(root)
+    return_audit = {}
+    for key, path in generated_maps.items():
+        text = path.read_text(encoding="utf-8")
+        projected, changed = project_stage_return(catalog, key, text)
+        if projected != text:
+            path.write_text(projected, encoding="utf-8", newline="")
+        return_audit[key] = changed
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
+    unrelated_owners.update(name for names in return_audit.values() for name in names)
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),
@@ -544,6 +553,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     if terminal_audit is not None:
         res["campaign_goal"] = terminal_audit
     res["unrelated_generated_entity_diff_count"] = unrelated
+    res["unified_campaign_returns"] = return_audit
     return res
 
 

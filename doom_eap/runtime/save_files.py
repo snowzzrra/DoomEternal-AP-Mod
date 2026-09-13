@@ -40,6 +40,24 @@ def primary_save_candidates(remote_directory, steam_id, filename="game_duration.
     return sorted(candidates, key=_slot_sort_key, reverse=True)
 
 
+def admitted_ap_save(remote_directory, native_root, filename="game_duration.dat"):
+    """Read only the single physical campaign under an already admitted provider."""
+    if remote_directory is None:
+        return None
+    directory = remote_directory / native_root / "GAME-AUTOSAVE0"
+    path = directory / filename
+    try:
+        # Provider-relative selection must not escape through filesystem links.
+        if directory.resolve() != remote_directory.resolve() / native_root / "GAME-AUTOSAVE0":
+            return None
+        info = path.stat()
+        if not path.is_file() or info.st_size <= 0 or path.resolve().parent != directory.resolve():
+            return None
+        return PrimarySaveSelection("GAME-AUTOSAVE0", path.resolve(), info.st_mtime_ns)
+    except OSError:
+        return None
+
+
 def read_gameplay_save_evidence(path):
     """Read native evidence; active-slot proof belongs to the observer."""
     path = Path(path)

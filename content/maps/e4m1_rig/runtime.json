@@ -9,7 +9,8 @@
       "mission_key": "e4m1_rig",
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/dlc/e4m1_rig/e4m1_rig"
+        "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
+        "owner": "underwater_facility_target_level_transition_1"
       },
       "order": 14
     }

@@ -78,5 +78,8 @@
     ],
     "virtual_locations": []
   },
-  "order": 16
+  "order": 16,
+  "campaign_return_owners": [
+    "game_target_level_transition_e4m3"
+  ]
 }

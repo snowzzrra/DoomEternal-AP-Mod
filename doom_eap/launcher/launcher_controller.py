@@ -997,11 +997,17 @@ class LauncherController:
         for key in (
             "endpoint", "slot", "seed_name", "state", "code", "reason", "message",
             "raw_message", "technical_message", "failure_domain", "recovery_action",
-            "category", "attempt_id", "reason_codes",
+            "category", "attempt_id", "reason_codes", "meathook_ok",
+            "meathook_status", "meathook_message", "native_state",
         ):
             if key in event and event[key] not in (None, ""):
                 fields.append(f"{key}={event[key]}")
-        self._record_diagnostic(f"{kind}: {' | '.join(fields) or 'received'}")
+        message = f"{kind}: {' | '.join(fields) or 'received'}"
+        if kind == "integration_status":
+            if getattr(self, "_last_integration_diagnostic", None) == message:
+                return
+            self._last_integration_diagnostic = message
+        self._record_diagnostic(message)
 
     def _worker_event(
         self, supervisor: BridgeSupervisor, event: dict[str, object]

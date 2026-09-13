@@ -220,10 +220,17 @@ def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
             raise ValueError(f"component=map_package map={directory.name} field=components value=missing {missing}")
         descriptor = _json(paths["descriptor"])
         key = descriptor.get("key")
-        unknown = set(descriptor) - required
+        unknown = set(descriptor) - required - {"campaign_return_owners"}
         missing_fields = required - set(descriptor)
         if descriptor.get("schema_version") != 1 or key != directory.name or unknown or missing_fields:
             raise ValueError(f"component=map_package map={directory.name} field=descriptor value=invalid key/schema/fields")
+        if "campaign_return_owners" in descriptor:
+            owners = descriptor["campaign_return_owners"]
+            if not isinstance(owners, list) or not owners or any(
+                not isinstance(owner, str) or re.fullmatch(r"[A-Za-z0-9_]+", owner) is None
+                for owner in owners
+            ) or len(set(owners)) != len(owners):
+                raise ValueError(f"component=map_package map={key} field=campaign_return_owners value=invalid")
         if key in keys:
             raise ValueError(f"component=map_package map={key} field=key value=duplicate")
         keys.add(key)

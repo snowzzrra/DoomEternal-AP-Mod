@@ -6,9 +6,14 @@
       "map_key": "e2m3_core",
       "triggers": [
         {
-          "strategy": "native_transition",
-          "from_map": "game/sp/e2m3_core/e2m3_core",
-          "to_map": "game/sp/e2m4_boss/e2m4_boss"
+          "strategy": "map_event_file",
+          "owner": "hell_chunk_2_target_level_transition_1",
+          "filename": "ap_stage_e2m3_core_complete.txt",
+          "marker": "AP_STAGE_COMPLETE_E2M3_CORE"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "hell_chunk_2_target_level_transition_1"
         }
       ],
       "effects": [

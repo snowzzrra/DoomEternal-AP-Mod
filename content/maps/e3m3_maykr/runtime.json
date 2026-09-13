@@ -124,12 +124,7 @@
       "signal": {
         "kind": "map_terminal",
         "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr",
-        "owner": "temp_all_scripting_target_level_transition_1",
-        "fallback": {
-          "kind": "native_transition",
-          "from": "game/sp/e3m3_maykr/e3m3_maykr",
-          "to": "game/sp/e3m4_boss/e3m4_boss"
-        }
+        "owner": "temp_all_scripting_target_level_transition_1"
       },
       "order": 60
     }

@@ -58,6 +58,9 @@ class SaveObserver:
     def bind_baselines(self, store):
         self._baselines = store
 
+    def bind_ap_provider(self, namespace, root):
+        self._ap_provider = namespace + ":" + root
+
     def capture_observation(self):
         return self._proof_revision, self._selection, self._readiness, self._mission_select
 
@@ -82,7 +85,7 @@ class SaveObserver:
                       doom_save_slot, observer_key, records, acknowledged_records):
         """Select the durable baseline independently of feature publication."""
         binding_key = self._baselines.binding_key(
-            session_identity=session_identity, team=team, slot=slot,
+            session_identity=session_identity + ":" + getattr(self, "_ap_provider", "unbound"), team=team, slot=slot,
             doom_save_slot=doom_save_slot, registry_revision=registry_revision,
         )
         return self._baselines.observe(

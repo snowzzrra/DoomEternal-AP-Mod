@@ -14,11 +14,6 @@
         {
           "strategy": "terminal_owner",
           "owner": "crystal_target_level_transition_1"
-        },
-        {
-          "strategy": "native_transition",
-          "from_map": "game/dlc2/e5m1_spear/e5m1_spear",
-          "to_map": "game/dlc2/e5m2_earth/e5m2_earth"
         }
       ],
       "effects": [
