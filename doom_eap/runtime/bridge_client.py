@@ -4739,7 +4739,9 @@ class DoomEternalContext(CommonContext):
             raise RuntimeError("Weapon Points require a qualified Windows game process")
         namespace = namespace_id(self.room_seed_name, self.team, self.slot,
                                  self._connected_slot_data.get("native_generation_fingerprint", ""))
-        probe = Path(os.environ.get("SENTINEL_PROBE", REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe"))
+        default_probe = (APPLICATION_DIR / "sentinel_probe.exe" if getattr(sys, "frozen", False)
+                         else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
+        probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
         link = SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
         authoritative = {index: receipt_identity(item) for index, item in enumerate(self.items_received)
                          if item.item == 7770903}
