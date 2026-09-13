@@ -180,7 +180,7 @@ class RuntimeLifecycle:
         }
 
     @staticmethod
-    def authored_marker_proposal(marker, newest_mtime, evidence_mtime, evidence_epoch):
+    def authored_marker_proposal(marker, newest_mtime, evidence_mtime, evidence_epoch, *, evidence_state="gameplay"):
         return MappingProxyType({
             **marker,
             "native_gameplay_epoch": newest_mtime,
@@ -189,7 +189,7 @@ class RuntimeLifecycle:
             "evidence_epoch": evidence_epoch,
             "materialization_evidence_epoch": (
                 evidence_epoch
-                if isinstance(evidence_epoch, int) and not isinstance(evidence_epoch, bool)
+                if evidence_state == "gameplay" and isinstance(evidence_epoch, int) and not isinstance(evidence_epoch, bool)
                 else None
             ),
         })

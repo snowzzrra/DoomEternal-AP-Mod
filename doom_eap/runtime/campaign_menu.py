@@ -19,7 +19,7 @@ class CampaignMenu:
         scope = link._run(["--pid", str(link.pid), "--native", "--json"])
         if scope.get("availability") != "enabled":
             raise RuntimeError("Native Campaign menu owner is unavailable")
-        identity = (link.namespace, scope["pid"], scope["process_created"], scope["instance_id"])
+        identity = (link.namespace, scope["target_pid"], scope["process_created"], scope["instance_id"])
         rows = [(1, 1 | 2 | 16, len(STAGES) + snapshot["fortress_phase"], snapshot["hub_map"], "FORTRESS OF DOOM")]
         stage_ids = {1: "hub"}
         for row in snapshot["rows"]:

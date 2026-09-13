@@ -3973,6 +3973,7 @@ class DoomEternalContext(CommonContext):
         self.runtime_lifecycle.clear_pending_marker()
         marker_data = self.runtime_lifecycle.authored_marker_proposal(
             marker_data, newest_mtime, gameplay_evidence_mtime_ns(), evidence_epoch,
+            evidence_state=getattr(evidence, "state", None),
         )
         if lease is not None:
             lease.observe_gameplay_loaded(newest_mtime)
@@ -4251,9 +4252,11 @@ class DoomEternalContext(CommonContext):
         execution and rejects a command after its materialization lease expires.
         """
         evidence = read_gameplay_save_evidence()
-        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not self.authored_map_runtime_ready(evidence):
+        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not self.runtime_effects_ready(evidence):
             return
         lease = self._active_materialization_lease()
+        if lease is None:
+            return
         phase = projection["fortress_phase"]
         identity = (self.state_key, lease, phase)
         if getattr(self, "_fortress_phase_publication", None) == identity:
@@ -4266,7 +4269,7 @@ class DoomEternalContext(CommonContext):
             if entry["location_id"] in self.checked_locations and entry["classification"] == "visible_cleanup":
                 commands.append(f'ai_ScriptCmdEnt {entry["reconciliation_entity"]} activate')
         if send_command("; ".join(commands),
-                        coalesce_key=f"fortress-{lease}-phase{phase}", state_key=self.state_key,
+                        coalesce_key=stable_spool_id("fortress", lease, phase), state_key=self.state_key,
                         materialization_lease=lease, already_queued_ok=True):
             self._fortress_phase_publication = identity
             logger.info("[Campaign] Fortress phase=%s queued for lease=%s; native execution pending", phase, lease)

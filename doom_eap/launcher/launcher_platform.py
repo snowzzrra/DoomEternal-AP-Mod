@@ -2431,6 +2431,12 @@ class WindowsModInjectorAdapter:
 
         confirmed = self.confirmer()
         if confirmed:
+            try:
+                from doom_eap.launcher.campaign_resources import enable_campaign_resources
+                campaign_resources = enable_campaign_resources(game_root, staged)
+            except Exception as error:
+                return AdapterResult(state="failed", message=f"Campaign resource installation failed: {error}",
+                                     command=result.command, returncode=1)
             return AdapterResult(
                 state="applied",
                 message="Mod installed successfully. Start DOOM Eternal through the launcher.",
@@ -2439,6 +2445,7 @@ class WindowsModInjectorAdapter:
                 details={
                     "installation_mode": "windows_injector_assisted",
                     "user_confirmed": True,
+                    "campaign_resources": campaign_resources,
                 },
             )
 
@@ -2606,6 +2613,8 @@ class LinuxModManagerAdapter:
         if result.state != "applied":
             return result
         try:
+            from doom_eap.launcher.campaign_resources import enable_campaign_resources
+            campaign_resources = enable_campaign_resources(game_root, staged)
             verification = verify_linux_mod_installation(
                 game_root,
                 staged,
@@ -2637,6 +2646,7 @@ class LinuxModManagerAdapter:
             details={
                 **result.details,
                 "post_install_verification": verification["state"],
+                "campaign_resources": campaign_resources,
                 "required_resources": verification["required_resources"],
                 "packagemapspec_path": verification["packagemapspec_path"],
                 "packagemapspec_sha256": verification["packagemapspec_sha256"],

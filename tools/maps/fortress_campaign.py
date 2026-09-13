@@ -9,9 +9,25 @@ from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_
 VISITS = ("from_e1m1", "from_e1m2", "from_e1m4", "from_e2m1",
           "from_e2m2", "from_e2m4", "from_e3m1")
 
+# Common circulation only. The battery-room reward doors keep their own
+# stations and costs; these native actions never grant inventory or AP checks.
+CIRCULATION_ACTIONS = (
+    "main_deck_target_interact_action_unlock_door_1",
+    "main_deck_target_interact_action_unlock_door_2",
+    "main_deck_target_interact_action_unlock_engine_door",
+    "target_interact_action_unlock_engine_doors",
+)
+
 
 def content_layers(phase: int) -> list[str]:
     return [f"game/sp/hub/ap_phase_{i}" for i in range(1, phase + 1)]
+
+
+def content_layer(location_id: int) -> str:
+    region = load_content_catalog().location_by_id(location_id).region
+    names = ("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh")
+    phase = next(i for i, visit in enumerate(names, 1) if f"- {visit} Visit" in region)
+    return content_layers(phase)[-1]
 
 
 def _layer(block: str, name: str | None) -> str:
@@ -30,17 +46,14 @@ def _native_list(field: str, values: list[str]) -> str:
 def project_fortress(text: str, config: dict) -> str:
     """Only the server-derived phase activates cumulative AP content layers.
 
-    Native visit scenery remains authored; Battery doors and transactions are
-    untouched. Native story exits cannot bypass the unified Mission Select.
+    Native visit scenery remains authored. Common corridors are usable from the
+    initial Hub; battery reward doors retain their transactions. Native story
+    exits cannot bypass the unified Mission Select.
     """
     if "entityDef ap_fortress_phase_0 {" in text:
         raise ValueError("Fortress campaign projection already applied")
-    names = ("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh")
-    catalog = load_content_catalog()
     for alias, code in config["entities"].items():
-        region = catalog.location_by_id(code).region
-        phase = next(i for i, visit in enumerate(names, 1) if f"- {visit} Visit" in region)
-        layer = content_layers(phase)[-1]
+        layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
         # All generated representations, including cleanup and automap, share
         # the gate. Keeping just the original pickup layered leaks AP triggers.
@@ -52,6 +65,28 @@ def project_fortress(text: str, config: dict) -> str:
             if bounds:
                 start, end = bounds
                 text = text[:start] + _layer(text[start:end], layer) + text[end:]
+
+    # Native visit objectives describe pickups gated by AP completion. Remove
+    # those directions, including objectives serialized in an older checkpoint.
+    # Objective completion changes HUD tracking only, not AP pickup publishers.
+    clear_objectives = []
+    pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
+    for match in reversed(list(re.finditer(pattern, text))):
+        start = match.start()
+        end = find_matching_brace(text, text.index("{", start)) + 1
+        block = text[start:end]
+        if 'class = "idTarget_Objective_Give";' not in block:
+            continue
+        objective = re.search(r'\bdecl = "(objective/hub/[^"]+)";', block)
+        if objective is None:
+            raise ValueError(f"Unrecognized Fortress story objective: {match[1]}")
+        clear_objectives.append(match[1])
+        replacement = ('entity {\n\tentityDef ' + match[1] + ' {\n'
+                       '\tclass = "idTarget_Objective_Complete";\n\texpandInheritance = false;\n'
+                       '\tedit = {\n\t\tobjective = "' + objective[1] + '";\n'
+                       '\t\tsteps = { num = 0; }\n\t\taddSteps = { num = 0; }\n'
+                       '\t\tentities = { num = 0; }\n\t}\n}\n}\n')
+        text = text[:start] + replacement + text[end:]
 
     # Reuse the engine's native layer primitive, not a console map loader.
     # Each command selects scenery and adds all earned content layers; it never
@@ -67,7 +102,7 @@ def project_fortress(text: str, config: dict) -> str:
                  '\tclass = "idTarget_LayerStateChange";\n\texpandInheritance = false;\n\tedit = {\n' +
                  _native_list("activate_Immediately", active + content_layers(phase)) +
                  _native_list("remove_Immediately", remove) + '\t}\n}\n}\n')
-        targets = [f"ap_fortress_layers_{phase}"]
+        targets = [f"ap_fortress_layers_{phase}", *sorted(clear_objectives), *CIRCULATION_ACTIONS]
         if phase == 7:
             targets.append("target_show_engine_room_secret")
         text += ('entity {\n\tentityDef ap_fortress_phase_' + str(phase) + ' {\n'
