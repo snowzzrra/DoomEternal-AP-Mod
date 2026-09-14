@@ -70,5 +70,14 @@ class FortressCampaign(unittest.TestCase):
                 layers = entity(self.result, f'ap_fortress_layers_{current}')
                 self.assertEqual(f'"game/sp/hub/ap_phase_{phase}"' in layers, current >= phase)
 
+    def test_suit_room_barriers_remain_present_before_reward_visit(self):
+        for index in (1, 2, 3):
+            name = f'interact_hub_2_battery_station_{index}'
+            block = entity(self.result, name)
+            self.assertEqual(block, entity(self.vanilla, name))
+            self.assertNotIn('layers {', block)
+            self.assertIn('collisionPieces = {', block)
+            self.assertIn('initalState = "interactables/progress/battery_station/2_battery_required";', block)
+
 if __name__ == '__main__':
     unittest.main()

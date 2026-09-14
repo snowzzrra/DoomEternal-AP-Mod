@@ -55,20 +55,16 @@ def project_fortress(text: str, config: dict) -> str:
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
-        # All generated representations, including cleanup and automap, share
-        # the gate. Keeping just the original pickup layered leaks AP triggers.
         entities = [source, f"ap_independent_{source}", f"ap_location_visual_{code}",
                     f"ap_automap_location_{code}", f"ap_remove_location_visual_{code}",
                     f"ap_hide_location_visual_{code}"]
+        if source in {f"interact_hub_2_battery_station_{i}" for i in (1, 2, 3)}:
+            entities.remove(source)
         for name in entities:
             bounds = find_entity_block_bounds(text, name)
             if bounds:
                 start, end = bounds
                 text = text[:start] + _layer(text[start:end], layer) + text[end:]
-
-    # Native visit objectives describe pickups gated by AP completion. Remove
-    # those directions, including objectives serialized in an older checkpoint.
-    # Objective completion changes HUD tracking only, not AP pickup publishers.
     clear_objectives = []
     pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
     for match in reversed(list(re.finditer(pattern, text))):
