@@ -126,6 +126,7 @@
     "7770080": {"type": "perk", "perk": "perk/player/weapons/chaingun/energy_shell_mastery"},
     "7770081": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/chaingun/turret",
     "7770082": {"type": "perk", "perk": "perk/player/weapons/chaingun/turret_mastery"},
+    "7770083": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/weapons/double_barrel/meat_hook",
     "7770084": {"type": "perk", "perk": "perk/player/weapons/double_barrel/meat_hook_mastery"},
     "7770085": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_speed",
     "7770086": "ai_ScriptCmdEnt player1 givePlayerPerk perk/player/runes/glory_kill_dash",

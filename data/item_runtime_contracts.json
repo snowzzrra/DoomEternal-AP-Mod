@@ -20,11 +20,19 @@
             "transient_effect": {"ownership_primitive": "receipt_only", "replay": "never_replay"}
         },
         "items": {
+            "7770083": {
+                "name": "Meat Hook",
+                "family": "weapon_mods",
+                "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook",
+                "requires_owned_item": [7770003],
+                "automatic_weapon_receipt": false,
+                "reconcile": "reapply_if_owned"
+            },
             "7770084": {
                 "name": "Meat Hook Mastery",
                 "family": "masteries",
                 "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook_mastery",
-                "requires_owned_item": [7770003],
+                "requires_owned_item": [7770003, 7770083],
                 "automatic_weapon_receipt": false,
                 "reconcile": "reapply_if_owned"
             },
