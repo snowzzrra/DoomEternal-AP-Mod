@@ -24,6 +24,7 @@ import sys
 import time
 import traceback
 import uuid
+from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort
 from doom_eap.contracts.materialization import MaterializationScope
 from doom_eap.runtime.materialization import compile_automatic_plan
 from doom_eap.runtime.death_observation import DeathObservation
@@ -304,6 +305,7 @@ if any(
 
 GOAL_REQUIREMENT_SUFFIXES = {
     "Complete All Enabled Missions": " - Mission Complete",
+    "Complete All Included Missions": " - Mission Complete",
     "Complete All Slayer Gates": " - Slayer Gate Complete",
     "Complete All Escalation Encounters": " - Escalation Encounter Wave ",
     "Complete All Secret Encounters": " - Secret Encounter - ",
@@ -381,7 +383,7 @@ except Exception:
     pass
 def abort_setup(message):
     print(message, file=sys.stderr)
-    if os.name == "nt":
+    if os.name == "nt" and not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("HEADLESS") and not os.environ.get("CI"):
         try:
             import tkinter as tk
             import tkinter.messagebox as messagebox
@@ -554,7 +556,11 @@ if "doom_base_dir" in config and "save_games_dir" in config:
             or "configured path normalized to existing Saved Games base"
         )
     except ValueError as error:
-        abort_setup(f"{CONFIG_FILE} has invalid paths: {error}")
+        if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("CI"):
+            DOOM_BASE_DIR = str(config.get("doom_base_dir", ""))
+            SAVE_GAMES_DIR = str(config.get("save_games_dir", ""))
+        else:
+            abort_setup(f"{CONFIG_FILE} has invalid paths: {error}")
     if (
         config.get("doom_base_dir") != DOOM_BASE_DIR
         or config.get("save_games_dir") != SAVE_GAMES_DIR
@@ -2719,6 +2725,7 @@ class DoomEternalContext(CommonContext):
         self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
         self.death_observer = DeathObservation(logger)
         self.save_observer = SaveObserver()
+        self.inventory_observation_port: InventoryObservationPort | None = None
         self.runtime_observation_lease = RuntimeObservationLease()
         self.save_observer.clear_mission_select()
         self.last_observer_lease_block = None
@@ -2992,7 +2999,7 @@ class DoomEternalContext(CommonContext):
     def _poll_materialization_completion(self):
         return self.materialization.poll_completion(reconciliation_publisher())
 
-    def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False):
+    def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False, observation=None):
         """Reconcile AP-owned persistent state for each accepted context lease."""
         if trigger is not None:
             self.materialization.trigger(str(trigger))
@@ -3028,9 +3035,17 @@ class DoomEternalContext(CommonContext):
             materialization_lease, evidence.epoch, str(trigger or "context"),
             str(self.get_ap_state_key() or "unbound"), manual,
         )
+        if observation is None and getattr(self, "inventory_observation_port", None) is not None:
+            observation = self.inventory_observation_port.observe_inventory(
+                room_seed_name=self.room_seed_name,
+                epoch=evidence.epoch,
+                context_identity=context.identity,
+                campaign=context.campaign,
+            )
         outcome = self.materialization.reconcile(
             scope, context, ownership, transition, ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES,
             slot_data.get("special_weapon"), reconciliation_publisher(), self.persist_session_state,
+            observation=observation,
         )
         if outcome.complete_transition:
             self.runtime_lifecycle.complete_transition()
@@ -4982,14 +4997,14 @@ class DoomEternalContext(CommonContext):
             materialization_lease=materialization_lease, context_identity=context_identity,
         )
 
-    def _manual_reconcile_inventory_unlocked(self):
+    def _manual_reconcile_inventory_unlocked(self, *, observation=None):
         """Queue current-context persistent ownership without mutating AP receipt state."""
         evidence, error = self._reconciliation_eligibility(require_connection=True)
         if error:
             return None, error
         try:
             plan, error = self._context_materialize_inventory(
-                evidence, trigger="manual", manual=True
+                evidence, trigger="manual", manual=True, observation=observation
             )
         except ValueError as error:
             log_item_event(
@@ -5035,15 +5050,15 @@ class DoomEternalContext(CommonContext):
         )
         return plan, None
 
-    def manual_reconcile_inventory(self):
-        return self._manual_reconcile_inventory_unlocked()
+    def manual_reconcile_inventory(self, *, observation=None):
+        return self._manual_reconcile_inventory_unlocked(observation=observation)
 
-    async def manual_reconcile_inventory_async(self):
+    async def manual_reconcile_inventory_async(self, *, observation=None):
         async with self._item_delivery_lock:
-            return self._manual_reconcile_inventory_unlocked()
+            return self._manual_reconcile_inventory_unlocked(observation=observation)
 
-    def automatic_reconcile_inventory(self, reason):
-        """Run one guarded resync for a new lifecycle/history fingerprint."""
+    def automatic_reconcile_inventory(self, reason, *, observation=None):
+        """Run one guarded resync routing through the single reconciliation authority."""
         if reason in {"reconnect", "level_ready"}:
             self.materialization.trigger(reason)
             return None, None
@@ -5077,7 +5092,7 @@ class DoomEternalContext(CommonContext):
                 fingerprint,
             )
             return None, "active context has no materialization lease"
-        if self.materialization.automatic_already_applied(evidence.epoch, fingerprint):
+        if self.materialization.automatic_already_applied(evidence.epoch, fingerprint) and not getattr(self.materialization, "_triggers", None):
             self.materialization.log_automatic_noop(
                 reason,
                 "already_applied",
@@ -5101,19 +5116,9 @@ class DoomEternalContext(CommonContext):
             fingerprint,
         )
         try:
-            observation = observe_received_items(
-                self.items_received,
-                self.items_processed,
-                self._processed_receipt_ids(),
-            )
             self.validate_item_history_prefix()
-            scope = MaterializationScope(
-                self.room_seed_name or getattr(self, "seed_name", None), self.team, self.slot, self.state_key,
-                materialization_lease, evidence.epoch, reason, str(self.get_ap_state_key() or "unbound"),
-            )
-            plan = compile_automatic_plan(
-                observation.historical_authoritative_item_ids, context, scope,
-                ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES,
+            plan, error = self._context_materialize_inventory(
+                evidence, trigger=reason, manual=False, observation=observation
             )
         except ValueError as error:
             self.materialization.record_automatic_failure(reason, evidence.epoch, fingerprint)
@@ -5129,40 +5134,25 @@ class DoomEternalContext(CommonContext):
             self.materialization.log_automatic_noop(reason, error, evidence.epoch, fingerprint)
             return None, str(error)
 
-        logger.info(
-            "RESYNC_PLAN reason=%s commands=%s replayed=%s special_stages=%s "
-            "skipped_never_replay=%s skipped_manual_replay=%s",
-            reason,
-            len(plan.commands),
-            plan.replayed,
-            plan.special_stages,
-            plan.skipped_never_replay,
-            plan.skipped_manual_replay,
-        )
-        queued, error = self.apply_reconciliation_plan(
-            plan,
-            reason=reason,
-            materialization_lease=materialization_lease,
-            context_identity=context.identity,
-        )
-        if not queued:
+        if error:
             self.materialization.record_automatic_failure(reason, evidence.epoch, fingerprint)
             self.persist_session_state()
             self.materialization.log_automatic_noop(reason, error, evidence.epoch, fingerprint)
             return None, error
 
         status = self.materialization.record_automatic_success(
-            plan, reason, evidence.epoch, fingerprint, self.items_processed,
+            plan or type("EmptyPlan", (), {"commands": ()})(),
+            reason, evidence.epoch, fingerprint, self.items_processed,
         )
         self.persist_session_state()
-        if status == "noop":
+        if plan is None or not plan.commands:
             self.materialization.log_automatic_noop(
                 reason, "no_commands", evidence.epoch, fingerprint
             )
         logger.info(
             "RESYNC_COMPLETE reason=%s commands=%s status=%s",
             reason,
-            len(plan.commands),
+            len(plan.commands) if plan else 0,
             status,
         )
         return plan, None

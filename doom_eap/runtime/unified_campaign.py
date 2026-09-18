@@ -21,8 +21,11 @@ def validate_plan(slot_data):
     if type(plan.get("difficulty")) is not int or not 0 <= plan["difficulty"] <= 3:
         raise ValueError("campaign difficulty must be fixed by the generated room")
     sequence, starts, goal = plan.get("sequence"), plan.get("starting_stages"), plan.get("goal_stage")
-    enabled = {key for key, stage in STAGES.items()
-               if slot_data["include_dlc_missions"] or stage["source"] == "base"}
+    if "stage_ids" in plan and isinstance(plan["stage_ids"], list):
+        enabled = set(plan["stage_ids"])
+    else:
+        enabled = {key for key, stage in STAGES.items()
+                   if slot_data.get("include_dlc_missions", False) or stage["source"] == "base"}
     if (not isinstance(sequence, list) or any(not isinstance(key, str) for key in sequence)
             or len(sequence) != len(enabled) or set(sequence) != enabled):
         raise ValueError("sequence must contain each enabled stage exactly once")

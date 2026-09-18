@@ -4,6 +4,15 @@ import time
 from typing import Callable, Protocol
 
 from doom_eap.contracts.command_publication import stable_spool_id
+from doom_eap.contracts.inventory_domain import (
+    BLOCKED,
+    DISPATCHED,
+    INDETERMINATE,
+    OBSERVED,
+    PLANNED,
+    QUEUED,
+    InventoryObservation,
+)
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
 from doom_eap.runtime.item_reconciliation import ReconciliationPlan, compile_reconciliation_plan
 from doom_eap.runtime.materialization import MaterializationPlanError, compile_materialization_plan
@@ -131,7 +140,7 @@ class MaterializationCoordinator:
 
     def reconcile(self, scope: MaterializationScope, context, ownership, transition, item_definitions,
                   replay_policies, special_mode, publisher: MaterializationPublicationPort,
-                  persist: Callable[[], None]):
+                  persist: Callable[[], None], *, observation: InventoryObservation | None = None):
         state = self._state
         materialization_lease = scope.materialization_lease
         manual = scope.manual
@@ -148,18 +157,23 @@ class MaterializationCoordinator:
         # TAG DevInv clears physical inventory on every load. Persistent
         # ownership therefore needs one reconciliation per accepted lease.
         persistent_reconciliation_key = materialization_key
-        if not manual and state.get("completed_key") == materialization_key:
+        received = set(ownership.reconciliation_item_ids)
+        has_triggers = bool(self._triggers)
+        proven_missing = (
+            observation is not None
+            and any(observation.is_proven_missing(item_id) for item_id in received)
+        )
+        if not manual and not has_triggers and not proven_missing and state.get("completed_key") == materialization_key:
             complete_transition = True
             self._triggers.clear()
             self._mode = "none"
             self._status = "completed_noop"
             return MaterializationOutcome(None, None, complete_transition)
-        received = set(ownership.reconciliation_item_ids)
         active_gate_keys = [
             item_id for item_id, map_key in GATE_KEY_TO_MAP.items()
             if map_key in context.map_keys and item_id in received
         ]
-        if not manual and state.get("completed_persistent_key") == persistent_reconciliation_key:
+        if not manual and not has_triggers and not proven_missing and state.get("completed_persistent_key") == persistent_reconciliation_key:
             if (
                 active_gate_keys
                 and materialization_lease is not None
@@ -230,7 +244,7 @@ class MaterializationCoordinator:
         try:
             planned = compile_materialization_plan(
                 ownership, context, scope, item_definitions, replay_policies,
-                special_mode,
+                special_mode, observation=observation,
             )
         except MaterializationPlanError as error:
             if error.blocked:
@@ -271,6 +285,14 @@ class MaterializationCoordinator:
             active_gate_keys
             and state.get("completed_gate_key_lease") not in (None, materialization_lease)
         )
+        semantic_state = (
+            "observed"
+            if (observation is not None and not commands)
+            else "dispatched_unverified"
+            if commands
+            else "observed_noop"
+        )
+        lifecycle_state = DISPATCHED if commands else OBSERVED
         state.update(
             context_identity=context.identity,
             campaign=context.campaign,
@@ -283,6 +305,8 @@ class MaterializationCoordinator:
             completion_criterion="durable_spool_publication",
             special_stage=planned.selected_special_stage,
             status="complete",
+            lifecycle_state=lifecycle_state,
+            semantic_state=semantic_state,
         )
         persist()
         state["completed_key"] = materialization_key

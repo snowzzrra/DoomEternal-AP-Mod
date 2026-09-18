@@ -30,6 +30,7 @@ GOAL_VALUES = frozenset({
 })
 VICTORY_REQUIREMENT_VALUES = frozenset({
     "Complete All Enabled Missions",
+    "Complete All Included Missions",
     "Complete All Slayer Gates",
     "Complete All Escalation Encounters",
     "Complete All Secret Encounters",

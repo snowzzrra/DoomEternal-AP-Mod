@@ -3,6 +3,14 @@ from dataclasses import dataclass
 
 from doom_eap.contracts.foundation import compile_item_delivery_plan
 from doom_eap.contracts.command_publication import stable_spool_id
+from doom_eap.contracts.inventory_domain import (
+    CAPACITY_ITEM_IDS,
+    MAX_CAPACITY_TIER,
+    MISSING,
+    OWNED,
+    UNKNOWN,
+    InventoryObservation,
+)
 from doom_eap.contracts.materialization import (
     MaterializationScope, context_item_ids, support_rune_commands,
     SUPPORT_RUNE_IDS, TAG_SPECIAL_CAPABILITY,
@@ -26,7 +34,18 @@ class MaterializationPlanError(ValueError):
         self.blocked = blocked
 
 
-def compile_materialization_plan(ownership, context, scope, item_definitions, replay_policies, special_mode):
+def compile_materialization_plan(
+    ownership, context, scope, item_definitions, replay_policies, special_mode,
+    *, observation: InventoryObservation | None = None,
+):
+    valid_obs = (
+        observation is not None
+        and not observation.is_stale_for(
+            room_seed_name=scope.room_seed_name,
+            context_identity=context.identity,
+            campaign=context.campaign,
+        )
+    )
     received = set(ownership.reconciliation_item_ids)
     materialization_lease = scope.materialization_lease
     received_counts = {}
@@ -83,6 +102,25 @@ def compile_materialization_plan(ownership, context, scope, item_definitions, re
         scope.evidence_epoch,
         include_manual_replay=True,
     )
+    plan_commands = list(plan.commands)
+    if valid_obs:
+        diff_commands = []
+        for cmd in plan_commands:
+            item_id = cmd.item_id
+            if item_id in capacity_ids:
+                desired_tier = min(MAX_CAPACITY_TIER, received_counts.get(item_id, 0))
+                observed_tier = (
+                    observation.get_observed_stage(item_id)
+                    if observation.is_owned(item_id)
+                    else 0
+                )
+                if observed_tier <= cmd.stage < desired_tier:
+                    diff_commands.append(cmd)
+            else:
+                if observation.is_proven_missing(item_id):
+                    diff_commands.append(cmd)
+                # If owned or UNKNOWN: omit from repair diff!
+        plan_commands = diff_commands
     # Special ownership is one physical state: materialize highest selected intent.
     special_candidates = []
     special_definitions = {
@@ -175,9 +213,19 @@ def compile_materialization_plan(ownership, context, scope, item_definitions, re
                             f"Sentinel Hammer upgrade: {upgrade_key}",
                         )
                     )
+    if special_commands and valid_obs and special_candidates:
+        is_owned = observation.is_owned(item_id)
+        observed_stage = observation.get_observed_stage(item_id)
+        if is_owned and observed_stage >= selected_special_stage:
+            special_commands = []
+        elif not observation.is_proven_missing(item_id) and not (is_owned and observed_stage < selected_special_stage):
+            special_commands = []
     special_diagnostic = (item_id, count, selected_special_stage, context.identity, len(special_commands)) if special_candidates else None
     support_commands = []
     for item_id in support_rune_commands(received, context):
+        if valid_obs:
+            if observation.is_owned(item_id) or not observation.is_proven_missing(item_id):
+                continue
         support_delivery = compile_item_delivery_plan(
             item_id, {item_id: item_definitions[item_id]}
         )
@@ -201,44 +249,46 @@ def compile_materialization_plan(ownership, context, scope, item_definitions, re
         )
     blood_punch_commands = []
     if context.campaign != "Base" and 7770014 in received:
-        for upgrade in ownership.blood_punch_upgrades:
-            blood_punch_commands.append(
-                ReconciliationCommand(
-                    7770014,
-                    "Blood Punch",
-                    "replay_idempotent",
-                    upgrade.location_id,
-                    stable_spool_id(
-                        "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                        context.identity, "blood-punch-upgrade", upgrade.location_id,
-                    ),
-                    f"ai_ScriptCmdEnt player1 givePlayerPerk {upgrade.perk_path}",
-                    f"Blood Punch upgrade from {upgrade.mission_name}",
+        if not (valid_obs and (observation.is_owned(7770014) or not observation.is_proven_missing(7770014))):
+            for upgrade in ownership.blood_punch_upgrades:
+                blood_punch_commands.append(
+                    ReconciliationCommand(
+                        7770014,
+                        "Blood Punch",
+                        "replay_idempotent",
+                        upgrade.location_id,
+                        stable_spool_id(
+                            "reconcile", scope.room_seed_name, scope.team, scope.slot,
+                            context.identity, "blood-punch-upgrade", upgrade.location_id,
+                        ),
+                        f"ai_ScriptCmdEnt player1 givePlayerPerk {upgrade.perk_path}",
+                        f"Blood Punch upgrade from {upgrade.mission_name}",
+                    )
                 )
-            )
 
     dash_commands = []
     if (
         context.campaign != "Base"
         and ownership.vanilla_dash
     ):
-        dash_commands.append(
-            ReconciliationCommand(
-                7770015,
-                "Dash",
-                "replay_idempotent",
-                0,
-                stable_spool_id(
-                    "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                    context.identity, "unrandomized-dash",
-                ),
-                "give ability_dash",
-                "Vanilla Dash proven by Exultia mission completion",
+        if not (valid_obs and (observation.is_owned(7770015) or not observation.is_proven_missing(7770015))):
+            dash_commands.append(
+                ReconciliationCommand(
+                    7770015,
+                    "Dash",
+                    "replay_idempotent",
+                    0,
+                    stable_spool_id(
+                        "reconcile", scope.room_seed_name, scope.team, scope.slot,
+                        context.identity, "unrandomized-dash",
+                    ),
+                    "give ability_dash",
+                    "Vanilla Dash proven by Exultia mission completion",
+                )
             )
-        )
 
     raw_commands = (
-        tuple(plan.commands)
+        tuple(plan_commands)
         + tuple(special_commands)
         + tuple(support_commands)
         + tuple(blood_punch_commands)
@@ -268,15 +318,24 @@ def compile_materialization_plan(ownership, context, scope, item_definitions, re
     )
 
 
-def compile_automatic_plan(authoritative_ids, context, scope, definitions, policies):
-    """Historical automatic repair excludes manual presentation and special context effects."""
-    excluded = SUPPORT_RUNE_IDS | {7770007, 7770009, 7770901, 7770902}
-    allowed = set(context_item_ids(context, authoritative_ids))
-    replayable = tuple(item_id for item_id in authoritative_ids if item_id not in excluded and item_id in allowed)
-    return compile_reconciliation_plan(
-        replayable, definitions, policies,
-        f"{scope.room_seed_name}-{scope.team}-{scope.slot}", scope.evidence_epoch,
+def compile_automatic_plan(authoritative_ids, context, scope, definitions, policies, *, observation=None):
+    """Historical automatic repair adapter routing through unified reconciliation."""
+    from doom_eap.runtime.item_reconciliation import effective_ownership
+    from types import SimpleNamespace
+    receipt_items = tuple(
+        SimpleNamespace(item=i, player=scope.slot, location=0)
+        for i in authoritative_ids
     )
+    ownership = effective_ownership(
+        receipt_items, slot=scope.slot,
+        randomize_chainsaw=True, randomize_dash=True,
+        checked_locations=frozenset(), local_checked_locations=frozenset(),
+        server_checked_ready=True, hell_on_earth_locations=frozenset(),
+        exultia_complete_location=0,
+    )
+    return compile_materialization_plan(
+        ownership, context, scope, definitions, policies, "the_crucible", observation=observation
+    ).reconciliation
 
 
 def authored_effects_allowed(*, evidence, campaign, epoch, lease, process_running,
