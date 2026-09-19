@@ -94,13 +94,17 @@ def all_mission_challenge_entries(registry: dict) -> list[dict]:
     return list(registry.get("all_mission_challenges", []))
 
 
-def aggregate_ready(signal: dict, checked_locations: set[int]) -> bool:
+def aggregate_ready(signal: dict, checked_locations: set[int], server_locations: set[int] | None = None) -> bool:
     if signal.get("authority") != "server_checked_locations":
         raise ValueError("aggregate authority must be server_checked_locations")
     children = set(signal.get("children", []))
     required_count = signal.get("required_count")
     if not children or not isinstance(required_count, int):
         raise ValueError("aggregate requires children and required_count")
+    if server_locations is not None:
+        inactive = set(signal.get("conditional_children", ())) & children - set(server_locations)
+        children -= inactive
+        required_count -= len(inactive)
     return len(children & set(checked_locations)) >= required_count
 
 

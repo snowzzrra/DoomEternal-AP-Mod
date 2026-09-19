@@ -277,7 +277,7 @@ class SaveChecks:
         for aggregate in self._aggregates:
             signal = aggregate["signal"]
             children = set(signal["children"])
-            if not aggregate_ready(signal, checked):
+            if not aggregate_ready(signal, checked, set(facts.server_locations)):
                 continue
             location_id = aggregate["location_id"]
             if location_id in checked:
@@ -314,4 +314,3 @@ class SaveChecks:
                 "[Challenge] ALL_LOCATION_CHECK_QUEUED id=%s awaiting=server_ack",
                 location_id,
             )
-
