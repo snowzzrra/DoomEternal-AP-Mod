@@ -42,10 +42,13 @@ def compile_materialization_plan(
         observation is not None
         and not observation.is_stale_for(
             room_seed_name=scope.room_seed_name,
+            epoch=scope.evidence_epoch,
             context_identity=context.identity,
             campaign=context.campaign,
         )
     )
+    if not valid_obs:
+        raise MaterializationPlanError("fresh native observation required; UNKNOWN is not missing")
     received = set(ownership.reconciliation_item_ids)
     materialization_lease = scope.materialization_lease
     received_counts = {}
@@ -108,6 +111,8 @@ def compile_materialization_plan(
         for cmd in plan_commands:
             item_id = cmd.item_id
             if item_id in capacity_ids:
+                if observation.get_state(item_id) == UNKNOWN:
+                    continue
                 desired_tier = min(MAX_CAPACITY_TIER, received_counts.get(item_id, 0))
                 observed_tier = (
                     observation.get_observed_stage(item_id)
@@ -312,6 +317,8 @@ def compile_materialization_plan(
         skipped_unproven=plan.skipped_unproven,
         skipped_manual_replay=plan.skipped_manual_replay,
     )
+    if not commands and any(observation.get_state(item_id) == UNKNOWN for item_id in selected_ids):
+        raise MaterializationPlanError("empty plan has unresolved native observations")
     return MaterializationPlan(
         scope, plan, len(raw_commands), len(support_commands), selected_special_stage,
         special_diagnostic,

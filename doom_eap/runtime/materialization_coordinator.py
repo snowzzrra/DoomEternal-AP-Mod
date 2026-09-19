@@ -158,65 +158,10 @@ class MaterializationCoordinator:
         # ownership therefore needs one reconciliation per accepted lease.
         persistent_reconciliation_key = materialization_key
         received = set(ownership.reconciliation_item_ids)
-        has_triggers = bool(self._triggers)
-        proven_missing = (
-            observation is not None
-            and any(observation.is_proven_missing(item_id) for item_id in received)
-        )
-        if not manual and not has_triggers and not proven_missing and state.get("completed_key") == materialization_key:
-            complete_transition = True
-            self._triggers.clear()
-            self._mode = "none"
-            self._status = "completed_noop"
-            return MaterializationOutcome(None, None, complete_transition)
         active_gate_keys = [
             item_id for item_id, map_key in GATE_KEY_TO_MAP.items()
             if map_key in context.map_keys and item_id in received
         ]
-        if not manual and not has_triggers and not proven_missing and state.get("completed_persistent_key") == persistent_reconciliation_key:
-            if (
-                active_gate_keys
-                and materialization_lease is not None
-                and state.get("completed_gate_key_lease") != materialization_lease
-            ):
-                gate_key_plan = compile_reconciliation_plan(
-                    active_gate_keys,
-                    {k: item_definitions[k] for k in active_gate_keys},
-                    {k: replay_policies[k] for k in active_gate_keys},
-                    stable_spool_id("context", scope.room_seed_name, scope.team, scope.slot, context.identity),
-                    scope.evidence_epoch,
-                    include_manual_replay=True,
-                )
-                publisher.publish(
-                    gate_key_plan, state_key=scope.state_key,
-                    reason="gate_key_epoch_rematerialization",
-                    materialization_lease=materialization_lease,
-                    context_identity=context.identity,
-                )
-                state["completed_gate_key_lease"] = materialization_lease
-                state["completed_key"] = materialization_key
-                persist()
-                complete_transition = True
-                self._triggers.clear()
-                self._mode = "same_context"
-                self._status = "gate_key_rematerialized"
-                self._logger.info(
-                    "GATE_KEY_REMATERIALIZE context=%s lease=%s keys=%s",
-                    context.identity, materialization_lease, active_gate_keys,
-                )
-                return MaterializationOutcome(gate_key_plan, None, complete_transition)
-
-            complete_transition = True
-            self._triggers.clear()
-            self._mode = "none"
-            self._status = "completed_noop"
-            state["completed_key"] = materialization_key
-            persist()
-            self._logger.info(
-                "MATERIALIZATION_SKIP reason=same_context_same_ownership_reload context=%s lease=%s",
-                context.identity, materialization_lease,
-            )
-            return MaterializationOutcome(None, None, complete_transition)
         if materialization_lease is None:
             deferred_key = f"{previous}:{target_campaign}:{context.identity}"
             self._mode = "cross_context"

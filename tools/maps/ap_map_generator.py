@@ -2513,13 +2513,7 @@ def load_explicit_location_feedback(
 
 def apply_runtime_map_correctives(text: str, map_key: str) -> str:
     """Apply focused runtime correctives for TAG maps."""
-    if map_key == "e4m2_swamp":
-        text = remove_balanced_entity_blocks(
-            text,
-            "fast_travel_target_fast_travel_unlock_2",
-        )
-
-    elif map_key == "e4m1_rig":
+    if map_key == "e4m1_rig":
         bounds = find_entity_block_bounds(text, "slayer_gate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]
@@ -2554,11 +2548,6 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             text = text[:bounds[0]] + block + text[bounds[1]:]
 
     elif map_key == "e4m3_mcity":
-        text = remove_balanced_entity_blocks(
-            text,
-            "fasttravel_target_fast_travel_unlock_1",
-        )
-
         bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]

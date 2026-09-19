@@ -182,7 +182,7 @@ class FastTravel:
         return True
 
     def capture(self, map_identity, room_identity, checked, marker_data=None, *, refresh=False):
-        """Capture server-history eligibility for current gameplay epoch."""
+        """Freeze eligibility at epoch entry; later checks cannot create a replay."""
         if not isinstance(marker_data, Mapping):
             marker_data = (
                 map_identity.cached_marker
@@ -194,10 +194,12 @@ class FastTravel:
         existing = getattr(self, "_epoch_state", None)
         if (
             isinstance(existing, dict)
+            and existing.get("identity") == room_identity
             and existing.get("epoch") == epoch
             and existing.get("map_key") == marker_data.get("map_key")
-            and not refresh
         ):
+            # Reconnect/history refresh may complete this first visit. Vanilla
+            # endpoint targets own its unlock; AP early unlock waits for re-entry.
             return getattr(self, "_eligibility", None)
         if epoch is None:
             return None
@@ -241,4 +243,3 @@ class FastTravel:
         if ineligible_reason:
             self._fast_travel_transition("INELIGIBLE", reason=ineligible_reason)
         return self._eligibility
-

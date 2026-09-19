@@ -48,22 +48,22 @@ CAPACITY_ITEM_IDS = frozenset({
 
 # Standard weapon item IDs
 WEAPON_ITEM_IDS = frozenset({
-    7770000,  # Combat Shotgun
-    7770001,  # Super Shotgun
-    7770002,  # Heavy Cannon
-    7770003,  # Chaingun
-    7770004,  # Plasma Rifle
-    7770005,  # Ballista
-    7770006,  # Rocket Launcher
-    7770008,  # BFG 9000
+    7770900,  # Combat Shotgun
+    7770000,  # Heavy Cannon
+    7770001,  # Plasma Rifle
+    7770002,  # Rocket Launcher
+    7770003,  # Super Shotgun
+    7770004,  # Ballista
+    7770005,  # Chaingun
+    7770006,  # BFG 9000
+    7770008,  # Unmaykr
     7770010,  # Chainsaw
-    7770011,  # Unmaykr
 })
 
-# Equipment item IDs
 EQUIPMENT_ITEM_IDS = frozenset({
-    7770012,  # Equipment Launcher
-    7770013,  # Flame Belch
+    7770011,  # Frag Grenade
+    7770012,  # Flame Belch
+    7770013,  # Ice Bomb
     7770014,  # Blood Punch
     7770015,  # Dash
 })
@@ -78,15 +78,17 @@ SPECIAL_WEAPON_ITEM_IDS = frozenset({
 
 # Persistent upgrade item IDs (Support Runes and Slayer Gate Keys)
 PERSISTENT_UPGRADE_ITEM_IDS = frozenset({
-    7770145,  # Support Rune: Desperate Punch
-    7770146,  # Support Rune: Take Back
-    7770147,  # Support Rune: Break Blast
-    7770051,  # Slayer Key: Exultia
-    7770052,  # Slayer Key: Cultist Base
-    7770053,  # Slayer Key: Super Gore Nest
-    7770054,  # Slayer Key: ARC Complex
-    7770055,  # Slayer Key: Phobos / Mars Core
-    7770056,  # Slayer Key: Taras Nabad
+    7770145,  # Support Rune: Break Blast
+    7770146,  # Support Rune: Desperate Punch
+    7770147,  # Support Rune: Take Back
+    7770148,  # Slayer Key: UAC Atlantica
+    7770149,  # Slayer Key: The Holt
+    7770150,  # Slayer Key: Exultia
+    7770151,  # Slayer Key: Cultist Base
+    7770152,  # Slayer Key: Super Gore Nest
+    7770153,  # Slayer Key: ARC Complex
+    7770154,  # Slayer Key: Phobos / Mars Core
+    7770155,  # Slayer Key: Taras Nabad
 })
 
 ALL_PERSISTENT_DOMAIN_IDS = frozenset(
@@ -186,7 +188,6 @@ class InventoryObservation:
             return True
         if (
             provider_namespace is not None
-            and self.provider_namespace is not None
             and self.provider_namespace != provider_namespace
         ):
             return True
