@@ -1,4 +1,4 @@
-"""Checked visual reconciliation owns per-load dedupe, local effects and retry state."""
+"""Checked visual reconciliation owns map-scoped repair and retry state."""
 from collections.abc import Mapping
 from types import MappingProxyType
 import time
@@ -24,8 +24,7 @@ class CheckedVisuals:
 
     def rebind(self):
         self._epoch = None
-        self._local_owned = set()
-        self._submitted = set()
+        self._local_observed = set()
 
     @property
     def epoch(self):
@@ -48,15 +47,13 @@ class CheckedVisuals:
             if previous_epoch != self._epoch:
                 self._retry.clear()
                 self._status.clear()
-                self._local_owned.clear()
-                self._submitted.clear()
+                self._local_observed.clear()
             return None
         self._epoch = epoch
         if previous_epoch != epoch:
             self._retry.clear()
             self._status.clear()
-            self._local_owned.clear()
-            self._submitted.clear()
+            self._local_observed.clear()
         return self._epoch
 
     def reconcile(self, trigger, *, map_identity, room_identity, state_key, checked, checked_ready, runtime_ready, rpc_ready, send):
@@ -123,22 +120,6 @@ class CheckedVisuals:
             entity_name = entry["reconciliation_entity"]
             delivery_key = (room_identity, map_name, str(location_id))
             runtime_key = (epoch, *delivery_key)
-            if (epoch, location_id) in self._local_owned:
-                self._automap_cleanup_transition(
-                    runtime_key,
-                    "LOCAL_FLOW_OWNS_EFFECT",
-                    "local_flow_owns_effect",
-                    trigger=trigger,
-                )
-                continue
-            if runtime_key in self._submitted:
-                self._automap_cleanup_transition(
-                    runtime_key,
-                    "SUBMITTED",
-                    "spool_already_submitted",
-                    trigger=trigger,
-                )
-                continue
             retry = self._retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})
             if now < retry["deadline"]:
                 self._automap_cleanup_transition(
@@ -155,6 +136,7 @@ class CheckedVisuals:
                 map_name,
                 location_id,
                 self._epoch,
+                retry["attempt"],
             )
             command = f"ai_ScriptCmdEnt {entity_name} activate"
             if not send(
@@ -178,13 +160,13 @@ class CheckedVisuals:
                     trigger=trigger,
                 )
                 continue
-            self._retry.pop(runtime_key, None)
-            self._submitted.add(runtime_key)
+            retry["attempt"] += 1
+            retry["deadline"] = now + AUTOMAP_CLEANUP_RETRY_MAX_SECONDS
             changed = True
             self._automap_cleanup_transition(
                 runtime_key,
-                "SUBMITTED",
-                "spool_enqueued",
+                "REPAIR_QUEUED",
+                "model_presence_unverified",
                 trigger=trigger,
             )
             self._logger.info(
@@ -214,11 +196,11 @@ class CheckedVisuals:
             return False
         if event_mtime < marker.get("mtime_ns", 0):
             return False
-        self._local_owned.add((epoch, location_id))
+        self._local_observed.add((epoch, location_id))
         self._automap_cleanup_transition(
             (epoch, room_identity or "", marker.get("runtime_map", ""), str(location_id)),
-            "LOCAL_FLOW_OWNS_EFFECT",
-            "local_flow_owns_effect",
+            "LOCAL_CHECK_OBSERVED",
+            "server_confirmation_and_repair_required",
             trigger="native_ap_check_event",
         )
         return True
@@ -239,4 +221,3 @@ class CheckedVisuals:
             previous,
             reason if status != "COMMAND_QUEUED_UNVERIFIED" else "<none>",
         )
-

@@ -164,21 +164,6 @@ def compile_materialization_plan(
         )
         selected_special_stage = physical_stage
         policy = special_policies[item_id]
-        if item_id == 7770901 and physical_stage >= 2:
-            special_commands.append(
-                ReconciliationCommand(
-                    item_id,
-                    policy.name,
-                    policy.policy,
-                    physical_stage,
-                    stable_spool_id(
-                        "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                        context.identity, "special", physical_stage, "remove-crucible",
-                    ),
-                    "removeInventoryItem weapon/player/crucible",
-                    "replace Crucible with Sentinel Hammer",
-                )
-            )
         for delivery in deliveries.commands:
             special_commands.append(
                 ReconciliationCommand(

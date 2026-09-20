@@ -12,7 +12,7 @@ from doom_eap.contracts.receipt_delivery import NEW_RECEIPT, HISTORICAL_OWNERSHI
 from doom_eap.runtime.item_reconciliation import load_policy_registry
 
 
-def test_feedback_is_live_occurrence_only_alternates_per_item_and_keeps_special_replacement(monkeypatch):
+def test_feedback_is_live_occurrence_only_alternates_per_item_and_preserves_special_ownership(monkeypatch):
     root = Path(__file__).resolve().parents[1]
     definitions = {int(key): value for key, value in json.loads((root / "data/items.json").read_text()).items()}
     policies = load_policy_registry(root / "data/item_replay_policies.json", definitions)
@@ -33,7 +33,7 @@ def test_feedback_is_live_occurrence_only_alternates_per_item_and_keeps_special_
         assert not any("ap_notify_item_" in command for command in plan(request, current).commands)
     assert plan(replace(request, intent=HISTORICAL_OWNERSHIP)).commands == ()
     assert not any("ap_notify_item_" in command for command in plan(replace(request, intent=PRESENTATION_REPAIR)).commands)
-    assert "removeInventoryItem weapon/player/crucible" in plan(ReceiptIntent(7770901, 10, NEW_RECEIPT), stage=1).commands
+    assert "removeInventoryItem weapon/player/crucible" not in plan(ReceiptIntent(7770901, 10, NEW_RECEIPT), stage=1).commands
     assert "removeInventoryItem weapon/player/crucible" not in plan(ReceiptIntent(7770901, 10, NEW_RECEIPT), stage=0).commands
 
 

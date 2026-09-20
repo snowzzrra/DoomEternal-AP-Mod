@@ -50,8 +50,6 @@ def compile_receipt_plan(request: ReceiptIntent, facts: ReceiptFeedbackFacts, st
     except ValueError as error:
         return ReceiptPlan(None, str(error))
     commands = [command.command for command in plan.commands]
-    if request.item_id == 7770901 and stage is not None and stage >= 1:
-        commands.insert(0, "removeInventoryItem weapon/player/crucible")
     return ReceiptPlan(tuple(commands), plan.description)
 
 

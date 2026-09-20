@@ -175,7 +175,7 @@ class TestAutomapCleanup(unittest.TestCase):
                 self.assertFalse(context.reconcile_checked_automap_cleanup("epoch2_repeat"))
                 self.assertEqual(len(sent), 2)
 
-    def test_local_pickup_cleanup_ownership_suppresses_reconciliation(self):
+    def test_local_pickup_remains_repairable_after_server_confirmation(self):
         context = _create_test_context()
         epoch = "3:1788279760388090599"
         context.runtime_lifecycle.accept_marker({
@@ -193,7 +193,7 @@ class TestAutomapCleanup(unittest.TestCase):
             with patch("doom_eap.runtime.bridge_client.rpc_execution_enabled", return_value=True):
                 changed = context.reconcile_checked_automap_cleanup("test")
 
-        self.assertFalse(changed)
-        self.assertEqual(len(sent), 0)
+        self.assertTrue(changed)
+        self.assertEqual(len(sent), 1)
         status = context.automap_cleanup_status.get((epoch, "room:test:1", "game/sp/e1m2_battle/e1m2_battle", "7770021"))
-        self.assertEqual(status, "LOCAL_FLOW_OWNS_EFFECT")
+        self.assertEqual(status, "REPAIR_QUEUED")

@@ -127,6 +127,7 @@ async def test_launcher_control_forwards_supervisor_chat_frame(monkeypatch, tmp_
 def _context(items=(), *, processed=0, ready=True):
     context = object.__new__(bridge.DoomEternalContext)
     context.exit_event = asyncio.Event()
+    context.send_msgs = lambda *_args, **_kwargs: None
     context.physical_checks = bridge.PhysicalChecks(bridge.logger)
     context.level_ready = bridge.LevelReady(bridge.logger)
     context.session_tasks = bridge.SessionTasks()
@@ -383,6 +384,70 @@ async def test_starting_materialization_suppresses_only_matching_occurrences(mon
     assert await context.process_pending_item_receipts("packet")
     assert context.items_processed == 3
     assert calls == [(2, 8)]
+
+
+@_run_async
+async def test_pending_hook_waits_for_native_owner_before_advancing(monkeypatch):
+    context = _context([NetworkItem(7770083, 8, 1, 0)])
+    calls = []
+    def ensure_hook():
+        calls.append("hook")
+        if len(calls) == 1:
+            raise RuntimeError("native owner not confirmed")
+        return {"outcome": 0, "flags": 27, "operations_applied": 1}
+
+    link = SimpleNamespace(
+        ensure_meat_hook=ensure_hook,
+    )
+    context.native_game_link = lambda: link
+    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", False)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {7770083: "native-owner"})
+
+    await context.process_pending_item_receipts("packet")
+    assert context.items_processed == 0
+    assert await context.process_pending_item_receipts("tracker")
+    assert calls == ["hook", "hook"]
+    assert context.items_processed == 1
+
+
+@_run_async
+async def test_progressive_special_reconciles_history_then_confirms_stage_two(monkeypatch):
+    receipts = [NetworkItem(7770901, 8, 1, 0), NetworkItem(7770901, 9, 1, 0)]
+    context = _context(receipts, processed=1)
+    context.receipt_session.configure_starting_materialization(
+        starting_inventory={"Progressive Special Weapon": 1}, starting_weapon=None,
+        item_identity={7770901: {"name": "Progressive Special Weapon"}},
+        processed_receipts=receipts[:1], eligible=lambda _item: True,
+    )
+    calls = []
+    link = SimpleNamespace(
+        ensure_progressive_special_weapon=lambda count: calls.append(count) or {
+            "outcome": 0, "flags": 106, "operations_applied": 1,
+        }
+    )
+    context.native_game_link = lambda: link
+    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", False)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {7770901: "native-owner"})
+
+    assert await context.process_pending_item_receipts("tracker")
+    assert calls == [1, 2]
+    assert context.items_processed == 2
+
+
+@_run_async
+async def test_historical_hook_reprojects_without_cursor_reset(monkeypatch):
+    context = _context([NetworkItem(7770083, 8, 1, 0)], processed=1)
+    calls = []
+    context.native_game_link = lambda: SimpleNamespace(
+        ensure_meat_hook=lambda: calls.append("hook") or {
+            "outcome": 1, "flags": 27, "operations_applied": 0,
+        }
+    )
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {7770083: "native-owner"})
+
+    assert await context.process_pending_item_receipts("reconnect")
+    assert calls == ["hook"]
+    assert context.items_processed == 1
 
 
 def test_packet_timing_preserves_history_tail_and_index_zero_clear(monkeypatch):

@@ -2748,6 +2748,7 @@ class DoomEternalContext(CommonContext):
         self.runes = RuneReconciliation(logger)
         self.bootstrap = Bootstrap(logger)
         self.checked_visuals = CheckedVisuals(KNOWN_CATALOG_MAPS, AUTOMAP_VISUALS_BY_MAP, uuid.uuid4().hex[:8], logger)
+        self._native_automap_published = None
         self.server_checked_locations_ready = False
         self.fast_travel = FastTravel(KNOWN_CATALOG_MAPS, FAST_TRAVEL_MAP_KEYS, FAST_TRAVEL_MISSION_COMPLETE_IDS, logger)
         self._launcher_connection_failure_reported = False
@@ -3498,6 +3499,7 @@ class DoomEternalContext(CommonContext):
                     logger.error("[WUP] Native checkpoint reconciliation blocked: %s", error)
                     self.item_delivery_blocked = True
                     return False
+            self._reconcile_native_receipt_owners(trigger)
             batch_count = 0
             fresh_receipt_boundary = self.items_processed
             while len(self.items_received) > self.items_processed:
@@ -3554,7 +3556,7 @@ class DoomEternalContext(CommonContext):
                             return False
                     continue
 
-                if self.receipt_session.consume_starting_materialization(item_id):
+                if item_id not in {7770083, 7770901} and self.receipt_session.consume_starting_materialization(item_id):
                     logger.info(
                         "[To Game] Materialized starting receipt acknowledged without replay: "
                         "index=%s item_id=%s",
@@ -3637,6 +3639,47 @@ class DoomEternalContext(CommonContext):
                         self.item_delivery_blocked = True
                         return False
                     logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
+                    continue
+
+                if item_id in {7770083, 7770901}:
+                    try:
+                        result = self._apply_native_owner_receipt(item_index, network_item)
+                    except (RuntimeError, OSError, ValueError) as error:
+                        reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
+                        log_item_event(
+                            "ITEM_RECEIPT_DEFERRED",
+                            receipt_index=item_index,
+                            item_id=item_id,
+                            receipt_id=receipt_identity(network_item),
+                            reason=reason,
+                            detail=str(error),
+                            decision="cursor_held",
+                            boundary=self.items_processed,
+                            trigger=trigger,
+                            state_key=getattr(self, "state_key", None),
+                        )
+                        logger.info("[NativeOwner] Receipt %s held: %s", item_index, error)
+                        break
+                    log_item_event(
+                        "ITEM_RECEIPT_ACK",
+                        receipt_index=item_index,
+                        item_id=item_id,
+                        receipt_id=receipt_identity(network_item),
+                        outcome="native_owner_confirmed",
+                        native_outcome=result.get("outcome"),
+                        native_flags=result.get("flags"),
+                        operations_applied=result.get("operations_applied"),
+                        namespace=result.get("namespace"),
+                        process_id=result.get("pid"),
+                        process_created=result.get("process_created"),
+                        lifecycle_generation=result.get("lifecycle_generation"),
+                        request_id=result.get("request_id"),
+                        native_build=result.get("build_id"),
+                        boundary=self.items_processed,
+                        trigger=trigger,
+                        state_key=getattr(self, "state_key", None),
+                    )
+                    batch_count += 1
                     continue
 
                 if item_id in TRANSIENT_EFFECTS:
@@ -4841,7 +4884,7 @@ class DoomEternalContext(CommonContext):
         namespace = namespace_id(self.room_seed_name, self.team, self.slot,
                                  self._connected_slot_data.get("native_generation_fingerprint", ""))
         default_probe = (APPLICATION_DIR / "sentinel_probe.exe" if getattr(sys, "frozen", False)
-                         else REPO_ROOT.parent / "Sentinel-Core/build/windows/bin/Release/sentinel_probe.exe")
+                         else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
         probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
         return SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
 
@@ -4851,6 +4894,70 @@ class DoomEternalContext(CommonContext):
         authoritative = {index: receipt_identity(item) for index, item in enumerate(self.items_received)
                          if item.item == 7770903}
         return WeaponPointReceipts(self.session_state, self.persist_session_state, link, link.namespace), authoritative
+
+    def _reconcile_native_receipt_owners(self, trigger):
+        authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
+        hook_owned = any(item.item == 7770083 for item in authoritative)
+        special_count = min(3, max(
+            sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),
+            sum(item.item == 7770901 for item in authoritative),
+        ))
+        if not hook_owned and not special_count:
+            return
+        try:
+            link = self.native_game_link()
+            if hook_owned:
+                hook = link.ensure_meat_hook()
+                log_item_event(
+                    "ITEM_NATIVE_OWNER_RECONCILED", domain="arsenal", operation="ensure_meat_hook",
+                    trigger=trigger, boundary=self.items_processed, native_outcome=hook.get("outcome"),
+                    native_flags=hook.get("flags"), operations_applied=hook.get("operations_applied"),
+                    namespace=hook.get("namespace"), process_id=hook.get("pid"),
+                    process_created=hook.get("process_created"),
+                    lifecycle_generation=hook.get("lifecycle_generation"),
+                    request_id=hook.get("request_id"), native_build=hook.get("build_id"),
+                    state_key=getattr(self, "state_key", None),
+                )
+            if special_count:
+                special = link.ensure_progressive_special_weapon(special_count)
+                log_item_event(
+                    "ITEM_NATIVE_OWNER_RECONCILED", domain="special", operation="ensure_ownership",
+                    desired_count=special_count, trigger=trigger, boundary=self.items_processed,
+                    native_outcome=special.get("outcome"), native_flags=special.get("flags"),
+                    operations_applied=special.get("operations_applied"),
+                    namespace=special.get("namespace"), process_id=special.get("pid"),
+                    process_created=special.get("process_created"),
+                    lifecycle_generation=special.get("lifecycle_generation"),
+                    request_id=special.get("request_id"), native_build=special.get("build_id"),
+                    state_key=getattr(self, "state_key", None),
+                )
+        except (RuntimeError, OSError, ValueError) as error:
+            reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
+            log_item_event(
+                "ITEM_NATIVE_OWNER_DEFERRED", reason=reason, detail=str(error), decision="ownership_unchanged",
+                trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
+            )
+
+    def _apply_native_owner_receipt(self, index, item):
+        link = self.native_game_link()
+        if item.item == 7770083:
+            result = link.ensure_meat_hook()
+        else:
+            count = min(3, max(
+                sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),
+                sum(receipt.item == 7770901 for receipt in self.items_received[:index + 1]),
+            ))
+            if not count:
+                raise ValueError("Progressive Special Weapon receipt count is empty")
+            result = link.ensure_progressive_special_weapon(count)
+        if ENABLE_ITEM_NOTIFICATIONS:
+            accepted, description = self.spool_deferred_receipt_notification(item.item, index)
+            if not accepted:
+                raise RuntimeError(f"native ownership confirmed but notification pending: {description}")
+        self._record_processed_receipt(item)
+        self.receipt_session.advance()
+        self.persist_session_state()
+        return result
 
     def _apply_weapon_points_receipt(self, index, item):
         received_item_classification(7770903, item.flags)
@@ -5370,6 +5477,30 @@ class DoomEternalContext(CommonContext):
 
 
     def reconcile_checked_automap_cleanup(self, trigger):
+        if self.server_checked_locations_ready:
+            checked = frozenset(getattr(self, "checked_locations", ()))
+            try:
+                link = self.native_game_link()
+                result = link.publish_checked_locations(checked, time.time_ns())
+                publication = (result.get("pid"), result.get("process_created"),
+                               result.get("lifecycle_generation"), checked)
+                if publication != self._native_automap_published:
+                    log_item_event(
+                        "ITEM_AUTOMAP_SNAPSHOT_ACCEPTED", trigger=trigger, decision="accepted_publication",
+                        snapshot_revision=result.get("revision"), lifecycle_generation=result.get("lifecycle_generation"),
+                        checked_count=len(checked), native_fault=result.get("native_fault"),
+                        namespace=result.get("namespace"), process_id=result.get("pid"),
+                        process_created=result.get("process_created"), request_id=result.get("request_id"),
+                        native_build=result.get("build_id"),
+                        state_key=getattr(self, "state_key", None),
+                    )
+                    self._native_automap_published = publication
+            except (RuntimeError, OSError, ValueError) as error:
+                log_item_event(
+                    "ITEM_AUTOMAP_SNAPSHOT_DEFERRED", trigger=trigger, decision="native_state_unchanged",
+                    reason="native_snapshot_not_accepted", detail=str(error), checked_count=len(checked),
+                    state_key=getattr(self, "state_key", None),
+                )
         return self.checked_visuals.reconcile(
             trigger, map_identity=self.runtime_lifecycle.map_identity,
             room_identity=self.get_ap_state_key(), state_key=self.state_key,

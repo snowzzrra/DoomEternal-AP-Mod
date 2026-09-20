@@ -49,43 +49,48 @@ class SentinelWeaponPoints:
         return result
 
     def _execute(self, amount=0, expected=0):
+        body = struct.pack("<III", int(amount != 0), amount, expected)
+        return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
+
+    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body):
         scope = self._run(["--pid", str(self.pid), "--native", "--json"])
         if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
             raise WeaponPointsBlocked("Native gameplay context is not active")
         request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
-        payload = struct.pack("<QIQ16sQQ16sI", 2048, self.pid,
+        payload = struct.pack("<QIQ16sQQ16sI", capability, self.pid,
                               int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
                               int(scope["lifecycle_generation"]), request_id, nonce, 2000)
-        payload += self.namespace.encode("ascii") + b"\0" + struct.pack("<III", int(amount != 0), amount, expected)
+        payload += self.namespace.encode("ascii") + b"\0" + body
         deadline = time.monotonic() + 5
-        operation = 18
+        operation = submit
         while True:
             message = struct.pack("<IHHII", 0x50494353, 1, operation, len(payload), 0) + payload
-            result = self._run(["--weapon-points"], message)
+            result = self._run([flag], message)
             if (result.get("namespace") != self.namespace or int(result["request_id"]) != request_id
                     or result.get("build_id") != scope.get("build_id")):
                 raise WeaponPointsBlocked("Sentinel response identity changed")
             if result["state"] in (3, 4, 5, 6):
                 # The native result is now consumed. Release only its retained
                 # queue slot; the pre-grant durable receipt intent remains ours.
-                release = struct.pack("<IHHII", 0x50494353, 1, 21, len(payload), 0) + payload
+                release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
                 try:
-                    self._run(["--weapon-points"], release)
+                    self._run([flag], release)
                 except WeaponPointsBlocked:
                     pass  # Default Core retention still expires a lost release.
             if result["state"] == 3:
-                if result["outcome"] not in (1, 2) or not result["flags"] & 16:
-                    raise WeaponPointsBlocked(f"Native WUP execution failed: {result}")
                 return result
             if result["state"] not in (1, 2) or time.monotonic() >= deadline:
                 # Never resubmit on an uncertain result. A future pass observes
                 # saved/native gained against the already durable receipt intent.
                 raise WeaponPointsBlocked(f"Native WUP execution not confirmed: {result}")
-            operation = 19
+            operation = result_operation
             time.sleep(0.025)
 
     def observe(self):
-        return self._execute()
+        result = self._execute()
+        if result["outcome"] not in (1, 2) or not result["flags"] & 16:
+            raise WeaponPointsBlocked(f"Native WUP observation failed: {result}")
+        return result
 
     def admitted_save_root(self):
         """Observe the exact provider admitted for this AP identity; never scan vanilla."""
@@ -99,7 +104,59 @@ class SentinelWeaponPoints:
     def grant_weapon_upgrade_points(self, amount, expected_gained):
         if type(amount) is not int or amount <= 0 or amount > 117:
             raise WeaponPointsBlocked("Invalid WUP amount")
-        return self._execute(amount, expected_gained)
+        result = self._execute(amount, expected_gained)
+        if result["outcome"] not in (1, 2) or not result["flags"] & 16:
+            raise WeaponPointsBlocked(f"Native WUP execution failed: {result}")
+        return result
+
+    def ensure_meat_hook(self):
+        body = struct.pack("<IIIIBBHIB3s", 1, 1 << 8, 0, 0, 0, 0, 0, 0, 0, b"\0\0\0")
+        result = self._execute_typed(16384, "--arsenal", 29, 30, 32, body)
+        if (result["outcome"] not in (0, 1) or result["flags"] & 26 != 26
+                or not result["mods_after"] & (1 << 8)):
+            raise WeaponPointsBlocked(f"Native Meat Hook authorization failed: {result}")
+        return result
+
+    def ensure_progressive_special_weapon(self, count):
+        if type(count) is not int or not 1 <= count <= 3:
+            raise WeaponPointsBlocked("Invalid Progressive Special Weapon count")
+        own_hammer = int(count >= 2)
+        hammer_tier = 2 if count >= 3 else own_hammer
+        body = struct.pack("<IIIIIIIQII", 1, 1, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
+        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
+        required_known = 1 | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
+        if (result["outcome"] not in (0, 1) or result["flags"] & 106 != 106
+                or result["owns_crucible"] != 1 or result["native_crucible"] != 1
+                or result["owns_hammer"] != own_hammer or result["native_hammer"] != own_hammer
+                or result["hammer_tier"] != hammer_tier
+                or (hammer_tier == 2 and result["native_hammer_perks"] < 2)
+                or result["native_state_known"] & required_known != required_known):
+            raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")
+        return result
+
+    def publish_checked_locations(self, checked_locations, revision):
+        if type(revision) is not int or revision <= 0:
+            raise WeaponPointsBlocked("Invalid Automap snapshot revision")
+        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
+        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
+            raise WeaponPointsBlocked("Native gameplay context is not active")
+        bits = [0] * 8
+        for location_id in checked_locations:
+            offset = int(location_id) - 7770000
+            if 0 <= offset < 512:
+                bits[offset // 64] |= 1 << (offset % 64)
+        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
+        payload = struct.pack("<QIQ16sQQ16sI", 262144, self.pid,
+                              int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
+                              int(scope["lifecycle_generation"]), request_id, nonce, 2000)
+        payload += self.namespace.encode("ascii") + b"\0" + struct.pack("<IIQ8Q", 1, 1, revision, *bits)
+        message = struct.pack("<IHHII", 0x50494353, 1, 45, len(payload), 0) + payload
+        result = self._run(["--automap"], message)
+        if (result.get("namespace") != self.namespace or int(result.get("request_id", 0)) != request_id
+                or result.get("build_id") != scope.get("build_id") or result.get("outcome") != 0
+                or result.get("known") != 1 or int(result.get("revision", 0)) != revision):
+            raise WeaponPointsBlocked(f"Native Automap snapshot refused: {result}")
+        return result
 
 
 class WeaponPointReceipts:

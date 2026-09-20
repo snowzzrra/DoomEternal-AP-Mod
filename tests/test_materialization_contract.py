@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from doom_eap.contracts.materialization import MaterializationScope
+from doom_eap.contracts.inventory_domain import InventoryObservation, ItemObservation, MISSING
 from doom_eap.contracts.runtime_context import RuntimeContext
 from doom_eap.runtime.command_spool import CommandSpool
 from doom_eap.runtime.item_reconciliation import effective_ownership, load_policy_registry
@@ -38,19 +39,29 @@ def ownership(item_ids):
     )
 
 
-def test_persistent_plan_is_pure_and_retains_replacement_without_resource_replay(inputs, monkeypatch):
+def missing_special(scope, context):
+    return InventoryObservation(
+        scope.room_seed_name, scope.evidence_epoch, context.identity, context.campaign,
+        {7770901: ItemObservation(7770901, MISSING), 7770145: ItemObservation(7770145, MISSING)},
+    )
+
+
+def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, monkeypatch):
     definitions, policies, context, scope = inputs
     never_replay = tuple(item_id for item_id, policy in policies.items() if policy.policy == "never_replay")
     owned = ownership((7770901, 7770901, 7770145, *never_replay))
     original = copy.deepcopy(definitions)
     monkeypatch.setattr(Path, "read_text", lambda *a, **k: pytest.fail("planner attempted discovery"))
-    plan = compile_materialization_plan(owned, context, scope, definitions, policies, "progressive_special_weapon")
+    observation = missing_special(scope, context)
+    plan = compile_materialization_plan(owned, context, scope, definitions, policies, "progressive_special_weapon",
+                                        observation=observation)
     repeated = compile_materialization_plan(owned, context, replace(scope, manual=True),
-                                            definitions, policies, "progressive_special_weapon")
+                                            definitions, policies, "progressive_special_weapon",
+                                            observation=observation)
     assert plan.reconciliation == repeated.reconciliation
     assert definitions == original
     commands = [intent.command for intent in plan.reconciliation.commands]
-    assert "removeInventoryItem weapon/player/crucible" in commands
+    assert "removeInventoryItem weapon/player/crucible" not in commands
     assert any("hammer/ammo_drops_upgraded" in command for command in commands)
     allowed_persistent = {7770017, 7770088, 7770092, 7770145, 7770146, 7770147, 7770901}
     assert not (set(never_replay) - allowed_persistent) & {c.item_id for c in plan.reconciliation.commands}
@@ -83,7 +94,8 @@ def test_failed_publication_retries_and_disappearance_stays_unverified(inputs, t
     def reconcile():
         return coordinator.reconcile(scope, context, owned, None, definitions, policies,
                                      "progressive_special_weapon", publisher,
-                                     lambda: persisted.append(copy.deepcopy(state)))
+                                     lambda: persisted.append(copy.deepcopy(state)),
+                                     observation=missing_special(scope, context))
 
     failed = reconcile()
     assert failed.error and not failed.complete_transition
@@ -107,7 +119,7 @@ def test_failed_publication_retries_and_disappearance_stays_unverified(inputs, t
         assert coordinator.poll_completion(publisher)
     assert "semantic_state=command_consumed_unverified" in caplog.text
     assert not coordinator.poll_completion(publisher)
-    assert reconcile().plan is None
+    assert reconcile().plan is not None
 
 
 def test_rebind_discards_old_room_completion_and_triggers(inputs):

@@ -41,6 +41,16 @@ def _native_list(field: str, values: list[str]) -> str:
             "\t\t}\n")
 
 
+def _mission_select_transition(block: str) -> str:
+    """Use the native level-transition return path without completing a mission."""
+    for field in ("nextMapName", "checkpointName", "playerSpawnSpot"):
+        block = re.sub(rf"\s*\b{field}\s*=\s*[^;]+;", "", block)
+    block = re.sub(r"\s*\breturnToMainMenu\s*=\s*[^;]+;", "", block)
+    edit = block.index("edit = {")
+    close = find_matching_brace(block, block.index("{", edit))
+    return block[:close] + "\t\treturnToMainMenu = true;\n\t" + block[close:]
+
+
 def project_fortress(text: str, config: dict) -> str:
     """Only the server-derived phase activates cumulative AP content layers.
 
@@ -106,8 +116,5 @@ def project_fortress(text: str, config: dict) -> str:
         end = find_matching_brace(text, text.index("{", start)) + 1
         block = text[start:end]
         if 'class = "idTarget_LevelTransition";' in block:
-            replacement = ('entity {\n\tentityDef ' + match[1] + ' {\n'
-                           '\tclass = "idTarget_Count";\n\texpandInheritance = false;\n'
-                           '\tedit = { count = 1; }\n}\n}')
-            text = text[:start] + replacement + text[end:]
+            text = text[:start] + _mission_select_transition(block) + text[end:]
     return text

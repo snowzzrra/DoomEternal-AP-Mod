@@ -80,8 +80,8 @@
             "name": "Progressive Special Weapon",
             "max_quantity": 3,
             "states": ["none", "crucible", "sentinel_hammer", "sentinel_hammer_upgraded"],
-            "replacement": "derived_highest_state_with_targeted_remove",
-            "selected_representation_only": true,
+            "ownership": "cumulative_native_owner",
+            "selected_representation_only": false,
             "start_inventory_eligible": true,
             "replay": "special_progressive"
         },
