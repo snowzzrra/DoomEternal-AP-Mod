@@ -146,8 +146,8 @@ def test_state_migration_preserves_history_and_safes_malformed_sessions():
 
 def test_legacy_session_migration_is_identity_bound_before_normalization():
     sessions = {
-        "None:0:1": {"processed_items": 7},
-        "None:0:2": {"processed_items": 11},
+        "room-a:0:1": {"processed_items": 7, "campaign_navigation": {"generation": "a" * 64}},
+        "room-a:0:2": {"processed_items": 11},
     }
 
     state_key, migrated_from = migrate_legacy_session_key(
@@ -155,14 +155,15 @@ def test_legacy_session_migration_is_identity_bound_before_normalization():
         seed_name="room-a",
         team=0,
         slot=1,
+        generation="a" * 64,
     )
 
-    assert state_key == "room-a:0:1"
+    assert state_key == "room-a:0:1:" + "a" * 64
     assert state_key is not None
-    assert migrated_from == "None:0:1"
+    assert migrated_from == "room-a:0:1"
     assert sessions[state_key]["processed_items"] == 7
-    assert "None:0:1" not in sessions
-    assert "None:0:2" in sessions
+    assert "room-a:0:1" not in sessions
+    assert "room-a:0:2" in sessions
 
     unchanged = dict(sessions)
     other_key, other_migration = migrate_legacy_session_key(
@@ -170,21 +171,41 @@ def test_legacy_session_migration_is_identity_bound_before_normalization():
         seed_name="room-a",
         team=1,
         slot=1,
+        generation="a" * 64,
     )
-    assert other_key == "room-a:1:1"
+    assert other_key == "room-a:1:1:" + "a" * 64
     assert other_migration is None
     assert sessions == unchanged
 
-    malformed = {"None:0:3": "malformed"}
+    malformed = {"room-a:0:3": "malformed"}
     malformed_key, malformed_from = migrate_legacy_session_key(
         malformed,
         seed_name="room-a",
         team=0,
         slot=3,
+        generation="a" * 64,
     )
-    assert malformed_from == "None:0:3"
+    assert malformed_from is None
     assert malformed_key is not None
-    assert normalize_session_state(cast(Any, malformed[malformed_key]))["processed_items"] == 0
+    assert malformed_key not in malformed
+
+
+def test_generation_identity_never_adopts_another_campaign_session():
+    sessions = {
+        "room-a:0:1": {
+            "processed_items": 31,
+            "campaign_navigation": {"generation": "b" * 64},
+        },
+    }
+
+    state_key, migrated_from = migrate_legacy_session_key(
+        sessions, seed_name="room-a", team=0, slot=1, generation="a" * 64,
+    )
+
+    assert state_key == "room-a:0:1:" + "a" * 64
+    assert migrated_from is None
+    assert sessions["room-a:0:1"]["processed_items"] == 31
+    assert state_key not in sessions
 
 
 def test_never_replay_has_zero_commands():

@@ -678,8 +678,9 @@ def migrate_legacy_session_key(
     seed_name: Any,
     team: Any,
     slot: Any,
+    generation: Any,
 ) -> tuple[str | None, str | None]:
-    """Move one v1 seed-less session only into matching current identity."""
+    """Move a pre-generation session only when its navigation proves the generation."""
     if (
         not isinstance(sessions, dict)
         or not isinstance(seed_name, str)
@@ -690,12 +691,19 @@ def migrate_legacy_session_key(
         or isinstance(slot, bool)
         or not isinstance(slot, int)
         or slot < 0
+        or not isinstance(generation, str)
+        or re.fullmatch(r"[0-9a-f]{64}", generation) is None
     ):
         return None, None
 
-    state_key = f"{seed_name}:{team}:{slot}"
-    legacy_key = f"None:{team}:{slot}"
-    if state_key not in sessions and legacy_key in sessions:
+    state_key = f"{seed_name}:{team}:{slot}:{generation}"
+    legacy_key = f"{seed_name}:{team}:{slot}"
+    legacy_session = sessions.get(legacy_key)
+    if (
+        state_key not in sessions
+        and isinstance(legacy_session, dict)
+        and legacy_session.get("campaign_navigation", {}).get("generation") == generation
+    ):
         sessions[state_key] = sessions.pop(legacy_key)
         return state_key, legacy_key
     return state_key, None

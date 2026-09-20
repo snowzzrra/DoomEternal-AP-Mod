@@ -3218,18 +3218,6 @@ class DoomEternalContext(CommonContext):
         elif cmd == "Connected":
             self._room_session_established = True
             self._launcher_connection_loss_reported = False
-            previous_state_key = self.state_key
-            self.initialize_item_state()
-            if previous_state_key and previous_state_key != self.state_key:
-                abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
-                discard_queued_coalesced_command(
-                    DEATHLINK_KILL_COALESCE_KEY, previous_state_key
-                )
-                if abandoned:
-                    logger.warning(
-                        "[DeathLink] Cleared room-bound receive events after slot change: %s.",
-                        ", ".join(event_id[:12] for event_id in abandoned),
-                    )
             slot_data = args.get("slot_data", {})
             if not isinstance(slot_data, dict):
                 slot_data = {}
@@ -3245,7 +3233,27 @@ class DoomEternalContext(CommonContext):
                 )
                 return
             self._connected_slot_data = slot_data
-            self.unified_campaign = UnifiedCampaign(slot_data, self.session_state, self.persist_session_state)
+            previous_state_key = self.state_key
+            self.initialize_item_state(slot_data)
+            if previous_state_key and previous_state_key != self.state_key:
+                abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
+                discard_queued_coalesced_command(
+                    DEATHLINK_KILL_COALESCE_KEY, previous_state_key
+                )
+                if abandoned:
+                    logger.warning(
+                        "[DeathLink] Cleared room-bound receive events after slot change: %s.",
+                        ", ".join(event_id[:12] for event_id in abandoned),
+                    )
+            try:
+                self.unified_campaign = UnifiedCampaign(slot_data, self.session_state, self.persist_session_state)
+            except ValueError as error:
+                message = f"Estado local incompatível com a campanha: {error}"
+                logger.error("[State] Connected campaign rejected: %s", error)
+                self._report_launcher_connection_failure(
+                    message, code="campaign_state_incompatible", technical_message=message,
+                )
+                return
             self.goals.connected(self.persist_session_state)
             self._refresh_runtime_context(slot_data)
             self.deathlink.configure(slot_data.get("death_link", False))
@@ -4555,9 +4563,7 @@ class DoomEternalContext(CommonContext):
         team = getattr(self, "team", 0)
         slot = getattr(self, "slot", 0)
         auth = str(self.auth or "unknown_auth")
-        # Bridge builds share one durable AP session. Runtime revision belongs
-        # in diagnostics, not receipt-session identity.
-        return f"{effective_seed_name}:{team}:{slot}:{auth}"
+        return self.state_key
 
     def migrate_revision_bound_session(self, sessions, state_key):
         """Adopt one pre-stable revision-bound session without trusting it blindly."""
@@ -4654,13 +4660,14 @@ class DoomEternalContext(CommonContext):
                 reason=reason,
             )
 
-    def initialize_item_state(self):
+    def initialize_item_state(self, slot_data):
         self.reset_queue_session_authority("initialize_item_state")
         initialization_boundary_before = getattr(self, "items_processed", 0)
         previous_state_key = self.state_key
         self.receipt_session.begin_rebind()
         self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
+        generation = slot_data.get("native_generation_fingerprint") if isinstance(slot_data, dict) else None
         if (
             not isinstance(effective_seed_name, str)
             or not re.fullmatch(r"[A-Za-z0-9_.-]+", effective_seed_name)
@@ -4670,6 +4677,8 @@ class DoomEternalContext(CommonContext):
             or isinstance(self.slot, bool)
             or not isinstance(self.slot, int)
             or self.slot < 0
+            or not isinstance(generation, str)
+            or re.fullmatch(r"[0-9a-f]{64}", generation) is None
         ):
             logger.warning(
                 "[State] Slot identity incomplete or unsafe; refusing session state reuse."
@@ -4697,6 +4706,7 @@ class DoomEternalContext(CommonContext):
             seed_name=effective_seed_name,
             team=self.team,
             slot=self.slot,
+            generation=generation,
         )
         if previous_state_key != self.state_key:
             self.receipt_session.clear_packet_ranges()

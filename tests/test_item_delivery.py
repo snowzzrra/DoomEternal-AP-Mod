@@ -617,7 +617,7 @@ async def test_launcher_hints_follow_canonical_storage_package_order(monkeypatch
     sent = []
     monkeypatch.setattr(bridge, "emit_launcher_event", lambda event_type, **payload: emitted.append((event_type, payload)))
     context.state_key = None
-    context.initialize_item_state = lambda: None
+    context.initialize_item_state = lambda _slot_data: None
     context.onboard_bootstrap = lambda _reason: None
     context.reconcile_checked_automap_cleanup = lambda _reason: None
     context.reconcile_fast_travel_unlock = lambda _reason: None

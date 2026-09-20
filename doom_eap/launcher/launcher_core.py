@@ -58,6 +58,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "physical_options_v1",
     "room_options_v1",
     "cross_campaign_materialization_v1",
+    "deathlink_mode_v1",
 })
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,

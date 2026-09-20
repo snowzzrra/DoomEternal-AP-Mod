@@ -9,8 +9,6 @@ from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_
 VISITS = ("from_e1m1", "from_e1m2", "from_e1m4", "from_e2m1",
           "from_e2m2", "from_e2m4", "from_e3m1")
 
-# Common circulation only. The battery-room reward doors keep their own
-# stations and costs; these native actions never grant inventory or AP checks.
 CIRCULATION_ACTIONS = (
     "main_deck_target_interact_action_unlock_door_1",
     "main_deck_target_interact_action_unlock_door_2",
@@ -84,9 +82,6 @@ def project_fortress(text: str, config: dict) -> str:
                        '\t\tentities = { num = 0; }\n\t}\n}\n}\n')
         text = text[:start] + replacement + text[end:]
 
-    # Reuse the engine's native layer primitive, not a console map loader.
-    # Each command selects scenery and adds all earned content layers; it never
-    # removes earlier AP layers or manufactures a check/inventory grant.
     all_scenery = [f"game/sp/hub/{visit}" for visit in (*VISITS, "from_e3m4", "from_e1m2_post_prison")]
     skies = [f"game/sp/hub/sky_{sky}" for sky in ("earth", "sentinel", "phobos")]
     for phase in range(8):
@@ -106,7 +101,6 @@ def project_fortress(text: str, config: dict) -> str:
                  '\t\tcount = 1;\n\t\treuseable = true;\n' + _native_list("targets", targets) +
                  '\t}\n}\n}\n')
 
-    # Story transitions must not launch the next Base mission behind AP policy.
     for match in reversed(list(re.finditer(r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{", text))):
         start = match.start()
         end = find_matching_brace(text, text.index("{", start)) + 1
