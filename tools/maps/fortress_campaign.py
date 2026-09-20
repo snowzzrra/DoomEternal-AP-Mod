@@ -55,7 +55,7 @@ def project_fortress(text: str, config: dict) -> str:
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
-        entities = [source, f"ap_independent_{source}", f"ap_location_visual_{code}",
+        entities = [source, f"ap_location_visual_{code}",
                     f"ap_automap_location_{code}", f"ap_remove_location_visual_{code}",
                     f"ap_hide_location_visual_{code}"]
         if source in {f"interact_hub_2_battery_station_{i}" for i in (1, 2, 3)}:
@@ -96,7 +96,7 @@ def project_fortress(text: str, config: dict) -> str:
         remove = [layer for layer in all_scenery + skies if layer not in active]
         text += ('\nentity {\n\tentityDef ap_fortress_layers_' + str(phase) + ' {\n'
                  '\tclass = "idTarget_LayerStateChange";\n\texpandInheritance = false;\n\tedit = {\n' +
-                 _native_list("activate_Immediately", active + content_layers(phase)) +
+                 _native_list("activate_Immediately", active + content_layers(max(1, phase))) +
                  _native_list("remove_Immediately", remove) + '\t}\n}\n}\n')
         targets = [f"ap_fortress_layers_{phase}", *sorted(clear_objectives), *CIRCULATION_ACTIONS]
         if phase == 7:

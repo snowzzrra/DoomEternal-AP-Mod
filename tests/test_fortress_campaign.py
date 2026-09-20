@@ -4,7 +4,10 @@ from pathlib import Path
 import re
 import unittest
 
-from tools.maps.ap_map_generator import find_entity_block_bounds
+from tools.maps.ap_map_generator import (
+    find_entity_block_bounds,
+    generate_independent_pickup_trigger,
+)
 from tools.maps.fortress_campaign import project_fortress
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +71,35 @@ class FortressCampaign(unittest.TestCase):
             self.assertNotIn('game/sp/hub/from_', block)
             for current in range(8):
                 layers = entity(self.result, f'ap_fortress_layers_{current}')
-                self.assertEqual(f'"game/sp/hub/ap_phase_{phase}"' in layers, current >= phase)
+                # The native first visit is the initial Hub materialization, so
+                # First Visit content rides with ap_fortress_layers_0. Later
+                # visits keep their own thresholds (Second Visit stays at 2+).
+                expected = current >= phase or (phase == 1 and current == 0)
+                self.assertEqual(f'"game/sp/hub/ap_phase_{phase}"' in layers, expected)
+
+    def test_first_visit_content_active_on_initial_materialization(self):
+        layers_0 = entity(self.result, 'ap_fortress_layers_0')
+        self.assertIn('"game/sp/hub/ap_phase_1"', layers_0)
+        self.assertNotIn('"game/sp/hub/ap_phase_2"', layers_0)
+        layers_1 = entity(self.result, 'ap_fortress_layers_1')
+        self.assertIn('"game/sp/hub/ap_phase_1"', layers_1)
+        self.assertNotIn('"game/sp/hub/ap_phase_2"', layers_1)
+
+    def test_physical_triggers_preserve_native_visit_layer_contract(self):
+        for source, ap_check in (
+            ('pickup_equipment_flame_belch_1', 'AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1'),
+            ('progress_argent_cell_1_1072112848', 'AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848'),
+        ):
+            trigger = generate_independent_pickup_trigger(
+                source, ap_check, entity(self.vanilla, source)
+            )
+            result = project_fortress(self.vanilla + trigger, self.config)
+            physical = entity(result, f'ap_independent_{source}')
+            self.assertEqual(physical, entity(trigger, f'ap_independent_{source}'))
+            self.assertIn('inherit = "trigger/trigger";', physical)
+            self.assertIn('class = "idTrigger";', physical)
+            self.assertIn('triggerOnce = true;', physical)
+            self.assertIn('type = "CLIPMODEL_BOX";', physical)
 
     def test_suit_room_barriers_remain_present_before_reward_visit(self):
         for index in (1, 2, 3):
