@@ -4882,7 +4882,8 @@ class DoomEternalContext(CommonContext):
         default_probe = (APPLICATION_DIR / "sentinel_probe.exe" if getattr(sys, "frozen", False)
                          else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
         probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
-        return SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace)
+        return SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace,
+                                   diagnostic=lambda evidence: log_item_event("ITEM_NATIVE_PROBE_RESPONSE", **evidence))
 
     def weapon_points_receipt_owner(self):
         from doom_eap.runtime.weapon_points import WeaponPointReceipts
@@ -4906,6 +4907,8 @@ class DoomEternalContext(CommonContext):
             try:
                 link = self.native_game_link()
                 result = link.ensure_meat_hook() if domain == "arsenal" else link.ensure_progressive_special_weapon(desired)
+                if domain == "special":
+                    self._synchronize_special_preference(link, result)
                 log_item_event(
                     "ITEM_NATIVE_OWNER_RECONCILED", domain=domain, trigger=trigger,
                     desired_count=int(desired), boundary=self.items_processed,
@@ -4920,9 +4923,28 @@ class DoomEternalContext(CommonContext):
                 reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
                 log_item_event(
                     "ITEM_NATIVE_OWNER_DEFERRED", domain=domain, reason=reason, detail=str(error),
-                    decision="ownership_unchanged", ownership="AP_OWNED", authorization="UNCONFIRMED",
+                    decision="native_effect_unconfirmed", ownership="AP_OWNED", authorization="UNCONFIRMED",
                     trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
                 )
+
+    def _synchronize_special_preference(self, link, result):
+        if not result.get("flags", 0) & 4096 or not result.get("native_state_known", 0) & 8:
+            return
+        preferences = config.setdefault("special_selection", {})
+        if not isinstance(preferences, dict):
+            raise ValueError("special_selection configuration must be a namespace mapping")
+        process = (doom_process_identity(), link.namespace)
+        if getattr(self, "_special_preference_process", None) != process:
+            saved = preferences.get(link.namespace)
+            if type(saved) is int and saved in (1, 2) and saved != result["native_selected"]:
+                result = link.select_special_weapon(saved)
+            self._special_preference_process = process
+        selected = result["native_selected"]
+        if selected in (1, 2) and preferences.get(link.namespace) != selected:
+            preferences[link.namespace] = selected
+            save_config()
+            log_item_event("ITEM_SPECIAL_PREFERENCE_SAVED", namespace=link.namespace,
+                           selected=selected, source="core_policy", config_path=str(CONFIG_FILE))
 
     def _apply_native_owner_receipt(self, index, item):
         link = self.native_game_link()
@@ -5483,7 +5505,7 @@ class DoomEternalContext(CommonContext):
                     self._native_automap_published = publication
             except (RuntimeError, OSError, ValueError) as error:
                 log_item_event(
-                    "ITEM_AUTOMAP_SNAPSHOT_DEFERRED", trigger=trigger, decision="native_state_unchanged",
+                    "ITEM_AUTOMAP_SNAPSHOT_DEFERRED", trigger=trigger, decision="publication_unconfirmed",
                     reason="native_snapshot_not_accepted", detail=str(error), checked_count=len(checked),
                     state_key=getattr(self, "state_key", None),
                 )

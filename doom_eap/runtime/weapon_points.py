@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import secrets
 import struct
 import subprocess
@@ -32,20 +33,34 @@ def namespace_id(seed: str, team: int, slot: int, fingerprint: str) -> str:
 
 class SentinelWeaponPoints:
     """Uses the existing process-authenticated inspection transport and queue."""
-    def __init__(self, probe: Path, pid: int, namespace: str):
-        self.probe, self.pid, self.namespace = probe, pid, namespace
+    def __init__(self, probe: Path, pid: int, namespace: str, diagnostic=None):
+        self.probe, self.pid, self.namespace = probe.resolve(), pid, namespace
+        self.diagnostic = diagnostic
 
     def _run(self, args, payload=None):
+        evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
+                    "cwd": os.getcwd(), "stage": args[2] if args[0] == "--pid" else args[0],
+                    "operation": struct.unpack_from("<H", payload, 6)[0] if payload else None}
         try:
+            evidence["sha256"] = hashlib.sha256(self.probe.read_bytes()).hexdigest()
             process = subprocess.run([str(self.probe), *args], input=payload,
                                      capture_output=True, timeout=4, check=False)
+            evidence.update(returncode=process.returncode,
+                            stdout=process.stdout.decode("utf-8", errors="replace"),
+                            stderr=process.stderr.decode("utf-8", errors="replace"))
             result = json.loads(process.stdout)
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            evidence.update(predicate="transport_or_json", error=str(error))
+            if self.diagnostic:
+                self.diagnostic(evidence)
             raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
-        if process.returncode or result.get("result") != "ok":
-            raise WeaponPointsBlocked(f"Sentinel refused: {result}")
-        if result.get("core_version") != "0.8.0":
-            raise WeaponPointsBlocked("Weapon Points require the Core 0.8.0 candidate")
+        predicate = ("exit_or_result" if process.returncode or result.get("result") != "ok"
+                     else "core_version_equals_0.8.0" if result.get("core_version") != "0.8.0" else None)
+        evidence["predicate"] = predicate
+        if self.diagnostic:
+            self.diagnostic(evidence)
+        if predicate:
+            raise WeaponPointsBlocked(f"Sentinel response validation failed: {json.dumps(evidence)}")
         return result
 
     def _execute(self, amount=0, expected=0):
@@ -138,13 +153,29 @@ class SentinelWeaponPoints:
         body = struct.pack("<IIIIIIIQII", 1, 1, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
         result = self._execute_typed(65536, "--special", 37, 38, 40, body)
         required_known = 1 | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
-        if (result["outcome"] not in (0, 1) or result["flags"] & 106 != 106
+        if (result["outcome"] not in (0, 1) or result["flags"] & 98 != 98
                 or result["owns_crucible"] != 1 or result["native_crucible"] != 1
                 or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
                 or result["hammer_tier"] < hammer_tier
                 or (hammer_tier == 2 and result["native_hammer_perks"] < 2)
                 or result["native_state_known"] & required_known != required_known):
             raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")
+        # NOOP performs no native mutation, independently of selection knowledge.
+        # A mutating acquisition still requires its preservation postconditions.
+        if ((result["outcome"] == 1 and result["flags"] & 4)
+                or (result["outcome"] == 0 and (result["flags"] & 8 != 8
+                    or (result["flags"] & 4096 and not result["flags"] & 8192)))):
+            raise WeaponPointsBlocked(f"Native Special ownership confirmed; preservation unconfirmed: {result}")
+        return result
+
+    def select_special_weapon(self, selected):
+        if type(selected) is not int or selected not in (1, 2):
+            raise WeaponPointsBlocked("Invalid Special selection")
+        body = struct.pack("<IIIIIIIQII", 2, 0, 0, 0, selected, 0, 0, 0, 0, 0)
+        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
+        if (result["outcome"] not in (0, 1) or not result["flags"] & 4096
+                or not result["native_state_known"] & 8 or result["native_selected"] != selected):
+            raise WeaponPointsBlocked(f"Special route selection unconfirmed: {result}")
         return result
 
     def publish_checked_locations(self, checked_locations, revision):

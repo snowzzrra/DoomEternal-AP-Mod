@@ -1661,9 +1661,9 @@ def build_universal_physical_policy(
             "entity_name": visual_name,
             "class": "idProp2",
             "inherit": None,
-            "automap_properties_decl": policy.get(
-                "independent_automap_properties_decl", "default"
-            ),
+            # A non-inherited visual has no automap DECL; the persistent idInfo
+            # helper owns the marker independently of model removal.
+            "automap_properties_decl": None,
             "model": visual_model,
             "thinkComponentDecl": policy.get("thinkComponentDecl", "bob_rotate_slow"),
             "position": position,

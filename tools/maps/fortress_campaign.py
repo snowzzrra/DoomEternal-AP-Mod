@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from doom_eap.content.content_catalog import load_content_catalog
-from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace
+from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace, replace_targets_block
 
 VISITS = ("from_e1m1", "from_e1m2", "from_e1m4", "from_e2m1",
           "from_e2m2", "from_e2m4", "from_e3m1")
@@ -50,7 +50,7 @@ def _mission_select_transition(name: str) -> str:
 
 
 def _mission_select_action(text: str) -> str:
-    """Clone Hub's authored portal action so its native interaction contract stays exact."""
+    """Dispatch the native mission_idle/mission_usable transition to mission_used."""
     bounds = find_entity_block_bounds(text, "target_interact_action_portal_usable")
     if bounds is None:
         raise ValueError("Fortress portal interaction action is missing")
@@ -59,7 +59,36 @@ def _mission_select_action(text: str) -> str:
     action = action.replace("interact_hub_portal_console", "interact_hub_mission_select_1", 1)
     if action == source or 'action = "IA_ACTIVATE_ANY";' not in action:
         raise ValueError("Fortress portal interaction action is not qualified")
-    return action
+    return action.replace('action = "IA_ACTIVATE_ANY";', 'action = "IA_USE_SUCCEED";', 1)
+
+
+def _portal_navigation(text: str) -> str:
+    """Use the reusable native console graph at the existing portal interaction."""
+    portal_bounds = find_entity_block_bounds(text, "interact_hub_portal_console")
+    menu_bounds = find_entity_block_bounds(text, "interact_hub_mission_select_1")
+    if portal_bounds is None or menu_bounds is None:
+        raise ValueError("Fortress navigation interaction sources are missing")
+    portal, menu = text[slice(*portal_bounds)], text[slice(*menu_bounds)]
+    components = []
+    for block in (portal, menu):
+        match = re.search(r"\binteraction\s*=\s*\{", block)
+        if match is None:
+            raise ValueError("Fortress navigation interaction component is missing")
+        components.append((match.start(), find_matching_brace(block, block.index("{", match.start()))))
+    interaction = menu[slice(*components[1])]
+    interaction = interaction.replace('openMenu = "HUD_MENU_GAME_MISSION_SELECT";', "", 1)
+    interaction = interaction.replace('initalState = "interactables/console/mission_console/mission_idle";',
+                                      'initalState = "interactables/console/mission_console/mission_activate";', 1)
+    portal = portal[:components[0][0]] + interaction + portal[components[0][1]:]
+    portal = replace_targets_block(portal, ["ap_fortress_navigation_relay"])
+    portal = portal.replace('class = "idInteractable_Obstacle";', 'class = "idInteractable";', 1)
+    portal = portal.replace('inherit = "interact/hub/portal_console_stairs";',
+                            'inherit = "interact/hub/mission_select";', 1)
+    portal = portal.replace('whenToSave = "SGT_NO_SAVE";',
+                            'whenToSave = "SGT_NO_SAVE";\n\t\tactivateTargetsOnUse = false;\n'
+                            '\t\tactivateTargetsOnEndInteraction = true;\n\t\tonUseCodexEntry = "";', 1)
+    return (text[:portal_bounds[0]] + portal + text[portal_bounds[1]:] + "\n" +
+            _mission_select_transition("ap_fortress_navigation_relay"))
 
 
 def project_fortress(text: str, config: dict) -> str:
@@ -74,6 +103,9 @@ def project_fortress(text: str, config: dict) -> str:
     if find_entity_block_bounds(text, "interact_hub_mission_select_1") is None:
         raise ValueError("Fortress Mission Select interactable is missing")
     mission_select_action = _mission_select_action(text)
+    mission_select_enable = mission_select_action.replace("ap_fortress_mission_select", "ap_fortress_mission_select_enable", 1)
+    mission_select_enable = mission_select_enable.replace('action = "IA_USE_SUCCEED";', 'action = "IA_ACTIVATE_ANY";', 1)
+    text = _portal_navigation(text)
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
@@ -105,7 +137,6 @@ def project_fortress(text: str, config: dict) -> str:
                       '\texpandInheritance = false;\n\tedit = {\n' +
                       _native_list("targets", [alias]) + '\t}\n}\n}')
             text = text[:start] + hidden + _layer(relay, layer) + _layer(remove, layer) + text[end:]
-    clear_objectives = []
     pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
     for match in reversed(list(re.finditer(pattern, text))):
         start = match.start()
@@ -116,7 +147,6 @@ def project_fortress(text: str, config: dict) -> str:
         objective = re.search(r'\bdecl = "(objective/hub/[^"]+)";', block)
         if objective is None:
             raise ValueError(f"Unrecognized Fortress story objective: {match[1]}")
-        clear_objectives.append(match[1])
         replacement = ('entity {\n\tentityDef ' + match[1] + ' {\n'
                        '\tclass = "idTarget_Objective_Complete";\n\texpandInheritance = false;\n'
                        '\tedit = {\n\t\tobjective = "' + objective[1] + '";\n'
@@ -135,7 +165,8 @@ def project_fortress(text: str, config: dict) -> str:
                  '\tclass = "idTarget_LayerStateChange";\n\texpandInheritance = false;\n\tedit = {\n' +
                  _native_list("activate_Immediately", active + content_layers(max(1, phase))) +
                  _native_list("remove_Immediately", remove) + '\t}\n}\n}\n')
-        targets = [f"ap_fortress_layers_{phase}", *sorted(clear_objectives), *CIRCULATION_ACTIONS]
+        targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,
+                   "target_interact_action_portal_usable", "ap_fortress_mission_select_enable"]
         if phase == 7:
             targets.append("target_show_engine_room_secret")
         text += ('entity {\n\tentityDef ap_fortress_phase_' + str(phase) + ' {\n'
@@ -149,4 +180,4 @@ def project_fortress(text: str, config: dict) -> str:
         block = text[start:end]
         if 'class = "idTarget_LevelTransition";' in block:
             text = text[:start] + _mission_select_transition(match[1]) + text[end:]
-    return text + "\n" + mission_select_action
+    return text + "\n" + mission_select_action + "\n" + mission_select_enable
