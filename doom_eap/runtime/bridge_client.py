@@ -2247,12 +2247,50 @@ def parse_goal_transition_event(path, include_raw=False):
 
 
 def log_mission_bridge_identity():
+    from doom_eap.runtime import weapon_points
+
+    executable = Path(sys.executable).resolve()
+    try:
+        executable_sha256 = hashlib.sha256(executable.read_bytes()).hexdigest()
+    except OSError as error:
+        executable_sha256 = f"unavailable:{type(error).__name__}"
     logger.info("BRIDGE_REVISION=%s", BRIDGE_REVISION)
     logger.info("BRIDGE_FILE=%s", BRIDGE_FILE)
     logger.info("BRIDGE_SHA256=%s", BRIDGE_SHA256)
+    logger.info("BRIDGE_EXECUTABLE_SHA256=%s", executable_sha256)
     logger.info("BRIDGE_PROTOCOL=%s", BRIDGE_PROTOCOL)
     logger.info("GAME_NAME=%s", GAME_NAME)
     logger.info("TRANSITION_HANDLER=%s", TRANSITION_HANDLER)
+    log_item_event(
+        "ITEM_WORKER_RUNTIME_IDENTITY",
+        frozen=bool(getattr(sys, "frozen", False)),
+        executable=str(executable),
+        executable_sha256=executable_sha256,
+        application_dir=str(APPLICATION_DIR),
+        modules={
+            __name__: {
+                "origin": __spec__.origin if __spec__ else None,
+                "loader": type(__loader__).__name__,
+                "methods": {
+                    name: hashlib.sha256(getattr(DoomEternalContext, name).__code__.co_code).hexdigest()
+                    for name in (
+                        "process_pending_item_receipts",
+                        "native_game_link",
+                        "_reconcile_native_receipt_owners",
+                    )
+                },
+            },
+            weapon_points.__name__: {
+                "origin": weapon_points.__spec__.origin if weapon_points.__spec__ else None,
+                "loader": type(weapon_points.__loader__).__name__,
+                "methods": {
+                    "SentinelWeaponPoints._run": hashlib.sha256(
+                        weapon_points.SentinelWeaponPoints._run.__code__.co_code
+                    ).hexdigest(),
+                },
+            },
+        },
+    )
 
 
 def cleanup_telemetry_dumps():
@@ -4895,10 +4933,25 @@ class DoomEternalContext(CommonContext):
     def _reconcile_native_receipt_owners(self, trigger):
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)
+        starting_special_count = sum(
+            fact.quantity for fact in self.receipt_session.starting_materialization
+            if fact.item_id == 7770901
+        )
         special_count = min(3, max(
-            sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),
+            starting_special_count,
             sum(item.item == 7770901 for item in authoritative),
         ))
+        log_item_event(
+            "ITEM_NATIVE_OWNER_PLAN",
+            trigger=trigger,
+            boundary=self.items_processed,
+            received_count=len(self.items_received),
+            authoritative_count=len(authoritative),
+            hook_owned=hook_owned,
+            special_count=special_count,
+            starting_special_count=starting_special_count,
+            state_key=getattr(self, "state_key", None),
+        )
         if not hook_owned and not special_count:
             return
         for domain, desired in (("arsenal", hook_owned), ("special", special_count)):
