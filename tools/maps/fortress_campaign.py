@@ -76,19 +76,17 @@ def _portal_navigation(text: str) -> str:
             raise ValueError("Fortress navigation interaction component is missing")
         components.append((match.start(), find_matching_brace(block, block.index("{", match.start()))))
     interaction = menu[slice(*components[1])]
-    interaction = interaction.replace('openMenu = "HUD_MENU_GAME_MISSION_SELECT";', "", 1)
     interaction = interaction.replace('initalState = "interactables/console/mission_console/mission_idle";',
                                       'initalState = "interactables/console/mission_console/mission_activate";', 1)
     portal = portal[:components[0][0]] + interaction + portal[components[0][1]:]
-    portal = replace_targets_block(portal, ["ap_fortress_navigation_relay"])
+    portal = replace_targets_block(portal, [])
     portal = portal.replace('class = "idInteractable_Obstacle";', 'class = "idInteractable";', 1)
     portal = portal.replace('inherit = "interact/hub/portal_console_stairs";',
                             'inherit = "interact/hub/mission_select";', 1)
     portal = portal.replace('whenToSave = "SGT_NO_SAVE";',
                             'whenToSave = "SGT_NO_SAVE";\n\t\tactivateTargetsOnUse = false;\n'
                             '\t\tactivateTargetsOnEndInteraction = true;\n\t\tonUseCodexEntry = "";', 1)
-    return (text[:portal_bounds[0]] + portal + text[portal_bounds[1]:] + "\n" +
-            _mission_select_transition("ap_fortress_navigation_relay"))
+    return text[:portal_bounds[0]] + portal + text[portal_bounds[1]:]
 
 
 def project_fortress(text: str, config: dict) -> str:
