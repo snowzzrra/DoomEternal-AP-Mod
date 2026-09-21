@@ -110,5 +110,21 @@ class FortressCampaign(unittest.TestCase):
             self.assertIn('collisionPieces = {', block)
             self.assertIn('initalState = "interactables/progress/battery_station/2_battery_required";', block)
 
+    def test_story_transitions_activate_the_authored_mission_select(self):
+        transitions = re.findall(
+            r'entityDef\s+(\w+)\s*\{[^{}]*?class = "idTarget_LevelTransition";',
+            self.vanilla,
+        )
+        self.assertTrue(transitions)
+        action = entity(self.result, 'ap_fortress_mission_select')
+        self.assertIn('inherit = "target/interact_action";', action)
+        self.assertIn('class = "idTarget_InteractionAction";', action)
+        self.assertIn('item[0] = "interact_hub_mission_select_1";', action)
+        self.assertIn('action = "IA_ACTIVATE_ANY";', action)
+        for name in transitions:
+            block = entity(self.result, name)
+            self.assertIn('class = "idTarget_Count";', block)
+            self.assertIn('item[0] = "ap_fortress_mission_select";', block)
+
 if __name__ == '__main__':
     unittest.main()

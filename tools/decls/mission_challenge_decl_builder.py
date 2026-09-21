@@ -242,19 +242,11 @@ def _plan_b_registration_contracts(registry: dict) -> tuple[dict, ...]:
         contract = contracts_by_mission.get(plan["mission_key"])
         if contract is None:
             raise ValueError(f"{plan['label']} Mission Challenge registration contract is missing")
-        mission_key = plan["mission_key"]
-        if mission_key == "e3m2_hell":
-            if len(contract["unlockables"]) != 2:
-                raise ValueError(
-                    f"{plan['label']} must retain exactly two active AP challenge children"
-                )
-            real_challenges = ("mission_challenge/e3m2/challenge_1", *contract["unlockables"])
-        else:
-            if len(contract["unlockables"]) != 3:
-                raise ValueError(
-                    f"{plan['label']} must retain exactly three real AP challenge children"
-                )
-            real_challenges = contract["unlockables"]
+        if len(contract["unlockables"]) != 3:
+            raise ValueError(
+                f"{plan['label']} must retain exactly three real AP challenge children"
+            )
+        real_challenges = contract["unlockables"]
         contracts.append({**contract, "plan": plan, "real_challenges": real_challenges})
     return tuple(contracts)
 
@@ -316,48 +308,10 @@ def _assert_dummy_candidate(plan: dict) -> None:
         )
 
 
-def _append_dummy_to_registration(
-    block: str,
-    expected: tuple[str, ...],
-    dummy_path: str,
-    label: str,
-) -> str:
-    challenge_match = re.search(r"\bchallenges\s*=\s*\{", block)
-    if challenge_match is None:
-        raise ValueError(f"{label} canonical registration has no challenges block")
-    challenge_end = _block_end(block, challenge_match.start())
-    challenge_block = block[challenge_match.start():challenge_end]
-    if len(re.findall(r"\bnum\s*=\s*3\s*;", challenge_block)) != 1:
-        raise ValueError(f"{label} canonical challenge count is not exactly three")
-    item_matches = list(re.finditer(
-        r'(?m)^(\s*)item\[(\d+)\]\s*=\s*"([^"]+)";',
-        challenge_block,
-    ))
-    if [int(match.group(2)) for match in item_matches] != [0, 1, 2]:
-        raise ValueError(f"{label} canonical challenge indexes drifted")
-    if tuple(match.group(3) for match in item_matches) != expected:
-        raise ValueError(f"{label} canonical real challenge order drifted")
-    item_indent = item_matches[-1].group(1)
-    close_indent = re.search(r"(?m)^(\s*)\}\s*$", challenge_block)
-    if close_indent is None:
-        raise ValueError(f"{label} canonical challenges block has no closing indentation")
-    patched_challenges = re.sub(
-        r"(\bnum\s*=\s*)3(\s*;)", r"\g<1>4\g<2>", challenge_block, count=1
-    )
-    close = patched_challenges.rfind("}")
-    patched_challenges = (
-        patched_challenges[:close].rstrip()
-        + f'\n{item_indent}item[3] = "{dummy_path}";\n'
-        + close_indent.group(1)
-        + patched_challenges[close:]
-    )
-    replacement = block.replace(challenge_block, patched_challenges, 1)
-    if _challenge_paths(replacement) != (*expected, dummy_path):
-        raise ValueError(f"{label} dummy registration patch failed")
-    return replacement
-
-
 def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]]:
+    # The native owner suppresses only the automatic Battery mutation. Keep the
+    # canonical three-child registration intact; a fourth entry violates the
+    # engine-owned array contract before gameplay starts.
     source = _source(
         AGGREGATE_SOURCE_OWNER,
         AGGREGATE_LIST_PATH,
@@ -379,33 +333,18 @@ def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]
                 f"{contract['name']}: canonical registration count is {len(matches)}"
             )
         level_index, block = matches[0]
-        replacement = _append_dummy_to_registration(
-            block, expected, plan["dummy_path"], plan["label"]
-        )
+        replacement = block
+        if _challenge_paths(replacement) != expected:
+            raise ValueError(
+                f"{plan['label']} canonical registration drift during native cutover"
+            )
         source = source.replace(block, replacement, 1)
         audited_contracts.append({
             **{key: value for key, value in contract.items() if key != "plan"},
             "level_index": level_index,
             "real_challenges": expected,
-            "dummy": {
-                "path": plan["dummy_path"],
-                "source_owner": DHB_DUMMY_SOURCE_OWNER,
-                "decl_path": plan["decl_path"],
-                "sha256": plan["sha256"],
-                "inherit": "mission_challenge/dlc1_challenge_base",
-                "stat": plan["stat"],
-                "count": plan["count"],
-                "duration": "DUR_CUSTOM_LEVEL",
-                "unlockable_flags": "UNLOCKABLE_FLAG_HORDE_CHALLENGE",
-                "violence_event": plan.get("violence_event"),
-                "violence_event_decl_path": plan.get("violence_event_decl_path"),
-                "violence_event_sha256": plan.get("violence_event_sha256"),
-                "required_monster": plan["required_monster"],
-                "impossibility": plan["impossibility"],
-                "existing_vanilla_reference": "Horde e6m3 registration",
-                "reward": None,
-                "ap_location": None,
-            },
+            "dummy": None,
+            "native_suppression_required": "challenge::available()",
         })
     return source, tuple(audited_contracts)
 
@@ -472,7 +411,7 @@ def build_mission_challenge_overrides(mod_root: Path) -> dict:
         "challenge_count": len(entries),
         "location_ids": [entry["location_id"] for entry in entries],
         "registration_experiment": {
-            "strategy": "append_existing_mission_safe_impossible_horde_challenges",
+            "strategy": "canonical_three_challenges_native_reward_suppression",
             "source_owner": AGGREGATE_SOURCE_OWNER,
             "target_owner": AGGREGATE_TARGET_OWNER,
             "source_path": AGGREGATE_LIST_PATH,

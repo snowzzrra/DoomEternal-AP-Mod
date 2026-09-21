@@ -41,14 +41,25 @@ def _native_list(field: str, values: list[str]) -> str:
             "\t\t}\n")
 
 
-def _mission_select_transition(block: str) -> str:
-    """Use the native level-transition return path without completing a mission."""
-    for field in ("nextMapName", "checkpointName", "playerSpawnSpot"):
-        block = re.sub(rf"\s*\b{field}\s*=\s*[^;]+;", "", block)
-    block = re.sub(r"\s*\breturnToMainMenu\s*=\s*[^;]+;", "", block)
-    edit = block.index("edit = {")
-    close = find_matching_brace(block, block.index("{", edit))
-    return block[:close] + "\t\treturnToMainMenu = true;\n\t" + block[close:]
+def _mission_select_transition(name: str) -> str:
+    """Use the known-safe relay shape to reach the authored Mission Select action."""
+    return ('entity {\n\tentityDef ' + name + ' {\n'
+            '\tclass = "idTarget_Count";\n\texpandInheritance = false;\n'
+            '\tedit = {\n\t\tcount = 1;\n\t\treuseable = true;\n' +
+            _native_list("targets", ["ap_fortress_mission_select"]) + '\t}\n}\n}')
+
+
+def _mission_select_action(text: str) -> str:
+    """Clone Hub's authored portal action so its native interaction contract stays exact."""
+    bounds = find_entity_block_bounds(text, "target_interact_action_portal_usable")
+    if bounds is None:
+        raise ValueError("Fortress portal interaction action is missing")
+    source = text[slice(*bounds)]
+    action = source.replace("target_interact_action_portal_usable", "ap_fortress_mission_select", 1)
+    action = action.replace("interact_hub_portal_console", "interact_hub_mission_select_1", 1)
+    if action == source or 'action = "IA_ACTIVATE_ANY";' not in action:
+        raise ValueError("Fortress portal interaction action is not qualified")
+    return action
 
 
 def project_fortress(text: str, config: dict) -> str:
@@ -60,6 +71,9 @@ def project_fortress(text: str, config: dict) -> str:
     """
     if "entityDef ap_fortress_phase_0 {" in text:
         raise ValueError("Fortress campaign projection already applied")
+    if find_entity_block_bounds(text, "interact_hub_mission_select_1") is None:
+        raise ValueError("Fortress Mission Select interactable is missing")
+    mission_select_action = _mission_select_action(text)
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
@@ -77,7 +91,7 @@ def project_fortress(text: str, config: dict) -> str:
     pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
     for match in reversed(list(re.finditer(pattern, text))):
         start = match.start()
-        end = find_matching_brace(text, text.index("{", start)) + 1
+        end = find_matching_brace(text, text.index("{", start))
         block = text[start:end]
         if 'class = "idTarget_Objective_Give";' not in block:
             continue
@@ -113,8 +127,8 @@ def project_fortress(text: str, config: dict) -> str:
 
     for match in reversed(list(re.finditer(r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{", text))):
         start = match.start()
-        end = find_matching_brace(text, text.index("{", start)) + 1
+        end = find_matching_brace(text, text.index("{", start))
         block = text[start:end]
         if 'class = "idTarget_LevelTransition";' in block:
-            text = text[:start] + _mission_select_transition(block) + text[end:]
-    return text
+            text = text[:start] + _mission_select_transition(match[1]) + text[end:]
+    return text + "\n" + mission_select_action
