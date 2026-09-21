@@ -189,6 +189,13 @@ class LauncherController:
         self._native_health_reader: NativeHealthReader | None = None
         self._last_native_health: dict[str, object] | None = None
         self._native_client_process: subprocess.Popen | None = None
+        self._native_helper_startup: dict[str, object] = {
+            "process_start_status": "not_attempted",
+            "winerror": None,
+            "normalized_category": None,
+            "disappeared_after_validation": False,
+            "latest_startup_error": None,
+        }
         self._last_game_running: bool = False
         self._game_lifecycle_sample: bool | None = None
         self._game_lifecycle_sample_lock = threading.Lock()
@@ -203,18 +210,30 @@ class LauncherController:
         executable_path: Path,
         exit_code: int | None = None,
     ) -> None:
-        if reason == "executable_missing":
+        if reason == "native_helper_missing":
             message = (
-                "The Game integration helper is missing from this installation. "
-                "Repair or reinstall DoomEAP, then retry. If the problem continues, "
-                "generate a Support Report."
+                "The Game integration helper is missing and may have been quarantined. "
+                "Check Windows Security Protection history, repair or reinstall DoomEAP, "
+                "then retry. Generate a Support Report if the problem continues."
             )
-        elif reason == "access_denied":
+        elif reason == "native_helper_application_control_blocked":
+            message = (
+                "Windows application control blocked the Game integration helper. "
+                "Generate a Support Report and ask the device administrator or DoomEAP "
+                "maintainer to review the signed release artifact."
+            )
+        elif reason == "native_helper_removed_after_validation":
+            message = (
+                "The Game integration helper disappeared while Windows was starting it and "
+                "may have been quarantined. Check Windows Security Protection history, "
+                "repair or reinstall DoomEAP, then retry."
+            )
+        elif reason == "native_helper_access_denied":
             message = (
                 "Windows denied access to the Game integration helper. Windows Security "
-                "or antivirus software may have blocked it. Check Protection history "
-                "and restore or allow the DoomEAP file if it was blocked, then retry. "
-                "If the problem continues, generate a Support Report."
+                "or antivirus software may have blocked it. Check Protection history, "
+                "repair or reinstall DoomEAP, then retry. Generate a Support Report if "
+                "the problem continues."
             )
         elif reason == "immediate_exit":
             message = (
@@ -243,6 +262,18 @@ class LauncherController:
             technical_message=technical_message,
             exit_code=exit_code,
         )
+
+    @staticmethod
+    def _classify_native_start_error(error: Exception, *, helper_exists: bool) -> tuple[str, bool]:
+        winerror = getattr(error, "winerror", None)
+        disappeared = (isinstance(error, FileNotFoundError) or winerror in {2, 3}) and not helper_exists
+        if winerror == 4556:
+            return "native_helper_application_control_blocked", False
+        if disappeared:
+            return "native_helper_removed_after_validation", True
+        if isinstance(error, PermissionError) or winerror == 5:
+            return "native_helper_access_denied", False
+        return "native_helper_process_creation_failed", False
 
     def _native_client_running(self) -> bool:
         with self._lifecycle_lock:
@@ -280,12 +311,30 @@ class LauncherController:
 
             client_exe = self.client_dir / "ap_client.exe"
             if not client_exe.is_file():
+                self._native_helper_startup.update({
+                    "expected_path": str(client_exe), "present": False, "sha256": None,
+                    "process_start_status": "failed", "winerror": None,
+                    "normalized_category": "native_helper_missing",
+                    "disappeared_after_validation": False,
+                    "latest_startup_error": "expected helper is missing; it may have been quarantined",
+                })
                 self._native_start_failure(
-                    reason="executable_missing",
-                    technical_message=f"file not found: {client_exe}",
+                    reason="native_helper_missing",
+                    technical_message=f"file not found: {client_exe}; it may have been quarantined",
                     executable_path=client_exe,
                 )
                 return False
+
+            try:
+                helper_sha256 = hashlib.sha256(client_exe.read_bytes()).hexdigest()
+            except OSError:
+                helper_sha256 = None
+            self._native_helper_startup.update({
+                "expected_path": str(client_exe), "present": True, "sha256": helper_sha256,
+                "process_start_status": "validated", "winerror": None,
+                "normalized_category": None, "disappeared_after_validation": False,
+                "latest_startup_error": None,
+            })
 
             meathook = probe_meathook(root)
             if not meathook.ok:
@@ -312,6 +361,10 @@ class LauncherController:
                             native_state=health.get("native_state"),
                         )
                         return True
+                    self._native_helper_startup.update({
+                        "process_start_status": "failed", "normalized_category": "immediate_exit",
+                        "latest_startup_error": "process exited before publishing current native health",
+                    })
                     self._native_start_failure(
                         reason="immediate_exit",
                         technical_message="process exited before publishing current native health",
@@ -320,17 +373,27 @@ class LauncherController:
                     )
                     return False
                 self.emit("native_client_started", path=str(client_exe), game_root=str(root))
+                self._native_helper_startup["process_start_status"] = "started"
                 return True
             except Exception as error:
                 self._native_client_process = None
                 winerror = getattr(error, "winerror", None)
-                access_denied = isinstance(error, PermissionError) or winerror == 5
+                category, disappeared = self._classify_native_start_error(
+                    error, helper_exists=client_exe.is_file()
+                )
+                technical_message = (
+                    f"{type(error).__name__}: {error}"
+                    + (f" (winerror={winerror})" if winerror is not None else "")
+                ).replace("\r", " ").replace("\n", " ")[:512]
+                self._native_helper_startup.update({
+                    "present": client_exe.is_file(), "process_start_status": "failed",
+                    "winerror": winerror, "normalized_category": category,
+                    "disappeared_after_validation": disappeared,
+                    "latest_startup_error": technical_message,
+                })
                 self._native_start_failure(
-                    reason="access_denied" if access_denied else "process_creation_failed",
-                    technical_message=(
-                        f"{type(error).__name__}: {error}"
-                        + (f" (winerror={winerror})" if winerror is not None else "")
-                    ),
+                    reason=category,
+                    technical_message=technical_message,
                     executable_path=client_exe,
                 )
                 return False
@@ -679,6 +742,7 @@ class LauncherController:
         return {
             "supervisor": supervisor_details,
             "native_rpc": native,
+            "native_helper_startup": dict(self._native_helper_startup),
             "config_paths": {
                 "application_dir": str(self.application_dir),
                 "client_dir": str(self.client_dir),

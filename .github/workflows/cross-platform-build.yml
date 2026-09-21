@@ -14,9 +14,9 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.5.2)'
+        description: 'Release version label (e.g. v0.5.3)'
         required: true
-        default: 'v0.5.2'
+        default: 'v0.5.3'
         type: string
 
 permissions:
@@ -206,6 +206,10 @@ jobs:
 
       - name: Build and Validate Native Client
         shell: pwsh
+        env:
+          DOOMEAP_SIGNING_REQUIRED: ${{ vars.DOOMEAP_SIGNING_REQUIRED }}
+          DOOMEAP_SIGNING_CERT_SHA1: ${{ secrets.DOOMEAP_SIGNING_CERT_SHA1 }}
+          DOOMEAP_SIGNING_TIMESTAMP_URL: ${{ vars.DOOMEAP_SIGNING_TIMESTAMP_URL }}
         run: .\scripts\build\client_windows.ps1 -OutputDir build\release\build\client
 
       - name: Verify Native Binaries

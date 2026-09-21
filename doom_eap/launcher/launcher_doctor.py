@@ -19,7 +19,10 @@ from .launcher_integration import UNINSTALL_OWNED_STATES
 from .launcher_platform import (
     AMMO_HOTKEY_STATE_FILENAME,
     AMMO_REFILL_BIND_COMMAND,
+    LINUX_MOD_INJECTOR,
     SavedGamesSelection,
+    WINDOWS_INJECTOR_REQUIRED_MEMBERS,
+    WINDOWS_MOD_INJECTOR,
     doom_saved_games_base,
     idfile_decompressor_spec,
     DependencyManager,
@@ -1285,6 +1288,17 @@ def build_support_diagnostics(
             config, config_path, paths, processes, runtime, meathook, live=live
         ),
         "idfile_decompressor": idfile_diagnostics,
+        "mod_injector": {
+            "name": (WINDOWS_MOD_INJECTOR if os.name == "nt" else LINUX_MOD_INJECTOR).name,
+            "version": (WINDOWS_MOD_INJECTOR if os.name == "nt" else LINUX_MOD_INJECTOR).version,
+            "url": (WINDOWS_MOD_INJECTOR if os.name == "nt" else LINUX_MOD_INJECTOR).url,
+            "expected_size": (WINDOWS_MOD_INJECTOR if os.name == "nt" else LINUX_MOD_INJECTOR).expected_size,
+            "expected_sha256": (WINDOWS_MOD_INJECTOR if os.name == "nt" else LINUX_MOD_INJECTOR).sha256,
+            "required_members": (
+                list(WINDOWS_INJECTOR_REQUIRED_MEMBERS)
+                if os.name == "nt" else [LINUX_MOD_INJECTOR.executable_glob]
+            ),
+        },
     }
 
 
@@ -1410,7 +1424,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.5.2"
+    VERSION = "0.5.3"
 
     def __init__(
         self,

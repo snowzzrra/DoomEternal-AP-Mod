@@ -4535,12 +4535,12 @@ class DoomEternalContext(CommonContext):
         )
 
     async def server_auth(self, password_requested: bool = False):
-        if password_requested and LAUNCHER_EVENTS_ENABLED:
+        if password_requested and LAUNCHER_EVENTS_ENABLED and not self.password:
             self._report_launcher_connection_failure(
-                "The room requires a password, or the supplied password was rejected.",
-                code="invalid_password",
-                reason_codes=["InvalidPassword"],
-                technical_message="Archipelago requested password authentication",
+                "This room requires a password.",
+                code="password_required",
+                reason_codes=[],
+                technical_message="Archipelago requested a password and none was supplied",
             )
             return
         if password_requested and not self.password:

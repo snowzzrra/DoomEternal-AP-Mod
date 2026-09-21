@@ -118,7 +118,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Native client build failed" }
     Copy-Item -LiteralPath (Join-Path $clientBuild "ap_client.exe") -Destination $clientHandoff -Force
     Copy-Item -LiteralPath (Join-Path $clientBuild "save_death_probe.exe") -Destination $clientHandoff -Force
-    Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.5.2", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
+    Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.5.3", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
     Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago)
     $launcher = Join-Path $launcherHandoff "DoomEternalArchipelagoLauncher.exe"
     & $launcher --self-test
@@ -126,8 +126,8 @@ try {
 
     $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
     $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
-    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.5.2", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows")
-    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.5.2", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
+    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.5.3", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows")
+    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.5.3", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
     Write-Output "WINDOWS_RELEASE status=PASS output=$(Join-Path $repoRoot 'build\final-release')"
 } finally {
     Pop-Location

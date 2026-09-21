@@ -308,11 +308,11 @@ Repair/Fix, and a sanitized support report.
   one 19-mission Archipelago world with global inventory and completion flow.
 - DLC-specific gear, mission logic, generation, runtime, and validation are in scope.
 
-### 0.5.1-2 Beta — Release Correctives
+### 0.5.1-3 Beta — Release Correctives
 
 - Base Campaign with DLC content packages Base locations only; room scope
   follows `include_dlc_missions` exactly.
-- Windows pins EternalModInjector `2026-09-04` (GameBanana download `1806698`)
+- Windows pins EternalModInjector `2026-09-17` (GameBanana download `1819101`)
   with direct sandbox support and no sandbox hold workaround.
 
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT

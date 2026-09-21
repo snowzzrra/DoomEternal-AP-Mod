@@ -41,7 +41,7 @@ Release packages are generated through GitHub Actions:
 4. Provide the exact inputs:
    - `mod_ref`: Full commit SHA or branch for `DoomEternal-AP-Mod` (e.g., `main`).
    - `apworld_ref`: Full commit SHA or branch for `Archipelago` / `DoomEternal-AP-World` (e.g., `doom_eternal`).
-   - `version_label`: Target version string (e.g., `v0.5.2`).
+   - `version_label`: Target version string (e.g., `v0.5.3`).
 5. Run the workflow. It executes portable release preflight gates, validates frozen room compiler resources against the content input fingerprint, builds the native client and standalone platform launchers, and assembles the public release packages.
 
 ### Native Windows build
@@ -72,7 +72,7 @@ Linux container.
 2. Testers run `DoomEternalArchipelagoLauncher.exe` directly; no local compilation or map processing is needed.
 
 ### Step 5: Publish Release
-1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.5.2`.
+1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.5.3`.
 2. Upload `DoomEternalArchipelago-<version>-windows-x86_64.zip`, `DoomEternalArchipelago-<version>-linux-x86_64.zip`, and `SHA256SUMS.txt`.
 
 ---
@@ -85,7 +85,7 @@ If assembling packages locally from a downloaded developer handoff artifact (`Do
 python3 scripts/release/assemble_ci_artifact.py \
     --handoff /path/to/DoomEAP-crossplatform-build-<version>-<short-mod-sha> \
     --room-resources-dir build/release/client/resources \
-    --version v0.5.2 \
+    --version v0.5.3 \
     --output-dir build/final-release
 ```
 

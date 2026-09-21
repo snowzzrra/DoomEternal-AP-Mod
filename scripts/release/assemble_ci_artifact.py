@@ -378,7 +378,7 @@ def assemble_platform_release(
 
     # Save handoff build provenance metadata in client directory
     provenance_doc = {
-        "version_label": manifest.get("version_label", "v0.5.2"),
+        "version_label": manifest.get("version_label", "v0.5.3"),
         "architecture": "x86_64",
         "mod_commit_sha": manifest.get("mod", {}).get("resolved_sha", "unknown"),
         "apworld_commit_sha": manifest.get("apworld", {}).get("resolved_sha", "unknown"),
@@ -395,7 +395,7 @@ def assemble_platform_release(
     canonical_manifest = build_release_manifest(
         repo_root,
         room_resources=room_resources_dir,
-        release_version=manifest.get("version_label", "v0.5.2"),
+        release_version=manifest.get("version_label", "v0.5.3"),
         public_files=declared_public_files,
         apworld=manifest.get("apworld"),
     )
@@ -563,7 +563,7 @@ def main() -> int:
 
         print("--> Validating handoff artifact...")
         manifest = validate_handoff_structure(extracted_handoff, args.platform)
-        version_label = manifest.get("version_label", "v0.5.2")
+        version_label = manifest.get("version_label", "v0.5.3")
 
         if args.version and args.version != version_label:
             raise ValueError(f"Version mismatch: handoff says {version_label}, expected {args.version}")

@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.5.2
+# Install DOOM Eternal Archipelago 0.5.3
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.5.2** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.5.3** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -138,7 +138,7 @@ Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
 by Steam inside the configured Proton prefix. Do not launch the Windows game
 executable directly through Wine.
 
-1. Approve verified EternalModInjectorShell 6.66-rev3.13 acquisition or provide
+1. Approve verified EternalModInjectorShell 6.66-rev3.16 acquisition or provide
    an official verified local artifact.
 2. Launcher stages the generated mod.
 3. Launcher opens the interactive EternalModInjectorShell workflow.
@@ -164,7 +164,8 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.2** identifies public launcher, room package, and generated content (APWorld remains 0.5.0).
+Version **0.5.3** identifies the public launcher and mod package. It remains
+compatible with 0.5.2 rooms and their unchanged generated content (APWorld remains 0.5.0).
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|
@@ -216,12 +217,21 @@ before sharing.
 
 - **Game Link / Meathook missing or incompatible:** launcher automatically downloads and verifies the official Meathook v7.2 runtime library. For manual setup, download `XINPUT1_3.dll` from the official Meathook v7.2 release and place it in the DOOM Eternal root directory.
 - **Client runtime not found:** keep bundled client files with release launcher.
+- **Game integration helper missing:** Windows Security may have quarantined
+  `client/ap_client.exe`. Check Protection history, reinstall the official package,
+  and include a Support Report when asking for help. Do not disable Windows Security
+  or add antivirus exclusions.
+- **Windows application control blocked the helper (WinError 4556):** use a signed
+  official package and send the Support Report to the device administrator or
+  DoomEAP maintainer. Unsigned local builds do not have established Smart App Control reputation.
 - **Room package mismatch:** run explicit Prepare and install for current room;
   do not reuse another room's package.
 - **Hash mismatch:** discard artifact and retry verified acquisition or provide a
   verified official artifact.
 - **Windows manual mod installation:** follow the [Windows Manual Mod Installer](#windows-manual-mod-installer) section to extract `EternalModInjector` into the DOOM Eternal folder, set `:AUTO_LAUNCH_GAME=0` in `EternalModInjector Settings.txt`, run `EternalModInjector.bat`, and confirm installation in the launcher.
-- **Linux injector failure:** review interactive tool output and exit status,
-  then retry setup.
+- **Linux injector loader failure:** DoomEAP removes inherited `LD_LIBRARY_PATH`,
+  `LD_PRELOAD`, and `LD_AUDIT` while preserving the ordinary environment and the
+  script shebang. If exit 127 still reports `rl_print_keybinding`, attach the
+  Support Report with the sanitized stderr.
 - **Bridge cannot reach game:** verify mod installation, one bridge instance,
   Meathook availability, and the Proton DLL override.

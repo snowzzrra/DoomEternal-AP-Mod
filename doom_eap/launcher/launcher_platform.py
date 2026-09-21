@@ -985,12 +985,12 @@ WINDOWS_INJECTOR_REQUIRED_MEMBERS: tuple[str, ...] = (
 
 WINDOWS_MOD_INJECTOR = DependencySpec(
     name="EternalModInjector",
-    version="2026-09-05",
-    url="https://gamebanana.com/dl/1807733",
-    sha256="1319a0e9d419c132b54a0cb842dae9aa62a35143d673be666937948fc7aa7bbc",
+    version="2026-09-17",
+    url="https://gamebanana.com/dl/1819101",
+    sha256="567fddbae0c6298b9cfecf6ac7e2b129ec109c53f1b09691aea1fb75f08a0f41",
     executable_glob="**/EternalModInjector.bat",
     archive_type="zip",
-    expected_size=5182675,
+    expected_size=5182727,
 )
 
 # Compatibility alias
@@ -998,11 +998,12 @@ WINDOWS_MOD_MANAGER = WINDOWS_MOD_INJECTOR
 
 LINUX_MOD_INJECTOR = DependencySpec(
     name="EternalModInjectorShell",
-    version="6.66-rev3.13",
-    url=("https://github.com/leveste/EternalBasher/releases/download/v6.66-rev3.13/EternalModInjectorShell.tar.gz"),
-    sha256="79874b20834ba3e0a8e94c67cab5f7f80af7c57e53035c4ec5075f7f28174935",
+    version="6.66-rev3.16",
+    url=("https://github.com/leveste/EternalBasher/releases/download/v6.66-rev3.16/EternalModInjectorShell.tar.gz"),
+    sha256="f891336c7481d5be4fe51e20a4ca7f40a6b9d3b9ef00948859b4b3c28523a9bf",
     executable_glob="**/EternalModInjectorShell.sh",
     archive_type="tar.gz",
+    expected_size=16754097,
 )
 
 MEATHOOK = DependencySpec(
@@ -2465,6 +2466,7 @@ class LinuxModManagerAdapter:
     """Stage bundled InjectorShell tools and apply mods without launching Steam."""
 
     TIMEOUT_SECONDS = 15 * 60
+    LOADER_ENVIRONMENT_KEYS = ("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
 
     def __init__(
         self,
@@ -2556,6 +2558,9 @@ class LinuxModManagerAdapter:
         executable = self._prepare_tools(game_root)
         self._configure_first_run(game_root)
         environment = os.environ.copy()
+        stripped_loader_environment = [
+            key for key in self.LOADER_ENVIRONMENT_KEYS if environment.pop(key, None) is not None
+        ]
         environment.update({"skip": "1", "skip_debug_check": "1"})
         command = (str(executable),)
         try:
@@ -2579,15 +2584,25 @@ class LinuxModManagerAdapter:
                     "injector_version": self.dependency.version,
                     "mods_path": str((game_root / "Mods").resolve()),
                     "post_install_verification": "not_run",
+                    "loader_environment_removed": stripped_loader_environment,
                 },
             )
         state = "applied" if completed.returncode == 0 else "failed"
+        loader_symbol_failure = completed.returncode == 127 and any(
+            marker in (completed.stderr or "").casefold()
+            for marker in ("symbol lookup error", "undefined symbol: rl_print_keybinding")
+        )
         return AdapterResult(
             state=state,
             message=(
                 "Mod installed successfully. Start DOOM Eternal through Steam."
                 if state == "applied"
-                else "Mod installation failed. Review details and try again."
+                else (
+                    "The injector shell could not load its host libraries. DoomEAP removed inherited "
+                    "loader overrides; review the full stderr in the Support Report."
+                    if loader_symbol_failure
+                    else "Mod installation failed. Review details and try again."
+                )
             ),
             command=command,
             stdout=completed.stdout,
@@ -2597,6 +2612,8 @@ class LinuxModManagerAdapter:
                 "injector_version": self.dependency.version,
                 "mods_path": str((game_root / "Mods").resolve()),
                 "post_install_verification": "not_run",
+                "loader_environment_removed": stripped_loader_environment,
+                "failure_category": "linux_loader_symbol_failure" if loader_symbol_failure else None,
             },
         )
 
