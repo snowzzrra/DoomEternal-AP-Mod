@@ -52,8 +52,10 @@ class SentinelWeaponPoints:
         body = struct.pack("<III", int(amount != 0), amount, expected)
         return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
 
-    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body):
+    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None):
         scope = self._run(["--pid", str(self.pid), "--native", "--json"])
+        if trace is not None:
+            trace.append({"stage": "scope", "response": scope})
         if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
             raise WeaponPointsBlocked("Native gameplay context is not active")
         request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
@@ -65,24 +67,35 @@ class SentinelWeaponPoints:
         operation = submit
         while True:
             message = struct.pack("<IHHII", 0x50494353, 1, operation, len(payload), 0) + payload
-            result = self._run([flag], message)
+            try:
+                result = self._run([flag], message)
+            except WeaponPointsBlocked as error:
+                if trace is not None:
+                    trace.append({"stage": "transport", "operation": operation, "error": str(error)})
+                raise
+            if trace is not None:
+                trace.append({"stage": "response", "operation": operation,
+                              "request_id": request_id, "nonce": nonce.hex(),
+                              "response": result, "at_monotonic": time.monotonic()})
             if (result.get("namespace") != self.namespace or int(result["request_id"]) != request_id
                     or result.get("build_id") != scope.get("build_id")):
                 raise WeaponPointsBlocked("Sentinel response identity changed")
             if result["state"] in (3, 4, 5, 6):
-                # The native result is now consumed. Release only its retained
-                # queue slot; the pre-grant durable receipt intent remains ours.
+                # Release the retained queue slot; durable receipt intent belongs to the caller.
                 release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
                 try:
-                    self._run([flag], release)
-                except WeaponPointsBlocked:
-                    pass  # Default Core retention still expires a lost release.
+                    released = self._run([flag], release)
+                    if trace is not None:
+                        trace.append({"stage": "release", "operation": release_operation, "response": released})
+                except WeaponPointsBlocked as error:
+                    if trace is not None:
+                        trace.append({"stage": "release", "operation": release_operation, "error": str(error)})
             if result["state"] == 3:
                 return result
             if result["state"] not in (1, 2) or time.monotonic() >= deadline:
                 # Never resubmit on an uncertain result. A future pass observes
                 # saved/native gained against the already durable receipt intent.
-                raise WeaponPointsBlocked(f"Native WUP execution not confirmed: {result}")
+                raise WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
             operation = result_operation
             time.sleep(0.025)
 
@@ -127,8 +140,8 @@ class SentinelWeaponPoints:
         required_known = 1 | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
         if (result["outcome"] not in (0, 1) or result["flags"] & 106 != 106
                 or result["owns_crucible"] != 1 or result["native_crucible"] != 1
-                or result["owns_hammer"] != own_hammer or result["native_hammer"] != own_hammer
-                or result["hammer_tier"] != hammer_tier
+                or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
+                or result["hammer_tier"] < hammer_tier
                 or (hammer_tier == 2 and result["native_hammer_perks"] < 2)
                 or result["native_state_known"] & required_known != required_known):
             raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")

@@ -458,7 +458,7 @@ bool NativeCommandQueue::MapEntityOperationMatchesCommand(
     }
     if (operation != MapEntityOperation::CheckedVisualHide) return false;
     static const std::regex cleanup(
-        R"(^ai_ScriptCmdEnt ap_hide_location_visual_[0-9]+ activate$)"
+        R"(^ai_ScriptCmdEnt ap_hide_location_visual_[0-9]+ activate player1$)"
     );
     return std::regex_match(command, cleanup);
 }

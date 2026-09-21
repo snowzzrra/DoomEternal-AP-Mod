@@ -138,7 +138,7 @@ class CheckedVisuals:
                 self._epoch,
                 retry["attempt"],
             )
-            command = f"ai_ScriptCmdEnt {entity_name} activate"
+            command = f"ai_ScriptCmdEnt {entity_name} activate player1"
             if not send(
                 command,
                 coalesce_key=command_id,

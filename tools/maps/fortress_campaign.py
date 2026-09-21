@@ -77,7 +77,7 @@ def project_fortress(text: str, config: dict) -> str:
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()
-        entities = [source, f"ap_location_visual_{code}",
+        entities = [source, f"ap_independent_{source}", f"ap_location_visual_{code}",
                     f"ap_automap_location_{code}", f"ap_remove_location_visual_{code}",
                     f"ap_hide_location_visual_{code}"]
         if source in {f"interact_hub_2_battery_station_{i}" for i in (1, 2, 3)}:
@@ -87,6 +87,24 @@ def project_fortress(text: str, config: dict) -> str:
             if bounds:
                 start, end = bounds
                 text = text[:start] + _layer(text[start:end], layer) + text[end:]
+        # Checked repair hides presentation and removes only the AP check relay.
+        # Shared native targets on the source trigger retain their authored edges.
+        name = f"ap_hide_location_visual_{code}"
+        bounds = find_entity_block_bounds(text, name)
+        if bounds:
+            start, end = bounds
+            model = name + "_model"
+            suppress = f"ap_suppress_checked_{code}"
+            hidden = text[start:end].replace(f"entityDef {name}", f"entityDef {model}", 1)
+            relay = ('entity {\n\tentityDef ' + name + ' {\n'
+                     '\tclass = "idTarget_Count";\n\texpandInheritance = false;\n'
+                     '\tedit = {\n\t\tcount = 1;\n\t\treuseable = true;\n' +
+                     _native_list("targets", [model, suppress]) + '\t}\n}\n}')
+            remove = ('entity {\n\tentityDef ' + suppress + ' {\n'
+                      '\tinherit = "target/remove";\n\tclass = "idTarget_Remove";\n'
+                      '\texpandInheritance = false;\n\tedit = {\n' +
+                      _native_list("targets", [alias]) + '\t}\n}\n}')
+            text = text[:start] + hidden + _layer(relay, layer) + _layer(remove, layer) + text[end:]
     clear_objectives = []
     pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
     for match in reversed(list(re.finditer(pattern, text))):

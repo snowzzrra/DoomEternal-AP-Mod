@@ -3491,6 +3491,7 @@ class DoomEternalContext(CommonContext):
                 )
                 return False
 
+            self._reconcile_native_receipt_owners(trigger)
             if self.session_state.get("weapon_points") is not None:
                 try:
                     owner, authoritative = self.weapon_points_receipt_owner()
@@ -3499,7 +3500,6 @@ class DoomEternalContext(CommonContext):
                     logger.error("[WUP] Native checkpoint reconciliation blocked: %s", error)
                     self.item_delivery_blocked = True
                     return False
-            self._reconcile_native_receipt_owners(trigger)
             batch_count = 0
             fresh_receipt_boundary = self.items_processed
             while len(self.items_received) > self.items_processed:
@@ -4327,14 +4327,10 @@ class DoomEternalContext(CommonContext):
         identity = (self.state_key, lease, phase)
         if getattr(self, "_fortress_phase_publication", None) == identity:
             return
-        commands = [f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate"]
-        # Newly activated content layers can contain previously checked visuals.
-        # Reapply the existing catalog-owned hide targets in this same native
-        # command, after layer activation, without resetting reconciliation.
-        for code, entry in sorted(AUTOMAP_VISUALS_BY_MAP.get("hub", {}).items()):
-            if entry["location_id"] in self.checked_locations and entry["classification"] == "visible_cleanup":
-                commands.append(f'ai_ScriptCmdEnt {entry["reconciliation_entity"]} activate')
-        if send_command("; ".join(commands),
+        # Layer activation and checked cleanup use separate scoped queue jobs.
+        # The checked-visual reconciler owns retries after content materialization.
+        command = f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate player1"
+        if send_command(command,
                         coalesce_key=stable_spool_id("fortress", lease, phase), state_key=self.state_key,
                         materialization_lease=lease, already_queued_ok=True):
             self._fortress_phase_publication = identity
@@ -4904,39 +4900,29 @@ class DoomEternalContext(CommonContext):
         ))
         if not hook_owned and not special_count:
             return
-        try:
-            link = self.native_game_link()
-            if hook_owned:
-                hook = link.ensure_meat_hook()
+        for domain, desired in (("arsenal", hook_owned), ("special", special_count)):
+            if not desired:
+                continue
+            try:
+                link = self.native_game_link()
+                result = link.ensure_meat_hook() if domain == "arsenal" else link.ensure_progressive_special_weapon(desired)
                 log_item_event(
-                    "ITEM_NATIVE_OWNER_RECONCILED", domain="arsenal", operation="ensure_meat_hook",
-                    trigger=trigger, boundary=self.items_processed, native_outcome=hook.get("outcome"),
-                    native_flags=hook.get("flags"), operations_applied=hook.get("operations_applied"),
-                    namespace=hook.get("namespace"), process_id=hook.get("pid"),
-                    process_created=hook.get("process_created"),
-                    lifecycle_generation=hook.get("lifecycle_generation"),
-                    request_id=hook.get("request_id"), native_build=hook.get("build_id"),
+                    "ITEM_NATIVE_OWNER_RECONCILED", domain=domain, trigger=trigger,
+                    desired_count=int(desired), boundary=self.items_processed,
+                    ownership="AP_OWNED", authorization="AUTHORIZATION_APPLIED",
+                    gameplay_effect="UNVERIFIED", host_ssg="UNKNOWN" if domain == "arsenal" else None,
+                    native_outcome=result.get("outcome"), native_flags=result.get("flags"),
+                    operations_applied=result.get("operations_applied"), namespace=result.get("namespace"),
+                    request_id=result.get("request_id"), native_build=result.get("build_id"),
                     state_key=getattr(self, "state_key", None),
                 )
-            if special_count:
-                special = link.ensure_progressive_special_weapon(special_count)
+            except (RuntimeError, OSError, ValueError) as error:
+                reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
                 log_item_event(
-                    "ITEM_NATIVE_OWNER_RECONCILED", domain="special", operation="ensure_ownership",
-                    desired_count=special_count, trigger=trigger, boundary=self.items_processed,
-                    native_outcome=special.get("outcome"), native_flags=special.get("flags"),
-                    operations_applied=special.get("operations_applied"),
-                    namespace=special.get("namespace"), process_id=special.get("pid"),
-                    process_created=special.get("process_created"),
-                    lifecycle_generation=special.get("lifecycle_generation"),
-                    request_id=special.get("request_id"), native_build=special.get("build_id"),
-                    state_key=getattr(self, "state_key", None),
+                    "ITEM_NATIVE_OWNER_DEFERRED", domain=domain, reason=reason, detail=str(error),
+                    decision="ownership_unchanged", ownership="AP_OWNED", authorization="UNCONFIRMED",
+                    trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
                 )
-        except (RuntimeError, OSError, ValueError) as error:
-            reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
-            log_item_event(
-                "ITEM_NATIVE_OWNER_DEFERRED", reason=reason, detail=str(error), decision="ownership_unchanged",
-                trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
-            )
 
     def _apply_native_owner_receipt(self, index, item):
         link = self.native_game_link()
