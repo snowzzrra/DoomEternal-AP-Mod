@@ -1743,10 +1743,7 @@ def generate_automap_location_helper(source_block, location_id, policy=None):
         for axis in ("x", "y", "z"):
             match = position_values[axis]
             coordinates[axis] = match.group(1) if match is not None else "0"
-    marker = re.search(
-        r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
-    )
-    automap_decl = marker.group(1) if marker else "default"
+    automap_decl = "default"
     return f'''entity {{
 	entityDef ap_automap_location_{location_id} {{
 		inherit = "info/null";

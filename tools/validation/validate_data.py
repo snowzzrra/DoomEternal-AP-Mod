@@ -589,9 +589,11 @@ def validate_generated_automap_carriers() -> list[str]:
                         continue
                     carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
                     trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
-                    for field in ("inherit", "class", "automapPropertiesDecl"):
+                    for field in ("inherit", "class"):
                         if entity_scalar(carrier, field) != entity_scalar(source_block, field):
                             errors.append(f"Automap source metadata drift for {location_id}/{field}")
+                    if entity_scalar(carrier, "automapPropertiesDecl") != "default":
+                        errors.append(f"Automap AP marker drift for {location_id}")
                     if f'model = "{expected_visual_model}";' not in carrier:
                         errors.append(f"Automap carrier lacks AP visual for {location_id}")
                     if extract_target_names(carrier):

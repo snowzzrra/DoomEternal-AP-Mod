@@ -178,6 +178,20 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Special route selection unconfirmed: {result}")
         return result
 
+    def publish_ammo_refill(self, snapshot, *, connected):
+        authoritative = snapshot.get("authoritative") is True
+        available = snapshot.get("available")
+        known = authoritative and type(available) is int and 0 <= available <= 3
+        balance = available if known else 0
+        flags = int(bool(connected)) | (2 if authoritative else 0) | (4 if known else 0)
+        body = struct.pack("<IIIIIIIQII", 4, 0, 0, 0, 0, balance, flags, 0, 0, 0)
+        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
+        if (result["outcome"] not in (0, 1) or result.get("kind") != 4
+                or result.get("refill_balance") != balance or result.get("refill_flags") != flags
+                or result["flags"] & 4):
+            raise WeaponPointsBlocked(f"Ammo presentation publication unconfirmed: {result}")
+        return result
+
     def publish_checked_locations(self, checked_locations, revision):
         if type(revision) is not int or revision <= 0:
             raise WeaponPointsBlocked("Invalid Automap snapshot revision")

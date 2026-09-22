@@ -2735,9 +2735,11 @@ class DoomEternalContext(CommonContext):
         self._item_delivery_waiting_for_state = False
         self.receipt_session = ReceiptSession()
         self._queue_session_authoritative = False
+        self._ammo_projection_active = False
+        self._ammo_projection_confirmed = None
         self.ammo = AmmoRefill(
             AmmoCommandPublication(send_command, discard_queued_coalesced_command, rpc_execution_enabled, set_rpc_execution, logger),
-            AmmoStorage(self.send_msgs), lambda *args, **kwargs: emit_launcher_event(*args, **kwargs), logger,
+            AmmoStorage(self.send_msgs), self._emit_ammo_refill, logger,
         )
         self.ammo_requests = AmmoRequestPump(self.ammo, self.request_ammo_refill, self.exit_event, logger)
         invalidate_queue_session_namespace("bridge_start")
@@ -2830,6 +2832,8 @@ class DoomEternalContext(CommonContext):
 
 
     def reset_queue_session_authority(self, reason):
+        self._ammo_projection_active = False
+        self._publish_native_ammo_refill(reason)
         self.runtime_lifecycle.invalidate_work()
         self.session_tasks.invalidate()
         self.physical_checks.invalidate()
@@ -3182,6 +3186,29 @@ class DoomEternalContext(CommonContext):
     def _observe_ammo_receipts(self):
         return self.ammo.observe_receipts(receipt_item_ids(self.items_received).count(AMMO_REFILL_ITEM_ID))
 
+    def _emit_ammo_refill(self, *args, **kwargs):
+        emit_launcher_event(*args, **kwargs)
+        self._publish_native_ammo_refill(kwargs.get("source") or kwargs.get("status") or "owner")
+
+    def _publish_native_ammo_refill(self, source):
+        self._ammo_projection_confirmed = None
+        socket = getattr(getattr(self, "server", None), "socket", None)
+        state_key = getattr(self, "state_key", "")
+        bound = bool(self._ammo_projection_active and state_key and self.ammo.storage_keys == (
+            f"doom_eap:{state_key}:ammo_refill_consumed", f"doom_eap:{state_key}:ammo_refill_discarded"))
+        snapshot = self.ammo.balance() if bound else {"authoritative": False}
+        connected = bool(bound and socket is not None and not socket.closed)
+        try:
+            link = self.native_game_link()
+            result = link.publish_ammo_refill(snapshot, connected=connected)
+        except Exception as exc:
+            logger.info("AMMO_NATIVE_PUBLICATION_UNCONFIRMED source=%s reason=%s", source, exc)
+            return None
+        self._ammo_projection_confirmed = result
+        logger.info("AMMO_NATIVE_PUBLICATION_CONFIRMED source=%s namespace=%s balance=%s flags=%s request=%s",
+                    source, link.namespace, result["refill_balance"], result["refill_flags"], result["request_id"])
+        return result
+
     def _refresh_ammo_refill_charge(self):
         return self._observe_ammo_receipts()
 
@@ -3215,6 +3242,7 @@ class DoomEternalContext(CommonContext):
     def _configure_ammo_refill_storage(self):
         self.ammo_requests.reset()
         self.ammo.bind(self.state_key)
+        self._ammo_projection_active = True
         self._observe_ammo_receipts()
         keys = self.ammo.storage_keys
         if any(key is None for key in keys):
@@ -6321,6 +6349,8 @@ class DoomEternalContext(CommonContext):
                     len(self.items_received),
                 )
 
+            self._observe_ammo_receipts()
+            self._publish_native_ammo_refill("tracker")
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
                     await self.synchronize_campaign_menu()
