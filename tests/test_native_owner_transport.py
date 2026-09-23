@@ -107,6 +107,23 @@ def test_mastery_is_commandless_and_uses_native_bit_order():
     assert struct.unpack_from("<IIII", messages[0][2], 16 + 72 + 65) == (4, 0, 0, mask)
 
 
+def test_normal_runes_register_cumulatively_without_slot_changes():
+    mask = (1 << 2) | (1 << 7)
+
+    def confirmed(_flag, _operation, request_id):
+        return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build",
+                "state": 3, "kind": 1, "outcome": 0, "flags": 11,
+                "owned_normal_after": mask, "selected_slots_before": [-1, 0, -1],
+                "selected_slots_after": [-1, 0, -1]}
+
+    link, messages = link_with(confirmed)
+    link.ensure_normal_runes(mask)
+    assert [(flag, operation) for flag, operation, _ in messages] == [
+        ("--runes", 33), ("--runes", 36),
+    ]
+    assert struct.unpack_from("<IIIBb", messages[0][2], 16 + 72 + 65) == (1, mask, 0, 0, -1)
+
+
 def test_automap_publishes_exact_checked_bits_without_native_mutation():
     def result(flag, operation, request_id):
         return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build", "outcome": 0,

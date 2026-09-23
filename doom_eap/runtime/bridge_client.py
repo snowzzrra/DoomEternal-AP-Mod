@@ -663,6 +663,9 @@ REVISION_ONE_RUNE_IDS = {
     7770094,
     7770095,
 } | SUPPORT_RUNE_IDS
+NORMAL_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate((
+    7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095,
+))}
 REVISION_TWO_SUIT_IDS = {7770021}
 REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
 REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
@@ -3708,7 +3711,7 @@ class DoomEternalContext(CommonContext):
                     logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
                     continue
 
-                if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS:
+                if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS:
                     try:
                         result = self._apply_native_owner_receipt(item_index, network_item)
                     except (RuntimeError, OSError, ValueError) as error:
@@ -4963,11 +4966,14 @@ class DoomEternalContext(CommonContext):
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)
         mastery_mask = 0
+        rune_mask = 0
         for item in authoritative:
             mastery_mask |= MASTERY_ITEM_BITS.get(item.item, 0)
+            rune_mask |= NORMAL_RUNE_ITEM_BITS.get(item.item, 0)
         for fact in self.receipt_session.starting_materialization:
             if fact.quantity:
                 mastery_mask |= MASTERY_ITEM_BITS.get(fact.item_id, 0)
+                rune_mask |= NORMAL_RUNE_ITEM_BITS.get(fact.item_id, 0)
         starting_special_count = sum(
             fact.quantity for fact in self.receipt_session.starting_materialization
             if fact.item_id == 7770901
@@ -4984,19 +4990,22 @@ class DoomEternalContext(CommonContext):
             authoritative_count=len(authoritative),
             hook_owned=hook_owned,
             mastery_mask=mastery_mask,
+            rune_mask=rune_mask,
             special_count=special_count,
             starting_special_count=starting_special_count,
             state_key=getattr(self, "state_key", None),
         )
-        if not hook_owned and not special_count and not mastery_mask:
+        if not hook_owned and not special_count and not mastery_mask and not rune_mask:
             return
-        for domain, desired in (("arsenal", hook_owned), ("special", special_count), ("arsenal_mastery", mastery_mask)):
+        for domain, desired in (("arsenal", hook_owned), ("special", special_count),
+                                ("arsenal_mastery", mastery_mask), ("normal_runes", rune_mask)):
             if not desired:
                 continue
             try:
                 link = self.native_game_link()
                 result = (link.ensure_meat_hook() if domain == "arsenal" else
-                          link.ensure_masteries(desired) if domain == "arsenal_mastery" else
+                           link.ensure_normal_runes(desired) if domain == "normal_runes" else
+                           link.ensure_masteries(desired) if domain == "arsenal_mastery" else
                           link.ensure_progressive_special_weapon(desired))
                 if domain == "special":
                     self._synchronize_special_preference(link, result)
@@ -5043,6 +5052,14 @@ class DoomEternalContext(CommonContext):
             result = link.ensure_meat_hook()
         elif item.item in MASTERY_ITEM_BITS:
             result = link.ensure_masteries(MASTERY_ITEM_BITS[item.item])
+        elif item.item in NORMAL_RUNE_ITEM_BITS:
+            mask = 0
+            for fact in self.receipt_session.starting_materialization:
+                if fact.quantity:
+                    mask |= NORMAL_RUNE_ITEM_BITS.get(fact.item_id, 0)
+            for receipt in self.items_received[:index + 1]:
+                mask |= NORMAL_RUNE_ITEM_BITS.get(receipt.item, 0)
+            result = link.ensure_normal_runes(mask)
         else:
             count = min(3, max(
                 sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),
@@ -5405,7 +5422,7 @@ class DoomEternalContext(CommonContext):
             return None, error
         try:
             plan = self.runes.compile(
-                self.received_item_ids(processed_only=True), native, ITEM_ID_TO_COMMAND, REVISION_ONE_RUNE_IDS,
+                self.received_item_ids(processed_only=True), native, ITEM_ID_TO_COMMAND, SUPPORT_RUNE_IDS,
             )
         except ValueError as error:
             return None, str(error)

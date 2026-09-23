@@ -203,6 +203,17 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Native Arsenal mastery projection unconfirmed: {result}")
         return result
 
+    def ensure_normal_runes(self, mask):
+        if type(mask) is not int or not 0 < mask <= 0x1FF:
+            raise WeaponPointsBlocked("Invalid normal Rune mask")
+        body = struct.pack("<IIIBb2s", 1, mask, 0, 0, -1, b"\0\0")
+        result = self._execute_typed(32768, "--runes", 33, 34, 36, body)
+        if (result["outcome"] not in (0, 1) or result["flags"] & 11 != 11
+                or result["owned_normal_after"] & mask != mask
+                or result["selected_slots_after"] != result["selected_slots_before"]):
+            raise WeaponPointsBlocked(f"Native normal Rune registration unconfirmed: {result}")
+        return result
+
     def publish_checked_locations(self, checked_locations, revision):
         if type(revision) is not int or revision <= 0:
             raise WeaponPointsBlocked("Invalid Automap snapshot revision")

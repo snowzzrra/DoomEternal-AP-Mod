@@ -41,6 +41,20 @@ def _native_list(field: str, values: list[str]) -> str:
             "\t\t}\n")
 
 
+def _set_native_list(block: str, field: str, values: list[str]) -> str:
+    match = re.search(rf"\b{field}\s*=\s*\{{", block)
+    if match:
+        start = block.rfind("\n", 0, match.start()) + 1
+        end = find_matching_brace(block, block.index("{", match.start()))
+    else:
+        edit = re.search(r"\bedit\s*=\s*\{", block)
+        if edit is None:
+            raise ValueError("Fortress visit transition has no edit block")
+        closing = find_matching_brace(block, block.index("{", edit.start())) - 1
+        start = end = block.rfind("\n", 0, closing) + 1
+    return block[:start] + _native_list(field, values) + block[end:]
+
+
 def _mission_select_transition(name: str) -> str:
     """Use the known-safe relay shape to reach the authored Mission Select action."""
     return ('entity {\n\tentityDef ' + name + ' {\n'
@@ -167,12 +181,12 @@ def project_fortress(text: str, config: dict) -> str:
         sky = "sentinel" if phase in (2, 6, 7) else "phobos" if phase == 5 else "earth"
         active = [f"game/sp/hub/{visit}", f"game/sp/hub/sky_{sky}"]
         remove = [layer for layer in all_scenery + skies if layer not in active]
-        text += ('\nentity {\n\tentityDef ap_fortress_layers_' + str(phase) + ' {\n'
-                 '\tclass = "idTarget_LayerStateChange";\n\texpandInheritance = false;\n\tedit = {\n' +
-                 f'\t\tcheckpointName = "{checkpoint[1]}";\n'
-                 f'\t\tplayerSpawnSpot = "{spawn[1]}";\n' +
-                 _native_list("activate_Immediately", active + content_layers(max(1, phase))) +
-                 _native_list("remove_Immediately", remove) + '\t}\n}\n}\n')
+        layer_target = _layer(visit_target, None).replace(
+            f"entityDef target_change_layer_{visit}", f"entityDef ap_fortress_layers_{phase}", 1)
+        layer_target = _set_native_list(
+            layer_target, "activate_Immediately", active + content_layers(max(1, phase)))
+        layer_target = _set_native_list(layer_target, "remove_Immediately", remove)
+        text += "\n" + layer_target + "\n"
         targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,
                    "target_interact_action_portal_usable", "ap_fortress_mission_select_enable"]
         if phase == 7:

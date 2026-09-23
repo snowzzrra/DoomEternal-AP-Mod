@@ -95,6 +95,11 @@ class FortressCampaign(unittest.TestCase):
                 value = re.search(rf'\b{field} = "([^"]+)";', source)
                 self.assertIsNotNone(value)
                 self.assertIn(f'{field} = "{value[1]}";', result)
+            for field in ('inherit = "target/change_layer";', 'flags = {', 'spawnPosition = {'):
+                self.assertIn(field, source)
+                self.assertIn(field, result)
+            if 'soundOcclusionBypass = true;' in source:
+                self.assertIn('soundOcclusionBypass = true;', result)
 
     def test_physical_triggers_use_cumulative_ap_visit_layers(self):
         for source, ap_check in (
