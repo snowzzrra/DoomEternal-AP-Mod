@@ -4952,8 +4952,13 @@ class DoomEternalContext(CommonContext):
         default_probe = (APPLICATION_DIR / "sentinel_probe.exe" if getattr(sys, "frozen", False)
                          else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
         probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
-        return SentinelWeaponPoints(probe, int(identity.split(":")[1]), namespace,
-                                   diagnostic=lambda evidence: log_item_event("ITEM_NATIVE_PROBE_RESPONSE", **evidence))
+        key = (identity, namespace, str(probe))
+        if getattr(self, "_native_link_key", None) != key:
+            self._native_link = SentinelWeaponPoints(
+                probe, int(identity.split(":")[1]), namespace,
+                diagnostic=lambda evidence: log_item_event("ITEM_NATIVE_PROBE_RESPONSE", **evidence))
+            self._native_link_key = key
+        return self._native_link
 
     def weapon_points_receipt_owner(self):
         from doom_eap.runtime.weapon_points import WeaponPointReceipts

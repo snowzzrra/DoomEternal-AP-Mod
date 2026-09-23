@@ -60,7 +60,9 @@ class SentinelWeaponPoints:
         if self.diagnostic:
             self.diagnostic(evidence)
         if predicate:
-            raise WeaponPointsBlocked(f"Sentinel response validation failed: {json.dumps(evidence)}")
+            error = WeaponPointsBlocked(f"Sentinel response validation failed: {json.dumps(evidence)}")
+            error.probe_result = result.get("result")
+            raise error
         return result
 
     def _execute(self, amount=0, expected=0):
@@ -73,6 +75,11 @@ class SentinelWeaponPoints:
             trace.append({"stage": "scope", "response": scope})
         if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
             raise WeaponPointsBlocked("Native gameplay context is not active")
+        identity = (scope["process_created"], scope["instance_id"], scope["build_id"])
+        if getattr(self, "_runtime_identity", None) != identity:
+            self._runtime_identity, self._incompatible_capabilities = identity, set()
+        if capability in self._incompatible_capabilities:
+            raise WeaponPointsBlocked("Native probe response incompatible with this runtime identity")
         request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
         payload = struct.pack("<QIQ16sQQ16sI", capability, self.pid,
                               int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
@@ -87,6 +94,17 @@ class SentinelWeaponPoints:
             except WeaponPointsBlocked as error:
                 if trace is not None:
                     trace.append({"stage": "transport", "operation": operation, "error": str(error)})
+                if operation != release_operation:
+                    release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
+                    try:
+                        cleaned = self._run([flag], release)
+                        if trace is not None:
+                            trace.append({"stage": "cleanup", "operation": release_operation, "response": cleaned})
+                    except WeaponPointsBlocked as cleanup_error:
+                        if trace is not None:
+                            trace.append({"stage": "cleanup", "operation": release_operation, "error": str(cleanup_error)})
+                if getattr(error, "probe_result", None) == "invalid_response":
+                    self._incompatible_capabilities.add(capability)
                 raise
             if trace is not None:
                 trace.append({"stage": "response", "operation": operation,
