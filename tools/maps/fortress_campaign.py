@@ -156,11 +156,21 @@ def project_fortress(text: str, config: dict) -> str:
     skies = [f"game/sp/hub/sky_{sky}" for sky in ("earth", "sentinel", "phobos")]
     for phase in range(8):
         visit = VISITS[max(0, phase - 1)]
+        visit_bounds = find_entity_block_bounds(text, f"target_change_layer_{visit}")
+        if visit_bounds is None:
+            raise ValueError(f"Fortress visit transition is missing: {visit}")
+        visit_target = text[slice(*visit_bounds)]
+        checkpoint = re.search(r'\bcheckpointName = "([^"]+)";', visit_target)
+        spawn = re.search(r'\bplayerSpawnSpot = "([^"]+)";', visit_target)
+        if checkpoint is None or spawn is None:
+            raise ValueError(f"Fortress visit checkpoint is incomplete: {visit}")
         sky = "sentinel" if phase in (2, 6, 7) else "phobos" if phase == 5 else "earth"
         active = [f"game/sp/hub/{visit}", f"game/sp/hub/sky_{sky}"]
         remove = [layer for layer in all_scenery + skies if layer not in active]
         text += ('\nentity {\n\tentityDef ap_fortress_layers_' + str(phase) + ' {\n'
                  '\tclass = "idTarget_LayerStateChange";\n\texpandInheritance = false;\n\tedit = {\n' +
+                 f'\t\tcheckpointName = "{checkpoint[1]}";\n'
+                 f'\t\tplayerSpawnSpot = "{spawn[1]}";\n' +
                  _native_list("activate_Immediately", active + content_layers(max(1, phase))) +
                  _native_list("remove_Immediately", remove) + '\t}\n}\n}\n')
         targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,

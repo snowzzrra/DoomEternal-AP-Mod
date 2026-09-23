@@ -192,6 +192,17 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Ammo presentation publication unconfirmed: {result}")
         return result
 
+    def ensure_masteries(self, mask):
+        if type(mask) is not int or not 0 < mask <= 0x1FFF:
+            raise WeaponPointsBlocked("Invalid Arsenal mastery mask")
+        body = struct.pack("<IIIIBBHIB3s", 4, 0, 0, mask, 0, 0, 0, 0, 0, b"\0\0\0")
+        result = self._execute_typed(16384, "--arsenal", 29, 30, 32, body)
+        if (result["outcome"] not in (0, 1, 2) or result["flags"] & 27 != 27
+                or (result["outcome"] == 2 and not result["flags"] & 32)
+                or result["masteries_ap_after"] & mask != mask):
+            raise WeaponPointsBlocked(f"Native Arsenal mastery projection unconfirmed: {result}")
+        return result
+
     def publish_checked_locations(self, checked_locations, revision):
         if type(revision) is not int or revision <= 0:
             raise WeaponPointsBlocked("Invalid Automap snapshot revision")

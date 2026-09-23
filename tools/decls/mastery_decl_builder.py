@@ -30,7 +30,6 @@ def _locked_decl(entry: dict, kind: str) -> dict:
     return entry["decls"][kind]
 
 
-# Kept as public compatibility names for focused Sticky regression tests.
 STICKY_DECLS = {
     "unlockable": _locked_decl(_masteries()[0], "unlockable"),
     "perk": _locked_decl(_masteries()[0], "perk"),
@@ -128,7 +127,6 @@ def build_mastery_overrides(mod_root: Path) -> dict:
 
 
 def build_sticky_overrides(mod_root: Path) -> dict:
-    """Compatibility wrapper; full catalogue is now one atomic override set."""
     return build_mastery_overrides(mod_root)
 
 

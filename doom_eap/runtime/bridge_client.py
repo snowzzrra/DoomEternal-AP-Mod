@@ -79,6 +79,7 @@ from doom_eap.contracts.challenge_registry import (
 )
 from doom_eap.runtime.deathlink_receive import DeathLinkReceiver
 from doom_eap.contracts.foundation import (
+    MASTERY_ITEM_BITS,
     compile_item_delivery_plan,
     load_foundation_contracts,
     load_primitive_registry,
@@ -3622,7 +3623,7 @@ class DoomEternalContext(CommonContext):
                             return False
                     continue
 
-                if item_id not in {7770083, 7770901} and self.receipt_session.consume_starting_materialization(item_id):
+                if item_id not in {7770083, 7770901} and item_id not in MASTERY_ITEM_BITS and self.receipt_session.consume_starting_materialization(item_id):
                     logger.info(
                         "[To Game] Materialized starting receipt acknowledged without replay: "
                         "index=%s item_id=%s",
@@ -3707,7 +3708,7 @@ class DoomEternalContext(CommonContext):
                     logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
                     continue
 
-                if item_id in {7770083, 7770901}:
+                if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS:
                     try:
                         result = self._apply_native_owner_receipt(item_index, network_item)
                     except (RuntimeError, OSError, ValueError) as error:
@@ -4961,6 +4962,12 @@ class DoomEternalContext(CommonContext):
     def _reconcile_native_receipt_owners(self, trigger):
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)
+        mastery_mask = 0
+        for item in authoritative:
+            mastery_mask |= MASTERY_ITEM_BITS.get(item.item, 0)
+        for fact in self.receipt_session.starting_materialization:
+            if fact.quantity:
+                mastery_mask |= MASTERY_ITEM_BITS.get(fact.item_id, 0)
         starting_special_count = sum(
             fact.quantity for fact in self.receipt_session.starting_materialization
             if fact.item_id == 7770901
@@ -4976,18 +4983,21 @@ class DoomEternalContext(CommonContext):
             received_count=len(self.items_received),
             authoritative_count=len(authoritative),
             hook_owned=hook_owned,
+            mastery_mask=mastery_mask,
             special_count=special_count,
             starting_special_count=starting_special_count,
             state_key=getattr(self, "state_key", None),
         )
-        if not hook_owned and not special_count:
+        if not hook_owned and not special_count and not mastery_mask:
             return
-        for domain, desired in (("arsenal", hook_owned), ("special", special_count)):
+        for domain, desired in (("arsenal", hook_owned), ("special", special_count), ("arsenal_mastery", mastery_mask)):
             if not desired:
                 continue
             try:
                 link = self.native_game_link()
-                result = link.ensure_meat_hook() if domain == "arsenal" else link.ensure_progressive_special_weapon(desired)
+                result = (link.ensure_meat_hook() if domain == "arsenal" else
+                          link.ensure_masteries(desired) if domain == "arsenal_mastery" else
+                          link.ensure_progressive_special_weapon(desired))
                 if domain == "special":
                     self._synchronize_special_preference(link, result)
                 log_item_event(
@@ -5031,6 +5041,8 @@ class DoomEternalContext(CommonContext):
         link = self.native_game_link()
         if item.item == 7770083:
             result = link.ensure_meat_hook()
+        elif item.item in MASTERY_ITEM_BITS:
+            result = link.ensure_masteries(MASTERY_ITEM_BITS[item.item])
         else:
             count = min(3, max(
                 sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),

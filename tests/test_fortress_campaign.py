@@ -85,7 +85,18 @@ class FortressCampaign(unittest.TestCase):
         self.assertIn('"game/sp/hub/ap_phase_1"', layers_1)
         self.assertNotIn('"game/sp/hub/ap_phase_2"', layers_1)
 
-    def test_physical_triggers_preserve_native_visit_layer_contract(self):
+    def test_phase_layers_keep_authored_checkpoint_and_spawn(self):
+        from tools.maps.fortress_campaign import VISITS
+        for phase in range(8):
+            visit = VISITS[max(0, phase - 1)]
+            source = entity(self.vanilla, f'target_change_layer_{visit}')
+            result = entity(self.result, f'ap_fortress_layers_{phase}')
+            for field in ('checkpointName', 'playerSpawnSpot'):
+                value = re.search(rf'\b{field} = "([^"]+)";', source)
+                self.assertIsNotNone(value)
+                self.assertIn(f'{field} = "{value[1]}";', result)
+
+    def test_physical_triggers_use_cumulative_ap_visit_layers(self):
         for source, ap_check in (
             ('pickup_equipment_flame_belch_1', 'AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1'),
             ('progress_argent_cell_1_1072112848', 'AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848'),
@@ -95,7 +106,7 @@ class FortressCampaign(unittest.TestCase):
             )
             result = project_fortress(self.vanilla + trigger, self.config)
             physical = entity(result, f'ap_independent_{source}')
-            self.assertEqual(physical, entity(trigger, f'ap_independent_{source}'))
+            self.assertIn('layers { "game/sp/hub/ap_phase_1" }', physical)
             self.assertIn('inherit = "trigger/trigger";', physical)
             self.assertIn('class = "idTrigger";', physical)
             self.assertIn('triggerOnce = true;', physical)
@@ -120,7 +131,7 @@ class FortressCampaign(unittest.TestCase):
         self.assertIn('inherit = "target/interact_action";', action)
         self.assertIn('class = "idTarget_InteractionAction";', action)
         self.assertIn('item[0] = "interact_hub_mission_select_1";', action)
-        self.assertIn('action = "IA_ACTIVATE_ANY";', action)
+        self.assertIn('action = "IA_USE_SUCCEED";', action)
         for name in transitions:
             block = entity(self.result, name)
             self.assertIn('class = "idTarget_Count";', block)

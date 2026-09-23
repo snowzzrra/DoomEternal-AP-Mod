@@ -1,6 +1,8 @@
 import struct
+from pathlib import Path
 
 from doom_eap.runtime.weapon_points import SentinelWeaponPoints
+from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
 
 
 SCOPE = {
@@ -14,7 +16,7 @@ SCOPE = {
 
 
 def link_with(result_factory):
-    link = SentinelWeaponPoints("probe", 42, "a" * 64)
+    link = SentinelWeaponPoints(Path("probe"), 42, "a" * 64)
     messages = []
 
     def run(args, payload=None):
@@ -48,6 +50,24 @@ def test_hook_and_special_use_typed_submit_and_release():
     ]
     assert struct.unpack_from("<Q", messages[0][2], 16)[0] == 16384
     assert struct.unpack_from("<Q", messages[2][2], 16)[0] == 65536
+
+
+def test_mastery_is_commandless_and_uses_native_bit_order():
+    assert list(MASTERY_ITEM_BITS.values()) == [1 << i for i in range(13)]
+    definitions = {item_id: {"type": "perk", "perk": "authored/mastery"} for item_id in MASTERY_ITEM_BITS}
+    assert all(not compile_item_delivery_plan(item_id, definitions).commands for item_id in definitions)
+
+    mask = MASTERY_ITEM_BITS[7770072] | MASTERY_ITEM_BITS[7770084]
+    def confirmed(_flag, _operation, request_id):
+        return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build",
+                "state": 3, "outcome": 2, "flags": 27 | 32, "masteries_ap_after": mask}
+
+    link, messages = link_with(confirmed)
+    link.ensure_masteries(mask)
+    assert [(flag, operation) for flag, operation, _ in messages] == [
+        ("--arsenal", 29), ("--arsenal", 32),
+    ]
+    assert struct.unpack_from("<IIII", messages[0][2], 16 + 72 + 65) == (4, 0, 0, mask)
 
 
 def test_automap_publishes_exact_checked_bits_without_native_mutation():

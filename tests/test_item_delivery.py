@@ -450,6 +450,24 @@ async def test_historical_hook_reprojects_without_cursor_reset(monkeypatch):
     assert context.items_processed == 1
 
 
+@_run_async
+async def test_mastery_receipt_and_history_use_native_projection(monkeypatch):
+    context = _context([NetworkItem(7770084, 8, 1, 0)])
+    calls = []
+    context.native_game_link = lambda: SimpleNamespace(
+        ensure_masteries=lambda mask: calls.append(mask) or {
+            "outcome": 0, "flags": 27, "masteries_ap_after": mask,
+        }
+    )
+    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", False)
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {7770084: {"type": "perk", "perk": "authored/mastery"}})
+
+    assert await context.process_pending_item_receipts("packet")
+    assert context.items_processed == 1
+    assert await context.process_pending_item_receipts("reconnect")
+    assert calls == [1 << 8, 1 << 8]
+
+
 def test_packet_timing_preserves_history_tail_and_index_zero_clear(monkeypatch):
     receipt = NetworkItem(8, -2, 1, 0)
     context = _context([receipt, receipt], processed=1)

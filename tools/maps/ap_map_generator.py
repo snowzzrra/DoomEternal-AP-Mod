@@ -10,6 +10,7 @@ from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
 from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
+    MASTERY_ITEM_BITS,
     build_primitive,
     validate_primitive_registry,
 )
@@ -2229,7 +2230,7 @@ def generate_rpc_command_entities(
     for item_id, command_value in items_dict.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
-            if command_type in {"no_op", "native_weapon_upgrade_points"}:
+            if int(item_id) in MASTERY_ITEM_BITS or command_type in {"no_op", "native_weapon_upgrade_points"}:
                 continue
             if command_type == "transient_effect":
                 continue

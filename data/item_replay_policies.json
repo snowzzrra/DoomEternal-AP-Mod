@@ -86,10 +86,6 @@
       "name": "Progressive Health Upgrade",
       "policy": "special_progressive"
     },
-    "7770020": {
-      "name": "Rune",
-      "policy": "never_replay"
-    },
     "7770021": {
       "name": "Suit Point",
       "policy": "special_progressive"

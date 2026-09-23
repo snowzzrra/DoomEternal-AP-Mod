@@ -12,6 +12,15 @@ from doom_eap.content.map_registry import load_map_registry, release_plan
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# Arsenal's mastery-bit order, not the order of rows in global_runtime.json.
+MASTERY_ITEM_BITS = {
+    7770070: 1 << 0, 7770069: 1 << 1, 7770067: 1 << 2,
+    7770068: 1 << 3, 7770063: 1 << 4, 7770065: 1 << 5,
+    7770072: 1 << 6, 7770074: 1 << 7, 7770084: 1 << 8,
+    7770076: 1 << 9, 7770078: 1 << 10, 7770082: 1 << 11,
+    7770080: 1 << 12,
+}
+
 VALID_STATUSES = {
     "runtime_verified",
     "runtime_verified_with_map_exception",
@@ -538,6 +547,16 @@ def compile_item_delivery_plan(
         raise ValueError(f"Unknown item ID: {item_id}")
     definition = definitions[item_id]
     family = classify_item_definition(definition)
+    if item_id in MASTERY_ITEM_BITS:
+        # Native Arsenal owns terminal effects. The old perk RPC would also
+        # register a normal upgrade and mutate challenge/selection state.
+        commands = ()
+        if receipt:
+            if classification is None:
+                raise ValueError(f"Received item {item_id} requires classification")
+            entity = notification_entity_name(item_id, classification, slot=notification_slot)
+            commands = (DeliveryCommand(entity, f"ai_ScriptCmdEnt {entity} activate", 0),)
+        return DeliveryPlan(item_id, family, "sentinel.arsenal_mastery.v1", commands, None, str(definition))
     if family == "native_weapon_upgrade_points":
         # Notification-only DECL plan. The receipt owner must confirm Sentinel
         # execution separately; no RPC/currency entity can materialize WUP.

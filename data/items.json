@@ -47,7 +47,6 @@
             "perk/player/argent/health_capacity_3"
         ]
     },
-    "7770020": "give inventory/rune",
     "7770021": {
         "type": "progressive_perk",
         "perks": [
