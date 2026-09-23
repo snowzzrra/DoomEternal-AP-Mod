@@ -1,7 +1,7 @@
 import struct
 from pathlib import Path
 
-from doom_eap.runtime.weapon_points import SentinelWeaponPoints
+from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
 from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
 
 
@@ -39,6 +39,43 @@ def queued_result(flag, operation, request_id):
             "outcome": 0, "flags": 106, "owns_crucible": 1, "native_crucible": 1,
             "owns_hammer": 1, "native_hammer": 1, "hammer_tier": 1,
             "native_hammer_perks": 0, "native_state_known": 3, "operations_applied": 1}
+
+
+def test_special_tier2_requires_terminal_projection_not_native_perks():
+    def response(_flag, _operation, request_id):
+        return {**queued_result("--special", 37, request_id), "hammer_tier": 2,
+                "flags": 106 | (1 << 14), "native_hammer_perks": 0}
+
+    link, messages = link_with(response)
+    assert link.ensure_progressive_special_weapon(3)["native_hammer_perks"] == 0
+    assert [(flag, op) for flag, op, _ in messages] == [("--special", 37), ("--special", 40)]
+
+    def perks_only(_flag, _operation, request_id):
+        return {**response(_flag, _operation, request_id), "flags": 106,
+                "native_hammer_perks": 2, "native_state_known": 7}
+
+    link, _ = link_with(perks_only)
+    try:
+        link.ensure_progressive_special_weapon(3)
+    except WeaponPointsBlocked as exc:
+        assert "Native Special ownership failed" in str(exc)
+    else:
+        raise AssertionError("native perks alone certified tier2")
+
+    link, _ = link_with(perks_only)
+    assert link.ensure_progressive_special_weapon(2)["hammer_tier"] == 2
+
+
+def test_special_tier2_noop_replay_keeps_projection_contract():
+    def replay(_flag, _operation, request_id):
+        return {**queued_result("--special", 37, request_id), "hammer_tier": 2,
+                "flags": 98 | (1 << 14), "outcome": 1,
+                "native_hammer_perks": 0, "operations_applied": 0}
+
+    link, messages = link_with(replay)
+    assert link.ensure_progressive_special_weapon(3)["outcome"] == 1
+    assert link.ensure_progressive_special_weapon(3)["outcome"] == 1
+    assert [op for _, op, _ in messages] == [37, 40, 37, 40]
 
 
 def test_hook_and_special_use_typed_submit_and_release():
