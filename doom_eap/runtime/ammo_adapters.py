@@ -2,6 +2,7 @@
 import asyncio
 from collections import deque
 import os
+from uuid import uuid4
 
 from doom_eap.contracts.command_publication import queue_session_namespace
 from doom_eap.runtime.ammo_refill import AMMO_REFILL_ITEM_ID, AMMO_REFILL_PRIMITIVE_ITEM_ID
@@ -67,8 +68,9 @@ class AmmoCommandPublication:
             self._logger.error("[Ammo Refill] Invalid raw console command plan: %r", commands)
             return False
         command_keys = []
+        attempt_id = uuid4().hex
         for stage, command in enumerate(commands):
-            command_key = f"ammo-refill-{namespace}-stage{stage}"
+            command_key = f"ammo-refill-{namespace}-{attempt_id}-stage{stage}"
             queued = self._send(
                 command,
                 coalesce_key=command_key,

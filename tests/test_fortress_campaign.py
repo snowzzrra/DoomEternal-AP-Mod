@@ -85,7 +85,7 @@ class FortressCampaign(unittest.TestCase):
         self.assertIn('"game/sp/hub/ap_phase_1"', layers_1)
         self.assertNotIn('"game/sp/hub/ap_phase_2"', layers_1)
 
-    def test_phase_layers_keep_authored_checkpoint_and_spawn(self):
+    def test_phase_layers_preserve_native_checkpoint_owner(self):
         from tools.maps.fortress_campaign import VISITS
         for phase in range(8):
             visit = VISITS[max(0, phase - 1)]
@@ -94,7 +94,8 @@ class FortressCampaign(unittest.TestCase):
             for field in ('checkpointName', 'playerSpawnSpot'):
                 value = re.search(rf'\b{field} = "([^"]+)";', source)
                 self.assertIsNotNone(value)
-                self.assertIn(f'{field} = "{value[1]}";', result)
+                self.assertIn(f'{field} = "{value[1]}";', entity(self.result, f'target_change_layer_{visit}'))
+                self.assertNotIn(f'{field} =', result)
             for field in ('inherit = "target/change_layer";', 'flags = {', 'spawnPosition = {'):
                 self.assertIn(field, source)
                 self.assertIn(field, result)

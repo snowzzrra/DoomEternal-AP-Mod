@@ -183,6 +183,7 @@ def project_fortress(text: str, config: dict) -> str:
         remove = [layer for layer in all_scenery + skies if layer not in active]
         layer_target = _layer(visit_target, None).replace(
             f"entityDef target_change_layer_{visit}", f"entityDef ap_fortress_layers_{phase}", 1)
+        layer_target = re.sub(r'\s*(?:checkpointName|playerSpawnSpot)\s*=\s*"[^"]+";', '', layer_target)
         layer_target = _set_native_list(
             layer_target, "activate_Immediately", active + content_layers(max(1, phase)))
         layer_target = _set_native_list(layer_target, "remove_Immediately", remove)

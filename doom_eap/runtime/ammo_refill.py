@@ -388,13 +388,13 @@ class AmmoRefill:
         except Exception as error:
             if generation != self._generation:
                 return False
-            self._commands.cancel("storage update failed")
+            self._commands.cancel("storage outcome uncertain")
             self._pending = False
             self._emit(
                 "ammo_refill",
-                status="error",
+                status="uncertain",
                 **self.balance(),
-                message=str(error),
+                message=f"Ammo Refill storage outcome unknown; commands cancelled: {error}",
             )
             return False
         if generation != self._generation:

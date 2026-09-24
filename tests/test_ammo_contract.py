@@ -70,6 +70,41 @@ def test_partial_staging_refusal_does_not_spend_or_leave_the_first_command(tmp_p
     assert ammo.available == 3 and not ammo.pending and gate["enabled"]
 
 
+def test_separate_f9_uses_keep_distinct_durable_command_ids(tmp_path):
+    messages = []
+
+    async def send(packets):
+        messages.extend(packets)
+
+    ammo, _, gate, events = setup_ammo(tmp_path, send)
+    scope = AmmoCommandScope("room-A", "map", "slot", True)
+    assert asyncio.run(ammo.request(scope, (None, {})))
+    first = {path.name for path in tmp_path.glob("*.cmd")}
+    assert len(first) == 2 and not gate["enabled"]
+    ammo.consume_consumed(1)
+    assert gate["enabled"] and ammo.available == 2
+    assert asyncio.run(ammo.request(scope, (None, {})))
+    second = {path.name for path in tmp_path.glob("*.cmd")} - first
+    assert len(second) == 2 and not gate["enabled"]
+    ammo.consume_consumed(2)
+    assert gate["enabled"] and ammo.available == 1
+    assert len(messages) == 2 and first.isdisjoint(second)
+    assert not any(event[1].get("status") == "verified" for event in events)
+
+
+def test_uncertain_storage_result_cancels_commands_without_replaying_debit(tmp_path):
+    async def send(_packets):
+        raise OSError("ack lost")
+
+    ammo, _, gate, events = setup_ammo(tmp_path, send)
+    scope = AmmoCommandScope("room-A", "map", "slot", True)
+    assert not asyncio.run(ammo.request(scope, (None, {})))
+    assert not list(tmp_path.glob("*.cmd")) and gate["enabled"]
+    assert events[-1][1]["status"] == "uncertain"
+    ammo.consume_consumed(1)
+    assert ammo.available == 2
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_late_storage_completion_cannot_cancel_or_report_in_a_new_room(tmp_path, fail):
     async def run():
