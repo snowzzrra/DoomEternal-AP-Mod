@@ -170,12 +170,13 @@ class SentinelWeaponPoints:
         hammer_tier = 2 if count >= 3 else own_hammer
         body = struct.pack("<IIIIIIIQII", 1, 1, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
         result = self._execute_typed(65536, "--special", 37, 38, 40, body)
-        required_known = 1 | (2 if own_hammer else 0)
-        if (result["outcome"] not in (0, 1) or result["flags"] & 98 != 98
+        required_known = 1 | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
+        required_flags = 34 | (64 if result["outcome"] == 1 else 0)
+        if (result["outcome"] not in (0, 1) or result["flags"] & required_flags != required_flags
                 or result["owns_crucible"] != 1 or result["native_crucible"] != 1
                 or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
                 or result["hammer_tier"] < hammer_tier
-                or (hammer_tier == 2 and not result["flags"] & (1 << 14))
+                or (hammer_tier == 2 and result["native_hammer_perks"] != 2)
                 or result["native_state_known"] & required_known != required_known):
             raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")
         # NOOP performs no native mutation, independently of selection knowledge.
