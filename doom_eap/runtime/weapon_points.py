@@ -176,7 +176,7 @@ class SentinelWeaponPoints:
                 or result["owns_crucible"] != 1 or result["native_crucible"] != 1
                 or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
                 or result["hammer_tier"] < hammer_tier
-                or (hammer_tier == 2 and result["native_hammer_perks"] != 2)
+                or (hammer_tier == 2 and result["native_hammer_perks"] != 3)
                 or result["native_state_known"] & required_known != required_known):
             raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")
         # NOOP performs no native mutation, independently of selection knowledge.

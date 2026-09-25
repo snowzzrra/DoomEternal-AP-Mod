@@ -184,6 +184,7 @@ def compile_materialization_plan(
             hammer_upgrades = (
                 ("ammo_drops_upgraded", "perk/player/weapons/hammer/ammo_drops_upgraded"),
                 ("armor_and_health_drops_upgraded", "perk/player/weapons/hammer/armor_and_health_drops_upgraded"),
+                ("debuff_duration_increase", "perk/player/weapons/hammer/debuff_duration_increase"),
             )
             existing_cmd_strings = {cmd.command for cmd in special_commands}
             for upgrade_key, perk_path in hammer_upgrades:
