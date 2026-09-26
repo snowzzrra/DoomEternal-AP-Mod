@@ -197,7 +197,10 @@ After a level is complete, Fast Travel is enabled when replaying it through Miss
 
 ### DeathLink
 
-When enabled, a received DeathLink applies a short two-hit lethal burst during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops.
+In Soft mode, one received event applies lethal damage once; an Extra Life or
+Saving Throw can protect the player and fulfills the event. Hardcore causes
+direct death and checkpoint reload without consuming either protection or
+repeating damage. Remote-caused deaths are echo-suppressed to prevent loops.
 
 ### Temporary effects
 
