@@ -33,7 +33,7 @@ def active_crucible(special_mode, processed_ids):
     if special_mode in {"the_crucible", "The Crucible"}:
         return 7770007 in processed_ids
     if special_mode in {"progressive_special_weapon", "Progressive Special Weapon"}:
-        return sum(item_id == 7770901 for item_id in processed_ids) == 1
+        return 7770901 in processed_ids
     return False
 
 
