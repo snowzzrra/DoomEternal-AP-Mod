@@ -14,6 +14,7 @@ class PhysicalChecks:
         self._logger = logger
         self._generation = 0
         self._last_event = None
+        self._pending = set()
 
     @property
     def last_event(self):
@@ -21,21 +22,28 @@ class PhysicalChecks:
 
     def invalidate(self):
         self._generation += 1
+        self._pending.clear()
 
-    @staticmethod
-    def disposition(location_id, facts: CheckObservation, item_ready):
+    def pending(self, facts):
+        """Qualified observations retained until ACK, within this publication epoch."""
+        self._pending.difference_update(facts.checked)
+        return frozenset(self._pending & facts.server_locations)
+
+    def disposition(self, location_id, facts: CheckObservation, item_ready):
         if location_id in facts.checked:
             return "acknowledged"
         if item_ready and facts.server_locations and location_id not in facts.server_locations:
             return "quarantine"
         if location_id not in facts.server_locations:
             return "outside_slot"
+        self._pending.add(location_id)
         return "submitted" if location_id in facts.submitted else "submit"
 
     async def publish(self, location_ids, publication: CheckBatchPublicationPort):
         if not location_ids:
             return
         generation = self._generation
+        self._pending.update(location_ids)
         self._last_event = location_ids[-1]
         try:
             await publication.locations(location_ids)

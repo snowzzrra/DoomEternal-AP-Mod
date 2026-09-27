@@ -867,9 +867,12 @@ class Pipeline:
             expected = build_release_manifest(
                 ROOT,
                 generated_maps=generated_root,
+                room_resources=root / "client" / "resources",
                 release_version=manifest["version"],
             )
-            for field in ("checked_location_visuals", "room_compiler", "base_resources"):
+            for field in ("checked_location_visuals", "physical_pickups", "room_compiler", "base_resources"):
+                if field == "physical_pickups" and field not in manifest:
+                    continue
                 actual_value = manifest[field]
                 expected_value = expected[field]
                 if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:

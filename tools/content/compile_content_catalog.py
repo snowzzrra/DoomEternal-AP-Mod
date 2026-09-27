@@ -184,6 +184,14 @@ def _compile_catalog(
     compiled_sources = _catalog_registry(catalog.root)
 
     generated_data = {
+        "physical_pickups.json": {
+            "schema": 1,
+            "maps": {
+                spec.runtime_map: sorted(item.location_id for item in catalog.physical_locations
+                                         if item.map_key == spec.key and item.strategy != "secret_encounter")
+                for spec in catalog.maps.values() if spec.enabled
+            },
+        },
         "map_sources.json": compiled_sources,
         "location_names.json": {
             "schema_version": 1,

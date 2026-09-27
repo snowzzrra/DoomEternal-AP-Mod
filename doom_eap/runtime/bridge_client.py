@@ -4365,7 +4365,24 @@ class DoomEternalContext(CommonContext):
             self._campaign_menu = CampaignMenu()
         try:
             projection = self.campaign_projection()
-            result = await asyncio.to_thread(self._campaign_menu.synchronize, self.native_game_link(), projection)
+            from doom_eap.runtime.mission_presentation import MissionPresentations
+            if not hasattr(self, "_mission_presentations"):
+                self._mission_presentations = MissionPresentations(REPO_ROOT,
+                                                                    MISSION_CHALLENGE_ENTRIES)
+            link = self.native_game_link()
+            facts = self.check_observation()
+            pending = self.physical_checks.pending(facts)
+            generation = self._connected_slot_data["native_generation_fingerprint"]
+            projection["summaries"] = {
+                row["stage"]: self._mission_presentations.snapshot(
+                    link.namespace, generation, row["map"], revealed=row["revealed"], facts=facts, pending=pending)
+                for row in projection["rows"]
+            }
+            ratings = self._connected_slot_data.get("mission_presentation_v1", {})
+            projection["ratings"] = {row["stage"]: ratings[row["stage"]]
+                                     for row in projection["rows"]
+                                     if row["revealed"] and row["stage"] in ratings}
+            result = await asyncio.to_thread(self._campaign_menu.synchronize, link, projection)
             self.synchronize_fortress_phase(projection)
             selected = result["selected_stage"]
             if selected:
@@ -6387,7 +6404,6 @@ class DoomEternalContext(CommonContext):
             self._publish_native_ammo_refill("tracker")
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
-                    await self.synchronize_campaign_menu()
                     evidence = read_gameplay_save_evidence()
                     if getattr(evidence, "state", None) == "not_running":
                         self.reset_transient_effects("game_exit")
@@ -6460,6 +6476,7 @@ class DoomEternalContext(CommonContext):
                     continue
 
                 await self.flush_check_event_files()
+                await self.synchronize_campaign_menu()
 
             await asyncio.sleep(4.0)
 
