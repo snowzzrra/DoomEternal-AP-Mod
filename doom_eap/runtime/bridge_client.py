@@ -4416,7 +4416,7 @@ class DoomEternalContext(CommonContext):
             return
         # Layer activation and checked cleanup use separate scoped queue jobs.
         # The checked-visual reconciler owns retries after content materialization.
-        command = f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate"
+        command = f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate player1"
         if send_command(command,
                         coalesce_key=stable_spool_id("fortress", lease, phase), state_key=self.state_key,
                         materialization_lease=lease, already_queued_ok=True):

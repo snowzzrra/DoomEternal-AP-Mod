@@ -130,7 +130,11 @@ def project_fortress(text: str, config: dict) -> str:
             bounds = find_entity_block_bounds(text, name)
             if bounds:
                 start, end = bounds
-                text = text[:start] + _layer(text[start:end], layer) + text[end:]
+                block = _layer(text[start:end], layer)
+                if code in (7770073, 7770086) and name == f"ap_independent_{source}":
+                    block = block.replace('edit = {', 'edit = {\n\t\tdormancy = {\n'
+                                          '\t\t\tallowDormancy = false;\n\t\t}', 1)
+                text = text[:start] + block + text[end:]
         # Checked repair hides presentation and removes only the AP check relay.
         # Shared native targets on the source trigger retain their authored edges.
         name = f"ap_hide_location_visual_{code}"
@@ -168,12 +172,6 @@ def project_fortress(text: str, config: dict) -> str:
 
     all_scenery = [f"game/sp/hub/{visit}" for visit in (*VISITS, "from_e3m4", "from_e1m2_post_prison")]
     skies = [f"game/sp/hub/sky_{sky}" for sky in ("earth", "sentinel", "phobos")]
-    text += ('\nentity {\n\tentityDef ap_fortress_enable_phase_0_pickups {\n'
-             '\tinherit = "target/enable_target";\n\tclass = "idTarget_EnableTarget";\n'
-             '\texpandInheritance = false;\n\tedit = {\n\t\tenableFlag = true;\n' +
-             _native_list("targets", ["ap_independent_pickup_equipment_flame_belch_1",
-                                      "ap_independent_progress_argent_cell_1_1072112848"]) +
-             '\t}\n}\n}\n')
     for phase in range(8):
         visit = VISITS[max(0, phase - 1)]
         visit_bounds = find_entity_block_bounds(text, f"target_change_layer_{visit}")
@@ -196,8 +194,6 @@ def project_fortress(text: str, config: dict) -> str:
         text += "\n" + layer_target + "\n"
         targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,
                     "target_interact_action_portal_usable", "ap_fortress_mission_select_enable"]
-        if phase == 0:
-            targets.append("ap_fortress_enable_phase_0_pickups")
         if phase == 7:
             targets.append("target_show_engine_room_secret")
         text += ('entity {\n\tentityDef ap_fortress_phase_' + str(phase) + ' {\n'
