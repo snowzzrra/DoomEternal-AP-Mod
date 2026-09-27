@@ -55,7 +55,7 @@ class SentinelWeaponPoints:
                 self.diagnostic(evidence)
             raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
         predicate = ("exit_or_result" if process.returncode or result.get("result") != "ok"
-                     else "core_version_equals_0.8.0" if result.get("core_version") != "0.8.0" else None)
+                     else "core_version_supported" if result.get("core_version") not in {"0.8.0", "0.9.0"} else None)
         evidence["predicate"] = predicate
         if self.diagnostic:
             self.diagnostic(evidence)
