@@ -4365,6 +4365,7 @@ class DoomEternalContext(CommonContext):
             self._campaign_menu = CampaignMenu()
         try:
             projection = self.campaign_projection()
+            self.synchronize_fortress_phase(projection)
             from doom_eap.runtime.mission_presentation import MissionPresentations
             if not hasattr(self, "_mission_presentations"):
                 self._mission_presentations = MissionPresentations(REPO_ROOT,
@@ -4383,7 +4384,6 @@ class DoomEternalContext(CommonContext):
                                      for row in projection["rows"]
                                      if row["revealed"] and row["stage"] in ratings}
             result = await asyncio.to_thread(self._campaign_menu.synchronize, link, projection)
-            self.synchronize_fortress_phase(projection)
             selected = result["selected_stage"]
             if selected:
                 self.unified_campaign.select(selected, projection)

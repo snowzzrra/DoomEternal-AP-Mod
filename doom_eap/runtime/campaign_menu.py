@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import secrets
 import struct
 
@@ -32,16 +33,16 @@ class CampaignMenu:
             summary = snapshot.get("summaries", {}).get(row["stage"])
             rating = snapshot.get("ratings", {}).get(row["stage"]) if row["revealed"] else None
             band = 0
-            if rating is not None:
-                tier = int(rating["skull_tier"])
-                if tier not in (1, 2, 3, 4):
-                    raise ValueError("Native mission skull tier is invalid")
-                band = tier
-                if "expected_player_cr" in rating:
-                    cr = round(float(rating["expected_player_cr"]) * 100)
-                    if cr < 0 or cr > 10000:
-                        raise ValueError("Native expected loadout CR is invalid")
-                    band |= (cr + 1) << 8
+            if rating is not None and "expected_player_cr" in rating:
+                base, expected, allowance = (float(rating[key]) for key in
+                                              ("base_cr", "expected_player_cr", "skill_allowance"))
+                if not all(math.isfinite(value) and 0 <= value <= 100
+                           for value in (base, expected, allowance)):
+                    raise ValueError("Native relative difficulty facts are invalid")
+                # Derive the visual tier from frozen facts, including rooms with an absolute skull_tier.
+                deficit = round((base - expected - allowance) * 100)
+                band = 1 + sum(deficit > cut for cut in (-1000, 0, 1000))
+                band |= (round(expected * 100) + 1) << 8
             fields = bytes(292)
             if summary is not None:
                 if summary.namespace != link.namespace or summary.runtime_map != row["map"]:
