@@ -1,0 +1,2733 @@
+{
+	edit = {
+		versionNumber = 21;
+		variables = {
+			num = 1;
+			item[0] = {
+				id = 4067588000;
+				name = "bSkipped";
+				model = {
+					className = "idLogicVariableModelBool";
+				}
+			}
+		}
+		mainGraph = {
+			className = "idLogicGraphAssetEntityMain";
+			object = {
+				id = 3559938963;
+				pos = {
+					x = 3394.04761;
+					y = 688.095215;
+				}
+				zoom = 84;
+				variables = {
+					num = 2;
+					item[0] = {
+						id = 571257839;
+						name = "hasScenePlayed";
+						model = {
+							className = "idLogicVariableModelBool";
+						}
+					}
+					item[1] = {
+						id = 3530825104;
+						name = "iScene_Switch";
+						model = {
+							className = "idLogicVariableModelInt";
+						}
+					}
+				}
+				nodes = {
+					num = 77;
+					item[0] = {
+						id = 180138460;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 571257839;
+								}
+							}
+						}
+						pos = {
+							x = -1260;
+							y = 60;
+						}
+						size = {
+							x = 180;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[1] = {
+						id = 2877089172;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 571257839;
+								}
+							}
+						}
+						pos = {
+							x = -340;
+							y = -80;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[2] = {
+						id = 272046422;
+						model = {
+							className = "idLogicNodeModelClass_v2";
+							object = {
+								class = {
+									decl = "cinematic/ultimate_sin";
+								}
+							}
+						}
+						pos = {
+							x = -60;
+							y = 120;
+						}
+						size = {
+							x = 360;
+							y = 480;
+						}
+						pinVariables = {
+							num = 19;
+							item[0] = {
+								id = 195846681;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[1] = {
+								id = 36148865;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[2] = {
+								id = 11919975;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+							item[3] = {
+								id = 115218104;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+							item[4] = {
+								id = 60688805;
+								model = {
+									className = "idLogicVariableModelVector3";
+								}
+							}
+							item[5] = {
+								id = 83517198;
+								model = {
+									className = "idLogicVariableModelAngles";
+									object = {
+										value = {
+											yaw = 5.5;
+										}
+									}
+								}
+							}
+							item[6] = {
+								id = 971921;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 300;
+									}
+								}
+							}
+							item[7] = {
+								id = 63664326;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[8] = {
+								id = 201647874;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[9] = {
+								id = 123372004;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[10] = {
+								id = 252777362;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[11] = {
+								id = 154870407;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+							item[12] = {
+								id = 146008909;
+								model = {
+									className = "idLogicVariableModelTimeList";
+									object = {
+										value = {
+											num = 3;
+											item[0] = 300;
+											item[1] = 200;
+											item[2] = 300;
+										}
+									}
+								}
+							}
+							item[13] = {
+								id = 53344893;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[14] = {
+								id = 25050976;
+								model = {
+									className = "idLogicVariableModelEntity";
+								}
+							}
+							item[15] = {
+								id = 31930812;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[16] = {
+								id = 163201144;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[17] = {
+								id = 76344554;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[18] = {
+								id = 262481666;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[3] = {
+						id = 1267908969;
+						model = {
+							className = "idLogicNodeModelEventReceive";
+							object = {
+								event = {
+									decl = "game/cin/dlc2";
+									id = 2695182644;
+								}
+							}
+						}
+						pos = {
+							x = 300;
+							y = -180;
+						}
+						size = {
+							x = 260;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[4] = {
+						id = 4093718922;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+									item[0] = "end_sin";
+								}
+							}
+						}
+						pos = {
+							x = -60;
+							y = 820;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						flipped = true;
+						minimized = true;
+					}
+					item[5] = {
+						id = 2635303458;
+						model = {
+							className = "idLogicNodeModelSwitchString_v2";
+							object = {
+								cases = {
+									num = 5;
+									item[0] = {
+										id = 1828668480;
+										value = "intro_text";
+									}
+									item[1] = {
+										id = 1787803328;
+										value = "cinStart";
+									}
+									item[2] = {
+										id = 3595396976;
+										value = "logo_slam";
+									}
+									item[3] = {
+										id = 3370875552;
+										value = "starting_area";
+									}
+									item[4] = {
+										id = 3596154096;
+										value = "cinEnd";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 2160;
+							y = 240;
+						}
+						size = {
+							x = 160;
+							y = 180;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelString";
+								}
+							}
+						}
+					}
+					item[6] = {
+						id = 4092355239;
+						model = {
+							className = "idLogicNodeModelBegin";
+						}
+						pos = {
+							x = -1660;
+							y = -100;
+						}
+						size = {
+							x = 80;
+							y = 60;
+						}
+					}
+					item[7] = {
+						id = 3662132047;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+									item[0] = "end_sin";
+								}
+							}
+						}
+						pos = {
+							x = 1680;
+							y = 780;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						flipped = true;
+						minimized = true;
+					}
+					item[8] = {
+						id = 1709116575;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = -1180;
+							y = -100;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[9] = {
+						id = 17689074;
+						model = {
+							className = "idLogicNodeModelSceneDirectorControl_v3";
+							object = {
+								scene = "maps/dlc2/e5m1_spear/intro";
+							}
+						}
+						pos = {
+							x = 1820;
+							y = 60;
+						}
+						size = {
+							x = 280;
+							y = 280;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+							item[1] = {
+								id = 2279745040;
+								model = {
+									className = "idLogicVariableModelInt";
+								}
+							}
+						}
+					}
+					item[10] = {
+						id = 1141381208;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = -340;
+							y = 380;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 3;
+											item[0] = "intro_dark_lord_naked";
+											item[1] = "intro_doomslayer_cine";
+											item[2] = "intro_double_barrel";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[11] = {
+						id = 1880025195;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Disable Helmet Lights";
+								bodyText = "if player skin is \"alt_helmet\"";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2960;
+							y = -260;
+						}
+						size = {
+							x = 300;
+							y = 260;
+						}
+					}
+					item[12] = {
+						id = 2578884078;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "lg_broadcast";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.711111009;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 280;
+							y = -240;
+						}
+						size = {
+							x = 300;
+							y = 200;
+						}
+					}
+					item[13] = {
+						id = 269297019;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Fade from Black";
+								bodyText = "THIS EVENT IS IGNORED WHEN SKIPPED---Edit no it is not";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.772548974;
+									b = 0.0274509974;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = 3520;
+							y = -260;
+						}
+						size = {
+							x = 220;
+							y = 220;
+						}
+					}
+					item[14] = {
+						id = 681554369;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "logo_slam";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 2400;
+							y = 280;
+						}
+						size = {
+							x = 120;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[15] = {
+						id = 408145826;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "DLC2 Logo Slam";
+								headerFillColor = {
+									r = 0.0313725993;
+									g = 0.838562012;
+									b = 1;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.0627451017;
+									g = 0.794772029;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 3200;
+							y = 180;
+						}
+						size = {
+							x = 320;
+							y = 200;
+						}
+					}
+					item[16] = {
+						id = 1333989340;
+						model = {
+							className = "idLogicNodeModelBink";
+							object = {
+								binkMaterial = "video/cineractive/e5m1_spear/intro/dlc_2_logo_slam";
+							}
+						}
+						pos = {
+							x = 3220;
+							y = 240;
+						}
+						size = {
+							x = 280;
+							y = 120;
+						}
+					}
+					item[17] = {
+						id = 2555055156;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 2420;
+							y = 420;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[18] = {
+						id = 2999173583;
+						model = {
+							className = "idLogicNodeModelUIHudEvent";
+							object = {
+								hudEvent = "HUD_EVENT_DISABLE_PAUSE";
+							}
+						}
+						pos = {
+							x = -600;
+							y = -80;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+					}
+					item[19] = {
+						id = 1021797131;
+						model = {
+							className = "idLogicNodeModelTextCrawl";
+							object = {
+								textCrawl = "campaign/dlc2/intro";
+							}
+						}
+						pos = {
+							x = 3180;
+							y = -540;
+						}
+						size = {
+							x = 100;
+							y = 120;
+						}
+					}
+					item[20] = {
+						id = 3377287191;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 3;
+									item[0] = {
+										id = 1894018480;
+										name = "stop";
+										locked = false;
+									}
+									item[1] = {
+										id = 1609884432;
+										name = "play";
+										locked = false;
+									}
+									item[2] = {
+										id = 519120848;
+										locked = false;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1120;
+						}
+						size = {
+							x = 100;
+							y = 40;
+						}
+						collapsed = true;
+					}
+					item[21] = {
+						id = 1093544252;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "disable pause";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.36601299;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = -620;
+							y = -140;
+						}
+						size = {
+							x = 240;
+							y = 180;
+						}
+					}
+					item[22] = {
+						id = 1861500921;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 3540;
+							y = -180;
+						}
+						size = {
+							x = 160;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+									object = {
+										value = {
+											a = 0;
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 1000;
+									}
+								}
+							}
+						}
+					}
+					item[23] = {
+						id = 376787662;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Intro text";
+								bodyText = "When it finishes broadcast event to play main cinematic";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.596078992;
+									g = 0.596078992;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 3160;
+							y = -620;
+						}
+						size = {
+							x = 1180;
+							y = 320;
+						}
+					}
+					item[24] = {
+						id = 794693827;
+						model = {
+							className = "idLogicNodeModelClass_v2";
+							object = {
+								class = {
+									decl = "lighting/disable_helmet_lights";
+								}
+							}
+						}
+						pos = {
+							x = 2980;
+							y = -180;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 26016416;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[25] = {
+						id = 2903386576;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "IGNORED WHEN SKIPPED";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 3180;
+							y = 60;
+						}
+						size = {
+							x = 980;
+							y = 400;
+						}
+					}
+					item[26] = {
+						id = 3069454978;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 3660;
+							y = 760;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						flipped = true;
+						minimized = true;
+					}
+					item[27] = {
+						id = 647163289;
+						model = {
+							className = "idLogicNodeModelEntityOnActivated";
+						}
+						pos = {
+							x = -920;
+							y = -400;
+						}
+						size = {
+							x = 260;
+							y = 140;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 5;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[1] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "checkpoints_target_relay_cp_was_used";
+									}
+								}
+							}
+						}
+					}
+					item[28] = {
+						id = 1740058005;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 571257839;
+								}
+							}
+						}
+						pos = {
+							x = -620;
+							y = -400;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[29] = {
+						id = 3143421888;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = -1520;
+							y = -160;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 50;
+									}
+								}
+							}
+						}
+					}
+					item[30] = {
+						id = 1129278094;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/cine_3";
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -180;
+						}
+						size = {
+							x = 320;
+							y = 80;
+						}
+					}
+					item[31] = {
+						id = 2538505166;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/main_ambient";
+							}
+						}
+						pos = {
+							x = 3620;
+							y = 360;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+					}
+					item[32] = {
+						id = 1768103966;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "Helmet Lights";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 2960;
+							y = -80;
+						}
+						size = {
+							x = 240;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 5;
+											item[0] = "intro_light_point_face_nose";
+											item[1] = "intro_light_point_face_sl";
+											item[2] = "intro_light_point_face_sr";
+											item[3] = "intro_light_point_face_top_brow_sl";
+											item[4] = "intro_light_point_face_top_brow_sr";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[33] = {
+						id = 2182133731;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/stinger";
+							}
+						}
+						pos = {
+							x = 3600;
+							y = 180;
+						}
+						size = {
+							x = 320;
+							y = 80;
+						}
+					}
+					item[34] = {
+						id = 2973355489;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 2820;
+							y = 580;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "checkpoints_target_relay_48";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[35] = {
+						id = 2961058989;
+						model = {
+							className = "idLogicNodeModelSetGameSoundState";
+							object = {
+								soundStateToSet = "cinematic/cinematic_stop";
+							}
+						}
+						pos = {
+							x = 3660;
+							y = 280;
+						}
+						size = {
+							x = 340;
+							y = 80;
+						}
+					}
+					item[36] = {
+						id = 479732666;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Checkpoints";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.941177011;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2800;
+							y = 520;
+						}
+						size = {
+							x = 240;
+							y = 180;
+						}
+					}
+					item[37] = {
+						id = 674340811;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 660;
+							y = -180;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelInt";
+									object = {
+										value = 1;
+									}
+								}
+							}
+						}
+					}
+					item[38] = {
+						id = 3751286852;
+						model = {
+							className = "idLogicNodeModelEventBroadcast";
+							object = {
+								event = {
+									decl = "game/cin/dlc2";
+									id = 2695182644;
+								}
+							}
+						}
+						pos = {
+							x = 3980;
+							y = -540;
+						}
+						size = {
+							x = 280;
+							y = 80;
+						}
+					}
+					item[39] = {
+						id = 2385666532;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 1340;
+							y = 420;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[40] = {
+						id = 274806376;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 3340;
+							y = -540;
+						}
+						size = {
+							x = 180;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[41] = {
+						id = 1597693352;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 3760;
+							y = -540;
+						}
+						size = {
+							x = 120;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 1000;
+									}
+								}
+							}
+						}
+					}
+					item[42] = {
+						id = 1792378336;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = -840;
+							y = -100;
+						}
+						size = {
+							x = 180;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[43] = {
+						id = 3008380401;
+						model = {
+							className = "idLogicNodeModelPlayerGiveCodex";
+							object = {
+								codexToGive = "codex/sentinel/dlc2/steppes";
+							}
+						}
+						pos = {
+							x = 3240;
+							y = 1060;
+						}
+						size = {
+							x = 120;
+							y = 80;
+						}
+					}
+					item[44] = {
+						id = 4181223861;
+						model = {
+							className = "idLogicNodeModelUIHudEvent";
+							object = {
+								hudEvent = "HUD_EVENT_ENABLE_PAUSE";
+							}
+						}
+						pos = {
+							x = 4380;
+							y = -500;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+					}
+					item[45] = {
+						id = 201091727;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "enable pause";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.36601299;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 4360;
+							y = -560;
+						}
+						size = {
+							x = 240;
+							y = 180;
+						}
+					}
+					item[46] = {
+						id = 76512867;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 3520;
+							y = 580;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "cinEnd";
+									}
+								}
+							}
+						}
+					}
+					item[47] = {
+						id = 551410295;
+						model = {
+							className = "idLogicNodeModelPlayerSetInhibitFlags";
+							object = {
+								flags = "UCMD_INHIBIT_ALL";
+							}
+						}
+						pos = {
+							x = 2740;
+							y = -500;
+						}
+						size = {
+							x = 140;
+							y = 80;
+						}
+					}
+					item[48] = {
+						id = 646012977;
+						model = {
+							className = "idLogicNodeModelSwitchInt_v2";
+							object = {
+								cases = {
+									num = 2;
+									item[0] = {
+										id = 533728688;
+									}
+									item[1] = {
+										id = 161450576;
+										value = 1;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 880;
+						}
+						size = {
+							x = 120;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelInt";
+								}
+							}
+						}
+					}
+					item[49] = {
+						id = 2253086647;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 840;
+							y = 120;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[50] = {
+						id = 3201075120;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1140;
+							y = -120;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[51] = {
+						id = 1790528467;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 900;
+							y = 300;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[52] = {
+						id = 2281864823;
+						model = {
+							className = "idLogicNodeModelSwitchInt_v2";
+							object = {
+								cases = {
+									num = 2;
+									item[0] = {
+										id = 533728688;
+									}
+									item[1] = {
+										id = 161450576;
+										value = 1;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 920;
+							y = 180;
+						}
+						size = {
+							x = 120;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelInt";
+								}
+							}
+						}
+					}
+					item[53] = {
+						id = 144292410;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 4;
+									item[0] = {
+										id = 1816539488;
+										name = "stop";
+										locked = false;
+									}
+									item[1] = {
+										id = 1750151872;
+										name = "play";
+										locked = false;
+									}
+									item[2] = {
+										id = 2303298096;
+										name = "skip";
+										locked = false;
+									}
+									item[3] = {
+										id = 752454192;
+										locked = false;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1100;
+							y = 120;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+					}
+					item[54] = {
+						id = 1324646036;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 2;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 640;
+							y = 180;
+						}
+						size = {
+							x = 140;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "switch:  ";
+									}
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelInt";
+								}
+							}
+						}
+					}
+					item[55] = {
+						id = 150551800;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 620;
+							y = 340;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[56] = {
+						id = 1758739615;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 3530825104;
+								}
+							}
+						}
+						pos = {
+							x = 1240;
+							y = 120;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelInt";
+									object = {
+										value = 1;
+									}
+								}
+							}
+						}
+					}
+					item[57] = {
+						id = 632438808;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 4067588000;
+								}
+							}
+						}
+						pos = {
+							x = 3500;
+							y = -420;
+						}
+						size = {
+							x = 140;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[58] = {
+						id = 1624994850;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 2920;
+							y = -520;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "text start";
+									}
+								}
+							}
+						}
+					}
+					item[59] = {
+						id = 2414827189;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1140;
+							y = 300;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[60] = {
+						id = 3352471164;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 4067588000;
+								}
+							}
+						}
+						pos = {
+							x = 420;
+							y = 200;
+						}
+						size = {
+							x = 140;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[61] = {
+						id = 336874704;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = 3580;
+							y = -540;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[62] = {
+						id = 3174272562;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 3920;
+							y = 340;
+						}
+						size = {
+							x = 140;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "bink complete";
+									}
+								}
+							}
+						}
+					}
+					item[63] = {
+						id = 3944563654;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 4;
+									item[0] = {
+										id = 1651972528;
+										locked = false;
+									}
+									item[1] = {
+										id = 1845390928;
+										locked = false;
+									}
+									item[2] = {
+										id = 3465083600;
+										locked = false;
+									}
+									item[3] = {
+										id = 95739744;
+										locked = false;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 3080;
+							y = 580;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+					}
+					item[64] = {
+						id = 3183870141;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 3240;
+							y = 860;
+						}
+						size = {
+							x = 120;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 2500;
+									}
+								}
+							}
+						}
+					}
+					item[65] = {
+						id = 1980863275;
+						model = {
+							className = "idLogicNodeModelTutorial";
+							object = {
+								tutorialToShow = "tutorialevent/ingame_tutorial/dlc/core_loop_summary";
+							}
+						}
+						pos = {
+							x = 3420;
+							y = 860;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+					}
+					item[66] = {
+						id = 3435759729;
+						model = {
+							className = "idLogicNodeModelPlayerSetInhibitFlags";
+							object = {
+								setType = "LOGIC_NODE_INHIBIT_CLEAR";
+								flags = "UCMD_INHIBIT_ALL";
+							}
+						}
+						pos = {
+							x = 2380;
+							y = 580;
+						}
+						size = {
+							x = 140;
+							y = 80;
+						}
+					}
+					item[67] = {
+						id = 164638611;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 2660;
+							y = 240;
+						}
+						size = {
+							x = 180;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[68] = {
+						id = 2574727096;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 4260;
+							y = 140;
+						}
+						size = {
+							x = 160;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+									object = {
+										value = {
+											a = 0;
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[69] = {
+						id = 3991354848;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 4020;
+							y = 140;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 100;
+									}
+								}
+							}
+						}
+					}
+					item[70] = {
+						id = 3649054991;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/additional_levelstart";
+							}
+						}
+						pos = {
+							x = 2400;
+							y = -500;
+						}
+						size = {
+							x = 280;
+							y = 80;
+						}
+					}
+					item[71] = {
+						id = 3547389099;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 3320;
+							y = -180;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 300;
+									}
+								}
+							}
+						}
+					}
+					item[72] = {
+						id = 1036013569;
+						model = {
+							className = "idLogicNodeModelUIHudEvent";
+							object = {
+								hudEvent = "HUD_EVENT_ENABLE_PAUSE";
+							}
+						}
+						pos = {
+							x = 500;
+							y = 560;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+					}
+					item[73] = {
+						id = 4269546097;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "enable pause";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.36601299;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 480;
+							y = 500;
+						}
+						size = {
+							x = 240;
+							y = 180;
+						}
+					}
+					item[74] = {
+						id = 1227821557;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = -1020;
+							y = 20;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[75] = {
+						id = 2237900794;
+						model = {
+							className = "idLogicNodeModelGetAutomatedTestingState";
+						}
+						pos = {
+							x = -1240;
+							y = 160;
+						}
+						size = {
+							x = 220;
+							y = 100;
+						}
+					}
+					item[76] = {
+						id = 3762417506;
+						model = {
+							className = "idLogicNodeModelExecuteConsoleCommand";
+						}
+						pos = {
+							x = 3240;
+							y = 580;
+						}
+						size = {
+							x = 220;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "cinematiccomplete e5m1_intro";
+									}
+								}
+							}
+						}
+					}
+				}
+				links = {
+					num = 74;
+					item[0] = {
+						id = 4138168658;
+						fromNodeId = 1129278094;
+						fromPinId = 1;
+						toNodeId = 794693827;
+						toPinId = 177509965;
+					}
+					item[1] = {
+						id = 3129416862;
+						fromNodeId = 674340811;
+						fromPinId = 1;
+						toNodeId = 646012977;
+						toPinId = 0;
+					}
+					item[2] = {
+						id = 287227063;
+						fromNodeId = 2385666532;
+						fromPinId = 0;
+						toNodeId = 17689074;
+						toPinId = 2279745040;
+					}
+					item[3] = {
+						id = 602663502;
+						fromNodeId = 17689074;
+						fromPinId = 7;
+						toNodeId = 2635303458;
+						toPinId = 1;
+					}
+					item[4] = {
+						id = 2810782089;
+						fromNodeId = 3662132047;
+						fromPinId = 1;
+						toNodeId = 4093718922;
+						toPinId = 0;
+					}
+					item[5] = {
+						id = 1958090573;
+						fromNodeId = 4093718922;
+						fromPinId = 1;
+						toNodeId = 272046422;
+						toPinId = 127268005;
+					}
+					item[6] = {
+						id = 3181421652;
+						fromNodeId = 17689074;
+						fromPinId = 6;
+						toNodeId = 2635303458;
+						toPinId = 0;
+					}
+					item[7] = {
+						id = 2299006654;
+						fromNodeId = 76512867;
+						fromPinId = 1;
+						toNodeId = 3069454978;
+						toPinId = 0;
+					}
+					item[8] = {
+						id = 4217316239;
+						fromNodeId = 1333989340;
+						fromPinId = 1;
+						toNodeId = 2182133731;
+						toPinId = 0;
+					}
+					item[9] = {
+						id = 758107457;
+						fromNodeId = 647163289;
+						fromPinId = 3;
+						toNodeId = 1740058005;
+						toPinId = 0;
+					}
+					item[10] = {
+						id = 2195401418;
+						fromNodeId = 2999173583;
+						fromPinId = 1;
+						toNodeId = 2877089172;
+						toPinId = 0;
+					}
+					item[11] = {
+						id = 1675175428;
+						fromNodeId = 180138460;
+						fromPinId = 0;
+						toNodeId = 1709116575;
+						toPinId = 1;
+					}
+					item[12] = {
+						id = 2078069302;
+						fromNodeId = 1141381208;
+						fromPinId = 0;
+						toNodeId = 272046422;
+						toPinId = 154870407;
+					}
+					item[13] = {
+						id = 3719310324;
+						fromNodeId = 3649054991;
+						fromPinId = 1;
+						toNodeId = 551410295;
+						toPinId = 0;
+					}
+					item[14] = {
+						id = 3115514938;
+						fromNodeId = 3377287191;
+						fromPinId = 1609884432;
+						toNodeId = 17689074;
+						toPinId = 0;
+					}
+					item[15] = {
+						id = 3043334668;
+						fromNodeId = 2635303458;
+						fromPinId = 3595396976;
+						toNodeId = 681554369;
+						toPinId = 0;
+					}
+					item[16] = {
+						id = 3621530959;
+						fromNodeId = 3183870141;
+						fromPinId = 2;
+						toNodeId = 1980863275;
+						toPinId = 0;
+					}
+					item[17] = {
+						id = 645190729;
+						fromNodeId = 2555055156;
+						fromPinId = 1;
+						toNodeId = 1333989340;
+						toPinId = 3;
+					}
+					item[18] = {
+						id = 2349555030;
+						fromNodeId = 2635303458;
+						fromPinId = 1828668480;
+						toNodeId = 3649054991;
+						toPinId = 0;
+					}
+					item[19] = {
+						id = 3104751067;
+						fromNodeId = 3377287191;
+						fromPinId = 1894018480;
+						toNodeId = 17689074;
+						toPinId = 4;
+					}
+					item[20] = {
+						id = 4190924579;
+						fromNodeId = 3751286852;
+						fromPinId = 1;
+						toNodeId = 4181223861;
+						toPinId = 0;
+					}
+					item[21] = {
+						id = 1246067372;
+						fromNodeId = 1792378336;
+						fromPinId = 1;
+						toNodeId = 2999173583;
+						toPinId = 0;
+					}
+					item[22] = {
+						id = 2104900467;
+						fromNodeId = 274806376;
+						fromPinId = 1;
+						toNodeId = 336874704;
+						toPinId = 0;
+					}
+					item[23] = {
+						id = 3625367792;
+						fromNodeId = 4092355239;
+						fromPinId = 0;
+						toNodeId = 3143421888;
+						toPinId = 0;
+					}
+					item[24] = {
+						id = 4115703436;
+						fromNodeId = 1333989340;
+						fromPinId = 2;
+						toNodeId = 2538505166;
+						toPinId = 0;
+					}
+					item[25] = {
+						id = 2288694591;
+						fromNodeId = 1768103966;
+						fromPinId = 0;
+						toNodeId = 794693827;
+						toPinId = 26016416;
+					}
+					item[26] = {
+						id = 2809123068;
+						fromNodeId = 1790528467;
+						fromPinId = 0;
+						toNodeId = 2281864823;
+						toPinId = 1;
+					}
+					item[27] = {
+						id = 1487124341;
+						fromNodeId = 2538505166;
+						fromPinId = 1;
+						toNodeId = 3174272562;
+						toPinId = 0;
+					}
+					item[28] = {
+						id = 1113614441;
+						fromNodeId = 551410295;
+						fromPinId = 1;
+						toNodeId = 1624994850;
+						toPinId = 0;
+					}
+					item[29] = {
+						id = 132463700;
+						fromNodeId = 1267908969;
+						fromPinId = 3;
+						toNodeId = 674340811;
+						toPinId = 0;
+					}
+					item[30] = {
+						id = 1140625398;
+						fromNodeId = 1624994850;
+						fromPinId = 1;
+						toNodeId = 1021797131;
+						toPinId = 0;
+					}
+					item[31] = {
+						id = 1525500960;
+						fromNodeId = 3201075120;
+						fromPinId = 1;
+						toNodeId = 17689074;
+						toPinId = 0;
+					}
+					item[32] = {
+						id = 1514154474;
+						fromNodeId = 2253086647;
+						fromPinId = 0;
+						toNodeId = 646012977;
+						toPinId = 1;
+					}
+					item[33] = {
+						id = 3011585239;
+						fromNodeId = 3944563654;
+						fromPinId = 3465083600;
+						toNodeId = 3008380401;
+						toPinId = 0;
+					}
+					item[34] = {
+						id = 1882985434;
+						fromNodeId = 1021797131;
+						fromPinId = 2;
+						toNodeId = 274806376;
+						toPinId = 0;
+					}
+					item[35] = {
+						id = 3212559449;
+						fromNodeId = 632438808;
+						fromPinId = 0;
+						toNodeId = 336874704;
+						toPinId = 1;
+					}
+					item[36] = {
+						id = 3250851675;
+						fromNodeId = 2877089172;
+						fromPinId = 1;
+						toNodeId = 3435759729;
+						toPinId = 0;
+					}
+					item[37] = {
+						id = 413358533;
+						fromNodeId = 3069454978;
+						fromPinId = 1;
+						toNodeId = 3662132047;
+						toPinId = 0;
+					}
+					item[38] = {
+						id = 1405987919;
+						fromNodeId = 2635303458;
+						fromPinId = 3370875552;
+						toNodeId = 2555055156;
+						toPinId = 0;
+					}
+					item[39] = {
+						id = 2446306017;
+						fromNodeId = 272046422;
+						fromPinId = 195412510;
+						toNodeId = 646012977;
+						toPinId = 0;
+					}
+					item[40] = {
+						id = 2951583892;
+						fromNodeId = 646012977;
+						fromPinId = 161450576;
+						toNodeId = 3377287191;
+						toPinId = 0;
+					}
+					item[41] = {
+						id = 3677544999;
+						fromNodeId = 646012977;
+						fromPinId = 533728688;
+						toNodeId = 3201075120;
+						toPinId = 0;
+					}
+					item[42] = {
+						id = 4187681540;
+						fromNodeId = 150551800;
+						fromPinId = 0;
+						toNodeId = 1324646036;
+						toPinId = 3;
+					}
+					item[43] = {
+						id = 1601702172;
+						fromNodeId = 3352471164;
+						fromPinId = 1;
+						toNodeId = 1324646036;
+						toPinId = 0;
+					}
+					item[44] = {
+						id = 3881907044;
+						fromNodeId = 2281864823;
+						fromPinId = 533728688;
+						toNodeId = 144292410;
+						toPinId = 0;
+					}
+					item[45] = {
+						id = 203417698;
+						fromNodeId = 144292410;
+						fromPinId = 1816539488;
+						toNodeId = 1758739615;
+						toPinId = 0;
+					}
+					item[46] = {
+						id = 3899356693;
+						fromNodeId = 2414827189;
+						fromPinId = 1;
+						toNodeId = 17689074;
+						toPinId = 17;
+					}
+					item[47] = {
+						id = 1404413178;
+						fromNodeId = 1324646036;
+						fromPinId = 1;
+						toNodeId = 2281864823;
+						toPinId = 0;
+					}
+					item[48] = {
+						id = 2268146775;
+						fromNodeId = 1597693352;
+						fromPinId = 2;
+						toNodeId = 3751286852;
+						toPinId = 0;
+					}
+					item[49] = {
+						id = 1436714920;
+						fromNodeId = 336874704;
+						fromPinId = 3;
+						toNodeId = 1597693352;
+						toPinId = 0;
+					}
+					item[50] = {
+						id = 968565922;
+						fromNodeId = 2281864823;
+						fromPinId = 161450576;
+						toNodeId = 2414827189;
+						toPinId = 0;
+					}
+					item[51] = {
+						id = 2586314138;
+						fromNodeId = 3944563654;
+						fromPinId = 1845390928;
+						toNodeId = 3183870141;
+						toPinId = 0;
+					}
+					item[52] = {
+						id = 2710447398;
+						fromNodeId = 1758739615;
+						fromPinId = 1;
+						toNodeId = 17689074;
+						toPinId = 4;
+					}
+					item[53] = {
+						id = 2813010230;
+						fromNodeId = 272046422;
+						fromPinId = 158492572;
+						toNodeId = 3352471164;
+						toPinId = 0;
+					}
+					item[54] = {
+						id = 2853925110;
+						fromNodeId = 144292410;
+						fromPinId = 1750151872;
+						toNodeId = 17689074;
+						toPinId = 0;
+					}
+					item[55] = {
+						id = 2239283496;
+						fromNodeId = 144292410;
+						fromPinId = 2303298096;
+						toNodeId = 17689074;
+						toPinId = 17;
+					}
+					item[56] = {
+						id = 3147352732;
+						fromNodeId = 2635303458;
+						fromPinId = 1787803328;
+						toNodeId = 1129278094;
+						toPinId = 0;
+					}
+					item[57] = {
+						id = 2326266287;
+						fromNodeId = 2973355489;
+						fromPinId = 1;
+						toNodeId = 3944563654;
+						toPinId = 0;
+					}
+					item[58] = {
+						id = 713521105;
+						fromNodeId = 1333989340;
+						fromPinId = 4;
+						toNodeId = 2961058989;
+						toPinId = 0;
+					}
+					item[59] = {
+						id = 2138088602;
+						fromNodeId = 3991354848;
+						fromPinId = 2;
+						toNodeId = 2574727096;
+						toPinId = 0;
+					}
+					item[60] = {
+						id = 4016158947;
+						fromNodeId = 2635303458;
+						fromPinId = 3596154096;
+						toNodeId = 3435759729;
+						toPinId = 0;
+					}
+					item[61] = {
+						id = 2826819115;
+						fromNodeId = 681554369;
+						fromPinId = 1;
+						toNodeId = 164638611;
+						toPinId = 0;
+					}
+					item[62] = {
+						id = 1885118663;
+						fromNodeId = 164638611;
+						fromPinId = 1;
+						toNodeId = 1333989340;
+						toPinId = 0;
+					}
+					item[63] = {
+						id = 3853674193;
+						fromNodeId = 2182133731;
+						fromPinId = 1;
+						toNodeId = 3991354848;
+						toPinId = 0;
+					}
+					item[64] = {
+						id = 3718417572;
+						fromNodeId = 3435759729;
+						fromPinId = 1;
+						toNodeId = 2973355489;
+						toPinId = 0;
+					}
+					item[65] = {
+						id = 2629657554;
+						fromNodeId = 794693827;
+						fromPinId = 84727104;
+						toNodeId = 3547389099;
+						toPinId = 0;
+					}
+					item[66] = {
+						id = 1523718654;
+						fromNodeId = 3547389099;
+						fromPinId = 2;
+						toNodeId = 1861500921;
+						toPinId = 0;
+					}
+					item[67] = {
+						id = 3462601020;
+						fromNodeId = 272046422;
+						fromPinId = 20375201;
+						toNodeId = 1036013569;
+						toPinId = 0;
+					}
+					item[68] = {
+						id = 854442796;
+						fromNodeId = 2237900794;
+						fromPinId = 0;
+						toNodeId = 1227821557;
+						toPinId = 1;
+					}
+					item[69] = {
+						id = 215632548;
+						fromNodeId = 1227821557;
+						fromPinId = 3;
+						toNodeId = 2877089172;
+						toPinId = 0;
+					}
+					item[70] = {
+						id = 1473159284;
+						fromNodeId = 1709116575;
+						fromPinId = 3;
+						toNodeId = 1227821557;
+						toPinId = 0;
+					}
+					item[71] = {
+						id = 1566553996;
+						fromNodeId = 3143421888;
+						fromPinId = 2;
+						toNodeId = 1709116575;
+						toPinId = 0;
+					}
+					item[72] = {
+						id = 3706770796;
+						fromNodeId = 3944563654;
+						fromPinId = 1651972528;
+						toNodeId = 3762417506;
+						toPinId = 0;
+					}
+					item[73] = {
+						id = 502475930;
+						fromNodeId = 3762417506;
+						fromPinId = 1;
+						toNodeId = 76512867;
+						toPinId = 0;
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "map": "e1m1_intro",
+    "resource": "e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl",
+    "source_sha256": "aa6305d1c847c97c621857a5e76112383b11e0824c69327a3142aa0de8443499",
+    "result_sha256": "fdbea7b7965a0a15ba0720902774c7508467e276a3ef2386774cf30c588aaf93",
+    "edges": [
+      [
+        2392606599,
+        3947516743,
+        3,
+        2788213351,
+        0,
+        4110483463,
+        0
+      ],
+      [
+        3484244384,
+        4110483463,
+        1,
+        1622116226,
+        0,
+        1701438474,
+        0
+      ]
+    ]
+  },
+  {
+    "map": "e4m1_rig",
+    "resource": "e4m1_rig_patch2/generated/decls/logicentity/maps/game/dlc/e4m1_rig/e4m1_rig_cinematic_intro/intro_info_logic.decl",
+    "source_sha256": "636ff9d8c103d61c6e1080de0ee272761450acf9e2b8b2f4cb534b025c5fba7b",
+    "result_sha256": "a14214175ef39277b52845c7095685189d919327dc085c1d7929ef6084700645",
+    "edges": [
+      [
+        1134950910,
+        1104602475,
+        3,
+        3112197059,
+        0,
+        1467365544,
+        0
+      ],
+      [
+        1919791452,
+        1467365544,
+        1,
+        2814965625,
+        0,
+        1708779698,
+        0
+      ]
+    ]
+  },
+  {
+    "map": "e5m1_spear",
+    "resource": "e5m1_spear_patch2/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_intro/cinematic_intro_info_logic.decl",
+    "source_sha256": "0faba3acdda2e11f3dd48a5abd996175c5ae23f00055b3e9f8f6c7af26adf497",
+    "result_sha256": "13d43b7dc0823100b61d900821fa112a7cfc74eec83622a3d49f32a72abae162",
+    "edges": [
+      [
+        215632548,
+        1227821557,
+        3,
+        1792378336,
+        0,
+        2877089172,
+        0
+      ],
+      [
+        3250851675,
+        2877089172,
+        1,
+        272046422,
+        117545624,
+        3435759729,
+        0
+      ]
+    ]
+  }
+]
