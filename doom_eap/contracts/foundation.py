@@ -548,8 +548,7 @@ def compile_item_delivery_plan(
     definition = definitions[item_id]
     family = classify_item_definition(definition)
     if item_id in MASTERY_ITEM_BITS:
-        # Native Arsenal owns terminal effects. The old perk RPC would also
-        # register a normal upgrade and mutate challenge/selection state.
+        # Native Arsenal owns terminal effects.
         commands = ()
         if receipt:
             if classification is None:

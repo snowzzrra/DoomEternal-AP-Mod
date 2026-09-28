@@ -517,6 +517,10 @@
     "7770903": {
       "name": "Weapon Upgrade Points (3)",
       "policy": "never_replay"
+    },
+    "7770904": {
+      "name": "Progressive Blood Punch",
+      "policy": "special_progressive"
     }
   }
 }

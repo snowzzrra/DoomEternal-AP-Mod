@@ -2099,9 +2099,27 @@ def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
 
+def remove_blood_punch_grants(text):
+    """Keep native target graphs while making AP receipts own Blood Punch grants."""
+    paths = {"abilities/blood_punch"} | {
+        f"perk/player/blood_punch/{tier}" for tier in ("base", "area_of_effect", "ai_charge_rate", "max_charges")
+    }
+    def project(match):
+        block = match.group(0)
+        items = list(re.finditer(r'(?m)^[ \t]*item\[\d+\]\s*=\s*"([^"\n]+)";\s*$', block))
+        if not any(item.group(1) in paths for item in items):
+            return block
+        kept = [item.group(1) for item in items if item.group(1) not in paths]
+        field = block.split("=", 1)[0].strip()
+        return field + " = {\n\t\t\tnum = " + str(len(kept)) + ";\n" + "".join(
+            f'\t\t\titem[{i}] = "{path}";\n' for i, path in enumerate(kept)
+        ) + "\t\t}"
+    return re.sub(r'\b(?:perkList|itemList)\s*=\s*\{[^{}]*\}', project, text)
+
+
 def progressive_effect_command(effect):
     """Compile physical item effects and perk effects to native-safe commands."""
-    if effect.startswith("weapon/"):
+    if effect.startswith(("weapon/", "abilities/")):
         return f"give {effect}"
     if effect.startswith(("ability_", "equipmentlauncher/", "throwable/", "ammo/", "inventory/")):
         return f"ai_ScriptCmdEnt player1 give {effect}"
@@ -2458,9 +2476,22 @@ def validate_ap_lifecycle_entity(content, map_key):
         raise ValueError(f"AP lifecycle target mismatch: {name}")
 
 
-def generate_bootstrap_entities():
-    """Return map bootstrap entities."""
-    return ""
+def generate_bootstrap_entities(runtime_map=""):
+    """Return ownership-gated stat targets for supported maps."""
+    from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ACTIONS, BOOTSTRAP_STAT_PRIMITIVE
+
+    return "".join(f'''entity {{
+    entityDef {action["entity_name"]} {{
+        class = "{BOOTSTRAP_STAT_PRIMITIVE["class"]}";
+        expandInheritance = false;
+        edit = {{
+            gameStat = "{action["stat"]}";
+            value = {BOOTSTRAP_STAT_PRIMITIVE["value"]};
+        }}
+    }}
+}}
+''' for action in BOOTSTRAP_ACTIONS.values()
+        if action["automatic_enabled"] and runtime_map in action["maps_supported"])
 
 def load_item_notification_policies(
     policy_path: str | Path = "data/item_replay_policies.json",
@@ -3178,7 +3209,7 @@ def generate_map(
             receipt_feedback=receipt_feedback,
             enable_notifications=enable_notifications,
         )
-        + generate_bootstrap_entities()
+        + generate_bootstrap_entities(level_config.get("runtime_map", ""))
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
         + generate_ap_lifecycle_entity(map_key)
         + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -119,6 +120,10 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     lines.extend(["})", "", "CAMPAIGN_STAGES = ("])
     lines.extend(f"    {stage!r}," for stage in campaign_stages(catalog))
     lines.extend([")", ""])
+    fortress = json.loads((catalog.root / "content/catalog/fortress.json").read_text(encoding="utf-8"))
+    lines.append(f"FORTRESS_POLICY = {fortress!r}")
+    lines.append("FORTRESS_SPEND_GROUPS = tuple(FORTRESS_POLICY['spend_groups'])")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -159,6 +164,17 @@ def _compile_catalog(
     write_artifact(output, rendered)
     write_artifact(catalog.root / "data" / "campaign_stages.json",
                    json.dumps(campaign_stages(catalog), indent=2) + "\n")
+    from tools.validation.validate_data import extract_item_classifications, extract_namedtuple_table
+    item_source = MOD_ROOT.parent / "Archipelago/worlds/doometernal/items.py"
+    item_ids = extract_namedtuple_table(item_source, "item_data_table")
+    classifications = extract_item_classifications(item_source)
+    write_artifact(catalog.root / "data/item_classifications.json", json.dumps({
+        "schema_version": 1, "item_mapping_revision": 8,
+        "source": "Archipelago/worlds/doometernal/items.py",
+        "source_sha256": hashlib.sha256(item_source.read_bytes()).hexdigest(),
+        "items": {str(code): {"name": name, "classification": classifications[code]}
+                  for name, code in sorted(item_ids.items(), key=lambda pair: pair[1])},
+    }, indent=2, ensure_ascii=False) + "\n")
 
     if source_only:
         return tuple(changed_paths)

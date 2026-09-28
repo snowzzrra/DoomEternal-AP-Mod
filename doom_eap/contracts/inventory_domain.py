@@ -195,7 +195,7 @@ class InventoryObservation:
 
 
 class InventoryObservationPort(Protocol):
-    """Observation producer interface (real native producer implemented in 8A.2)."""
+    """Observation producer interface."""
 
     def observe_inventory(
         self,

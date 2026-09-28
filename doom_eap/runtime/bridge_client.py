@@ -650,7 +650,7 @@ GOAL_EVENT_PREFIX = "ap_transition_"
 GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
 TELEMETRY_DUMP_PREFIX = "ap_telemetry"
 LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 8
+ITEM_MAPPING_REVISION = 9
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 REVISION_ONE_RUNE_IDS = {
     7770085,
@@ -669,6 +669,7 @@ NORMAL_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate((
 REVISION_TWO_SUIT_IDS = {7770021}
 REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
 REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
+REVISION_NINE_ICE_BOMB_IDS = {7770013}
 
 
 def discover_client_state_file():
@@ -3799,12 +3800,12 @@ class DoomEternalContext(CommonContext):
                     continue
 
                 definition = ITEM_ID_TO_COMMAND[item_id]
-                runtime_context = self._refresh_runtime_context(
-                    getattr(self, "_connected_slot_data", {})
-                )
+                slot_data = getattr(self, "_connected_slot_data", {})
+                runtime_context = self._refresh_runtime_context(slot_data)
                 special_ids = {7770007, 7770009, 7770901, 7770902}
-                defer_special = item_id in special_ids and not self._base_special_receipt_allowed(
-                    item_id, item_index, runtime_context
+                defer_special = item_id in special_ids and not base_special_receipt_allowed(
+                    item_id, getattr(runtime_context, "campaign", None),
+                    slot_data.get("special_weapon"),
                 )
                 materialization_lease = self._active_materialization_lease(runtime_context)
                 replay_policy = ITEM_REPLAY_POLICIES.get(item_id)
@@ -3817,7 +3818,7 @@ class DoomEternalContext(CommonContext):
                     and replay_policy.policy in {"replay_idempotent", "replay_manual_only"}
                     and (materialization_lease is None or not context_allows_item)
                 )
-                if item_id in SUPPORT_RUNE_IDS or defer_special or defer_replayable:
+                if item_id == 7770904 or item_id in SUPPORT_RUNE_IDS or defer_special or defer_replayable:
                     logger.info(
                         "[To Game] Item %s deferred to supported runtime context.",
                         item_id,
@@ -3848,6 +3849,8 @@ class DoomEternalContext(CommonContext):
                         trigger=trigger,
                         state_key=getattr(self, "state_key", None),
                     )
+                    if item_id == 7770904:
+                        self._reconcile_blood_punch(trigger)
                     if item_id in SUPPORT_RUNE_IDS or materialization_lease is None or (
                         runtime_context is not None and runtime_context.campaign != "Base"
                     ):
@@ -4984,7 +4987,36 @@ class DoomEternalContext(CommonContext):
                          if item.item == 7770903}
         return WeaponPointReceipts(self.session_state, self.persist_session_state, link, link.namespace), authoritative
 
+    def _reconcile_blood_punch(self, trigger):
+        if "progressive_blood_punch_v1" not in self._connected_slot_data.get("required_capabilities", ()):
+            return
+        starting = sum(fact.quantity for fact in self.receipt_session.starting_materialization
+                       if fact.item_id == 7770904)
+        received = sum(item.item == 7770904 for item in self.items_received[:self.items_processed])
+        desired = min(4, max(starting, received))
+        lease = self._active_materialization_lease()
+        if not desired or lease is None:
+            return
+        try:
+            observed = self.native_game_link().observe_blood_punch()
+            missing = [stage for stage in range(desired) if not observed & (1 << stage)]
+            for stage in missing:
+                plan = compile_item_delivery_plan(7770904, ITEM_ID_TO_COMMAND, stage=stage)
+                for delivery in plan.commands:
+                    if not send_command(delivery.command,
+                                        coalesce_key=stable_spool_id("blood-punch", lease, stage, delivery.index),
+                                        state_key=self.state_key, materialization_lease=lease,
+                                        already_queued_ok=True):
+                        raise RuntimeError("Blood Punch repair publication was not accepted")
+            log_item_event("ITEM_BLOOD_PUNCH_RECONCILE", desired=desired, observed_perks=observed,
+                           missing_stages=missing, trigger=trigger, state_key=self.state_key,
+                           outcome="queued" if missing else "native_satisfied")
+        except (RuntimeError, OSError, ValueError) as error:
+            log_item_event("ITEM_BLOOD_PUNCH_DEFERRED", detail=str(error), trigger=trigger,
+                           state_key=self.state_key, decision="native_effect_unconfirmed")
+
     def _reconcile_native_receipt_owners(self, trigger):
+        self._reconcile_blood_punch(trigger)
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)
         mastery_mask = 0
@@ -5717,7 +5749,8 @@ class DoomEternalContext(CommonContext):
     def repair_item_mappings(self):
         repair = self.receipt_delivery.next_mapping_repair(receipt_item_ids(self.items_received), self.items_processed,
             ITEM_MAPPING_REVISION, {1: REVISION_ONE_RUNE_IDS, 2: REVISION_TWO_SUIT_IDS,
-                4: REVISION_FOUR_FLAME_BELCH_IDS, 5: REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS})
+                4: REVISION_FOUR_FLAME_BELCH_IDS, 5: REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS,
+                9: REVISION_NINE_ICE_BOMB_IDS})
         if repair.action == "done":
             return True
         if repair.action == "deferred":

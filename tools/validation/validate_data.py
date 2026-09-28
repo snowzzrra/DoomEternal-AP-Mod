@@ -1535,14 +1535,14 @@ def main(argv: list[str] | None = None) -> int:
                     or not perks
                     or not all(
                         isinstance(perk, str)
-                        and (perk.startswith("perk/player/") or perk.startswith("weapon/player/"))
+                        and perk.startswith(("perk/player/", "weapon/player/", "abilities/"))
                         for perk in stage_effects
                     )
                     or not stage_effects
                 ):
                     errors.append(
                         f"Progressive command {item_id} must define "
-                        "player perk or weapon stages"
+                        "native perk, weapon, or ability stages"
                     )
                 if item_id in {7770017, 7770088, 7770092} and (
                     not isinstance(perks, list)

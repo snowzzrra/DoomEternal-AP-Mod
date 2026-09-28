@@ -1,7 +1,9 @@
 """Keep AP Fortress checks independent of disposable vanilla visit layers."""
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
 from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace, replace_targets_block
@@ -19,6 +21,46 @@ CIRCULATION_ACTIONS = (
 
 def content_layers(phase: int) -> list[str]:
     return [f"game/sp/hub/ap_phase_{i}" for i in range(1, phase + 1)]
+
+
+def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
+    """Place only room-selected transactions and their checks in live layers."""
+    root = Path(__file__).resolve().parents[2]
+    groups = json.loads((root / "content/catalog/fortress.json").read_text(encoding="utf-8"))["spend_groups"]
+    active = set(active_group_ids)
+    if len(active) != len(active_group_ids) or active - {group["id"] for group in groups}:
+        raise ValueError("Fortress room contains invalid spend groups")
+    catalog = load_content_catalog()
+    config = json.loads((root / "content/maps/hub/locations.json").read_text(encoding="utf-8"))
+    aliases = {code: alias for alias, code in config["entities"].items()}
+    location_ids = {name: code for code, name in catalog.location_names.items()}
+    for group in groups:
+        enabled = group["id"] in active
+        codes = [location_ids[name] for name in group["locations"]]
+        layers = {content_layer(code) for code in codes}
+        if len(layers) != 1:
+            raise ValueError(f"Fortress transaction splits content layers: {group['id']}")
+        layer = layers.pop() if enabled else "game/sp/hub/ap_excluded"
+        names = {group["station"]}
+        for code in codes:
+            alias = aliases[code]
+            source = alias.removeprefix("AP_CHECK_").lower()
+            names.update({source, alias, f"ap_independent_{source}",
+                          f"ap_location_visual_{code}", f"ap_automap_location_{code}",
+                          f"ap_remove_location_visual_{code}", f"ap_hide_location_visual_{code}",
+                          f"ap_hide_location_visual_{code}_model", f"ap_suppress_checked_{code}",
+                          f"ap_fortress_battery_placement_{code}"})
+            if not enabled:
+                bounds = find_entity_block_bounds(text, f"ap_notify_location_{code}")
+                if bounds:
+                    text = text[:bounds[0]] + text[bounds[1]:]
+        for name in names:
+            bounds = find_entity_block_bounds(text, name)
+            if bounds:
+                start, end = bounds
+                block = _layer(text[start:end], layer)
+                text = text[:start] + block + text[end:]
+    return text
 
 
 def content_layer(location_id: int) -> str:
@@ -131,7 +173,7 @@ def project_fortress(text: str, config: dict) -> str:
             if bounds:
                 start, end = bounds
                 block = _layer(text[start:end], layer)
-                if code in (7770073, 7770086) and name == f"ap_independent_{source}":
+                if name == f"ap_independent_{source}":
                     block = block.replace('edit = {', 'edit = {\n\t\tdormancy = {\n'
                                           '\t\t\tallowDormancy = false;\n\t\t}', 1)
                 text = text[:start] + block + text[end:]
@@ -185,6 +227,7 @@ def project_fortress(text: str, config: dict) -> str:
         sky = "sentinel" if phase in (2, 6, 7) else "phobos" if phase == 5 else "earth"
         active = [f"game/sp/hub/{visit}", f"game/sp/hub/sky_{sky}"]
         remove = [layer for layer in all_scenery + skies if layer not in active]
+        remove.append("game/sp/hub/ap_excluded")
         layer_target = _layer(visit_target, None).replace(
             f"entityDef target_change_layer_{visit}", f"entityDef ap_fortress_layers_{phase}", 1)
         layer_target = re.sub(r'\s*(?:checkpointName|playerSpawnSpot)\s*=\s*"[^"]+";', '', layer_target)

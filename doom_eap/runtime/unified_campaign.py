@@ -10,6 +10,9 @@ STAGES = {stage["id"]: stage for stage in json.loads(
 )}
 ACCESS_IDS = {stage["access_id"]: key for key, stage in STAGES.items()}
 MODES = {"Vanilla Order", "Random Mission Order", "Mission Access as Items"}
+FORTRESS_POLICY = json.loads(
+    (Path(__file__).resolve().parents[2] / "content/catalog/fortress.json").read_text(encoding="utf-8")
+)
 
 
 def validate_plan(slot_data):
@@ -43,10 +46,12 @@ def validate_plan(slot_data):
         raise ValueError("invalid Starting Stages")
     bootstrap = {"Dash": 1} if (not slot_data["randomize_dash"] and
                  any(key not in {"e1m1_intro", "e1m2_war"} for key in starts)) else {}
+    if not slot_data.get("randomize_chainsaw", False) and any(key != "e1m1_intro" for key in starts):
+        bootstrap["Chainsaw"] = 1
     if plan.get("bootstrap_inventory") != bootstrap:
-        raise ValueError("Dash bootstrap contradicts randomization/Starting Stages")
+        raise ValueError("Equipment bootstrap contradicts randomization/Starting Stages")
     if any(slot_data.get("starting_inventory", {}).get(name) != count for name, count in bootstrap.items()):
-        raise ValueError("Dash bootstrap is absent from initial materialization")
+        raise ValueError("Equipment bootstrap is absent from initial materialization")
     if type(plan.get("goal_as_item")) is not bool or (plan["goal_as_item"] and not (access_mode and goal)):
         raise ValueError("Goal Mission as Item requires Access mode and a boss stage")
     expected_access = {str(STAGES[key]["access_id"]): key for key in sequence
@@ -57,6 +62,30 @@ def validate_plan(slot_data):
         raise ValueError("stage catalog differs from compiled content")
     if plan.get("hub") != {"id": "hub", "map": "game/hub/hub"}:
         raise ValueError("universal Fortress contract is invalid")
+    if "fortress_economy_v1" in slot_data.get("required_capabilities", ()):
+        ordinary_count = len(sequence) - int(goal is not None)
+        denominator = FORTRESS_POLICY["phase_completion_denominator"]
+        expected_thresholds = [
+            (count * ordinary_count + denominator - 1) // denominator
+            for count in FORTRESS_POLICY["phase_completion_weights"]
+        ]
+        if plan.get("fortress_phase_thresholds") != expected_thresholds:
+            raise ValueError("Fortress thresholds differ from the authored campaign chronology")
+        groups = {group["id"]: group for group in FORTRESS_POLICY["spend_groups"]}
+        active = slot_data.get("active_fortress_spend_group_ids")
+        if (not isinstance(active, list) or any(not isinstance(key, str) for key in active)
+                or len(active) != len(set(active)) or set(active) - groups.keys()):
+            raise ValueError("Fortress spend groups are invalid")
+        cost = sum(groups[key]["cost"] for key in active)
+        percent = FORTRESS_POLICY["battery_surplus_percent"]
+        surplus = (cost * percent + 99) // 100
+        expected_economy = {
+            "cost": cost, "surplus": surplus, "total": cost + surplus,
+            "surplus_percent": percent,
+            "native_first_battery": int(not slot_data["randomize_first_battery"] and "e1m2_war" in sequence),
+        }
+        if plan.get("battery_economy") != expected_economy:
+            raise ValueError("Fortress Battery economy contradicts its native spend groups")
     if plan["mode"] == "Vanilla Order":
         chronological = [key for key in STAGES if key in enabled and key != goal] + ([goal] if goal else [])
         if sequence != chronological:
@@ -137,8 +166,10 @@ class UnifiedCampaign:
             })
         ordinary = [key for key in sequence if key != goal]
         completed_count = sum(key in completed for key in ordinary)
-        phase = sum(completed_count >= (count * len(ordinary) + 12) // 13
-                    for count in (1, 2, 4, 5, 6, 8, 9))
+        thresholds = plan.get("fortress_phase_thresholds")
+        if thresholds is None:
+            thresholds = [(count * len(ordinary) + 12) // 13 for count in (1, 2, 4, 5, 6, 8, 9)]
+        phase = sum(completed_count >= threshold for threshold in thresholds)
         return {"rows": rows, "hub_map": plan["hub"]["map"], "fortress_phase": phase,
                 "selected": self.navigation["selected"]}
 

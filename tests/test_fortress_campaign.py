@@ -84,6 +84,11 @@ class FortressCampaign(unittest.TestCase):
         layers_1 = entity(self.result, 'ap_fortress_layers_1')
         self.assertIn('"game/sp/hub/ap_phase_1"', layers_1)
         self.assertNotIn('"game/sp/hub/ap_phase_2"', layers_1)
+        for phase in range(8):
+            block = entity(self.result, f'ap_fortress_layers_{phase}')
+            removed = re.search(r'remove_Immediately\s*=\s*\{([^}]*)\}', block, re.DOTALL)
+            self.assertIsNotNone(removed)
+            self.assertIn('"game/sp/hub/ap_excluded"', removed[1])
 
     def test_phase_layers_preserve_native_checkpoint_owner(self):
         from tools.maps.fortress_campaign import VISITS
@@ -103,20 +108,23 @@ class FortressCampaign(unittest.TestCase):
                 self.assertIn('soundOcclusionBypass = true;', result)
 
     def test_physical_triggers_use_cumulative_ap_visit_layers(self):
-        for source, ap_check in (
-            ('pickup_equipment_flame_belch_1', 'AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1'),
-            ('progress_argent_cell_1_1072112848', 'AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848'),
+        for source, ap_check, phase in (
+            ('pickup_equipment_flame_belch_1', 'AP_CHECK_PICKUP_EQUIPMENT_FLAME_BELCH_1', 1),
+            ('progress_argent_cell_1_1072112848', 'AP_CHECK_PROGRESS_ARGENT_CELL_1_1072112848', 1),
+            ('progress_praetor_point_hub_1', 'AP_CHECK_PROGRESS_PRAETOR_POINT_HUB_1', 2),
+            ('pickup_weapon_gauss_rifle_hub_1', 'AP_CHECK_PICKUP_WEAPON_GAUSS_RIFLE_HUB_1', 3),
         ):
             trigger = generate_independent_pickup_trigger(
                 source, ap_check, entity(self.vanilla, source)
             )
             result = project_fortress(self.vanilla + trigger, self.config)
             physical = entity(result, f'ap_independent_{source}')
-            self.assertIn('layers { "game/sp/hub/ap_phase_1" }', physical)
+            self.assertIn(f'layers {{ "game/sp/hub/ap_phase_{phase}" }}', physical)
             self.assertIn('inherit = "trigger/trigger";', physical)
             self.assertIn('class = "idTrigger";', physical)
             self.assertIn('triggerOnce = true;', physical)
             self.assertIn('type = "CLIPMODEL_BOX";', physical)
+            self.assertIn('allowDormancy = false;', physical)
 
     def test_suit_room_barriers_remain_present_before_reward_visit(self):
         for index in (1, 2, 3):

@@ -139,20 +139,25 @@ class Bootstrap:
             self._action_state(action_name, revision=1).update(status="quarantined_runtime_invalid", timestamp=time.time())
             persist()
         for action_name in BOOTSTRAP_ACTIONS:
-            state = self._action_state(action_name)
-            if state["status"] == "queued" and not spool.exists(self.command_id(action_name), state_key):
+            state = self._actions.get(f"v{BOOTSTRAP_REVISION}:{action_name}")
+            if state and state["status"] == "queued" and not spool.exists(self.command_id(action_name), state_key):
                 state.update(status="delivered_effect_unknown", timestamp=time.time())
                 self._logger.info("[Bootstrap] v2 spool consumed; effect remains unknown: %s", action_name)
                 persist()
 
     def onboard(self, trigger, *, ownership, map_identity, state_key, item_ready, rpc_ready, spool, persist):
-        # Historical actions are experimental, disabled automatically, and only available in the lab.
+        # Only explicitly enabled, ownership-gated acquisition actions run automatically.
         if not any(action.get("automatic_enabled") for action in BOOTSTRAP_ACTIONS.values()):
+            return
+        if not any(action["automatic_enabled"] and self.eligible(name, ownership)
+                   for name, action in BOOTSTRAP_ACTIONS.items()):
             return
         if not item_ready or not rpc_ready:
             return
         self.reconcile_spool(state_key=state_key, spool=spool, persist=persist)
         for action_name, action in BOOTSTRAP_ACTIONS.items():
+            if not action["automatic_enabled"]:
+                continue
             if trigger in action["trigger_policy"]:
                 if trigger == "on_supported_map_load" and self.action_state(action_name)["status"] != "pending":
                     continue

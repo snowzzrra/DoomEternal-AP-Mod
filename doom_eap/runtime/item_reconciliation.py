@@ -999,6 +999,9 @@ def compile_reconciliation_plan(
     skipped_manual_replay = 0
 
     for item_id in sorted(counts):
+        if item_id == 7770904:
+            # The native perk observer owns cumulative Blood Punch repair.
+            continue
         policy = registry[item_id]
         if not isinstance(policy, ReplayPolicy) or policy.policy not in SUPPORTED_POLICIES:
             raise ValueError(f"unsupported policy for item {item_id}: {getattr(policy, 'policy', None)!r}")

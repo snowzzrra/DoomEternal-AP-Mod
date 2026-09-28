@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "battery_surplus_percent": 25,
+  "phase_completion_weights": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    8,
+    9
+  ],
+  "phase_completion_denominator": 13,
+  "spend_groups": [
+    {
+      "id": "SG_LOWER_EAST",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Sentinel Crystal - Battery Room Lower East"
+      ],
+      "station": "sentinel_battery_room_interact_hub_2_battery_station_4"
+    },
+    {
+      "id": "SG_LOWER_WEST",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Sentinel Crystal - Battery Room Lower West"
+      ],
+      "station": "sentinel_battery_room_interact_hub_2_battery_station_3"
+    },
+    {
+      "id": "SG_UPPER_EAST_MODBOT",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Modbot - Battery Room Upper East"
+      ],
+      "station": "sentinel_battery_room_interact_hub_2_battery_station_1"
+    },
+    {
+      "id": "SG_UPPER_WEST_MODBOT",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Modbot - Battery Room Upper West"
+      ],
+      "station": "sentinel_battery_room_interact_hub_2_battery_station_2"
+    },
+    {
+      "id": "SG_UPPER_EAST_PRAETOR",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Praetor Suit Token - Battery Room Upper East"
+      ],
+      "station": "sentinel_battery_room_interact_hub_1_battery_station_1"
+    },
+    {
+      "id": "SG_UPPER_WEST_PRAETOR",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Praetor Suit Token - Battery Room Upper West"
+      ],
+      "station": "sentinel_battery_room_interact_hub_1_battery_station_2"
+    },
+    {
+      "id": "SG_ELEVATOR_EAST",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Praetor Suit Token - Elevator Room East"
+      ],
+      "station": "interact_hub_1_battery_station_12"
+    },
+    {
+      "id": "SG_ELEVATOR_WEST",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Praetor Suit Token - Elevator Room West"
+      ],
+      "station": "interact_hub_1_battery_station_11"
+    },
+    {
+      "id": "SG_SENTINEL_ARMOR",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Sentinel Armor"
+      ],
+      "station": "interact_hub_2_battery_station_2"
+    },
+    {
+      "id": "SG_CLASSIC_MARINE",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Classic Marine Suit"
+      ],
+      "station": "interact_hub_2_battery_station_3"
+    },
+    {
+      "id": "SG_PRAETOR_AND_RUNES",
+      "cost": 2,
+      "locations": [
+        "Fortress of Doom - Praetor Suit",
+        "Fortress of Doom - All Runes Cheat Code"
+      ],
+      "station": "interact_hub_2_battery_station_1"
+    }
+  ]
+}

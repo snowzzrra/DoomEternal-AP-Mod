@@ -501,7 +501,8 @@ def _materialized_representations(
         tiers = entry["tiers"]
         if quantity > len(tiers):
             raise ValueError(f"starting_inventory quantity for {name!r} exceeds {len(tiers)} progressive tiers")
-        return [(entry["field"], path, ()) for path in tiers[:quantity]]
+        return [(entry["field"], path, ("equip",) if path == "perk/player/blood_punch/base" else ())
+                for path in tiers[:quantity]]
     materialized = []
     for raw in entry["representations"]:
         dedupe = raw.get("dedupe")
@@ -946,7 +947,7 @@ TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
 )
 
 
-def validate_tag_devinv_source(source: str) -> None:
+def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = False) -> None:
     """Keep authored engine prerequisites; paid upgrades belong to native WUP purchases."""
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
@@ -1002,7 +1003,7 @@ def validate_tag_devinv_source(source: str) -> None:
         raise ValueError(f"TAG DevInvLoadout missing authored engine perks: {missing_engine}")
 
     missing_bp = TAG_REQUIRED_BLOOD_PUNCH_PERKS - perk_paths
-    if missing_bp:
+    if missing_bp and not progressive_blood_punch:
         raise ValueError(f"TAG DevInvLoadout missing required Blood Punch perks: {missing_bp}")
 
 
@@ -1015,6 +1016,7 @@ def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
 def build_tag_devinv_overrides(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
+    *, progressive_blood_punch: bool = False,
 ) -> dict[str, str]:
     """Build exact TAG archive overrides from project-owned declaration inputs."""
     manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
@@ -1029,7 +1031,14 @@ def build_tag_devinv_overrides(
     existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))
                        if not ((perk := _PERK_PATH_RE.search(m.group("body"))) and
                                perk.group("path") in TAG_PAID_NORMAL_MOD_UPGRADES)]
-    all_bodies = existing_bodies[:4] + list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS) + existing_bodies[4:]
+    blood_punch_bodies = [] if progressive_blood_punch else list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS)
+    if progressive_blood_punch:
+        existing_bodies = [body for body in existing_bodies if "perk/player/blood_punch/" not in body]
+        quantity = (starting_inventory or {}).get("Progressive Blood Punch", 0)
+        for field, path, flags in _materialized_representations(
+                "Progressive Blood Punch", quantity, load_devinv_mapping(), set()):
+            blood_punch_bodies.append(_ITEM_BLOCK_RE.search(_decl_item(field, path, flags, 0)).group("body"))
+    all_bodies = existing_bodies[:4] + blood_punch_bodies + existing_bodies[4:]
     new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
     baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)
     baseline_inventory_block = (
@@ -1110,7 +1119,7 @@ def build_tag_devinv_overrides(
         override = _INHERIT_DECL_RE.sub("", override)
         if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
             raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
-        validate_tag_devinv_source(override)
+        validate_tag_devinv_source(override, progressive_blood_punch=progressive_blood_punch)
         archive = Path(record["archive"])
         map_key = record["map_key"]
         result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override

@@ -46,6 +46,8 @@ SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
     "slot_data_v5",
     "unified_campaign_v1",
+    "fortress_economy_v1",
+    "progressive_blood_punch_v1",
     "dlc_missions_v1",
     "goal_events_v1",
     "goal_endpoint_events_v1",
@@ -450,6 +452,9 @@ class SeedManifest:
         }
         required_capabilities.add("physical_options_v1")
         required_capabilities.add("room_options_v1")
+        required_capabilities.update(set(normalized_options.get("required_capabilities", ())) & {
+            "fortress_economy_v1", "progressive_blood_punch_v1",
+        })
         if normalized_options.get("randomize_dash"):
             required_capabilities.add("randomize_dash_v1")
         if normalized_options.get("starting_inventory"):
@@ -546,6 +551,8 @@ class SeedManifest:
             slot=snapshot.slot,
             options={
                 "campaign_plan": slot_data["campaign_plan"],
+                "required_capabilities": sorted(required_capabilities),
+                "active_fortress_spend_group_ids": slot_data.get("active_fortress_spend_group_ids"),
                 "native_generation_fingerprint": slot_data["native_generation_fingerprint"],
                 "use_dlc_content": slot_data["use_dlc_content"],
                 "include_dlc_missions": slot_data["include_dlc_missions"],
@@ -845,7 +852,8 @@ class RoomCompiler:
             ).encode("utf-8")
 
     def _apply_placement_entities(
-        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...]
+        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...],
+        options: dict | None = None,
     ) -> None:
         """Bind packaged location notifications to their room placements."""
         import re
@@ -855,8 +863,10 @@ class RoomCompiler:
         decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
+        selected_groups = (options or {}).get("active_fortress_spend_group_ids")
+        economy_enabled = "fortress_economy_v1" in (options or {}).get("required_capabilities", ())
         fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
-            placement_by_id
+            placement_by_id, selected_groups if economy_enabled else None
         )
         fortress_labels_written = False
         notification_header = re.compile(
@@ -910,11 +920,27 @@ class RoomCompiler:
                         + match.group(3)
                     )
 
+                if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
+                    from tools.maps.ap_map_generator import remove_blood_punch_grants
+                    text = remove_blood_punch_grants(text)
+                if economy_enabled and member.endswith(fortress_member_suffix):
+                    from tools.maps.fortress_campaign import project_spend_groups
+                    text = text.rstrip() + "\n" + fortress_labels
+                    text = project_spend_groups(text, selected_groups)
+                if economy_enabled:
+                    from tools.maps.ap_map_generator import find_entity_block_bounds
+                    inactive = {int(match.group(2)) for match in notification_header.finditer(text)} - placement_by_id.keys()
+                    for location_id in sorted(inactive):
+                        bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                        if bounds is None:
+                            raise ValueError(f"notification entity missing: {location_id}")
+                        text = text[:bounds[0]] + text[bounds[1]:]
                 rewritten_text = notification_header.sub(replace_header, text)
                 if member.endswith(fortress_member_suffix):
                     if fortress_labels_written:
                         raise ValueError("room package contains multiple Fortress hub entity members")
-                    rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
+                    if not economy_enabled:
+                        rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
                     fortress_labels_written = True
                 rewritten = rewritten_text.encode("utf-8")
                 decoded.write_bytes(rewritten)
@@ -955,7 +981,7 @@ class RoomCompiler:
         return normalized.replace("\\", "\\\\").replace('"', '\\"')
 
     def _fortress_battery_label_entities(
-        self, placement_by_id: dict[int, PlacementRecord]
+        self, placement_by_id: dict[int, PlacementRecord], active_group_ids: list[str] | None = None
     ) -> tuple[str, str]:
         """Compile seed-specific pre-purchase labels for all Battery consumers."""
         from doom_eap.presentation import (
@@ -964,7 +990,15 @@ class RoomCompiler:
             item_classification_color_key,
         )
 
-        missing = sorted(self.FORTRESS_BATTERY_LOCATION_IDS - set(placement_by_id))
+        expected = self.FORTRESS_BATTERY_LOCATION_IDS
+        if active_group_ids is not None:
+            from doom_eap.content.content_catalog import load_content_catalog
+            policy = json.loads((ROOT / "content/catalog/fortress.json").read_text(encoding="utf-8"))
+            names = {name for group in policy["spend_groups"] if group["id"] in active_group_ids
+                     for name in group["locations"]}
+            expected = {code for code, name in load_content_catalog().location_names.items() if name in names}
+            expected.add(7770171)
+        missing = sorted(expected - set(placement_by_id))
         if missing:
             raise ValueError(
                 "Fortress Battery placement scout is incomplete; missing location IDs: "
@@ -1022,10 +1056,10 @@ class RoomCompiler:
                 [float(val) for val in vec] for vec in orientation
             ]
         if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
-            raise ValueError("Fortress Battery label specification must cover exactly 13 consumers")
+            raise ValueError("Fortress placement label specification must cover exactly 13 anchors")
 
         entities: list[str] = []
-        for location_id in sorted(rows_by_id):
+        for location_id in sorted(expected):
             record = placement_by_id[location_id]
             if record.trap:
                 display = "A TRAP\\nFOR SOMEONE"
@@ -1229,6 +1263,7 @@ class RoomCompiler:
                 for path, source in build_tag_devinv_overrides(
                     manifest.options.get("starting_inventory", {}),
                     manifest.options.get("starting_weapon"),
+                    progressive_blood_punch="progressive_blood_punch_v1" in manifest.options.get("required_capabilities", ()),
                 ).items()
             })
             from doom_eap.content.content_catalog import load_content_catalog
@@ -1238,9 +1273,8 @@ class RoomCompiler:
 
             catalog = load_content_catalog()
             # DLC mission AP content is scoped by include_dlc_missions; DLC
-            # gameplay/context support stays scoped by use_dlc_content. Excluded
-            # TAG mission maps were already dropped from assembled payloads, so
-            # their overlay members rebuild as vanilla + marker support without
+            # gameplay/context support stays scoped by use_dlc_content.
+            # Excluded TAG mission overlays contain vanilla + marker support without
             # location publishers, while the publisher patch below skips them.
             include_dlc_missions = manifest.options.get("include_dlc_missions", True)
             excluded_mission_maps = set() if include_dlc_missions else dlc_mission_map_keys()
@@ -1300,7 +1334,7 @@ class RoomCompiler:
         if manifest.options.get("enhanced_melee_damage", False):
             assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
         if not manifest.static_precompile:
-            self._apply_placement_entities(assembled, placements)
+            self._apply_placement_entities(assembled, placements, manifest.options)
             self._apply_placement_strings(assembled, placements)
         incoming = destination.with_name(f".{destination.name}.incoming")
         try:

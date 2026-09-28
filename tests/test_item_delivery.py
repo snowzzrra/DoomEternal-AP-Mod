@@ -276,6 +276,20 @@ async def test_spool_failure_preserves_boundary_and_tracker_retry_succeeds():
 
 
 @_run_async
+async def test_crucible_receipt_defers_without_crashing_tracker(monkeypatch):
+    context = _context([NetworkItem(7770007, 8, 1, 0)])
+    context._connected_slot_data = {"special_weapon": "The Crucible"}
+    context._refresh_runtime_context = lambda _slot_data: None
+    context._active_materialization_lease = lambda _runtime_context: None
+    context.spool_deferred_receipt_notification = lambda *_args, **_kwargs: (True, "")
+    context._trigger_live_context_materialization = lambda: None
+    monkeypatch.setattr(bridge, "ITEM_ID_TO_COMMAND", {7770007: "native-owner"})
+
+    assert await context.process_pending_item_receipts("packet")
+    assert context.items_processed == 1
+
+
+@_run_async
 async def test_durable_spool_gate_arm_failure_rearms_on_tracker_retry(
     monkeypatch, tmp_path
 ):

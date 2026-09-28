@@ -9,6 +9,7 @@ from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ACTIONS
 from doom_eap.runtime.command_spool import CommandSpool
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime.rune_reconciliation import RuneReconciliation, RuneNativeState
+from tools.maps.ap_map_generator import generate_bootstrap_entities
 
 
 def test_bootstrap_remains_disabled_and_consumption_is_unknown_with_legacy_quarantine(tmp_path):
@@ -42,6 +43,30 @@ def test_bootstrap_remains_disabled_and_consumption_is_unknown_with_legacy_quara
     assert legacy.with_suffix(".quarantined").read_text() == "historical"
     assert not owner.enqueue("frag_acquired", "manual_diagnostic", ownership=ownership, current_map=current_map,
                              state_key="room", spool=spool, persist=lambda: None)
+
+
+def test_owned_ice_bomb_queues_acquisition_stat_once_on_connect(tmp_path):
+    owner = Bootstrap(logging.getLogger(__name__))
+    state = {"actions": {}}
+    owner.bind(state)
+    spool = CommandSpool(tmp_path, arm_rpc=lambda *_: None, log_delivery=lambda *a, **k: None,
+                         logger=logging.getLogger(__name__))
+    current_map = next(iter(BOOTSTRAP_ACTIONS["ice_acquired"]["maps_supported"]))
+    target = generate_bootstrap_entities(current_map)
+    assert 'entityDef ap_bootstrap_v2_ice_acquired {' in target
+    assert 'gameStat = "STAT_ICE_BOMB_GAINED";' in target
+    assert target.count('entityDef ') == 1
+    assert 'entityDef ap_bootstrap_v2_ice_acquired {' in generate_bootstrap_entities("game/hub/hub")
+    assert generate_bootstrap_entities("game/sp/e1m4_boss/e1m4_boss") == ""
+    kwargs = dict(ownership=BootstrapOwnership(frozenset({7770013}), False),
+                  map_identity=MapIdentitySnapshot(current_map=current_map), state_key="room",
+                  item_ready=True, rpc_ready=True, spool=spool, persist=lambda: None)
+    owner.onboard("on_connect", **kwargs)
+    assert owner.action_state("ice_acquired")["status"] == "queued"
+    assert owner.action_state("frag_acquired")["status"] == "pending"
+    assert len(list(tmp_path.glob("*.cmd"))) == 1
+    owner.onboard("on_reconnect", **kwargs)
+    assert len(list(tmp_path.glob("*.cmd"))) == 1
 
 
 def test_rune_repair_owns_publication_ledger_and_distinct_perk_epoch():

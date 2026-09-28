@@ -211,6 +211,14 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Ammo presentation publication unconfirmed: {result}")
         return result
 
+    def observe_blood_punch(self):
+        body = struct.pack("<5I4B", *([0] * 9))
+        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
+        if (result.get("inventory_abi") != 3 or result.get("outcome") != 1
+                or result.get("flags", 0) & 3 != 3 or result.get("upgrades_after") == 0xffffffff):
+            raise WeaponPointsBlocked(f"Blood Punch native observation is unknown or incompatible: {result}")
+        return (result["upgrades_after"] >> 11) & 15
+
     def ensure_masteries(self, mask):
         if type(mask) is not int or not 0 < mask <= 0x1FFF:
             raise WeaponPointsBlocked("Invalid Arsenal mastery mask")

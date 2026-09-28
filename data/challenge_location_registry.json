@@ -1013,6 +1013,7 @@
       "order": 0,
       "signal": {
         "kind": "map_terminal",
+        "owner": "3509104422",
         "runtime_map": "game/sp/e1m1_intro/e1m1_intro"
       },
       "strategy": "map_terminal"
@@ -1025,6 +1026,7 @@
       "order": 1,
       "signal": {
         "kind": "map_terminal",
+        "owner": "extraction_map_exit_level_transition_relay_1723732033",
         "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
       },
       "strategy": "map_terminal"
@@ -1035,11 +1037,11 @@
       "name": "Cultist Base - Mission Complete",
       "order": 2,
       "signal": {
-        "from": "game/sp/e1m3_cult/e1m3_cult",
-        "kind": "native_transition",
-        "to": "game/sp/e1m4_boss/e1m4_boss"
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_1",
+        "runtime_map": "game/sp/e1m3_cult/e1m3_cult"
       },
-      "strategy": "native_transition"
+      "strategy": "map_terminal"
     },
     {
       "category": "mission_complete",
@@ -1049,6 +1051,7 @@
       "order": 3,
       "signal": {
         "kind": "map_terminal",
+        "owner": "checkpoints_target_relay_65",
         "runtime_map": "game/sp/e1m4_boss/e1m4_boss"
       },
       "strategy": "map_terminal"
@@ -1059,11 +1062,11 @@
       "name": "Super Gore Nest - Mission Complete",
       "order": 4,
       "signal": {
-        "from": "game/sp/e2m1_nest/e2m1_nest",
-        "kind": "native_transition",
-        "to": "game/hub/hub"
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_1",
+        "runtime_map": "game/sp/e2m1_nest/e2m1_nest"
       },
-      "strategy": "native_transition"
+      "strategy": "map_terminal"
     },
     {
       "category": "mission_complete",
@@ -1071,11 +1074,11 @@
       "name": "ARC Complex - Mission Complete",
       "order": 5,
       "signal": {
-        "from": "game/sp/e2m2_base/e2m2_base",
-        "kind": "native_transition",
-        "to": "game/hub/hub"
+        "kind": "map_terminal",
+        "owner": "fort_map_exit_level_transition_relay_393966306",
+        "runtime_map": "game/sp/e2m2_base/e2m2_base"
       },
-      "strategy": "native_transition"
+      "strategy": "map_terminal"
     },
     {
       "category": "mission_complete",
@@ -1083,11 +1086,11 @@
       "name": "Mars Core - Mission Complete",
       "order": 6,
       "signal": {
-        "from": "game/sp/e2m3_core/e2m3_core",
-        "kind": "native_transition",
-        "to": "game/sp/e2m4_boss/e2m4_boss"
+        "kind": "map_terminal",
+        "owner": "hell_chunk_2_target_level_transition_1",
+        "runtime_map": "game/sp/e2m3_core/e2m3_core"
       },
-      "strategy": "native_transition"
+      "strategy": "map_terminal"
     },
     {
       "category": "mission_complete",
@@ -1110,6 +1113,7 @@
       "order": 14,
       "signal": {
         "kind": "map_terminal",
+        "owner": "underwater_facility_target_level_transition_1",
         "runtime_map": "game/dlc/e4m1_rig/e4m1_rig"
       },
       "strategy": "map_terminal"
@@ -1122,6 +1126,7 @@
       "order": 15,
       "signal": {
         "kind": "map_terminal",
+        "owner": "checkpoint_target_level_transition_1",
         "runtime_map": "game/dlc/e4m2_swamp/e4m2_swamp"
       },
       "strategy": "map_terminal"
@@ -1134,6 +1139,7 @@
       "order": 16,
       "signal": {
         "kind": "map_terminal",
+        "owner": "game_target_level_transition_e4m3",
         "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity"
       },
       "strategy": "map_terminal"
@@ -1146,6 +1152,7 @@
       "order": 17,
       "signal": {
         "kind": "map_terminal",
+        "owner": "crystal_target_level_transition_1",
         "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear"
       },
       "strategy": "map_terminal"
@@ -1158,6 +1165,7 @@
       "order": 19,
       "signal": {
         "kind": "map_terminal",
+        "owner": "checkpoints_target_level_transition_1",
         "runtime_map": "game/dlc2/e5m2_earth/e5m2_earth"
       },
       "strategy": "map_terminal"
@@ -1170,6 +1178,7 @@
       "order": 21,
       "signal": {
         "kind": "map_terminal",
+        "owner": "hangar_target_level_transition_1",
         "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell"
       },
       "strategy": "map_terminal"
@@ -1181,11 +1190,6 @@
       "name": "Taras Nabad - Mission Complete",
       "order": 45,
       "signal": {
-        "fallback": {
-          "from": "game/sp/e3m1_slayer/e3m1_slayer",
-          "kind": "native_transition",
-          "to": "game/hub/hub"
-        },
         "kind": "map_terminal",
         "owner": "game_map_exit_level_transition_relay_852698944",
         "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer"
@@ -1199,11 +1203,6 @@
       "name": "Nekravol - Mission Complete",
       "order": 50,
       "signal": {
-        "fallback": {
-          "from": "game/sp/e3m2_hell/e3m2_hell",
-          "kind": "native_transition",
-          "to": "game/sp/e3m2_hell_b/e3m2_hell_b"
-        },
         "kind": "map_terminal",
         "owner": "game_target_relay_28",
         "runtime_map": "game/sp/e3m2_hell/e3m2_hell"
@@ -1217,11 +1216,6 @@
       "name": "Nekravol Part II - Mission Complete",
       "order": 55,
       "signal": {
-        "fallback": {
-          "from": "game/sp/e3m2_hell_b/e3m2_hell_b",
-          "kind": "native_transition",
-          "to": "game/sp/e3m3_maykr/e3m3_maykr"
-        },
         "kind": "map_terminal",
         "owner": "game_target_level_transition_1",
         "runtime_map": "game/sp/e3m2_hell_b/e3m2_hell_b"
@@ -1235,11 +1229,6 @@
       "name": "Urdak - Mission Complete",
       "order": 60,
       "signal": {
-        "fallback": {
-          "from": "game/sp/e3m3_maykr/e3m3_maykr",
-          "kind": "native_transition",
-          "to": "game/sp/e3m4_boss/e3m4_boss"
-        },
         "kind": "map_terminal",
         "owner": "temp_all_scripting_target_level_transition_1",
         "runtime_map": "game/sp/e3m3_maykr/e3m3_maykr"
@@ -1253,10 +1242,6 @@
       "name": "Final Sin - Mission Complete",
       "order": 61,
       "signal": {
-        "fallback": {
-          "kind": "terminal_owner",
-          "owner": "icon_of_sin_death_target_relay_post_destruction_idle"
-        },
         "kind": "map_terminal",
         "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
         "runtime_map": "game/sp/e3m4_boss/e3m4_boss"
