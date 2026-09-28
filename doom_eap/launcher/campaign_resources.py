@@ -7,6 +7,7 @@ exist. Native OpenContainer/FindStreamFile apply that bitmap before name lookup.
 from __future__ import annotations
 
 import hashlib
+import json
 import mmap
 from pathlib import Path
 import struct
@@ -20,6 +21,7 @@ DECLS = (
     *(f"layer/game/sp/hub/ap_phase_{phase}.decl" for phase in range(1, 8)),
 )
 STREAMFILES = tuple("generated/decls/" + name for name in DECLS)
+EXCLUDED_LAYER = "generated/decls/layer/game/sp/hub/ap_excluded.decl"
 
 
 def _u32(data, offset):
@@ -70,17 +72,22 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
     from doom_eap.launcher.launcher_platform import detect_doom_processes, publish_file
 
     with zipfile.ZipFile(mod_zip) as package:
+        names = set(package.namelist())
+        manifest = json.loads(package.read("seed_manifest.json")) if "seed_manifest.json" in names else {}
+        required = set(STREAMFILES)
+        if "fortress_economy_v1" in manifest.get("required_capabilities", ()):
+            required.add(EXCLUDED_LAYER)
         expected = {name: package.read("gameresources_patch2/" + name)
-                    for name in STREAMFILES if "gameresources_patch2/" + name in package.namelist()}
-    if not expected:
+                    for name in required if "gameresources_patch2/" + name in names}
+    if not expected and "unified_campaign_v1" not in manifest.get("required_capabilities", ()) and EXCLUDED_LAYER not in required:
         return {"state": "not_applicable"}
-    if expected.keys() != set(STREAMFILES):
+    if expected.keys() != required:
         raise ValueError("Incomplete unified campaign resource package")
     if any(process["name"] == "doometernalx64vk.exe" for process in detect_doom_processes()):
         raise RuntimeError("Close DOOM before finalizing campaign resources")
 
     base = game_root / "base"
-    records = _records(base / CONTAINER, set(STREAMFILES))
+    records = _records(base / CONTAINER, required)
     for name, (_, kind, _, payload, flags) in records.items():
         if kind != "rs_streamfile" or flags != 0 or payload != expected[name]:
             raise ValueError(f"Installed campaign streamfile differs from the room package: {name}")

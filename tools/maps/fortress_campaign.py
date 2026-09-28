@@ -34,6 +34,23 @@ def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
     config = json.loads((root / "content/maps/hub/locations.json").read_text(encoding="utf-8"))
     aliases = {code: alias for alias, code in config["entities"].items()}
     location_ids = {name: code for code, name in catalog.location_names.items()}
+    assemblies = {group["station"]: {group["station"]} for group in groups}
+    lights = {}
+    pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
+    for match in re.finditer(pattern, text):
+        block = text[match.start():find_matching_brace(text, text.index("{", match.start()))]
+        if 'class = "idLight";' in block:
+            targets = re.search(r'\btargets\s*=\s*\{([^}]*)\}', block)
+            if targets:
+                lights[match[1]] = re.findall(r'item\[\d+\]\s*=\s*"([^"]+)"', targets[1])
+        for station, members in assemblies.items():
+            bound = f'bindParent = "{station}";' in block
+            socket = ('inherit = "interact/hub/battery_socket";' in block
+                      and re.search(r'\btargets\s*=\s*\{[^}]*"' + re.escape(station) + '"', block))
+            if bound or socket:
+                members.add(match[1])
+    for members in assemblies.values():
+        members.update(name for name, targets in lights.items() if len(targets) == 1 and targets[0] in members)
     for group in groups:
         enabled = group["id"] in active
         codes = [location_ids[name] for name in group["locations"]]
@@ -41,7 +58,7 @@ def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
         if len(layers) != 1:
             raise ValueError(f"Fortress transaction splits content layers: {group['id']}")
         layer = layers.pop() if enabled else "game/sp/hub/ap_excluded"
-        names = {group["station"]}
+        names = set() if enabled else assemblies[group["station"]].copy()
         for code in codes:
             alias = aliases[code]
             source = alias.removeprefix("AP_CHECK_").lower()
@@ -54,6 +71,8 @@ def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
                 bounds = find_entity_block_bounds(text, f"ap_notify_location_{code}")
                 if bounds:
                     text = text[:bounds[0]] + text[bounds[1]:]
+        if enabled:
+            names.discard(group["station"])
         for name in names:
             bounds = find_entity_block_bounds(text, name)
             if bounds:
