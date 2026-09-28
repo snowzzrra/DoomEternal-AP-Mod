@@ -90,11 +90,12 @@ def build_campaign_overrides(hub_assetsinfo: bytes) -> dict[str, bytes]:
     result[PREFIX + "campaign/campaign/main.decl"] = main.replace(
         'missionSelectList = "missionlist";', 'missionSelectList = "missionlist_ap_unified";'
     ).encode("utf-8")
-    for layer in content_layers(7):
+    resource_layers = content_layers(7) + ["game/sp/hub/ap_excluded"]
+    for layer in resource_layers:
         result[PREFIX + f"layer/{layer}.decl"] = b"{\n}\n"
     # New streamfiles also need typed entries in the effective common catalog.
     # patch3 owns the last common.mapresources override on the supported build.
-    assets = [{"name": layer, "mapResourceType": "layer"} for layer in content_layers(7)]
+    assets = [{"name": layer, "mapResourceType": "layer"} for layer in resource_layers]
     assets += [
         {"name": "devmenuoption/ap_unified_campaign", "mapResourceType": "devMenuOption"},
         {"name": "missionlist_ap_unified", "mapResourceType": "missionSelectInfoList"},
@@ -104,7 +105,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes) -> dict[str, bytes]:
     ).encode("utf-8")
     # Entity layer membership belongs to the destination map's separate table.
     hub_assets = json.loads(hub_assetsinfo)
-    hub_assets["layers"] = hub_assets.get("layers", []) + [{"name": layer} for layer in content_layers(7)]
+    hub_assets["layers"] = hub_assets.get("layers", []) + [{"name": layer} for layer in resource_layers]
     result["hub_patch2/EternalMod/assetsinfo/hub.json"] = (
         json.dumps(hub_assets, indent=2) + "\n"
     ).encode("utf-8")
