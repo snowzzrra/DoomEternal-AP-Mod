@@ -24,7 +24,7 @@ import sys
 import time
 import traceback
 import uuid
-from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort
+from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort, ItemObservation, OWNED, MISSING
 from doom_eap.contracts.materialization import MaterializationScope
 from doom_eap.runtime.materialization import compile_automatic_plan
 from doom_eap.runtime.death_observation import DeathObservation
@@ -2719,6 +2719,44 @@ class DoomCommandProcessor(ClientCommandProcessor):
 GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABILITIES, GOAL_ENDPOINT_LOCATION_IDS, GOAL_REQUIREMENT_SUFFIXES)
 
 
+class SentinelInventoryObservation:
+    def __init__(self, context):
+        self.context = context
+        self.last_logged = None
+
+    def observe_inventory(self, *, room_seed_name, epoch, context_identity, campaign):
+        try:
+            link = self.context.native_game_link()
+            result = link.observe_inventory()
+        except (RuntimeError, OSError, ValueError) as error:
+            logger.info("INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
+            return None
+        items = {}
+        weapons = result["weapons_after"]
+        if weapons != 0xffffffff:
+            items[7770002] = ItemObservation(7770002, OWNED if weapons & (1 << 6) else MISSING,
+                                             source="sentinel_inventory")
+        ice = result["ice_bomb_after"]
+        if ice != 255:
+            items[7770013] = ItemObservation(7770013, OWNED if ice else MISSING,
+                                             source="sentinel_inventory")
+        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice)
+        if signature != self.last_logged:
+            log_item_event(
+                "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
+                namespace=link.namespace, process_id=link.pid, epoch=epoch,
+                context=context_identity, rocket=items.get(7770002, ItemObservation(7770002)).state,
+                ice=items.get(7770013, ItemObservation(7770013)).state,
+                weapons_mask=weapons, ice_bomb=ice,
+            )
+            self.last_logged = signature
+        return InventoryObservation(
+            room_seed_name, epoch, context_identity, campaign, items,
+            state_key=self.context.state_key, process_id=link.pid,
+            provider_namespace=link.namespace, timestamp_ns=time.time_ns(),
+        )
+
+
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
     game = GAME_NAME
@@ -2770,7 +2808,7 @@ class DoomEternalContext(CommonContext):
         self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
         self.death_observer = DeathObservation(logger)
         self.save_observer = SaveObserver()
-        self.inventory_observation_port: InventoryObservationPort | None = None
+        self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self)
         self.runtime_observation_lease = RuntimeObservationLease()
         self.save_observer.clear_mission_select()
         self.last_observer_lease_block = None

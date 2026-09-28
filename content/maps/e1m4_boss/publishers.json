@@ -7,7 +7,7 @@
       "triggers": [
         {
           "strategy": "map_event_file",
-          "owner": "checkpoints_target_relay_65",
+          "owner": "stage2_complete",
           "filename": "ap_event_7770162.txt",
           "marker": "AP_CHECK_EVENT_7770162"
         }

@@ -1,7 +1,7 @@
 """Persistent inventory planning from supplied ownership, context and catalogs."""
 from dataclasses import dataclass
 
-from doom_eap.contracts.foundation import compile_item_delivery_plan
+from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
 from doom_eap.contracts.command_publication import stable_spool_id
 from doom_eap.contracts.inventory_domain import (
     CAPACITY_ITEM_IDS,
@@ -74,15 +74,17 @@ def compile_materialization_plan(
     )
     selected_ids = tuple(
         item_id for item_id in materializable_ids
-        if item_id in SUPPORT_RUNE_IDS
-        or (
-            replay_policies.get(item_id) is not None
-            and replay_policies[item_id].policy in allowed_replay_policies
-        )
-        or item_id in {7770007, 7770009, 7770901, 7770902}
-        or (
-            item_id in capacity_ids
-            and materialization_lease is not None
+        if item_id not in MASTERY_ITEM_BITS and (
+            item_id in SUPPORT_RUNE_IDS
+            or (
+                replay_policies.get(item_id) is not None
+                and replay_policies[item_id].policy in allowed_replay_policies
+            )
+            or item_id in {7770007, 7770009, 7770901, 7770902}
+            or (
+                item_id in capacity_ids
+                and materialization_lease is not None
+            )
         )
     )
     selected_ids = tuple(sorted(set(selected_ids)))

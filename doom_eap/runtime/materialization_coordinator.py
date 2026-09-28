@@ -1,5 +1,5 @@
 """Materialization publication ledger and completion evidence; no global lifecycle."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import time
 from typing import Callable, Protocol
 
@@ -198,6 +198,15 @@ class MaterializationCoordinator:
             return MaterializationOutcome(None, str(error))
         plan = planned.reconciliation
         commands = plan.commands
+        attempted_items = (set(state.get("dispatched_item_ids", ()))
+                           if state.get("completed_key") == materialization_key else set())
+        if attempted_items and commands:
+            fresh_commands = tuple(cmd for cmd in commands if cmd.item_id not in attempted_items)
+            if not fresh_commands:
+                self.block("previous repair was dispatched; native possession remains missing")
+                return MaterializationOutcome(None, self._block)
+            plan = replace(plan, commands=fresh_commands)
+            commands = fresh_commands
         if planned.special_diagnostic is not None:
             self._logger.info(
                 "SPECIAL_WEAPON_PLAN item=%s owned_count=%s resolved_stage=%s context=%s ops=%s",
@@ -252,6 +261,9 @@ class MaterializationCoordinator:
             status="complete",
             lifecycle_state=lifecycle_state,
             semantic_state=semantic_state,
+            dispatched_item_ids=sorted(attempted_items | {
+                command.item_id for command in commands if command.item_id in (7770002, 7770013)
+            }),
         )
         persist()
         state["completed_key"] = materialization_key

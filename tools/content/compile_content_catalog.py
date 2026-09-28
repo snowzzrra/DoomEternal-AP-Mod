@@ -169,7 +169,7 @@ def _compile_catalog(
     item_ids = extract_namedtuple_table(item_source, "item_data_table")
     classifications = extract_item_classifications(item_source)
     write_artifact(catalog.root / "data/item_classifications.json", json.dumps({
-        "schema_version": 1, "item_mapping_revision": 8,
+        "schema_version": 1, "item_mapping_revision": 9,
         "source": "Archipelago/worlds/doometernal/items.py",
         "source_sha256": hashlib.sha256(item_source.read_bytes()).hexdigest(),
         "items": {str(code): {"name": name, "classification": classifications[code]}

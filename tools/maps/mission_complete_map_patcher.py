@@ -125,7 +125,8 @@ def _patch_hell(contract: dict, root: Path, mod_root: Path) -> dict:
     }
 
 
-def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
+def _patch_exultia(contract: dict, root: Path, generated_map: Path,
+                   publishers: tuple[PublisherContract, ...] = ()) -> dict:
     source = (root / contract["source_path"]).read_text(encoding="utf-8")
     source_bounds = find_entity_block_bounds(source, contract["owner"])
     if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
@@ -150,11 +151,20 @@ def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
     before = extract_target_names(block)
     if before != contract["original_targets"]:
         raise ValueError(f"Exultia native owner target drift: {before}")
-    after = [contract["ap_check"], *before]
+    compiled = None
+    if contract["patch_strategy"] == "deferred_publishers":
+        compiled = compile_publishers(map_publishers_for_owner(
+            publishers, contract["map_key"], contract["owner"]
+        ))
+        if compiled["preserved_native_targets"] != before:
+            raise ValueError(f"{contract['map_key']}: native transition target drift")
+    after = compiled["owner_targets"] if compiled else [contract["ap_check"], *before]
     patched = replace_targets_block(block, after)
     result = text[:bounds[0]] + patched + text[bounds[1]:]
+    if compiled:
+        result = result.rstrip() + "\n" + compiled["entities"]
     generated_map.write_text(result, encoding="utf-8", newline="")
-    return {
+    audit = {
         "source_path": contract["source_path"],
         "source_sha256": source_sha,
         "expected_source_sha256": expected_source or source_sha,
@@ -162,6 +172,10 @@ def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
         "after_targets": after,
         "changed_lists": 1,
     }
+    if compiled:
+        audit["publishers"] = compiled["publishers"]
+        audit["preserved_native_targets"] = compiled["preserved_native_targets"]
+    return audit
 
 
 def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -> None:
@@ -503,8 +517,10 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         strategy = contract.get("patch_strategy")
         if strategy == "logic_node_targets":
             audit = _patch_hell(contract, root, mod_root)
-        elif strategy == "entity_targets":
-            audit = _patch_exultia(contract, root, generated_maps[contract["map_key"]])
+        elif strategy in {"entity_targets", "deferred_publishers"}:
+            audit = _patch_exultia(
+                contract, root, generated_maps[contract["map_key"]], publisher_contracts
+            )
         elif strategy == "terminal_publishers":
             audit = _patch_sentinel_prime_end(
                 contract,
@@ -517,7 +533,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{name}: unknown Mission Complete patch strategy {strategy!r}")
         audits[name] = audit
     for name, contract in contract_items.items():
-        if contract["patch_strategy"] == "terminal_publishers":
+        if contract["patch_strategy"] in {"terminal_publishers", "deferred_publishers"}:
             continue
         _append_standard_event_target(
             generated_maps[contract["map_key"]], contract["ap_check"], contract["location_id"]
