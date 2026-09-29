@@ -21,7 +21,8 @@ class SaveCheckObservations:
     def observe_record(self, kind, slot, unlockable, record):
         return self._observer.observe_record(kind, slot, unlockable, record)
 
-    def observe_edges(self, observer_key, records, entries, slot_directory):
+    def observe_edges(self, observer_key, records, entries, slot_directory,
+                      first_sample_pending=frozenset()):
         if not self._scope.item_ready:
             return set()
         acknowledged = {
@@ -38,6 +39,7 @@ class SaveCheckObservations:
             observer_key=observer_key,
             records=records,
             acknowledged_records=acknowledged,
+            first_sample_pending=first_sample_pending,
         )
         if self._scope.persist_enabled:
             self._persist()
@@ -49,7 +51,7 @@ class SaveCheckObservations:
                 sum(records.values()),
             )
         for key in sorted(new_edges):
-            self._logger.info("[OBSERVER] EDGE_COMPLETE key=%s", key)
+            self._logger.info("[OBSERVER] %s key=%s", "BASELINE_CATCHUP" if created else "EDGE_COMPLETE", key)
         return pending
 
 

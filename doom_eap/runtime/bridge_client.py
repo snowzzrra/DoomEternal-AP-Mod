@@ -6039,9 +6039,18 @@ class DoomEternalContext(CommonContext):
     def observe_mission_challenges(self, records, path):
         slot_directory = self.observation_slot_for_source(path)
         self.select_save_observation_slot(slot_directory)
+        recovery_context = (
+            self.state_key == "Phase9BF90902003:0:1:557241ae1d544f992f8291df7b93e7fa8c721150d8e6e81e8fa39061535e6f79"
+            and getattr(self.save_observer, "_ap_provider", None)
+            == "fbc2fe1e1d324da082bbcd98a3e6c3eb56edcfb098e14077470803d0dde4e3e1:ap-fbc2fe1e1d324da082bbcd98a3e6c3eb56edcfb0"
+        )
+        if recovery_context and not self.server_checked_locations_ready:
+            return  # Do not consume the first complete baseline before checked Locations arrive.
+        recovery_locations = {7770172, 7770173, 7770174} if recovery_context else set()
+        recovery_locations.intersection_update(self.server_locations)
         self.save_checks.observe_challenges(records, path, slot_directory,
             self.mission_select_observation_map, self.mission_select_observation_epoch, self.save_check_observations(),
-            authoritative=self.has_authoritative_save_proof())
+            authoritative=self.has_authoritative_save_proof(), first_sample_locations=recovery_locations)
 
     def observe_sticky_mastery(self, snapshot, path):
         """Sticky compatibility wrapper used by the proven 24→25 regression."""
@@ -6357,6 +6366,9 @@ class DoomEternalContext(CommonContext):
             self.queue_received_deathlink()
             work_token = self.runtime_lifecycle.capture_work()
             used_duration = False
+            if not DEATH_PROBE.is_file() and not getattr(self, "_save_probe_missing_logged", False):
+                logger.warning("[Challenge] SAVE_PROBE_UNAVAILABLE reason=helper_missing path=%s", DEATH_PROBE)
+                self._save_probe_missing_logged = True
             if death_probe_available():
                 used_duration = await self.check_game_duration_death()
             if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():

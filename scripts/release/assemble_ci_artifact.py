@@ -491,6 +491,9 @@ def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | No
         if "DoomEternalArchipelago/client/ap_client.exe" not in names:
             raise ValueError(f"client/ap_client.exe missing in {zip_path.name}")
 
+        if "DoomEternalArchipelago/client/save_death_probe.exe" not in names:
+            raise ValueError(f"client/save_death_probe.exe missing in {zip_path.name}")
+
         # Mandatory room compiler resources
         for resource_rel in ROOM_COMPILER_RESOURCE_FILES:
             expected_zip_path = f"DoomEternalArchipelago/{resource_rel}"

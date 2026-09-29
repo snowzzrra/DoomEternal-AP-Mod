@@ -6,7 +6,8 @@ from doom_eap.contracts.challenge_registry import aggregate_ready
 
 
 class SaveCheckObservationPort(Protocol):
-    def observe_edges(self, observer_key, records, entries, slot_directory): ...
+    def observe_edges(self, observer_key, records, entries, slot_directory,
+                      first_sample_pending=frozenset()): ...
     def observe_record(self, kind, slot, unlockable, record): ...
 
 
@@ -82,7 +83,7 @@ class SaveChecks:
             self._masteries[unlockable] = True
 
 
-    def observe_challenges(self, records, path, slot_directory, mission_select_map, mission_select_epoch, observations: SaveCheckObservationPort, *, authoritative):
+    def observe_challenges(self, records, path, slot_directory, mission_select_map, mission_select_epoch, observations: SaveCheckObservationPort, *, authoritative, first_sample_locations=frozenset()):
         if not authoritative:
             return
         save_entries = {
@@ -114,6 +115,10 @@ class SaveChecks:
             completion_states,
             save_entries,
             slot_directory,
+            first_sample_pending=frozenset(
+                key for key, entry in save_entries.items()
+                if entry["location_id"] in first_sample_locations
+            ),
         )
         for unlockable, record in records.items():
             entry = self._challenge_entries.get(unlockable)

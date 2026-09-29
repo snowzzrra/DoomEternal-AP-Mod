@@ -82,7 +82,8 @@ class SaveObserver:
         return True
 
     def observe_edges(self, *, session_identity, team, slot, registry_revision,
-                      doom_save_slot, observer_key, records, acknowledged_records):
+                      doom_save_slot, observer_key, records, acknowledged_records,
+                      first_sample_pending=frozenset()):
         """Select the durable baseline independently of feature publication."""
         binding_key = self._baselines.binding_key(
             session_identity=session_identity + ":" + getattr(self, "_ap_provider", "unbound"), team=team, slot=slot,
@@ -91,6 +92,7 @@ class SaveObserver:
         return self._baselines.observe(
             binding_key=binding_key, observer_key=observer_key,
             records=records, acknowledged_records=acknowledged_records,
+            first_sample_pending=first_sample_pending,
         )
 
     @property
@@ -284,6 +286,7 @@ class SaveObserverBaselineStore:
         observer_key: str,
         records: Mapping[str, bool],
         acknowledged_records: set[str],
+        first_sample_pending: frozenset[str] = frozenset(),
     ) -> tuple[set[str], bool, set[str]]:
         binding = self.state.get(binding_key)
         created = binding is None
@@ -295,6 +298,10 @@ class SaveObserverBaselineStore:
         observers = binding["observers"]
         observer = observers.get(observer_key)
         if observer is None:
+            recovered = {
+                key for key in first_sample_pending
+                if records.get(key) and key not in acknowledged_records
+            }
             observer = observers[observer_key] = {
                 "baseline_preexisting": sorted(
                     key for key, complete in records.items() if complete
@@ -302,9 +309,9 @@ class SaveObserverBaselineStore:
                 "last_observed": {
                     key: bool(complete) for key, complete in records.items()
                 },
-                "pending_edges": [],
+                "pending_edges": sorted(recovered),
             }
-            return set(), True, set()
+            return recovered, True, recovered
 
         previous = observer.setdefault("last_observed", {})
         pending = set(observer.setdefault("pending_edges", []))
