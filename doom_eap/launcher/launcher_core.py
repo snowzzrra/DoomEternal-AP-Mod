@@ -1256,7 +1256,15 @@ class RoomCompiler:
         ).as_posix()
         assembled[hub_devinv_path] = devinv_source.encode("utf-8")
         from tools.decls.campaign_builder import build_campaign_overrides
-        assembled.update(build_campaign_overrides(assembled["hub_patch2/EternalMod/assetsinfo/hub.json"]))
+        holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
+        skip_holt_credits = self.payload_manifest.get("phase9c_final_credits") is True
+        if skip_holt_credits and hashlib.sha256(assembled[holt_member]).hexdigest() != \
+                "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19":
+            raise ValueError("credits overlay drifted")
+        assembled.update(build_campaign_overrides(
+            assembled["hub_patch2/EternalMod/assetsinfo/hub.json"],
+            skip_dlc1_credits=skip_holt_credits,
+        ))
         if manifest.options.get("use_dlc_content", True):
             assembled.update({
                 path: source.encode("utf-8")

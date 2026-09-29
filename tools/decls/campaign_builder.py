@@ -29,7 +29,7 @@ def _source(key: str, manifest: dict) -> str:
     return raw.decode("utf-8")
 
 
-def build_campaign_overrides(hub_assetsinfo: bytes) -> dict[str, bytes]:
+def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool = False) -> dict[str, bytes]:
     manifest = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
     result = {}
     for key in ("dlc1", "dlc2"):
@@ -42,9 +42,13 @@ def build_campaign_overrides(hub_assetsinfo: bytes) -> dict[str, bytes]:
             raise ValueError(f"Native campaign currency owner missing: {key}")
         # The ordinary dossier reads the player's existing global currencies.
         # Change only visibility; preserve slots, purchase logic and balances.
-        result[PREFIX + f"campaign/campaign/{key}.decl"] = source.replace(
-            before, "showDossierCurrency = true;"
-        ).encode("utf-8")
+        source = source.replace(before, "showDossierCurrency = true;")
+        if key == "dlc1" and skip_dlc1_credits:
+            credits = 'credits = "dlc1";'
+            if source.count(credits) != 1:
+                raise ValueError("Native DLC1 credits field drifted")
+            source = source.replace(credits, "", 1)
+        result[PREFIX + f"campaign/campaign/{key}.decl"] = source.encode("utf-8")
     hub = (SOURCES / "hub.decl").read_bytes()
     if hashlib.sha256(hub).hexdigest() != manifest["hub"]["sha256"]:
         raise ValueError("Native Fortress DevMenu source drifted")
