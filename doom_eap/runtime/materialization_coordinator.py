@@ -148,12 +148,12 @@ class MaterializationCoordinator:
         target_campaign = transition[1] if transition is not None else context.campaign
         complete_transition = False
         ownership_fingerprint = ownership.materialization_fingerprint
-        materialization_key = ":".join((
+        dispatch_key = ":".join((
             scope.dedupe_identity,
             context.identity,
             str(materialization_lease or "deferred"),
-            ownership_fingerprint,
         ))
+        materialization_key = f"{dispatch_key}:{ownership_fingerprint}"
         # TAG DevInv clears physical inventory on every load. Persistent
         # ownership therefore needs one reconciliation per accepted lease.
         persistent_reconciliation_key = materialization_key
@@ -199,7 +199,7 @@ class MaterializationCoordinator:
         plan = planned.reconciliation
         commands = plan.commands
         attempted_items = (set(state.get("dispatched_item_ids", ()))
-                           if state.get("completed_key") == materialization_key else set())
+                           if state.get("dispatched_key") == dispatch_key else set())
         if attempted_items and commands:
             fresh_commands = tuple(cmd for cmd in commands if cmd.item_id not in attempted_items)
             if not fresh_commands:
@@ -261,8 +261,9 @@ class MaterializationCoordinator:
             status="complete",
             lifecycle_state=lifecycle_state,
             semantic_state=semantic_state,
+            dispatched_key=dispatch_key,
             dispatched_item_ids=sorted(attempted_items | {
-                command.item_id for command in commands if command.item_id in (7770002, 7770013)
+                command.item_id for command in commands if command.item_id in (7770002, 7770006, 7770013)
             }),
         )
         persist()

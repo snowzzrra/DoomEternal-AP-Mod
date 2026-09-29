@@ -3,14 +3,14 @@
     "map": "final_sin_death",
     "resource": "e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_of_sin_death/icon_of_sin_death_cinematic_info_logic.decl",
     "source_sha256": "755c2fb0227e9c6ed63c963431db3b407facbfe34f6984fe5e583a7fafd11a5c",
-    "result_sha256": "3b9988222ff5028bcd951932a8429278b0df2c52d12d3d47cb3fc07aeec13ee4",
+    "result_sha256": "6dc720eddcad383dedb7ef89e91fe8cf81f3d0106fab187b99abd13c301c0550",
     "edge": [
       522942224,
       3031889519,
       3,
       881189391,
       0,
-      2563665440,
+      96874852,
       0
     ]
   },

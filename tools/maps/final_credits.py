@@ -13,7 +13,7 @@ ROUTES = {
     "final_sin_death": (
         "e3m4_boss_patch3", DECL + "sp/e3m4_boss/e3m4_boss_cinematic_icon_of_sin_death/icon_of_sin_death_cinematic_info_logic.decl",
         "755c2fb0227e9c6ed63c963431db3b407facbfe34f6984fe5e583a7fafd11a5c",
-        (522942224, 3031889519, 3, 881189391, 0, 2563665440, 0),
+        (522942224, 3031889519, 3, 881189391, 0, 96874852, 0),
         ('binkMaterial = "video/credits/credits";', "e3m4_endoflevel_transition"),
     ),
     "final_sin_destroyer": (

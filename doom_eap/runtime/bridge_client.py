@@ -2736,6 +2736,8 @@ class SentinelInventoryObservation:
         if weapons != 0xffffffff:
             items[7770002] = ItemObservation(7770002, OWNED if weapons & (1 << 6) else MISSING,
                                              source="sentinel_inventory")
+            items[7770006] = ItemObservation(7770006, OWNED if weapons & (1 << 7) else MISSING,
+                                             source="sentinel_inventory")
         ice = result["ice_bomb_after"]
         if ice != 255:
             items[7770013] = ItemObservation(7770013, OWNED if ice else MISSING,
@@ -2746,6 +2748,7 @@ class SentinelInventoryObservation:
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
                 namespace=link.namespace, process_id=link.pid, epoch=epoch,
                 context=context_identity, rocket=items.get(7770002, ItemObservation(7770002)).state,
+                bfg=items.get(7770006, ItemObservation(7770006)).state,
                 ice=items.get(7770013, ItemObservation(7770013)).state,
                 weapons_mask=weapons, ice_bomb=ice,
             )

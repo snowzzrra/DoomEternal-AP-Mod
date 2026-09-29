@@ -124,7 +124,7 @@ def compile_materialization_plan(
                 if observed_tier <= cmd.stage < desired_tier:
                     diff_commands.append(cmd)
             else:
-                if observation.is_proven_missing(item_id):
+                if observation.is_proven_missing(item_id) and (item_id != 7770006 or cmd.stage == 0):
                     diff_commands.append(cmd)
                 # If owned or UNKNOWN: omit from repair diff!
         plan_commands = diff_commands
