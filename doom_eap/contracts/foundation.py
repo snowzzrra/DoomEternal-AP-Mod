@@ -37,6 +37,12 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "shape": {"class": "idTarget_Command", "inherit": None, "required_fields": ["commandText"], "forbidden_fields": ["targets", "currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "hub", "e1m3_cult"], "allowed_in_release": True, "frozen": True,
         },
+        "weapon_grant_direct": {
+            "family": "weapon", "status": "static_evidence_only",
+            "source": {"map": "game/hub/hub", "container": "hub_patch2.resources", "file": "vanillamaps/hub.map", "entity": "target_give_item_ballista", "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b"},
+            "shape": {"class": "idTarget_GiveItems", "inherit": None, "required_fields": ["itemList", "addUpToCount", "spawnPosition"], "forbidden_fields": ["targets", "commandText", "currencyList"]},
+            "targets": [], "runtime_verified_maps": [], "allowed_in_release": True, "frozen": False,
+        },
         "target_count_relay": {
             "family": "relay", "status": "runtime_verified",
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "master_level_target_relay_barge_arena_door_close", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
@@ -267,6 +273,22 @@ def build_primitive(
         block = f'''{header}
 \t\tedit = {{
 \t\t\tcommandText = "{parameters["command"]}";
+\t\t}}
+\t}}
+}}
+'''
+    elif primitive_id == "weapon_grant_direct":
+        if parameters != {"item": "weapon/player/bfg"}:
+            raise ValueError("weapon_grant_direct accepts only the BFG")
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tflags = {{ noFlood = true; }}
+\t\t\titemList = {{
+\t\t\t\tnum = 1;
+\t\t\t\titem[0] = {{ item = "weapon/player/bfg"; }}
+\t\t\t}}
+\t\t\taddUpToCount = false;
+\t\t\tspawnPosition = {{ x = 0; y = -30.9800339; z = -1.87999964; }}
 \t\t}}
 \t}}
 }}

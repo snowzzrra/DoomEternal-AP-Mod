@@ -91,9 +91,11 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
     main = _source("main", manifest)
     if main.count('missionSelectList = "missionlist";') != 1:
         raise ValueError("Native Base campaign mission roster is missing")
+    if main.count('credits = "credits";') != 1:
+        raise ValueError("Native Base campaign credits field drifted")
     result[PREFIX + "campaign/campaign/main.decl"] = main.replace(
         'missionSelectList = "missionlist";', 'missionSelectList = "missionlist_ap_unified";'
-    ).encode("utf-8")
+    ).replace('credits = "credits";', '', 1).encode("utf-8")
     resource_layers = content_layers(7) + ["game/sp/hub/ap_excluded"]
     for layer in resource_layers:
         result[PREFIX + f"layer/{layer}.decl"] = b"{\n}\n"

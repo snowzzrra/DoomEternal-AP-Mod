@@ -2304,11 +2304,14 @@ def generate_rpc_command_entities(
             command_blocks = []
             for idx, cmd in enumerate(command_value):
                 cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
+                direct_bfg = int(item_id) == 7770006 and idx == 0 and cmd == "give weapon/player/bfg"
                 if command_requires_map_side_rpc(cmd):
                     required_entities.append(cmd_entity_name)
                 relay_targets.append(cmd_entity_name)
                 command_blocks.append(build_primitive(
-                    "target_command", cmd_entity_name, {"command": cmd}
+                    "weapon_grant_direct" if direct_bfg else "target_command",
+                    cmd_entity_name,
+                    {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd},
                 ))
 
             blocks.append(build_primitive(
