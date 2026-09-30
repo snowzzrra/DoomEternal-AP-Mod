@@ -32,7 +32,7 @@ def _u64(data, offset):
     return struct.unpack_from("<Q", data, offset)[0]
 
 
-def _records(path: Path, wanted: set[str]) -> dict:
+def _records(path: Path, wanted: set[str], *, decode=None) -> dict:
     result = {}
     with path.open("rb") as source, mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as data:
         if data[:4] != b"IDCL" or _u32(data, 4) != 12:
@@ -59,9 +59,14 @@ def _records(path: Path, wanted: set[str]) -> dict:
                 raise ValueError(f"Duplicate campaign resource: {name}")
             kind = names[_u64(data, local_names + _u64(data, row) * 8)]
             offset, size, decoded = (_u64(data, row + n) for n in (56, 64, 72))
-            if size != decoded or offset + size > len(data):
+            if (size != decoded and decode is None) or offset + size > len(data):
                 raise ValueError(f"Expected decoded post-inject resource: {name}")
-            result[name] = (index, kind, offset, data[offset:offset + size], _u32(data, row + 112))
+            payload = data[offset:offset + size]
+            if size != decoded:
+                payload = decode(payload, decoded)
+                if len(payload) != decoded:
+                    raise ValueError(f"Decoded resource length differs: {name}")
+            result[name] = (index, kind, offset, payload, _u32(data, row + 112))
     if result.keys() != wanted:
         raise ValueError(f"Missing installed campaign resources: {sorted(wanted - result.keys())}")
     return result

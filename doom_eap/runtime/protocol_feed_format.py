@@ -264,3 +264,4 @@ def emit_hints(key, source, names, emit, logger, update_kind="DATA_RECEIVED") ->
         )
     logger.info("HINTS_%s key=%s records=%d", update_kind, key, len(records))
     emit("hints", hints=records)
+    return records

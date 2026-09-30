@@ -190,6 +190,7 @@ def item_receipt_text(
     local: bool,
     trap: bool,
     recipient_name: str,
+    uppercase: bool = True,
 ) -> str:
     """Return the placement-aware received-item subtitle text.
 
@@ -198,8 +199,10 @@ def item_receipt_text(
     """
     item = _sanitized_name(item_name)
     if trap:
-        return "A TRAP FOR SOMEONE"
+        return "A TRAP FOR SOMEONE" if uppercase else "A trap for someone"
+    if uppercase:
+        item = item.upper()
     if local:
-        return f"YOUR {item.upper()}"
+        return f"YOUR {item}"
     recipient = _sanitized_name(recipient_name)
-    return f"{item.upper()} FOR {recipient.upper()}"
+    return f"{item} FOR {recipient.upper() if uppercase else recipient}"

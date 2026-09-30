@@ -2874,7 +2874,11 @@ class DoomEternalContext(CommonContext):
     def _emit_launcher_hints(self, update_kind="DATA_RECEIVED"):
         key = self._launcher_hints_key()
         if key is not None:
-            emit_hints(key, self.stored_data.get(key, []), self.protocol_names(), emit_launcher_event, logger, update_kind)
+            records = emit_hints(key, self.stored_data.get(key, []), self.protocol_names(), emit_launcher_event, logger, update_kind)
+            self._presentation_hints_confirmed = (
+                (self.room_seed_name, self.team, self.slot,
+                 self._connected_slot_data.get("native_generation_fingerprint", "")),
+                {record["location"] for record in records if record["finding_player"] == self.slot})
 
 
     def reset_queue_session_authority(self, reason):
@@ -4423,11 +4427,36 @@ class DoomEternalContext(CommonContext):
                     link.namespace, generation, row["map"], revealed=row["revealed"], facts=facts, pending=pending)
                 for row in projection["rows"]
             }
+            placements = {entry["location_id"]: entry for entry in resolve_placement_records(
+                self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot)}
+            projection["hub_summary"] = self._mission_presentations.snapshot(
+                link.namespace, generation, projection["hub_map"], revealed=True, facts=facts, pending=pending)
+            projection["challenge_rewards"] = {
+                row["stage"]: self._mission_presentations.challenge_snapshot(
+                    link.namespace, generation, row["map"], revealed=row["revealed"], facts=facts,
+                    placements=placements, aggregates=ALL_MISSION_CHALLENGES_ENTRIES)
+                for row in projection["rows"]
+            }
+            projection["masteries"] = self._mission_presentations.mastery_snapshot(
+                facts, placements, WEAPON_MASTERY_ENTRIES)
             ratings = self._connected_slot_data.get("mission_presentation_v1", {})
             projection["ratings"] = {row["stage"]: ratings[row["stage"]]
                                      for row in projection["rows"]
                                      if row["revealed"] and row["stage"] in ratings}
             result = await asyncio.to_thread(self._campaign_menu.synchronize, link, projection)
+            from doom_eap.runtime.presentation_hints import PresentationHints
+            hints = getattr(self, "_presentation_hints", None)
+            if hints is None or hints.namespace != link.namespace:
+                state = self.session_state.setdefault("presentation_hints", {}).setdefault(link.namespace, {})
+                self._presentation_hints = hints = PresentationHints(link.namespace, state, self.persist_session_state)
+            hint_scope = (self.room_seed_name, self.team, self.slot, generation)
+            confirmed_scope, confirmed = getattr(self, "_presentation_hints_confirmed", (None, set()))
+            allowed = {entry["location_id"] for entry in
+                       (*MISSION_CHALLENGE_ENTRIES, *ALL_MISSION_CHALLENGES_ENTRIES, *WEAPON_MASTERY_ENTRIES)}
+            await hints.synchronize(result.get("hint_intents", []), allowed & facts.server_locations,
+                                    confirmed if confirmed_scope == hint_scope else set(),
+            self.send_msgs if self.server and self.server.socket.open and not self.server.socket.closed else None,
+            self._launcher_hints_key())
             selected = result["selected_stage"]
             if selected:
                 self.unified_campaign.select(selected, projection)

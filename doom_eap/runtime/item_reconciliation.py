@@ -847,7 +847,6 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     elif "item_command_groups" in normalized:
         normalized.pop("item_command_groups")
 
-    # Older prototypes used one of these names for the durable no-replay set.
     # Keep valid history and make malformed values inert rather than executable.
     for key in ("never_replay_history", "never_replay_items", "never_replayed", "never_replay"):
         if key not in normalized:

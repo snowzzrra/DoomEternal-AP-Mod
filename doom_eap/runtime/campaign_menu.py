@@ -9,6 +9,19 @@ import struct
 from .unified_campaign import STAGES
 
 
+def _reward_wire(known, entries):
+    entries = tuple(entries)
+    if len(entries) > 17:
+        raise ValueError("Native reward projection exceeds its authored catalog")
+    wire = struct.pack("<II", known, len(entries))
+    for kind, entry in entries:
+        identity, name, text = entry.unlockable.encode("ascii"), entry.name.encode("utf8"), entry.text.encode("utf8")
+        if len(identity) >= 80 or len(name) >= 128 or len(text) >= 512:
+            raise ValueError("Native reward text exceeds its field capacity")
+        wire += struct.pack("<III80s128s512s", entry.location_id, kind, entry.checked, identity, name, text)
+    return wire
+
+
 class CampaignMenu:
     def __init__(self):
         self.identity = None
@@ -24,6 +37,11 @@ class CampaignMenu:
         rows = [(1, 1 | 2 | 16, len(STAGES) + snapshot["fortress_phase"], snapshot["hub_map"], "FORTRESS OF DOOM")]
         stage_ids = {1: "hub"}
         summaries = [bytes(292)]
+        rewards = [_reward_wire(True, ((3, entry) for entry in snapshot.get("masteries", ())))]
+        hub_summary = snapshot.get("hub_summary")
+        if hub_summary is not None:
+            summaries[0] = struct.pack("<IIII", 1 if hub_summary.found is not None else 2,
+                                       hub_summary.found or 0, hub_summary.total or 0, 0) + bytes(276)
         for row in snapshot["rows"]:
             stage_id = STAGES[row["stage"]]["access_id"]
             stage_ids[stage_id] = row["stage"]
@@ -58,13 +76,21 @@ class CampaignMenu:
                     fields += struct.pack("<80sIII", name, challenge.found, challenge.required, challenge.checked)
                 fields += bytes(92 * (3 - len(summary.challenges)))
             summaries.append(fields)
-        serialized = json.dumps(rows, separators=(",", ":")), tuple(summaries)
+            reward = snapshot.get("challenge_rewards", {}).get(row["stage"])
+            entries = [(1, entry) for entry in reward.challenges] if reward else []
+            if reward and reward.aggregate:
+                entries.append((2, reward.aggregate))
+            if reward and (reward.namespace != link.namespace or reward.runtime_map != row["map"]):
+                raise RuntimeError("Native rewards belong to a different campaign view")
+            rewards.append(_reward_wire(bool(reward and reward.known), entries))
+        extended = "challenge_rewards" in snapshot
+        serialized = json.dumps(rows, separators=(",", ":")), tuple(summaries), tuple(rewards) if extended else ()
         presentation = "summaries" in snapshot
 
         def exchange(operation, revision=0, index=0, row=(0, 0, 0, "", "")):
             request_id = secrets.randbits(64) or 1
             payload = struct.pack(
-                "<QIQ16sQQ16sI", 524288 if presentation else 4096, link.pid, int(scope["process_created"]),
+                "<QIQ16sQQ16sI", 1048576 if extended else 524288 if presentation else 4096, link.pid, int(scope["process_created"]),
                 bytes.fromhex(scope["instance_id"]), int(scope["lifecycle_generation"]),
                 request_id, secrets.token_bytes(16), 2000,
             ) + link.namespace.encode("ascii") + b"\0"
@@ -72,6 +98,8 @@ class CampaignMenu:
                                    row[3].encode("ascii"), row[4].encode("ascii"))
             if presentation:
                 payload += summaries[index] if operation == 22 else bytes(292)
+            if extended:
+                payload += rewards[index] if operation == 22 else bytes(8)
             message = struct.pack("<IHHII", 0x50494353, 1, operation, len(payload), 0) + payload
             result = link._run(["--campaign-menu"], message)
             if result.get("namespace") != link.namespace or int(result.get("request_id", 0)) != request_id:
