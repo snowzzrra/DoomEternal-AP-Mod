@@ -1389,68 +1389,13 @@ def main(argv: list[str] | None = None) -> int:
             "command_transport.h",
             "game_state_probe.cpp",
             "game_state_probe.h",
-            "ap_runtime_rpc_client.cpp",
-            "ap_runtime_rpc_client.h",
-            "ap_runtime_rpc_seh.c",
-            "ap_runtime_rpc_seh.h",
+            "sentinel_command_client.cpp",
+            "sentinel_command_client.h",
         )
     )
-    rpc_idl_path = ROOT / "native" / "client" / "ap_runtime_rpc.idl"
-    rpc_idl = rpc_idl_path.read_text(encoding="utf-8", errors="ignore")
-    normalized_idl = re.sub(r"\s+", " ", rpc_idl).strip()
-    if any(fragment not in normalized_idl for fragment in
-           ("1c9ca7c8-d421-482d-b85d-79fac33b2658", "version(1.0)",
-            "implicit_handle(handle_t ap_runtime_rpc_binding_handle)")):
-        errors.append("AP runtime RPC IDL is missing required interface metadata")
-    if "explicit_handle" in normalized_idl:
-        errors.append("AP runtime RPC IDL must use implicit binding")
-    exact_rpc_declarations = (
-        "void ap_execute( [in, string] unsigned char* command);",
-        "void ap_request_entities( [in, string] unsigned char* path, [in] boolean begin, [in] int size);",
-        "void ap_upload_chunk( [in] int size, [in] int offset, [in, size_is(size)] unsigned char* data);",
-        "void ap_retrieve_entities( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_encounter( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_checkpoint( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_spawn( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_health( [in, out] int* state);",
-    )
-    expected_interface_body = "interface ap_runtime_rpc { " + " ".join(exact_rpc_declarations) + " }"
-    interface_match = re.search(r"interface ap_runtime_rpc \{ (.*) \}", normalized_idl)
-    if interface_match is None or "interface ap_runtime_rpc { " + interface_match.group(1) + " }" != expected_interface_body:
-        errors.append("AP runtime RPC IDL interface does not match the exact eight-operation contract")
-    wrapper_source = (ROOT / "native" / "client" / "ap_runtime_rpc_client.cpp").read_text(encoding="utf-8")
-    if "ncacn_np" not in wrapper_source or r"\\pipe\\meathook_interface_rpc" not in wrapper_source:
-        errors.append("AP runtime RPC wrapper is missing private transport constants")
-    seh_source = (ROOT / "native" / "client" / "ap_runtime_rpc_seh.c").read_text(encoding="utf-8")
-    if (
-        "ApRpcSetImplicitBinding(binding)" not in seh_source
-        or "ApRpcClearImplicitBinding()" not in seh_source
-        or "RpcTryExcept" not in seh_source
-        or "ap_execute(command)" not in seh_source
-    ):
-        errors.append("AP runtime RPC SEH wrapper does not enforce implicit binding ABI")
-    forbidden_paths = [ROOT / name for name in
-                       ("meathook_interface.h", "meathook_interface_c.c", "mhclient.h", "mhclient.cpp",
-                        "native/client/meathook_interface.h", "native/client/meathook_interface_c.c",
-                        "native/client/mhclient.h", "native/client/mhclient.cpp")]
-    if any(path.exists() for path in forbidden_paths):
-        errors.append("Forbidden native RPC path still exists")
-    tracked_native = list((ROOT / "native").rglob("*"))
-    generated_markers = ("ALWAYS GENERATED", "MIDL compiler version", "@@MIDL_FILE_HEADING")
-    for path in tracked_native:
-        if path.is_file() and path.suffix in (".c", ".h", ".cpp"):
-            text = path.read_text(encoding="utf-8", errors="ignore")
-            if any(marker in text for marker in generated_markers):
-                errors.append(f"Generated RPC marker found in tracked native source: {path}")
-            if (path.name.endswith("_c.c") or path.name == "ap_runtime_rpc.h") and path.name != "ap_runtime_rpc_seh.h":
-                errors.append(f"Generated RPC artifact found under native: {path}")
-    if (ROOT / ".git").exists():
-        tracked = subprocess.run(["git", "ls-files", "native"], cwd=ROOT, capture_output=True, text=True, check=False)
-        if tracked.returncode == 0 and any(
-            (ROOT / line).exists() and ("generated-rpc" in line or line.endswith("_c.c"))
-            for line in tracked.stdout.splitlines()
-        ):
-            errors.append("Generated RPC build artifact is tracked")
+    transport_source = (ROOT / "native/client/sentinel_command_client.cpp").read_text(encoding="utf-8")
+    if "query_command" not in transport_source or "ncacn_np" in native_runtime_source or "meathook_interface_rpc" in native_runtime_source:
+        errors.append("Native consumer must use the typed Core command interface")
     for term in native_hook_terms:
         if term in native_runtime_source:
             errors.append(f"Forbidden in-process/remote hook primitive entered runtime: {term}")

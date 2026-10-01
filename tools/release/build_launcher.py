@@ -75,9 +75,12 @@ def _dependency_version(name: str) -> str:
         return "missing"
 
 
-def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
+def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: Path | None = None) -> Path:
     output_dir = output_dir.expanduser().resolve()
     archipelago_source = archipelago_source.expanduser().resolve()
+    from doom_eap.contracts.core_distribution import verify_runtime
+    core_runtime = (core_runtime or WORKSPACE / "Sentinel-Core/build/distribution/1.0.0-rc-1").resolve()
+    verify_runtime(core_runtime / "distribution.json")
     if not _within(output_dir, RELEASE_ROOT):
         raise ValueError(f"launcher output must remain under {RELEASE_ROOT}")
     if not (archipelago_source / "CommonClient.py").is_file():
@@ -86,7 +89,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     executable_name = f"{name}.exe" if os.name == "nt" else name
     key = content_key(
         "launcher",
-        _launcher_inputs(archipelago_source),
+        _launcher_inputs(archipelago_source) + _source_inputs("core-runtime", core_runtime),
         config={
             "name": name,
             "python": sys.executable,
@@ -151,6 +154,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--add-data",
         f"{REPO_ROOT / 'doom_eap/runtime/bridge_client.py'}{data_separator}.",
         "--add-data",
+        f"{core_runtime}{data_separator}core",
+        "--add-data",
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
@@ -189,8 +194,9 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=RELEASE_ROOT)
     parser.add_argument("--archipelago-source", type=Path, default=WORKSPACE / "Archipelago")
     parser.add_argument("--name", default="DoomEternalArchipelagoLauncher")
+    parser.add_argument("--core-runtime", type=Path)
     arguments = parser.parse_args()
-    print(build(arguments.output_dir, arguments.archipelago_source, arguments.name))
+    print(build(arguments.output_dir, arguments.archipelago_source, arguments.name, arguments.core_runtime))
     return 0
 
 

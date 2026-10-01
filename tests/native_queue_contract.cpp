@@ -9,15 +9,18 @@ class FakeTransport : public CommandTransport {
 public:
     std::vector<std::string> commands;
     bool succeed = true;
+    ApRpcResult failure = AP_RPC_PIPE_MISSING;
+    std::string deletionLockPath;
+    HANDLE deletionLock = INVALID_HANDLE_VALUE;
     bool Ready() const override { return true; }
     bool ExecuteConsoleCommand(const std::string& command) override {
         commands.push_back(command);
+        if (!deletionLockPath.empty()) deletionLock = CreateFileA(deletionLockPath.c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
         return succeed;
     }
-    bool RequestEntityLoad(const std::string&, bool, int) override { return succeed; }
-    bool RetrieveEntities(unsigned char*, size_t* capacity) override { *capacity = 0; return succeed; }
     void SetCurrentCommandId(const std::string&) override {}
-    ApRpcResult LastResult() const override { return succeed ? AP_RPC_DELIVERED : AP_RPC_EXCEPTION; }
+    ApRpcResult LastResult() const override { return succeed ? AP_RPC_DELIVERED : failure; }
     DWORD LastTransportStatus() const override { return 0; }
 };
 
@@ -56,16 +59,16 @@ int main() {
         assert(transport.commands.empty());
 
         // Lock deletion but permit reads. Execution succeeds once; later passes only remove.
-        HANDLE lock = CreateFileA((id + ".processing").c_str(), GENERIC_READ,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
-        assert(lock != INVALID_HANDLE_VALUE);
+        transport.deletionLockPath = id + ".processing";
         Dispatch(queue, transport);
         assert(transport.commands.size() == 1);
         queue.Import();
         Dispatch(queue, transport);
         assert(transport.commands.size() == 1);
         assert(std::filesystem::exists(id + ".processing"));
-        CloseHandle(lock);
+        assert(transport.deletionLock != INVALID_HANDLE_VALUE);
+        CloseHandle(transport.deletionLock);
+        transport.deletionLockPath.clear();
         Sleep(1050);
         queue.Import();
         Dispatch(queue, transport);
@@ -152,6 +155,22 @@ int main() {
         Sleep(260);
         Dispatch(queue, transport, {true, true}, true);
         assert(transport.commands.back() == "g_infiniteAmmo 1");
+    }
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope("fedcba9876543210"); queue.Import();
+        const std::string key = "base/ap_queue/recv-fedcba9876543210-unknown";
+        Write(key + ".cmd", "give ammo\n"); queue.Import();
+        transport.succeed = false; transport.failure = AP_RPC_AMBIGUOUS;
+        const auto attempts = transport.commands.size();
+        Dispatch(queue, transport); Sleep(260); Dispatch(queue, transport);
+        assert(transport.commands.size() == attempts + 1);
+        assert(std::filesystem::exists(key + ".failed"));
+        Write(key + ".cmd", "give ammo\n"); queue.Import(); Dispatch(queue, transport);
+        assert(transport.commands.size() == attempts + 1);
+        const std::string crash = "base/ap_queue/recv-fedcba9876543210-crash";
+        Write(crash + ".processing", "AP_NATIVE_ATTEMPT_V1\ngive ammo\n");
+        queue.Import(); assert(std::filesystem::exists(crash + ".failed"));
+        assert(transport.commands.size() == attempts + 1);
     }
     assert(std::any_of(logs.begin(), logs.end(), [](const std::string& line) {
         return line.find("ACK_REMOVE_RETRY command_id=") != std::string::npos;

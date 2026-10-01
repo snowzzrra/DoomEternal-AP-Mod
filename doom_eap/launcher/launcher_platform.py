@@ -32,7 +32,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterator, Protocol
 
 DOOM_ETERNAL_APP_ID = "782330"
-REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
+REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
@@ -567,7 +567,7 @@ class RuntimePrerequisiteReport:
 
     @property
     def ok(self) -> bool:
-        """All mandatory 0.5.2 runtime prerequisites must be satisfied."""
+        """Require the game, verified Core pair, and packaged client runtime."""
         mandatory_keys = {"game", "meathook", "client_runtime"}
         return all(
             check.ok
@@ -591,138 +591,26 @@ class RuntimePrerequisiteReport:
 
 
 def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
-    """Probe the canonical Game Link / Meathook runtime library in DOOM Eternal root."""
+    """Verify the Core runtime pair used by Game Link."""
+    from ..contracts.core_distribution import read_manifest
     if game_root is None:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.MISSING,
-            message="DOOM Eternal folder is not configured.",
-            details={
-                "expected_path": "",
-                "present": False,
-                "status": "missing",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "DOOM folder is not configured.")
     try:
-        root = game_root.expanduser().resolve()
-        if root.name.casefold() == "base":
-            root = root.parent
-        dll_path = root / "XINPUT1_3.dll"
-    except (OSError, ValueError) as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Invalid DOOM Eternal folder path: {error}",
-            details={
-                "expected_path": "",
-                "present": False,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
+        root = validate_game_root(game_root)
+        value = read_manifest(root / "sentinel-distribution.json")
+        records = {item["path"]: item for item in value["artifacts"]}
+        for name in ("sentinel_core.dll", "msimg32.dll"):
+            data = (root / name).read_bytes()
+            if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
+                raise ValueError(f"Core runtime hash mismatch: {name}")
+        if (root / "XINPUT1_3.dll").exists():
+            raise ValueError("A foreign XINPUT provider is present; resolve its ownership before Core-only admission.")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, f"Sentinel Core {value['version']} pair verified.",
+                                 {"path": str(root / "sentinel_core.dll"), "sha256": records["sentinel_core.dll"]["sha256"],
+                                  "version": value["version"], "build_id": value["build_id"]})
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, f"Core runtime unavailable: {error}")
 
-    if not dll_path.is_file():
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.MISSING,
-            message="Game Link runtime is not installed. Supported version: Meathook v7.2.",
-            details={
-                "expected_path": str(dll_path),
-                "present": False,
-                "status": "missing",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    try:
-        dll_stat = dll_path.stat()
-        size = dll_stat.st_size
-    except OSError as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Could not read XINPUT1_3.dll: {error}",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    if size <= 0:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message="XINPUT1_3.dll is empty (0 bytes). Replace it with the verified Meathook v7.2 runtime library.",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "size_bytes": 0,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    try:
-        actual_sha = _sha256_file_identity(
-            str(dll_path.resolve()), size, dll_stat.st_mtime_ns, dll_stat.st_ctime_ns
-        )
-    except OSError as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Could not compute hash of XINPUT1_3.dll: {error}",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "size_bytes": size,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    if actual_sha == MEATHOOK.sha256:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.OK,
-            message="Game Link runtime verified (Meathook v7.2)",
-            details={
-                "expected_path": str(dll_path),
-                "path": str(dll_path),
-                "present": True,
-                "size_bytes": size,
-                "sha256": actual_sha,
-                "version": MEATHOOK.version,
-                "identity": "verified",
-                "status": "compatible",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    return PrerequisiteCheck(
-        key="meathook",
-        status=PrerequisiteStatus.INCOMPATIBLE,
-        message="Installed Game Link runtime does not match supported Meathook v7.2.",
-        details={
-            "expected_path": str(dll_path),
-            "path": str(dll_path),
-            "present": True,
-            "size_bytes": size,
-            "sha256": actual_sha,
-            "status": "incompatible",
-            "expected_version": MEATHOOK.version,
-            "expected_sha256": MEATHOOK.sha256,
-        },
-    )
 
 
 def probe_runtime_prerequisites(
@@ -730,7 +618,7 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe all mandatory and advisory 0.5.2 runtime prerequisites."""
+    """Probe the MOD 0.6.0 game, Core and client prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
     # 1. Game installation check
@@ -786,7 +674,7 @@ def probe_runtime_prerequisites(
             checks.append(PrerequisiteCheck(
                 key="linux_steam_override",
                 status=PrerequisiteStatus.OK,
-                message="Steam launch option configured with XINPUT1_3 override",
+                message="Steam launch option configured with msimg32 override",
                 details={"configured": True},
             ))
         else:
@@ -1005,14 +893,6 @@ LINUX_MOD_INJECTOR = DependencySpec(
     archive_type="tar.gz",
 )
 
-MEATHOOK = DependencySpec(
-    name="Meathook",
-    version="7.2",
-    url="https://github.com/brongo/m3337ho0o0ok/releases/download/v7.2/XINPUT1_3.dll",
-    sha256="02c7159964245e249bcffc12598651b871f6c73925c4e04355510587114cdab3",
-    executable_glob="XINPUT1_3.dll",
-    archive_type="file",
-)
 
 IDFILE_DECOMPRESSOR_LINUX = DependencySpec(
     name="idFileDeCompressor",
@@ -1064,112 +944,61 @@ class GameLinkResult:
 
 
 def install_meathook(
-    game_root: Path,
-    dependency_manager: DependencyManager,
-    *,
-    state_dir: Path | None = None,
-    consent: Callable[[DependencySpec], bool],
-    local_artifact: Path | None = None,
-    force_repair: bool = False,
+    game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
+    consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
 ) -> GameLinkResult:
-    """Safely and atomically install verified Meathook v7.2 runtime library."""
+    """Install a verified local Core distribution without replacing foreign providers."""
+    from ..contracts.core_distribution import verify_runtime
+    del dependency_manager, consent, force_repair, state_dir
     root = validate_game_root(game_root)
-    dll_path = root / "XINPUT1_3.dll"
-
-    backup_path = ""
-    if dll_path.is_file():
-        try:
-            current_sha = hashlib.sha256(dll_path.read_bytes()).hexdigest()
-        except OSError as error:
-            raise RuntimeError(f"Could not inspect existing XINPUT1_3.dll: {error}") from error
-
-        if current_sha == MEATHOOK.sha256:
-            return GameLinkResult(
-                state="verified",
-                message="Game Link runtime is already verified (Meathook v7.2).",
-                path=str(dll_path),
-                sha256=current_sha,
-                ownership="preexisting_verified",
-            )
-
-        if not force_repair:
-            return GameLinkResult(
-                state="needs_repair",
-                message="Installed Game Link runtime does not match supported Meathook v7.2.",
-                path=str(dll_path),
-                sha256=current_sha,
-                ownership="unverified_foreign",
-            )
-
-        # Back up existing DLL before replacement
-        if state_dir is not None:
-            backup_root = state_dir / "repair-backups" / "meathook"
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_subdir = backup_root / f"{timestamp_str}_{current_sha[:8]}"
-            backup_subdir.mkdir(parents=True, exist_ok=True)
-            backup_file = backup_subdir / "XINPUT1_3.dll"
-            shutil.copy2(dll_path, backup_file)
-            metadata = {
-                "original_path": str(dll_path),
-                "sha256": current_sha,
-                "size": dll_path.stat().st_size,
-                "timestamp": timestamp_str,
-                "replacement_version": MEATHOOK.version,
-            }
-            (backup_subdir / "metadata.json").write_text(
-                json.dumps(metadata, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            backup_path = str(backup_file)
-
-    # Acquire verified dependency
-    installed = dependency_manager.acquire(
-        MEATHOOK,
-        consent=consent,
-        local_artifact=local_artifact,
-    )
-    source_dll = Path(installed.executable)
-    if not source_dll.is_file():
-        raise RuntimeError("Managed Meathook library is missing from dependency cache.")
-    cached_sha = hashlib.sha256(source_dll.read_bytes()).hexdigest()
-    if cached_sha != MEATHOOK.sha256:
-        raise ValueError(
-            f"Cached Meathook SHA mismatch: expected {MEATHOOK.sha256}, got {cached_sha}"
-        )
-
-    # Atomic installation to <game_root>/XINPUT1_3.dll
-    incoming = root / ".XINPUT1_3.dll.incoming"
+    if detect_doom_processes():
+        raise RuntimeError("Close DOOM Eternal before installing the Core runtime.")
+    installed = probe_meathook(root)
+    if local_artifact is None:
+        bundled = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "core" / "distribution.json"
+        if bundled.is_file():
+            local_artifact = bundled
+    if local_artifact is None:
+        if installed.ok:
+            return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
+                                  sha256=str(installed.details["sha256"]), ownership="verified")
+        raise RuntimeError("Select distribution.json from the compatible Core runtime release; installation is unchanged.")
+    manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
+    value, contents = verify_runtime(manifest)
+    if installed.ok:
+        from ..contracts.core_distribution import version_key
+        current = version_key(str(installed.details["version"]))
+        incoming_version = version_key(value["version"])
+        if current > incoming_version:
+            return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
+                                  sha256=str(installed.details["sha256"]), ownership="verified")
+        if current == incoming_version and installed.details["build_id"] != value["build_id"]:
+            raise ValueError("An installed Core version has a different build identity; select a new RC version.")
+    if (root / "XINPUT1_3.dll").exists():
+        raise RuntimeError("Resolve the existing XINPUT provider with its owner before Core-only installation.")
+    existing = root / "sentinel-distribution.json"
+    if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok:
+        raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
+    names = ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")
+    original = {name: (root / name).read_bytes() if (root / name).exists() else None for name in names}
+    incoming = {name: contents[name] for name in names[:2]}
+    incoming[names[2]] = manifest.read_bytes()
     try:
-        if incoming.exists():
-            incoming.unlink()
-        shutil.copy2(source_dll, incoming)
-        incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
-        if incoming_sha != MEATHOOK.sha256:
-            incoming.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"Staged Meathook DLL hash mismatch: expected {MEATHOOK.sha256}, got {incoming_sha}"
-            )
-        publish_file(incoming, dll_path, operation="meathook_publish")
-    except Exception as error:
-        incoming.unlink(missing_ok=True)
-        raise RuntimeError(f"Failed to install Game Link runtime into DOOM folder: {error}") from error
+        for name in names:
+            _atomic_write_bytes(root / name, incoming[name])
+        if not probe_meathook(root).ok:
+            raise RuntimeError("Core pair verification failed after installation")
+    except Exception:
+        for name in names:
+            if original[name] is None:
+                (root / name).unlink(missing_ok=True)
+            else:
+                _atomic_write_bytes(root / name, original[name])
+        raise
+    return GameLinkResult(state="installed", message=f"Sentinel Core {value['version']} installed.",
+                          path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
+                          ownership="launcher_installed")
 
-    final_sha = hashlib.sha256(dll_path.read_bytes()).hexdigest()
-    if final_sha != MEATHOOK.sha256:
-        raise RuntimeError(
-            f"Installed Meathook DLL hash mismatch: expected {MEATHOOK.sha256}, got {final_sha}"
-        )
-
-    ownership = "launcher_replaced" if backup_path else "launcher_installed"
-    state = "repaired" if backup_path else "installed"
-    return GameLinkResult(
-        state=state,
-        message=f"Game Link runtime (Meathook v{MEATHOOK.version}) installed successfully.",
-        path=str(dll_path),
-        sha256=final_sha,
-        ownership=ownership,
-        backup_path=backup_path,
-    )
 
 
 @dataclass(frozen=True)

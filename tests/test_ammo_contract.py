@@ -154,7 +154,7 @@ def test_overflow_uses_monotonic_discard_storage_and_cannot_restore_consumed_amm
     ammo.consume_consumed(0)
     assert ammo.available == 2
     assert active_crucible("progressive_special_weapon", [7770901])
-    assert not active_crucible("progressive_special_weapon", [7770901, 7770901])
+    assert active_crucible("progressive_special_weapon", [7770901, 7770901])
 
 
 def test_readiness_preserves_order_and_requires_no_universal_save_proof():

@@ -33,7 +33,6 @@ class CommandSpool:
         self.logger = logger
 
     def quarantine_bootstrap(self, action_names):
-        """Archive only the historical unscoped v1 files, yielding each completed move."""
         for action_name in action_names:
             command_id = f"bootstrap-v1-{action_name}"
             for suffix in (".cmd", ".processing"):
@@ -71,6 +70,8 @@ class CommandSpool:
         if room_scoped:
             command_id = self.scoped_id(command_id, state_key)
         validate_spool_id(command_id)
+        if os.path.exists(os.path.join(self.queue_dir, f"{command_id}.failed")):
+            return True
         queued_path = os.path.join(self.queue_dir, f"{command_id}.cmd")
         processing_path = os.path.join(self.queue_dir, f"{command_id}.processing")
         return os.path.exists(queued_path) or os.path.exists(processing_path)
@@ -102,6 +103,8 @@ class CommandSpool:
             if room_scoped:
                 command_id = self.scoped_id(command_id, state_key)
             validate_spool_id(command_id)
+            if os.path.exists(os.path.join(self.queue_dir, f"{command_id}.failed")):
+                return PublicationResult(False, CommandEvidence.EFFECT_UNKNOWN, command_id)
             os.makedirs(self.queue_dir, exist_ok=True)
             if coalesce_key:
                 if self.exists(command_id, room_scoped=room_scoped):
@@ -160,6 +163,12 @@ class CommandSpool:
                     except FileNotFoundError:
                         pass
                 processing_path = os.path.join(self.queue_dir, f"{command_id}.processing")
+                if os.path.exists(os.path.join(self.queue_dir, f"{command_id}.failed")):
+                    try:
+                        os.remove(command_path)
+                    except FileNotFoundError:
+                        pass
+                    return PublicationResult(False, CommandEvidence.EFFECT_UNKNOWN, command_id)
                 if os.path.exists(processing_path):
                     evidence = CommandEvidence.CLAIMED
                     try:

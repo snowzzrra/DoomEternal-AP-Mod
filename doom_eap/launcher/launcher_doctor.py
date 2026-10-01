@@ -1454,19 +1454,19 @@ class LauncherDoctor:
                 if meathook_probe.status == PrerequisiteStatus.MISSING:
                     actions.append(RepairAction(
                         "install_game_link", "Install verified Game Link runtime",
-                        ("Download official Meathook v7.2 and install to DOOM Eternal folder",),
+                        ("Select a compatible Core distribution and install its verified pair",),
                         False,
-                        "Downloads verified XINPUT1_3.dll from GitHub release.",
+                        "Requires a verified local Core distribution.",
                     ))
                 elif meathook_probe.status in {PrerequisiteStatus.INCOMPATIBLE, PrerequisiteStatus.INVALID}:
                     actions.append(RepairAction(
                         "repair_game_link", "Repair Game Link runtime",
                         (
-                            "Back up existing XINPUT1_3.dll to repair-backups",
-                            "Install verified Meathook v7.2 runtime library",
+                            "Verify existing Core pair ownership",
+                            "Install the matching Core/bootstrap pair",
                         ),
                         True,
-                        "Backs up foreign/unverified XINPUT1_3.dll before replacing.",
+                        "Preserves foreign providers and restores the owned pair on publication failure.",
                     ))
             except Exception:
                 pass

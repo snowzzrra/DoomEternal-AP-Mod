@@ -1526,9 +1526,9 @@ class LauncherUI(QMainWindow):
             confirm = QMessageBox.question(
                 self,
                 "Repair game integration",
-                "A different XINPUT1_3.dll is installed in your DOOM Eternal folder.\n\n"
-                "Repair game integration will back up its current game file to the launcher state folder "
-                "and replace it with the verified version.\n\n"
+                "The Core runtime pair requires verification.\n\n"
+                "Repair game integration verifies the selected Core distribution "
+                "and publishes its matching pair. Foreign providers require their owner's action.\n\n"
                 "Do you want to proceed with repair?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,

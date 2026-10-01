@@ -34,6 +34,7 @@ class CommandEvidence(str, Enum):
     SPOOL_PRESENT = "spool_file_observed"
     DURABLY_PUBLISHED = "durably_published"
     CLAIMED = "claimed"
+    EFFECT_UNKNOWN = "effect_unknown_hold"
     CONSUMED_UNVERIFIED = "consumed_unverified"
     GAMEPLAY_VERIFIED = "gameplay_verified"
 

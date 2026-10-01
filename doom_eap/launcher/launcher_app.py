@@ -28,6 +28,19 @@ def _run_self_test(arguments: list[str]) -> int:
     mode_launcher_only = "--launcher-only" in arguments or "launcher" in arguments
 
     print("--> Executing DOOM Eternal Archipelago Launcher self-test...")
+    if "--core-only" in arguments:
+        from doom_eap.contracts.core_distribution import verify_runtime
+        bundle = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[3] / "Sentinel-Core/build/distribution/1.0.0-rc-1"))
+        manifest = bundle / "core/distribution.json" if getattr(sys, "frozen", False) else bundle / "distribution.json"
+        try:
+            value, _ = verify_runtime(manifest)
+            print(json.dumps({"product": value["product"], "version": value["version"],
+                              "build_id": value["build_id"], "mod_versions": value["mod_versions"],
+                              "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))
+            return 0
+        except Exception as error:
+            print(f"Core distribution self-test failed: {error}", file=sys.stderr)
+            return 1
 
     # 1. Verify third-party core packages & certifi CA bundle in bundle_directory
     try:

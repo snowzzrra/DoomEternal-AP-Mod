@@ -8,6 +8,7 @@ import secrets
 import struct
 import subprocess
 import time
+from doom_eap.contracts.core_distribution import version_key
 from pathlib import Path
 
 ITEM_ID = 7770903
@@ -54,8 +55,12 @@ class SentinelWeaponPoints:
             if self.diagnostic:
                 self.diagnostic(evidence)
             raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
+        try:
+            supported = result.get("core_version") in {"0.8.0", "0.9.0"} or version_key(result.get("core_version"))[:3] == (1, 0, 0)
+        except (ValueError, TypeError):
+            supported = False
         predicate = ("exit_or_result" if process.returncode or result.get("result") != "ok"
-                     else "core_version_supported" if result.get("core_version") not in {"0.8.0", "0.9.0"} else None)
+                     else "core_version_supported" if not supported else None)
         evidence["predicate"] = predicate
         if self.diagnostic:
             self.diagnostic(evidence)

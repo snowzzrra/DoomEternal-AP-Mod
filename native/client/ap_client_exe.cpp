@@ -23,13 +23,13 @@
 #include <vector>
 #include "ap_client_path_utils.h"
 #include "game_state_probe.h"
-#include "ap_runtime_rpc_client.h"
+#include "sentinel_command_client.h"
 #include "ap_rpc_health_state.h"
 #include "command_queue.h"
 #include "ammo_hotkey.h"
 
-ApRuntimeRpcClient* g_ApRpc = nullptr;
-std::unique_ptr<ApRuntimeRpcClient> g_ApRpcOwner;
+SentinelCommandClient* g_ApRpc = nullptr;
+std::unique_ptr<SentinelCommandClient> g_ApRpcOwner;
 
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
@@ -37,7 +37,7 @@ static const char* kReleaseVersion = "0.5.2";
 static const int kNativeCommandPolicyRevision = 11;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kGoalMonitorPollMs = 1000;
-static const std::array<const char*, 0> kValidatedXinputSha256 = {};
+
 
 std::string CanonicalMapName(std::string name) {
     std::replace(name.begin(), name.end(), '\\', '/');
@@ -58,22 +58,9 @@ struct SaveSnapshot {
     long long mtimeToken = 0;
 };
 
-struct MeathookPreflightResult {
-    bool xinputPresent = false;
-    bool hashValidated = false;
-    bool deliveryAllowed = false;
-    bool multipleSuspiciousLoaders = false;
-    bool probableProton = false;
-    XinputDllMode dllMode = XinputDllMode::Missing;
-    std::string xinputPath;
-    std::string gameRootCandidate;
-    std::string clientCandidate;
-    std::string sha256;
-    std::string fileVersion;
-    std::string productVersion;
-    unsigned long long sizeBytes = 0;
-    std::string lastWriteLocal;
-    std::vector<std::string> suspiciousLoaders;
+struct CorePreflightResult {
+    bool corePresent = false, bootstrapPresent = false, deliveryAllowed = false, probableProton = false;
+    std::string corePath, sha256;
     std::vector<std::string> protonSignals;
 };
 
@@ -370,14 +357,14 @@ DWORD CountProcessesNamed(const char* executableName) {
     return count;
 }
 
-void LogXinputRuntimeModule(DWORD processId, const std::filesystem::path& expectedPath) {
+void LogCoreRuntimeModule(DWORD processId, const std::filesystem::path& expectedPath) {
     HANDLE snapshot = CreateToolhelp32Snapshot(
         TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
         processId
     );
     if (snapshot == INVALID_HANDLE_VALUE) {
         LogDebug(
-            "XINPUT_RUNTIME_MODULE status=unavailable doom_pid="
+            "CORE_RUNTIME_MODULE status=unavailable doom_pid="
             + std::to_string(processId)
             + " expected_game_root_path=" + expectedPath.string()
             + " error=" + std::to_string(GetLastError())
@@ -392,7 +379,7 @@ void LogXinputRuntimeModule(DWORD processId, const std::filesystem::path& expect
     DWORD enumerationError = ERROR_SUCCESS;
     if (Module32First(snapshot, &module)) {
         do {
-            if (_stricmp(module.szModule, "XINPUT1_3.dll") == 0) {
+            if (_stricmp(module.szModule, "sentinel_core.dll") == 0) {
                 loaded = true;
                 loadedPath = module.szExePath;
                 break;
@@ -409,7 +396,7 @@ void LogXinputRuntimeModule(DWORD processId, const std::filesystem::path& expect
 
     if (enumerationError != ERROR_SUCCESS) {
         LogDebug(
-            "XINPUT_RUNTIME_MODULE status=unavailable doom_pid="
+            "CORE_RUNTIME_MODULE status=unavailable doom_pid="
             + std::to_string(processId)
             + " expected_game_root_path=" + expectedPath.string()
             + " error=" + std::to_string(enumerationError)
@@ -417,7 +404,7 @@ void LogXinputRuntimeModule(DWORD processId, const std::filesystem::path& expect
         return;
     }
     LogDebug(
-        "XINPUT_RUNTIME_MODULE status=" + std::string(loaded ? "loaded" : "not_loaded")
+        "CORE_RUNTIME_MODULE status=" + std::string(loaded ? "loaded" : "not_loaded")
         + " doom_pid=" + std::to_string(processId)
         + " module_path=" + (loaded ? loadedPath : "unavailable")
         + " expected_game_root_path=" + expectedPath.string()
@@ -448,64 +435,17 @@ std::string RpcGateReason(
     return "ready";
 }
 
-MeathookPreflightResult InspectMeathookInstallation(const RuntimePathInfo& runtimePaths) {
-    MeathookPreflightResult result;
-    result.probableProton = runtimePaths.probableProton;
-    result.protonSignals = runtimePaths.protonSignals;
-    result.gameRootCandidate = runtimePaths.gameRootDllCandidate.string();
-    result.clientCandidate = runtimePaths.clientDllCandidate.string();
-
-    const XinputDllSelection selectedDll = SelectXinputDllCandidate(runtimePaths);
-    result.dllMode = selectedDll.mode;
-    result.xinputPath = selectedDll.selectedPath.string();
-    if (selectedDll.mode == XinputDllMode::Missing) {
-        return result;
-    }
-
-    WIN32_FILE_ATTRIBUTE_DATA attributes = {};
-    if (!GetFileAttributesExA(
-            selectedDll.selectedPath.string().c_str(),
-            GetFileExInfoStandard,
-            &attributes
-        )) {
-        return result;
-    }
-
-    result.xinputPresent = true;
-    result.sizeBytes =
-        (static_cast<unsigned long long>(attributes.nFileSizeHigh) << 32)
-        | attributes.nFileSizeLow;
-    result.lastWriteLocal = FormatLocalFileTime(attributes.ftLastWriteTime);
-    result.fileVersion = GetFixedFileVersion(selectedDll.selectedPath, false);
-    result.productVersion = GetFixedFileVersion(selectedDll.selectedPath, true);
-
-    const std::string contents = ReadBinaryFile(selectedDll.selectedPath);
-    if (!contents.empty()) {
-        std::array<unsigned char, 32> digest = {};
-        if (ComputeSha256(contents, digest)) {
-            result.sha256 = DigestToHex(digest);
-        }
-    }
-
-    for (const char* candidate : { "xinput1_4.dll", "dinput8.dll", "dxgi.dll", "version.dll" }) {
-        const std::filesystem::path candidatePath = runtimePaths.gameRootDir / candidate;
-        if (std::filesystem::exists(candidatePath)) {
-            result.suspiciousLoaders.push_back(candidatePath.string());
-        }
-    }
-    result.multipleSuspiciousLoaders = result.suspiciousLoaders.size() > 1;
-
-    if (!result.sha256.empty()) {
-        for (const char* validatedHash : kValidatedXinputSha256) {
-            if (result.sha256 == validatedHash) {
-                result.hashValidated = true;
-                break;
-            }
-        }
-    }
-
-    result.deliveryAllowed =
-        result.xinputPresent && (result.hashValidated || kValidatedXinputSha256.empty());
+CorePreflightResult InspectCoreInstallation(const RuntimePathInfo& runtime) {
+    CorePreflightResult result{};
+    const auto core = runtime.gameRootDir / "sentinel_core.dll";
+    result.corePath = core.string();
+    result.corePresent = std::filesystem::is_regular_file(core);
+    result.bootstrapPresent = std::filesystem::is_regular_file(runtime.gameRootDir / "msimg32.dll");
+    result.deliveryAllowed = result.corePresent && result.bootstrapPresent;
+    result.probableProton = runtime.probableProton;
+    result.protonSignals = runtime.protonSignals;
+    std::array<unsigned char, 32> digest{};
+    if (result.corePresent && ComputeSha256(ReadBinaryFile(core), digest)) result.sha256 = DigestToHex(digest);
     return result;
 }
 
@@ -514,7 +454,7 @@ void LogStartupHeader(
     const std::string& workingDirectory,
     const std::string& doomExecutablePath,
     const QueueSnapshot& queueSnapshot,
-    const MeathookPreflightResult& preflight,
+    const CorePreflightResult& preflight,
     const RuntimePathInfo& runtimePaths
 ) {
     SYSTEMTIME utcNow = {};
@@ -608,10 +548,9 @@ void LogStartupHeader(
     );
     LogDebug(
         std::string("Runtime mode: ")
-        + (preflight.probableProton ? "Proton-compatible/client-local DLL allowed" : "Windows-native/game-root DLL required")
+        + (preflight.probableProton ? "Windows x64 under Proton" : "Windows x64")
     );
-    LogDebug("Game root DLL candidate: " + preflight.gameRootCandidate);
-    LogDebug("Client DLL candidate: " + preflight.clientCandidate);
+    LogDebug("Core DLL candidate: " + preflight.corePath);
     if (!preflight.protonSignals.empty()) {
         for (const std::string& signal : preflight.protonSignals) {
             LogDebug("Proton signal: " + signal);
@@ -620,47 +559,10 @@ void LogStartupHeader(
     for (const std::filesystem::path& configPath : runtimePaths.configCandidates) {
         LogDebug("Config candidate: " + configPath.string());
     }
-    LogDebug(std::string("Meathook XINPUT1_3.dll path: ") + preflight.xinputPath);
-    LogDebug(
-        "Meathook XINPUT1_3.dll present: "
-        + std::string(preflight.xinputPresent ? "yes" : "no")
-    );
-    if (preflight.xinputPresent) {
-        LogDebug(
-            std::string("Meathook XINPUT1_3.dll source: ")
-            + (preflight.dllMode == XinputDllMode::GameRoot
-                ? "game-root candidate"
-                : "client-local Proton candidate")
-        );
-    }
-    if (preflight.xinputPresent) {
-        LogDebug("Meathook XINPUT1_3.dll size: " + std::to_string(preflight.sizeBytes));
-        LogDebug("Meathook XINPUT1_3.dll last write: " + preflight.lastWriteLocal);
-        LogDebug("Meathook XINPUT1_3.dll SHA-256: " + preflight.sha256);
-        LogDebug("Meathook XINPUT1_3.dll FileVersion: " + preflight.fileVersion);
-        LogDebug("Meathook XINPUT1_3.dll ProductVersion: " + preflight.productVersion);
-    }
-    if (kValidatedXinputSha256.empty()) {
-        LogDebug("Native XINPUT allowlist: not configured.");
-        LogDebug("Launcher Game Link SHA-256 verification remains authoritative.");
-    } else {
-        LogDebug(
-            "Native XINPUT allowlist: configured; disk hash match="
-            + std::string(preflight.hashValidated ? "yes" : "no")
-        );
-    }
-    if (!preflight.suspiciousLoaders.empty()) {
-        for (const std::string& loaderPath : preflight.suspiciousLoaders) {
-            LogDebug("Suspicious proxy DLL present: " + loaderPath);
-        }
-    }
-    if (preflight.multipleSuspiciousLoaders) {
-        LogDebug("WARNING: multiple proxy DLL candidates are present in the DOOM root.");
-    }
-    if (!preflight.probableProton && getenv("DOOM_AP_STARTED_BY_WINDOWS_BATCH") == nullptr) {
-        LogDebug("WARNING: ap_client.exe was opened directly. Start the integrated DOOM Eternal Client from Archipelago Launcher.");
-    }
-    LogDebug("=== End startup header ===");
+    LogDebug("CORE_PREFLIGHT path=" + preflight.corePath + " sha256=" + preflight.sha256 +
+        " core_present=" + std::to_string(preflight.corePresent) +
+        " bootstrap_present=" + std::to_string(preflight.bootstrapPresent));
+
 }
 
 bool Aes128GcmDecrypt(
@@ -1403,7 +1305,7 @@ int main(int argc, char** argv) {
     NativeCommandQueue commandQueue(LogDebug);
     commandQueue.Initialize();
     const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
-    const MeathookPreflightResult preflight = InspectMeathookInstallation(runtimePaths);
+    const CorePreflightResult preflight = InspectCoreInstallation(runtimePaths);
     LogStartupHeader(
         executablePath,
         workingDirectory,
@@ -1418,8 +1320,8 @@ int main(int argc, char** argv) {
     );
     LogDebug(
         "XINPUT_DISK_PREFLIGHT status="
-        + std::string(preflight.xinputPresent ? "present" : "missing")
-        + " path=" + preflight.xinputPath
+        + std::string(preflight.corePresent ? "present" : "missing")
+        + " path=" + preflight.corePath
         + " sha256=" + (preflight.sha256.empty() ? "unavailable" : preflight.sha256)
         + " launcher_game_link_verification=authoritative"
     );
@@ -1439,7 +1341,7 @@ int main(int argc, char** argv) {
             "with a valid install."
         );
     } else {
-        g_ApRpcOwner = std::make_unique<ApRuntimeRpcClient>();
+        g_ApRpcOwner = std::make_unique<SentinelCommandClient>();
         g_ApRpc = g_ApRpcOwner.get();
         g_ApRpc->SetLogCallback(LogDebug);
         LogDebug("RPC_CLIENT_CREATED binding=Meathook");
@@ -1483,11 +1385,12 @@ int main(int argc, char** argv) {
                 healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
             }
             gameStateProbe.Poll();
+        if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
             const DWORD doomPid = gameStateProbe.GetProcessId();
             if (doomPid != 0 && doomPid != moduleProbePid) {
-                LogXinputRuntimeModule(
+                LogCoreRuntimeModule(
                     doomPid,
-                    runtimePaths.gameRootDir / "XINPUT1_3.dll"
+                    runtimePaths.gameRootDir / "sentinel_core.dll"
                 );
                 moduleProbePid = doomPid;
             }
@@ -1519,15 +1422,15 @@ int main(int argc, char** argv) {
             Sleep(100);
         }
         if (gameStateProbe.GetProcessId() != 0 && gameStateProbe.GetProcessId() != moduleProbePid) {
-            LogXinputRuntimeModule(
+            LogCoreRuntimeModule(
                 gameStateProbe.GetProcessId(),
-                runtimePaths.gameRootDir / "XINPUT1_3.dll"
+                runtimePaths.gameRootDir / "sentinel_core.dll"
             );
         } else if (gameStateProbe.GetProcessId() == 0) {
             LogDebug(
-                "XINPUT_RUNTIME_MODULE status=unavailable doom_pid=0"
+                "CORE_RUNTIME_MODULE status=unavailable doom_pid=0"
                 " module_path=unavailable expected_game_root_path="
-                + (runtimePaths.gameRootDir / "XINPUT1_3.dll").string()
+                + (runtimePaths.gameRootDir / "sentinel_core.dll").string()
                 + " error=0 reason=doom_process_not_detected"
             );
         }
@@ -1561,11 +1464,12 @@ int main(int argc, char** argv) {
 
     while (true) {
         gameStateProbe.Poll();
+        if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
         const DWORD doomPid = gameStateProbe.GetProcessId();
         if (doomPid != 0 && doomPid != moduleProbePid) {
-            LogXinputRuntimeModule(
+            LogCoreRuntimeModule(
                 doomPid,
-                runtimePaths.gameRootDir / "XINPUT1_3.dll"
+                runtimePaths.gameRootDir / "sentinel_core.dll"
             );
             moduleProbePid = doomPid;
         }

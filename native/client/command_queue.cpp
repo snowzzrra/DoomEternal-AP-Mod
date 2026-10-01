@@ -24,6 +24,10 @@ const char* RpcCallResultName(ApRpcResult result) {
         return "RPC_EXCEPTION";
     case AP_RPC_UNKNOWN:
         return "UNKNOWN_TRANSPORT_ERROR";
+    case AP_RPC_AMBIGUOUS:
+        return "CORE_EFFECT_AMBIGUOUS";
+    case AP_RPC_REJECTED:
+        return "CORE_REQUEST_REFUSED";
     case AP_RPC_NONE:
     default:
         return "RPC_CALL_RESULT_NONE";
@@ -212,6 +216,8 @@ bool NativeCommandQueue::ReadCommandFile(
             if (!std::regex_match(scope, validScope)) return false;
             if (transientScope) *transientScope = scope;
             sawTransientScope = true;
+        } else if (line == "AP_NATIVE_ATTEMPT_V1") {
+            // The consumer records entry before sending an effect request.
         } else {
             if (line.rfind("AP_", 0) == 0) {
                 return false;
@@ -252,12 +258,16 @@ bool NativeCommandQueue::ReadCommandFile(
 
 
 bool NativeCommandQueue::WriteCommandFile(const std::string& path, const std::string& command) {
-    FILE* file = fopen(path.c_str(), "wb");
-    if (!file) return false;
     const std::string line = command + "\n";
-    const size_t written = fwrite(line.data(), 1, line.size(), file);
-    const bool ok = written == line.size() && fflush(file) == 0;
-    fclose(file);
+    const auto temporary = path + ".consumer.tmp";
+    HANDLE file = CreateFileA(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    DWORD written = 0;
+    bool ok = WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr) &&
+        written == line.size() && FlushFileBuffers(file);
+    CloseHandle(file);
+    if (ok) ok = MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+    if (!ok) DeleteFileA(temporary.c_str());
     return ok;
 }
 
@@ -390,6 +400,14 @@ void NativeCommandQueue::EnsureQueueDirectory(
             if (activeCommandIds.find(commandId) != activeCommandIds.end()) {
                 continue;
             }
+            std::ifstream interrupted(processingPath);
+            std::string firstLine; std::getline(interrupted, firstLine); interrupted.close();
+            if (TrimLine(firstLine) == "AP_NATIVE_ATTEMPT_V1") {
+                CommandJob unknown{}; unknown.path = processingPath;
+                QuarantineFailedJob(unknown);
+                LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + commandId + " automatic_replay=disabled");
+                continue;
+            }
             const std::string queuedPath =
                 processingPath.substr(0, processingPath.size() - std::string(".processing").size()) + ".cmd";
             std::string command;
@@ -488,6 +506,12 @@ void NativeCommandQueue::ImportSpoolFiles(
             continue;
         }
         const std::string queuedCommandId = CommandIdFromPath(queuedPath);
+        const auto failedPath = queuedPath.substr(0, queuedPath.size() - 4) + ".failed";
+        if (GetFileAttributesA(failedPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            if (heldReceiptLogs.insert(filename).second)
+                LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + queuedCommandId + " automatic_replay=disabled");
+            continue;
+        }
         if (knownCommandIds.find(queuedCommandId) != knownCommandIds.end()) {
             ++duplicateCount;
             NoteQueueDedupe(queuedCommandId);
@@ -879,35 +903,14 @@ bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport*
         LogDebug("RPC_DIAGNOSTIC_CONDUMP command_id=" + commandId + " file=AP_SUPPORT_FILE.txt");
     }
 
-    if (command.rfind("#DUMP_ENTITIES", 0) == 0) {
-        const size_t bufferSize = 128 * 1024 * 1024;
-        unsigned char* buffer = static_cast<unsigned char*>(malloc(bufferSize));
-        if (!buffer) {
-            return false;
-        }
-        size_t actualSize = bufferSize;
-        const bool success = rpc->RetrieveEntities(buffer, &actualSize);
-        if (success) {
-            FILE* output = fopen("base\\map.entities", "wb");
-            if (output) {
-                fwrite(buffer, 1, actualSize, output);
-                fclose(output);
-            } else {
-                free(buffer);
-                return false;
-            }
-        }
-        free(buffer);
-        return success;
-    }
-
-    if (command.rfind("#PUSH_ENTITIES ", 0) == 0) {
-        std::string path = command.substr(15);
-        const bool success = rpc->RequestEntityLoad(path, true, 0);
-        return success;
-    }
-
-    return rpc->ExecuteConsoleCommand(command);
+    std::ifstream source(job.path, std::ios::binary);
+    const std::string original{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
+    source.close();
+    if (original.empty() || !WriteCommandFile(job.path, "AP_NATIVE_ATTEMPT_V1\n" + original)) return false;
+    const bool dispatched = rpc->ExecuteConsoleCommand(command);
+    if (!dispatched && rpc->LastResult() != AP_RPC_AMBIGUOUS && rpc->LastResult() != AP_RPC_EXCEPTION)
+        WriteCommandFile(job.path, original);
+    return dispatched;
 }
 
 
@@ -1209,7 +1212,12 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 if (silentMaintenance) {
                     finishSilentBurst("rpc_failure");
                 }
-                if (normalReceipt) {
+                if (rpc->LastResult() == AP_RPC_AMBIGUOUS || rpc->LastResult() == AP_RPC_EXCEPTION) {
+                    QuarantineFailedJob(job);
+                    LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + commandId + " automatic_replay=disabled");
+                    knownCommandIds.erase(commandId);
+                    queue.erase(queue.begin() + selectedIndex);
+                } else if (normalReceipt) {
                     ++job.retryAttempt;
                     const DWORD delay = ReceiptRetryDelayMs(job.retryAttempt);
                     job.nextAttemptTick = GetTickCount() + delay;

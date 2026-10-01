@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 function Invoke-NativeBuild {
     param([string]$RepositoryRoot, [string]$BuildDirectory, [switch]$PreflightOnly)
 
-    foreach ($tool in "cl.exe", "link.exe", "midl.exe", "dumpbin.exe") {
+    foreach ($tool in "cl.exe", "link.exe", "dumpbin.exe") {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
             throw "MSVC x64 toolchain is not active: missing $tool. Install Visual Studio 2022 Build Tools with Desktop development with C++."
         }
@@ -24,25 +24,12 @@ function Invoke-NativeBuild {
         Remove-Item -LiteralPath $BuildDirectory -Recurse -Force
     }
     $null = New-Item -ItemType Directory -Path $BuildDirectory -Force
-    $rpcDirectory = Join-Path $BuildDirectory "generated-rpc"
-    $null = New-Item -ItemType Directory -Path $rpcDirectory -Force
-
     $clientDirectory = Join-Path $RepositoryRoot "native\\client"
-    $idl = Join-Path $clientDirectory "ap_runtime_rpc.idl"
-    & midl.exe /nologo /env x64 /Oicf /app_config /client stub /out $rpcDirectory $idl
-    if ($LASTEXITCODE -ne 0) { throw "MIDL failed with exit code $LASTEXITCODE" }
-
-    $rpcHeader = Join-Path $rpcDirectory "ap_runtime_rpc.h"
-    $rpcClient = Join-Path $rpcDirectory "ap_runtime_rpc_c.c"
-    if (-not (Test-Path -LiteralPath $rpcHeader) -or -not (Test-Path -LiteralPath $rpcClient)) {
-        throw "MIDL did not generate the required RPC client files."
-    }
-
-    $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/c")
-    $compileC = @("/nologo", "/O2", "/MT", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$rpcDirectory", "/TC", "/c")
+    $coreRoot = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot "..\\Sentinel-Core"))
+    $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/DNOMINMAX", "/I$RepositoryRoot", "/I$coreRoot\\include", "/I$coreRoot\\src", "/I$coreRoot\\build\\generated", "/c")
     $sources = @(
         "ap_client_exe.cpp", "command_queue.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
-        "ap_runtime_rpc_client.cpp", "ap_rpc_health_state.cpp", "ammo_hotkey.cpp"
+        "sentinel_command_client.cpp", "ap_rpc_health_state.cpp", "ammo_hotkey.cpp"
     )
     $objects = @()
     foreach ($source in $sources) {
@@ -51,15 +38,15 @@ function Invoke-NativeBuild {
         if ($LASTEXITCODE -ne 0) { throw "MSVC failed compiling $source" }
         $objects += $object
     }
-    foreach ($source in @($rpcClient, (Join-Path $clientDirectory "ap_runtime_rpc_seh.c"))) {
+    foreach ($source in @("inspection_client.cpp", "protocol.cpp", "commands.cpp")) {
         $object = Join-Path $BuildDirectory (([IO.Path]::GetFileNameWithoutExtension($source)) + ".obj")
-        & cl.exe @compileC $source "/Fo$object"
+        & cl.exe @compileCxx (Join-Path $coreRoot "src\\$source") "/Fo$object"
         if ($LASTEXITCODE -ne 0) { throw "MSVC failed compiling $source" }
         $objects += $object
     }
 
     $clientOutput = Join-Path $BuildDirectory "ap_client.exe"
-    & link.exe /nologo "/OUT:$clientOutput" @objects rpcrt4.lib bcrypt.lib version.lib user32.lib
+    & link.exe /nologo "/OUT:$clientOutput" @objects bcrypt.lib version.lib user32.lib
     if ($LASTEXITCODE -ne 0) { throw "MSVC linker failed creating ap_client.exe" }
 
     $probeOutput = Join-Path $BuildDirectory "save_death_probe.exe"
@@ -83,7 +70,7 @@ function Invoke-NativeBuild {
     $importsExitCode = $LASTEXITCODE
     if ($importsExitCode -ne 0) { throw "dumpbin /imports failed with exit code $importsExitCode" }
     $importsRpcrt4 = [bool]($imports | Select-String -Pattern "RPCRT4.dll" -Quiet)
-    if (-not $importsRpcrt4) { throw "ap_client.exe is missing its RPCRT4 import" }
+    if ($importsRpcrt4) { throw "Typed Core client must not import RPCRT4" }
     Write-Output "NATIVE_CLIENT windows-msvc output=$BuildDirectory"
 }
 

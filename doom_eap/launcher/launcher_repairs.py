@@ -8,7 +8,7 @@ def install_game_link(config, workflow, emit, force_repair: bool = False) -> Gam
     if not game_root:
         raise RuntimeError("DOOM Eternal installation is not configured.")
     root = validate_game_root(Path(str(game_root)))
-    local_key = "meathook_dll"
+    local_key = "core_runtime_manifest"
     local_value = config.get(local_key)
     local_artifact = Path(str(local_value)).expanduser() if local_value else None
     result = workflow.ensure_game_link(

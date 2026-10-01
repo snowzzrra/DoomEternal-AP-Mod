@@ -808,7 +808,7 @@ class IntegratedLaunchWorkflow:
             return cached
 
         # 1. Ensure Game Link / Meathook dependency before any room mod operations
-        local_key = "meathook_dll"
+        local_key = "core_runtime_manifest"
         local_val = config.get(local_key)
         local_artifact = Path(str(local_val)).expanduser() if local_val else None
         try:
@@ -862,7 +862,7 @@ class IntegratedLaunchWorkflow:
                     details=meathook.details,
                 )
                 raise RuntimeError(
-                    "Meathook runtime is not installed (<DOOM root>/XINPUT1_3.dll). "
+                    "Sentinel Core runtime is not installed. "
                     "Install Meathook before preparing the room mod."
                 )
             failed = [c.message for c in prereqs.checks if not c.ok]
