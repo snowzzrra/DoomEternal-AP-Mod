@@ -72,7 +72,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
         for entry in _entries(_source(key, manifest)):
             authored[re.search(r'mapName = "([^"]+)";', entry)[1]] = entry
     rows = [authored[stage["map"]] for stage in stages]
-    # Hub phase0 and phase1 use the authored first-visit layers. Later phases
+    # The first two Hub visits use the authored first-visit layers. Later visits
     # select their own native layer sets; no inventory or completion is imported.
     for phase in range(8):
         from tools.maps.fortress_campaign import content_layers

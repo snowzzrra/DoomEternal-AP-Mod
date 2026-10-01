@@ -3,18 +3,13 @@ from dataclasses import dataclass, replace
 import time
 from typing import Callable, Protocol
 
-from doom_eap.contracts.command_publication import stable_spool_id
 from doom_eap.contracts.inventory_domain import (
-    BLOCKED,
     DISPATCHED,
-    INDETERMINATE,
     OBSERVED,
-    PLANNED,
-    QUEUED,
     InventoryObservation,
 )
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
-from doom_eap.runtime.item_reconciliation import ReconciliationPlan, compile_reconciliation_plan
+from doom_eap.runtime.item_reconciliation import ReconciliationPlan
 from doom_eap.runtime.materialization import MaterializationPlanError, compile_materialization_plan
 
 
@@ -140,7 +135,7 @@ class MaterializationCoordinator:
 
     def reconcile(self, scope: MaterializationScope, context, ownership, transition, item_definitions,
                   replay_policies, special_mode, publisher: MaterializationPublicationPort,
-                  persist: Callable[[], None], *, observation: InventoryObservation | None = None):
+                  persist: Callable[[], None], *, observation: InventoryObservation | None = None, selected_item_ids=None):
         state = self._state
         materialization_lease = scope.materialization_lease
         manual = scope.manual
@@ -197,6 +192,14 @@ class MaterializationCoordinator:
                 self._block = str(error)
             return MaterializationOutcome(None, str(error))
         plan = planned.reconciliation
+        from doom_eap.contracts.inventory_domain import ALL_PERSISTENT_DOMAIN_IDS
+        relevant = set(ownership.reconciliation_item_ids) & ALL_PERSISTENT_DOMAIN_IDS
+        if selected_item_ids is not None:
+            relevant &= selected_item_ids
+        plan = replace(plan, entitlement_item_ids=tuple(sorted(relevant)))
+        if selected_item_ids is not None:
+            plan = replace(plan, commands=tuple(command for command in plan.commands
+                                               if command.item_id in selected_item_ids))
         commands = plan.commands
         attempted_items = (set(state.get("dispatched_item_ids", ()))
                            if state.get("dispatched_key") == dispatch_key else set())
@@ -267,14 +270,15 @@ class MaterializationCoordinator:
             }),
         )
         persist()
-        state["completed_key"] = materialization_key
-        state["completed_persistent_key"] = persistent_reconciliation_key
-        state["completed_gate_key_lease"] = materialization_lease
+        if selected_item_ids is None:
+            state["completed_key"] = materialization_key
+            state["completed_persistent_key"] = persistent_reconciliation_key
+            state["completed_gate_key_lease"] = materialization_lease
+            complete_transition = True
+            self._triggers.clear()
         state.pop("pending_key", None)
         state.pop("pending_plan", None)
         persist()
-        complete_transition = True
-        self._triggers.clear()
         self._completion = {
             "context": context.identity,
             "lease": materialization_lease,

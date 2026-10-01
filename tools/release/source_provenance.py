@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tools.release.build_launcher import _source_inputs
 
-MOD_ROOTS = ("doom_eap", "tools", "native", "scripts", "data", "content", "manifests",
+MOD_ROOTS = ("doom_eap", "tools", "native", "scripts", "data", "content", "manifests", "assets/launcher", ".github/workflows",
              "level_configs", "player_templates", "packaging/mod_assets", "packaging/standalone_runtime",
              "packaging/client", "packaging/shell_menu_assetsinfo.json", "packaging/hub_world_text_assetsinfo.json",
              "requirements-launcher.txt", "requirements-ci.txt")

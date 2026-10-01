@@ -1249,7 +1249,7 @@ class RoomCompiler:
             manifest.options.get("starting_weapon"),
         )
         assembled[devinv_path] = devinv_source.encode("utf-8")
-        # Native NewGame still selects sp/e1m1 DevInv; Core redirects its first
+        # Native NewGame selects sp/e1m1 DevInv; Core redirects its first
         # map to Fortress. The destination archive must own that room override.
         hub_devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", "hub"
@@ -1257,14 +1257,13 @@ class RoomCompiler:
         assembled[hub_devinv_path] = devinv_source.encode("utf-8")
         from tools.decls.campaign_builder import build_campaign_overrides
         holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
-        skip_final_credits = self.payload_manifest.get("phase9c_final_credits") is True
-        if skip_final_credits and hashlib.sha256(assembled[holt_member]).hexdigest() != \
+        if hashlib.sha256(assembled[holt_member]).hexdigest() != \
                 "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19":
             raise ValueError("credits overlay drifted")
         assembled.update(build_campaign_overrides(
             assembled["hub_patch2/EternalMod/assetsinfo/hub.json"],
-            skip_dlc1_credits=skip_final_credits,
-            skip_dlc2_credits=skip_final_credits,
+            skip_dlc1_credits=True,
+            skip_dlc2_credits=True,
         ))
         if manifest.options.get("use_dlc_content", True):
             assembled.update({

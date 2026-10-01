@@ -100,6 +100,22 @@ ALL_PERSISTENT_DOMAIN_IDS = frozenset(
 )
 
 
+def selected_persistent_items(domain="all", item_id=None):
+    """Limit repair intent while leaving entitlement and native ownership authoritative."""
+    domains = {classify_inventory_domain(value) for value in ALL_PERSISTENT_DOMAIN_IDS}
+    if domain != "all" and domain not in domains:
+        raise ValueError("Unknown persistent inventory domain")
+    if item_id is not None:
+        if type(item_id) is not int or item_id not in ALL_PERSISTENT_DOMAIN_IDS:
+            raise ValueError("Consumables and currency cannot be replayed by inventory repair")
+        if domain != "all" and classify_inventory_domain(item_id) != domain:
+            raise ValueError("Item does not belong to the selected domain")
+        return frozenset((item_id,))
+    if domain == "all":
+        return None
+    return frozenset(value for value in ALL_PERSISTENT_DOMAIN_IDS if classify_inventory_domain(value) == domain)
+
+
 def classify_inventory_domain(item_id: int) -> str | None:
     """Classify an item ID into its persistent inventory domain."""
     if item_id in WEAPON_ITEM_IDS:

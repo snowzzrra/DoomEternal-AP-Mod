@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+from ctypes import wintypes
 import hashlib
 import json
 import logging
@@ -64,6 +65,45 @@ def _warn_windows_process_probe_once(message: str) -> None:
         return
     _windows_process_probe_warning_emitted = True
     logger.warning("Windows process detection failed: %s", message)
+
+
+def windows_game_processes() -> tuple[dict[str, object], ...] | None:
+    """Return exact Windows game identities; None means observation failed."""
+    api = _load_kernel32()
+    api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    api.OpenProcess.restype = wintypes.HANDLE
+    api.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    api.GetProcessTimes.restype = wintypes.BOOL
+    api.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    api.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    snapshot = api.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot in (None, INVALID_HANDLE_VALUE):
+        return None
+    rows = []
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(entry)
+    try:
+        if not api.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return () if ctypes.get_last_error() == ERROR_NO_MORE_FILES else None
+        while True:
+            if entry.szExeFile.casefold() == "doometernalx64vk.exe":
+                handle = api.OpenProcess(0x1000, False, entry.th32ProcessID)
+                if not handle:
+                    return None
+                try:
+                    times = [wintypes.FILETIME() for _ in range(4)]
+                    path = ctypes.create_unicode_buffer(32768)
+                    length = wintypes.DWORD(len(path))
+                    if not api.GetProcessTimes(handle, *(ctypes.byref(value) for value in times)) or not api.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(length)):
+                        return None
+                    rows.append({"pid": int(entry.th32ProcessID), "path": path.value,
+                                 "created": (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime})
+                finally:
+                    api.CloseHandle(handle)
+            if not api.Process32NextW(snapshot, ctypes.byref(entry)):
+                return tuple(rows) if ctypes.get_last_error() == ERROR_NO_MORE_FILES else None
+    finally:
+        api.CloseHandle(snapshot)
 
 
 def _windows_process_running(executable: str) -> bool:

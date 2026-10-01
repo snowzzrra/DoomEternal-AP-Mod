@@ -3114,6 +3114,42 @@ AMMO_HOTKEY_STATE_HEADER = "AP_AMMO_REFILL_HOTKEY_V1"
 AMMO_HOTKEY_STATE_FILENAME = "ammo_refill_hotkey.state"
 
 
+def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | None:
+    if base is None:
+        return None
+    name = "special_toggle_hotkey.state" if special else AMMO_HOTKEY_STATE_FILENAME
+    header = "AP_SPECIAL_TOGGLE_HOTKEY_V1" if special else AMMO_HOTKEY_STATE_HEADER
+    path = base / name
+    if not path.exists():
+        return None
+    with path.open("rb") as stream:
+        raw = stream.read(128)
+    tokens = raw.decode("ascii").split()
+    if len(raw) >= 128 or len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header):
+        raise ValueError(f"Invalid AP shortcut file: {name}")
+    return tokens[-1]
+
+
+def write_ap_hotkey_states(base: Path | None, refill: str, special: str) -> Path | None:
+    """Publish validated shortcuts together, restoring both files on failure."""
+    if base is None:
+        return None
+    base.mkdir(parents=True, exist_ok=True)
+    paths = [base / AMMO_HOTKEY_STATE_FILENAME, base / "special_toggle_hotkey.state"]
+    previous = [path.read_bytes() if path.exists() else None for path in paths]
+    try:
+        for path, header, token in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1"), (refill, special)):
+            _atomic_write_bytes(path, f"{header}\n{token or 'UNBOUND'}\n".encode("ascii"))
+    except OSError:
+        for path, content in zip(paths, previous):
+            if content is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic_write_bytes(path, content)
+        raise
+    return paths[0]
+
+
 def resolve_doom_config_path(config: Mapping[str, object]) -> Path | None:
     """Resolve authoritative DOOMEternalConfig.cfg path from configured or discovered save paths."""
     save_val = config.get("save_games_dir")

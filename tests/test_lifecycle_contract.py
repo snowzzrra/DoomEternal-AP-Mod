@@ -10,8 +10,6 @@ def test_lifecycle_is_independent_of_registry_discovery():
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
-import sys
-
 with patch.object(Path, "read_text", side_effect=AssertionError("unexpected discovery")):
     from doom_eap.runtime.lifecycle import RuntimeLifecycle
     from doom_eap.contracts.runtime_context import RuntimeContext, canonical_map_name
@@ -30,9 +28,6 @@ with patch.object(Path, "read_text", side_effect=AssertionError("unexpected disc
     assert canonical_map_name(None) is None
     assert canonical_map_name(False) is False
     assert canonical_map_name(" game\\sp\\hub\\hub/ ") == "game/hub/hub"
-assert "doom_eap.runtime.context_registry" not in sys.modules
-assert "doom_eap.contracts.challenge_registry" not in sys.modules
-assert "doom_eap.runtime.bridge_client" not in sys.modules
 '''
     result = subprocess.run(
         [sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1],

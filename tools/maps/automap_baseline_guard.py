@@ -119,7 +119,9 @@ def assert_separate_automap_helper_guard() -> int:
                         elif removed_original:
                             raise ValueError(f"Independent marker source missing: {map_key}/{location_id}")
                     expected_decl = _scalar(source_block, "automapPropertiesDecl")
-                    if target_policy.get("independent_ap_trigger"):
+                    if removed_original:
+                        expected_decl = target_policy.get("independent_visual", {}).get("automap_properties_decl")
+                    elif target_policy.get("independent_ap_trigger"):
                         expected_decl = target_policy.get("independent_automap_properties_decl", _expected_decl(source_block))
                     if _scalar(marker_owner, "automapPropertiesDecl") != expected_decl:
                         raise ValueError(f"Native Automap marker drift: {map_key}/{location_id}")
@@ -138,7 +140,7 @@ def assert_separate_automap_helper_guard() -> int:
                 ):
                     if forbidden in helper:
                         raise ValueError(f"Automap helper retains {forbidden}: {map_key}/{location_id}")
-                if _scalar(helper, "automapPropertiesDecl") != _expected_decl(source_block):
+                if _scalar(helper, "automapPropertiesDecl") != "default":
                     raise ValueError(f"Automap helper decl drift: {map_key}/{location_id}")
                 expected_position = target_policy.get(
                     "independent_position", _position(source_block)
@@ -191,7 +193,7 @@ def assert_separate_automap_helper_guard() -> int:
                             f"Secret Automap helper retains {forbidden}: "
                             f"{map_key}/{location_id}"
                         )
-                if _scalar(helper, "automapPropertiesDecl") != _expected_decl(source_block):
+                if _scalar(helper, "automapPropertiesDecl") != "default":
                     raise ValueError(f"Secret Automap helper decl drift: {map_key}/{location_id}")
                 _assert_close(
                     _position(helper), _position(source_block),

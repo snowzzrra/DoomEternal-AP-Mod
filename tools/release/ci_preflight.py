@@ -153,11 +153,21 @@ def check_workflow_contract(repo_root: Path) -> None:
 
     # 8. Check that the native support job uses the canonical Windows/MSVC builder.
     native_job = doc["jobs"]["build-native-support"]
-    if native_job.get("runs-on") != "windows-latest":
-        raise RuntimeError("Workflow native job must run on windows-latest")
+    if native_job.get("runs-on") != "windows-2022":
+        raise RuntimeError("Workflow native job must use the qualified Windows 2022 toolchain host")
     native_runs = [step.get("run", "") for step in native_job.get("steps", [])]
     if not any("scripts/build/client_windows.ps1" in run.replace("\\", "/") for run in native_runs):
         raise RuntimeError("Workflow native job must invoke scripts/build/client_windows.ps1")
+    native_commands = "\n".join(native_runs)
+    if "-CoreSource Sentinel-Core" not in native_commands or "qualify_distribution.py" not in native_commands or "build_session_owner" not in native_commands:
+        raise RuntimeError("Workflow must qualify the explicitly selected Core and package its Windows session supervisor")
+    inputs = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {})
+    if any(not inputs.get(key, {}).get("required") for key in ("core_repo", "core_ref")):
+        raise RuntimeError("Core repository and full commit must be explicit workflow inputs")
+    for name in ("build-linux-launcher", "build-windows-launcher"):
+        job = doc["jobs"][name]
+        if "build-native-support" not in job.get("needs", []) or not any("--core-runtime build/qualified-core" in step.get("run", "") for step in job["steps"]):
+            raise RuntimeError(f"{name} must consume the qualified Core artifact")
 
     # 9. Check apworld_ref default
     apworld_default = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {}).get("apworld_ref", {}).get("default")

@@ -1,0 +1,12 @@
+Run one service replica behind the project's HTTPS ingress. Do not expose port 8080 publicly.
+Mount a private persistent /data volume and a read-only GitHub App RSA key at /run/secrets/github_app_key.
+Set GITHUB_APP_ID and GITHUB_INSTALLATION_ID using the installed App for snowzzrra/DoomEternal-AP-Mod.
+The installation needs Issues:write only. No App key or token belongs in launcher assets, YAML, logs or CI forks.
+Limit the ingress to POST /v1/reports, application/json, 32768 bytes; rate-limit by trusted client address.
+The service also limits its socket peer to ten new reports/hour. Shared proxy peers share that limit.
+Uncertain issue submissions stay reserved on disk; retries search the fixed repository and never repeat the POST.
+Back up /data and retain reservations. Deleting a reservation removes its duplicate protection.
+Run: node test_server.cjs. The check uses an ephemeral RSA key and a fake GitHub transport.
+Build the supplied Dockerfile, mount the key and volume, and supply config.env.example values through the server environment.
+After deploying and qualifying HTTPS, set data/report_endpoint.json endpoint to the real project URL ending /v1/reports.
+Until that operational gate is passed, launcher reports support local preview/export with submission disabled.

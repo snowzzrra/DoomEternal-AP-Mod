@@ -34,18 +34,7 @@
     }
   ],
   "asset_package_contract_sha256": "5f1c55d3fc72d85b26f7f7b7448b0d6ecb97b0c0c86b27d2d835540976d30812",
-  "byte_sha256": "deef20d27cc1d79130411b8b310c28656e08294eb17e74d7092a754bc37a11eb",
   "content_revision": "0.5.0",
-  "generated_entity_metrics": {
-    "bind_parents": 731,
-    "byte_size": 12512866,
-    "classes": 10659,
-    "entity_count": 10681,
-    "layers": 2216,
-    "targets": 11786,
-    "transforms": 23460,
-    "unique_entity_names": 10660
-  },
   "manifest_sha256": "f462194b313aeaf7061944cc9043b15e4e8731275a144bc46ec9724ff7c699d0",
   "map_key": "e4m3_mcity",
   "physical_ap_ids": [
@@ -63,11 +52,9 @@
     7770455,
     7770456
   ],
-  "publisher_contract_sha256": "4e33ebe02962ac50afc4098e0807338223f75b6b55e08da9a9525e80b4d6fa29",
   "runtime_location_ids": [
     7770457
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "8d656df2034e5f49fada320368ac18ba18e6aa959f02912664fb3fb2872ca82f",
-  "semantic_sha256": "b6499bd333e661c1847f3b6ae200ae75574753155ce67d1896ce19446783677a"
+  "scripted_contract_sha256": "8d656df2034e5f49fada320368ac18ba18e6aa959f02912664fb3fb2872ca82f"
 }

@@ -217,12 +217,12 @@ class BridgeSupervisor:
             process.stdin.write(f"AP_CONTROL {control}\n")
             process.stdin.flush()
 
-    def request_inventory_resync(self) -> None:
+    def request_inventory_resync(self, *, domain="all", item_id=None) -> None:
         """Request one manual inventory reconciliation through bridge control."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
             raise RuntimeError("bridge worker is not running")
-        control = json.dumps({"type": "inventory_resync"}, separators=(",", ":"))
+        control = json.dumps({"type": "inventory_resync", "domain": domain, "item_id": item_id}, separators=(",", ":"))
         with self._write_lock:
             process.stdin.write(f"AP_CONTROL {control}\n")
             process.stdin.flush()

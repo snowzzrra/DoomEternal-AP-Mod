@@ -314,7 +314,7 @@ def compile_materialization_plan(
 
 
 def compile_automatic_plan(authoritative_ids, context, scope, definitions, policies, *, observation=None):
-    """Historical automatic repair adapter routing through unified reconciliation."""
+    """Route automatic repairs through shared reconciliation."""
     from doom_eap.runtime.item_reconciliation import effective_ownership
     from types import SimpleNamespace
     receipt_items = tuple(

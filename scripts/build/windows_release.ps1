@@ -7,6 +7,8 @@ param(
     [string]$StagedMod,
     [string]$MapSources,
     [string]$Compressor,
+    [string]$CoreSource,
+    [string]$CoreRuntime,
     [string]$Python,
     [string]$PipelineReceipt
 )
@@ -62,7 +64,7 @@ try {
     if (-not $RebuildRoomResources) {
         Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--check", "--repo-root", $repoRoot)
     }
-    & (Join-Path $PSScriptRoot "client_windows.ps1") -Preflight
+    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -Preflight
     if ($LASTEXITCODE -ne 0) { throw "MSVC preflight failed" }
     if ($Preflight) {
         Write-Output "WINDOWS_PREFLIGHT status=PASS"
@@ -119,12 +121,14 @@ try {
 
     Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--export-dir", $resources, "--repo-root", $repoRoot)
     Invoke-Python @("-m", "tools.release.apworld_cache", "--output", (Join-Path $handoff "shared\doometernal.apworld"), "--archipelago-source", $archipelago, "--archipelago-python", $pythonExe)
-    & (Join-Path $PSScriptRoot "client_windows.ps1") -OutputDir $clientBuild
+    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -OutputDir $clientBuild
     if ($LASTEXITCODE -ne 0) { throw "Native client build failed" }
     Copy-Item -LiteralPath (Join-Path $clientBuild "ap_client.exe") -Destination $clientHandoff -Force
     Copy-Item -LiteralPath (Join-Path $clientBuild "save_death_probe.exe") -Destination $clientHandoff -Force
     Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.5.2", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
-    Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago)
+    Invoke-Python @("-m", "tools.release.build_session_owner", "--output", $clientBuild, "--core-runtime", $CoreRuntime)
+    Copy-Item -LiteralPath (Join-Path $clientBuild "APSessionOwner.exe") -Destination $clientHandoff -Force
+    Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago, "--core-runtime", $CoreRuntime)
     $launcher = Join-Path $launcherHandoff "DoomEternalArchipelagoLauncher.exe"
     & $launcher --self-test
     if ($LASTEXITCODE -ne 0) { throw "Frozen Windows launcher self-test failed" }

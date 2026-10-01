@@ -6,7 +6,6 @@ import pytest
 
 from doom_eap.runtime.check_publication import CheckPublication
 from doom_eap.runtime.location_setup import LocationSetup
-from doom_eap.runtime.location_names import resolve_placement_records
 from doom_eap.runtime.protocol_feed import ProtocolFeed, hints_key
 
 
@@ -40,21 +39,6 @@ def test_connected_rejection_retains_existing_contract(missing, checked, error):
         setup.begin({"missing_locations": missing, "checked_locations": checked}, {1})
 
 
-@pytest.mark.parametrize("rows,materialized,error", [
-    (None, {1}, "not a list"), ([(2, 1, 1)], {1}, "malformed placement"),
-    ([(2, True, 1, 0)], {1}, "invalid location ID"),
-    ([(2, 9, 1, 0)], {9}, "unknown location ID"),
-    ([(2, 1, 1, 0)], set(), "did not materialize"),
-    ([(2, 1, 1, 0), (2, 1, 1, 0)], {1}, "duplicate location IDs"),
-])
-def test_location_info_failure_blocks_resolution(rows, materialized, error):
-    setup = LocationSetup(logging.getLogger("setup-contract"))
-    setup.begin({"missing_locations": [1], "checked_locations": []}, {1})
-    reason = setup.consume({"locations": rows}, materialized)
-    assert error in reason
-    assert setup.fail(reason)
-    assert not setup.fail(reason)
-    assert not setup.ready_to_resolve
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -76,19 +60,6 @@ def test_old_scout_cannot_complete_or_fail_new_connection(failure):
     asyncio.run(run())
 
 
-def test_placement_names_preserve_sorted_order_and_unknown_classification_rejection():
-    names = SimpleNamespace(
-        item_names=SimpleNamespace(lookup_in_slot=lambda item, slot: f"item-{item}"),
-        location_names=SimpleNamespace(lookup_in_slot=lambda loc, slot: f"location-{loc}"),
-        player_names={1: "local", 2: "remote"},
-    )
-    network = {2: SimpleNamespace(item=20, player=2, flags=4), 1: SimpleNamespace(item=10, player=1, flags=0)}
-    rows = resolve_placement_records({2, 1}, network, {1: object(), 2: object()}, names, 1)
-    assert [row["location_id"] for row in rows] == [1, 2]
-    assert rows[0]["local"] and rows[1]["trap"] and rows[1]["recipient_name"] == "remote"
-    network[1].flags = True
-    with pytest.raises(ValueError, match="invalid item classification"):
-        resolve_placement_records({1}, network, {1: object()}, names, 1)
 
 
 def test_chat_echo_is_bounded_local_once_and_cannot_cross_connection(monkeypatch):

@@ -59,7 +59,7 @@ def write_handoff_manifest(
         "version_label": version,
         "mod": {"requested_ref": mod_ref or mod_sha, "resolved_sha": mod_sha},
         "apworld": {"requested_ref": apworld_ref or apworld_sha, "resolved_sha": apworld_sha},
-        "build": {"platform": platform, "native_client_toolchain_identity": "MSVC x64 / MIDL"},
+        "build": {"platform": platform, "native_client_toolchain_identity": "MSVC x64"},
         "files": records,
     }
     path = root / "BUILD-MANIFEST.json"

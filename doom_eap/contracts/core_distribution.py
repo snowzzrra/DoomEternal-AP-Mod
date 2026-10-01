@@ -12,6 +12,7 @@ ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "special": 1, "deathlink": 1, "automap": 1, "commands": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
+HELPERS = {"prepare_vanilla_backup.py"}
 
 def version_key(value):
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-rc-([1-9]\d*))?", value)
@@ -56,13 +57,13 @@ def validate_manifest(value):
         if not name or parts.is_absolute() or "\\" in name or ":" in name or ".." in parts.parts or str(parts) != name or name.casefold() in names:
             raise ValueError("Unsafe or duplicate artifact name")
         names.add(name.casefold())
-        role = "runtime_zip" if name == "sentinel-runtime.zip" else "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name == "sentinel_probe.exe" else "core"
+        role = "runtime_zip" if name == "sentinel-runtime.zip" else "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name == "sentinel_probe.exe" else "helper" if name in HELPERS else "core"
         if item.get("role") != role:
             raise ValueError("Inconsistent artifact role")
         if type(item["size"]) is not int or not 0 < item["size"] <= 50 * 1024 * 1024 or not re.fullmatch("[a-f0-9]{64}", item["sha256"]):
             raise ValueError("Invalid artifact identity")
     required = {name.casefold() for name in REQUIRED} | {"sentinel-runtime.zip"}
-    if not required <= names or any(name not in required and not name.startswith("notices/") for name in names):
+    if not required <= names or any(name not in required | HELPERS and not name.startswith("notices/") for name in names):
         raise ValueError("Incomplete or unexpected artifact set")
     return value
 
@@ -93,9 +94,9 @@ def verify_runtime(manifest_path):
             data = archive.read(name)
             verify_bytes(name, data, items[name])
             contents[name] = data
-        direct = path.parent / "sentinel_core.dll"
-        if direct.read_bytes() != contents["sentinel_core.dll"]:
-            raise ValueError("Direct DLL differs from runtime ZIP")
+        for name, data in contents.items():
+            if (path.parent / name).read_bytes() != data:
+                raise ValueError(f"Direct runtime artifact differs from ZIP: {name}")
     return value, contents
 
 def select_compatible(manifests, *, allow_rc=False):

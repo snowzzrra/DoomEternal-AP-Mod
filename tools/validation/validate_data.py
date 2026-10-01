@@ -762,9 +762,18 @@ def validate_automap_prototypes_only() -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global APWORLD
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--map", dest="map_key")
+    parser.add_argument("--apworld-root", type=Path,
+                        help="Explicit integration checkout: worlds/doometernal directory")
     args = parser.parse_args(argv)
+    if not args.map_key and args.apworld_root is None:
+        parser.error("integration audit requires --apworld-root")
+    if args.apworld_root is not None:
+        APWORLD = args.apworld_root.resolve()
+    if not args.map_key and not (APWORLD / "items.py").is_file():
+        parser.error("--apworld-root must contain the DOOM Eternal APWorld sources")
     if args.map_key:
         from tools.validation.pipeline import Pipeline
 
@@ -791,7 +800,7 @@ def main(argv: list[str] | None = None) -> int:
         classification_path = ROOT / "data" / "item_classifications.json"
         classification_document = read_json(classification_path)
         classification_identity = load_item_classification_identity(classification_path)
-        if classification_document.get("item_mapping_revision") != 8:
+        if classification_document.get("item_mapping_revision") != 9:
             errors.append("Packaged item classification revision drifted")
         if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
             errors.append(

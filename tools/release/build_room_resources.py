@@ -186,7 +186,7 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         records[key] = {"option_keys": list(plan.option_keys), "target_member": target_member,
                         "states": states, "state_policy": plan.state_policy}
     manifest = {
-        "schema_version": 1, "model": "dependent_map_payloads", "phase9c_final_credits": True,
+        "schema_version": 1, "model": "dependent_map_payloads",
         "physical_option_keys": list(PHYSICAL_OPTION_KEYS), "base_members": sorted(base_members), "maps": records,
         "context_targets": {context.identity: f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
                             for context in dlc_contexts()},

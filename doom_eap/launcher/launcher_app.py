@@ -304,13 +304,18 @@ def _run_self_test(arguments: list[str]) -> int:
 
 
 def _run_ui() -> int:
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
-    from doom_eap.launcher.launcher_controller import LauncherController
+    from doom_eap.launcher.launcher_controller import LauncherController, bundle_directory
     from doom_eap.launcher.launcher_ui import LauncherUI
 
+    if os.name == "nt":
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DoomEternal.Archipelago.Launcher")
     application = QApplication(sys.argv[:1])
     application.setApplicationName("DOOM Eternal Archipelago")
+    application.setWindowIcon(QIcon(str(bundle_directory() / "assets/launcher/EternalAP.ico")))
     LauncherUI(LauncherController()).run()
     return 0
 

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
 from .launcher_workers import LauncherJob, LauncherWorkCancelled, LauncherWorkers
+from .launcher_session import APSessionOwner
 from .launcher_interactions import LauncherInteractions, ScopedInteractions
 from .launcher_platform import (
     IDFILE_DECOMPRESSOR_LINUX,
@@ -268,11 +269,13 @@ class IntegratedLaunchWorkflow:
         consent: ConsentCallback | None = None,
         confirmation: ConfirmationCallback | None = None,
         uninstall_confirmation: ConfirmationCallback | None = None,
+        session_owner: APSessionOwner | None = None,
     ):
         self.base_workflow = LaunchWorkflow()
         self.application_dir = application_dir
         self.state_dir = state_dir
         self.data_dir = data_dir or state_dir.parent / "data"
+        self.session_owner = session_owner or APSessionOwner(application_dir, self.data_dir, state_dir)
         self.config_path = config_path
         self.platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
         self.event_sink = event_sink or (lambda _kind, _payload: None)
@@ -297,6 +300,7 @@ class IntegratedLaunchWorkflow:
             consent=interactions.consent,
             confirmation=interactions.confirmation,
             uninstall_confirmation=interactions.uninstall_confirmation,
+            session_owner=self.session_owner,
         )
         workflow._configuration_snapshot = configuration
         workflow._job = job
@@ -984,6 +988,9 @@ class IntegratedLaunchWorkflow:
                 guide_section="Windows Manual Mod Installer",
                 guide_url="https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer",
             )
+        if adapter.state == "applied":
+            self.check_cancelled()
+            self.session_owner.prepare(snapshot, config)
         return record
 
     def uninstall(self, snapshot: RoomSnapshot) -> UninstallResult:

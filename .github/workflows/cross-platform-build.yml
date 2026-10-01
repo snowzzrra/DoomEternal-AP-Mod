@@ -16,7 +16,15 @@ name: DOOM Eternal AP Cross-Platform Build
       version_label:
         description: 'Release version label (e.g. v0.5.2)'
         required: true
-        default: 'v0.5.2'
+        default: 'v0.6.0'
+        type: string
+      core_repo:
+        description: 'Repository containing Sentinel Core source (owner/repository)'
+        required: true
+        type: string
+      core_ref:
+        description: 'Full 40-character Sentinel Core source commit'
+        required: true
         type: string
 
 permissions:
@@ -33,14 +41,14 @@ jobs:
       version_label: ${{ steps.resolve.outputs.version_label }}
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ inputs.mod_ref }}
           path: mod_repo
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ inputs.apworld_ref }}
@@ -48,6 +56,10 @@ jobs:
 
       - name: Resolve Commit SHAs
         id: resolve
+        env:
+          MOD_REF: ${{ inputs.mod_ref }}
+          APWORLD_REF: ${{ inputs.apworld_ref }}
+          VERSION_LABEL: ${{ inputs.version_label }}
         run: |
           MOD_SHA=$(git -C mod_repo rev-parse HEAD)
           SHORT_MOD_SHA=$(git -C mod_repo rev-parse --short=8 HEAD)
@@ -55,11 +67,12 @@ jobs:
           echo "mod_resolved_sha=$MOD_SHA" >> "$GITHUB_OUTPUT"
           echo "short_mod_sha=$SHORT_MOD_SHA" >> "$GITHUB_OUTPUT"
           echo "apworld_resolved_sha=$APWORLD_SHA" >> "$GITHUB_OUTPUT"
-          echo "version_label=${{ inputs.version_label }}" >> "$GITHUB_OUTPUT"
+          [[ "$VERSION_LABEL" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc-[0-9]+)?$ ]] || exit 1
+          echo "version_label=$VERSION_LABEL" >> "$GITHUB_OUTPUT"
           echo "=== RESOLVED BUILD METADATA ==="
-          echo "MOD Ref: ${{ inputs.mod_ref }} -> $MOD_SHA ($SHORT_MOD_SHA)"
-          echo "APWorld Ref: ${{ inputs.apworld_ref }} -> $APWORLD_SHA"
-          echo "Version: ${{ inputs.version_label }}"
+          echo "MOD Ref: $MOD_REF -> $MOD_SHA ($SHORT_MOD_SHA)"
+          echo "APWorld Ref: $APWORLD_REF -> $APWORLD_SHA"
+          echo "Version: $VERSION_LABEL"
 
   preflight:
     name: Portable Release Preflight & Verified Room Resources
@@ -67,21 +80,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
           path: DoomEternal-AP-Mod
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
           path: Archipelago
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -136,7 +149,7 @@ jobs:
           python -m tools.release.prebuilt_room_resources --export-dir build/release/client/resources
 
       - name: Upload Room Resources Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: room-resources-artifact
           path: DoomEternal-AP-Mod/build/release/client/resources/
@@ -148,21 +161,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
           path: DoomEternal-AP-Mod
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
           path: Archipelago
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
@@ -182,7 +195,7 @@ jobs:
             --archipelago-python "$(command -v python)"
 
       - name: Upload APWorld Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: apworld-artifact
           path: DoomEternal-AP-Mod/build/artifacts/doometernal.apworld
@@ -191,22 +204,60 @@ jobs:
   build-native-support:
     name: Build Native Client (MSVC x64)
     needs: [resolve-metadata, preflight]
-    runs-on: windows-latest
+    runs-on: windows-2022
+    env:
+      SELECTED_CORE_COMMIT: ${{ inputs.core_ref }}
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
 
+      - name: Checkout Selected Core Source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ inputs.core_repo }}
+          ref: ${{ inputs.core_ref }}
+          path: Sentinel-Core
+          persist-credentials: false
+
+      - name: Locate Qualified MSVC and CMake
+        shell: pwsh
+        run: |
+          if ($env:SELECTED_CORE_COMMIT -cnotmatch '^[a-f0-9]{40}$') { throw 'Select a full Core source commit' }
+          $installation = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!(Test-Path -LiteralPath "$installation\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\cl.exe")) { throw 'MSVC 14.44.35207 is required' }
+          $cmakeDirectory = Join-Path $installation 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin'
+          $cmakeVersion = & (Join-Path $cmakeDirectory 'cmake.exe') --version
+          if ($cmakeVersion[0] -notmatch '3\.31\.6') { throw 'CMake 3.31.6 is required' }
+          "SC_VCVARS=$installation\VC\Auxiliary\Build\vcvars64.bat" >> $env:GITHUB_ENV
+          "SC_CMAKE=$cmakeDirectory" >> $env:GITHUB_ENV
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Build and Validate Native Client
-        shell: pwsh
-        run: .\scripts\build\client_windows.ps1 -OutputDir build\release\build\client
+        shell: cmd
+        run: |
+          call "%SC_VCVARS%" -vcvars_ver=14.44
+          if errorlevel 1 exit /b 1
+          "%SC_CMAKE%\cmake.exe" -S Sentinel-Core -B Sentinel-Core/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          if errorlevel 1 exit /b 1
+          "%SC_CMAKE%\cmake.exe" --build Sentinel-Core/build
+          if errorlevel 1 exit /b 1
+          "%SC_CMAKE%\ctest.exe" --test-dir Sentinel-Core/build --output-on-failure --timeout 60
+          if errorlevel 1 exit /b 1
+          python Sentinel-Core\tools\qualify_distribution.py --output Sentinel-Core\build\distribution\candidate --commit "%SELECTED_CORE_COMMIT%"
+          if errorlevel 1 exit /b 1
+          powershell.exe -NoProfile -File scripts\build\client_windows.ps1 -CoreSource Sentinel-Core -OutputDir build\release\build\client -UseCurrentToolchain
+
+      - name: Build Windows Session Supervisor
+        run: |
+          python -m pip install -r requirements-launcher.txt
+          python -m tools.release.build_session_owner --output build/release/build/client --core-runtime Sentinel-Core/build/distribution/candidate
 
       - name: Verify Native Binaries
         shell: pwsh
@@ -217,35 +268,44 @@ jobs:
           if ($clientBytes.Length -lt 2 -or $clientBytes[0] -ne 0x4d -or $clientBytes[1] -ne 0x5a) { throw "Invalid native client: $client" }
           New-Item -ItemType Directory -Force build/artifacts/client | Out-Null
           Copy-Item $client build/artifacts/client/
+          Copy-Item build/release/build/client/APSessionOwner.exe build/artifacts/client/
           if (Test-Path -LiteralPath 'build/release/build/client/save_death_probe.exe') { Copy-Item build/release/build/client/save_death_probe.exe build/artifacts/client/ }
 
       - name: Upload Native Client Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: native-support-artifact
           path: build/artifacts/client
           retention-days: 1
 
+      - name: Upload Qualified Core Runtime
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: core-runtime-artifact
+          path: Sentinel-Core/build/distribution/candidate/
+          if-no-files-found: error
+          retention-days: 1
+
   build-linux-launcher:
     name: Build Linux Standalone Launcher
-    needs: [resolve-metadata, preflight]
+    needs: [resolve-metadata, preflight, build-native-support]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
           path: Archipelago
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -260,12 +320,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
+      - name: Download Qualified Core Runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: core-runtime-artifact
+          path: build/qualified-core
+
       - name: Build Linux Frozen Launcher
         run: |
           mkdir -p build/release
           python3 -m tools.release.build_launcher \
             --output-dir build/release \
             --archipelago-source Archipelago \
+            --core-runtime build/qualified-core \
             --name DoomEternalArchipelagoLauncher
 
       - name: Validate Linux Frozen Launcher
@@ -279,7 +346,7 @@ jobs:
           cp build/release/DoomEternalArchipelagoLauncher build/artifacts/linux/
 
       - name: Upload Linux Launcher Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: linux-launcher-artifact
           path: build/artifacts/linux/DoomEternalArchipelagoLauncher
@@ -287,24 +354,24 @@ jobs:
 
   build-windows-launcher:
     name: Build Windows Standalone Launcher
-    needs: [resolve-metadata, preflight]
+    needs: [resolve-metadata, preflight, build-native-support]
     runs-on: windows-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
           path: Archipelago
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -319,9 +386,15 @@ jobs:
         run: |
           python -m pytest tests/test_install_workflow.py::TestWindowsFilesystemCorrective -q
 
+      - name: Download Qualified Core Runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: core-runtime-artifact
+          path: build/qualified-core
+
       - name: Build Windows Frozen Launcher
         run: |
-          python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
+          python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher --core-runtime build/qualified-core
 
       - name: Validate Windows Frozen Launcher
         shell: pwsh
@@ -338,7 +411,7 @@ jobs:
           Copy-Item $launcher build/artifacts/windows/
 
       - name: Upload Windows Launcher Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-launcher-artifact
           path: build/artifacts/windows/DoomEternalArchipelagoLauncher.exe
@@ -356,14 +429,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
           path: DoomEternal-AP-Mod
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
@@ -375,45 +448,51 @@ jobs:
           mkdir -p DoomEAP-build-handoff/shared/resources
 
       - name: Download APWorld Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: apworld-artifact
           path: DoomEAP-build-handoff/shared
 
       - name: Download Native Support Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: native-support-artifact
           path: DoomEAP-build-handoff/shared/client
 
       - name: Download Linux Launcher Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: linux-launcher-artifact
           path: DoomEAP-build-handoff/linux
 
       - name: Download Windows Launcher Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: windows-launcher-artifact
           path: DoomEAP-build-handoff/windows
 
       - name: Download Room Resources Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: room-resources-artifact
           path: DoomEAP-build-handoff/shared/resources
 
       - name: Generate Manifest and Checksums
+        env:
+          VERSION_LABEL: ${{ needs.resolve-metadata.outputs.version_label }}
+          MOD_REF: ${{ inputs.mod_ref }}
+          MOD_SHA: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
+          APWORLD_REF: ${{ inputs.apworld_ref }}
+          APWORLD_SHA: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
         run: |
           cd DoomEternal-AP-Mod
           python -m tools.release.handoff \
             --root ../DoomEAP-build-handoff \
-            --version '${{ needs.resolve-metadata.outputs.version_label }}' \
-            --mod-ref '${{ github.event.inputs.mod_ref }}' \
-            --mod-sha '${{ needs.resolve-metadata.outputs.mod_resolved_sha }}' \
-            --apworld-ref '${{ github.event.inputs.apworld_ref }}' \
-            --apworld-sha '${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}' \
+            --version "$VERSION_LABEL" \
+            --mod-ref "$MOD_REF" \
+            --mod-sha "$MOD_SHA" \
+            --apworld-ref "$APWORLD_REF" \
+            --apworld-sha "$APWORLD_SHA" \
             --platform both
 
       - name: Restore Linux Launcher Executable Bit
@@ -423,7 +502,7 @@ jobs:
           test -x linux/DoomEternalArchipelagoLauncher
 
       - name: Upload Cross-Platform Build Handoff Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: DoomEAP-crossplatform-build-${{ needs.resolve-metadata.outputs.version_label }}-${{ needs.resolve-metadata.outputs.short_mod_sha }}
           path: DoomEAP-build-handoff
@@ -438,21 +517,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MOD repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-Mod
           ref: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
           path: DoomEternal-AP-Mod
 
       - name: Checkout APWorld repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/DoomEternal-AP-World
           ref: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
           path: Archipelago
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -469,27 +548,31 @@ jobs:
           python -m pip check
 
       - name: Download Build Handoff Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: DoomEAP-crossplatform-build-${{ needs.resolve-metadata.outputs.version_label }}-${{ needs.resolve-metadata.outputs.short_mod_sha }}
           path: handoff
 
       - name: Download Room Resources Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: room-resources-artifact
           path: room_resources
 
       - name: Assemble Final Release ZIPs
+        env:
+          VERSION_LABEL: ${{ needs.resolve-metadata.outputs.version_label }}
+          MOD_SHA: ${{ needs.resolve-metadata.outputs.mod_resolved_sha }}
+          APWORLD_SHA: ${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}
         run: |
           cd DoomEternal-AP-Mod
           python3 scripts/release/assemble_ci_artifact.py \
             --handoff ../handoff \
             --room-resources-dir ../room_resources \
             --output-dir dist \
-            --version "${{ needs.resolve-metadata.outputs.version_label }}" \
-            --expect-mod-sha "${{ needs.resolve-metadata.outputs.mod_resolved_sha }}" \
-            --expect-apworld-sha "${{ needs.resolve-metadata.outputs.apworld_resolved_sha }}" \
+            --version "$VERSION_LABEL" \
+            --expect-mod-sha "$MOD_SHA" \
+            --expect-apworld-sha "$APWORLD_SHA" \
             --repo-root .
 
       - name: Validate Release Packages & Checksums
@@ -503,7 +586,7 @@ jobs:
           ls -lh
 
       - name: Upload Final Public Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: DoomEAP-release-${{ needs.resolve-metadata.outputs.version_label }}-${{ needs.resolve-metadata.outputs.short_mod_sha }}
           path: DoomEternal-AP-Mod/dist/

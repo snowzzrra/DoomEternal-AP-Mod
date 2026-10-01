@@ -3,70 +3,12 @@ import logging
 import json
 from pathlib import Path
 
-from doom_eap.contracts.runtime_context import MapIdentitySnapshot
-from doom_eap.runtime.bootstrap import Bootstrap, BootstrapOwnership
-from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ACTIONS
-from doom_eap.runtime.command_spool import CommandSpool
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime.rune_reconciliation import RuneReconciliation, RuneNativeState
-from tools.maps.ap_map_generator import generate_bootstrap_entities
 
 
-def test_bootstrap_remains_disabled_and_consumption_is_unknown_with_legacy_quarantine(tmp_path):
-    owner = Bootstrap(logging.getLogger(__name__))
-    state = {"actions": {"rune_page": {"status": "applied"}}}
-    owner.bind(state)
-    assert owner.actions["v1:rune_page"]["status"] == "delivered_effect_unknown"
-    before = deepcopy(state)
-    owner.action_state("frag_acquired")
-    assert state == before  # Presentation queries no longer create pending work.
-    spool = CommandSpool(tmp_path, arm_rpc=lambda *_: None, log_delivery=lambda *a, **k: None,
-                         logger=logging.getLogger(__name__))
-    ownership = BootstrapOwnership(frozenset({7770011}), False)
-    current_map = next(iter(BOOTSTRAP_ACTIONS["frag_acquired"]["maps_supported"]))
-    commits = []
-    owner.onboard("on_connect", ownership=ownership, map_identity=MapIdentitySnapshot(current_map=current_map),
-                  state_key="room", item_ready=True, rpc_ready=True, spool=spool,
-                  persist=lambda: commits.append(deepcopy(state)))
-    assert not list(tmp_path.iterdir())
-    assert state == before and not commits
-    assert owner.enqueue("frag_acquired", "manual_diagnostic", ownership=ownership, current_map=current_map,
-                         state_key="room", spool=spool, persist=lambda: commits.append(deepcopy(state)))
-    assert owner.action_state("frag_acquired")["status"] == "queued"
-    for path in tmp_path.glob("*.cmd"):
-        path.unlink()
-    legacy = tmp_path / "bootstrap-v1-rune_page.processing"
-    legacy.write_text("historical", encoding="utf-8")
-    owner.reconcile_spool(state_key="room", spool=spool, persist=lambda: commits.append(deepcopy(state)))
-    assert owner.action_state("frag_acquired")["status"] == "delivered_effect_unknown"
-    assert owner.action_state("rune_page", 1)["status"] == "quarantined_runtime_invalid"
-    assert legacy.with_suffix(".quarantined").read_text() == "historical"
-    assert not owner.enqueue("frag_acquired", "manual_diagnostic", ownership=ownership, current_map=current_map,
-                             state_key="room", spool=spool, persist=lambda: None)
 
 
-def test_owned_ice_bomb_queues_acquisition_stat_once_on_connect(tmp_path):
-    owner = Bootstrap(logging.getLogger(__name__))
-    state = {"actions": {}}
-    owner.bind(state)
-    spool = CommandSpool(tmp_path, arm_rpc=lambda *_: None, log_delivery=lambda *a, **k: None,
-                         logger=logging.getLogger(__name__))
-    current_map = next(iter(BOOTSTRAP_ACTIONS["ice_acquired"]["maps_supported"]))
-    target = generate_bootstrap_entities(current_map)
-    assert 'entityDef ap_bootstrap_v2_ice_acquired {' in target
-    assert 'gameStat = "STAT_ICE_BOMB_GAINED";' in target
-    assert target.count('entityDef ') == 1
-    assert 'entityDef ap_bootstrap_v2_ice_acquired {' in generate_bootstrap_entities("game/hub/hub")
-    assert generate_bootstrap_entities("game/sp/e1m4_boss/e1m4_boss") == ""
-    kwargs = dict(ownership=BootstrapOwnership(frozenset({7770013}), False),
-                  map_identity=MapIdentitySnapshot(current_map=current_map), state_key="room",
-                  item_ready=True, rpc_ready=True, spool=spool, persist=lambda: None)
-    owner.onboard("on_connect", **kwargs)
-    assert owner.action_state("ice_acquired")["status"] == "queued"
-    assert owner.action_state("frag_acquired")["status"] == "pending"
-    assert len(list(tmp_path.glob("*.cmd"))) == 1
-    owner.onboard("on_reconnect", **kwargs)
-    assert len(list(tmp_path.glob("*.cmd"))) == 1
 
 
 def test_rune_repair_owns_publication_ledger_and_distinct_perk_epoch():

@@ -56,6 +56,7 @@ def _source_inputs(label: str, root: Path, *, pattern: str | None = None) -> lis
 def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs: list[tuple[str, Path]] = []
     inputs.extend(_source_inputs("doom_eap", REPO_ROOT / "doom_eap"))
+    inputs.extend(_source_inputs("assets/launcher", REPO_ROOT / "assets/launcher"))
     inputs.extend(_source_inputs("tools/decls", REPO_ROOT / "tools/decls"))
     inputs.extend(_source_inputs("tools/maps", REPO_ROOT / "tools/maps"))
     inputs.extend(_source_inputs("tools/release", REPO_ROOT / "tools/release"))
@@ -79,7 +80,9 @@ def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: P
     output_dir = output_dir.expanduser().resolve()
     archipelago_source = archipelago_source.expanduser().resolve()
     from doom_eap.contracts.core_distribution import verify_runtime
-    core_runtime = (core_runtime or WORKSPACE / "Sentinel-Core/build/distribution/1.0.0-rc-1").resolve()
+    if core_runtime is None:
+        raise ValueError("Pass the qualified Core runtime directory explicitly")
+    core_runtime = core_runtime.resolve()
     verify_runtime(core_runtime / "distribution.json")
     if not _within(output_dir, RELEASE_ROOT):
         raise ValueError(f"launcher output must remain under {RELEASE_ROOT}")
@@ -156,6 +159,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: P
         "--add-data",
         f"{core_runtime}{data_separator}core",
         "--add-data",
+        f"{REPO_ROOT / 'assets/launcher'}{data_separator}assets/launcher",
+        "--add-data",
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
@@ -172,7 +177,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: P
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
     if os.name == "nt":
-        command[-1:-1] = ["--hide-console", "hide-early"]
+        command[-1:-1] = ["--hide-console", "hide-early", "--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
     build_environment = os.environ.copy()
     if os.name == "nt":
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
@@ -194,7 +199,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=RELEASE_ROOT)
     parser.add_argument("--archipelago-source", type=Path, default=WORKSPACE / "Archipelago")
     parser.add_argument("--name", default="DoomEternalArchipelagoLauncher")
-    parser.add_argument("--core-runtime", type=Path)
+    parser.add_argument("--core-runtime", type=Path, required=True)
     arguments = parser.parse_args()
     print(build(arguments.output_dir, arguments.archipelago_source, arguments.name, arguments.core_runtime))
     return 0

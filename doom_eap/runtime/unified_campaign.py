@@ -17,7 +17,7 @@ FORTRESS_POLICY = json.loads(
 
 def validate_plan(slot_data):
     if CAPABILITY not in slot_data.get("required_capabilities", ()):
-        raise ValueError("unified_campaign_v1 is required; generate a Phase6 seed")
+        raise ValueError("unified_campaign_v1 is required; generate a compatible DOOM Eternal seed")
     plan = slot_data.get("campaign_plan")
     if not isinstance(plan, dict) or plan.get("schema") != 1 or plan.get("mode") not in MODES:
         raise ValueError("unsupported unified campaign plan")
@@ -32,6 +32,9 @@ def validate_plan(slot_data):
     if (not isinstance(sequence, list) or any(not isinstance(key, str) for key in sequence)
             or len(sequence) != len(enabled) or set(sequence) != enabled):
         raise ValueError("sequence must contain each enabled stage exactly once")
+    fixed_dash = plan.get("fixed_dash_completion_stage")
+    if fixed_dash is not None and (not isinstance(fixed_dash, str) or fixed_dash not in sequence):
+        raise ValueError("Fixed Dash acquisition must belong to the campaign")
     expected_goal = {"Kill the Icon of Sin": "e3m4_boss", "Kill the Dark Lord": "e5m4_boss"}.get(slot_data["goal"])
     if slot_data["goal"] == "Complete the Full Saga":
         if goal not in {"e3m4_boss", "e5m4_boss"}:

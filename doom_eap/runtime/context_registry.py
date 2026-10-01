@@ -115,7 +115,7 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate the new-seed Phase6 identity and exact option contract."""
+    """Validate the generated room identity and exact option contract."""
     if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
         raise ValueError(f"slot_data_revision must be {SLOT_DATA_REVISION}")
     required = slot_data.get("required_capabilities")
@@ -138,8 +138,6 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("use_dlc_content must be boolean")
     if not isinstance(slot_data.get("include_dlc_missions"), bool):
         raise ValueError("include_dlc_missions must be boolean")
-    if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
-        raise ValueError("include_dlc_missions requires use_dlc_content")
     if slot_data.get("dlc_logic_timing") not in {
         "late_game", "from_the_beginning", "Late Game", "From the Beginning",
     }:

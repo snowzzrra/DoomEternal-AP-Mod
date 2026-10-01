@@ -118,6 +118,10 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                 choice_keys = sorted(valid_keys)
             except (TypeError, ValueError) as error:
                 raise ValueError(f"invalid option set values for {key}") from error
+            if key == "custom_missions":
+                stages = sys.modules["worlds.doometernal.generated_content"].CAMPAIGN_STAGES
+                mission_names = {stage["name"] for stage in stages if stage["kind"] == "mission"}
+                choice_keys = sorted(mission_names)
             if any(not isinstance(choice_key, str) or not choice_key for choice_key in choice_keys):
                 raise ValueError(f"option set {key} values must be non-empty strings")
             default = getattr(option_type, "default", ())
@@ -134,7 +138,9 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                     **base,
                     "ui_type": "option_set",
                     "default": default_values,
-                    "choices": [{"key": choice_key, "label": choice_key} for choice_key in choice_keys],
+                    "choices": [{"key": choice_key, "label": choice_key,
+                                 **({"aliases": [stage["id"] for stage in stages if stage["name"] == choice_key]}
+                                    if key == "custom_missions" else {})} for choice_key in choice_keys],
                 }
             )
             continue

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$OutputDir = "build\\release\\build\\client",
+    [string]$CoreSource = "",
     [switch]$UseCurrentToolchain,
     [switch]$Preflight
 )
@@ -8,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Invoke-NativeBuild {
-    param([string]$RepositoryRoot, [string]$BuildDirectory, [switch]$PreflightOnly)
+    param([string]$RepositoryRoot, [string]$BuildDirectory, [string]$CoreRoot, [switch]$PreflightOnly)
 
     foreach ($tool in "cl.exe", "link.exe", "dumpbin.exe") {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
@@ -25,7 +26,7 @@ function Invoke-NativeBuild {
     }
     $null = New-Item -ItemType Directory -Path $BuildDirectory -Force
     $clientDirectory = Join-Path $RepositoryRoot "native\\client"
-    $coreRoot = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot "..\\Sentinel-Core"))
+    $coreRoot = $CoreRoot
     $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/DNOMINMAX", "/I$RepositoryRoot", "/I$coreRoot\\include", "/I$coreRoot\\src", "/I$coreRoot\\build\\generated", "/c")
     $sources = @(
         "ap_client_exe.cpp", "command_queue.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
@@ -75,6 +76,11 @@ function Invoke-NativeBuild {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
+if (-not $CoreSource) { throw "Pass -CoreSource with the configured Sentinel Core source directory" }
+$coreDirectory = (Resolve-Path -LiteralPath $CoreSource).Path
+if (-not (Test-Path -LiteralPath (Join-Path $coreDirectory "build\\generated\\sentinel_version.h"))) {
+    throw "Configure Sentinel Core before building its client"
+}
 $releaseRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "build\\release"))
 $buildDirectory = if ([IO.Path]::IsPathRooted($OutputDir)) {
     [IO.Path]::GetFullPath($OutputDir)
@@ -103,10 +109,10 @@ if (-not $UseCurrentToolchain) {
         throw "Visual Studio Build Tools x64 components were not found. Install the Desktop development with C++ workload."
     }
     $preflightArgument = if ($Preflight) { " -Preflight" } else { "" }
-    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -UseCurrentToolchain{3}' -f $developerCommand, $PSCommandPath, $buildDirectory, $preflightArgument
+    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -CoreSource "{4}" -UseCurrentToolchain{3}' -f $developerCommand, $PSCommandPath, $buildDirectory, $preflightArgument, $coreDirectory
     & cmd.exe /d /s /c $command
     if ($LASTEXITCODE -ne 0) { throw "Native Windows build failed with exit code $LASTEXITCODE" }
     exit 0
 }
 
-Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory -PreflightOnly:$Preflight
+Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory -CoreRoot $coreDirectory -PreflightOnly:$Preflight

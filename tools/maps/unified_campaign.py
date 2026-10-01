@@ -16,7 +16,6 @@ def project_stage_return(catalog: ContentCatalog, map_key: str, text: str) -> tu
         raise ValueError(f"{map_key}: missing authored unified campaign exit")
     changed = []
     if map_key == "e5m4_boss":
-        # The authored final-defeat event used to start the saga-ending movie.
         # Preserve encounter exit/XP, then run the existing defeat publisher and
         # native transition. AP GoalPolicy alone decides whether this ends a seed.
         defeat = "death_of_the_darklord_start_trigger"

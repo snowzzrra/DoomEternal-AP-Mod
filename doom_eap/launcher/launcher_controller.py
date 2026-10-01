@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import queue
-import re
 import shutil
 import subprocess
 import sys
@@ -26,7 +25,7 @@ from copy import deepcopy
 from .launcher_workers import LauncherWorkers, LauncherWorkCancelled
 from .launcher_repairs import apply_repair, install_game_link
 from .launcher_interactions import LauncherInteractions
-from .launcher_reporting import ScopedSupportReport, report_problem
+from .launcher_reporting import ScopedSupportReport, report_problem, submission_endpoint, submit_report
 
 from .connection_errors import enrich_connection_failure, validate_server_address
 from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
@@ -40,9 +39,6 @@ from .launcher_integration import (
 )
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_platform import (
-    AMMO_HOTKEY_STATE_FILENAME,
-    AMMO_HOTKEY_STATE_HEADER,
-    AMMO_REFILL_BIND_COMMAND,
     SavedGamesSelection,
     SteamInstallationLocator,
     cleanup_legacy_doomeap_cfg,
@@ -57,11 +53,11 @@ from .launcher_platform import (
     publish_file,
     read_handshake_probe,
     redact_secrets,
-    resolve_doom_config_path,
     select_saved_games_dir,
     validate_game_root,
     validate_save_directory,
-    write_ammo_refill_hotkey_state,
+    read_ap_hotkey_state,
+    write_ap_hotkey_states,
 )
 from .launcher_supervisor import BridgeSupervisor
 
@@ -93,6 +89,7 @@ AMMO_REFILL_SUPPORTED_KEY_TOKENS = frozenset(
 def normalize_ammo_refill_keybind(keybind: str) -> str:
     """Accept one proven DOOM key token or an unbound value."""
     value = str(keybind).strip()
+    value = {"pgup": "PageUp", "pgdn": "PageDown"}.get(value.casefold(), value)
     if not value or value.casefold() == "unbound":
         return ""
     if "\n" in value or "\r" in value or "+" in value or len(value) > 32:
@@ -132,6 +129,7 @@ class LauncherController:
 
     def __init__(self, application_dir: Path | None = None):
         self.application_dir = (application_dir or application_directory()).resolve()
+        self.bundle_dir = bundle_directory()
         packaged_client = self.application_dir / "client"
         self.client_dir = packaged_client if packaged_client.is_dir() else self.application_dir
         self.user_paths = launcher_user_paths()
@@ -144,17 +142,15 @@ class LauncherController:
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
-        configured_keybind = self.config.get(AMMO_REFILL_KEYBIND_CONFIG)
-        if configured_keybind is None or not isinstance(configured_keybind, str):
-            normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
-        else:
-            try:
-                normalized_keybind = normalize_ammo_refill_keybind(configured_keybind)
-            except ValueError:
-                normalized_keybind = DEFAULT_AMMO_REFILL_KEYBIND
-        if configured_keybind != normalized_keybind:
-            self.config[AMMO_REFILL_KEYBIND_CONFIG] = normalized_keybind
-            self._persist_config()
+        if not self.config.get("client_state_file"):
+            receipt_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) if os.name == "nt" else Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+            self.config["client_state_file"] = str(receipt_root / "doom-eternal-ap/client_state.json")
+        for key, default, special in ((AMMO_REFILL_KEYBIND_CONFIG, "F9", False), ("special_toggle_keybind", "F10", True)):
+            configured = self.config.get(key)
+            if configured is None:
+                configured = read_ap_hotkey_state(doom_base_dir_from_config(self.config), special=special)
+            self.config[key] = normalize_ammo_refill_keybind(default if configured is None else configured)
+        self._persist_config()
         self.options_schema = load_options_schema(
             self.client_dir / "data" / "options_schema.json"
         )
@@ -162,6 +158,8 @@ class LauncherController:
         self.connected_room = False
         self.supervisor: BridgeSupervisor | None = None
         self._lifecycle_lock = threading.Lock()
+        self._condump_lock = threading.Lock()
+        self._condump_pending = None
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
         self.last_setup_failure: dict[str, object] | None = None
@@ -341,6 +339,8 @@ class LauncherController:
                 return False
 
     def _stop_native_client(self) -> None:
+        if hasattr(self, "workflow") and not self.workflow.session_owner.can_close():
+            return
         with self._lifecycle_lock:
             process = self._native_client_process
             self._native_client_process = None
@@ -397,7 +397,10 @@ class LauncherController:
         is_running = self.is_game_running()
         cleanup_stale_doom_config_bind(self.config, is_game_running=is_running)
 
-        state_file = write_ammo_refill_hotkey_state(base_dir, normalized_keybind)
+        special = normalize_ammo_refill_keybind(str(self.config.get("special_toggle_keybind", "F10")))
+        if normalized_keybind and normalized_keybind == special:
+            raise ValueError("Ammo Refill and Special Weapon toggle must use different keys")
+        state_file = write_ap_hotkey_states(base_dir, normalized_keybind, special)
         logger.info(
             "AMMO_HOTKEY_CONFIG path=%s token=%s state=%s",
             state_file,
@@ -538,25 +541,37 @@ class LauncherController:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
 
     def launch_game(self, *, platform: str | None = None) -> str:
-        """Launch through Steam URL handler after validating live runtime prerequisites."""
-        target_platform = platform if platform is not None else os.name
-        game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
-        if not game_root:
-            raise RuntimeError("DOOM Eternal installation is not configured.")
-        root = validate_game_root(Path(str(game_root)))
-        prereqs = probe_runtime_prerequisites(root, self.client_dir, self.config)
-        if not prereqs.ok:
-            failed = [c.message for c in prereqs.checks if not c.ok]
-            raise RuntimeError(f"Cannot launch DOOM Eternal: {'; '.join(failed)}")
-        if target_platform == "nt" and self.connected_room:
-            if not self._ensure_native_client(platform=target_platform):
-                raise RuntimeError(
-                    "Game integration helper could not start. Review the launcher warning "
-                    "or generate a Support Report."
-                )
-        url = launch_doom_via_steam()
-        self.emit("steam_launch_requested", url=url)
-        return url
+        """Prepare process-session admission on the shared worker before opening Steam."""
+        event = self.setup.current_event
+        if not self.connected_room or not event:
+            raise RuntimeError("Connect to an AP room before playing")
+        snapshot = RoomSnapshot.from_event(event)
+        configuration = dict(self.config)
+        generation = self.workers.generation
+
+        def operation(job):
+            job.check()
+            root = validate_game_root(Path(str(configuration.get("game_root") or configuration.get("doom_base_dir"))))
+            prerequisites = probe_runtime_prerequisites(root, self.client_dir, configuration)
+            if not prerequisites.ok:
+                raise RuntimeError("Cannot play: " + "; ".join(check.message for check in prerequisites.checks if not check.ok))
+            workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
+            installed = workflow.install_state(snapshot)
+            if installed.state != "already_installed":
+                raise RuntimeError("Prepare the room package before playing")
+            status = workflow.session_owner.prepare(snapshot, configuration)
+            job.check()
+            if status["state"] != "prelaunch_ready":
+                raise RuntimeError("An AP game process is already active or requires attention")
+            if (platform or os.name) == "nt" and not self._ensure_native_client(generation=generation):
+                raise RuntimeError("The game integration helper could not start")
+            self.emit("ap_session_status", **status)
+            url = launch_doom_via_steam()
+            self.emit("steam_launch_requested", url=url)
+
+        if not self.workers.submit("launch_game", operation, generation=generation):
+            raise RuntimeError("A game launch is already being prepared")
+        return "queued"
 
 
 
@@ -585,6 +600,10 @@ class LauncherController:
         if self._native_health_reader is None or self._native_health_reader.path != path:
             self._native_health_reader = NativeHealthReader(path)
         result = self._native_health_reader.read(force=force).document()
+        session = dict(self.workflow.session_owner.status)
+        result["session"] = session
+        if result.get("ready") and not session.get("ready"):
+            result.update(state="not_ready", ready=False, reason=session["state"])
         if result.get("native_state") is not None:
             self._last_native_health = dict(result)
         return result
@@ -645,6 +664,8 @@ class LauncherController:
         return {
             "supervisor": supervisor_details,
             "native_rpc": native,
+            "ap_session": dict(self.workflow.session_owner.status),
+            "native_diagnostics": self._native_diagnostics(),
             "config_paths": {
                 "application_dir": str(self.application_dir),
                 "client_dir": str(self.client_dir),
@@ -652,6 +673,21 @@ class LauncherController:
                 "state_dir": str(self.state_dir),
             },
         }
+
+    def _native_diagnostics(self) -> dict:
+        from .sentinel_diagnostics import collect
+        session = dict(self.workflow.session_owner.status)
+        if not session.get("pid") and os.name == "nt":
+            from doom_eap.runtime.observer_lifecycle import windows_game_processes
+            processes = windows_game_processes()
+            root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            if root and processes and len(processes) == 1:
+                game = Path(str(root)).resolve()
+                if game.name.casefold() == "base":
+                    game = game.parent
+                if os.path.normcase(processes[0]["path"]) == os.path.normcase(str(game / "DOOMEternalx64vk.exe")):
+                    session.update(pid=processes[0]["pid"], process_created=processes[0]["created"])
+        return collect(self.config, session)
 
     def run_doctor(self, *, job=None) -> DoctorReport:
         if job is not None:
@@ -777,10 +813,21 @@ class LauncherController:
             result = report_problem(ScopedSupportReport(self.create_support_bundle, job), logs=logs, job=job)
             self._setup_event("problem_report_ready", job.event({
                 "message": result.message, "path": str(result.path) if result.path else None,
-                "browser_opened": result.browser_opened,
+                "payload": result.payload,
             }))
 
         return self.workers.submit("problem_report", operation, generation=generation)
+
+    def request_report_submission(self, payload: dict) -> bool:
+        endpoint = submission_endpoint(self.bundle_dir)
+        if endpoint is None:
+            raise RuntimeError("Online submission is awaiting service deployment. Export the report locally.")
+        payload = deepcopy(payload)
+        def operation(job):
+            job.check()
+            url = submit_report(endpoint, payload)
+            self._setup_event("problem_report_submitted", job.event({"url": url}))
+        return self.workers.submit(("report_submission", payload["idempotency_key"]), operation)
 
     def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None, job=None) -> Path:
         """Collect a support bundle without requiring a healthy game install.
@@ -853,19 +900,25 @@ class LauncherController:
             support_diagnostics["release"] = {"status": "unavailable"}
         if job is not None:
             job.check()
-        bundle = write_support_bundle(
-            destination,
-            report,
-            logs=diagnostic_logs,
-            config=self.config,
-            paths=self.user_paths,
-            application_dir=self.client_dir,
-            session_start=self.session_start_time,
-            last_setup_failure=self.last_setup_failure,
-            last_connection_error=self.last_connection_error,
-            support_condump=support_condump,
-            support_diagnostics=support_diagnostics,
-        )
+        try:
+            bundle = write_support_bundle(
+                destination,
+                report,
+                logs=diagnostic_logs,
+                config=self.config,
+                paths=self.user_paths,
+                application_dir=self.client_dir,
+                session_start=self.session_start_time,
+                last_setup_failure=self.last_setup_failure,
+                last_connection_error=self.last_connection_error,
+                support_condump=support_condump,
+                support_diagnostics=support_diagnostics,
+            )
+        finally:
+            if support_condump and support_condump.get("owned_capture"):
+                capture = Path(str(support_condump["path"]))
+                if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
+                    capture.unlink(missing_ok=True)
         if job is None:
             self.emit("support_bundle_ready", path=str(bundle))
         else:
@@ -921,63 +974,52 @@ class LauncherController:
                 "message": f"Saved Games path unavailable: {type(error).__name__}: {error}",
                 "requested_at": requested_at,
             }
-        previous_files: dict[Path, tuple[int, int]] = {}
-        try:
-            for candidate in set(save_dir.glob("AP_SUPPORT_FILE*.txt")):
-                try:
-                    stat = candidate.stat()
-                    previous_files[candidate] = (stat.st_size, stat.st_mtime_ns)
-                except (OSError, ValueError, RuntimeError):
-                    pass
-        except (OSError, ValueError, RuntimeError):
-            pass
-        try:
+        source = save_dir / "AP_SUPPORT_FILE.txt"
+        with self._condump_lock:
+            scope = self.session_owner.observe()
+            if not scope.get("ready") or not scope.get("pid") or not scope.get("process_created"):
+                return {"status":"unavailable", "reason":"qualified_process_unavailable"}
+            identity = (scope["pid"], scope["process_created"])
+            if self._condump_pending == identity:
+                return {"status":"pending", "reason":"previous_capture_not_confirmed"}
+            previous = source.stat() if source.exists() else None
+            self._condump_pending = identity
             supervisor.request_support_condump()
-        except Exception as error:
-            return {
-                "status": "unavailable",
-                "reason": "request_failed",
-                "message": str(error),
-                "requested_at": requested_at,
-            }
-
-        deadline = time.monotonic() + 4.0
-        while time.monotonic() < deadline:
-            if job is not None:
-                job.check()
-            candidates: list[tuple[int, str, Path, os.stat_result, str]] = []
-            try:
-                paths = sorted(save_dir.glob("AP_SUPPORT_FILE*.txt"))
-            except (OSError, ValueError, RuntimeError):
-                paths = []
-            for candidate in paths:
+            deadline = time.monotonic() + 4
+            while time.monotonic() < deadline:
+                if job is not None:
+                    job.check()
+                current = self.session_owner.observe()
+                if not current.get("ready") or (current.get("pid"), current.get("process_created")) != identity:
+                    return {"status":"unavailable", "reason":"process_scope_changed"}
                 try:
-                    stat = candidate.stat()
-                except (OSError, ValueError, RuntimeError):
-                    continue
-                previous = previous_files.get(candidate)
-                freshness = "new" if previous is None else "modified"
-                changed = previous is None or previous != (stat.st_size, stat.st_mtime_ns)
-                if changed and stat.st_mtime >= requested_at - 1.0:
-                    candidates.append((stat.st_mtime_ns, candidate.name, candidate, stat, freshness))
-            if candidates:
-                _, _, candidate, stat, freshness = max(candidates)
-                return {
-                    "status": "available",
-                    "path": str(candidate),
-                    "source_filename": candidate.name,
-                    "requested_at": requested_at,
-                    "source_mtime": stat.st_mtime,
-                    "source_size": stat.st_size,
-                    "freshness": freshness,
-                    "selection_reason": "freshest_changed_candidate_by_mtime_ns_then_filename",
-                }
-            time.sleep(0.1)
-        return {
-            "status": "pending",
-            "reason": "game_diagnostic_condump_not_observed_within_timeout",
-            "requested_at": requested_at,
-        }
+                    stat = source.stat()
+                    changed = previous is None or (stat.st_size,stat.st_mtime_ns) != (previous.st_size,previous.st_mtime_ns)
+                    if changed and stat.st_mtime >= requested_at - 1:
+                        import uuid
+                        capture_dir = self.user_paths.data_dir / "support-captures"
+                        capture_dir.mkdir(parents=True,exist_ok=True)
+                        destination = capture_dir / (uuid.uuid4().hex + ".txt")
+                        with source.open("rb") as incoming:
+                            payload = incoming.read(16*1024*1024 + 1)
+                        after = source.stat()
+                        if (after.st_size,after.st_mtime_ns) != (stat.st_size,stat.st_mtime_ns):
+                            continue
+                        if len(payload) > 16*1024*1024:
+                            return {"status":"unavailable", "reason":"condump_too_large"}
+                        with destination.open("xb") as outgoing:
+                            outgoing.write(payload)
+                            outgoing.flush()
+                            os.fsync(outgoing.fileno())
+                        self._condump_pending = None
+                        return {"status":"available", "path":str(destination), "owned_capture":True,
+                            "source_filename":source.name, "source_size":len(payload),
+                            "pid":scope["pid"], "process_created":scope["process_created"],
+                            "requested_at":requested_at, "freshness":"request_copy"}
+                except FileNotFoundError:
+                    pass
+                time.sleep(.1)
+            return {"status":"pending", "reason":"game_diagnostic_condump_not_observed_within_timeout"}
 
     def emit(self, kind: str, **payload: object) -> None:
         event = {"type": kind, **payload}
@@ -1299,9 +1341,11 @@ class LauncherController:
                 state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
             except Exception:
                 state = "not_ready"
+                health = {"reason": "health_unavailable", "session": dict(self.workflow.session_owner.status)}
             self._setup_event("integration_status", job.event({
                 "meathook_ok": meathook.ok, "meathook_status": meathook.status.value,
                 "meathook_message": meathook.message, "native_state": state,
+                "reason": health.get("reason"), "session": health.get("session", {}),
             }))
 
         return self.workers.submit("integration_status", operation, generation=generation)
@@ -1395,18 +1439,39 @@ class LauncherController:
     def _sample_game_lifecycle(self) -> None:
         """Run the slow Windows process enumeration away from the Qt thread."""
         while not self._game_lifecycle_stop.is_set():
-            current_running = self.is_game_running()
+            if os.name == "nt":
+                from doom_eap.runtime.observer_lifecycle import windows_game_processes
+                processes = windows_game_processes()
+                current_running = None if processes is None else bool(processes)
+                status = self.workflow.session_owner.observe(processes)
+            else:
+                current_running = self.is_game_running()
+                status = self.workflow.session_owner.observe()
+            semantic = (status.get("state"), status.get("pid"), status.get("namespace_id"),
+                        status.get("admission", {}).get("instance_id"))
+            if semantic != getattr(self, "_last_ap_session_status", None):
+                self._last_ap_session_status = semantic
+                self.emit("ap_session_status", **status)
             with self._game_lifecycle_sample_lock:
                 self._game_lifecycle_sample = current_running
             self._game_lifecycle_stop.wait(1.0)
 
     def set_ammo_refill_keybind(self, keybind: str) -> None:
+        self.set_ap_keybinds(keybind, str(self.config.get("special_toggle_keybind", "F10")))
+
+    def set_ap_keybinds(self, refill: str, special: str) -> None:
+        refill, special = normalize_ammo_refill_keybind(refill), normalize_ammo_refill_keybind(special)
+        if refill and refill == special:
+            raise ValueError("Ammo Refill and Special Weapon toggle must use different keys")
+        previous = {key: self.config.get(key) for key in (AMMO_REFILL_KEYBIND_CONFIG, "special_toggle_keybind")}
+        write_ap_hotkey_states(doom_base_dir_from_config(self.config), refill, special)
         try:
-            normalized = normalize_ammo_refill_keybind(keybind)
-        except ValueError:
-            normalized = DEFAULT_AMMO_REFILL_KEYBIND
-        self.save_config({AMMO_REFILL_KEYBIND_CONFIG: normalized})
-        self.ensure_ammo_refill_keybind()
+            self.save_config({AMMO_REFILL_KEYBIND_CONFIG: refill, "special_toggle_keybind": special})
+        except OSError:
+            self.config.update(previous)
+            write_ap_hotkey_states(doom_base_dir_from_config(self.config), str(previous[AMMO_REFILL_KEYBIND_CONFIG]), str(previous["special_toggle_keybind"]))
+            raise
+        self.emit("ammo_refill_keybind_status", state="configured", keybind=refill)
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:
@@ -1425,7 +1490,36 @@ class LauncherController:
         except Exception as error:
             self.emit("ammo_refill", status="error", message=str(error))
 
-    def request_inventory_resync(self) -> None:
+    def ap_backups(self) -> list[str]:
+        if not self.connected_room or not self.setup.current_event:
+            raise RuntimeError("Connect to a room before selecting its AP backups")
+        return self.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
+
+    def request_ap_backup(self, *, restore=None) -> bool:
+        if not self.connected_room or not self.setup.current_event:
+            raise RuntimeError("Connect to a room before managing its AP save")
+        snapshot=RoomSnapshot.from_event(self.setup.current_event)
+        configuration=dict(self.config)
+
+        def operation(job):
+            job.check()
+            if restore is not None:
+                self.session_owner.prepare(snapshot,configuration,recovery_basename=restore)
+                message="Compatible recovery is staged. Play this room to let the game restore it. Receipt history, purchases and consumables were preserved."
+            else:
+                from .launcher_session import namespace_id
+                expected=namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
+                                      snapshot.slot_data["native_generation_fingerprint"])
+                if self.session_owner.namespace != expected:
+                    raise RuntimeError("The live AP session belongs to a different room")
+                result=self.session_owner.create_backup()
+                message=f"AP backup captured and verified: {result['basename']}. Opening it in-game remains unverified."
+            job.check()
+            self.emit("ap_backup_result",**job.event({"message":message}))
+
+        return self.workers.submit("ap_backup",operation,generation=self.workers.generation)
+
+    def request_inventory_resync(self, *, domain="all", item_id=None) -> None:
         with self._lifecycle_lock:
             connected = self.connected_room
             supervisor = self.supervisor
@@ -1434,7 +1528,7 @@ class LauncherController:
         if supervisor is None or not supervisor.running:
             raise RuntimeError("bridge worker is not running")
         try:
-            supervisor.request_inventory_resync()
+            supervisor.request_inventory_resync(domain=domain, item_id=item_id)
         except Exception as error:
             message = str(error).replace("\r", " ").replace("\n", " ")[:512]
             self.emit("inventory_resync", status="error", message=message)
@@ -1468,6 +1562,7 @@ class LauncherController:
         destination: Path,
         player_name: str,
         values: dict[str, object],
+        *, imported: dict[str, object] | None = None,
     ) -> Path:
         """Save future-room generation input without touching connected room state."""
         saved = save_player_yaml(
@@ -1475,6 +1570,7 @@ class LauncherController:
             self.options_schema,
             player_name,
             values,
+            imported=imported,
         )
         self.emit("player_yaml_saved", path=str(saved))
         return saved
@@ -1539,6 +1635,9 @@ class LauncherController:
         raise RuntimeError("no supported terminal emulator found for interactive injector")
 
     def close(self) -> None:
+        if not self.workflow.session_owner.can_close():
+            raise RuntimeError("Keep the launcher open until DOOM Eternal has exited")
+        self.workflow.session_owner.retire()
         self._game_lifecycle_stop.set()
         lifecycle_thread = self._game_lifecycle_thread
         if lifecycle_thread is not None and lifecycle_thread.is_alive():

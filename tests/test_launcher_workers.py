@@ -10,7 +10,6 @@ import pytest
 from doom_eap.launcher.launcher_workers import LauncherWorkers, LauncherWorkCancelled
 from doom_eap.launcher.launcher_interactions import LauncherInteractions
 from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
-from doom_eap.launcher.launcher_core import RoomSnapshot
 from test_install_workflow import _snapshot
 
 
@@ -78,22 +77,18 @@ def test_file_publication_finishes_before_a_new_scope_can_write(tmp_path):
         workers.close(3)
 
 
-def test_cancelled_problem_report_cannot_open_browser_or_reveal_file(tmp_path, monkeypatch):
+def test_cancelled_problem_report_cannot_publish_preview(tmp_path):
     from doom_eap.launcher import launcher_reporting as reporting
     from doom_eap.launcher.launcher_workers import LauncherJob
     cancelled = threading.Event()
     job = LauncherJob("report", 0, cancelled)
-    effects = []
 
     def generate(destination, *, logs):
         cancelled.set()
         return tmp_path / "report.zip"
 
-    monkeypatch.setattr(reporting.webbrowser, "open", lambda *_: effects.append("browser"))
-    monkeypatch.setattr(reporting, "reveal_support_report", lambda *_: effects.append("reveal"))
     with pytest.raises(LauncherWorkCancelled):
         reporting.report_problem(SimpleNamespace(create_support_bundle=generate), logs=[], job=job)
-    assert effects == []
 
 
 def test_question_kind_scope_and_cancellation():

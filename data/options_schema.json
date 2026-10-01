@@ -108,7 +108,7 @@
     },
     {
       "default": true,
-      "description": "Adds supported The Ancient Gods equipment and gameplay content to the randomizer, including the Sentinel Hammer and Support Runes. DLC missions are controlled separately.",
+      "description": "Adds supported The Ancient Gods equipment and gameplay content to the randomizer, including the Sentinel Hammer and Support Runes. Mission inclusion is controlled by Mission Pool.",
       "display_name": "Use DLC Content",
       "group": "Game Options",
       "key": "use_dlc_content",
@@ -116,13 +116,226 @@
       "ui_type": "toggle"
     },
     {
-      "default": true,
-      "description": "Adds The Ancient Gods Part One and Part Two missions and their Archipelago locations. Disable this for the Base Campaign while keeping enabled DLC equipment and gameplay content in the randomizer.",
-      "display_name": "Include DLC Missions",
+      "choices": [
+        {
+          "key": "base",
+          "label": "Base",
+          "value": 0
+        },
+        {
+          "key": "full_saga",
+          "label": "Full Saga",
+          "value": 1
+        },
+        {
+          "key": "dlc_only",
+          "label": "DLC Only",
+          "value": 2
+        },
+        {
+          "key": "custom",
+          "label": "Custom",
+          "value": 3
+        }
+      ],
+      "default": "full_saga",
+      "description": "Choose the set of missions available for this seed.\n\nBase \u2014 13 Base Campaign missions (The Dark Lord disabled).\nFull Saga \u2014 All 19 normal missions across Base, TAG1, and TAG2 plus The Dark Lord.\nDLC Only \u2014 The 6 missions of The Ancient Gods Parts One and Two plus The Dark Lord.\nCustom \u2014 Explicitly select candidate missions and whether The Dark Lord is eligible.",
+      "display_name": "Mission Pool",
       "group": "Game Options",
-      "key": "include_dlc_missions",
-      "source_class": "IncludeDLCMissions",
+      "key": "mission_pool",
+      "source_class": "MissionPool",
+      "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "aliases": [
+            "e2m2_base"
+          ],
+          "key": "ARC Complex",
+          "label": "ARC Complex"
+        },
+        {
+          "aliases": [
+            "e1m3_cult"
+          ],
+          "key": "Cultist Base",
+          "label": "Cultist Base"
+        },
+        {
+          "aliases": [
+            "e1m4_boss"
+          ],
+          "key": "Doom Hunter Base",
+          "label": "Doom Hunter Base"
+        },
+        {
+          "aliases": [
+            "e1m2_war"
+          ],
+          "key": "Exultia",
+          "label": "Exultia"
+        },
+        {
+          "aliases": [
+            "e3m4_boss"
+          ],
+          "key": "Final Sin",
+          "label": "Final Sin"
+        },
+        {
+          "aliases": [
+            "e1m1_intro"
+          ],
+          "key": "Hell on Earth",
+          "label": "Hell on Earth"
+        },
+        {
+          "aliases": [
+            "e5m3_hell"
+          ],
+          "key": "Immora",
+          "label": "Immora"
+        },
+        {
+          "aliases": [
+            "e2m3_core"
+          ],
+          "key": "Mars Core",
+          "label": "Mars Core"
+        },
+        {
+          "aliases": [
+            "e3m2_hell"
+          ],
+          "key": "Nekravol",
+          "label": "Nekravol"
+        },
+        {
+          "aliases": [
+            "e3m2_hell_b"
+          ],
+          "key": "Nekravol Part II",
+          "label": "Nekravol Part II"
+        },
+        {
+          "aliases": [
+            "e5m2_earth"
+          ],
+          "key": "Reclaimed Earth",
+          "label": "Reclaimed Earth"
+        },
+        {
+          "aliases": [
+            "e2m4_boss"
+          ],
+          "key": "Sentinel Prime",
+          "label": "Sentinel Prime"
+        },
+        {
+          "aliases": [
+            "e2m1_nest"
+          ],
+          "key": "Super Gore Nest",
+          "label": "Super Gore Nest"
+        },
+        {
+          "aliases": [
+            "e3m1_slayer"
+          ],
+          "key": "Taras Nabad",
+          "label": "Taras Nabad"
+        },
+        {
+          "aliases": [
+            "e4m2_swamp"
+          ],
+          "key": "The Blood Swamps",
+          "label": "The Blood Swamps"
+        },
+        {
+          "aliases": [
+            "e4m3_mcity"
+          ],
+          "key": "The Holt",
+          "label": "The Holt"
+        },
+        {
+          "aliases": [
+            "e5m1_spear"
+          ],
+          "key": "The World Spear",
+          "label": "The World Spear"
+        },
+        {
+          "aliases": [
+            "e4m1_rig"
+          ],
+          "key": "UAC Atlantica Facility",
+          "label": "UAC Atlantica Facility"
+        },
+        {
+          "aliases": [
+            "e3m3_maykr"
+          ],
+          "key": "Urdak",
+          "label": "Urdak"
+        }
+      ],
+      "default": [
+        "ARC Complex",
+        "Cultist Base",
+        "Doom Hunter Base",
+        "Exultia",
+        "Final Sin",
+        "Hell on Earth",
+        "Immora",
+        "Mars Core",
+        "Nekravol",
+        "Nekravol Part II",
+        "Reclaimed Earth",
+        "Sentinel Prime",
+        "Super Gore Nest",
+        "Taras Nabad",
+        "The Blood Swamps",
+        "The Holt",
+        "The World Spear",
+        "UAC Atlantica Facility",
+        "Urdak"
+      ],
+      "description": "Missions included when Mission Pool is set to Custom.",
+      "display_name": "Custom Missions",
+      "group": "Game Options",
+      "key": "custom_missions",
+      "source_class": "CustomMissions",
+      "ui_type": "option_set"
+    },
+    {
+      "default": true,
+      "description": "Include The Dark Lord when Mission Pool is set to Custom.",
+      "display_name": "Custom Dark Lord",
+      "group": "Game Options",
+      "key": "custom_dark_lord",
+      "source_class": "CustomDarkLord",
       "ui_type": "toggle"
+    },
+    {
+      "default": "all",
+      "description": "Number of normal missions to include in Random Mission Order or Mission Access as Items.\n\nAll [default] \u2014 Includes all candidate normal missions from the selected Mission Pool.\n3..19 \u2014 Selects a random active subset of this size (The Dark Lord is independent).\nIgnored in Vanilla Order (Vanilla Order always uses all candidate missions in chronological order).",
+      "display_name": "Mission Count",
+      "group": "Game Options",
+      "key": "mission_count",
+      "maximum": 19,
+      "minimum": 3,
+      "source_class": "MissionCount",
+      "special_values": [
+        {
+          "key": "all",
+          "label": "All",
+          "value": 0
+        }
+      ],
+      "ui_type": "named_range"
     },
     {
       "choices": [
@@ -148,6 +361,109 @@
     {
       "choices": [
         {
+          "key": "vanilla_order",
+          "label": "Vanilla Order",
+          "value": 0
+        },
+        {
+          "key": "random_mission_order",
+          "label": "Random Mission Order",
+          "value": 1
+        },
+        {
+          "key": "mission_access_as_items",
+          "label": "Mission Access as Items",
+          "value": 2
+        }
+      ],
+      "default": "random_mission_order",
+      "description": "Choose chronological progression, a fixed seeded sequence, or individual Access items.\n\nEvery completed stage remains replayable; travel returns through the Fortress.\nAccess and sequence availability do not guarantee immediate logical completion.",
+      "display_name": "Mission Order",
+      "group": "Game Options",
+      "key": "mission_order",
+      "source_class": "MissionOrder",
+      "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "key": "im_too_young_to_die",
+          "label": "Im Too Young To Die",
+          "value": 0
+        },
+        {
+          "key": "hurt_me_plenty",
+          "label": "Hurt Me Plenty",
+          "value": 1
+        },
+        {
+          "key": "ultra_violence",
+          "label": "Ultra Violence",
+          "value": 2
+        },
+        {
+          "key": "nightmare",
+          "label": "Nightmare",
+          "value": 3
+        }
+      ],
+      "default": "ultra_violence",
+      "description": "Gameplay difficulty fixed for this generated room, including Base, TAG1 and TAG2.",
+      "display_name": "Campaign Difficulty",
+      "group": "Game Options",
+      "key": "campaign_difficulty",
+      "source_class": "CampaignDifficulty",
+      "ui_type": "choice"
+    },
+    {
+      "default": 1,
+      "description": "Number of stages initially available in Mission Access as Items. Other modes start with one.",
+      "display_name": "Starting Missions",
+      "group": "Game Options",
+      "key": "starting_missions",
+      "maximum": 3,
+      "minimum": 1,
+      "source_class": "StartingMissions",
+      "ui_type": "range"
+    },
+    {
+      "choices": [
+        {
+          "key": "randomized",
+          "label": "Random",
+          "value": 0
+        },
+        {
+          "key": "icon_of_sin",
+          "label": "Icon of Sin",
+          "value": 1
+        },
+        {
+          "key": "davoth",
+          "label": "Davoth / The Dark Lord",
+          "value": 2
+        }
+      ],
+      "default": "randomized",
+      "description": "Reserve the final Full Saga encounter. Vanilla Order always ends at Davoth.",
+      "display_name": "Full Saga Final Boss",
+      "group": "Game Options",
+      "key": "full_saga_final_boss",
+      "source_class": "FullSagaFinalBoss",
+      "ui_type": "choice"
+    },
+    {
+      "default": false,
+      "description": "Choose if you can or cannot get your Goal Mission as an Item.\nIf false, the mission is unlocked when you finish all other missions.\nHas no effect for Acquire the Unmaykr, which ends in the Fortress.",
+      "display_name": "Goal Mission as Item",
+      "group": "Game Options",
+      "key": "goal_mission_as_item",
+      "source_class": "GoalMissionAsItem",
+      "ui_type": "toggle"
+    },
+    {
+      "choices": [
+        {
           "key": "acquire_the_unmaykr",
           "label": "Acquire the Unmaykr",
           "value": 0
@@ -169,7 +485,7 @@
         }
       ],
       "default": "acquire_the_unmaykr",
-      "description": "Choose the main objective that wins your Archipelago world.\n\nAcquire the Unmaykr \u2014 Complete the six Base Campaign Slayer Gates and claim the Unmaykr from its case in the Fortress of Doom.\n\nKill the Icon of Sin \u2014 Progress through the Base Campaign and defeat the Icon of Sin.\n\nKill the Dark Lord \u2014 Progress through The Ancient Gods Part Two and defeat the Dark Lord.\n\nComplete the Full Saga \u2014 Complete all 19 Base Campaign, TAG1, and TAG2 missions, claim the Unmaykr, defeat the Icon of Sin, and defeat the Dark Lord.",
+      "description": "Choose the main objective that wins your Archipelago world.\n\nAcquire the Unmaykr \u2014 Complete the six Base Campaign Slayer Gates and claim the Unmaykr from its case in the Fortress of Doom.\n\nKill the Icon of Sin \u2014 Progress through the Base Campaign and defeat the Icon of Sin.\n\nKill the Dark Lord \u2014 Progress through The Ancient Gods Part Two and defeat the Dark Lord.\n\nComplete the Full Saga \u2014 Use the unified Base/TAG campaign and defeat its selected final boss. Selected additional objectives remain required. Goal Mission as Item can bypass the ordinary mission-completion gate.",
       "display_name": "Goal",
       "group": "Game Options",
       "key": "goal",
@@ -183,12 +499,12 @@
           "label": "Acquire the Unmaykr"
         },
         {
-          "key": "Complete All Enabled Missions",
-          "label": "Complete All Enabled Missions"
-        },
-        {
           "key": "Complete All Escalation Encounters",
           "label": "Complete All Escalation Encounters"
+        },
+        {
+          "key": "Complete All Included Missions",
+          "label": "Complete All Included Missions"
         },
         {
           "key": "Complete All Mission Challenges",
@@ -208,8 +524,8 @@
         }
       ],
       "default": [
-        "Complete All Enabled Missions",
         "Complete All Escalation Encounters",
+        "Complete All Included Missions",
         "Complete All Slayer Gates"
       ],
       "description": "Choose extra objectives that must also be completed before your Goal counts as victory. Hover an objective to see exactly what it requires.",
@@ -243,6 +559,27 @@
       "group": "Game Options",
       "key": "special_weapon",
       "source_class": "SpecialWeapon",
+      "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "key": "soft",
+          "label": "Soft",
+          "value": 0
+        },
+        {
+          "key": "hardcore",
+          "label": "Hardcore",
+          "value": 1
+        }
+      ],
+      "default": "soft",
+      "description": "Choose how a received DeathLink is fulfilled. Soft applies one death to you, but can be mitigated by Extra Lives or Saving Throw. Hardcore ignores mitigation.",
+      "display_name": "DeathLink Mode",
+      "group": "Game Options",
+      "key": "death_link_mode",
+      "source_class": "DeathLinkMode",
       "ui_type": "choice"
     },
     {
@@ -465,5 +802,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "c47c058ef405a26d3d696c1a9d468e77cfd875402e50ac846aa2e38b131f252a"
+  "source_sha256": "7a348bfca241bea9925459b1374a86f926836c9625d93102663a65a713fc4abf"
 }

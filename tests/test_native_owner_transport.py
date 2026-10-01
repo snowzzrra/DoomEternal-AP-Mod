@@ -41,13 +41,13 @@ def queued_result(flag, operation, request_id):
             "native_hammer_perks": 0, "native_state_known": 3, "operations_applied": 1}
 
 
-def test_special_tier2_requires_terminal_projection_not_native_perks():
+def test_special_tier2_requires_observed_native_perks():
     def response(_flag, _operation, request_id):
         return {**queued_result("--special", 37, request_id), "hammer_tier": 2,
-                "flags": 106 | (1 << 14), "native_hammer_perks": 0}
+                "flags": 106, "native_hammer_perks": 3, "native_state_known": 7}
 
     link, messages = link_with(response)
-    assert link.ensure_progressive_special_weapon(3)["native_hammer_perks"] == 0
+    assert link.ensure_progressive_special_weapon(3)["native_hammer_perks"] == 3
     assert [(flag, op) for flag, op, _ in messages] == [("--special", 37), ("--special", 40)]
 
     def perks_only(_flag, _operation, request_id):
@@ -60,22 +60,10 @@ def test_special_tier2_requires_terminal_projection_not_native_perks():
     except WeaponPointsBlocked as exc:
         assert "Native Special ownership failed" in str(exc)
     else:
-        raise AssertionError("native perks alone certified tier2")
+        raise AssertionError("incomplete perks certified tier2")
 
     link, _ = link_with(perks_only)
     assert link.ensure_progressive_special_weapon(2)["hammer_tier"] == 2
-
-
-def test_special_tier2_noop_replay_keeps_projection_contract():
-    def replay(_flag, _operation, request_id):
-        return {**queued_result("--special", 37, request_id), "hammer_tier": 2,
-                "flags": 98 | (1 << 14), "outcome": 1,
-                "native_hammer_perks": 0, "operations_applied": 0}
-
-    link, messages = link_with(replay)
-    assert link.ensure_progressive_special_weapon(3)["outcome"] == 1
-    assert link.ensure_progressive_special_weapon(3)["outcome"] == 1
-    assert [op for _, op, _ in messages] == [37, 40, 37, 40]
 
 
 def test_hook_and_special_use_typed_submit_and_release():

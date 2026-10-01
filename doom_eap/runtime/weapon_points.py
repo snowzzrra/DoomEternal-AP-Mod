@@ -34,18 +34,26 @@ def namespace_id(seed: str, team: int, slot: int, fingerprint: str) -> str:
 
 class SentinelWeaponPoints:
     """Uses the existing process-authenticated inspection transport and queue."""
-    def __init__(self, probe: Path, pid: int, namespace: str, diagnostic=None):
+    def __init__(self, probe: Path, pid: int, namespace: str, diagnostic=None, *, command_prefix=(), environment=None):
         self.probe, self.pid, self.namespace = probe.resolve(), pid, namespace
         self.diagnostic = diagnostic
+        self.command_prefix, self.environment = command_prefix, environment
+        self._probe_sha256 = None
 
     def _run(self, args, payload=None):
         evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
                     "cwd": os.getcwd(), "stage": args[2] if args[0] == "--pid" else args[0],
                     "operation": struct.unpack_from("<H", payload, 6)[0] if payload else None}
         try:
-            evidence["sha256"] = hashlib.sha256(self.probe.read_bytes()).hexdigest()
-            process = subprocess.run([str(self.probe), *args], input=payload,
-                                     capture_output=True, timeout=4, check=False)
+            if self._probe_sha256 is None:
+                self._probe_sha256 = hashlib.sha256(self.probe.read_bytes()).hexdigest()
+            evidence["sha256"] = self._probe_sha256
+            executable = str(self.probe)
+            if self.command_prefix:
+                from doom_eap.runtime.proton import windows_path
+                executable = windows_path(self.probe)
+            process = subprocess.run([*self.command_prefix, executable, *args], input=payload,
+                                     capture_output=True, timeout=4, check=False, env=self.environment)
             evidence.update(returncode=process.returncode,
                             stdout=process.stdout.decode("utf-8", errors="replace"),
                             stderr=process.stderr.decode("utf-8", errors="replace"))

@@ -202,6 +202,7 @@ class ReconciliationPlan:
     skipped_never_replay: int
     skipped_unproven: int = 0
     skipped_manual_replay: int = 0
+    entitlement_item_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -459,7 +460,7 @@ def effective_ownership(
     if vanilla_chainsaw:
         facts.append(DerivedOwnershipFact(7770010, "unrandomized_chainsaw_server_or_local_hoe_check"))
     if vanilla_dash:
-        facts.append(DerivedOwnershipFact(7770015, "unrandomized_dash_server_exultia_complete"))
+        facts.append(DerivedOwnershipFact(7770015, "unrandomized_dash_server_mission_complete"))
     upgrades = tuple(
         CompletionUpgrade(location_id, perk_path, mission_name)
         for location_id, perk_path, mission_name in (
