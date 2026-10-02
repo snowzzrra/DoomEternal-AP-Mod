@@ -46,32 +46,32 @@ def create_fake_handoff(
     win_dir.mkdir(parents=True, exist_ok=True)
     shared_client_dir.mkdir(parents=True, exist_ok=True)
 
-    # Linux launcher
+    # linux launcher
     if not omit_linux_launcher:
         lin_content = b"\x7fELF" + b"\x00" * 100
         if bad_elf:
             lin_content = b"NOT_ELF" + b"\x00" * 100
         (linux_dir / "DoomEternalArchipelagoLauncher").write_bytes(lin_content)
 
-    # Windows launcher
+    # windows launcher
     if not omit_win_launcher:
         win_content = b"MZ" + b"\x00" * 100
         if bad_mz:
             win_content = b"NOT_MZ" + b"\x00" * 100
         (win_dir / "DoomEternalArchipelagoLauncher.exe").write_bytes(win_content)
 
-    # APWorld (valid zip)
+    # apworld (valid zip)
     apworld_path = shared_dir / "doometernal.apworld"
     with zipfile.ZipFile(apworld_path, "w") as zf:
         zf.writestr("doometernal/__init__.py", "# test apworld\n")
 
-    # Native ap_client.exe
+    # native ap_client.exe
     if not omit_ap_client:
         client_content = b"MZ" + b"\x00" * 200
         (shared_client_dir / "ap_client.exe").write_bytes(client_content)
         (shared_client_dir / "save_death_probe.exe").write_bytes(client_content)
 
-    # BUILD-MANIFEST.json
+    # build-manifest.json
     manifest = {
         "schema_version": 1,
         "version_label": version,
@@ -95,7 +95,7 @@ def create_fake_handoff(
     }
     (target_dir / "BUILD-MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    # SHA256SUMS.txt
+    # sha256sums.txt
     lines = []
     for root, _, files in os.walk(target_dir):
         for f in sorted(files):
@@ -220,10 +220,10 @@ class TestAssembleCIArtifact(unittest.TestCase):
         lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
         win_stage = assemble_platform_release("windows", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
 
-        # Check parity audit passes
+        # check parity audit passes
         audit_platform_parity(lin_stage, win_stage)
 
-        # Check ZIP creation & audit
+        # check zip creation & audit
         lin_zip = self.output_dir / "DoomEternalArchipelago-v0.4.0-beta.4-linux-x86_64.zip"
         win_zip = self.output_dir / "DoomEternalArchipelago-v0.4.0-beta.4-windows-x86_64.zip"
 
@@ -236,7 +236,7 @@ class TestAssembleCIArtifact(unittest.TestCase):
         self.assertTrue(lin_zip.is_file())
         self.assertTrue(win_zip.is_file())
 
-        # Verify ZIP contents and mandatory room resources
+        # check zip contents and mandatory room resources
         with zipfile.ZipFile(lin_zip) as zf:
             names = set(zf.namelist())
             self.assertIn("DoomEternalArchipelago/DoomEternalArchipelagoLauncher", names)
@@ -281,7 +281,7 @@ class TestAssembleCIArtifact(unittest.TestCase):
         lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
         win_stage = assemble_platform_release("windows", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
 
-        # Corrupt a shared file in windows stage
+        # corrupt a shared file in windows stage
         (win_stage / "doometernal.apworld").write_bytes(b"corrupted_apworld_bytes")
         with self.assertRaises(ValueError) as ctx:
             audit_platform_parity(lin_stage, win_stage)

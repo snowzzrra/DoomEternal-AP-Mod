@@ -137,7 +137,7 @@ class TestDependencyAcquisition(unittest.TestCase):
             self.assertEqual(installed.artifact_sha256, archive_sha)
             self.assertTrue(Path(installed.executable).is_file())
 
-            # Verify checksum mismatch rejection
+            # check checksum mismatch rejection
             bad_spec = DependencySpec(
                 name="BadTool",
                 version="1.0.0",
@@ -234,7 +234,7 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 state_dir,
                 config_path,
                 platform_name="linux",
-                consent=lambda _spec: False,  # User declines consent
+                consent=lambda _spec: False,  # user declines consent
                 session_owner=MagicMock(prepare=MagicMock(return_value={"state": "prelaunch_ready", "ready": False})),
             )
 
@@ -245,7 +245,7 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                     workflow.execute(_snapshot())
 
             self.assertIn("compatible Core runtime release", str(ctx.exception))
-            # Assert zero mutations
+            # assert zero mutations
             self.assertFalse((game_root / "XINPUT1_3.dll").exists())
             self.assertEqual(list((game_root / "Mods").glob("*.zip")), [])
 
@@ -288,11 +288,11 @@ class TestWindowsToolchainStaging(unittest.TestCase):
 
             stage_windows_injector_toolchain(dep, game_root)
 
-            # Mods folder untouched
+            # mods folder untouched
             self.assertTrue(custom_player_mod.is_file())
             self.assertEqual(custom_player_mod.read_bytes(), b"custom_skin")
 
-            # Settings preserved
+            # settings kept
             content = settings_file.read_text(encoding="utf-8")
             self.assertIn(":ASSET_VERSION=2025-01-01", content)
             self.assertIn(":AUTO_LAUNCH_GAME=0", content)
@@ -305,7 +305,7 @@ class TestWindowsToolchainStaging(unittest.TestCase):
             dep_root = tmp / "dep_corrupted"
             dep_root.mkdir()
             (dep_root / "EternalModInjector.bat").write_bytes(b"batch")
-            # Missing other 13 files
+            # missing other 13 files
             dep = InstalledDependency(
                 "EternalModInjector", "2026-09-04", "sha", "url", str(dep_root), str(dep_root / "EternalModInjector.bat")
             )
@@ -476,7 +476,7 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
         fake_process.terminate.assert_called_once()
         self.assertIsNone(self.controller._native_client_process)
 
-        # Re-attach and test close
+        # re-attach and test close
         fake_process_2 = MagicMock()
         fake_process_2.poll.return_value = None
         self.controller._native_client_process = fake_process_2

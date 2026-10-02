@@ -621,7 +621,7 @@ def probe_runtime_prerequisites(
     """Probe the MOD 0.6.0 game, Core and client prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
-    # 1. Game installation check
+    # game installation check
     if game_root is None:
         checks.append(PrerequisiteCheck(
             key="game",
@@ -646,10 +646,10 @@ def probe_runtime_prerequisites(
                 details={"path": str(game_root)},
             ))
 
-    # Verify the installed Core pair.
+    # check the installed core pair
     checks.append(probe_meathook(game_root))
 
-    # 3. Client runtime check
+    # client runtime check
     if client_dir is not None:
         packaged_bridge = client_dir / "bridge_client.py"
         if packaged_bridge.is_file() or getattr(sys, "frozen", False):
@@ -667,7 +667,7 @@ def probe_runtime_prerequisites(
                 details={"expected_path": str(packaged_bridge)},
             ))
 
-    # 4. Linux Steam Launch Options override check
+    # linux steam launch options override check
     if os.name != "nt" and config is not None:
         launch_opts = str(config.get("steam_launch_options") or "")
         if REQUIRED_DLL_OVERRIDE in launch_opts:
@@ -756,8 +756,8 @@ def publish_file(
 ) -> Path:
     """Publish a launcher-owned temp/incoming file to its final destination.
 
-    Same-filesystem atomic os.replace remains the mechanism. Linux behavior is
-    effectively unchanged (single attempt). On Windows only, transient
+    Publication uses same-filesystem atomic os.replace. Linux uses one attempt.
+    On Windows, transient
     sharing/access failures (winerror 5/32/33, errno 13) are retried with
     bounded backoff totaling at most ~timeout seconds. Only use where the
     launcher owns source and publication and retrying the replace is safe.
@@ -881,7 +881,7 @@ WINDOWS_MOD_INJECTOR = DependencySpec(
     expected_size=5182727,
 )
 
-# Compatibility alias
+# compatibility alias
 WINDOWS_MOD_MANAGER = WINDOWS_MOD_INJECTOR
 
 LINUX_MOD_INJECTOR = DependencySpec(
@@ -1996,7 +1996,7 @@ def hold_sandbox(
         yield
         return
 
-    # 4. Record pre-run identity
+    # record pre-run identity
     original_size = original.stat().st_size
     original_sha = hashlib.sha256(original.read_bytes()).hexdigest()
 
@@ -2012,7 +2012,7 @@ def hold_sandbox(
         }
         tx_file.write_text(json.dumps(tx_data, indent=2) + "\n", encoding="utf-8")
 
-    # 6. Atomically move original -> hold
+    # atomically move original -> hold
     publish_file(original, hold, operation="sandbox_hold")
     if event_sink is not None:
         event_sink(
@@ -2294,7 +2294,7 @@ class WindowsModInjectorAdapter:
         )
 
 
-# Compatibility alias
+# compatibility alias
 WindowsModManagerAdapter = WindowsModInjectorAdapter
 
 
@@ -2858,7 +2858,7 @@ def detect_doom_processes(
         name = matching_name(*values)
         if name is None:
             continue
-        # tasklist emits name,pid; ps emits pid,comm,args.
+        # tasklist emits name,pid; ps emits pid,comm,args
         value_iterator = iter(values)
         first_value = next(value_iterator, "")
         second_value = next(value_iterator, "")

@@ -39,6 +39,15 @@ class SentinelWeaponPoints:
         self.diagnostic = diagnostic
         self.command_prefix, self.environment = command_prefix, environment
         self._probe_sha256 = None
+        self._diagnostic_signatures = {}
+
+    def _diagnose(self, evidence):
+        if self.diagnostic:
+            key = (evidence["stage"], evidence["operation"])
+            signature = json.dumps(evidence, sort_keys=True)
+            if self._diagnostic_signatures.get(key) != signature:
+                self._diagnostic_signatures[key] = signature
+                self.diagnostic(evidence)
 
     def _run(self, args, payload=None):
         evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
@@ -60,8 +69,7 @@ class SentinelWeaponPoints:
             result = json.loads(process.stdout)
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             evidence.update(predicate="transport_or_json", error=str(error))
-            if self.diagnostic:
-                self.diagnostic(evidence)
+            self._diagnose(evidence)
             raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
         try:
             supported = result.get("core_version") in {"0.8.0", "0.9.0"} or version_key(result.get("core_version"))[:3] == (1, 0, 0)
@@ -70,8 +78,7 @@ class SentinelWeaponPoints:
         predicate = ("exit_or_result" if process.returncode or result.get("result") != "ok"
                      else "core_version_supported" if not supported else None)
         evidence["predicate"] = predicate
-        if self.diagnostic:
-            self.diagnostic(evidence)
+        self._diagnose(evidence)
         if predicate:
             error = WeaponPointsBlocked(f"Sentinel response validation failed: {json.dumps(evidence)}")
             error.probe_result = result.get("result")
@@ -91,6 +98,7 @@ class SentinelWeaponPoints:
         identity = (scope["process_created"], scope["instance_id"], scope["build_id"])
         if getattr(self, "_runtime_identity", None) != identity:
             self._runtime_identity, self._incompatible_capabilities = identity, set()
+            self._diagnostic_signatures.clear()
         if capability in self._incompatible_capabilities:
             raise WeaponPointsBlocked("Native probe response incompatible with this runtime identity")
         request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)

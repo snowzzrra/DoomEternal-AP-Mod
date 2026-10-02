@@ -309,9 +309,7 @@ def _assert_dummy_candidate(plan: dict) -> None:
 
 
 def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]]:
-    # The native owner suppresses only the automatic Battery mutation. Keep the
-    # canonical three-child registration intact; a fourth entry violates the
-    # engine-owned array contract before gameplay starts.
+    # skip the automatic battery change; keep all three challenge entries, since a fourth breaks the engine array
     source = _source(
         AGGREGATE_SOURCE_OWNER,
         AGGREGATE_LIST_PATH,

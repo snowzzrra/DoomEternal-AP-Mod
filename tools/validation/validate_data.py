@@ -965,7 +965,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Aggregate Mission Challenge ID mismatch: "
                 f"{aggregate_entry['name']}"
             )
-    # Parse ast of a few key python files
+    # parse ast of a few key python files
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (

@@ -59,7 +59,7 @@ int AmmoHotkeyHandler::TokenToVirtualKey(const std::string& token) {
         return 0;
     }
 
-    // Function keys F1..F12
+    // function keys f1..f12
     if (canonical.size() >= 2 && canonical[0] == 'F') {
         const std::string numStr = canonical.substr(1);
         if (!numStr.empty() && std::all_of(numStr.begin(), numStr.end(), ::isdigit)) {
@@ -70,17 +70,17 @@ int AmmoHotkeyHandler::TokenToVirtualKey(const std::string& token) {
         }
     }
 
-    // Letters A..Z
+    // letters a..z
     if (canonical.size() == 1 && canonical[0] >= 'A' && canonical[0] <= 'Z') {
         return static_cast<int>(canonical[0]);
     }
 
-    // Digits 0..9
+    // digits 0..9
     if (canonical.size() == 1 && canonical[0] >= '0' && canonical[0] <= '9') {
         return static_cast<int>(canonical[0]);
     }
 
-    // Common named keys
+    // common named keys
     if (canonical == "SPACE") return VK_SPACE;
     if (canonical == "TAB") return VK_TAB;
     if (canonical == "BACKSPACE") return VK_BACK;

@@ -4,6 +4,7 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const net = require('node:net');
 
 const REPOSITORY = 'snowzzrra/DoomEternal-AP-Mod';
 const MAX_BYTES = 32768;
@@ -21,13 +22,15 @@ function validate(value) {
   return Object.fromEntries(fields.map(key => [key, value[key]]));
 }
 
-function createServer({directory, appId, installationId, privateKey, request = fetch, now = Date.now}) {
+function createServer({directory, appId, installationId, privateKey, trustedProxyHops = 0, request = fetch, now = Date.now}) {
   if (!/^\d+$/.test(String(appId)) || !/^\d+$/.test(String(installationId))) throw new Error('invalid_app_configuration');
   const signingKey = crypto.createPrivateKey(privateKey);
   if (signingKey.asymmetricKeyType !== 'rsa') throw new Error('RSA_app_key_required');
+  if (!Number.isInteger(trustedProxyHops) || trustedProxyHops < 0 || trustedProxyHops > 3) throw new Error('invalid_proxy_configuration');
   fs.mkdirSync(directory, {recursive: true, mode: 0o700});
   const rates = new Map();
   let token = '', tokenUntil = 0;
+  let activeRequests = 0;
 
   async function github(route, body, authorization) {
     const response = await request(`https://api.github.com${route}`, {
@@ -62,10 +65,13 @@ function createServer({directory, appId, installationId, privateKey, request = f
     const reply = (status, body) => {
       if (!res.destroyed) res.writeHead(status, {'Content-Type':'application/json', 'Cache-Control':'no-store'}).end(JSON.stringify(body));
     };
+    if (req.method === 'GET' && req.url === '/health') return reply(200, {status:'ready'});
     if (req.method !== 'POST' || req.url !== '/v1/reports') return reply(404, {error:'not_found'});
     if (!/^application\/json(?:;\s*charset=utf-8)?$/i.test(req.headers['content-type'] || '')) return reply(415, {error:'json_required'});
     if (Number(req.headers['content-length']) > MAX_BYTES) return reply(413, {error:'report_too_large'});
     let chunks = [], size = 0;
+    if (activeRequests >= 8) return reply(503, {error:'service_busy'});
+    activeRequests++;
     try {
       for await (const chunk of req) {
         size += chunk.length;
@@ -89,7 +95,14 @@ function createServer({directory, appId, installationId, privateKey, request = f
         return reply(200, {url:issue.html_url});
       }
       for (const [key, value] of rates) if (value.until <= now()) rates.delete(key);
-      const address = req.socket.remoteAddress;
+      let address = req.socket.remoteAddress;
+      if (trustedProxyHops) {
+        const forwarded = req.headers['x-forwarded-for'];
+        if (typeof forwarded !== 'string' || forwarded.length > 1024) return reply(400, {error:'invalid_client_address'});
+        const chain = forwarded.split(',').map(value => value.trim()).concat(address);
+        address = chain[chain.length - trustedProxyHops - 1];
+        if (!net.isIP(address || '')) return reply(400, {error:'invalid_client_address'});
+      }
       if (!rates.has(address) && rates.size >= 4096) return reply(429, {error:'rate_limit'});
       const rate = rates.get(address) || {count:0,until:now()+3600000};
       if (++rate.count > 10) return reply(429, {error:'rate_limit'});
@@ -109,9 +122,11 @@ function createServer({directory, appId, installationId, privateKey, request = f
     } catch (error) {
       reply(error.message === 'invalid_report' || error instanceof SyntaxError ? 400 : 503,
         {error:error.message === 'invalid_report' || error instanceof SyntaxError ? 'invalid_report' : 'submission_unconfirmed'});
+    } finally {
+      activeRequests--;
     }
   });
-  server.requestTimeout = 15000;
+  server.requestTimeout = 30000;
   server.headersTimeout = 10000;
   server.maxRequestsPerSocket = 20;
   return server;
@@ -120,7 +135,8 @@ function createServer({directory, appId, installationId, privateKey, request = f
 if (require.main === module) {
   // The ingress supplies HTTPS; this listener stays on the private container interface.
   const server = createServer({directory:process.env.REPORT_DATA_DIR || '/data', appId:process.env.GITHUB_APP_ID,
-    installationId:process.env.GITHUB_INSTALLATION_ID, privateKey:fs.readFileSync(process.env.GITHUB_APP_KEY_FILE)});
+    installationId:process.env.GITHUB_INSTALLATION_ID, privateKey:fs.readFileSync(process.env.GITHUB_APP_KEY_FILE),
+    trustedProxyHops:Number(process.env.REPORT_TRUSTED_PROXY_HOPS || 0)});
   server.listen(8080, '0.0.0.0');
 }
 module.exports = {validate, createServer};

@@ -2538,6 +2538,9 @@ class LauncherUI(QMainWindow):
         title = QLineEdit(payload["title"]); title.setMaxLength(120)
         layout.addWidget(QLabel("Title")); layout.addWidget(title)
         description = QPlainTextEdit(); description.setPlaceholderText("What happened, and what did you expect?")
+        description.setPlainText(payload["description"])
+        title.setReadOnly(bool(event.get("submitted")))
+        description.setReadOnly(bool(event.get("submitted")))
         description.setMaximumHeight(120)
         layout.addWidget(description)
         preview = QPlainTextEdit(); preview.setReadOnly(True)
@@ -2559,31 +2562,55 @@ class LauncherUI(QMainWindow):
                     QMessageBox.critical(dialog, "Could not export", str(error))
         export.clicked.connect(export_report)
         send = QPushButton("SEND REVIEWED REPORT")
+        if event.get("url"):
+            send.setText("START NEW REPORT")
+        self._report_send = send
+        self._report_message = message
+        self._report_event = event
         try:
             available = submission_endpoint(self.controller.bundle_dir) is not None
         except (OSError, ValueError):
             available = False
-        send.setEnabled(available)
+        send.setEnabled(available or bool(event.get("url")))
         if not available:
             send.setToolTip("Online submission is awaiting service deployment. Export locally.")
             message.setText(message.text() + " Online submission is awaiting service deployment; local export is available.")
+        new_report = False
         def submit():
+            nonlocal new_report
+            if event.get("url"):
+                new_report = True
+                dialog.accept()
+                return
             review = document()
             # Edits must be visible after redaction before the user confirms submission.
             confirmation = QMessageBox.question(dialog, "Send this report?", review["title"] + "\n\n" + review["description"])
             if confirmation != QMessageBox.StandardButton.Yes:
                 return
             try:
+                self.controller.save_problem_report(review)
                 self.controller.request_report_submission(review)
             except Exception as error:
                 QMessageBox.critical(dialog, "Report unavailable", str(error)); return
             send.setEnabled(False)
+            title.setReadOnly(True)
+            description.setReadOnly(True)
             message.setText("Submission pending. A confirmed issue URL will appear in the launcher log.")
         send.clicked.connect(submit)
         close = QPushButton("CLOSE"); close.clicked.connect(dialog.accept)
         for button in (export, send, close): actions.addWidget(button)
         layout.addLayout(actions)
         dialog.exec()
+        try:
+            if new_report:
+                self.controller.start_new_problem_report(logs=self.log.toPlainText().splitlines())
+            else:
+                self.controller.save_problem_report(document())
+        except (OSError, ValueError) as error:
+            self._append_log(f"Report draft: {error}")
+        self._report_send = None
+        self._report_message = None
+        self._report_event = None
 
     def _save_support_bundle(self) -> None:
         self.controller.request_support_bundle(
@@ -2786,7 +2813,20 @@ class LauncherUI(QMainWindow):
             return
         if kind == "problem_report_submitted":
             self._append_log("Problem report submitted: " + event["url"])
+            if getattr(self, "_report_send", None) is not None:
+                self._report_event["url"] = event["url"]
+                self._report_send.setEnabled(True)
+                self._report_send.setText("START NEW REPORT")
+                self._report_message.setText("Report confirmed: " + event["url"])
             QMessageBox.information(self, "Report submitted", event["url"])
+            return
+        if kind == "problem_report_retry":
+            message = "Submission unconfirmed. Retry the saved report; its key is preserved. " + event["message"]
+            self._append_log(message)
+            if getattr(self, "_report_send", None) is not None:
+                self._report_send.setEnabled(True)
+                self._report_send.setText("RETRY REVIEWED REPORT")
+                self._report_message.setText(message)
             return
         if kind == "integration_status":
             self._render_native_health(event)

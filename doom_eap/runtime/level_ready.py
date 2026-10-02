@@ -27,6 +27,8 @@ class LevelReady:
         self._completed = set()
         self._settled = set()
         self._active = {}
+        self._prepared = {}
+        self._wait_reasons = {}
         self._pending_signature = None
 
     @property
@@ -38,9 +40,10 @@ class LevelReady:
         return frozenset(self._completed)
 
     def invalidate(self):
-        # Preserve original process-local pending/completed/settled lifetimes.
         self._generation += 1
         self._active.clear()
+        self._prepared.clear()
+        self._wait_reasons.clear()
 
     def queue(self, epoch, path):
         if valid_materialization_epoch(epoch) and epoch not in self._completed:
@@ -70,8 +73,25 @@ class LevelReady:
                             context is not None and context.campaign != "Base" and epoch not in self._settled)
         self._active[epoch] = job
         self._pending_signature = None
-        self._logger.info("[RPC] LEVEL_READY_EXECUTE epoch=%s", epoch)
+        if epoch not in self._prepared:
+            self._logger.info("[RPC] LEVEL_READY_EXECUTE epoch=%s", epoch)
         return LevelReadyAdmission(job=job)
+
+    def needs_preparation(self, job, step):
+        return self.is_current(job) and step not in self._prepared.get(job.epoch, ())
+
+    def prepared(self, job, step):
+        if self.is_current(job):
+            self._prepared.setdefault(job.epoch, set()).add(step)
+            self._wait_reasons.get(job.epoch, {}).pop(step, None)
+            self._logger.info("[RPC] LEVEL_READY_ADVANCE epoch=%s domain=%s", job.epoch, step)
+
+    def wait(self, job, reason, *, domain="inventory"):
+        if self.is_current(job):
+            reasons = self._wait_reasons.setdefault(job.epoch, {})
+            if reasons.get(domain) != reason:
+                reasons[domain] = reason
+                self._logger.info("[Context] LEVEL_READY_PENDING epoch=%s domain=%s reason=%s", job.epoch, domain, reason)
 
     def is_current(self, job):
         return job.generation == self._generation and self._active.get(job.epoch) is job
@@ -91,6 +111,9 @@ class LevelReady:
     def complete(self, job):
         self._pending.pop(job.epoch, None)
         self._completed.add(job.epoch)
+        self._prepared.pop(job.epoch, None)
+        self._wait_reasons.pop(job.epoch, None)
+        self._logger.info("[RPC] LEVEL_READY_COMPLETE epoch=%s", job.epoch)
 
     def finish(self, job):
         if self.is_current(job):

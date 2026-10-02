@@ -33,7 +33,7 @@ def test_two_hit_burst_full_lifecycle():
     spool = FakeSpool()
     receiver.receive("one", 0.0)
 
-    # Hit 1 dispatched
+    # hit 1 dispatched
     res1 = advance(receiver, spool, 1.0)
     assert res1.state is ReceiveState.COMMAND_IN_FLIGHT
     assert res1.detail == "dispatched"
@@ -45,19 +45,19 @@ def test_two_hit_burst_full_lifecycle():
     assert res2.state is ReceiveState.BURST_IN_FLIGHT
     assert res2.detail == "burst_wait"
 
-    # Still waiting (only 0.3s elapsed)
+    # still waiting (only 0.3s elapsed)
     res3 = advance(receiver, spool, 1.4)
     assert res3.state is ReceiveState.BURST_IN_FLIGHT
     assert res3.detail == "burst_wait"
     assert spool.dispatches == 1
 
-    # 0.5s elapsed -> Hit 2 dispatched
+    # 0.5s elapsed -> hit 2 dispatched
     res4 = advance(receiver, spool, 1.6)
     assert res4.state is ReceiveState.COMMAND_IN_FLIGHT
     assert res4.detail == "dispatched"
     assert spool.dispatches == 2
 
-    # Hit 2 delivered -> burst complete
+    # hit 2 delivered -> burst complete
     spool.delivered()
     res5 = advance(receiver, spool, 1.7)
     assert res5.state is ReceiveState.APPLIED
@@ -72,7 +72,7 @@ def test_unsafe_gameplay_drops_second_hit_failsafe():
     spool = FakeSpool()
     receiver.receive("one", 0.0)
 
-    # Hit 1 dispatched and delivered
+    # hit 1 dispatched and delivered
     advance(receiver, spool, 1.0)
     spool.delivered()
     advance(receiver, spool, 1.1)

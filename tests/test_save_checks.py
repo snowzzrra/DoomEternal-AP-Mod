@@ -71,7 +71,7 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
     assert packets == []
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}), publication))
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}, submitted={201}), publication))
-    assert len(packets) == 2 and submitted == set()  # Existing retry-until-server-ack behavior.
+    assert len(packets) == 2 and submitted == set()  # existing retry-until-server-ack behavior
     asyncio.run(service.check_aggregates(readiness, facts(checked={101}, submitted={201}), publication))
     assert len(packets) == 2
     asyncio.run(service.check_aggregates(readiness, facts(checked={101, 201}), publication))
@@ -83,7 +83,7 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
 def test_rebind_rejects_late_check_completion_and_remaining_aggregate_work(kind, fail):
     async def run():
         service, submitted, packets = owner(), set(), []
-        service._masteries["mastery"] = True  # Explicit already-observed owner state.
+        service._masteries["mastery"] = True  # explicit already-observed owner state
         service._aggregates += ({"location_id": 302, "signal": AGGREGATE["signal"]},)
 
         async def send(messages):

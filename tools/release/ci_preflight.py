@@ -51,17 +51,17 @@ def check_workflow_contract(repo_root: Path) -> None:
 
     doc = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
 
-    # 1. Trigger check
+    # trigger check
     triggers = list(doc.get("on", {}).keys())
     if triggers != ["workflow_dispatch"]:
         raise RuntimeError(f"Workflow triggers must be exactly ['workflow_dispatch'], got {triggers}")
 
-    # 2. Permissions check
+    # permissions check
     perms = doc.get("permissions")
     if perms != {"contents": "read"}:
         raise RuntimeError(f"Workflow permissions must be exactly {{'contents': 'read'}}, got {perms}")
 
-    # 3. Check job presence (all 7 jobs)
+    # check job presence (all 7 jobs)
     jobs = set(doc.get("jobs", {}).keys())
     expected_jobs = {
         "resolve-metadata",
@@ -76,7 +76,7 @@ def check_workflow_contract(repo_root: Path) -> None:
     if jobs != expected_jobs:
         raise RuntimeError(f"Unexpected workflow job set: missing={expected_jobs - jobs}, extra={jobs - expected_jobs}")
 
-    # 4. Check downstream job dependencies on preflight
+    # check downstream job dependencies on preflight
     for job_name in ["build-apworld", "build-native-support", "build-linux-launcher", "build-windows-launcher"]:
         job_needs = doc["jobs"][job_name].get("needs", [])
         if isinstance(job_needs, str):
@@ -103,7 +103,7 @@ def check_workflow_contract(repo_root: Path) -> None:
             f"found in job '{verify_runtime_invocations[0][0]}'"
         )
 
-    # 6. Single-Owner Invariant for Ruff Static Analysis
+    # keep one job in charge of ruff checks
     ruff_invocations = []
     for job_name, job_def in doc.get("jobs", {}).items():
         for step in job_def.get("steps", []):
@@ -151,7 +151,7 @@ def check_workflow_contract(repo_root: Path) -> None:
                 f"install({install_idx}) < build({build_idx}) < selftest({selftest_idx}) < upload({upload_idx})"
             )
 
-    # 8. Check that the native support job uses the canonical Windows/MSVC builder.
+    # check that the native support job uses the windows/msvc builder
     native_job = doc["jobs"]["build-native-support"]
     if native_job.get("runs-on") != "windows-2022":
         raise RuntimeError("Workflow native job must use the qualified Windows 2022 toolchain host")
@@ -169,7 +169,7 @@ def check_workflow_contract(repo_root: Path) -> None:
         if "build-native-support" not in job.get("needs", []) or not any("--core-runtime build/qualified-core" in step.get("run", "") for step in job["steps"]):
             raise RuntimeError(f"{name} must consume the qualified Core artifact")
 
-    # 9. Check apworld_ref default
+    # check apworld_ref default
     apworld_default = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {}).get("apworld_ref", {}).get("default")
     if apworld_default != "doom_eternal":
         raise RuntimeError(f"Expected apworld_ref default to be 'doom_eternal', got {apworld_default!r}")

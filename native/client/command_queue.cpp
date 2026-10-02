@@ -260,14 +260,36 @@ bool NativeCommandQueue::ReadCommandFile(
 bool NativeCommandQueue::WriteCommandFile(const std::string& path, const std::string& command) {
     const std::string line = command + "\n";
     const auto temporary = path + ".consumer.tmp";
+    const auto failed = [&](const char* stage, DWORD error) {
+        const auto signature = path + ":" + stage + ":" + std::to_string(error);
+        if (signature != publicationFailure) {
+            LogDebug("QUEUE_PUBLICATION_BLOCKED command_id=" + CommandIdFromPath(path)
+                + " stage=" + stage + " winerror=" + std::to_string(error)
+                + " consumer_pid=" + std::to_string(GetCurrentProcessId())
+                + " source=" + temporary + " destination=" + path
+                + " parent=" + std::filesystem::path(path).parent_path().string());
+            publicationFailure = signature;
+        }
+        return false;
+    };
     HANDLE file = CreateFileA(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return false;
+    if (file == INVALID_HANDLE_VALUE) return failed("open_temporary", GetLastError());
     DWORD written = 0;
     bool ok = WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr) &&
         written == line.size() && FlushFileBuffers(file);
+    DWORD error = ok ? ERROR_SUCCESS : GetLastError();
     CloseHandle(file);
     if (ok) ok = MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
-    if (!ok) DeleteFileA(temporary.c_str());
+    if (!ok) {
+        const auto stage = error == ERROR_SUCCESS ? "replace_attempt" : "write_flush";
+        if (error == ERROR_SUCCESS) error = GetLastError();
+        DeleteFileA(temporary.c_str());
+        return failed(stage, error);
+    }
+    if (!publicationFailure.empty()) {
+        LogDebug("QUEUE_PUBLICATION_RECOVERED command_id=" + CommandIdFromPath(path));
+        publicationFailure.clear();
+    }
     return ok;
 }
 
@@ -903,10 +925,26 @@ bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport*
         LogDebug("RPC_DIAGNOSTIC_CONDUMP command_id=" + commandId + " file=AP_SUPPORT_FILE.txt");
     }
 
+    submittedToNative = false;
+    SetLastError(ERROR_SUCCESS);
     std::ifstream source(job.path, std::ios::binary);
     const std::string original{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
+    const DWORD readError=GetLastError();
+    const bool readFailed=source.bad() || original.empty();
     source.close();
-    if (original.empty() || !WriteCommandFile(job.path, "AP_NATIVE_ATTEMPT_V1\n" + original)) return false;
+    if (readFailed) {
+        const auto signature=job.path+":read_source:"+std::to_string(readError);
+        if (publicationFailure!=signature) {
+            LogDebug("QUEUE_PUBLICATION_BLOCKED command_id="+CommandIdFromPath(job.path)
+                +" stage=read_source winerror="+std::to_string(readError)
+                +" consumer_pid="+std::to_string(GetCurrentProcessId())+" source="+job.path
+                +" parent="+std::filesystem::path(job.path).parent_path().string());
+            publicationFailure=signature;
+        }
+        return false;
+    }
+    if (!WriteCommandFile(job.path, "AP_NATIVE_ATTEMPT_V1\n" + original)) return false;
+    submittedToNative = true;
     const bool dispatched = rpc->ExecuteConsoleCommand(command);
     if (!dispatched && rpc->LastResult() != AP_RPC_AMBIGUOUS && rpc->LastResult() != AP_RPC_EXCEPTION)
         WriteCommandFile(job.path, original);
@@ -1031,6 +1069,17 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
 
         std::optional<size_t> dispatchIndex;
         for (size_t index = 0; index < queue.size(); ++index) {
+            if (!ReceiptDispatchReady(now, queue[index].nextAttemptTick)) continue;
+            const auto id = CommandIdFromPath(queue[index].path);
+            if (IsFreshReceiptCommandId(id)) {
+                auto boundary = id.rfind("-effect-");
+                if (boundary == std::string::npos) boundary = id.rfind("-cmd-");
+                if (boundary == std::string::npos) boundary = id.rfind("-notify");
+                const auto occurrence = id.substr(0, boundary) + "-";
+                if (std::any_of(queue.begin(), queue.begin() + index, [&](const CommandJob& prior) {
+                        return CommandIdFromPath(prior.path).rfind(occurrence, 0) == 0;
+                    })) continue;
+            }
             if (CommandExecutionGateOpen(
                     queue[index], rpcArmed, rpcTransportReady, safety,
                     transientBaselineReady)) {
@@ -1212,7 +1261,8 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 if (silentMaintenance) {
                     finishSilentBurst("rpc_failure");
                 }
-                if (rpc->LastResult() == AP_RPC_AMBIGUOUS || rpc->LastResult() == AP_RPC_EXCEPTION) {
+                const auto failure=submittedToNative ? rpc->LastResult() : AP_RPC_NONE;
+                if (failure == AP_RPC_AMBIGUOUS || failure == AP_RPC_EXCEPTION) {
                     QuarantineFailedJob(job);
                     LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + commandId + " automatic_replay=disabled");
                     knownCommandIds.erase(commandId);
@@ -1228,7 +1278,7 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                         + " attempt=" + std::to_string(job.retryAttempt)
                         + " delay_ms=" + std::to_string(delay)
                         + " reason="
-                        + RpcCallResultName(rpc->LastResult())
+                        + RpcCallResultName(failure)
                         + "/" + std::to_string(rpc->LastTransportStatus())
                         + DeliveryContextFields()
                     );
@@ -1247,19 +1297,23 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                         LogDebug(
                             "RPC_DIAGNOSTIC_CONDUMP_RETRY command_id=" + commandId
                             + " attempt=" + std::to_string(job.retryAttempt)
-                            + " reason=" + RpcCallResultName(rpc->LastResult())
+                            + " reason=" + RpcCallResultName(failure)
                             + "/" + std::to_string(rpc->LastTransportStatus())
                         );
                     }
                 } else {
+                    ++job.retryAttempt;
+                    const DWORD delay = ReceiptRetryDelayMs(job.retryAttempt);
+                    job.nextAttemptTick = GetTickCount() + delay;
                     LogDebug(
                         "RPC_RESULT command_id=" + commandId
                         + " kind=non_receipt result=retry"
-                        + " transport=" + RpcCallResultName(rpc->LastResult())
+                        + " attempt=" + std::to_string(job.retryAttempt)
+                        + " delay_ms=" + std::to_string(delay)
+                        + " transport=" + RpcCallResultName(failure)
                         + " wait_error=" + std::to_string(rpc->LastTransportStatus())
                         + DeliveryContextFields()
                     );
-                    DeleteFileA(kRpcGatePath);
                 }
             }
             if (!diagnosticJob) {

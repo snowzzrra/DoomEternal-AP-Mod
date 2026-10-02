@@ -126,7 +126,7 @@ def compile_materialization_plan(
             else:
                 if observation.is_proven_missing(item_id) and (item_id != 7770006 or cmd.stage == 0):
                     diff_commands.append(cmd)
-                # If owned or UNKNOWN: omit from repair diff!
+                # if owned or unknown: omit from repair diff!
         plan_commands = diff_commands
     # Special ownership is one physical state: materialize highest selected intent.
     special_candidates = []

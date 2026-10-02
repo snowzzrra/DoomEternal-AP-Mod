@@ -3,14 +3,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-# Observation States
+# observation states
 OWNED = "owned"
 MISSING = "missing"
 UNKNOWN = "unknown"
 
 OBSERVATION_STATES = frozenset({OWNED, MISSING, UNKNOWN})
 
-# Lifecycle / Execution States
+# lifecycle / execution states
 PLANNED = "planned"
 ADMITTED = "admitted"
 QUEUED = "queued"
@@ -31,7 +31,7 @@ LIFECYCLE_STATES = frozenset({
     INDETERMINATE,
 })
 
-# Inventory Domains
+# inventory domains
 DOMAIN_WEAPONS = "weapons"
 DOMAIN_EQUIPMENT = "equipment"
 DOMAIN_CAPACITIES = "capacities"
@@ -41,54 +41,54 @@ DOMAIN_SPECIAL_WEAPONS = "special_weapons"
 # Capacity Bounds: strictly max 4 perk tiers per capacity domain item.
 MAX_CAPACITY_TIER = 4
 CAPACITY_ITEM_IDS = frozenset({
-    7770017,  # Sentinel Crystal (Health)
-    7770088,  # Sentinel Crystal (Armor)
-    7770092,  # Sentinel Crystal (Ammo)
+    7770017,  # sentinel crystal (health)
+    7770088,  # sentinel crystal (armor)
+    7770092,  # sentinel crystal (ammo)
 })
 
-# Standard weapon item IDs
+# standard weapon item ids
 WEAPON_ITEM_IDS = frozenset({
-    7770900,  # Combat Shotgun
-    7770000,  # Heavy Cannon
-    7770001,  # Plasma Rifle
-    7770002,  # Rocket Launcher
-    7770003,  # Super Shotgun
-    7770004,  # Ballista
-    7770005,  # Chaingun
-    7770006,  # BFG 9000
-    7770008,  # Unmaykr
-    7770010,  # Chainsaw
+    7770900,  # combat shotgun
+    7770000,  # heavy cannon
+    7770001,  # plasma rifle
+    7770002,  # rocket launcher
+    7770003,  # super shotgun
+    7770004,  # ballista
+    7770005,  # chaingun
+    7770006,  # bfg 9000
+    7770008,  # unmaykr
+    7770010,  # chainsaw
 })
 
 EQUIPMENT_ITEM_IDS = frozenset({
-    7770011,  # Frag Grenade
-    7770012,  # Flame Belch
-    7770013,  # Ice Bomb
-    7770014,  # Blood Punch
-    7770015,  # Dash
+    7770011,  # frag grenade
+    7770012,  # flame belch
+    7770013,  # ice bomb
+    7770014,  # blood punch
+    7770015,  # dash
 })
 
-# Special weapon item IDs
+# special weapon item ids
 SPECIAL_WEAPON_ITEM_IDS = frozenset({
-    7770007,  # The Crucible
-    7770009,  # Sentinel Hammer
-    7770901,  # Progressive Special Weapon
-    7770902,  # Progressive Sentinel Hammer
+    7770007,  # the crucible
+    7770009,  # sentinel hammer
+    7770901,  # progressive special weapon
+    7770902,  # progressive sentinel hammer
 })
 
 # Persistent upgrade item IDs (Support Runes and Slayer Gate Keys)
 PERSISTENT_UPGRADE_ITEM_IDS = frozenset({
-    7770145,  # Support Rune: Break Blast
-    7770146,  # Support Rune: Desperate Punch
-    7770147,  # Support Rune: Take Back
-    7770148,  # Slayer Key: UAC Atlantica
-    7770149,  # Slayer Key: The Holt
-    7770150,  # Slayer Key: Exultia
-    7770151,  # Slayer Key: Cultist Base
-    7770152,  # Slayer Key: Super Gore Nest
-    7770153,  # Slayer Key: ARC Complex
-    7770154,  # Slayer Key: Phobos / Mars Core
-    7770155,  # Slayer Key: Taras Nabad
+    7770145,  # support rune: break blast
+    7770146,  # support rune: desperate punch
+    7770147,  # support rune: take back
+    7770148,  # slayer key: uac atlantica
+    7770149,  # slayer key: the holt
+    7770150,  # slayer key: exultia
+    7770151,  # slayer key: cultist base
+    7770152,  # slayer key: super gore nest
+    7770153,  # slayer key: arc complex
+    7770154,  # slayer key: phobos / mars core
+    7770155,  # slayer key: taras nabad
 })
 
 ALL_PERSISTENT_DOMAIN_IDS = frozenset(

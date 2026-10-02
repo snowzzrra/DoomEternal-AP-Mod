@@ -34,13 +34,7 @@ BOOTSTRAP_STAT_PRIMITIVE = {
 }
 INVALID_BOOTSTRAP_INHERITS = frozenset({"target/player_stat_modifier"})
 
-# Canonical APWorld metadata is ``SUIT_PAGE_UNLOCKING_ITEM_IDS`` in
-# Archipelago/worlds/doometernal/items.py.  This compact mirror is packaged
-# with the bridge; validate_data verifies it remains exactly synchronized.
-# Crystal progressives unlock the parent Suit tab. Frag/Ice base equipment is
-# included because the vanilla Suit perk groups have their own acquisition
-# preReqStat. Flame Belch is intentionally absent: it has no family in that
-# Suit group, so no local UI/DECL evidence makes it a parent-tab unlocker.
+# mirror the suit unlock ids from apworld and check them in validate_data; crystals, frag and ice unlock suit tabs, flame belch has no suit perk group
 SUIT_PAGE_UNLOCKING_ITEM_IDS = frozenset({
     7770011, 7770013, 7770017, 7770088, 7770092,
     7770097, 7770098, 7770099, 7770100, 7770101, 7770102, 7770103, 7770104,

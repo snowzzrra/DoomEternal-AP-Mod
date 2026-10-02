@@ -2063,7 +2063,7 @@ def discover_map_group_unlocks(content):
         # Walk backwards to find the nearest entityDef declaration
         entity_def_pos = content.rfind("entityDef ", 0, pos)
         if entity_def_pos != -1:
-            # Extract the entity name from "entityDef <name> {"
+            # read the entity name from the entity definition header
             snippet = content[entity_def_pos:entity_def_pos + 200]
             match = re.match(r'entityDef\s+(\S+)', snippet)
             if match:

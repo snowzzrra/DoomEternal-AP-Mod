@@ -854,7 +854,7 @@ class IntegratedLaunchWorkflow:
                 )
             raise
 
-        # 2. Probe mandatory runtime prerequisites
+        # probe mandatory runtime prerequisites
         prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
         if not prereqs.ok:
             meathook = prereqs.meathook

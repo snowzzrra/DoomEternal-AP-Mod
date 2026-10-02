@@ -241,7 +241,7 @@ def assemble_platform_release(
         shutil.rmtree(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    # 1. Copy platform launcher
+    # copy platform launcher
     if platform_name == "linux":
         src_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
         dst_launcher = out_root / "DoomEternalArchipelagoLauncher"
@@ -254,7 +254,7 @@ def assemble_platform_release(
     else:
         raise ValueError(f"Unsupported platform: {platform_name}")
 
-    # 2. Copy doometernal.apworld
+    # copy doometernal.apworld
     src_apworld = handoff_dir / "shared" / "doometernal.apworld"
     dst_apworld = out_root / "doometernal.apworld"
     shutil.copy2(src_apworld, dst_apworld)
@@ -265,18 +265,18 @@ def assemble_platform_release(
         if src_doc.is_file():
             shutil.copy2(src_doc, out_root / doc)
 
-    # 4. Copy client runtime, resources & templates
+    # copy client runtime, resources & templates
     client_dir = out_root / "client"
     client_dir.mkdir(parents=True, exist_ok=True)
 
-    # Shared client binaries from handoff
+    # shared client binaries from handoff
     shared_client_dir = handoff_dir / "shared" / "client"
     if shared_client_dir.is_dir():
         for item in shared_client_dir.iterdir():
             if item.is_file():
                 shutil.copy2(item, client_dir / item.name)
 
-    # Copy precompiled canonical room resources
+    # copy the prebuilt room resources
     resources_dst = client_dir / "resources"
     resources_dst.mkdir(parents=True, exist_ok=True)
     for filename in ("base_mod.zip", "room_payloads.zip", "room_payload_manifest.json"):
@@ -285,7 +285,7 @@ def assemble_platform_release(
             raise ValueError(f"Room resource file missing during staging: {src_res}")
         shutil.copy2(src_res, resources_dst / filename)
 
-    # Repository client templates & scripts
+    # repository client templates & scripts
     repo_client_example = repo_root / "packaging" / "client" / "ap_config.example.json"
     if repo_client_example.is_file():
         shutil.copy2(repo_client_example, client_dir / "ap_config.example.json")
@@ -302,13 +302,13 @@ def assemble_platform_release(
         shutil.copy2(val_install, dst_val)
         dst_val.chmod(dst_val.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    # Data directory
+    # data directory
     repo_data = repo_root / "data"
     if repo_data.is_dir():
         dst_data = client_dir / "data"
         shutil.copytree(repo_data, dst_data, dirs_exist_ok=True)
 
-    # Manifests directory
+    # manifests directory
     repo_manifests = repo_root / "manifests"
     if repo_manifests.is_dir():
         dst_manifests = client_dir / "manifests"
@@ -316,13 +316,13 @@ def assemble_platform_release(
         for f in repo_manifests.glob("*.json"):
             shutil.copy2(f, dst_manifests / f.name)
 
-    # Player templates directory
+    # player templates directory
     repo_templates = repo_root / "player_templates"
     if repo_templates.is_dir():
         dst_templates = client_dir / "player_templates"
         shutil.copytree(repo_templates, dst_templates, dirs_exist_ok=True)
 
-    # Canonical content tree (maps, catalog, global_runtime.json)
+    # copy the content tree: maps, catalog and global_runtime.json
     repo_content = repo_root / "content"
     if repo_content.is_dir():
         dst_content = client_dir / "content"
@@ -361,12 +361,12 @@ def assemble_platform_release(
         if (repo_tools / "__init__.py").is_file():
             shutil.copy2(repo_tools / "__init__.py", dst_tools / "__init__.py")
 
-    # Copy top-level doom_logo.png if available
+    # copy top-level doom_logo.png if available
     logo_src = repo_root.parent / "Archipelago" / "worlds" / "doometernal" / "doom_logo.png"
     if logo_src.is_file():
         shutil.copy2(logo_src, client_dir / "doom_logo.png")
 
-    # Generate bridge_identity.json
+    # generate bridge_identity.json
     bridge_src = repo_root / "doom_eap" / "runtime" / "bridge_client.py"
     if bridge_src.is_file() and (repo_data / "content_identity.json").is_file():
         content_id = json.loads((repo_data / "content_identity.json").read_text(encoding="utf-8"))
@@ -402,7 +402,7 @@ def assemble_platform_release(
         json.dumps(provenance_doc, indent=2) + "\n", encoding="utf-8"
     )
 
-    # 5. Build canonical RELEASE_MANIFEST.json
+    # build the release manifest
     declared_public_files = sorted(
         list(public_file_members(out_root)) + [MANIFEST_FILENAME]
     )
@@ -424,7 +424,7 @@ def audit_platform_parity(linux_root: Path, windows_root: Path) -> None:
     linux_files = {p.relative_to(linux_root).as_posix(): p for p in linux_root.rglob("*") if p.is_file()}
     windows_files = {p.relative_to(windows_root).as_posix(): p for p in windows_root.rglob("*") if p.is_file()}
 
-    # Check allowed launcher differences
+    # check allowed launcher differences
     if "DoomEternalArchipelagoLauncher" not in linux_files:
         raise ValueError("Linux package missing DoomEternalArchipelagoLauncher")
     if "DoomEternalArchipelagoLauncher.exe" in linux_files:
@@ -435,7 +435,7 @@ def audit_platform_parity(linux_root: Path, windows_root: Path) -> None:
     if "DoomEternalArchipelagoLauncher" in windows_files:
         raise ValueError("Windows package must NOT contain Linux DoomEternalArchipelagoLauncher")
 
-    # Filter out platform-specific launcher and canonical release manifest
+    # skip the platform launcher and release manifest when comparing packages
     ignored_keys = {"DoomEternalArchipelagoLauncher", "DoomEternalArchipelagoLauncher.exe", MANIFEST_FILENAME}
     shared_linux_keys = set(linux_files.keys()) - ignored_keys
     shared_windows_keys = set(windows_files.keys()) - ignored_keys
@@ -481,7 +481,7 @@ def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | No
             if ".." in parts or Path(name).is_absolute():
                 raise ValueError(f"Path traversal or absolute path found in {zip_path.name}: {name}")
 
-        # Check canonical manifest
+        # check the release manifest
         if f"DoomEternalArchipelago/{MANIFEST_FILENAME}" not in names:
             raise ValueError(f"{MANIFEST_FILENAME} missing in {zip_path.name}")
 
@@ -494,7 +494,7 @@ def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | No
         if "DoomEternalArchipelago/client/save_death_probe.exe" not in names:
             raise ValueError(f"client/save_death_probe.exe missing in {zip_path.name}")
 
-        # Mandatory room compiler resources
+        # mandatory room compiler resources
         for resource_rel in ROOM_COMPILER_RESOURCE_FILES:
             expected_zip_path = f"DoomEternalArchipelago/{resource_rel}"
             if expected_zip_path not in names:

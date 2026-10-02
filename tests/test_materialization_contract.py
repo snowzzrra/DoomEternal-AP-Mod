@@ -107,7 +107,7 @@ def test_failed_publication_retries_and_disappearance_stays_unverified(inputs, t
     assert state["completed_key"].startswith("dedupe-room:")
     assert state["completion_criterion"] == "durable_spool_publication"
     files = list(tmp_path.glob("*.cmd"))
-    assert len(files) == len(completed.plan.commands)  # Retry kept the already-published first command.
+    assert len(files) == len(completed.plan.commands)  # retry kept the already-published first command
     assert all(path.name.startswith("recv-") for path in files)
     assert {path.stem for path in files} == {
         spool.scoped_id(command.spool_id, scope.state_key) for command in completed.plan.commands

@@ -49,6 +49,8 @@ private:
     DWORD silentBurstStarted = 0;
     DWORD silentBurstRpcMs = 0;
     size_t silentBurstOperations = 0;
+    std::string publicationFailure;
+    bool submittedToNative = false;
 
     std::string TrimLine(std::string value);
     std::string CommandIdFromPath(const std::string& path);

@@ -21,7 +21,7 @@ import sys
 import time
 import traceback
 import uuid
-from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort, ItemObservation, OWNED, MISSING
+from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort, ItemObservation, OWNED, MISSING, UNKNOWN
 from doom_eap.contracts.materialization import MaterializationScope
 from doom_eap.runtime.death_observation import DeathObservation
 from doom_eap.contracts.goal_policy import GoalPolicy
@@ -1446,10 +1446,10 @@ def probe_checkpoint_death(path):
     return probe_game_duration(path)["checkpoint_death"]
 
 
-# Load item definitions
+# load item definitions
 ITEMS_FILE = REPO_ROOT / "data" / "items.json"
 with open(ITEMS_FILE, encoding="utf-8") as f:
-    # Keys in JSON are strings, convert them to ints
+    # keys in json are strings, convert them to ints
     _raw_items = json.load(f)
     ITEM_ID_TO_COMMAND = {int(k): v for k, v in _raw_items.items()}
 ITEM_REPLAY_POLICIES_FILE = REPO_ROOT / "data" / "item_replay_policies.json"
@@ -1624,7 +1624,7 @@ PUBLISHER_MAP_EVENT_FILENAMES = frozenset(
     for publisher in PUBLISHERS
     for trigger in publisher.triggers_for("map_event_file")
 )
-# Load ALL level manifests dynamically
+# load all level manifests dynamically
 DECL_TO_LOCATION = {}
 MANIFESTS_DIR = REPO_ROOT / "manifests"
 if os.path.exists(MANIFESTS_DIR):
@@ -1928,9 +1928,7 @@ def migrate_direct_item_command_jobs(state_key):
             if not match:
                 continue
 
-            # A map-side activation is already the safe canonical payload.
-            # Its suffix is authoritative (not the cmd-NN filename), so keep
-            # the file contents byte-for-byte unchanged.
+            # keep map activation files as they are; the command suffix sets the payload, not the filename
             if re.fullmatch(
                 rf"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_[0-9]+(?:_[0-9]+)? activate",
                 command,
@@ -4462,7 +4460,7 @@ class DoomEternalContext(CommonContext):
             evidence_context = classify_runtime_context(evidence.map_name)
         transition_context = marker_context or evidence_context
         active_campaign = transition_context.campaign if transition_context else None
-        expected_prefix = "GAME-"  # Physical AP save family is independent of content.
+        expected_prefix = "GAME-"  # physical ap save family is independent of content
 
         active_family_mismatch, prior_evidence_epoch = self.save_observer.observe_expected_family(expected_prefix)
 
@@ -4637,7 +4635,7 @@ class DoomEternalContext(CommonContext):
 
         if proof.action == "activate":
 
-            # SAVE_PROOF_ACCEPTED MUST precede SAVE_SLOT_ACTIVE
+            # save_proof_accepted must precede save_slot_active
             self.log_save_proof_accepted(
                 selected.slot_directory,
                 active_map,
@@ -5503,7 +5501,8 @@ class DoomEternalContext(CommonContext):
     def reconcile_owned_runes(self, trigger, *, force=False):
         plan, error = self.observe_owned_rune_plan()
         if error:
-            logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
+            if trigger != "level_ready":
+                logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
             return None, error
         seed = self.room_seed_name or getattr(self, "seed_name", None)
         return self.runes.reconcile(
@@ -5628,15 +5627,27 @@ class DoomEternalContext(CommonContext):
                     job, self.runtime_lifecycle.map_identity, self.runtime_effects_ready(evidence), settled=True,
                 ):
                     return False
-            reconciliation_epoch = self.advance_reconciliation_epoch("level_ready")
-            logger.info(
-                "[RPC] Level-ready signal received (%s). RPC armed; "
-                "perk reconciliation epoch %s queued behind native safety gate.",
-                os.path.basename(job.source_path) if job.source_path else "<marker>", reconciliation_epoch,
-            )
-            self.reconcile_owned_runes("level_ready")
-            self.advance_automap_cleanup_epoch()
-            self.reconcile_checked_automap_cleanup("level_ready")
+            if self.level_ready.needs_preparation(job, "reconciliation"):
+                reconciliation_epoch = self.advance_reconciliation_epoch("level_ready")
+                logger.info(
+                    "[RPC] Level-ready signal received (%s). RPC armed; "
+                    "perk reconciliation epoch %s queued behind native safety gate.",
+                    os.path.basename(job.source_path) if job.source_path else "<marker>", reconciliation_epoch,
+                )
+                self.level_ready.prepared(job, "reconciliation")
+            rune_error = None
+            if self.level_ready.needs_preparation(job, "runes"):
+                _, rune_error = self.reconcile_owned_runes("level_ready")
+                if rune_error:
+                    self.level_ready.wait(job, rune_error, domain="runes")
+                else:
+                    self.level_ready.prepared(job, "runes")
+            if self.level_ready.needs_preparation(job, "cleanup_epoch"):
+                self.advance_automap_cleanup_epoch()
+                self.level_ready.prepared(job, "cleanup_epoch")
+            if self.level_ready.needs_preparation(job, "cleanup"):
+                self.reconcile_checked_automap_cleanup("level_ready")
+                self.level_ready.prepared(job, "cleanup")
             await self.check_mission_challenge_locations()
             if not self.receipt_session.is_current(receipt_token, self.state_key) or not self.level_ready.is_current(job):
                 return False
@@ -5646,10 +5657,12 @@ class DoomEternalContext(CommonContext):
                 return False
             _, context_error = self._context_materialize_inventory(evidence, trigger="level_ready")
             if context_error == "materialization queued; awaiting native application":
-                logger.info("[Context] LEVEL_READY_PENDING reason=native_materialization_pending")
+                self.level_ready.wait(job, "native_materialization_pending")
                 return False
             if context_error:
-                logger.info("[Context] LEVEL_READY_PENDING reason=%s", context_error)
+                self.level_ready.wait(job, context_error)
+                return False
+            if rune_error:
                 return False
             self.reconcile_fast_travel_unlock("level_ready")
             self.level_ready.complete(job)

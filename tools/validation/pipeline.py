@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,9 +35,9 @@ from tools.content.compile_start_inventory_catalog import (
 )
 from doom_eap.content.automap_visual_registry import (
     load_automap_visual_registry,
-    validate_generated_visuals,
+    validate_generated_visuals as _validate_generated_visuals,
 )
-from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
+from tools.maps.ap_map_generator import generate_map, load_item_notification_policies, extract_target_names, find_entity_block_bounds
 from tools.maps.map_semantic_baseline import (
     assert_map_baseline,
 )
@@ -52,6 +53,34 @@ from tools.release.release_manifest import (
     validate_release_manifest,
     validate_source_layout,
 )
+
+def validate_generated_visuals(document, map_key, content):
+    if map_key == "hub":
+        for entry in document["entries"]:
+            if entry["map_key"] != map_key or entry["classification"] != "visible_cleanup":
+                continue
+            relay = entry["reconciliation_entity"]
+            model = relay + "_model"
+            suppress = f"ap_suppress_checked_{entry['location_id']}"
+            bounds = [find_entity_block_bounds(content, name) for name in (relay, model, suppress)]
+            if any(value is None for value in bounds):
+                raise ValueError(f"Fortress reconciliation endpoint missing: {entry['location_id']}")
+            relay_bounds, model_bounds, suppress_bounds = bounds
+            relay_text = content[slice(*relay_bounds)]
+            if re.findall(r'class\s*=\s*"([^"]+)";', relay_text) != ["idTarget_Count"]:
+                raise ValueError(f"Fortress reconciliation relay class drift: {entry['location_id']}")
+            if extract_target_names(relay_text) != [model, suppress]:
+                raise ValueError(f"Fortress reconciliation relay graph drift: {entry['location_id']}")
+            if 'count = 1;' not in relay_text or 'reuseable = true;' not in relay_text:
+                raise ValueError(f"Fortress reconciliation relay count drift: {entry['location_id']}")
+            suppression = content[slice(*suppress_bounds)]
+            if re.findall(r'class\s*=\s*"([^"]+)";', suppression) != ["idTarget_Remove"] or extract_target_names(suppression) != [entry["ap_check"]]:
+                raise ValueError(f"Fortress suppression must remove only its AP check: {entry['location_id']}")
+            model_text = content[slice(*model_bounds)].replace(model, relay, 1)
+            content = content[:relay_bounds[0]] + model_text + content[relay_bounds[1]:]
+    _validate_generated_visuals(document, map_key, content)
+
+
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent

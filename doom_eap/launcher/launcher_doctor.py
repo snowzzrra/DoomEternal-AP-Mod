@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import logging
 import os
 import platform
 import re
+import shutil
 import tempfile
 import time
 import zipfile
@@ -1316,15 +1318,10 @@ def write_support_bundle(
     last_connection_error: Mapping[str, object] | None = None,
     support_condump: Mapping[str, object] | None = None,
     support_diagnostics: Mapping[str, object] | None = None,
+    archive_directory: Path | None = None,
 ) -> Path:
-    """Write bounded diagnostics and redacted logs with freshness metadata.
-
-    The destination is never clobbered: when it already exists a UTC
-    timestamped sibling is used instead, so repeated support reports cannot
-    collide with a locked or in-use previous bundle.
-    """
+    """Retain a verified local archive and export without replacing existing files."""
     destination = destination.expanduser().absolute()
-    destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         candidate = destination.with_name(f"{destination.stem}_{stamp}{destination.suffix}")
@@ -1409,7 +1406,11 @@ def write_support_bundle(
                 "line_count": len(safe_logs.splitlines()),
             }
         payload["log_provenance"] = sanitize_support_value(provenance)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
+    storage = archive_directory or destination.parent / "support-bundles"
+    storage.mkdir(parents=True, exist_ok=True)
+    owned_directory = Path(tempfile.mkdtemp(prefix="report-", dir=storage))
+    local_archive = owned_directory / destination.name
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".archive.", suffix=".tmp", dir=owned_directory)
     os.close(descriptor)
     temporary = Path(temporary_name)
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -1422,8 +1423,36 @@ def write_support_bundle(
             archive.writestr(name, tail)
         if condump_content is not None:
             archive.writestr("AP_SUPPORT_FILE.txt", condump_content)
-    publish_file(temporary, destination, operation="support_bundle_publish")
-    return destination
+    with zipfile.ZipFile(temporary) as archive:
+        if archive.testzip() is not None:
+            raise OSError(f"Support archive verification failed: {temporary}")
+    publish_file(temporary, local_archive, operation="support_bundle_publish")
+    with zipfile.ZipFile(local_archive) as archive:
+        if archive.testzip() is not None:
+            raise OSError(f"Support archive verification failed: {local_archive}")
+    export_owned = False
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as exported, local_archive.open("rb") as source:
+            export_owned = True
+            shutil.copyfileobj(source, exported)
+            exported.flush()
+            os.fsync(exported.fileno())
+        with zipfile.ZipFile(destination) as archive:
+            if archive.testzip() is not None:
+                raise OSError("Support export verification failed")
+        return destination
+    except (OSError, zipfile.BadZipFile) as error:
+        if export_owned:
+            try:
+                destination.unlink()
+            except OSError:
+                pass
+        logging.getLogger(__name__).warning(
+            "Support export unavailable (%s); verified archive retained at %s",
+            type(error).__name__, local_archive,
+        )
+        return local_archive
 
 
 class LauncherDoctor:

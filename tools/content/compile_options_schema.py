@@ -18,6 +18,17 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = ROOT.parent / "Archipelago"
 DEFAULT_OUTPUT = ROOT / "data" / "options_schema.json"
+LAUNCHER_DESCRIPTIONS = {
+    "goal_mission_as_item": (
+        "Choose if you can or cannot get your Goal Mission as an Item.\n"
+        "If false, the mission is unlocked when you finish all other missions.\n"
+        "Has no effect for Acquire the Unmaykr, which ends in the Fortress."
+    ),
+    "death_link_mode": (
+        "Choose how a received DeathLink is fulfilled. Soft applies one death to you, "
+        "but can be mitigated by Extra Lives or Saving Throw. Hardcore ignores mitigation."
+    ),
+}
 
 
 def _load_apworld(ap_root: Path):
@@ -85,7 +96,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
         base = {
             "key": key,
             "display_name": getattr(option_type, "display_name", key),
-            "description": inspect.cleandoc(option_type.__doc__ or ""),
+            "description": LAUNCHER_DESCRIPTIONS.get(key, inspect.cleandoc(option_type.__doc__ or "")),
             "group": "Game Options",
             "source_class": option_type.__name__,
         }

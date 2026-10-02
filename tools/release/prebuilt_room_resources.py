@@ -103,13 +103,13 @@ def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = "
     if not bundle_path.is_dir():
         raise ValueError(f"Prebuilt room resources bundle directory missing: {bundle_path}")
 
-    # 1. Verify existence of canonical files and metadata
+    # check that the resource files and metadata exist
     for filename in (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES):
         target = bundle_path / filename
         if not target.is_file():
             raise ValueError(f"Required file missing from room resources bundle: {filename} at {target}")
 
-    # 2. Verify SHA256SUMS.txt
+    # check sha256sums.txt
     sums_path = bundle_path / "SHA256SUMS.txt"
     sums_lines = sums_path.read_text(encoding="utf-8").splitlines()
     recorded_sums: dict[str, str] = {}
@@ -179,7 +179,7 @@ def validate_prebuilt_room_resources(
     expected_fingerprint = provenance.get("room_resource_input_fingerprint")
     if (current_fingerprint != expected_fingerprint
             or provenance.get("compiler_input_byte_contract") != SOURCE_BYTE_CONTRACT):
-        # Diagnose divergence
+        # diagnose divergence
         old_hashes = provenance.get("source_hashes", {})
         diffs = []
         for k in set(current_hashes) | set(old_hashes):
@@ -204,7 +204,7 @@ def validate_prebuilt_room_resources(
     if provenance.get("source_hashes") != current_hashes or provenance.get("inputs_count") != len(current_hashes):
         raise ValueError("Compiler input provenance does not match the declared fingerprint/source byte contract")
 
-    # 5. Canonical validate_room_resources contract
+    # check the room resources
     from scripts.release.assemble_ci_artifact import validate_room_resources
 
     manifest_doc = validate_room_resources(bundle_path, repo_root=root)

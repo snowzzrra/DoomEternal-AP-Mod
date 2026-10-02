@@ -270,8 +270,7 @@ def build_apworld(
     print(f"APWORLD cache=miss reason={reason} key={key}")
     build_env = os.environ.copy()
     build_env["SKIP_REQUIREMENTS_UPDATE"] = "1"
-    # The canonical builder uses cwd/worlds and cwd/build. Stage its unchanged
-    # inputs instead of deleting an existing candidate in the AP checkout.
+    # the builder uses cwd/worlds and cwd/build; stage its inputs and keep the ap checkout candidate
     with tempfile.TemporaryDirectory(prefix="apworld-build-", dir=output.parent) as temporary:
         work = Path(temporary)
         shutil.copytree(archipelago_source / "worlds/doometernal", work / "worlds/doometernal")

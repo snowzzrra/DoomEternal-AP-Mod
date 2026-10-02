@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 import logging
 import os
 import queue
@@ -25,7 +26,7 @@ from copy import deepcopy
 from .launcher_workers import LauncherWorkers, LauncherWorkCancelled
 from .launcher_repairs import apply_repair, install_game_link
 from .launcher_interactions import LauncherInteractions
-from .launcher_reporting import ScopedSupportReport, report_problem, submission_endpoint, submit_report
+from .launcher_reporting import ScopedSupportReport, report_body, report_problem, save_report_draft, submission_endpoint, submit_report
 
 from .connection_errors import enrich_connection_failure, validate_server_address
 from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
@@ -810,22 +811,43 @@ class LauncherController:
         logs = list(logs)
 
         def operation(job):
-            result = report_problem(ScopedSupportReport(self.create_support_bundle, job), logs=logs, job=job)
+            result = report_problem(ScopedSupportReport(self.create_support_bundle, job), logs=logs, job=job,
+                                    draft_path=self.user_paths.data_dir / "reports" / "draft.json")
             self._setup_event("problem_report_ready", job.event({
                 "message": result.message, "path": str(result.path) if result.path else None,
-                "payload": result.payload,
+                "payload": result.payload, "submitted": result.submitted, "url": result.url,
             }))
 
         return self.workers.submit("problem_report", operation, generation=generation)
+
+    def save_problem_report(self, payload):
+        save_report_draft(self.user_paths.data_dir / "reports" / "draft.json", payload)
+
+    def start_new_problem_report(self, *, logs):
+        draft = self.user_paths.data_dir / "reports" / "draft.json"
+        saved = json.loads(draft.read_text(encoding="utf-8"))
+        if not saved.get("url"):
+            raise ValueError("Resolve or retry the saved report before starting another.")
+        archived = draft.with_name(str(uuid.UUID(saved["payload"]["idempotency_key"])) + ".json")
+        publish_file(draft, archived, operation="report_archive_publish")
+        return self.request_problem_report(logs=logs)
 
     def request_report_submission(self, payload: dict) -> bool:
         endpoint = submission_endpoint(self.bundle_dir)
         if endpoint is None:
             raise RuntimeError("Online submission is awaiting service deployment. Export the report locally.")
         payload = deepcopy(payload)
+        report_body(payload)
         def operation(job):
             job.check()
-            url = submit_report(endpoint, payload)
+            draft = self.user_paths.data_dir / "reports" / "draft.json"
+            save_report_draft(draft, payload, submitted=True)
+            try:
+                url = submit_report(endpoint, payload)
+            except Exception as error:
+                self._setup_event("problem_report_retry", job.event({"message": str(error)}))
+                return
+            save_report_draft(draft, payload, submitted=True, url=url)
             self._setup_event("problem_report_submitted", job.event({"url": url}))
         return self.workers.submit(("report_submission", payload["idempotency_key"]), operation)
 
@@ -900,8 +922,7 @@ class LauncherController:
             support_diagnostics["release"] = {"status": "unavailable"}
         if job is not None:
             job.check()
-        try:
-            bundle = write_support_bundle(
+        bundle = write_support_bundle(
                 destination,
                 report,
                 logs=diagnostic_logs,
@@ -913,12 +934,12 @@ class LauncherController:
                 last_connection_error=self.last_connection_error,
                 support_condump=support_condump,
                 support_diagnostics=support_diagnostics,
-            )
-        finally:
-            if support_condump and support_condump.get("owned_capture"):
-                capture = Path(str(support_condump["path"]))
-                if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
-                    capture.unlink(missing_ok=True)
+                archive_directory=self.user_paths.data_dir / "support-bundles",
+        )
+        if support_condump and support_condump.get("owned_capture"):
+            capture = Path(str(support_condump["path"]))
+            if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
+                capture.unlink(missing_ok=True)
         if job is None:
             self.emit("support_bundle_ready", path=str(bundle))
         else:
@@ -941,8 +962,7 @@ class LauncherController:
                 "message": "diagnostic condump unavailable: game not running",
                 "requested_at": requested_at,
             }
-        # Fresh native readiness is authoritative under Proton; avoid making
-        # bounded diagnostics wait on a host-side executable-name probe.
+        # use fresh native readiness on proton; diagnostics don't need to wait for the host process-name check
         game_running = bool(native_health.get("ready")) if supervisor_available else self.is_game_running()
         if not game_running:
             return {

@@ -284,7 +284,7 @@ STARTING_WEAPON_NAMES = frozenset({
     "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Super Shotgun", "Ballista", "Chaingun", "Combat Shotgun",
 })
 
-# Retail source markers required by the patcher.
+# retail source markers required by the patcher
 REQUIRED_MARKERS = frozenset({
     "clearAllBeforeApply",
     "currencyToGive",
@@ -292,7 +292,7 @@ REQUIRED_MARKERS = frozenset({
     "CURRENCY_PRAETOR_UPGRADE",
 })
 
-# Markers introduced by the generated room loadout.
+# markers introduced by the generated room loadout
 FORBIDDEN_MARKERS = frozenset({
     "STAT_SUIT_PAGE_UNLOCKED",
     "statsToGive",
@@ -569,7 +569,7 @@ def _patch(source: str) -> str:
         1,
     )
 
-    # Verify patch succeeded
+    # check patch succeeded
     if "STAT_SUIT_PAGE_UNLOCKED" not in override:
         raise ValueError("DevInvLoadout patch: STAT_SUIT_PAGE_UNLOCKED not injected")
     if "STAT_RUNE_PAGE_UNLOCKED" not in override:
