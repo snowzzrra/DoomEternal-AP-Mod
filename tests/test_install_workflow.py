@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from types import SimpleNamespace
 import hashlib
 import json
@@ -382,12 +381,31 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
 
 
 
-    @contextmanager
 
 
 
 
 
+
+    def test_room_password_retry_is_transient_and_cancelable(self):
+        request = dict(endpoint="localhost:38281", slot="Marine",
+                       game_root=str(self.game_root), saves_root=str(self.saves_dir))
+        with patch.object(self.controller, "_start_supervisor") as start, \
+             patch.object(self.controller, "ensure_ammo_refill_config"):
+            self.controller.connect(password="wrong-room-password", **request)
+            start.assert_called_once_with({
+                "endpoint": "localhost:38281", "slot": "Marine", "password": "wrong-room-password",
+            })
+            self.controller.state = launcher_controller_mod.LauncherState.FAILED
+            self.controller.supervisor = MagicMock()
+            self.controller.connect(password="correct-room-password", **request)
+            self.controller.supervisor.stop.assert_called_once_with(emit_disconnected=False)
+            self.assertEqual(self.controller._pending_connect["password"], "correct-room-password")
+            self.controller.disconnect()
+            self.assertIsNone(self.controller._pending_connect)
+        persisted = self.controller.config_path.read_text()
+        self.assertNotIn("wrong-room-password", persisted)
+        self.assertNotIn("correct-room-password", persisted)
 
     def test_retired_dialog_cannot_start_repair_or_confirm_a_different_room(self):
         generation = self.controller.operation_generation

@@ -31,8 +31,13 @@ _BY_CODE = {
     ),
     "invalid_password": ConnectionFailure(
         "invalid_password", "Room password rejected",
-        "The room accepted the connection, but rejected the password.",
+        "The server rejected the supplied room password.",
         "Check the room password and try again.",
+    ),
+    "password_required": ConnectionFailure(
+        "password_required", "Room password required",
+        "This room requires a password, but none was supplied.",
+        "Enter the room password and try again.",
     ),
     "invalid_game": ConnectionFailure(
         "invalid_game", "Wrong game for this player",
