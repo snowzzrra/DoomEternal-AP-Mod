@@ -187,9 +187,6 @@ _CONTENT_IDENTITY = json.loads(
 BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
 TRANSITION_HANDLER = "unified"
 GAME_NAME = _CONTENT_IDENTITY["game"]
-# In-game Ammo Refill request channel: the player's DOOM bind for
-# AP_USE_REFILL_CHARGE executes `condump AP_REFILL_REQUEST.txt`, and the bridge
-# consumes that file from SAVE_GAMES_DIR as one refill request.
 AMMO_REFILL_REQUEST_FILENAME = "AP_REFILL_REQUEST.txt"
 AMMO_REFILL_REQUEST_RE = re.compile(r"^AP_REFILL_REQUEST(?:_(\d+))?\.txt$")
 
@@ -4772,7 +4769,7 @@ class DoomEternalContext(CommonContext):
 
     def check_and_update_event_session(self):
         current_key = self.get_ap_state_key()
-        if not current_key:
+        if not current_key or not doom_process_identity():
             return False
 
         session_file = Path(INV_DUMP_DIR) / "ap_event_session.json"
@@ -6342,6 +6339,9 @@ class DoomEternalContext(CommonContext):
         while not self.exit_event.is_set():
             self.check_rpc_autopause()
             self.queue_received_deathlink()
+            if not doom_process_identity():
+                await asyncio.sleep(1.0)
+                continue
             work_token = self.runtime_lifecycle.capture_work()
             used_duration = False
             if not DEATH_PROBE.is_file() and not getattr(self, "_save_probe_missing_logged", False):
@@ -6371,8 +6371,8 @@ class DoomEternalContext(CommonContext):
     async def flush_check_event_files(self):
         get_key = getattr(self, "get_ap_state_key", None)
         state_key = get_key() if get_key else None
-        if state_key:
-            self.check_and_update_event_session()
+        if not state_key or not self.check_and_update_event_session():
+            return
 
         event_paths_by_location = {}
         unknown_event_paths = []
@@ -6451,6 +6451,10 @@ class DoomEternalContext(CommonContext):
 
         while not self.exit_event.is_set():
             self.last_heartbeat_timestamp = time.time()
+            if not doom_process_identity():
+                self.invalidate_map_identity("game_not_running")
+                await asyncio.sleep(4.0)
+                continue
             self.heartbeat_iteration_count += 1
             if self.heartbeat_iteration_count % 15 == 0:
                 logger.info(
@@ -6714,9 +6718,10 @@ async def amain(launch_args=None):
         set_rpc_execution(False)
     except Exception as error:
         logger.warning("[RPC] Initial RPC gate disarm failed: %s", error)
-    cleanup_active_map_markers()
-    cleanup_ammo_refill_request_files()
-    cleanup_telemetry_dumps()
+    if doom_process_identity():
+        cleanup_active_map_markers()
+        cleanup_ammo_refill_request_files()
+        cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
 
