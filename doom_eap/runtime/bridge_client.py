@@ -5213,7 +5213,26 @@ class DoomEternalContext(CommonContext):
             mapping_revision=ITEM_MAPPING_REVISION,
         )
         if not compatible:
+            blocked = {
+                "reason": "history_incompatible",
+                "boundary": self.items_processed,
+                "received_count": len(self.items_received),
+                "state_key": getattr(self, "state_key", None),
+                "message": (
+                    "Item delivery is paused because the server item history differs from your saved progress. "
+                    "The server save may have been reset or restored. Restore the matching server save "
+                    "or start a new room with a new game save. Resync cannot repair this mismatch."
+                ),
+            }
+            if getattr(self, "item_delivery_blocked_info", None) != blocked:
+                self.item_delivery_blocked = True
+                self.item_delivery_blocked_info = blocked
+                emit_launcher_event("item_history_status", status="blocked", **blocked)
             raise ValueError(f"received-item history is incompatible: {detail}")
+        if (getattr(self, "item_delivery_blocked_info", None) or {}).get("reason") == "history_incompatible":
+            self.item_delivery_blocked = False
+            self.item_delivery_blocked_info = None
+            emit_launcher_event("item_history_status", status="ready", message="Server item history matches again. Item delivery can resume.")
         return True
 
     def observe_received_item_history(self):

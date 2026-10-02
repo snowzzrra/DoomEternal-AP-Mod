@@ -66,6 +66,22 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
         assert notifications == [(7770016, 0), (7770904, 1)]
         assert context.session_state["weapon_points"] == {"version": 1}
 
+        saved = copy.deepcopy(context.session_state)
+        history = context.items_received
+        events = []
+        monkeypatch.setattr(bridge, "emit_launcher_event", lambda kind, **event: events.append((kind, event)))
+        context.items_received = history[:1]
+        assert not await context.process_pending_item_receipts("server_save_reset")
+        assert not await context.process_pending_item_receipts("tracker")
+        assert context.items_processed == 2 and context.session_state == saved
+        assert notifications == [(7770016, 0), (7770904, 1)]
+        assert len(events) == 1 and events[0][1]["status"] == "blocked"
+        assert context.item_delivery_blocked and "Resync cannot repair" in events[0][1]["message"]
+        context.items_received = history
+        assert context.validate_item_history_prefix()
+        assert not context.item_delivery_blocked and events[-1][1]["status"] == "ready"
+        assert context.session_state == saved
+
     asyncio.run(consume())
 from dataclasses import replace
 from pathlib import Path

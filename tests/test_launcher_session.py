@@ -7,6 +7,28 @@ import pytest
 from doom_eap.launcher.launcher_session import APSessionOwner, _verify_new_campaign_receipts
 
 
+def test_support_condump_uses_workflow_session_owner(tmp_path):
+    import threading
+    from doom_eap.launcher.launcher_controller import LauncherController
+
+    controller = LauncherController.__new__(LauncherController)
+    controller.config = {"save_games_dir": str(tmp_path)}
+    controller.user_paths = SimpleNamespace(data_dir=tmp_path / "data")
+    controller._condump_lock = threading.Lock()
+    controller._condump_pending = None
+    owner = Mock(observe=Mock(return_value={"ready": True, "pid": 7, "process_created": 22}))
+    controller.workflow = SimpleNamespace(session_owner=owner)
+    controller.read_native_health = Mock(return_value={"ready": True})
+    source = tmp_path / "AP_SUPPORT_FILE.txt"
+    controller.supervisor = SimpleNamespace(running=True, request_support_condump=lambda: source.write_bytes(b"fixture condump"))
+    result = controller._request_support_condump()
+    assert result["status"] == "available" and result["owned_capture"]
+    from pathlib import Path
+    assert Path(result["path"]).read_bytes() == b"fixture condump"
+    assert source.read_bytes() == b"fixture condump"
+    assert owner.observe.call_count >= 2 and controller._condump_pending is None
+
+
 def test_admission_identity_and_unknown_exit_preserve_owner(tmp_path):
     owner = APSessionOwner(tmp_path, tmp_path / "data", tmp_path / "state")
     owner._handle = 123

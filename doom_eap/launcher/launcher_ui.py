@@ -2869,6 +2869,14 @@ class LauncherUI(QMainWindow):
                 str(event.get("message") or "Generate a Support Report for details."),
             )
             return
+        if kind == "item_history_status":
+            blocked = event.get("status") == "blocked"
+            message = str(event.get("message", ""))
+            self.player_inventory.setText(message)
+            self._set_inventory_tile("server history mismatch" if blocked else "history matches", self.COLORS["bad"] if blocked else self.COLORS["good"])
+            self.resync_inventory_button.setEnabled(not blocked and self._room_connected)
+            self._append_log(message)
+            return
         if kind == "inventory_resync":
             status = str(event.get("status", ""))
             presentation = {

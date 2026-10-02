@@ -996,7 +996,7 @@ class LauncherController:
             }
         source = save_dir / "AP_SUPPORT_FILE.txt"
         with self._condump_lock:
-            scope = self.session_owner.observe()
+            scope = self.workflow.session_owner.observe()
             if not scope.get("ready") or not scope.get("pid") or not scope.get("process_created"):
                 return {"status":"unavailable", "reason":"qualified_process_unavailable"}
             identity = (scope["pid"], scope["process_created"])
@@ -1009,7 +1009,7 @@ class LauncherController:
             while time.monotonic() < deadline:
                 if job is not None:
                     job.check()
-                current = self.session_owner.observe()
+                current = self.workflow.session_owner.observe()
                 if not current.get("ready") or (current.get("pid"), current.get("process_created")) != identity:
                     return {"status":"unavailable", "reason":"process_scope_changed"}
                 try:
@@ -1513,7 +1513,7 @@ class LauncherController:
     def ap_backups(self) -> list[str]:
         if not self.connected_room or not self.setup.current_event:
             raise RuntimeError("Connect to a room before selecting its AP backups")
-        return self.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
+        return self.workflow.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
 
     def request_ap_backup(self, *, restore=None) -> bool:
         if not self.connected_room or not self.setup.current_event:
@@ -1524,15 +1524,15 @@ class LauncherController:
         def operation(job):
             job.check()
             if restore is not None:
-                self.session_owner.prepare(snapshot,configuration,recovery_basename=restore)
+                self.workflow.session_owner.prepare(snapshot,configuration,recovery_basename=restore)
                 message="Compatible recovery is staged. Play this room to let the game restore it. Receipt history, purchases and consumables were preserved."
             else:
                 from .launcher_session import namespace_id
                 expected=namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
                                       snapshot.slot_data["native_generation_fingerprint"])
-                if self.session_owner.namespace != expected:
+                if self.workflow.session_owner.namespace != expected:
                     raise RuntimeError("The live AP session belongs to a different room")
-                result=self.session_owner.create_backup()
+                result=self.workflow.session_owner.create_backup()
                 message=f"AP backup captured and verified: {result['basename']}. Opening it in-game remains unverified."
             job.check()
             self.emit("ap_backup_result",**job.event({"message":message}))
