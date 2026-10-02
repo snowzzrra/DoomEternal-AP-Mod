@@ -3282,6 +3282,7 @@ class DoomEternalContext(CommonContext):
         elif cmd == "ReceivedItems":
             self._on_received_items_packet(args)
         elif cmd == "Connected":
+            self._item_history_received = False
             self._room_session_established = True
             self._launcher_connection_loss_reported = False
             slot_data = args.get("slot_data", {})
@@ -3473,6 +3474,8 @@ class DoomEternalContext(CommonContext):
             args.get("index") if isinstance(args, dict) else None,
             packet_item_count, authoritative_count, packet_received_ns,
         )
+        if packet_accepted and packet_start_index == 0:
+            self._item_history_received = True
         log_item_event(
             "ITEM_PACKET_OBSERVATION",
             packet_start_index=packet_start_index,
@@ -5196,6 +5199,8 @@ class DoomEternalContext(CommonContext):
         return record_processed_receipt(self.session_state, network_item)
 
     def validate_item_history_prefix(self):
+        if not getattr(self, "_item_history_received", True):
+            raise ValueError("waiting for the full server item history")
         compatible, detail = validate_session_receipt_prefix(
             self.session_state,
             self.items_received,
@@ -5221,7 +5226,8 @@ class DoomEternalContext(CommonContext):
                 "message": (
                     "Item delivery is paused because the server item history differs from your saved progress. "
                     "The server save may have been reset or restored. Restore the matching server save "
-                    "or start a new room with a new game save. Resync cannot repair this mismatch."
+                    "or close DOOM Eternal and choose AP SAVE > New DOOM save in this room. "
+                    "The launcher backs up local progress first; the multiworld can stay the same. Resync cannot repair this mismatch."
                 ),
             }
             if getattr(self, "item_delivery_blocked_info", None) != blocked:

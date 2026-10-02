@@ -14,7 +14,7 @@
     "sha256": "b8184dc3a61f284f5701df29a0480c2d848123e67ec0156d6fbed174418719c5",
     "size": 2202482
   },
-  "room_resource_input_fingerprint": "342b41f94782da94b2934c8bb3922951ec1ca7b17a167ec3822e92847d8e3a2d",
+  "room_resource_input_fingerprint": "a69478df8d8dab279da135dbcae188db0b9ec4b639ad71b2d9d6b7e000cf8246",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -213,9 +213,9 @@
     "doom_eap/contracts/check_observation.py": "9d460751c0857e7db7045ec6f2238f5728d136d2fd0e4068b7b4e0c16231f658",
     "doom_eap/contracts/command_publication.py": "9d1cc1ab0ede2d9f57dc107d89af47fc0c55dd427d88cc4c20e96717054ab981",
     "doom_eap/contracts/core_distribution.py": "7c0d68894c48fc3e754a80d93edc03ad8140917b8f5b9df28b8d8e8e8ed57450",
-    "doom_eap/contracts/foundation.py": "28260bd66487aa2921731ec419995fc07056b9a25b5f8699b2c9cfaee4efc1a7",
+    "doom_eap/contracts/foundation.py": "7e837e9cb3b8d98615708b3d6c266d77f8d9eda000b4ddb4ecdd9a799aa0fc93",
     "doom_eap/contracts/goal_policy.py": "0aacdc0a0c1aa52535a0a7c341eb337d40ee6391edbd3a22671a6b28a2594c74",
-    "doom_eap/contracts/inventory_domain.py": "87738c4009650d914f4ed3d8df63ebad9f64e65427e2d2964a8f83ed705755b5",
+    "doom_eap/contracts/inventory_domain.py": "e52e3d57c444afd85d2cba4d41a0b38b681190c3fc7abd9ffc94aad4d673b656",
     "doom_eap/contracts/item_contracts.py": "c75f091dcf77c7641632623a1f2f0263e450f4d63bc82a30d69521e1c2eb843a",
     "doom_eap/contracts/materialization.py": "b4fd7c5a2a4ab0b5d8ed3e2cc35880f271f5574098c1f4c2edbc79ce4eb8fb85",
     "doom_eap/contracts/ownership.py": "255370c23d8f2e0219b0833815bb1e173ddb87d36e7152b175aa05e605a4deba",
@@ -371,14 +371,14 @@
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/decls/campaign_builder.py": "201893f9a417b4b61c359a0e1b56a2cde48db581711172b8ce13d23300c18cd4",
-    "tools/decls/devinv_builder.py": "83778c30308ddd7b6f6fc165974de20cb7dc1d98d05c5567651719ba22d4d275",
+    "tools/decls/devinv_builder.py": "d91b4669e65c8ddd6e75fad295dd1500b0d13c6a39e20771c10d5c86fd15e87b",
     "tools/decls/mastery_decl_builder.py": "767f7a8b33c3d0c2d4b6a7bd4283964724cbe5b9957472641edcf281d522fa99",
-    "tools/decls/mission_challenge_decl_builder.py": "c7034cad8687b3435a41d150f2ba73cfc306569e7e5f9b99d79418873515c25b",
+    "tools/decls/mission_challenge_decl_builder.py": "3fe1b1c8e4ae29a2815079037309149685d07f507c19aa9fb042f20e52ec5182",
     "tools/decls/rune_decl_builder.py": "fd9c0cc2d21e476790671b561b9ff0df8a39459ee013f95f7fe1374ca8d895ba",
     "tools/decls/rune_slot_builder.py": "657f5e08a322a065532ef48a8b85e0be3167685ceb14223e0e132a11085c41c8",
     "tools/decls/weapon_stripping_builder.py": "6a961a00fbb0242d5e6007ccaaaaacd79c97c3fac334f4589157d88e3d544c14",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/maps/ap_map_generator.py": "16f04b7d5ea5b91351fdc02ab02ba9a7e9f38d3d4162f74596dcca06c14df1a4",
+    "tools/maps/ap_map_generator.py": "cc75c4f4d44aac9a565fc49d374e50e869c19ece458acdda748774b6239e7ca1",
     "tools/maps/automap_baseline_guard.py": "d7d280015c3dc61627089326cdb44a868356b8e412422f506cb56738ca63d6ad",
     "tools/maps/automap_native_decl_builder.py": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
     "tools/maps/final_credits.py": "80993bfa95b3775a713bd49f66415bd0f3e377cc4d8d48b81a04612908e8ec97",
@@ -13258,7 +13258,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "8569504fd4aea7dfaa16a5385ce1b78a5fc3a2e8",
+      "base_commit_sha": "1706eaa771239f40b8b59f34a772a5dda9d92c86",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14091,16 +14091,16 @@
             "size": 5774
           },
           "doom_eap/contracts/foundation.py": {
-            "sha256": "28260bd66487aa2921731ec419995fc07056b9a25b5f8699b2c9cfaee4efc1a7",
-            "size": 33668
+            "sha256": "7e837e9cb3b8d98615708b3d6c266d77f8d9eda000b4ddb4ecdd9a799aa0fc93",
+            "size": 33667
           },
           "doom_eap/contracts/goal_policy.py": {
             "sha256": "4bc1ed0c5a689e0e3384b0540dc1d3d020be588e466e28e2af9dd890f0d77e54",
             "size": 2886
           },
           "doom_eap/contracts/inventory_domain.py": {
-            "sha256": "15c86415fc21b0ae9f41ce87afbf1c775d27c5ddd18725ac30a344a049dd360f",
-            "size": 7278
+            "sha256": "2ac02ebb90f49ac34f92b2e2d988ddd4e7a4ea0e6c770d0687340a26c62788e1",
+            "size": 7236
           },
           "doom_eap/contracts/item_contracts.py": {
             "sha256": "c75f091dcf77c7641632623a1f2f0263e450f4d63bc82a30d69521e1c2eb843a",
@@ -14151,28 +14151,28 @@
             "size": 7542
           },
           "doom_eap/launcher/launcher_app.py": {
-            "sha256": "a3598514e596bf5a6507bdb97f3f3aa1496aadeae1ab99635f61b6b57b5eb2c4",
-            "size": 16422
+            "sha256": "1945e86108818888fc1afba788200687453734b540046b5ce4cadf17ca2f20a9",
+            "size": 16446
           },
           "doom_eap/launcher/launcher_cli.py": {
             "sha256": "183614039a8364f2cdd3c4374a54ee2793fb8a3d1b6a48c04985f5d255513db9",
             "size": 2511
           },
           "doom_eap/launcher/launcher_controller.py": {
-            "sha256": "3172fb28d71690eda08ce853bb0733e04b8559f27d5749718d5a2dc7836598db",
-            "size": 76553
+            "sha256": "07140971d569805360dc122aa83bb5ea382192aab512f700f69ebe389bf129d5",
+            "size": 77839
           },
           "doom_eap/launcher/launcher_core.py": {
             "sha256": "928c3d4d1c724908d50e8b3b35099a0a5f5b85a4fd28ec05c4acc2f85ef61f14",
             "size": 85918
           },
           "doom_eap/launcher/launcher_doctor.py": {
-            "sha256": "96814f4576ef15f872b83a31b084dd62505a658fc66e60ff237110518c192f46",
-            "size": 84132
+            "sha256": "032ff5fdf7599dcceef316a2609913218dd4a649860bc85e2822188a0c65d836",
+            "size": 85419
           },
           "doom_eap/launcher/launcher_integration.py": {
-            "sha256": "b19c5a7a3acc0f73aec5786cc1d3b0ccf261968d37b7a08bc23e606782465fd8",
-            "size": 75831
+            "sha256": "06fded6109522a99e4ddbaa9bf20bd07d89042de0b8c017d2d6551358c005d47",
+            "size": 75827
           },
           "doom_eap/launcher/launcher_interactions.py": {
             "sha256": "40d30fdceb6636b1cd83154d90dffab8f8686a123cb8fd5265d9358a218707ac",
@@ -14183,16 +14183,16 @@
             "size": 6953
           },
           "doom_eap/launcher/launcher_platform.py": {
-            "sha256": "1cab479692029f88471d4f1a586670ce47959dbd32c161eb0f4af6a428bd80f8",
-            "size": 139851
+            "sha256": "f4f9731302f64af8130d4896cf63b8e99f47fe2c40a88cf41e157fe737fc7025",
+            "size": 139779
           },
           "doom_eap/launcher/launcher_repairs.py": {
             "sha256": "6cb8105bdde3fcb51c00ad7b39982f5e34b9b63e7c8de0e9126b5a835c5e0867",
             "size": 4105
           },
           "doom_eap/launcher/launcher_reporting.py": {
-            "sha256": "3f69b0a81d1ea4abb83815d780b2994637355c4341ad7db29d818704d49170b0",
-            "size": 3976
+            "sha256": "c6f4300b708c9175b7d1edb8efb893302fadd31c37fcc8917c85018c66f8359c",
+            "size": 6792
           },
           "doom_eap/launcher/launcher_session.py": {
             "sha256": "4a5859368446632c0ad2e3738f97ba6d767b415d7e4427476830124c0e2ed566",
@@ -14203,8 +14203,8 @@
             "size": 11486
           },
           "doom_eap/launcher/launcher_ui.py": {
-            "sha256": "a672fa9e2957b3454d583dd9e5e5f905c690692def19f67ae89270bd33e6c9b1",
-            "size": 171343
+            "sha256": "7dbe35ae603459404b31710d14360581fbab055751d1b4bd2e100875807f2763",
+            "size": 173724
           },
           "doom_eap/launcher/launcher_workers.py": {
             "sha256": "336795d007b9648de7f0d4186adff717bceffd0da839249c1ec4a2dd70dd6481",
@@ -14239,12 +14239,12 @@
             "size": 7781
           },
           "doom_eap/runtime/bootstrap_actions.py": {
-            "sha256": "1e84890dafe3dd875536a436c4df91afd9a4f12b0bf19458e6438926ebc7de5f",
-            "size": 7509
+            "sha256": "4815cf77d49010779b9d441ff08b4d6367c8382f7014783a3b25f0b5f4fe5132",
+            "size": 7137
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "54d1e6745e9d240e90b4ab2e2e52f59a4efb103c4eb833f7fd15a0140dd109fe",
-            "size": 301524
+            "sha256": "7d93122f14f5c24b4dccdb4fc4e89c71ae10ba868275cb25e0223faeb5eba781",
+            "size": 303440
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "d0d0f023eb12cd9284196e6a096ba6da3b7396fccc9abe4cbf677438d66e52cc",
@@ -14299,8 +14299,8 @@
             "size": 42917
           },
           "doom_eap/runtime/level_ready.py": {
-            "sha256": "59a1a2b32c27aba3b977de214e98801278dc8b30bc85b697920d163baddf294c",
-            "size": 3872
+            "sha256": "34ffec81a4274520ef853a1ffb64685dede1ddc64630a20809d82ffb47c21eca",
+            "size": 4918
           },
           "doom_eap/runtime/lifecycle.py": {
             "sha256": "665cf723480e80445fbd9aab457e55a63ccaf3bd9a9af122a0704b7c2e2396e1",
@@ -14315,8 +14315,8 @@
             "size": 4054
           },
           "doom_eap/runtime/materialization.py": {
-            "sha256": "0505449271f8800d4ded6b3e7d2f18b25cf7cf5ef104cbcc85c8f90116ab18ba",
-            "size": 16655
+            "sha256": "0d7d4c2e4eba7b07dad72e3cf7770375fc3710f3a9362c6c12c82f2808505fe1",
+            "size": 16654
           },
           "doom_eap/runtime/materialization_coordinator.py": {
             "sha256": "ec316d9c994326853eda2f460239b73e1d8385ce5898bbfbe08fe9a66aab70fe",
@@ -14415,8 +14415,8 @@
             "size": 10600
           },
           "doom_eap/runtime/weapon_points.py": {
-            "sha256": "24a9a7994aee1ee1766c9588f76e1382a9de3e8a980d257e2848a1d6b92ad1aa",
-            "size": 21197
+            "sha256": "c47c65aee12674b7fbeec2195162b73f72f07f4aea04f25f636af9b13ce44c2f",
+            "size": 21567
           },
           "manifests/e1m1_intro.json": {
             "sha256": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
@@ -14503,7 +14503,7 @@
             "size": 1222
           },
           "native/client/ammo_hotkey.cpp": {
-            "sha256": "411171fa9b5c1967c1e36c163029d8ded8991457b7bddd13f1707013668345a6",
+            "sha256": "5058848bfe03988c086bf7def0b6e25c073a2144abb22d0fba7ba47c59b6b624",
             "size": 8193
           },
           "native/client/ammo_hotkey.h": {
@@ -14531,12 +14531,12 @@
             "size": 1096
           },
           "native/client/command_queue.cpp": {
-            "sha256": "0bb92fd2868e7a120fb7177e677f70a0cd054bfd5579e0490c24bd88ff12b57f",
-            "size": 53486
+            "sha256": "647efcd6fea8dfb5dacf54e4e2083f19c83f2cf3243066c68b20988f348902ce",
+            "size": 56369
           },
           "native/client/command_queue.h": {
-            "sha256": "28a579b977ce80527d89d0b3020ad32a82b9fab26b6be302f751f915fc3657d8",
-            "size": 5665
+            "sha256": "5c3829c19a9e89eaf40b64db323c5cfda41290a10dba96a0e2b3649185d6f842",
+            "size": 5736
           },
           "native/client/command_queue_contracts.h": {
             "sha256": "39f026771934567ec1251a2c5162f45d2d67275b00b367587fbaf3316ecf2574",
@@ -15087,8 +15087,8 @@
             "size": 322
           },
           "scripts/release/assemble_ci_artifact.py": {
-            "sha256": "6730836bcd6793d38c3eb2b4def766a95828690ee2c67efcad6bbcdb9d5f9457",
-            "size": 29502
+            "sha256": "2ed76893fc39b82c1c4b6050c140e411ac47f16e7e26f624cf4e72c075e01acf",
+            "size": 29459
           },
           "scripts/setup/linux_client.sh": {
             "sha256": "ab0d24b819ee01c421923ab7a58a4877f40a5da7cfc9dedc197d012bc38a8505",
@@ -15155,8 +15155,8 @@
             "size": 13200
           },
           "tools/content/compile_options_schema.py": {
-            "sha256": "b339af0b9e05b5d7cf6fc7289c60db47a941b25ab7954fcbcb6866bfe976d849",
-            "size": 10973
+            "sha256": "e35018a1a0bd0cfc6e85fbe05d2ad9b437e14e773590b735b2a111f80d48f62b",
+            "size": 11515
           },
           "tools/content/compile_start_inventory_catalog.py": {
             "sha256": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
@@ -15179,16 +15179,16 @@
             "size": 6609
           },
           "tools/decls/devinv_builder.py": {
-            "sha256": "473c9ee1d5626e2c124e27bc1fc7a4d86242e090efb5b47d7de62b5c96735777",
-            "size": 56102
+            "sha256": "501ba3dac5734b6fefaf5d6c4cc8829f91e5eda528b2d95a41a8b708e7f80342",
+            "size": 56096
           },
           "tools/decls/mastery_decl_builder.py": {
             "sha256": "18fa88a055190fdf5255f91b4403bff8b7d3fc2b473a226a69be339a52408455",
             "size": 5520
           },
           "tools/decls/mission_challenge_decl_builder.py": {
-            "sha256": "41dcefdb7b70424e43f4c2b4a143ef36c0ee51d55e1c06f70185d270f7122fa6",
-            "size": 18832
+            "sha256": "4bcdb735911e073dfc42e534e043aea6b9116c28f224031c07f03c0c6664996a",
+            "size": 18728
           },
           "tools/decls/rune_decl_builder.py": {
             "sha256": "006a602d02a9604da0f3ad8ea4d83e14e50615d00dc0d62300c21819a1fa1ac8",
@@ -15215,8 +15215,8 @@
             "size": 0
           },
           "tools/maps/ap_map_generator.py": {
-            "sha256": "99c875b8745182f27d261882e569e63e33a83a4bc6c1a166e2e068c1ae5b813c",
-            "size": 137924
+            "sha256": "1b99a8d3ebf5d31fb6a81cf9ee8f43100ed7910bc0711c49696c85809826edd5",
+            "size": 137928
           },
           "tools/maps/automap_baseline_guard.py": {
             "sha256": "8dea88c36eb0de791187ff66b390ef36c5dabccafbf327948c78fc761edef3a2",
@@ -15279,8 +15279,8 @@
             "size": 36
           },
           "tools/release/apworld_cache.py": {
-            "sha256": "b599a4048eb8f1a27295f349cec71b7fc6d194576de15a129ce7701b527ba6ab",
-            "size": 12531
+            "sha256": "40a6e13b3acd0f6ebb0569178f994da022590a94d754dcd736b5924d26f553cf",
+            "size": 12476
           },
           "tools/release/audit_binary.py": {
             "sha256": "cb4364da1e7fb8646315c3aa5dc8bc7e3d53f952411d55ed9faa525a56e67fd0",
@@ -15311,8 +15311,8 @@
             "size": 11416
           },
           "tools/release/ci_preflight.py": {
-            "sha256": "6f037165d77da130e201619101c8315df9ca28594862ff697ac5ef51827455b3",
-            "size": 10942
+            "sha256": "fc0f34653f10db284a7821562266c8ee326ee5dcc7f2555c846e34a8928e3064",
+            "size": 10893
           },
           "tools/release/generate_foundation_test_plan.py": {
             "sha256": "3b47413497298ab49141fb364ff15f9330f36242319ab4d557b2066b226a9ab4",
@@ -15323,8 +15323,8 @@
             "size": 4487
           },
           "tools/release/prebuilt_room_resources.py": {
-            "sha256": "0496bd93ca0d0ff56897d4c42d7b86abd343e24c93bdb9ec168088dd0208460a",
-            "size": 15153
+            "sha256": "5c3e362f16492b17f170eb0756a58c08da8708c133911572b659384de88da481",
+            "size": 15121
           },
           "tools/release/release_manifest.py": {
             "sha256": "b8eb8d1271d477b55435ff883837721c797f8286ee51a37a602d58702c8a8096",
@@ -15351,24 +15351,20 @@
             "size": 7061
           },
           "tools/release/verify_launcher_runtime.py": {
-            "sha256": "d4e7e8e2cd0d59bf486d2257a2ee582ba4e8e742e8b14016b547f7993e776189",
-            "size": 15655
+            "sha256": "eb21165d5048037c3538400b3fd2cbfc6096a6736412c455b6fff5649db5971d",
+            "size": 15618
           },
           "tools/report_backend/Dockerfile": {
             "sha256": "de45bd3dc1648cb9a7a50598547d04106edb51367276ca3993ecf2cd46623b44",
             "size": 150
           },
           "tools/report_backend/config.env.example": {
-            "sha256": "89b0cd89e185c76d6c4db8d05b080d725e81fde6eb588ee10e594d8a318a94a2",
-            "size": 109
-          },
-          "tools/report_backend/deploy.txt": {
-            "sha256": "67e7d690654107308ed3556a1d02c2d63377b006ddaf4cdc6b0292acd520d0d2",
-            "size": 1288
+            "sha256": "9ba1f086c3ca7abadadcac6b922e0f50f5c209770d748ebaf99b73f0f40dbecb",
+            "size": 137
           },
           "tools/report_backend/server.cjs": {
-            "sha256": "df03025b97ac70be37b959327c25d0632a29b3e4367a032e9dbe5e3f049e2d92",
-            "size": 7444
+            "sha256": "30600b50f2109889203988c83995c0687ba9c4886bf1d74bf92d89143790c696",
+            "size": 8420
           },
           "tools/report_backend/test_server.cjs": {
             "sha256": "6c654367e9ddd43f84fce60a3febbf70354650a243e73495c45bbf41251fc49e",
@@ -15399,20 +15395,20 @@
             "size": 3175
           },
           "tools/validation/pipeline.py": {
-            "sha256": "f10c95d407096021deb6f2cf56d297bfdabc09a8c004a6f1f408bd0da31e14b8",
-            "size": 61145
+            "sha256": "23a44c80568f635005e9c9190fa822f3be9c1bf6dd57938f5b9d777895468385",
+            "size": 63159
           },
           "tools/validation/release_layout.py": {
             "sha256": "47cc930899d240a1248c41909a6ac1096a6884b5f2fab2bb3e8b08d1625948cf",
             "size": 1782
           },
           "tools/validation/validate_challenge_overrides.py": {
-            "sha256": "5c05ef8ee76fa0b28d0c19a0ba9a9d75515d44dbdba6fbf97b9707cb435aa7af",
-            "size": 15546
+            "sha256": "47bacb0e6065c1d3d768cf0e57e3cd5186216813e9b43f36717aa4c00d986a9b",
+            "size": 15559
           },
           "tools/validation/validate_data.py": {
-            "sha256": "561781062ca999b0b1ffa354122d0486a94df95c7e1ec31ae9da2aa633a97a76",
-            "size": 78372
+            "sha256": "1c5fc2f903bb99d76a4ddecfc18e31bcc91013ca142cdb23a65359f83e6c3ac1",
+            "size": 78371
           },
           "tools/validation/validate_devinvloadout_package.py": {
             "sha256": "8cc372b5970dd439ce33b1a29e444124c5c4fb517ff980f4103f708fc7755f9f",
@@ -15423,7 +15419,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "3109c24f736b0509b5729c0f1e02a052825d2f92940edb8699c2f4124f19ade6",
+        "fingerprint": "72160a1dbb28bb14fe78e6312475bf212d97770af04bb4bfc5787298cc93e1d3",
         "kind": "working_tree_snapshot"
       }
     }

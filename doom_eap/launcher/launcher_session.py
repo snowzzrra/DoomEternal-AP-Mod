@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import ctypes
 from collections import Counter
+from itertools import chain
 from dataclasses import asdict
 from ctypes import wintypes
 import hashlib
 import importlib.util
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -16,6 +18,8 @@ import selectors
 import subprocess
 import sys
 import threading
+import stat
+import zipfile
 from types import SimpleNamespace
 
 from doom_eap.contracts.core_distribution import verify_runtime
@@ -372,6 +376,116 @@ class APSessionOwner:
                 or result.get("quarantine") is not False or result.get("namespace") != (namespace or self.namespace)):
             raise RuntimeError("Backup lacks compatible AP identity and native owner proof")
         return result
+
+    def game_processes(self, config: dict):
+        if os.name == "nt":
+            return windows_game_processes()
+        from doom_eap.runtime.proton import windows_processes
+        return windows_processes(config, self.client_dir / "APSessionOwner.exe")
+
+    def restart_campaign(self, snapshot, config: dict) -> Path:
+        from doom_eap.contracts.command_publication import queue_session_namespace
+        from doom_eap.runtime.client_state_store import ClientStateStore
+        from doom_eap.runtime.item_reconciliation import CLIENT_STATE_VERSION, default_session_state, migrate_client_state
+
+        with self._lock:
+            processes = self.game_processes(config)
+            if processes != ():
+                raise RuntimeError("Exit DOOM Eternal before creating a new AP game save; its process must be confirmed closed")
+            self.retire(processes)
+            root = Path(config["doom_base_dir"]).resolve()
+            if (root.parent / "sentinel-prelaunch.txt").exists():
+                raise RuntimeError("Another launcher owns an AP session; close it before restarting")
+            remote = Path(config["steam_remote_dir"]).resolve()
+            if remote.name.casefold() != "remote" or remote.parent.name != "782330" or remote.parent.parent.parent.name.casefold() != "userdata":
+                raise RuntimeError("Select the Steam account save provider before restarting")
+            local = Path(config["save_games_dir"]).resolve()
+            namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
+                                     snapshot.slot_data["native_generation_fingerprint"])
+            prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
+            state_key = prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]
+            state_file = Path(config["client_state_file"]).resolve()
+            raw = None
+            if state_file.exists():
+                with state_file.open("rb") as stream:
+                    raw = stream.read(16 * 1024 * 1024 + 1)
+            if raw is not None and len(raw) > 16 * 1024 * 1024:
+                raise RuntimeError("Local AP receipt state is too large to back up")
+            state = json.loads(raw) if raw is not None else {"version": CLIENT_STATE_VERSION, "sessions": {}}
+            if not isinstance(state, dict) or not isinstance(state.get("sessions"), dict):
+                raise RuntimeError("Local AP receipt state is unreadable; restart refused")
+            logger = logging.getLogger(__name__)
+            store = ClientStateStore(state_file, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
+                logger=logger, log_event=lambda kind, **details: logger.info("%s %s", kind, details))
+            keys = {key for key in state["sessions"] if key == prefix or key.startswith(prefix + ":")}
+            sources = [remote / ("ap-" + namespace[:40]), local / ("ap-" + namespace[:40]),
+                       self.data_dir / "campaigns" / namespace]
+            sources.extend(self.data_dir / "campaigns" / name for name in self.list_backups(snapshot))
+            queue = root / "ap_queue"
+            for key in keys | {state_key}:
+                sources.extend(queue.glob(f"recv-{queue_session_namespace(key)}-*"))
+            event_key = None
+            event_session = local / "ap_event_session.json"
+            if event_session.is_file():
+                event_key = json.loads(event_session.read_text(encoding="utf-8")).get("ap_state_key")
+            if event_key is None or event_key in keys | {state_key}:
+                for pattern in ("ap_event_*.txt", "ap_active_map*.txt", "ap_telemetry*.txt", "ap_condump*.txt", "ap_event_session.json"):
+                    sources.extend(local.glob(pattern))
+                sources.extend(root.glob("ap_transition_*.evt"))
+                from doom_eap.content.publisher_loader import load_publisher_contracts
+                sources.extend(local / trigger["filename"] for publisher in load_publisher_contracts()
+                               for trigger in publisher.triggers_for("map_event_file"))
+            sources = list(dict.fromkeys(path for path in sources if path.exists() or path.is_symlink()))
+            files = {}
+            for index, source in enumerate(sources):
+                for path in chain((source,), source.rglob("*") if source.is_dir() else ()):
+                    info = path.lstat()
+                    if getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
+                        raise RuntimeError("AP restart refuses linked or special save files")
+                    if path.is_file():
+                        name = f"{index}/{path.relative_to(source).as_posix() if source.is_dir() else source.name}"
+                        files[name] = (path, hashlib.sha256(path.read_bytes()).hexdigest())
+            token = secrets.token_hex(16)
+            backup = self.data_dir / "campaigns" / "restarts" / token
+            backup.mkdir(parents=True, exist_ok=False)
+            archive = backup / "campaign.zip"
+            with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as output:
+                for name, (path, digest) in files.items():
+                    output.write(path, name)
+                if raw is not None:
+                    output.writestr("client_state.json", raw)
+                output.writestr("room.json", json.dumps({"seed": snapshot.seed_name, "team": snapshot.team,
+                    "slot": snapshot.slot, "namespace": namespace, "sources": [str(path) for path in sources],
+                    "sha256": {name: digest for name, (_, digest) in files.items()}}))
+            with archive.open("r+b") as stream:
+                os.fsync(stream.fileno())
+            with zipfile.ZipFile(archive) as saved:
+                if saved.testzip() is not None or any(hashlib.sha256(saved.read(name)).hexdigest() != digest for name, (_, digest) in files.items()):
+                    raise RuntimeError("AP backup verification failed; existing saves were kept")
+                if raw is not None and saved.read("client_state.json") != raw:
+                    raise RuntimeError("AP receipt backup verification failed; existing saves were kept")
+            if self.game_processes(config) != ():
+                raise RuntimeError("DOOM Eternal started during backup; existing saves were kept")
+            moved = []
+            try:
+                for source in sources:
+                    target = source.with_name("." + source.name + "-restart-" + token)
+                    os.replace(source, target)
+                    moved.append((source, target))
+                for key in keys:
+                    state["sessions"].pop(key)
+                state["sessions"][state_key] = default_session_state()
+                store.commit(state, reason="campaign_restart")
+            except BaseException:
+                for source, target in reversed(moved):
+                    os.replace(target, source)
+                if raw is not None:
+                    store.commit(json.loads(raw), reason="campaign_restart_rollback")
+                elif state_file.exists():
+                    state_file.unlink()
+                raise
+            self.namespace = ""
+            return archive
 
     def list_backups(self, snapshot) -> list[str]:
         namespace = namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,

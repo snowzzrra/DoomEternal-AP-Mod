@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 import importlib
+import pytest
 from types import SimpleNamespace
 
 
@@ -10,7 +11,6 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
     root = Path(__file__).resolve().parents[1]
     archipelago = root.parent / "Archipelago"
     if not (archipelago / "CommonClient.py").is_file():
-        import pytest
         pytest.skip("Archipelago source required for bridge integration")
     configuration = tmp_path / "config.json"
     for directory in (tmp_path / "game/base", tmp_path / "local", tmp_path / "Steam/userdata/1/782330/remote"):
@@ -81,6 +81,14 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
         assert context.validate_item_history_prefix()
         assert not context.item_delivery_blocked and events[-1][1]["status"] == "ready"
         assert context.session_state == saved
+
+        context.items_received = history + [history[0]]
+        assert context.validate_item_history_prefix() and not context.item_delivery_blocked
+        context._item_history_received = False
+        event_count = len(events)
+        with pytest.raises(ValueError, match="full server item history"):
+            context.validate_item_history_prefix()
+        assert len(events) == event_count and context.session_state == saved
 
     asyncio.run(consume())
 from dataclasses import replace

@@ -29,6 +29,77 @@ def test_support_condump_uses_workflow_session_owner(tmp_path):
     assert owner.observe.call_count >= 2 and controller._condump_pending is None
 
 
+def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeypatch):
+    from pathlib import Path
+    import zipfile
+    from doom_eap.runtime.client_state_store import ClientStateStore
+    from doom_eap.contracts.command_publication import queue_session_namespace
+    from doom_eap.runtime.weapon_points import namespace_id
+
+    snapshot = SimpleNamespace(seed_name="same-world", team=0, slot=1,
+                               slot_data={"native_generation_fingerprint": "a" * 64})
+    namespace = namespace_id(snapshot.seed_name, 0, 1, "a" * 64)
+    key = "same-world:0:1:" + "a" * 64
+    owner = APSessionOwner(tmp_path, tmp_path / "data", tmp_path / "state")
+    config = {"doom_base_dir": str(tmp_path / "game/base"),
+              "steam_remote_dir": str(tmp_path / "Steam/userdata/123/782330/remote"),
+              "save_games_dir": str(tmp_path / "saved/base"),
+              "client_state_file": str(tmp_path / "client_state.json")}
+    sources = [Path(config["steam_remote_dir"]) / ("ap-" + namespace[:40]),
+               Path(config["save_games_dir"]) / ("ap-" + namespace[:40]),
+               owner.data_dir / "campaigns" / namespace]
+    for source in sources:
+        source.mkdir(parents=True)
+        (source / "fixture").write_bytes(b"old campaign")
+    old_backup = owner.data_dir / "campaigns" / "transport-backup-old"
+    old_backup.mkdir()
+    (old_backup / "transport.manifest").write_text(f"namespace={namespace}\n")
+    queue = Path(config["doom_base_dir"]) / "ap_queue"
+    queue.mkdir(parents=True)
+    pending = queue / f"recv-{queue_session_namespace(key)}-0-item-1.processing"
+    pending.write_bytes(b"old item must not reach the new save")
+    goal = Path(config["doom_base_dir"]) / "ap_transition_goal.evt"
+    goal.write_bytes(b"old goal")
+    marker = Path(config["save_games_dir"]) / "ap_event_session.json"
+    marker.write_text(json.dumps({"ap_state_key": key}))
+    foreign = queue / "recv-ffffffffffffffff-1.cmd"
+    foreign.write_bytes(b"other room")
+    original = {"version": 2, "sessions": {key: {"processed_items": 13}, "other-world:0:1": {"processed_items": 7}}}
+    state_file = Path(config["client_state_file"])
+    state_file.write_text(json.dumps(original))
+    monkeypatch.setattr(owner, "game_processes", lambda config: None)
+    with pytest.raises(RuntimeError, match="confirmed closed"):
+        owner.restart_campaign(snapshot, config)
+    assert all(source.exists() for source in sources) and pending.exists()
+    monkeypatch.setattr(owner, "game_processes", lambda config: ())
+    commit = ClientStateStore.commit
+
+    def fail_after_publish(store, state, **options):
+        commit(store, state, **options)
+        if options.get("reason") == "campaign_restart":
+            raise OSError("publication fixture")
+
+    with monkeypatch.context() as patching:
+        patching.setattr(ClientStateStore, "commit", fail_after_publish)
+        with pytest.raises(OSError, match="publication fixture"):
+            owner.restart_campaign(snapshot, config)
+    assert json.loads(state_file.read_text()) == original
+    assert all((source / "fixture").read_bytes() == b"old campaign" for source in sources) and pending.exists()
+    archive = owner.restart_campaign(snapshot, config)
+    with zipfile.ZipFile(archive) as backup:
+        assert backup.testzip() is None and json.loads(backup.read("client_state.json")) == original
+        assert json.loads(backup.read("room.json"))["seed"] == "same-world"
+        assert sum(backup.read(name) == b"old campaign" for name in backup.namelist()) == 3
+    saved = json.loads(state_file.read_text())
+    assert saved["sessions"][key]["processed_items"] == 0
+    assert saved["sessions"]["other-world:0:1"] == original["sessions"]["other-world:0:1"]
+    assert all(not source.exists() for source in sources) and not pending.exists()
+    assert foreign.read_bytes() == b"other room"
+    assert not goal.exists() and not marker.exists()
+    assert not old_backup.exists() and owner.list_backups(snapshot) == []
+    _verify_new_campaign_receipts(state_file, snapshot)
+
+
 def test_admission_identity_and_unknown_exit_preserve_owner(tmp_path):
     owner = APSessionOwner(tmp_path, tmp_path / "data", tmp_path / "state")
     owner._handle = 123

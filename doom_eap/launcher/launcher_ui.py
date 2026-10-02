@@ -917,8 +917,8 @@ class LauncherUI(QMainWindow):
         actions.addWidget(self.stop_button)
         layout.addLayout(actions)
         backup_actions = QHBoxLayout()
-        backup_button = QPushButton("AP BACKUPS…")
-        backup_button.setToolTip("Create, browse or restore backups for this room's AP campaign. Restore requires DOOM Eternal to be closed.")
+        backup_button = QPushButton("AP SAVE…")
+        backup_button.setToolTip("Back up, restore or start a new game save in the same room. Restart and restore require DOOM Eternal to be closed.")
         backup_button.clicked.connect(self._ap_save_actions)
         backup_actions.addWidget(backup_button)
         backup_actions.addStretch()
@@ -1825,9 +1825,9 @@ class LauncherUI(QMainWindow):
             self._append_log("Room package uninstall failed.")
 
     def _ap_save_actions(self) -> None:
-        choices=["Create backup", "Open backup folder", "Restore compatible backup"]
-        action,accepted=QInputDialog.getItem(self,"AP campaign backups",
-            "Protect this room's AP progress.\nCreate or restore a compatible save backup.",choices,0,False)
+        choices=["Create backup", "Open backup folder", "Restore compatible backup", "New DOOM save in this room"]
+        action,accepted=QInputDialog.getItem(self,"AP game save",
+            "Manage this room's DOOM Eternal save.\nA new game save keeps the same multiworld and backs up your local progress first.",choices,0,False)
         if not accepted:
             return
         try:
@@ -1837,6 +1837,14 @@ class LauncherUI(QMainWindow):
                 QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.controller.user_paths.data_dir / "campaigns")))
             elif action=="Create backup":
                 self.controller.request_ap_backup()
+            elif action=="New DOOM save in this room":
+                if QMessageBox.question(self,"New DOOM Eternal save",
+                        "Back up this room's game save and local AP progress, then start a fresh DOOM Eternal save in the same room?\n\n"
+                        "Exit DOOM Eternal first. The launcher will disconnect. Reconnect to the same room and click Play. "
+                        "Server progress is kept; its current items will be delivered to the new save. Other rooms and vanilla saves are kept.",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
+                    self.controller.request_new_ap_save()
             else:
                 backups=self.controller.ap_backups()
                 if not backups:
@@ -2015,6 +2023,13 @@ class LauncherUI(QMainWindow):
         if value:
             self.saves_root.setText(value)
 
+    def _render_item_history_status(self, event: dict[str, object]) -> None:
+        blocked = event.get("status") == "blocked"
+        self.player_inventory.setText(str(event.get("message", "")))
+        self._set_inventory_tile("server history mismatch" if blocked else "history matches",
+                                 self.COLORS["bad"] if blocked else self.COLORS["good"])
+        self.resync_inventory_button.setEnabled(not blocked and self._room_connected)
+
     def _render_room(self, event: dict[str, object]) -> None:
         self.room_event = dict(event)
         def text_or(value: object, fallback: str) -> str:
@@ -2036,6 +2051,9 @@ class LauncherUI(QMainWindow):
         self._set_inventory_tile("synced", self.COLORS["good"])
         self._set_ammo_refill_indicator(event.get("ammo_refills_available"))
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
+        history = self.controller.item_history_status
+        if history:
+            self._render_item_history_status(history)
         self.session_uninstall_button.setEnabled(self._room_connected)
         self._clear_drift()
         raw_slot_data = event.get("slot_data")
@@ -2870,11 +2888,8 @@ class LauncherUI(QMainWindow):
             )
             return
         if kind == "item_history_status":
-            blocked = event.get("status") == "blocked"
             message = str(event.get("message", ""))
-            self.player_inventory.setText(message)
-            self._set_inventory_tile("server history mismatch" if blocked else "history matches", self.COLORS["bad"] if blocked else self.COLORS["good"])
-            self.resync_inventory_button.setEnabled(not blocked and self._room_connected)
+            self._render_item_history_status(event)
             self._append_log(message)
             return
         if kind == "inventory_resync":

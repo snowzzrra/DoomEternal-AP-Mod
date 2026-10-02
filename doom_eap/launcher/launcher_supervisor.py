@@ -259,6 +259,9 @@ class BridgeSupervisor:
             }
         )
 
+    def wait_stopped(self, timeout: float) -> bool:
+        return not self.running or self._stopped.wait(timeout)
+
     def stop(self, timeout: float = 5.0, *, emit_disconnected: bool = True) -> None:
         """Request shutdown and return without waiting for worker process."""
         process = self._process

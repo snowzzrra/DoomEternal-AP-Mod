@@ -157,6 +157,7 @@ class LauncherController:
         )
         self.state = LauncherState.IDLE
         self.connected_room = False
+        self.item_history_status: dict[str, object] | None = None
         self.supervisor: BridgeSupervisor | None = None
         self._lifecycle_lock = threading.Lock()
         self._condump_lock = threading.Lock()
@@ -1083,6 +1084,8 @@ class LauncherController:
         with self._lifecycle_lock:
             if supervisor is not self.supervisor:
                 return
+            if kind == "item_history_status":
+                self.item_history_status = dict(event)
             if kind == "error" and not event.get("failure_domain"):
                 event = enrich_connection_failure(event, attempt_id=self.connection_attempt_id)
                 self.last_connection_error = dict(event)
@@ -1311,11 +1314,14 @@ class LauncherController:
         except ValueError as error:
             raise ValueError(str(error)) from error
         with self._lifecycle_lock:
+            if "new_ap_save" in self.workers.active:
+                raise RuntimeError("Wait for the AP save backup and restart to finish before reconnecting")
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
                 raise RuntimeError("disconnect the current bridge worker before connecting again")
             if self.state is LauncherState.DISCONNECTING:
                 raise RuntimeError("bridge worker is still disconnecting")
             self.connection_attempt_id += 1
+            self.item_history_status = None
             self.setup.invalidate()
         self.interactions.cancel_all()
         self.save_config(
@@ -1515,6 +1521,29 @@ class LauncherController:
             raise RuntimeError("Connect to a room before selecting its AP backups")
         return self.workflow.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
 
+    def request_new_ap_save(self) -> bool:
+        if not self.connected_room or not self.setup.current_event:
+            raise RuntimeError("Connect to the existing room before creating its new game save")
+        if self.workflow.session_owner.game_processes(self.config) != ():
+            raise RuntimeError("Exit DOOM Eternal before creating a new AP game save")
+        snapshot = RoomSnapshot.from_event(self.setup.current_event)
+        configuration = dict(self.config)
+        supervisor = self.supervisor
+        self.disconnect()
+
+        def operation(job):
+            job.check()
+            if supervisor is not None and not supervisor.wait_stopped(15):
+                raise RuntimeError("The bridge has not stopped; existing saves were kept")
+            archive = job.publish(lambda: self.workflow.session_owner.restart_campaign(snapshot, configuration))
+            self.emit("ap_backup_result", message=(
+                f"Your previous game save and AP receipt state were backed up to {archive}. "
+                "Reconnect to the same room, then click Play to create a fresh DOOM Eternal save. "
+                "The multiworld is unchanged; items in the server's current history will be delivered to the new save."
+            ))
+
+        return self.workers.submit("new_ap_save", operation, generation=self.workers.generation)
+
     def request_ap_backup(self, *, restore=None) -> bool:
         if not self.connected_room or not self.setup.current_event:
             raise RuntimeError("Connect to a room before managing its AP save")
@@ -1566,6 +1595,7 @@ class LauncherController:
             supervisor = self.supervisor
             self._pending_connect = None
             self.connected_room = False
+            self.item_history_status = None
             self.last_setup_failure = None
             self.last_room_package_issue = None
             if supervisor is None:

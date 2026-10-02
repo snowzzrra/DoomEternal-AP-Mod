@@ -4,9 +4,13 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[1]
+    if not (root.parent / "Archipelago" / "CommonClient.py").is_file():
+        pytest.skip("Archipelago source required for bridge integration")
     for directory in (tmp_path / "game/base", tmp_path / "local", tmp_path / "Steam/userdata/1/782330/remote"):
         directory.mkdir(parents=True)
     config = tmp_path / "config.json"
