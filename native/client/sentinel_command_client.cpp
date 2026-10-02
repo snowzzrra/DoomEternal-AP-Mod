@@ -57,6 +57,8 @@ bool SentinelCommandClient::ExecuteConsoleCommand(const std::string& command) {
     for (;;) {
         if (reply.result == sentinel::ProbeResult::ok) {
             const auto& execution = reply.command.execution;
+            if (execution.state >= SC_DIAGNOSTIC_EXECUTED)
+                sentinel::query_command(pid_, 500, sentinel::command_release_operation, request);
             if (execution.state == SC_DIAGNOSTIC_EXECUTED) {
                 status_ = reply.command.native_exception;
                 result_ = reply.command.outcome == SC_COMMAND_DISPATCHED ? AP_RPC_DELIVERED :

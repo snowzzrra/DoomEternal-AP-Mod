@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import re
+import tempfile
 import time
 import zipfile
 from collections.abc import Mapping, Sequence
@@ -1408,7 +1409,9 @@ def write_support_bundle(
                 "line_count": len(safe_logs.splitlines()),
             }
         payload["log_provenance"] = sanitize_support_value(provenance)
-    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
+    os.close(descriptor)
+    temporary = Path(temporary_name)
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
         if "launcher.log" not in tails:

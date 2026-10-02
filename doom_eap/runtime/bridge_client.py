@@ -3564,9 +3564,7 @@ class DoomEternalContext(CommonContext):
                     owner, authoritative = self.weapon_points_receipt_owner()
                     owner.reconcile(authoritative)
                 except (RuntimeError, OSError, ValueError) as error:
-                    logger.error("[WUP] Native checkpoint reconciliation blocked: %s", error)
-                    self.item_delivery_blocked = True
-                    return False
+                    logger.warning("[WUP] Native checkpoint reconciliation deferred: %s", error)
             batch_count = 0
             fresh_receipt_boundary = self.items_processed
             while len(self.items_received) > self.items_processed:

@@ -1,6 +1,72 @@
 import copy
 import json
 import logging
+import asyncio
+import importlib
+from types import SimpleNamespace
+
+
+def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    archipelago = root.parent / "Archipelago"
+    if not (archipelago / "CommonClient.py").is_file():
+        import pytest
+        pytest.skip("Archipelago source required for bridge integration")
+    configuration = tmp_path / "config.json"
+    for directory in (tmp_path / "game/base", tmp_path / "local", tmp_path / "Steam/userdata/1/782330/remote"):
+        directory.mkdir(parents=True)
+    configuration.write_text(json.dumps({
+        "doom_base_dir": str(tmp_path / "game/base"),
+        "save_games_dir": str(tmp_path / "local"),
+        "steam_remote_dir": str(tmp_path / "Steam/userdata/1/782330/remote"),
+        "client_state_file": str(tmp_path / "state.json"),
+        "bridge_log_path": str(tmp_path / "bridge.log"),
+    }))
+    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(configuration))
+    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
+    monkeypatch.syspath_prepend(str(archipelago))
+    monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
+    bridge = importlib.import_module("doom_eap.runtime.bridge_client")
+
+    async def consume():
+        context = bridge.DoomEternalContext(None, None)
+        context.state_key = "room"
+        context.server = object()
+        context.auth = "Review"
+        context.slot = 1
+        context.item_state_ready = True
+        context.session_state = bridge.default_session_state()
+        context.session_state["weapon_points"] = {"version": 1}
+        context.items_received = [
+            SimpleNamespace(item=7770016, location=11, player=1, flags=0),
+            SimpleNamespace(item=7770904, location=12, player=1, flags=1),
+        ]
+        checkpoint = []
+        notifications = []
+
+        def reconcile(_history):
+            checkpoint.append(True)
+            raise RuntimeError("native queue full")
+
+        monkeypatch.setattr(context, "weapon_points_receipt_owner", lambda: (SimpleNamespace(reconcile=reconcile), {}))
+        monkeypatch.setattr(context, "_reconcile_native_receipt_owners", lambda _: None)
+        from doom_eap.contracts.runtime_context import RuntimeContext
+        runtime_context = RuntimeContext("base/e1m1_intro", "Base", ("game/sp/e1m1_intro/e1m1_intro",), ("e1m1_intro",), frozenset())
+        monkeypatch.setattr(context, "_refresh_runtime_context", lambda _: runtime_context)
+        monkeypatch.setattr(context, "_active_materialization_lease", lambda _: "42:1")
+        monkeypatch.setattr(context, "spool_item_commands", lambda item, index, **kw: (notifications.append((item, index)) or True, ""))
+        monkeypatch.setattr(context, "spool_deferred_receipt_notification", lambda item, index, **kw: (notifications.append((item, index)) or True, ""))
+        monkeypatch.setattr(context, "persist_session_state", lambda: None)
+        monkeypatch.setattr(context, "_reconcile_blood_punch", lambda _: None)
+        monkeypatch.setattr(context, "_trigger_live_context_materialization", lambda: None)
+        monkeypatch.setattr(context, "onboard_bootstrap", lambda _: None)
+        await context.process_pending_item_receipts("received_items")
+        assert checkpoint == [True]
+        assert context.items_processed == 2
+        assert notifications == [(7770016, 0), (7770904, 1)]
+        assert context.session_state["weapon_points"] == {"version": 1}
+
+    asyncio.run(consume())
 from dataclasses import replace
 from pathlib import Path
 

@@ -7,6 +7,37 @@ import pytest
 from doom_eap.runtime.command_spool import CommandSpool
 
 
+def test_support_report_uses_its_own_closed_archive(tmp_path, monkeypatch):
+    import json
+    import zipfile
+    from doom_eap.launcher import launcher_doctor as doctor
+
+    destination = tmp_path / "support.zip"
+    previous_temporary = destination.with_suffix(".zip.tmp")
+    previous_temporary.write_bytes(b"another export owns this file")
+    monkeypatch.setattr(doctor, "_support_log_tails", lambda *args, **kwargs: ({}, {}))
+    publish = doctor.publish_file
+    sources = []
+
+    def publish_closed_archive(source, target, **kwargs):
+        assert source != previous_temporary
+        with zipfile.ZipFile(source) as archive:
+            assert archive.testzip() is None
+            assert json.loads(archive.read("doctor.json"))["version"] == "test"
+        sources.append(source)
+        publish(source, target, **kwargs)
+
+    monkeypatch.setattr(doctor, "publish_file", publish_closed_archive)
+    report = doctor.DoctorReport("test", ())
+    with previous_temporary.open("rb") as held:
+        first = doctor.write_support_bundle(destination, report)
+        original = first.read_bytes()
+        second = doctor.write_support_bundle(destination, report)
+        assert first != second and first.read_bytes() == original
+        assert held.read() == b"another export owns this file"
+    assert len(set(sources)) == 2 and not any(source.exists() for source in sources)
+
+
 @pytest.fixture
 def io_boundary(tmp_path):
     gate = []

@@ -1,10 +1,10 @@
 {
   "base_mod": {
-    "sha256": "6dbc397eab603b64fb29ac902e5a556643cc2ea3b2b6b9c6b9373c9967af21e5",
-    "size": 13622195
+    "sha256": "5d91e31fdd81115f40ee84a4b622e07fc1e912d4dfb2f51d0172984307068aa2",
+    "size": 13622383
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
-  "inputs_count": 379,
+  "inputs_count": 380,
   "release_version": "0.5.2",
   "room_payload_manifest": {
     "sha256": "30a33b75bf3b141dce53fad4e53617136715b7ce09daa32e9e5131afe5df5a77",
@@ -14,7 +14,7 @@
     "sha256": "b8184dc3a61f284f5701df29a0480c2d848123e67ec0156d6fbed174418719c5",
     "size": 2202482
   },
-  "room_resource_input_fingerprint": "26e8db930bf5d044d979b53bc4b98247b123cf19f4cfb60d6c482210973e5938",
+  "room_resource_input_fingerprint": "342b41f94782da94b2934c8bb3922951ec1ca7b17a167ec3822e92847d8e3a2d",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -96,7 +96,7 @@
     "content/maps/e3m4_boss/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
     "content/maps/e3m4_boss/descriptor.json": "1f26cf43e97b5adcf7e5390e775c5717d079744b735294a5e9ec86fd5ed7735b",
     "content/maps/e3m4_boss/locations.json": "11c3191d787602639d2426ef588c4de9ecf9320005dff1fcf0e50eef0c4e5587",
-    "content/maps/e3m4_boss/onboarding.json": "42ef6622eeb1612c9465a58f18ad00159a9d115f0a556ff5009f5eb6d9a05e43",
+    "content/maps/e3m4_boss/onboarding.json": "b3b74abafa3b117c1fe56f757e71371ddd8bfdf77d527d193237547e8647d6b8",
     "content/maps/e3m4_boss/publishers.json": "f9a2474f625841194ff8c552434e18311c0de28541372d516eebf3da608d40e9",
     "content/maps/e3m4_boss/runtime.json": "bfb4df80f7eded04d054cd2f8bad6e261991ad4f8da5b014eb8ef131674406f2",
     "content/maps/e4m1_rig/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
@@ -152,7 +152,7 @@
     "data/automap_native_decl_sources/e1m1_intro/generated/decls/propitem/propitem/collectible/default.decl": "3a7b87f0a274863538a142d0708353b796b4f6b18bdc10f904e9990e8f9469fa",
     "data/automap_native_decl_sources/e1m1_intro/generated/decls/propitem/propitem/collectible/toys/default.decl": "e571e82a3059d05d734a78bf5320b4f0ac0360b22ad921d57282536b88743fe5",
     "data/automap_native_decl_sources/e1m1_intro/generated/decls/propitem/propitem/collectible/toys/doom_slayer.decl": "1c221458498ddde1df81ab8cf50a24d5c4d3671fd1227a819bd696cd5881230b",
-    "data/campaign_goal_contract.json": "5f52272fd0501eb5db32427630def50df8d58249881a327c75ead79e584ff253",
+    "data/campaign_goal_contract.json": "7912eb88b8d7b66c230c749b83be44bb957e0ef9df2bd8c2fca68e7d085874f5",
     "data/campaign_sources/dlc1.decl": "7f691e46bd8c23918e57f67825b77af09c90100f111dfff53008afb1ec19ae17",
     "data/campaign_sources/dlc2.decl": "8bc7ee0cb564c40a50b3306a301f085943c9c4a8eb3f71d6108d1e859840c5a4",
     "data/campaign_sources/hub.decl": "a3dab6fa9d77e8ccf4c5a6113ce576f4eb6d959d93ace8bc4dabf245cfa9c3e1",
@@ -164,7 +164,7 @@
     "data/campaign_stages.json": "19a18381059532b035b6cb7949baa83765c13c294ea9cad6948f6e6bd9a61403",
     "data/challenge_location_registry.json": "047519463858991f9cb076b527f04bb960d01f62d86ea3f33eb8200ee7c9f832",
     "data/checked_location_visuals.json": "eddf348f262b53ad6dc2ece3c2ac6336a5e40a67b5fc32e273df7b113c4ae61d",
-    "data/content_identity.json": "b87faef33682c142fcf0cd763eab7c283fcac0f38dee7c6b1c3b96fb4a446a69",
+    "data/content_identity.json": "278541e678d49338202aa31215dfb05a37ab5f4b01e31e9322403480f4087467",
     "data/contextual_location_names.json": "22ca0eba0c0433809fef6db237b6e040d527bcd9046d2ab1ed104b53da911b17",
     "data/devinv_sources/tag/e4m1_rig.decl": "bddcb02c136895c470bbd88a03216086a2e00406bd6fe1d80f347d7f0a797660",
     "data/devinv_sources/tag/e4m2_swamp.decl": "843cdf89f2a48936f7b40ba4bf3ec90a4d73da8368de373d769145cdfa491094",
@@ -176,7 +176,7 @@
     "data/devinv_start_mapping.json": "b6152092647d89fc8d30a98cf73742178ebacd51adb22e578f257619fd94353e",
     "data/fast_travel.json": "d7d4b58f7c8e651a838605cea34506b3781e88a02cfa9d543416c4e4dd7450e4",
     "data/fortress_battery_labels.json": "fe9ab0fc491b4d1801d2061981a01efa22962eaec68c3c2b48a46b75e3d23ff7",
-    "data/foundation_contracts.json": "e6f23465edaad02f96f208ebb58f0db4522c5d31a024a2ae4e33a07d42b151f8",
+    "data/foundation_contracts.json": "dda652528040189f2b3831bb759afc819cd6363746fa7967b841e5e058acc675",
     "data/item_classifications.json": "5902a9feb09fabe25208104eb02f99b98d6f1551d41ff984c0c87c6143c1c3c0",
     "data/item_replay_policies.json": "aef44d95796a3b762d8438184f4f2805d87275fcb9a6f8cf58c0a1e0ef2e56ce",
     "data/item_runtime_contracts.json": "c133cf5801ca81237a1b4df4c05d6f5747f416775864eb9fd0ba2f1886f1e953",
@@ -186,10 +186,11 @@
     "data/map_sources.json": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
     "data/mission_complete_map_contracts.json": "f1b4cfbf45f7960cc4f2bfa765a4ffc35ce72641092e87a566df0b8266edb2e9",
     "data/observer_contracts.json": "3e604750ef57c6164eeb30edd785e1efc286062b981c51efddd040bfe74a4b98",
-    "data/options_schema.json": "e3eb7701b6ec067dd904525a773d30cd3976f799e57ae8e4b1e115a3d50dcb88",
+    "data/options_schema.json": "2e067b95582ddb7a83813b156ac4497a82fb3a0323049b548f5e223bfc945c56",
     "data/perk_candidates.json": "0d989a009c6907a3930f874312caeaf377b14e6069f50a478961b2e316a7ba71",
     "data/physical_pickups.json": "15c04c2be5c2c1fde1ed2808760a92878ec8979d3270a6757f214969821db074",
     "data/publisher_contracts.json": "59f57b890a0f4c779162c5bfb86f008e86d90fb444041c1f2da54b7ea7847186",
+    "data/report_endpoint.json": "156af67e8895f050917c8d50493b4f88a699a9abcd7128b32f60240f4deed3f3",
     "data/runtime_contexts.json": "154593d920ef448b74b9c8dc5ea21af421ba82025114495038494d266960b440",
     "data/runtime_locations.json": "51c616fe66b9667c997d68eccb0f68695c90a6a8f6f0fad355257bd0004f0891",
     "data/scripted_location_contracts.json": "1d1801f76c4378809f1cc9415a0555d32947142634c7e4a99831a8beda6f1636",
@@ -212,9 +213,9 @@
     "doom_eap/contracts/check_observation.py": "9d460751c0857e7db7045ec6f2238f5728d136d2fd0e4068b7b4e0c16231f658",
     "doom_eap/contracts/command_publication.py": "9d1cc1ab0ede2d9f57dc107d89af47fc0c55dd427d88cc4c20e96717054ab981",
     "doom_eap/contracts/core_distribution.py": "7c0d68894c48fc3e754a80d93edc03ad8140917b8f5b9df28b8d8e8e8ed57450",
-    "doom_eap/contracts/foundation.py": "f6c13ca6ea8a780b309e74069795ac8cde690d1be43555bc1d9b9a46d63ef509",
+    "doom_eap/contracts/foundation.py": "28260bd66487aa2921731ec419995fc07056b9a25b5f8699b2c9cfaee4efc1a7",
     "doom_eap/contracts/goal_policy.py": "0aacdc0a0c1aa52535a0a7c341eb337d40ee6391edbd3a22671a6b28a2594c74",
-    "doom_eap/contracts/inventory_domain.py": "6e361e81e0c4f8c61f231143739087b3e0edbdea4138d007b4ca3bc0612adbd8",
+    "doom_eap/contracts/inventory_domain.py": "87738c4009650d914f4ed3d8df63ebad9f64e65427e2d2964a8f83ed705755b5",
     "doom_eap/contracts/item_contracts.py": "c75f091dcf77c7641632623a1f2f0263e450f4d63bc82a30d69521e1c2eb843a",
     "doom_eap/contracts/materialization.py": "b4fd7c5a2a4ab0b5d8ed3e2cc35880f271f5574098c1f4c2edbc79ce4eb8fb85",
     "doom_eap/contracts/ownership.py": "255370c23d8f2e0219b0833815bb1e173ddb87d36e7152b175aa05e605a4deba",
@@ -225,7 +226,7 @@
     "doom_eap/contracts/source_bytes.py": "9a9c41e4d61d7c84e4cf16167bcb36c3f6403f44334d52c6dfdc0ccda356bcba",
     "doom_eap/contracts/tag_prerequisites.py": "76f605b03424824de269aaa4fed88425e950f0d687a09095dcdd5d8e73cad907",
     "doom_eap/launcher/launcher_core.py": "3b2234f412e0c8920df420c028e681355ddf46277857e6c09fe2a211c7c89306",
-    "doom_eap/runtime/context_registry.py": "da0615042a3deb45ae53e7ffd98f96c0fac3ea3a300c7c0b04aea04a9b05836c",
+    "doom_eap/runtime/context_registry.py": "8b813d6a4b6de566255dba8f7b39ecb40706e679f5112e5f860315939cfee67b",
     "doom_eap/runtime/save_records.py": "96065b79896e964c47e5855c4035b1eb3ea13b56c0bcb7025b0593c25955a106",
     "manifests/e1m1_intro.json": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
     "manifests/e1m2_war.json": "c7ccd0f5ef1915074a6ade712fb5136ff51c78f35ac0d9e377db19151e1affe0",
@@ -252,7 +253,7 @@
     "packaging/mod_assets/e1m1_intro/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m1_intro/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m1_intro/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
+    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
     "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": "fdbea7b7965a0a15ba0720902774c7508467e276a3ef2386774cf30c588aaf93",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
@@ -260,75 +261,75 @@
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m3_cult/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e1m3_cult_patch3/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e1m3_cult_patch3/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e1m4_boss/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m4_boss/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e1m4_boss_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e1m4_boss_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e2m1_nest/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m1_nest/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m1_nest/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e2m1_nest_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e2m1_nest_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e2m2_base/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m2_base/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m2_base/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
+    "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
     "packaging/mod_assets/e2m3_core/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m3_core/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m3_core/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e2m3_core_patch3/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e2m3_core_patch3/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e2m4_boss/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m4_boss/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e2m4_boss_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e2m4_boss_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e3m1_slayer/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m1_slayer/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m1_slayer/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e3m1_slayer_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e3m1_slayer_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e3m2_hell/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m2_hell/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m2_hell/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
     "packaging/mod_assets/e3m2_hell_b/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m2_hell_b/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m2_hell_b/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e3m2_hell_b_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-    "packaging/mod_assets/e3m2_hell_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e3m2_hell_b_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+    "packaging/mod_assets/e3m2_hell_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e3m3_maykr/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m3_maykr/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m3_maykr/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
+    "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
     "packaging/mod_assets/e3m4_boss/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m4_boss/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e3m4_boss_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e3m4_boss_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_destroyer/icon_destroyer_info_logic.decl": "30154762f1182c91a58f18c6e7edf8655e5152f03c3e1ab953b6fd46d80819ef",
     "packaging/mod_assets/e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_of_sin_death/icon_of_sin_death_cinematic_info_logic.decl": "6dc720eddcad383dedb7ef89e91fe8cf81f3d0106fab187b99abd13c301c0550",
     "packaging/mod_assets/e4m1_rig/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e4m1_rig/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e4m1_rig/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
     "packaging/mod_assets/e4m1_rig_patch2/generated/decls/logicentity/maps/game/dlc/e4m1_rig/e4m1_rig_cinematic_intro/intro_info_logic.decl": "a14214175ef39277b52845c7095685189d919327dc085c1d7929ef6084700645",
-    "packaging/mod_assets/e4m1_rig_patch2/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e4m1_rig_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e4m2_swamp/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e4m2_swamp/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e4m2_swamp/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e4m2_swamp_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e4m2_swamp_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e4m3_mcity/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e4m3_mcity/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e4m3_mcity/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e4m3_mcity_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e4m3_mcity_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e5m1_spear/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e5m1_spear/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e5m1_spear/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e5m1_spear_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e5m1_spear_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e5m1_spear_patch2/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_intro/cinematic_intro_info_logic.decl": "13d43b7dc0823100b61d900821fa112a7cfc74eec83622a3d49f32a72abae162",
     "packaging/mod_assets/e5m2_earth/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e5m2_earth/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e5m2_earth/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e5m2_earth_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e5m2_earth_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e5m3_hell/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e5m3_hell/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e5m3_hell/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e5m3_hell_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/e5m3_hell_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e5m4_boss_patch1/generated/decls/logicentity/maps/game/dlc2/e5m4_boss/e5m4_boss_cinematics_death_of_the_darklord/death_of_the_darklord_info_logic.decl": "09e8ca10d30b66dc31eeb2adc7b3e913214296ec02dbb113f37d35627b793f25",
     "packaging/mod_assets/gameresources/swf/hud/menus/dossier/dossier_challenges.swf": "f1efea5a51f2635e73257979f1d327438821f2cc8828aa784496b069b9fb5188",
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/doom_logo_base.png$bc7$streamed$mtlkind=ui": "8bbb2b444570c83dcc5ce5473dbfb0d56885c97781e39720586f31fcb58c73b9",
@@ -346,7 +347,7 @@
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/logo_base_scanline_b.png$bc7$streamed$mtlkind=ui": "d94876fcd004b124dfd8e33dd1654f5f06e9efd684338aa4c0955379df6f0aab",
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/logo_base_white.png$bc7$streamed$mtlkind=ui": "d94876fcd004b124dfd8e33dd1654f5f06e9efd684338aa4c0955379df6f0aab",
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/scanline_a.png$bc7$streamed$mtlkind=ui": "d94876fcd004b124dfd8e33dd1654f5f06e9efd684338aa4c0955379df6f0aab",
-    "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
+    "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_map.swf": "70b1317db301c4bd069f52a42cfc2e36287f7f39143bcee5fc0f513d0d4fffb1",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/end_of_level/eol_challenges.swf": "96465b1e8fa9eb501222a610248d64aa8219894895882336bb0a2d2efdd77437",
@@ -358,7 +359,7 @@
     "packaging/mod_assets/hub/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/hub/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/hub/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/hub_patch1/swf/hud/hud_score.swf": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
+    "packaging/mod_assets/hub_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/shell/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/shell/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/shell/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
@@ -369,7 +370,7 @@
     "tools/content/compile_content_catalog.py": "c5eee47fdcf2ba1aa821d6749ad05d89b57597e872b604f2cb4c91ed24a0e714",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/decls/campaign_builder.py": "06ff76c35b4090f1eefc905cdfc5536f2f15225440b3f31d85791ea628b4a508",
+    "tools/decls/campaign_builder.py": "201893f9a417b4b61c359a0e1b56a2cde48db581711172b8ce13d23300c18cd4",
     "tools/decls/devinv_builder.py": "83778c30308ddd7b6f6fc165974de20cb7dc1d98d05c5567651719ba22d4d275",
     "tools/decls/mastery_decl_builder.py": "767f7a8b33c3d0c2d4b6a7bd4283964724cbe5b9957472641edcf281d522fa99",
     "tools/decls/mission_challenge_decl_builder.py": "c7034cad8687b3435a41d150f2ba73cfc306569e7e5f9b99d79418873515c25b",
@@ -378,7 +379,7 @@
     "tools/decls/weapon_stripping_builder.py": "6a961a00fbb0242d5e6007ccaaaaacd79c97c3fac334f4589157d88e3d544c14",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/maps/ap_map_generator.py": "16f04b7d5ea5b91351fdc02ab02ba9a7e9f38d3d4162f74596dcca06c14df1a4",
-    "tools/maps/automap_baseline_guard.py": "8b36a6b651cdbd3bdbb28e18b26ff6c8b21737230a90fc2aa5188a932f54c270",
+    "tools/maps/automap_baseline_guard.py": "d7d280015c3dc61627089326cdb44a868356b8e412422f506cb56738ca63d6ad",
     "tools/maps/automap_native_decl_builder.py": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
     "tools/maps/final_credits.py": "80993bfa95b3775a713bd49f66415bd0f3e377cc4d8d48b81a04612908e8ec97",
     "tools/maps/fortress_campaign.py": "f74dc536948f1d54ae4b03b6a9ac2a3b348454122b491cd2365518b90f125dc1",
@@ -386,7 +387,7 @@
     "tools/maps/intro_skip.py": "a733090cde9f6f16150bbe3c0b1f8fc3312b8d02569fc70d50c7d78837bb6def",
     "tools/maps/logic_decl_patcher.py": "2770469dfcc0ed8a7169aa6565dc187b97a2e5b4349dbb02f35a62376d858cac",
     "tools/maps/map_preflight.py": "87c2c02771455edd02722346919af3e3da4e506fc719b6012691b4cc1820ad65",
-    "tools/maps/map_semantic_baseline.py": "93fabcc91f0d73aabd3a8bfd51d3605c467e752407b0827f12447259a2a9c5b5",
+    "tools/maps/map_semantic_baseline.py": "5d772f2d1afd37362c878ab668234ed1dafab9ca463f3f0b62394b08c0501b79",
     "tools/maps/mission_complete_map_patcher.py": "ff8d7344ae52f340784681d498854b1036f6cf2226cfbadf38b00f9394e1b99d",
     "tools/maps/notification_formatting.py": "10b48794fb330d1fd2bb5044d9c5507be65b915e2cef4fe1337632219e226f70",
     "tools/maps/resource_priority.py": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
@@ -399,7 +400,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "89cd341a25cef9233ba030c9af818a5f86d9c195",
+      "base_commit_sha": "eb9add264e9afad61b22dcd7ac8587a422779e59",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -1696,8 +1697,8 @@
             "size": 234
           },
           "archipelago/_persistent_storage.yaml": {
-            "sha256": "06f01a63f1fcf97b03d15ec2b2bb88230c51df24416ab066c2ed79616f0bcc81",
-            "size": 29126
+            "sha256": "5576f92f19a44b7ca94019ab277d1f684f4ef31f193a370689847963de9c7f06",
+            "size": 29220
           },
           "archipelago/_speedups.pyx": {
             "sha256": "450f13b8fa4be4129c909afd5181f7f8e267371b1445ab927d49b65d8206772c",
@@ -2255,6 +2256,82 @@
             "sha256": "a3814ad8e2bdf6c4912b239009cef1d064467e5bea45c30eea7f30680b1ce202",
             "size": 57174
           },
+          "archipelago/logs/DoomEternalClient_2026_10_01_19_12_33.txt": {
+            "sha256": "c414d154eb0ee01b4fb7759df45da490852659502a6dfae5e971eae101db86eb",
+            "size": 1167
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_19_14_55.txt": {
+            "sha256": "ffbe10441b6e3220fb4603feffd81cf0ee78981ad7f1e9c31408b958ebd6afd2",
+            "size": 1007
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_19_16_14.txt": {
+            "sha256": "88dc155abb8bc8dd06a27cc152c18d0feaa0368373e7b404d4ece7e674e9e2b2",
+            "size": 1057
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_19_18_10.txt": {
+            "sha256": "43a509f1473ca02134d0cf5e13943dcf25caf70ac11adf68dc207778903c8388",
+            "size": 1057
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_08_14.txt": {
+            "sha256": "a05e739d7da7fbbff41bc64a35797bef8d3bd98122914e6d7901f8476f86dc64",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_08_16.txt": {
+            "sha256": "b754154ec6b358319e1885386977054cf1c20f77e0f833cfe28bfb2849eca51d",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_10_43.txt": {
+            "sha256": "8e07ef5b0352bdc958bb7f8de74def67a23a957dd1b91eed203bf8a5b95ce239",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_10_44.txt": {
+            "sha256": "9ec8e20e64e69400c64bdaa683dd2d5d1953160ec12f389a6422f3c61c1b9da6",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_12_09.txt": {
+            "sha256": "3f29edf97c60fd64413a3b3843f5711d6b5df8e9eea629a1b0596abbaa4ff3da",
+            "size": 1063
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_12_10.txt": {
+            "sha256": "4f91aa8e1507f4c4c15383d83318e044165b584c748bbea41ceb8fba169859b5",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_32.txt": {
+            "sha256": "619e198bfc59be924273c685527426ccb9d8607f33f475da36c3807621c53fda",
+            "size": 1062
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_33.txt": {
+            "sha256": "39c588eb80a8a10a69454809b5e76132203cb4cb53c014f45532a8b5b1f44692",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_34.txt": {
+            "sha256": "c7041777c236b17a51342a7d2e0fc4030284ecba37815402dd73e1b20ec637a5",
+            "size": 1114
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_35.txt": {
+            "sha256": "1e27f8e8ffcd301fd2950e63de61c1161faf9391d4a7ec158b112b208eb29b28",
+            "size": 1113
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_13.txt": {
+            "sha256": "a1894f93c0ac7aba15d5b2194507d13fa15a8d1ee113b4031351097db5f04854",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_14.txt": {
+            "sha256": "0882840eb6c161620bbca94967c10d8ce8c0a99175a4cea269ea6c87cbed7e54",
+            "size": 1064
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_15.txt": {
+            "sha256": "e7c5fe49f712f5ad9ea2159ecd4ffe8334b9e55b2baa4a653a5fbc1d436d0454",
+            "size": 1114
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_16.txt": {
+            "sha256": "9039fc3c8f340451598d14f94d41ef59a21e8e3f69274a28ec132c50795cafb3",
+            "size": 1114
+          },
+          "archipelago/logs/DoomEternalClient_2026_10_01_23_58_26.txt": {
+            "sha256": "36da6f720a7698df0d150547d75539a32cbd18bbe6605fad807475de8e159495",
+            "size": 1113
+          },
           "archipelago/logs/Generate_90911006_2026_10_01_15_11_13.txt": {
             "sha256": "a7d343d7b9b6f2550041e6c5526acce96af1871d33b5914b05d7424cc093c64f",
             "size": 527
@@ -2263,53 +2340,13 @@
             "sha256": "3f7bae8c0a14787ae3068ad6173636504cc23c5c256c7602a5368e359b8ceac6",
             "size": 7867
           },
+          "archipelago/logs/Generate_90911006_2026_10_01_19_00_45.txt": {
+            "sha256": "a242d02194ba94b17632b86a5339652ab1ef0a24f1d726d9088580ca1b5d2186",
+            "size": 1733
+          },
           "archipelago/logs/Generate_90911020_2026_10_01_16_41_12.txt": {
             "sha256": "896db3e6e24ebcbbc618e428cacb20c37327b6c3fb935fd403e6505f0aa9cd95",
             "size": 1739
-          },
-          "archipelago/logs/Server_2026_09_24_16_48_09.txt": {
-            "sha256": "708926b7c7a25c9a5190cd9e3667bb2bbea5028e9a1759b3250d0c386d10f5ca",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_17_12_23.txt": {
-            "sha256": "f01d3248f216cd6b6d3fd1304b5af208b832e089c5a8f9463b556d5291160a2e",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_17_37_37.txt": {
-            "sha256": "2323a088b95841a5b6d0d43252cbede4df768f140630dc1091837c9daec170ac",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_17_40_16.txt": {
-            "sha256": "b7fb1390eb49f08141ba7f1408b4bf0978531e78b7e2c14c6f063ec3544d5eb0",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_17_42_40.txt": {
-            "sha256": "f1f7e374198badee252b23bdfdd65f0cab325f30ae1d8358e3bdd86e5d2a0751",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_17_56_55.txt": {
-            "sha256": "54c8f1af4ec9e6376bd607416ec8962a1d317a07d103c768416e46b814250bfb",
-            "size": 1385
-          },
-          "archipelago/logs/Server_2026_09_24_18_08_06.txt": {
-            "sha256": "d09f716b0b91da9089d369381d4dc8e4c845a822ca0cf0a76c920bab55c05d7e",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_18_17_09.txt": {
-            "sha256": "5560702181ab13df04609e6b85530ae54fa25f2e5d6536085f413b6c8b030a62",
-            "size": 1385
-          },
-          "archipelago/logs/Server_2026_09_24_19_34_41.txt": {
-            "sha256": "f5a52ce5106cc10f4aced3e4467f9f3cc638d8d66a67b100c87c82259048b1ba",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_19_38_22.txt": {
-            "sha256": "c3152794cd8001b78327d3c860d272765c2695f2f361cc375afb6fcd91ba356f",
-            "size": 1386
-          },
-          "archipelago/logs/Server_2026_09_24_20_37_19.txt": {
-            "sha256": "e0d70bef27543e6b116f983cdb45da194b1f4a198a6d4265029fd71b4c2249a6",
-            "size": 1386
           },
           "archipelago/logs/Server_2026_09_25_09_34_57.txt": {
             "sha256": "78ee7f3334f5146efdcafb61072e381e6bdd8c0bc10a4d615f78f225917b74ff",
@@ -4364,8 +4401,8 @@
             "size": 215140
           },
           "archipelago/worlds/doometernal/generated_content.py": {
-            "sha256": "62627713151b88a4f06786b7d15f44ece6e3f1feb52126d3934620f4061ce010",
-            "size": 118674
+            "sha256": "a838fffe114cdbd37198b43e11a05a28acbc2fa668ecb4670d385c47eb5d6076",
+            "size": 118673
           },
           "archipelago/worlds/doometernal/identity.py": {
             "sha256": "6a123986feb63c56d2bbb161be81ea67f7b687b766ae13855ebaa14afca73792",
@@ -13216,22 +13253,26 @@
             "size": 136
           }
         },
-        "fingerprint": "7e0a4359a9cef4e304122e3c1c2cd0f232ef561842237139d24ba986e006e97c",
+        "fingerprint": "d80b8c65a449efba5272d588d24bf0a8ed42567e168d70f32be4a5c75d723639",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "8ae2656c113593e7fb7eeea77505264e9ed19fcb",
+      "base_commit_sha": "8569504fd4aea7dfaa16a5385ce1b78a5fc3a2e8",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
           ".github/workflows/ci.yml": {
-            "sha256": "951fc1c0419729aa35e4b99ab1a93701f0ba90fb9905830376b156b4b756d759",
-            "size": 833
+            "sha256": "3b12b389e5421ab4103ce47676d1617d51a72e3701185d953a4da3accb4351b2",
+            "size": 1298
           },
           ".github/workflows/cross-platform-build.yml": {
-            "sha256": "daa51f08dcdaf1ef36a47834f01e03779405d9d23386321ffbfe82edb1783aec",
-            "size": 24137
+            "sha256": "f23ae4f93363736d7ad54ee8cb6b4ee0411fbaf237e338f88bb303c086c552a6",
+            "size": 25155
+          },
+          ".github/workflows/integration-audit.yml": {
+            "sha256": "4536121c55ecff2e2726e355809886a16abad4cdb2174e25a90a15f07810acc5",
+            "size": 1059
           },
           "assets/launcher/EternalAP.ico": {
             "sha256": "29c44bdabed653c259db072ec505d38c6e914d5f27cfee3a801a5260cc5d485c",
@@ -13578,8 +13619,8 @@
             "size": 1774
           },
           "content/maps/e3m4_boss/onboarding.json": {
-            "sha256": "e76229d910dd01b65119e373400a9021ae7ebc8e8e60f780bbfb28768d080b5b",
-            "size": 5206
+            "sha256": "9215fd498747891efcf94f97bed2dea1fb4fcee92d3d74c3c62fe3d5b4dc9e57",
+            "size": 5205
           },
           "content/maps/e3m4_boss/publishers.json": {
             "sha256": "368e962de2b5bf9d0c69b1226821c380717bd760340cb354a8b84e227744ef27",
@@ -13802,8 +13843,8 @@
             "size": 147
           },
           "data/campaign_goal_contract.json": {
-            "sha256": "c5d3ea3c84c39113d1b3e75b5a3855e0ff7c002aae0851b4da5e8da269ca4c34",
-            "size": 478
+            "sha256": "7912eb88b8d7b66c230c749b83be44bb957e0ef9df2bd8c2fca68e7d085874f5",
+            "size": 466
           },
           "data/campaign_sources/dlc1.decl": {
             "sha256": "7f691e46bd8c23918e57f67825b77af09c90100f111dfff53008afb1ec19ae17",
@@ -13850,7 +13891,7 @@
             "size": 568443
           },
           "data/content_identity.json": {
-            "sha256": "b4b0897addce9bd62ed16e137869f1632b05a49d1316165209b622eecd6c2c4f",
+            "sha256": "81665ebc5a18e66cc6c1ff44373e3b12b8be52d4ad362eb5648b74351a9b102a",
             "size": 359
           },
           "data/contextual_location_names.json": {
@@ -13898,8 +13939,8 @@
             "size": 3163
           },
           "data/foundation_contracts.json": {
-            "sha256": "168e630cce718a7ccba4a9eb34831f747c35e7a3904c1fcc02fa92959213f65a",
-            "size": 2499
+            "sha256": "dda652528040189f2b3831bb759afc819cd6363746fa7967b841e5e058acc675",
+            "size": 2429
           },
           "data/item_classifications.json": {
             "sha256": "5902a9feb09fabe25208104eb02f99b98d6f1551d41ff984c0c87c6143c1c3c0",
@@ -13938,8 +13979,8 @@
             "size": 1082
           },
           "data/options_schema.json": {
-            "sha256": "e3eb7701b6ec067dd904525a773d30cd3976f799e57ae8e4b1e115a3d50dcb88",
-            "size": 24498
+            "sha256": "2e067b95582ddb7a83813b156ac4497a82fb3a0323049b548f5e223bfc945c56",
+            "size": 24453
           },
           "data/perk_candidates.json": {
             "sha256": "0d989a009c6907a3930f874312caeaf377b14e6069f50a478961b2e316a7ba71",
@@ -13952,6 +13993,10 @@
           "data/publisher_contracts.json": {
             "sha256": "59f57b890a0f4c779162c5bfb86f008e86d90fb444041c1f2da54b7ea7847186",
             "size": 15264
+          },
+          "data/report_endpoint.json": {
+            "sha256": "156af67e8895f050917c8d50493b4f88a699a9abcd7128b32f60240f4deed3f3",
+            "size": 46
           },
           "data/runtime_contexts.json": {
             "sha256": "154593d920ef448b74b9c8dc5ea21af421ba82025114495038494d266960b440",
@@ -14046,7 +14091,7 @@
             "size": 5774
           },
           "doom_eap/contracts/foundation.py": {
-            "sha256": "f6c13ca6ea8a780b309e74069795ac8cde690d1be43555bc1d9b9a46d63ef509",
+            "sha256": "28260bd66487aa2921731ec419995fc07056b9a25b5f8699b2c9cfaee4efc1a7",
             "size": 33668
           },
           "doom_eap/contracts/goal_policy.py": {
@@ -14054,8 +14099,8 @@
             "size": 2886
           },
           "doom_eap/contracts/inventory_domain.py": {
-            "sha256": "7484a7da0296cd5229039a10383a3a59259a8c5d48c9ece47b1a2c3c38c4da57",
-            "size": 6372
+            "sha256": "15c86415fc21b0ae9f41ce87afbf1c775d27c5ddd18725ac30a344a049dd360f",
+            "size": 7278
           },
           "doom_eap/contracts/item_contracts.py": {
             "sha256": "c75f091dcf77c7641632623a1f2f0263e450f4d63bc82a30d69521e1c2eb843a",
@@ -14102,8 +14147,8 @@
             "size": 7138
           },
           "doom_eap/launcher/connection_errors.py": {
-            "sha256": "cc50c08f615e1cd260005fd127f8f02dc5c1413ffcd68cc5d33c8f9f7773bf23",
-            "size": 7329
+            "sha256": "d3ccfd5567f2c88de09ca8f90c31f66bed6730f5f22cf011436b186e3ad65e8e",
+            "size": 7542
           },
           "doom_eap/launcher/launcher_app.py": {
             "sha256": "a3598514e596bf5a6507bdb97f3f3aa1496aadeae1ab99635f61b6b57b5eb2c4",
@@ -14114,20 +14159,20 @@
             "size": 2511
           },
           "doom_eap/launcher/launcher_controller.py": {
-            "sha256": "61e39a97233b5ac6b7082e3a01261e049036973cdbede7dc6bdc346bfd81e82b",
-            "size": 73303
+            "sha256": "3172fb28d71690eda08ce853bb0733e04b8559f27d5749718d5a2dc7836598db",
+            "size": 76553
           },
           "doom_eap/launcher/launcher_core.py": {
             "sha256": "928c3d4d1c724908d50e8b3b35099a0a5f5b85a4fd28ec05c4acc2f85ef61f14",
             "size": 85918
           },
           "doom_eap/launcher/launcher_doctor.py": {
-            "sha256": "733fa63d4b0f1a2fb01eadf7c31eac561291e1019f60c63eb6c6365095dc8987",
-            "size": 83187
+            "sha256": "96814f4576ef15f872b83a31b084dd62505a658fc66e60ff237110518c192f46",
+            "size": 84132
           },
           "doom_eap/launcher/launcher_integration.py": {
-            "sha256": "15d89da893f56de354a5523de2f1d207d516e25d94dc25d5e574e0953858b7b6",
-            "size": 75840
+            "sha256": "b19c5a7a3acc0f73aec5786cc1d3b0ccf261968d37b7a08bc23e606782465fd8",
+            "size": 75831
           },
           "doom_eap/launcher/launcher_interactions.py": {
             "sha256": "40d30fdceb6636b1cd83154d90dffab8f8686a123cb8fd5265d9358a218707ac",
@@ -14138,28 +14183,28 @@
             "size": 6953
           },
           "doom_eap/launcher/launcher_platform.py": {
-            "sha256": "8f9fe8d32993d020bb2a71044e4af545f52b6f8f0081bf5b4df92fd52d2ba178",
-            "size": 138753
+            "sha256": "1cab479692029f88471d4f1a586670ce47959dbd32c161eb0f4af6a428bd80f8",
+            "size": 139851
           },
           "doom_eap/launcher/launcher_repairs.py": {
             "sha256": "6cb8105bdde3fcb51c00ad7b39982f5e34b9b63e7c8de0e9126b5a835c5e0867",
             "size": 4105
           },
           "doom_eap/launcher/launcher_reporting.py": {
-            "sha256": "4251fdde9338a12f983c792f8e9bb2ee315639456d25b22db4be5fdc74a3918f",
-            "size": 2835
+            "sha256": "3f69b0a81d1ea4abb83815d780b2994637355c4341ad7db29d818704d49170b0",
+            "size": 3976
           },
           "doom_eap/launcher/launcher_session.py": {
-            "sha256": "6ee157c7a6d197b9a747ca35344dffc07bdf325b20505f23460f2554393de43d",
-            "size": 22408
+            "sha256": "4a5859368446632c0ad2e3738f97ba6d767b415d7e4427476830124c0e2ed566",
+            "size": 28712
           },
           "doom_eap/launcher/launcher_supervisor.py": {
-            "sha256": "b9f6c8603b9419953606ff6cc8a630eacccbd2b252e515cb07b9e0a1e628e2ba",
-            "size": 11120
+            "sha256": "7197af2c8faf7ddddacf77f5daa5a2ec7311cc3af97159cbbbf5e6280274bc8a",
+            "size": 11486
           },
           "doom_eap/launcher/launcher_ui.py": {
-            "sha256": "177c388321f836f6b898149af2a56f0855d48abd9334755588595dac4786f7bb",
-            "size": 164863
+            "sha256": "a672fa9e2957b3454d583dd9e5e5f905c690692def19f67ae89270bd33e6c9b1",
+            "size": 171343
           },
           "doom_eap/launcher/launcher_workers.py": {
             "sha256": "336795d007b9648de7f0d4186adff717bceffd0da839249c1ec4a2dd70dd6481",
@@ -14198,8 +14243,8 @@
             "size": 7509
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "6a31e3be17d3f5f491e634d52cc8577f1ebe9a7b0bf0bd998f0e6bcc23dcb196",
-            "size": 301245
+            "sha256": "54d1e6745e9d240e90b4ab2e2e52f59a4efb103c4eb833f7fd15a0140dd109fe",
+            "size": 301524
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "d0d0f023eb12cd9284196e6a096ba6da3b7396fccc9abe4cbf677438d66e52cc",
@@ -14222,8 +14267,8 @@
             "size": 10080
           },
           "doom_eap/runtime/context_registry.py": {
-            "sha256": "3e953542f2e7a7a0bb11c1b990482c0ce7e7334c4e7b8cdd0bfbca575542ed8d",
-            "size": 7209
+            "sha256": "c268ecdb7e23acb4982c90fbfdf330bbda4f177756af14197627651e5ff5a82b",
+            "size": 7054
           },
           "doom_eap/runtime/death_observation.py": {
             "sha256": "aee34619254739f4b8cd324120a4bcc6221b6a944d998bd1564c19fa33b6becd",
@@ -14250,8 +14295,8 @@
             "size": 7232
           },
           "doom_eap/runtime/item_reconciliation.py": {
-            "sha256": "633bddacc1c6230a29dbbae5eb3c5fd3725e82b9f1b97b1e8dba9f41f5f647bb",
-            "size": 42756
+            "sha256": "e81a9626c94c0ca5a77c766340115a5f5b846fa73b0a0cb18614260724438383",
+            "size": 42917
           },
           "doom_eap/runtime/level_ready.py": {
             "sha256": "59a1a2b32c27aba3b977de214e98801278dc8b30bc85b697920d163baddf294c",
@@ -14274,8 +14319,8 @@
             "size": 16655
           },
           "doom_eap/runtime/materialization_coordinator.py": {
-            "sha256": "1edd20592ad9f67031549a8b72276198fc45f8524b364a3a6c6ed1955a4128ed",
-            "size": 12739
+            "sha256": "ec316d9c994326853eda2f460239b73e1d8385ce5898bbfbe08fe9a66aab70fe",
+            "size": 13233
           },
           "doom_eap/runtime/mission_presentation.py": {
             "sha256": "6a4691c81499ea34f801ca67faf3d3d03bfae1fdee0cc24e4b3495ba8201d1f4",
@@ -14510,8 +14555,8 @@
             "size": 2316
           },
           "native/client/sentinel_command_client.cpp": {
-            "sha256": "f68815dd759cd13f4aaf0ca1dca2406550229b58718d8ab9d5b5f5e51ee28f8e",
-            "size": 4570
+            "sha256": "ee187650f92fe41c67c32e69746711e933be28ed0210a3944dc6dde372f8e471",
+            "size": 4727
           },
           "native/client/sentinel_command_client.h": {
             "sha256": "1dae417a33dd630bfa59079c61b5f2ccd3933bf79303c05df0d63e1f8bcbaaf9",
@@ -14550,8 +14595,8 @@
             "size": 660
           },
           "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": {
-            "sha256": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
-            "size": 179899
+            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+            "size": 179901
           },
           "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": {
             "sha256": "fdbea7b7965a0a15ba0720902774c7508467e276a3ef2386774cf30c588aaf93",
@@ -14582,8 +14627,8 @@
             "size": 660
           },
           "packaging/mod_assets/e1m3_cult_patch3/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e1m4_boss/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14598,8 +14643,8 @@
             "size": 660
           },
           "packaging/mod_assets/e1m4_boss_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e2m1_nest/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14614,8 +14659,8 @@
             "size": 660
           },
           "packaging/mod_assets/e2m1_nest_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e2m2_base/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14630,8 +14675,8 @@
             "size": 660
           },
           "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": {
-            "sha256": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
-            "size": 179899
+            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+            "size": 179901
           },
           "packaging/mod_assets/e2m3_core/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14646,8 +14691,8 @@
             "size": 660
           },
           "packaging/mod_assets/e2m3_core_patch3/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e2m4_boss/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14662,8 +14707,8 @@
             "size": 660
           },
           "packaging/mod_assets/e2m4_boss_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m1_slayer/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14678,8 +14723,8 @@
             "size": 660
           },
           "packaging/mod_assets/e3m1_slayer_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m2_hell/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14706,12 +14751,12 @@
             "size": 660
           },
           "packaging/mod_assets/e3m2_hell_b_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m2_hell_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m3_maykr/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14726,8 +14771,8 @@
             "size": 660
           },
           "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": {
-            "sha256": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
-            "size": 179899
+            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+            "size": 179901
           },
           "packaging/mod_assets/e3m4_boss/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14742,8 +14787,8 @@
             "size": 660
           },
           "packaging/mod_assets/e3m4_boss_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_destroyer/icon_destroyer_info_logic.decl": {
             "sha256": "30154762f1182c91a58f18c6e7edf8655e5152f03c3e1ab953b6fd46d80819ef",
@@ -14770,8 +14815,8 @@
             "size": 332770
           },
           "packaging/mod_assets/e4m1_rig_patch2/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e4m2_swamp/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14786,8 +14831,8 @@
             "size": 660
           },
           "packaging/mod_assets/e4m2_swamp_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e4m3_mcity/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14802,8 +14847,8 @@
             "size": 660
           },
           "packaging/mod_assets/e4m3_mcity_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e5m1_spear/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14818,8 +14863,8 @@
             "size": 660
           },
           "packaging/mod_assets/e5m1_spear_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e5m1_spear_patch2/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_intro/cinematic_intro_info_logic.decl": {
             "sha256": "13d43b7dc0823100b61d900821fa112a7cfc74eec83622a3d49f32a72abae162",
@@ -14838,8 +14883,8 @@
             "size": 660
           },
           "packaging/mod_assets/e5m2_earth_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e5m3_hell/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14854,8 +14899,8 @@
             "size": 660
           },
           "packaging/mod_assets/e5m3_hell_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e5m4_boss_patch1/generated/decls/logicentity/maps/game/dlc2/e5m4_boss/e5m4_boss_cinematics_death_of_the_darklord/death_of_the_darklord_info_logic.decl": {
             "sha256": "09e8ca10d30b66dc31eeb2adc7b3e913214296ec02dbb113f37d35627b793f25",
@@ -14926,8 +14971,8 @@
             "size": 111
           },
           "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": {
-            "sha256": "4a1bdf24d5f855eb99e4e9b1e923e0dbe3af9bf33d3fd70fc2068025284c14db",
-            "size": 179899
+            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+            "size": 179901
           },
           "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": {
             "sha256": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
@@ -14974,8 +15019,8 @@
             "size": 660
           },
           "packaging/mod_assets/hub_patch1/swf/hud/hud_score.swf": {
-            "sha256": "d92f3fa83aef1ff829fc29583bb7f3970b1afd02b45f86a14641ed225d91a32b",
-            "size": 180953
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/shell/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -15018,8 +15063,8 @@
             "size": 150
           },
           "requirements-ci.txt": {
-            "sha256": "82585bf70e0cd1b4974ce8cd0b44f08f59ad5ca1b917131444b83b74b226b0f4",
-            "size": 94
+            "sha256": "e3a3bd68284b242b34b5540f56dfc3098e65a19ca0d4dbe39d6e2c2a3864836e",
+            "size": 112
           },
           "requirements-launcher.txt": {
             "sha256": "a5a10fbd877d7e4d5f71e4b5cb185502e3451544a4a958edffe42b40315f276a",
@@ -15042,8 +15087,8 @@
             "size": 322
           },
           "scripts/release/assemble_ci_artifact.py": {
-            "sha256": "e25906141e5e3e04e99ce056419c66b370f13917e8fea1b84a17ab137c60e92b",
-            "size": 29497
+            "sha256": "6730836bcd6793d38c3eb2b4def766a95828690ee2c67efcad6bbcdb9d5f9457",
+            "size": 29502
           },
           "scripts/setup/linux_client.sh": {
             "sha256": "ab0d24b819ee01c421923ab7a58a4877f40a5da7cfc9dedc197d012bc38a8505",
@@ -15130,8 +15175,8 @@
             "size": 0
           },
           "tools/decls/campaign_builder.py": {
-            "sha256": "7bc9653d051e16ecb6cb80469b10d0c523fe19f3b03c39da833e760f862d68be",
-            "size": 6582
+            "sha256": "e1d75d0f51204781690ec44c524abc63363fc2ba723905a8ed488d6b37ff5f10",
+            "size": 6609
           },
           "tools/decls/devinv_builder.py": {
             "sha256": "473c9ee1d5626e2c124e27bc1fc7a4d86242e090efb5b47d7de62b5c96735777",
@@ -15174,8 +15219,8 @@
             "size": 137924
           },
           "tools/maps/automap_baseline_guard.py": {
-            "sha256": "565877187c3d7c0d06fd2eebdc1de4ee19b7740ae6bd20d903baa2700215eddb",
-            "size": 11301
+            "sha256": "8dea88c36eb0de791187ff66b390ef36c5dabccafbf327948c78fc761edef3a2",
+            "size": 11417
           },
           "tools/maps/automap_native_decl_builder.py": {
             "sha256": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
@@ -15206,8 +15251,8 @@
             "size": 8699
           },
           "tools/maps/map_semantic_baseline.py": {
-            "sha256": "93fabcc91f0d73aabd3a8bfd51d3605c467e752407b0827f12447259a2a9c5b5",
-            "size": 14642
+            "sha256": "4b08479ed74eb632a942d6eaae390753c1496f5ba9ab6659c32dc8abf164118e",
+            "size": 12727
           },
           "tools/maps/mission_complete_map_patcher.py": {
             "sha256": "5f356766c6dc08182c20b9ccd3a865d04b50561fec407ee799fe835eee6fb870",
@@ -15242,8 +15287,8 @@
             "size": 1264
           },
           "tools/release/build_cache.py": {
-            "sha256": "e5c7ab35e449d245f6343b44ca5cdcd405ff90fa280f003e728990667870c6c8",
-            "size": 10616
+            "sha256": "afd758c9a96ff496165b837e1fd28b6055e2770defd21c1f7a2549c42cee15d2",
+            "size": 10448
           },
           "tools/release/build_launcher.py": {
             "sha256": "8f8825a4f0d5ad8000f827fb240c485622756da5d535e179404ff773121f224f",
@@ -15258,8 +15303,8 @@
             "size": 11284
           },
           "tools/release/build_session_owner.py": {
-            "sha256": "f3e6bbf39f11d461b22a6996606e0f79c16f3d5e5fe4bcfcb869149ced65ece8",
-            "size": 1632
+            "sha256": "0cad40bad30ee014b4767394b65423e3ee9174258f6ae247ef66b5f1107921bb",
+            "size": 1661
           },
           "tools/release/build_string_table.py": {
             "sha256": "4c0c372c1fb8ebe477b26c0b9af36a1b27157cd4061f93be78540dc5e5f632de",
@@ -15309,6 +15354,26 @@
             "sha256": "d4e7e8e2cd0d59bf486d2257a2ee582ba4e8e742e8b14016b547f7993e776189",
             "size": 15655
           },
+          "tools/report_backend/Dockerfile": {
+            "sha256": "de45bd3dc1648cb9a7a50598547d04106edb51367276ca3993ecf2cd46623b44",
+            "size": 150
+          },
+          "tools/report_backend/config.env.example": {
+            "sha256": "89b0cd89e185c76d6c4db8d05b080d725e81fde6eb588ee10e594d8a318a94a2",
+            "size": 109
+          },
+          "tools/report_backend/deploy.txt": {
+            "sha256": "67e7d690654107308ed3556a1d02c2d63377b006ddaf4cdc6b0292acd520d0d2",
+            "size": 1288
+          },
+          "tools/report_backend/server.cjs": {
+            "sha256": "df03025b97ac70be37b959327c25d0632a29b3e4367a032e9dbe5e3f049e2d92",
+            "size": 7444
+          },
+          "tools/report_backend/test_server.cjs": {
+            "sha256": "6c654367e9ddd43f84fce60a3febbf70354650a243e73495c45bbf41251fc49e",
+            "size": 2878
+          },
           "tools/validation/audit_item_notification_release.py": {
             "sha256": "059f673cc2a7d3ed9a7eade9289511e0054b5934d5043ade0c6af0a73b1a4814",
             "size": 33150
@@ -15326,8 +15391,8 @@
             "size": 12913
           },
           "tools/validation/authorial.py": {
-            "sha256": "f91a8fd2bf6977ea2e25082938aff26977500b25bf3fb688ced09ae18425e043",
-            "size": 5438
+            "sha256": "772817f7539c7bf41ce53130173a394c8af24a1974d4d970529adaf5073c9775",
+            "size": 5430
           },
           "tools/validation/physical_option_room_contract.py": {
             "sha256": "55a6952ceab03707328b7b4db0a37f4ec19730da660b849b3e1483121a0ea7e7",
@@ -15346,8 +15411,8 @@
             "size": 15546
           },
           "tools/validation/validate_data.py": {
-            "sha256": "5ddac8734f23a78f25c07075a60742eed7b2f3133dc4bfaa7e1583cf8046fa7c",
-            "size": 77856
+            "sha256": "561781062ca999b0b1ffa354122d0486a94df95c7e1ec31ae9da2aa633a97a76",
+            "size": 78372
           },
           "tools/validation/validate_devinvloadout_package.py": {
             "sha256": "8cc372b5970dd439ce33b1a29e444124c5c4fb517ff980f4103f708fc7755f9f",
@@ -15358,7 +15423,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "8e7c5ec2dbd181b7cccc34a43105224033174b4c24948f978d957217677fd24c",
+        "fingerprint": "3109c24f736b0509b5729c0f1e02a052825d2f92940edb8699c2f4124f19ade6",
         "kind": "working_tree_snapshot"
       }
     }

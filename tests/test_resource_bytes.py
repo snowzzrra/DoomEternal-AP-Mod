@@ -1,6 +1,7 @@
 """Checkout views, emitted integrity and compiler inputs have distinct byte contracts."""
 import hashlib
 import json
+import struct
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,37 @@ from tools.release.source_bytes import compiler_source_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
+
+
+def test_every_hud_counter_is_a_root_sibling():
+    recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
+    variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]
+    assert any("e1m1_intro" in entry["resource"] for entry in variants)
+    assert any("e4m1" in entry["resource"] for entry in variants)
+    assert any("e5m1" in entry["resource"] for entry in variants)
+    for entry in variants:
+        data = (ROOT / "packaging/mod_assets" / entry["resource"]).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == entry["result_sha256"]
+        position = 27
+
+        def integer():
+            nonlocal position
+            value = struct.unpack_from(">I", data, position)[0]
+            position += 4
+            return value
+
+        count = integer()
+        position += 4 * count
+        for _ in range(integer()):
+            integer()
+            length = struct.unpack_from("<I", data, position)[0]
+            position += 4 + length
+        placements = []
+        for _ in range(integer()):
+            tag, length = integer(), integer()
+            placements.append((tag, data[position:position + length]))
+            position += length
+        assert sum(tag in (26, 70) and b"apFoundLabel\0" in payload for tag, payload in placements) == 1, entry["resource"]
 
 
 

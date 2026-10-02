@@ -3,10 +3,28 @@
 import shutil
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_terminal_console_commands_release_native_capacity(tmp_path):
+    compiler = shutil.which("cl.exe")
+    core = Path(os.environ.get("SENTINEL_CORE_SOURCE", str(REPO_ROOT.parent / "Sentinel-Core")))
+    if not compiler or not (core / "include/sentinel_inspection.h").is_file():
+        pytest.skip("Windows MSVC and Core SDK source required")
+    executable = tmp_path / "command-release.exe"
+    subprocess.run([
+        compiler, "/nologo", "/std:c++17", "/EHsc", "/DNOMINMAX",
+        f"/I{REPO_ROOT / 'native/client'}", f"/I{core / 'include'}",
+        f"/I{core / 'src'}", f"/I{core / 'build/generated'}",
+        str(REPO_ROOT / "tests/native_command_release.cpp"),
+        str(REPO_ROOT / "native/client/sentinel_command_client.cpp"),
+        str(core / "src/commands.cpp"), f"/Fe{executable}", "bcrypt.lib",
+    ], check=True, cwd=tmp_path, capture_output=True, text=True)
+    subprocess.run([str(executable)], check=True)
 
 
 def tick_reached(now: int, deadline: int) -> bool:
