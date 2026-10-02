@@ -77,7 +77,7 @@ def verify_bytes(name, data, item):
         if offset + 6 > len(data) or data[offset:offset+4] != b"PE\0\0" or struct.unpack_from("<H", data, offset+4)[0] != 0x8664:
             raise ValueError("Artifact is not Windows x64")
 
-def verify_runtime(manifest_path):
+def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
     path = Path(manifest_path)
     value = read_manifest(path)
     items = {item["path"]: item for item in value["artifacts"]}
@@ -95,6 +95,8 @@ def verify_runtime(manifest_path):
             verify_bytes(name, data, items[name])
             contents[name] = data
         for name, data in contents.items():
+            if bootstrap_from_archive and name == "msimg32.dll":
+                continue
             if (path.parent / name).read_bytes() != data:
                 raise ValueError(f"Direct runtime artifact differs from ZIP: {name}")
     return value, contents

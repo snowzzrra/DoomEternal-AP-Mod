@@ -157,8 +157,6 @@ def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: P
         "--add-data",
         f"{REPO_ROOT / 'doom_eap/runtime/bridge_client.py'}{data_separator}.",
         "--add-data",
-        f"{core_runtime}{data_separator}core",
-        "--add-data",
         f"{REPO_ROOT / 'assets/launcher'}{data_separator}assets/launcher",
         "--add-data",
         f"{REPO_ROOT / 'data'}{data_separator}data",
@@ -174,6 +172,10 @@ def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: P
         "certifi",
         str(REPO_ROOT / "doom_eap/launcher/launcher_app.py"),
     ]
+    for source in sorted(core_runtime.rglob("*")):
+        if source.is_file() and source.name != "msimg32.dll":
+            destination = Path("core") / source.relative_to(core_runtime).parent
+            command[-1:-1] = ["--add-data", f"{source}{data_separator}{destination}"]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
     if os.name == "nt":

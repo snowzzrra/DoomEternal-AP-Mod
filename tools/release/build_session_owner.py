@@ -20,7 +20,11 @@ def build(output: Path, core_runtime: Path) -> Path:
                "--hide-console", "hide-early", "--name", "APSessionOwner",
                "--distpath", str(output), "--workpath", str(output / "work"),
                "--specpath", str(output / "spec"), "--paths", str(root)]
-    for name, source in (("core", core_runtime), ("data", root / "data"), ("manifests", root / "manifests"), ("content", root / "content")):
+    for source in sorted(core_runtime.rglob("*")):
+        if source.is_file() and source.name != "msimg32.dll":
+            destination = Path("core") / source.relative_to(core_runtime).parent
+            command.extend(["--add-data", f"{source};{destination}"])
+    for name, source in (("data", root / "data"), ("manifests", root / "manifests"), ("content", root / "content")):
         command.extend(["--add-data", f"{source};{name}"])
     command.extend(["--hidden-import", "uuid", str(root / "doom_eap/launcher/session_owner_app.py")])
     subprocess.run(command, cwd=root, check=True)

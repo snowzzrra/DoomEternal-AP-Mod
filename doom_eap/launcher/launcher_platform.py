@@ -944,6 +944,50 @@ class GameLinkResult:
     backup_path: str = ""
 
 
+def _core_file_error(path: Path, error: Exception) -> RuntimeError:
+    message = f"Core runtime file could not be read or installed: {path}. {error}"
+    if sys.platform != "win32":
+        return RuntimeError(message)
+    script = r"""$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=1116,1117,5007; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 200 | ForEach-Object {
+    $xml = [xml]$_.ToXml(); $data = @{}
+    foreach ($item in $xml.Event.EventData.Data) { $data[$item.Name] = $item.'#text' }
+    @{time=$_.TimeCreated.ToUniversalTime().ToString('o'); id=$_.Id; data=$data}
+} | ConvertTo-Json -Depth 4 -Compress
+"""
+    try:
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                                capture_output=True, encoding="utf-8", errors="replace", timeout=5,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if result.returncode:
+            raise ValueError("Defender history query failed")
+        events = json.loads(result.stdout)
+        if isinstance(events, dict):
+            events = [events]
+        candidates = {str(candidate).casefold() for candidate in
+                      (path, getattr(error, "filename", None), getattr(error, "cause_filename", None),
+                       getattr(error, "source_path", None)) if candidate}
+        for event in events:
+            data = event["data"]
+            resources = {resource.strip().removeprefix("file:_").removeprefix("file:").casefold()
+                         for resource in data.get("Path", "").split(";")}
+            if event["id"] not in (1116, 1117) or not resources & candidates:
+                continue
+            threat_id = data.get("Threat ID", "")
+            setting = next((record for record in events if record["id"] == 5007 and threat_id and
+                            f"\\ThreatIDDefaultAction\\{threat_id} =" in record["data"].get("New Value", "")), None)
+            allowed = setting and setting["data"]["New Value"].endswith("= 0x6")
+            detail = (f"An allow action is recorded at {setting['time']}. Retry setup to restore the verified file. "
+                      "If it is removed again, check Protection History for this exact path."
+                      if allowed else "Review this exact detection in Windows Security > Protection history, then retry setup.")
+            return RuntimeError(f"{message} Defender detected {data.get('Threat Name', 'this file')} at "
+                                f"{event['time']}. {detail}")
+    except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
+        return RuntimeError(message + " Defender history could not be read; export Support for diagnosis.")
+    return RuntimeError(message + " No matching Defender detection was found; export Support for diagnosis.")
+
+
 def install_meathook(
     game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
     consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
@@ -965,7 +1009,10 @@ def install_meathook(
                                   sha256=str(installed.details["sha256"]), ownership="verified")
         raise RuntimeError("Select distribution.json from the compatible Core runtime release; installation is unchanged.")
     manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
-    value, contents = verify_runtime(manifest)
+    try:
+        value, contents = verify_runtime(manifest, bootstrap_from_archive=True)
+    except OSError as error:
+        raise _core_file_error(Path(error.filename) if error.filename else manifest, error) from error
     if installed.ok:
         from ..contracts.core_distribution import version_key
         current = version_key(str(installed.details["version"]))
@@ -978,7 +1025,10 @@ def install_meathook(
     if (root / "XINPUT1_3.dll").exists():
         raise RuntimeError("Resolve the existing XINPUT provider with its owner before Core-only installation.")
     existing = root / "sentinel-distribution.json"
-    if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok:
+    owned_partial = (not installed.ok and existing.is_file() and existing.read_bytes() == manifest.read_bytes()
+                     and all(not (root / name).exists() or (root / name).read_bytes() == contents[name]
+                             for name in ("sentinel_core.dll", "msimg32.dll")))
+    if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok and not owned_partial:
         raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
     names = ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")
     original = {name: (root / name).read_bytes() if (root / name).exists() else None for name in names}
@@ -988,15 +1038,30 @@ def install_meathook(
         for name in names:
             _atomic_write_bytes(root / name, incoming[name])
         if not probe_meathook(root).ok:
+            for name in names[:2]:
+                if not (root / name).is_file():
+                    raise FileNotFoundError(2, "Core file disappeared after installation", str(root / name))
             raise RuntimeError("Core pair verification failed after installation")
-    except Exception:
-        for name in names:
-            if original[name] is None:
-                (root / name).unlink(missing_ok=True)
-            else:
-                _atomic_write_bytes(root / name, original[name])
+    except Exception as error:
+        failed_path = root / name
+        rollback_errors = []
+        for restore_name in names:
+            try:
+                if original[restore_name] is None:
+                    (root / restore_name).unlink(missing_ok=True)
+                else:
+                    _atomic_write_bytes(root / restore_name, original[restore_name])
+            except OSError as rollback_error:
+                rollback_errors.append(str(rollback_error))
+        if isinstance(error, OSError):
+            detail = _core_file_error(failed_path, error)
+            if rollback_errors:
+                detail = RuntimeError(f"{detail} Rollback incomplete: {'; '.join(rollback_errors)}")
+            raise detail from error
+        if rollback_errors:
+            raise RuntimeError(f"{error} Rollback incomplete: {'; '.join(rollback_errors)}") from error
         raise
-    return GameLinkResult(state="installed", message=f"Sentinel Core {value['version']} installed.",
+    return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Sentinel Core {value['version']} installed.",
                           path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
                           ownership="launcher_installed")
 

@@ -33,7 +33,7 @@ def _run_self_test(arguments: list[str]) -> int:
         bundle = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[3] / "Sentinel-Core/build/distribution/1.0.0-rc-1"))
         manifest = bundle / "core/distribution.json" if getattr(sys, "frozen", False) else bundle / "distribution.json"
         try:
-            value, _ = verify_runtime(manifest)
+            value, _ = verify_runtime(manifest, bootstrap_from_archive=True)
             print(json.dumps({"product": value["product"], "version": value["version"],
                               "build_id": value["build_id"], "mod_versions": value["mod_versions"],
                               "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))

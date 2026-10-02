@@ -205,13 +205,66 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                             raise OSError("transaction interrupted")
                         return original_write(path, data)
                     write.side_effect = fail_once
-                    with self.assertRaises(OSError):
+                    with self.assertRaisesRegex(RuntimeError, "transaction interrupted"):
                         install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
                 self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
                 (root / "XINPUT1_3.dll").write_bytes(b"foreign")
                 with self.assertRaises(RuntimeError):
                     install_meathook(root, None, consent=lambda _: True, local_artifact=manifest, force_repair=True)
                 self.assertEqual((root / "XINPUT1_3.dll").read_bytes(), b"foreign")
+
+
+    def test_bootstrap_recovery_uses_verified_zip_and_reports_defender(self):
+        from doom_eap.contracts.core_distribution import verify_runtime
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._create_mock_game_root(Path(directory) / "doom")
+            manifest = _install_core_fixture(root)
+            bootstrap = root / "msimg32.dll"
+            expected = bootstrap.read_bytes()
+            (manifest.parent / "msimg32.dll").unlink()
+            with self.assertRaises(FileNotFoundError):
+                verify_runtime(manifest)
+            bootstrap.unlink()
+            with patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()):
+                result = install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                self.assertEqual(result.state, "repaired")
+                self.assertEqual(bootstrap.read_bytes(), expected)
+                (root / "sentinel_core.dll").write_bytes(b"foreign")
+                with self.assertRaisesRegex(RuntimeError, "ownership"):
+                    install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                (root / "sentinel_core.dll").write_bytes(expected)
+                original = {name: (root / name).read_bytes() for name in
+                            ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")}
+                events = [
+                    {"id": 5007, "time": "2026-10-02T18:41:36Z", "data": {
+                        "New Value": r"HKLM\SOFTWARE\Microsoft\Windows Defender\Threats\ThreatIDDefaultAction\251873 = 0x6"}},
+                    {"id": 1117, "time": "2026-10-02T18:41:08Z", "data": {
+                        "Path": "file:_" + str(bootstrap), "Threat ID": "251873",
+                        "Threat Name": "Program:Win32/Contebrew.A!ml"}},
+                ]
+                write = launcher_platform_mod._atomic_write_bytes
+                calls = 0
+
+                def fail_once(path, data):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        raise FileNotFoundError(2, "quarantine fixture", str(path))
+                    write(path, data)
+
+                with patch.object(launcher_platform_mod.sys, "platform", "win32"), \
+                     patch.object(launcher_platform_mod.subprocess, "run", return_value=SimpleNamespace(
+                         returncode=0, stdout=json.dumps(events))) as query, \
+                     patch.object(launcher_platform_mod, "_atomic_write_bytes", side_effect=fail_once):
+                    with self.assertRaisesRegex(RuntimeError, "An allow action is recorded") as failure:
+                        install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                    self.assertIn(str(bootstrap), str(failure.exception))
+                    self.assertEqual(query.call_count, 1)
+                self.assertEqual(original, {name: (root / name).read_bytes() for name in original})
+                (manifest.parent / "sentinel-runtime.zip").write_bytes(b"corrupt")
+                with self.assertRaisesRegex(ValueError, "Artifact mismatch"):
+                    verify_runtime(manifest, bootstrap_from_archive=True)
 
 
     def test_missing_core_distribution_stops_workflow_with_zero_mutation(self):

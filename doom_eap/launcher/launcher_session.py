@@ -259,7 +259,7 @@ class APSessionOwner:
             runtime_manifest = config.get("core_runtime_manifest")
             bundled = Path(getattr(sys, "_MEIPASS", self.client_dir)) / "core" / "distribution.json"
             self._runtime = Path(str(runtime_manifest)).resolve().parent if runtime_manifest else bundled.parent
-            manifest, contents = verify_runtime(self._runtime / "distribution.json")
+            manifest, contents = verify_runtime(self._runtime / "distribution.json", bootstrap_from_archive=True)
             helper = self._runtime / "prepare_vanilla_backup.py"
             if "prepare_vanilla_backup.py" not in contents or helper.read_bytes() != contents["prepare_vanilla_backup.py"]:
                 raise RuntimeError("Runtime package lacks its verified vanilla-protection helper")
