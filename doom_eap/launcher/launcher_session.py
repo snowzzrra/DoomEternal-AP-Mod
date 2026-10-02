@@ -30,6 +30,18 @@ _UNSET = object()
 _INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
 
 
+def _campaign_native_root(campaign_root, namespace):
+    record = campaign_root / namespace / "native.root"
+    if not record.exists():
+        return "ap-" + namespace[:40]
+    with record.open("rb") as stream:
+        text = stream.read(2049)
+    header = f"sentinel-native-root-v1\nnamespace={namespace}\nroot=".encode("ascii")
+    if not text.startswith(header) or not re.fullmatch(rb"ap-[0-9a-f]{40}\n", text[len(header):]):
+        raise RuntimeError("AP campaign provider metadata is unreadable")
+    return text[len(header):-1].decode("ascii")
+
+
 def _initial_receipts_only(session, snapshot):
     from doom_eap.content.item_classification import load_item_classification_identity
     from doom_eap.contracts.item_contracts import start_inventory_eligible
@@ -276,11 +288,20 @@ class APSessionOwner:
             local = Path(str(config["save_games_dir"])).resolve()
             campaign_root = self.data_dir / "campaigns"
             campaign_root.mkdir(parents=True, exist_ok=True)
-            native_name = "ap-" + namespace[:40]
+            native_name = _campaign_native_root(campaign_root, namespace)
             native_dirs = [remote / native_name, local / native_name]
             native_exists = any(path.exists() for path in native_dirs)
             namespace_dir = campaign_root / namespace
             contract, checkpoint = namespace_dir / "campaign.contract", namespace_dir / "campaign.checkpoint"
+            if native_exists and not contract.exists() and not checkpoint.exists():
+                marker = f"sentinel-owner-{namespace}.txt"
+                ownership = (f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
+                             f"team={snapshot.team}\nslot={snapshot.slot}\ngeneration_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
+                             "provenance=synthetic-fixture\n").encode("utf-8")
+                if all(not path.exists() or (path.is_dir() and all(
+                        file.name == marker and file.is_file() and file.read_bytes() == ownership
+                        for file in path.iterdir())) for path in native_dirs):
+                    native_exists = False
             if contract.exists() != checkpoint.exists() or (recovery_basename is None and native_exists != contract.exists()):
                 raise RuntimeError("AP campaign metadata and native saves disagree; inspect or recover the campaign before playing")
             intent = "resume" if native_exists else "create"
@@ -309,10 +330,12 @@ class APSessionOwner:
             if intent == "recover":
                 descriptor += f"backup={recovery_basename}\n"
             descriptor_path.write_text(descriptor, encoding="utf-8", newline="\n")
-            mode = "--save-session-reopen" if namespace_dir.exists() else "--save-session-prepare"
+            mode = "--save-session-prepare" if intent == "create" or not namespace_dir.exists() else "--save-session-reopen"
             plan = self._probe(mode, str(descriptor_path))
             if plan.get("namespace_id") != namespace:
                 raise RuntimeError("Core storage returned a different room namespace")
+            if plan.get("native_root") != _campaign_native_root(campaign_root, namespace):
+                raise RuntimeError("Core storage returned a different campaign provider")
             if intent == "recover":
                 self.verify_backup(str(recovery_basename), namespace=namespace)
             spec = importlib.util.spec_from_file_location("_sentinel_vanilla_protection", helper)
@@ -418,7 +441,8 @@ class APSessionOwner:
             store = ClientStateStore(state_file, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
                 logger=logger, log_event=lambda kind, **details: logger.info("%s %s", kind, details))
             keys = {key for key in state["sessions"] if key == prefix or key.startswith(prefix + ":")}
-            sources = [remote / ("ap-" + namespace[:40]), local / ("ap-" + namespace[:40]),
+            native_name = _campaign_native_root(self.data_dir / "campaigns", namespace)
+            sources = [remote / native_name, local / native_name,
                        self.data_dir / "campaigns" / namespace]
             sources.extend(self.data_dir / "campaigns" / name for name in self.list_backups(snapshot))
             queue = root / "ap_queue"

@@ -202,7 +202,7 @@ def test_create_preserves_initial_receipts_and_pending_ownership(tmp_path):
         _verify_new_campaign_receipts(state_file, snapshot)
 
 
-def test_core_prepares_launcher_session():
+def test_core_prepares_launcher_session(monkeypatch):
     import ctypes
     import os
     import shutil
@@ -214,6 +214,7 @@ def test_core_prepares_launcher_session():
     selected = os.environ.get("SENTINEL_CORE_RUNTIME")
     if os.name != "nt" or not selected:
         pytest.skip("requires an explicitly selected Windows Core distribution")
+    monkeypatch.setattr("doom_eap.launcher.launcher_session.windows_game_processes", lambda: ())
     runtime = Path(selected).resolve()
     with tempfile.TemporaryDirectory(prefix="ap-") as temporary:
         expanded = ctypes.create_unicode_buffer(32768)
@@ -256,6 +257,25 @@ def test_core_prepares_launcher_session():
             assert "seed_hex=" + snapshot.seed_name.encode("utf-8").hex() + "\n" in descriptor
             for path, content in originals.items():
                 assert path.read_bytes() == content
+            from doom_eap.launcher.launcher_session import _campaign_native_root
+            first = _campaign_native_root(data / "campaigns", owner.namespace)
+            namespace = owner.namespace
+            assert first != "ap-" + namespace[:40]
+            owner.retire()
+            # a menu-only start can leave just the marker before campaign creation
+            native = remote / first
+            native.mkdir()
+            (native / f"sentinel-owner-{namespace}.txt").write_text(
+                f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
+                f"team=0\nslot=1\ngeneration_fingerprint={'a' * 64}\nprovenance=synthetic-fixture\n", encoding="utf-8", newline="\n")
+            assert owner.prepare(snapshot, config)["intent"] == "create"
+            assert _campaign_native_root(data / "campaigns", namespace) == first
+            config["doom_base_dir"] = str(game / "base")
+            archive = owner.restart_campaign(snapshot, config)
+            assert archive.is_file() and steam.poll() is None
+            assert owner.prepare(snapshot, config)["intent"] == "create"
+            assert owner.namespace == namespace and _campaign_native_root(data / "campaigns", namespace) != first
+            assert steam.poll() is None
         finally:
             owner.retire()
             steam.communicate(b"", timeout=5)

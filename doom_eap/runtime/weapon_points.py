@@ -1,5 +1,6 @@
 """Spendable WUP receipt ownership and the typed Sentinel Game Link adapter."""
 from __future__ import annotations
+import re
 
 import hashlib
 import json
@@ -164,7 +165,7 @@ class SentinelWeaponPoints:
         facts = self._run(["--pid", str(self.pid), "--save-admission", "--json"])
         if (facts.get("namespace_id") != self.namespace or not facts.get("accepting_requests")
                 or not facts.get("route_retained") or facts.get("state") != "admitted"
-                or facts.get("native_root") != "ap-" + self.namespace[:40]):
+                or not re.fullmatch(r"ap-[0-9a-f]{40}", str(facts.get("native_root", "")))):
             raise WeaponPointsBlocked("AP save provider is not admitted for this identity")
         return facts["native_root"]
 
