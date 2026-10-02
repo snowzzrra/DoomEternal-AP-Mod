@@ -1379,6 +1379,7 @@ class LauncherController:
     def _queue_room_readiness(self, event) -> bool:
         generation = self.workers.generation
         event = deepcopy(event)
+        configuration = dict(self.config)
 
         def operation(job):
             def emit(kind, **payload):
@@ -1388,23 +1389,6 @@ class LauncherController:
                 snapshot = RoomSnapshot.from_event(event)
                 workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
                 state = workflow.install_state(snapshot)
-                emit(
-                    "room_install_state",
-                    state=state.state,
-                    manifest_hash=state.manifest_hash,
-                    staged_mod=state.staged_mod,
-                    steam_launch_option=state.steam_launch_option,
-                    reason=state.reason,
-                    readiness=state.readiness,
-                    readiness_reason=state.readiness_reason,
-                    **(
-                        installed_package_issue_payload(state.reason)
-                        if state.state == "update_required"
-                        else {}
-                    ),
-                )
-                if state.state == "already_installed" and state.readiness != "blocked":
-                    self._ensure_native_client(generation=job.generation)
             except LauncherWorkCancelled:
                 raise
             except Exception as error:
@@ -1417,6 +1401,25 @@ class LauncherController:
                     readiness_reason=str(error),
                     **issue,
                 )
+                return
+            if state.state == "already_installed" and state.readiness != "blocked":
+                job.check()
+                status = workflow.session_owner.prepare(snapshot, configuration)
+                job.check()
+                emit("ap_session_status", **status)
+            emit(
+                "room_install_state",
+                state=state.state,
+                manifest_hash=state.manifest_hash,
+                staged_mod=state.staged_mod,
+                steam_launch_option=state.steam_launch_option,
+                reason=state.reason,
+                readiness=state.readiness,
+                readiness_reason=state.readiness_reason,
+                **(installed_package_issue_payload(state.reason) if state.state == "update_required" else {}),
+            )
+            if state.state == "already_installed" and state.readiness != "blocked":
+                self._ensure_native_client(generation=job.generation)
 
         return self.workers.submit(("room_readiness", self.setup.room_key(event)), operation, generation=generation)
 
@@ -1538,7 +1541,7 @@ class LauncherController:
             archive = job.publish(lambda: self.workflow.session_owner.restart_campaign(snapshot, configuration))
             self.emit("ap_backup_result", message=(
                 f"Your previous game save and AP receipt state were backed up to {archive}. "
-                "Reconnect to the same room, then click Play to create a fresh DOOM Eternal save. "
+                "Reconnect to the same room and wait for AP save preparation, then start DOOM Eternal through Steam. "
                 "The multiworld is unchanged; items in the server's current history will be delivered to the new save."
             ))
 

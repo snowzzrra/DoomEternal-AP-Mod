@@ -255,3 +255,46 @@ def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(t
         assert not coordinator.start(force=True)
     finally:
         workers.close(3)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_reconnect_prepares_installed_room_before_starting_native_client(fail):
+    from doom_eap.launcher.launcher_controller import LauncherController
+
+    events, errors, calls = [], [], []
+    done = threading.Event()
+    workers = LauncherWorkers(lambda job, error: errors.append(error))
+    interactions = LauncherInteractions(lambda *args: None)
+    owner = SimpleNamespace(status={"state": "not_prepared", "ready": False})
+
+    def prepare(snapshot, config):
+        calls.append("prepare")
+        assert snapshot.seed_name == "install-seed" and config == {"room": "existing"}
+        if fail:
+            raise RuntimeError("admission fixture blocked")
+        owner.status = {"state": "prelaunch_ready", "ready": False, "intent": "create"}
+        return owner.status
+
+    owner.prepare = prepare
+    workflow = SimpleNamespace(session_owner=owner, install_state=lambda snapshot: SimpleNamespace(
+        state="already_installed", manifest_hash="same-package", staged_mod="room.zip", steam_launch_option="",
+        reason="", readiness="ready", readiness_reason=""))
+    workflow.for_job = lambda *args: workflow
+    controller = SimpleNamespace(workers=workers, config={"room": "existing"}, workflow=workflow,
+                                 setup=SimpleNamespace(room_key=RoomSetupCoordinator.room_key), interactions=interactions,
+                                 _setup_event=lambda kind, payload: events.append((kind, payload)),
+                                 _ensure_native_client=lambda **kwargs: calls.append("native"))
+    try:
+        assert LauncherController._queue_room_readiness(controller, room_event())
+        assert workers.submit("sentinel", lambda job: done.set())
+        assert done.wait(3)
+        if fail:
+            assert calls == ["prepare"] and len(errors) == 1
+            assert str(errors[0]) == "admission fixture blocked"
+            assert events == []
+        else:
+            assert calls == ["prepare", "native"] and errors == []
+            assert events[0][0] == "ap_session_status" and events[0][1]["state"] == "prelaunch_ready"
+            assert events[1][0] == "room_install_state" and events[1][1]["state"] == "already_installed"
+    finally:
+        workers.close(3)

@@ -1840,7 +1840,7 @@ class LauncherUI(QMainWindow):
             elif action=="New DOOM save in this room":
                 if QMessageBox.question(self,"New DOOM Eternal save",
                         "Back up this room's game save and local AP progress, then start a fresh DOOM Eternal save in the same room?\n\n"
-                        "Exit DOOM Eternal first. The launcher will disconnect. Reconnect to the same room and click Play. "
+                        "Exit DOOM Eternal first. The launcher will disconnect. Reconnect to the same room, wait for AP save preparation, then start the game through Steam. "
                         "Server progress is kept; its current items will be delivered to the new save. Other rooms and vanilla saves are kept.",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                         QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
