@@ -811,7 +811,7 @@ class IntegratedLaunchWorkflow:
             self._emit("runtime_config_ready", path=str(runtime_config))
             return cached
 
-        # 1. Ensure Game Link / Meathook dependency before any room mod operations
+        # Verify the selected Core pair before preparing the room mod.
         local_key = "core_runtime_manifest"
         local_val = config.get(local_key)
         local_artifact = Path(str(local_val)).expanduser() if local_val else None
@@ -829,7 +829,7 @@ class IntegratedLaunchWorkflow:
                     details={"path": game_link.path, "sha256": game_link.sha256, "status": "incompatible"},
                 )
                 raise RuntimeError(
-                    "Installed Game Link runtime does not match supported Meathook v7.2. "
+                    "Installed Sentinel Core runtime does not match the selected distribution. "
                     "Repair Game Link before preparing the room mod."
                 )
             if game_link.state == "failed":
@@ -867,7 +867,7 @@ class IntegratedLaunchWorkflow:
                 )
                 raise RuntimeError(
                     "Sentinel Core runtime is not installed. "
-                    "Install Meathook before preparing the room mod."
+                    "Repair Game Link before preparing the room mod."
                 )
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Runtime prerequisites not met: {'; '.join(failed)}")

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from doom_eap.contracts.foundation import compile_item_delivery_plan
+from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
 from doom_eap.contracts.receipt_delivery import (
     NEW_RECEIPT, HISTORICAL_OWNERSHIP, RECONCILIATION_REPAIR, PRESENTATION_REPAIR,
 )
@@ -133,6 +133,8 @@ class ReceiptSession:
         self._starting_materialization = tuple(facts)
 
     def consume_starting_materialization(self, item_id):
+        if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS:
+            return False
         if self._starting_counts.get(item_id, 0) > 0:
             self._starting_counts[item_id] -= 1
             return True

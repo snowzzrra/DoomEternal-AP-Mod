@@ -646,7 +646,7 @@ def probe_runtime_prerequisites(
                 details={"path": str(game_root)},
             ))
 
-    # 2. Meathook check
+    # Verify the installed Core pair.
     checks.append(probe_meathook(game_root))
 
     # 3. Client runtime check

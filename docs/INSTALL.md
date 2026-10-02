@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.5.2
+# Install DOOM Eternal Archipelago 0.6.0
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.5.2** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.0** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -138,7 +138,7 @@ Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
 by Steam inside the configured Proton prefix. Do not launch the Windows game
 executable directly through Wine.
 
-1. Approve verified EternalModInjectorShell 6.66-rev3.13 acquisition or provide
+1. Approve verified EternalModInjectorShell 6.66-rev3.16 acquisition or provide
    an official verified local artifact.
 2. Launcher stages the generated mod.
 3. Launcher opens the interactive EternalModInjectorShell workflow.
@@ -164,7 +164,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.2** identifies public launcher, room package, and generated content (APWorld remains 0.5.0).
+Version **0.6.0** identifies public launcher, room package, and generated content (APWorld uses 0.6.0).
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|

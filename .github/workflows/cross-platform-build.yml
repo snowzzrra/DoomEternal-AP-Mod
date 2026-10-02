@@ -14,7 +14,7 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.5.2)'
+        description: 'Release version label (e.g. v0.6.0)'
         required: true
         default: 'v0.6.0'
         type: string
@@ -258,6 +258,15 @@ jobs:
         run: |
           python -m pip install -r requirements-launcher.txt
           python -m tools.release.build_session_owner --output build/release/build/client --core-runtime Sentinel-Core/build/distribution/candidate
+
+      - name: Verify Launcher and Core Session Contract
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-ci.txt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:SENTINEL_CORE_RUNTIME = (Resolve-Path 'Sentinel-Core/build/distribution/candidate').Path
+          python -m pytest tests/test_launcher_session.py -q
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Verify Native Binaries
         shell: pwsh

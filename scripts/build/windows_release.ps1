@@ -136,8 +136,8 @@ try {
     $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
     $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
     Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $buildSourceState, "--verify")
-    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.5.2", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows", "--source-state", $buildSourceState)
-    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.5.2", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
+    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.6.0", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows", "--source-state", $buildSourceState)
+    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.6.0", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
     Write-Output "WINDOWS_RELEASE status=PASS output=$(Join-Path $repoRoot 'build\final-release')"
 } finally {
     Pop-Location

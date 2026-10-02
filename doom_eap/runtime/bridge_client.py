@@ -3626,7 +3626,7 @@ class DoomEternalContext(CommonContext):
                             return False
                     continue
 
-                if item_id not in {7770083, 7770901} and item_id not in MASTERY_ITEM_BITS and self.receipt_session.consume_starting_materialization(item_id):
+                if self.receipt_session.consume_starting_materialization(item_id):
                     logger.info(
                         "[To Game] Materialized starting receipt acknowledged without replay: "
                         "index=%s item_id=%s",

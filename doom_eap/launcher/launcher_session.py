@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+from collections import Counter
 from dataclasses import asdict
 from ctypes import wintypes
 import hashlib
@@ -25,6 +26,47 @@ _UNSET = object()
 _INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
 
 
+def _initial_receipts_only(session, snapshot):
+    from doom_eap.content.item_classification import load_item_classification_identity
+    from doom_eap.contracts.item_contracts import start_inventory_eligible
+    from doom_eap.runtime.item_reconciliation import ReceiptSession
+    from doom_eap.runtime.unified_campaign import ACCESS_IDS
+
+    history = session.get("receipt_history", {})
+    boundary = session.get("processed_items", 0)
+    receipts, items = history.get("receipt_ids"), history.get("receipt_item_ids")
+    if (not isinstance(receipts, list) or not isinstance(items, list)
+            or not boundary or len(receipts) != boundary or len(items) != boundary
+            or any(not isinstance(receipt, str) for receipt in receipts)
+            or history.get("processed_boundary") != boundary
+            or history.get("receipt_counts") != dict(Counter(receipts))):
+        return False
+    starting = ReceiptSession()
+    starting.configure_starting_materialization(
+        starting_inventory=snapshot.slot_data["starting_inventory"],
+        starting_weapon=snapshot.slot_data["starting_weapon"],
+        item_identity=load_item_classification_identity(
+            Path(__file__).resolve().parents[2] / "data/item_classifications.json"),
+        processed_receipts=(), eligible=start_inventory_eligible,
+    )
+    for receipt, item in zip(receipts, items):
+        if not receipt.startswith("network:"):
+            return False
+        try:
+            fields = json.loads(receipt[len("network:"):])
+        except ValueError:
+            return False
+        if (not isinstance(fields, list) or len(fields) != 4
+                or any(type(field) is not int for field in fields)
+                or type(item) is not int or fields[2] != item):
+            return False
+        if item in ACCESS_IDS:
+            continue
+        if fields[0] != -2 or fields[1] != 0 or not starting.consume_starting_materialization(item):
+            return False
+    return True
+
+
 def _verify_new_campaign_receipts(state_file, snapshot):
     if not state_file.exists():
         return
@@ -45,8 +87,11 @@ def _verify_new_campaign_receipts(state_file, snapshot):
         history = session.get("receipt_history", {})
         if not isinstance(history, dict):
             raise RuntimeError("Local AP receipt history is ambiguous; inspect it before creating a campaign")
-        if (session.get("processed_items", 0) or session.get("weapon_points")
-                or any(history.get(key) for key in ("receipt_ids", "receipt_counts", "receipt_item_ids", "owned_item_ids", "processed_boundary"))
+        processed = session.get("processed_items", 0) or any(history.get(field) for field in
+            ("receipt_ids", "receipt_counts", "receipt_item_ids", "processed_boundary"))
+        initial = (processed and key == prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]
+                   and _initial_receipts_only(session, snapshot))
+        if ((processed and not initial) or session.get("weapon_points")
                 or any(session.get(key) for key in ("item_command_groups", "never_replay_history", "never_replay_items", "never_replayed", "never_replay"))
                 or session.get("bootstrap", {}).get("actions")):
             raise RuntimeError("Local AP receipts exist without native saves; recover the campaign before playing")
@@ -172,7 +217,8 @@ class APSessionOwner:
         if not isinstance(value, dict):
             raise RuntimeError("Core session probe returned an invalid object")
         if result.returncode and "--save-admission" not in arguments:
-            raise RuntimeError(f"Core session refused: {value.get('result', 'unknown')} (error {value.get('win32_error', 0)})")
+            outcome = value.get("outcome", value.get("result", "unknown"))
+            raise RuntimeError(f"Core session refused: {outcome} (error {value.get('win32_error', 0)})")
         return value
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None) -> dict:
@@ -243,7 +289,7 @@ class APSessionOwner:
             difficulty = snapshot.slot_data["campaign_plan"].get("difficulty")
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError("Room campaign difficulty is unsupported")
-            descriptor = (f"sentinel-test-session-v2\nseed={snapshot.seed_name}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
+            descriptor = (f"sentinel-test-session-v2\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
                           f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
                           f"provenance=synthetic-fixture\nroot={campaign_root}\ncampaign=unified\nstarting_stage=hub\n"
                           f"difficulty={difficulty}\nintent={intent}\n")
@@ -277,7 +323,7 @@ class APSessionOwner:
                     ap_root=str(campaign_root), uninstall_root=[str(self.state_dir)], reference_directory=None,
                     run_backup_parent=None))
             except (module.Refused, OSError, ValueError) as error:
-                raise RuntimeError("Vanilla protection could not be verified; AP activation refused") from error
+                raise RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}") from error
             api = ctypes.WinDLL("kernel32", use_last_error=True)
             api.GetCurrentProcess.restype = wintypes.HANDLE
             api.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4

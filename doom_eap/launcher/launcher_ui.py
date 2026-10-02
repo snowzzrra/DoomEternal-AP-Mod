@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -477,9 +477,6 @@ class LauncherUI(QMainWindow):
         self._set_hints_state("disconnected")
         self._set_setup_state("disconnected")
         self._load_icon()
-        self._qt_application = QApplication.instance()
-        if self._qt_application is not None:
-            self._qt_application.installEventFilter(self)
         self._install_shortcuts()
         self._discover()
         self.timer = QTimer(self)
@@ -709,7 +706,10 @@ class LauncherUI(QMainWindow):
         return strip
 
     def _arrange_status_strip(self) -> None:
-        available = self.status_strip.contentsRect().width()
+        page = cast(QScrollArea, self.pages.widget(2))
+        outer = page.widget().layout().contentsMargins()
+        inner = self.status_strip.parentWidget().layout().contentsMargins()
+        available = page.viewport().width() - outer.left() - outer.right() - inner.left() - inner.right()
         if available <= 0:
             QTimer.singleShot(0, self._arrange_status_strip)
             return
@@ -740,7 +740,7 @@ class LauncherUI(QMainWindow):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if hasattr(self, "status_strip"):
-            self._arrange_status_strip()
+            QTimer.singleShot(0, self._arrange_status_strip)
 
     def _join_page(self) -> QScrollArea:
         body = QWidget()
@@ -917,7 +917,8 @@ class LauncherUI(QMainWindow):
         actions.addWidget(self.stop_button)
         layout.addLayout(actions)
         backup_actions = QHBoxLayout()
-        backup_button = QPushButton("AP SAVE…")
+        backup_button = QPushButton("AP BACKUPS…")
+        backup_button.setToolTip("Create, browse or restore backups for this room's AP campaign. Restore requires DOOM Eternal to be closed.")
         backup_button.clicked.connect(self._ap_save_actions)
         backup_actions.addWidget(backup_button)
         backup_actions.addStretch()
@@ -1388,19 +1389,6 @@ class LauncherUI(QMainWindow):
         primary = QShortcut(QKeySequence("Ctrl+Return"), self)
         primary.activated.connect(self._primary_action)
 
-    def eventFilter(self, watched, event) -> bool:
-        if (
-            event.type() == QEvent.Type.KeyPress
-            and self.isActiveWindow()
-            and watched is not self.ammo_refill_keybind.editor
-            and not self.ammo_refill_keybind.editor.isAncestorOf(watched)
-        ):
-            token = _simple_physical_key_token(event)
-            if token == self.ammo_refill_keybind.value():
-                self.controller.request_ammo_refill()
-                return True
-        return super().eventFilter(watched, event)
-
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
         value = captured.strip()
         try:
@@ -1837,13 +1825,12 @@ class LauncherUI(QMainWindow):
             self._append_log("Room package uninstall failed.")
 
     def _ap_save_actions(self) -> None:
-        choices=["Create backup", "Open backup folder", "Restore compatible backup", "Reset AP data"]
-        action,accepted=QInputDialog.getItem(self,"AP save","Action",choices,0,False)
+        choices=["Create backup", "Open backup folder", "Restore compatible backup"]
+        action,accepted=QInputDialog.getItem(self,"AP campaign backups",
+            "Protect this room's AP progress.\nCreate or restore a compatible save backup.",choices,0,False)
         if not accepted:
             return
         try:
-            if action=="Reset AP data":
-                raise RuntimeError("Verified native reconstruction is unavailable. Receipt history, purchases and consumables were preserved.")
             if action=="Open backup folder":
                 from PySide6.QtCore import QUrl
                 from PySide6.QtGui import QDesktopServices
@@ -3184,8 +3171,6 @@ class LauncherUI(QMainWindow):
             QMessageBox.information(self, "AP session active", str(error))
             event.ignore()
             return
-        if self._qt_application is not None:
-            self._qt_application.removeEventFilter(self)
         self.timer.stop()
         self.lifecycle_timer.stop()
         event.accept()

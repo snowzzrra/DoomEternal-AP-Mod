@@ -22,7 +22,7 @@ def build(output: Path, core_runtime: Path) -> Path:
                "--specpath", str(output / "spec"), "--paths", str(root)]
     for name, source in (("core", core_runtime), ("data", root / "data"), ("manifests", root / "manifests"), ("content", root / "content")):
         command.extend(["--add-data", f"{source};{name}"])
-    command.append(str(root / "doom_eap/launcher/session_owner_app.py"))
+    command.extend(["--hidden-import", "uuid", str(root / "doom_eap/launcher/session_owner_app.py")])
     subprocess.run(command, cwd=root, check=True)
     return output / "APSessionOwner.exe"
 
