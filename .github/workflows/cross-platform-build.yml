@@ -240,6 +240,10 @@ jobs:
           python-version: '3.12'
 
       - name: Build and Validate Native Client
+        env:
+          DOOMEAP_SIGNING_REQUIRED: ${{ vars.DOOMEAP_SIGNING_REQUIRED }}
+          DOOMEAP_SIGNING_CERT_SHA1: ${{ secrets.DOOMEAP_SIGNING_CERT_SHA1 }}
+          DOOMEAP_SIGNING_TIMESTAMP_URL: ${{ vars.DOOMEAP_SIGNING_TIMESTAMP_URL }}
         shell: cmd
         run: |
           call "%SC_VCVARS%" -vcvars_ver=14.44

@@ -33,7 +33,7 @@ std::unique_ptr<SentinelCommandClient> g_ApRpcOwner;
 
 static const char* kTransitionEventPrefix = "base\\ap_transition_";
 static const char* kGameplaySaveEvidencePath = "base\\ap_gameplay_save.state";
-static const char* kReleaseVersion = "0.5.2";
+static const char* kReleaseVersion = "0.6.0";
 static const int kNativeCommandPolicyRevision = 11;
 static const ULONGLONG kSteamId64Base = 76561197960265728ULL;
 static const DWORD kGoalMonitorPollMs = 1000;
