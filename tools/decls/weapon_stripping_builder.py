@@ -20,6 +20,24 @@ WORKSPACE = ROOT.parent
 
 OWNERS = (
     {
+        "name": "hammer_world_spear_cinematic",
+        "container": "e5m1_spear_patch2",
+        "source": ROOT / "vanilla_decls/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
+        "path": "logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
+        "sha256": "e4a79b99f9d10643db1ee4bcb664839c4f7e0669d2826f93fb5a5e7fa383f790",
+        "inventory_item": "weapon/player/hammer",
+        "desired_count": "1",
+    },
+    {
+        "name": "plasma_mars_cinematic",
+        "container": "e2m3_core_patch3",
+        "source": ROOT / "vanilla_decls/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+        "path": "logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+        "sha256": "ca960747e4464ec379d42ddcf340c2294d987d76eb66bd2a82eef2ab1456c0b4",
+        "inventory_item": "weapon/player/plasma_rifle",
+        "desired_count": "1",
+    },
+    {
         "name": "ssg_revenant_cinematic",
         "container": "e1m3_cult_patch3",
         "source": WORKSPACE / "sp_hub_decl_analysis_20260719_140903" / "decls" / "game" / "sp" / "e1m3_cult" / "e1m3_cult_patch3" / "generated" / "decls" / "logicentity" / "maps" / "game" / "sp" / "e1m3_cult" / "e1m3_cult_cinematic" / "cinematic_info_logic_revenant_gives_shotgun.decl",
@@ -47,6 +65,15 @@ OWNERS = (
         "desired_count": "1",
     },
 )
+
+SSG_WEAPON = {
+    "name": "ssg_meat_hook_grant",
+    "container": "gameresources",
+    "source": WORKSPACE / "Tools" / "gameresources_decl_analysis_20260710_201519" / "files" / "generated" / "decls" / "weapon" / "weapon" / "player" / "double_barrel.decl",
+    "path": "weapon/weapon/player/double_barrel.decl",
+    "sha256": "5655770c5e74ef49eaf7347775bd368d0702f68c2aeaf05a3f96781bdcedf31d",
+    "inventory_item": "perk/player/weapons/double_barrel/meat_hook",
+}
 
 PAYLOAD_RE = re.compile(
     r'(className = "idLogicNodeModelPlayerModifyInventory";.*?'
@@ -86,7 +113,7 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
             f"{owner['name']}: expected one ownership payload, found {len(matches)}"
         )
     match = matches[0]
-    if match.group("num") != "1":
+    if match.group("num") not in ("0", "1"):
         raise ValueError(
             f"{owner['name']}: ownership payload count drifted: {match.group('num')}"
         )
@@ -99,10 +126,10 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
         for index, (left, right) in enumerate(zip(before, after))
         if left != right
     ]
-    if len(before) != len(after) or len(changed) != 1:
+    if len(before) != len(after) or len(changed) != (match.group("num") == "1"):
         raise ValueError(f"{owner['name']}: override changed more than num=1 to num=0")
-    line_number, old_line, new_line = changed[0]
-    if old_line.strip() != "num = 1;" or new_line.strip() != "num = 0;":
+    line_number, old_line, new_line = changed[0] if changed else (None, "num = 0;", "num = 0;")
+    if changed and (old_line.strip() != "num = 1;" or new_line.strip() != "num = 0;"):
         raise ValueError(f"{owner['name']}: unexpected ownership payload diff")
     return result, {
         "name": owner["name"],
@@ -117,15 +144,51 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
     }
 
 
+def _strip_ssg_meat_hook(payload: bytes) -> tuple[str, dict]:
+    text = payload.decode("utf-8")
+    pattern = re.compile(
+        r'(givePerksOnReceive\s*=\s*\{\s*num\s*=\s*)1(\s*;\s*item\[0\]\s*=\s*"perk/player/weapons/double_barrel/meat_hook";)',
+        re.DOTALL,
+    )
+    result, count = pattern.subn(r"\g<1>0\g<2>", text)
+    if count != 1:
+        raise ValueError(f"ssg_meat_hook_grant: expected one givePerksOnReceive payload, found {count}")
+    before = text.splitlines()
+    after = result.splitlines()
+    changed = [(index + 1, left, right) for index, (left, right) in enumerate(zip(before, after)) if left != right]
+    if len(before) != len(after) or len(changed) != 1:
+        raise ValueError("ssg_meat_hook_grant: override changed more than perk payload count")
+    line_number, old_line, new_line = changed[0]
+    return result, {
+        "name": SSG_WEAPON["name"],
+        "container": SSG_WEAPON["container"],
+        "path": SSG_WEAPON["path"],
+        "source_sha256": SSG_WEAPON["sha256"],
+        "override_sha256": hashlib.sha256(result.encode("utf-8")).hexdigest(),
+        "inventory_item": SSG_WEAPON["inventory_item"],
+        "changed_line": line_number,
+        "before": old_line,
+        "after": new_line,
+    }
+
+
 def build_weapon_stripping_overrides(mod_root: Path) -> dict:
     audits = []
     for owner in OWNERS:
         result, audit = _neutralize(owner, _source_payload(owner))
         target = mod_root / owner["container"] / "generated" / "decls" / owner["path"]
+        if target.exists():
+            result, audit = _neutralize(owner, target.read_bytes())
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(result, encoding="utf-8", newline="")
         audit["written_path"] = target.as_posix()
         audits.append(audit)
+    result, audit = _strip_ssg_meat_hook(_source_payload(SSG_WEAPON))
+    target = mod_root / SSG_WEAPON["container"] / "generated" / "decls" / SSG_WEAPON["path"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(result, encoding="utf-8", newline="")
+    audit["written_path"] = target.as_posix()
+    audits.append(audit)
     if len({entry["written_path"] for entry in audits}) != len(audits):
         raise ValueError("weapon stripping override paths overlap")
     return {"schema_version": 1, "overrides": audits}
@@ -138,7 +201,7 @@ def main() -> int:
     args = parser.parse_args()
     audit = build_weapon_stripping_overrides(args.mod_root)
     args.audit_output.parent.mkdir(parents=True, exist_ok=True)
-    args.audit_output.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     return 0
 
 

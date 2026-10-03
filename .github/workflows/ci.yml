@@ -1,13 +1,14 @@
 name: DOOM mod smoke
 on: [push, pull_request]
-permissions: {}
+permissions:
+  contents: read
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with: {python-version: '3.12.10'}
       - name: Install smoke dependencies
         run: python -m pip install --requirement requirements-ci.txt
       - name: Compile Python
@@ -16,5 +17,12 @@ jobs:
         run: python -m tools.validation.authorial --check-authorial
       - name: Validate packaged options schema
         run: python -c "from pathlib import Path; from doom_eap.content.options_foundation import load_options_schema; load_options_schema(Path('data/options_schema.json'))"
+      - name: Behavioral contracts (isolated checkout)
+        run: python -m pytest tests -q --disable-warnings
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.19.0'
+      - name: Report service contract without external writes
+        run: node tools/report_backend/test_server.cjs
       - name: Check whitespace
         run: git diff --check

@@ -104,5 +104,8 @@
     ],
     "virtual_locations": []
   },
-  "order": 14
+  "order": 14,
+  "campaign_return_owners": [
+    "underwater_facility_target_level_transition_1"
+  ]
 }

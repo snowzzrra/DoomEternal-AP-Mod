@@ -32,14 +32,14 @@
     "location_id": 7770162,
     "map_key": "e1m4_boss",
     "ap_check": "AP_CHECK_MISSION_COMPLETE_DOOM_HUNTER_BASE",
-    "owner": "checkpoints_target_relay_65",
+    "owner": "stage2_complete",
     "source_path": "vanillamaps/e1m4_boss.map",
-    "source_sha256": "93020236c609df3c7b2243a69d1df1ce08e07764924bd7571d24197b06c1380b",
-    "original_targets": ["checkpoints_target_level_transition_1"],
+    "source_sha256": "bd31f659b366fc389a05ffbcbd7f329f15c222ec62962d8ea58c12a672cbafa0",
+    "original_targets": ["stage2_cleanup_boss", "set_outro_hack"],
     "required_snippets": [
       "class = \"idTarget_Count\";",
       "count = 1;",
-      "delay = 2;"
+      "noFlood = true;"
     ],
     "terminal": {
       "owner": "checkpoints_target_level_transition_1",

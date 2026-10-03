@@ -53,9 +53,14 @@
       "map_key": "e1m3_cult",
       "triggers": [
         {
-          "from_map": "game/sp/e1m3_cult/e1m3_cult",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e1m4_boss/e1m4_boss"
+          "filename": "ap_stage_e1m3_cult_complete.txt",
+          "marker": "AP_STAGE_COMPLETE_E1M3_CULT",
+          "owner": "game_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_1",
+          "strategy": "terminal_owner"
         }
       ]
     },
@@ -74,13 +79,8 @@
         {
           "filename": "ap_event_7770162.txt",
           "marker": "AP_CHECK_EVENT_7770162",
-          "owner": "checkpoints_target_relay_65",
+          "owner": "stage2_complete",
           "strategy": "map_event_file"
-        },
-        {
-          "from_map": "game/sp/e1m4_boss/e1m4_boss",
-          "strategy": "native_transition",
-          "to_map": "game/hub/hub"
         }
       ]
     },
@@ -97,9 +97,14 @@
       "map_key": "e2m1_nest",
       "triggers": [
         {
-          "from_map": "game/sp/e2m1_nest/e2m1_nest",
-          "strategy": "native_transition",
-          "to_map": "game/hub/hub"
+          "filename": "ap_stage_e2m1_nest_complete.txt",
+          "marker": "AP_STAGE_COMPLETE_E2M1_NEST",
+          "owner": "game_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_1",
+          "strategy": "terminal_owner"
         }
       ]
     },
@@ -120,11 +125,6 @@
           "marker": "AP_CHECK_EVENT_7770248",
           "owner": "fort_map_exit_level_transition_relay_393966306",
           "strategy": "map_event_file"
-        },
-        {
-          "from_map": "game/sp/e2m2_base/e2m2_base",
-          "strategy": "native_transition",
-          "to_map": "game/hub/hub"
         }
       ]
     },
@@ -141,9 +141,14 @@
       "map_key": "e2m3_core",
       "triggers": [
         {
-          "from_map": "game/sp/e2m3_core/e2m3_core",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e2m4_boss/e2m4_boss"
+          "filename": "ap_stage_e2m3_core_complete.txt",
+          "marker": "AP_STAGE_COMPLETE_E2M3_CORE",
+          "owner": "hell_chunk_2_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "hell_chunk_2_target_level_transition_1",
+          "strategy": "terminal_owner"
         }
       ]
     },
@@ -168,11 +173,6 @@
           "marker": "AP_MISSION_EVENT_SENTINEL_PRIME_COMPLETE",
           "owner": "e2m4_endoflevel_transition",
           "strategy": "map_event_file"
-        },
-        {
-          "from_map": "game/sp/e2m4_boss/e2m4_boss",
-          "strategy": "native_transition",
-          "to_map": "game/hub/hub"
         }
       ]
     },
@@ -229,11 +229,6 @@
         {
           "owner": "game_map_exit_level_transition_relay_852698944",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
-          "strategy": "native_transition",
-          "to_map": "game/hub/hub"
         }
       ]
     },
@@ -291,11 +286,6 @@
         {
           "owner": "game_target_relay_28",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/sp/e3m2_hell/e3m2_hell",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e3m2_hell_b/e3m2_hell_b"
         }
       ]
     },
@@ -320,11 +310,6 @@
         {
           "owner": "game_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/sp/e3m2_hell_b/e3m2_hell_b",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e3m3_maykr/e3m3_maykr"
         }
       ]
     },
@@ -349,11 +334,6 @@
         {
           "owner": "temp_all_scripting_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/sp/e3m3_maykr/e3m3_maykr",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e3m4_boss/e3m4_boss"
         }
       ]
     },
@@ -378,11 +358,6 @@
         {
           "owner": "icon_of_sin_death_target_relay_post_destruction_idle",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/sp/e3m4_boss/e3m4_boss",
-          "strategy": "native_transition",
-          "to_map": "game/sp/e3m4_boss/e3m4_boss/end_game"
         }
       ]
     },
@@ -407,11 +382,6 @@
         {
           "owner": "underwater_facility_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc/e4m1_rig/e4m1_rig",
-          "strategy": "native_transition",
-          "to_map": "maps/game/dlc/hub/hub.map"
         }
       ]
     },
@@ -436,11 +406,6 @@
         {
           "owner": "checkpoint_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc/e4m2_swamp/e4m2_swamp",
-          "strategy": "native_transition",
-          "to_map": "game/dlc/e4m3_mcity/e4m3_mcity"
         }
       ]
     },
@@ -465,11 +430,6 @@
         {
           "owner": "game_target_level_transition_e4m3",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc/e4m3_mcity/e4m3_mcity",
-          "strategy": "native_transition",
-          "to_map": "maps/game/dlc/hub/hub.map"
         }
       ]
     },
@@ -494,11 +454,6 @@
         {
           "owner": "crystal_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc2/e5m1_spear/e5m1_spear",
-          "strategy": "native_transition",
-          "to_map": "game/dlc2/e5m2_earth/e5m2_earth"
         }
       ]
     },
@@ -523,11 +478,6 @@
         {
           "owner": "checkpoints_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc2/e5m2_earth/e5m2_earth",
-          "strategy": "native_transition",
-          "to_map": "game/dlc2/e5m3_hell/e5m3_hell"
         }
       ]
     },
@@ -552,11 +502,6 @@
         {
           "owner": "hangar_target_level_transition_1",
           "strategy": "terminal_owner"
-        },
-        {
-          "from_map": "game/dlc2/e5m3_hell/e5m3_hell",
-          "strategy": "native_transition",
-          "to_map": "game/dlc2/e5m4_boss/e5m4_boss"
         }
       ]
     },

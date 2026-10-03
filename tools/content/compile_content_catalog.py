@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
+from doom_eap.content.campaign_stages import campaign_stages
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
@@ -115,7 +117,13 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         ]
     )
     lines.extend(f"    {string(item.name)}," for item in catalog.runtime_locations)
-    lines.extend(["})", ""])
+    lines.extend(["})", "", "CAMPAIGN_STAGES = ("])
+    lines.extend(f"    {stage!r}," for stage in campaign_stages(catalog))
+    lines.extend([")", ""])
+    fortress = json.loads((catalog.root / "content/catalog/fortress.json").read_text(encoding="utf-8"))
+    lines.append(f"FORTRESS_POLICY = {fortress!r}")
+    lines.append("FORTRESS_SPEND_GROUPS = tuple(FORTRESS_POLICY['spend_groups'])")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -154,6 +162,19 @@ def _compile_catalog(
             changed_paths.append(path)
 
     write_artifact(output, rendered)
+    write_artifact(catalog.root / "data" / "campaign_stages.json",
+                   json.dumps(campaign_stages(catalog), indent=2) + "\n")
+    from tools.validation.validate_data import extract_item_classifications, extract_namedtuple_table
+    item_source = MOD_ROOT.parent / "Archipelago/worlds/doometernal/items.py"
+    item_ids = extract_namedtuple_table(item_source, "item_data_table")
+    classifications = extract_item_classifications(item_source)
+    write_artifact(catalog.root / "data/item_classifications.json", json.dumps({
+        "schema_version": 1, "item_mapping_revision": 9,
+        "source": "Archipelago/worlds/doometernal/items.py",
+        "source_sha256": hashlib.sha256(item_source.read_bytes()).hexdigest(),
+        "items": {str(code): {"name": name, "classification": classifications[code]}
+                  for name, code in sorted(item_ids.items(), key=lambda pair: pair[1])},
+    }, indent=2, ensure_ascii=False) + "\n")
 
     if source_only:
         return tuple(changed_paths)
@@ -164,7 +185,7 @@ def _compile_catalog(
     staging_gen = output_root / "generated_content.py"
     write_artifact(staging_gen, rendered)
 
-    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json"]:
+    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json", "campaign_stages.json"]:
         src = catalog.root / "data" / json_name
         if src.exists():
             content_bytes = src.read_bytes()
@@ -179,6 +200,14 @@ def _compile_catalog(
     compiled_sources = _catalog_registry(catalog.root)
 
     generated_data = {
+        "physical_pickups.json": {
+            "schema": 1,
+            "maps": {
+                spec.runtime_map: sorted(item.location_id for item in catalog.physical_locations
+                                         if item.map_key == spec.key and item.strategy != "secret_encounter")
+                for spec in catalog.maps.values() if spec.enabled
+            },
+        },
         "map_sources.json": compiled_sources,
         "location_names.json": {
             "schema_version": 1,

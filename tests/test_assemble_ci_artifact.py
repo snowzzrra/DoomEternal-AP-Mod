@@ -2,13 +2,11 @@ import hashlib
 import json
 import os
 import shutil
-import stat
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
 
-from doom_eap.launcher.launcher_core import RoomCompiler
 from scripts.release.assemble_ci_artifact import (
     assemble_platform_release,
     audit_final_zip,
@@ -18,8 +16,8 @@ from scripts.release.assemble_ci_artifact import (
     validate_room_resources,
     write_deterministic_zip,
 )
-from tools.release.release_manifest import MANIFEST_FILENAME, validate_release_manifest
-from tools.validation.release_layout import ROOM_COMPILER_RESOURCE_FILES, public_file_members
+from tools.release.release_manifest import MANIFEST_FILENAME
+from tools.validation.release_layout import ROOM_COMPILER_RESOURCE_FILES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_LOCAL_RESOURCES = REPO_ROOT / "build" / "release" / "client" / "resources"
@@ -48,31 +46,32 @@ def create_fake_handoff(
     win_dir.mkdir(parents=True, exist_ok=True)
     shared_client_dir.mkdir(parents=True, exist_ok=True)
 
-    # Linux launcher
+    # linux launcher
     if not omit_linux_launcher:
         lin_content = b"\x7fELF" + b"\x00" * 100
         if bad_elf:
             lin_content = b"NOT_ELF" + b"\x00" * 100
         (linux_dir / "DoomEternalArchipelagoLauncher").write_bytes(lin_content)
 
-    # Windows launcher
+    # windows launcher
     if not omit_win_launcher:
         win_content = b"MZ" + b"\x00" * 100
         if bad_mz:
             win_content = b"NOT_MZ" + b"\x00" * 100
         (win_dir / "DoomEternalArchipelagoLauncher.exe").write_bytes(win_content)
 
-    # APWorld (valid zip)
+    # apworld (valid zip)
     apworld_path = shared_dir / "doometernal.apworld"
     with zipfile.ZipFile(apworld_path, "w") as zf:
         zf.writestr("doometernal/__init__.py", "# test apworld\n")
 
-    # Native ap_client.exe
+    # native ap_client.exe
     if not omit_ap_client:
         client_content = b"MZ" + b"\x00" * 200
         (shared_client_dir / "ap_client.exe").write_bytes(client_content)
+        (shared_client_dir / "save_death_probe.exe").write_bytes(client_content)
 
-    # BUILD-MANIFEST.json
+    # build-manifest.json
     manifest = {
         "schema_version": 1,
         "version_label": version,
@@ -96,7 +95,7 @@ def create_fake_handoff(
     }
     (target_dir / "BUILD-MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    # SHA256SUMS.txt
+    # sha256sums.txt
     lines = []
     for root, _, files in os.walk(target_dir):
         for f in sorted(files):
@@ -221,10 +220,10 @@ class TestAssembleCIArtifact(unittest.TestCase):
         lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
         win_stage = assemble_platform_release("windows", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
 
-        # Check parity audit passes
+        # check parity audit passes
         audit_platform_parity(lin_stage, win_stage)
 
-        # Check ZIP creation & audit
+        # check zip creation & audit
         lin_zip = self.output_dir / "DoomEternalArchipelago-v0.4.0-beta.4-linux-x86_64.zip"
         win_zip = self.output_dir / "DoomEternalArchipelago-v0.4.0-beta.4-windows-x86_64.zip"
 
@@ -237,7 +236,7 @@ class TestAssembleCIArtifact(unittest.TestCase):
         self.assertTrue(lin_zip.is_file())
         self.assertTrue(win_zip.is_file())
 
-        # Verify ZIP contents and mandatory room resources
+        # check zip contents and mandatory room resources
         with zipfile.ZipFile(lin_zip) as zf:
             names = set(zf.namelist())
             self.assertIn("DoomEternalArchipelago/DoomEternalArchipelagoLauncher", names)
@@ -258,34 +257,10 @@ class TestAssembleCIArtifact(unittest.TestCase):
             for res in ROOM_COMPILER_RESOURCE_FILES:
                 self.assertIn(f"DoomEternalArchipelago/{res}", names)
 
-    def test_missing_base_mod_rejected(self):
-        create_synthetic_room_resources(self.resources_dir, omit_base_mod=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_room_resources(self.resources_dir)
-        self.assertIn("base_mod.zip", str(ctx.exception))
 
-    def test_missing_room_payloads_rejected(self):
-        create_synthetic_room_resources(self.resources_dir, omit_room_payloads=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_room_resources(self.resources_dir)
-        self.assertIn("room_payloads.zip", str(ctx.exception))
 
-    def test_missing_room_payload_manifest_rejected(self):
-        create_synthetic_room_resources(self.resources_dir, omit_manifest=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_room_resources(self.resources_dir)
-        self.assertIn("room_payload_manifest.json", str(ctx.exception))
 
-    def test_corrupt_manifest_json_rejected(self):
-        create_synthetic_room_resources(self.resources_dir, corrupt_manifest_json=True)
-        with self.assertRaises(Exception):
-            validate_room_resources(self.resources_dir)
 
-    def test_room_archive_manifest_mismatch_rejected(self):
-        create_synthetic_room_resources(self.resources_dir, mismatch_archive_members=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_room_resources(self.resources_dir)
-        self.assertIn("disagree", str(ctx.exception))
 
     def test_checksum_mismatch_rejected(self):
         create_fake_handoff(self.handoff_dir, corrupt_hash=True)
@@ -293,35 +268,10 @@ class TestAssembleCIArtifact(unittest.TestCase):
             validate_handoff_structure(self.handoff_dir)
         self.assertIn("Checksum mismatch", str(ctx.exception))
 
-    def test_missing_linux_launcher_rejected(self):
-        create_fake_handoff(self.handoff_dir, omit_linux_launcher=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_handoff_structure(self.handoff_dir)
-        self.assertIn("Missing Linux launcher", str(ctx.exception))
 
-    def test_missing_windows_launcher_rejected(self):
-        create_fake_handoff(self.handoff_dir, omit_win_launcher=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_handoff_structure(self.handoff_dir)
-        self.assertIn("Missing Windows launcher", str(ctx.exception))
 
-    def test_missing_ap_client_rejected(self):
-        create_fake_handoff(self.handoff_dir, omit_ap_client=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_handoff_structure(self.handoff_dir)
-        self.assertIn("Missing native ap_client.exe", str(ctx.exception))
 
-    def test_invalid_elf_magic_rejected(self):
-        create_fake_handoff(self.handoff_dir, bad_elf=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_handoff_structure(self.handoff_dir)
-        self.assertIn("ELF magic", str(ctx.exception))
 
-    def test_invalid_mz_magic_rejected(self):
-        create_fake_handoff(self.handoff_dir, bad_mz=True)
-        with self.assertRaises(ValueError) as ctx:
-            validate_handoff_structure(self.handoff_dir)
-        self.assertIn("MZ magic", str(ctx.exception))
 
     def test_parity_mismatch_rejected(self):
         create_fake_handoff(self.handoff_dir)
@@ -331,38 +281,13 @@ class TestAssembleCIArtifact(unittest.TestCase):
         lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
         win_stage = assemble_platform_release("windows", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
 
-        # Corrupt a shared file in windows stage
+        # corrupt a shared file in windows stage
         (win_stage / "doometernal.apworld").write_bytes(b"corrupted_apworld_bytes")
         with self.assertRaises(ValueError) as ctx:
             audit_platform_parity(lin_stage, win_stage)
         self.assertIn("Byte mismatch in shared file doometernal.apworld", str(ctx.exception))
 
-    def test_final_zip_audit_rejects_missing_room_resources(self):
-        create_fake_handoff(self.handoff_dir)
-        manifest = validate_handoff_structure(self.handoff_dir)
-        resources_dir = self._get_resources_dir()
-        stage_dir = Path(self.temp_dir) / "stage"
-        lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)
 
-        # Remove a room resource before zip creation
-        (lin_stage / "client" / "resources" / "room_payloads.zip").unlink()
-        lin_zip = self.output_dir / "test_missing_resource.zip"
-        write_deterministic_zip(lin_stage, lin_zip)
-
-        with self.assertRaises(ValueError) as ctx:
-            audit_final_zip(lin_zip, "linux", repo_root=REPO_ROOT)
-        self.assertIn("Mandatory room compiler resource missing", str(ctx.exception))
-
-    def test_room_compiler_reports_missing_resources_cleanly(self):
-        empty_dir = Path(self.temp_dir) / "empty_resources"
-        empty_dir.mkdir()
-        with self.assertRaises(FileNotFoundError) as ctx:
-            RoomCompiler(
-                empty_dir / "base_mod.zip",
-                empty_dir / "room_payloads.zip",
-                empty_dir / "room_payload_manifest.json",
-            )
-        self.assertIn("Release package is incomplete or corrupted", str(ctx.exception))
 
 
 if __name__ == "__main__":

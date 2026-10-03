@@ -9,7 +9,8 @@
       "mission_key": "e4m3_mcity",
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity"
+        "runtime_map": "game/dlc/e4m3_mcity/e4m3_mcity",
+        "owner": "game_target_level_transition_e4m3"
       },
       "order": 16
     }

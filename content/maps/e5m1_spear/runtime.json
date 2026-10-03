@@ -9,7 +9,8 @@
       "mission_key": "e5m1_spear",
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear"
+        "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+        "owner": "crystal_target_level_transition_1"
       },
       "order": 17
     }

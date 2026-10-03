@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any
 
 from doom_eap.content.content_catalog import RUNTIME_STRATEGIES
+from doom_eap.contracts.runtime_context import canonical_map_name
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -24,13 +25,6 @@ MISSION_CHALLENGE_RUNTIME_MAP_BY_MISSION_KEY = {
     "e3m2_hell_b": "game/sp/e3m2_hell_b/e3m2_hell_b",
     "e3m3_maykr": "game/sp/e3m3_maykr/e3m3_maykr",
 }
-
-
-def canonical_map_name(name: str | None) -> str | None:
-    if not name:
-        return name
-    normalized = str(name).strip().replace("\\", "/").rstrip("/")
-    return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
 
 
 def _thaw(value: Any) -> Any:
@@ -100,13 +94,17 @@ def all_mission_challenge_entries(registry: dict) -> list[dict]:
     return list(registry.get("all_mission_challenges", []))
 
 
-def aggregate_ready(signal: dict, checked_locations: set[int]) -> bool:
+def aggregate_ready(signal: dict, checked_locations: set[int], server_locations: set[int] | None = None) -> bool:
     if signal.get("authority") != "server_checked_locations":
         raise ValueError("aggregate authority must be server_checked_locations")
     children = set(signal.get("children", []))
     required_count = signal.get("required_count")
     if not children or not isinstance(required_count, int):
         raise ValueError("aggregate requires children and required_count")
+    if server_locations is not None:
+        inactive = set(signal.get("conditional_children", ())) & children - set(server_locations)
+        children -= inactive
+        required_count -= len(inactive)
     return len(children & set(checked_locations)) >= required_count
 
 

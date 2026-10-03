@@ -75,21 +75,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire five experimental CVar items (7770156-7770160)"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "16392e8bba1a6c68530cedcd746f41e1d75a9f71218ff7c866b657368a9744e1",
-  "byte_sha256": "495af3caf90781108bc08bd3373ab0db08a0f49d44f207fcb22b071532386322",
   "content_revision": "0.5.0",
-  "generated_entity_metrics": {
-    "bind_parents": 387,
-    "byte_size": 7207497,
-    "classes": 7370,
-    "entity_count": 7370,
-    "layers": 435,
-    "targets": 3955,
-    "transforms": 14982,
-    "unique_entity_names": 7370
-  },
   "manifest_sha256": "f05560ddbc41d3d605ff9757be1575757b86cd945874238523be0001b1f9c6c1",
   "map_key": "e3m2_hell_b",
   "physical_ap_ids": [
@@ -114,7 +107,6 @@
     7770381,
     7770382
   ],
-  "publisher_contract_sha256": "7e5dda4fc0a112630436bee94e48f9608bdeed1e29cee10ac6c56172a56abf11",
   "runtime_location_ids": [
     7770383,
     7770384,
@@ -123,6 +115,5 @@
     7770387
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "b71b444278c47dd7f5d03a741c9e46f220f153cf6b7fe489be4d088c87c7d946",
-  "semantic_sha256": "21af801cbcc9e87abed6ee44c3a7ca5d7c31d8895bc1a1f21cc58653990182c6"
+  "scripted_contract_sha256": "b71b444278c47dd7f5d03a741c9e46f220f153cf6b7fe489be4d088c87c7d946"
 }

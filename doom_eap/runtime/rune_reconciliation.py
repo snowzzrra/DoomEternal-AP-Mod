@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
@@ -250,3 +251,92 @@ def compile_rune_reconciliation_plan(
         entry.disposition == "repair_candidate" for entry in entries
     ) else "noop"
     return RuneReconciliationPlan(tuple(entries), fingerprint, status)
+
+
+class RuneReconciliation:
+    """Own the legacy perk clock and bounded Rune repair publication ledger."""
+    def __init__(self, logger):
+        self._logger = logger
+        self._state = {}
+        self._perk = {"epoch": 1, "delivered": {}}
+
+    def bind(self, state, perk):
+        self._state = state
+        self._perk = perk
+        raw_epoch = perk.get("epoch", 0)
+        if isinstance(raw_epoch, bool) or not isinstance(raw_epoch, int):
+            raw_epoch = 0
+        perk["epoch"] = raw_epoch + 1
+        if not isinstance(perk.get("delivered"), dict):
+            perk["delivered"] = {}
+
+    def reset(self):
+        self._state.clear()
+        self._perk.clear()
+        self._perk.update(epoch=1, delivered={})
+
+    @property
+    def epoch(self):
+        return int(self._perk["epoch"])
+
+    def advance(self, trigger):
+        self._perk["epoch"] = int(self._perk.get("epoch", 0)) + 1
+        self._perk.update(trigger=trigger, timestamp=time.time())
+        return self.epoch
+
+    def compile(self, owned_ids, native, item_definitions, expected_ids):
+        mapping = rune_item_perk_mapping(item_definitions, expected_ids)
+        return compile_rune_reconciliation_plan(
+            owned_ids, native, mapping, expected_rune_item_ids=expected_ids,
+        )
+
+    def reconcile(self, plan, trigger, *, slot_identity, state_key, publisher, persist, force=False):
+        """Queue bounded corrections for each owned Rune with missing state."""
+        state = self._state
+        if not force and rune_plan_already_recorded(state, plan):
+            self._logger.info(
+                "RUNE_RECONCILE_NOOP trigger=%s detail=already_planned fingerprint=%s",
+                trigger,
+                plan.fingerprint,
+            )
+            return plan, None
+        if plan.repairs:
+            try:
+                command_plan = with_rune_reconciliation_commands(
+                    plan,
+                    slot_identity,
+                    self.epoch,
+                )
+            except ValueError as error:
+                return None, str(error)
+            queued, queue_error = publisher.publish(
+                command_plan, state_key=state_key,
+                reason=f"rune:{trigger}",
+            )
+            if not queued:
+                return None, queue_error
+        state.update(
+            fingerprint=plan.fingerprint,
+            status=plan.status,
+            trigger=trigger,
+            timestamp=time.time(),
+            repair_candidates=len(plan.repairs),
+        )
+        persist()
+        if plan.repairs:
+            self._logger.warning(
+                "RUNE_RECONCILE_QUEUED trigger=%s candidates=%s fingerprint=%s",
+                trigger,
+                len(plan.repairs),
+                plan.fingerprint,
+            )
+        else:
+            self._logger.info(
+                "RUNE_RECONCILE_NOOP trigger=%s detail=native_state_coherent "
+                "owned=%s fingerprint=%s",
+                trigger,
+                len(plan.entries),
+                plan.fingerprint,
+            )
+        return plan, None
+

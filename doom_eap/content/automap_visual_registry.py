@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
+from doom_eap.contracts.source_bytes import first_party_text_bytes
+
 SCHEMA_VERSION = 1
 REGISTRY_REVISION = "checked-location-visuals-v2"
 ENTITY_NAME_RE = re.compile(r"^ap_[A-Za-z0-9_]+$")
@@ -31,7 +33,8 @@ def _canonical_hash(value: object) -> str:
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Every caller supplies first-party source/descriptor JSON, never a resource archive.
+    return hashlib.sha256(first_party_text_bytes(path.read_bytes())).hexdigest()
 
 
 def _resource_identity(spec: Any) -> dict[str, Any]:

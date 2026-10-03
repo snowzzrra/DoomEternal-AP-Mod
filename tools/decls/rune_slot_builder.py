@@ -1278,7 +1278,7 @@ def main() -> int:
     audit = build_rune_slot_override(args.mod_root)
     args.audit_output.write_text(
         json.dumps(audit, indent=2) + "\n", encoding="utf-8"
-    )
+    , newline="\n")
     return 0
 
 

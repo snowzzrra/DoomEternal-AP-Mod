@@ -175,6 +175,10 @@
       "label": "Lock-on Burst Mastery"
     },
     {
+      "name": "Meat Hook",
+      "label": "Meat Hook"
+    },
+    {
       "name": "Meat Hook Mastery",
       "label": "Meat Hook Mastery"
     },
@@ -225,6 +229,10 @@
     {
       "name": "Progressive Armor Upgrade",
       "label": "Progressive Armor Upgrade"
+    },
+    {
+      "name": "Progressive Blood Punch",
+      "label": "Progressive Blood Punch"
     },
     {
       "name": "Progressive Health Upgrade",

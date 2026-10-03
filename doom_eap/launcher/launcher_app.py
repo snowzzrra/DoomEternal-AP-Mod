@@ -28,6 +28,19 @@ def _run_self_test(arguments: list[str]) -> int:
     mode_launcher_only = "--launcher-only" in arguments or "launcher" in arguments
 
     print("--> Executing DOOM Eternal Archipelago Launcher self-test...")
+    if "--core-only" in arguments:
+        from doom_eap.contracts.core_distribution import verify_runtime
+        bundle = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[3] / "Sentinel-Core/build/distribution/1.0.0-rc-1"))
+        manifest = bundle / "core/distribution.json" if getattr(sys, "frozen", False) else bundle / "distribution.json"
+        try:
+            value, _ = verify_runtime(manifest, bootstrap_from_archive=True)
+            print(json.dumps({"product": value["product"], "version": value["version"],
+                              "build_id": value["build_id"], "mod_versions": value["mod_versions"],
+                              "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))
+            return 0
+        except Exception as error:
+            print(f"Core distribution self-test failed: {error}", file=sys.stderr)
+            return 1
 
     # 1. Verify third-party core packages & certifi CA bundle in bundle_directory
     try:
@@ -89,6 +102,11 @@ def _run_self_test(arguments: list[str]) -> int:
             if not any(k.startswith(prefix) for k in tag_overrides):
                 raise RuntimeError(f"TAG DevInv build missing output for {prefix}")
         print(f"  [OK] Bundled TAG DevInv overrides verified ({len(tag_overrides)} declarations)")
+        from doom_eap.content.compiler_identity import load_compiler_source_identity
+        compiler_identity = load_compiler_source_identity(bundle_dir, frozen=getattr(sys, "frozen", False))
+        if "doom_eap/launcher/launcher_core.py" not in compiler_identity["source_hashes"]:
+            raise RuntimeError("Bundled compiler identity omits launcher_core")
+        print(f"  [OK] Compiler source identity verified ({len(compiler_identity['source_hashes'])} modules)")
     except Exception as e:
         print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
         return 1
@@ -286,13 +304,18 @@ def _run_self_test(arguments: list[str]) -> int:
 
 
 def _run_ui() -> int:
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
-    from doom_eap.launcher.launcher_controller import LauncherController
+    from doom_eap.launcher.launcher_controller import LauncherController, bundle_directory
     from doom_eap.launcher.launcher_ui import LauncherUI
 
+    if os.name == "nt":
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DoomEternal.Archipelago.Launcher")
     application = QApplication(sys.argv[:1])
     application.setApplicationName("DOOM Eternal Archipelago")
+    application.setWindowIcon(QIcon(str(bundle_directory() / "assets/launcher/EternalAP.ico")))
     LauncherUI(LauncherController()).run()
     return 0
 

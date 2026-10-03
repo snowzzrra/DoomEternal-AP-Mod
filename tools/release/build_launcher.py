@@ -56,6 +56,7 @@ def _source_inputs(label: str, root: Path, *, pattern: str | None = None) -> lis
 def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs: list[tuple[str, Path]] = []
     inputs.extend(_source_inputs("doom_eap", REPO_ROOT / "doom_eap"))
+    inputs.extend(_source_inputs("assets/launcher", REPO_ROOT / "assets/launcher"))
     inputs.extend(_source_inputs("tools/decls", REPO_ROOT / "tools/decls"))
     inputs.extend(_source_inputs("tools/maps", REPO_ROOT / "tools/maps"))
     inputs.extend(_source_inputs("tools/release", REPO_ROOT / "tools/release"))
@@ -75,9 +76,14 @@ def _dependency_version(name: str) -> str:
         return "missing"
 
 
-def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
+def build(output_dir: Path, archipelago_source: Path, name: str, core_runtime: Path | None = None) -> Path:
     output_dir = output_dir.expanduser().resolve()
     archipelago_source = archipelago_source.expanduser().resolve()
+    from doom_eap.contracts.core_distribution import verify_runtime
+    if core_runtime is None:
+        raise ValueError("Pass the qualified Core runtime directory explicitly")
+    core_runtime = core_runtime.resolve()
+    verify_runtime(core_runtime / "distribution.json")
     if not _within(output_dir, RELEASE_ROOT):
         raise ValueError(f"launcher output must remain under {RELEASE_ROOT}")
     if not (archipelago_source / "CommonClient.py").is_file():
@@ -86,7 +92,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     executable_name = f"{name}.exe" if os.name == "nt" else name
     key = content_key(
         "launcher",
-        _launcher_inputs(archipelago_source),
+        _launcher_inputs(archipelago_source) + _source_inputs("core-runtime", core_runtime),
         config={
             "name": name,
             "python": sys.executable,
@@ -120,6 +126,11 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
 
     build_root = RELEASE_ROOT / "build/launcher"
     build_root.mkdir(parents=True, exist_ok=True)
+    from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
+    import json
+    source_identity = build_root / "compiler_source_identity.json"
+    source_identity.write_text(json.dumps(compiler_source_document(capture_compiler_sources(REPO_ROOT)),
+                                          sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     data_separator = os.pathsep
     command = [
         sys.executable,
@@ -146,21 +157,29 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--add-data",
         f"{REPO_ROOT / 'doom_eap/runtime/bridge_client.py'}{data_separator}.",
         "--add-data",
+        f"{REPO_ROOT / 'assets/launcher'}{data_separator}assets/launcher",
+        "--add-data",
         f"{REPO_ROOT / 'data'}{data_separator}data",
         "--add-data",
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
         "--add-data",
         f"{REPO_ROOT / 'content'}{data_separator}content",
+        "--add-data",
+        f"{source_identity}{data_separator}data",
         "--collect-data",
         "certifi",
         "--copy-metadata",
         "certifi",
         str(REPO_ROOT / "doom_eap/launcher/launcher_app.py"),
     ]
+    for source in sorted(core_runtime.rglob("*")):
+        if source.is_file() and source.name != "msimg32.dll":
+            destination = Path("core") / source.relative_to(core_runtime).parent
+            command[-1:-1] = ["--add-data", f"{source}{data_separator}{destination}"]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
     if os.name == "nt":
-        command[-1:-1] = ["--hide-console", "hide-early"]
+        command[-1:-1] = ["--hide-console", "hide-early", "--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
     build_environment = os.environ.copy()
     if os.name == "nt":
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
@@ -182,8 +201,9 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=RELEASE_ROOT)
     parser.add_argument("--archipelago-source", type=Path, default=WORKSPACE / "Archipelago")
     parser.add_argument("--name", default="DoomEternalArchipelagoLauncher")
+    parser.add_argument("--core-runtime", type=Path, required=True)
     arguments = parser.parse_args()
-    print(build(arguments.output_dir, arguments.archipelago_source, arguments.name))
+    print(build(arguments.output_dir, arguments.archipelago_source, arguments.name, arguments.core_runtime))
     return 0
 
 

@@ -29,33 +29,42 @@ Launcher creates player YAML files, connects to rooms, prepares matching room pa
 ### Reporting problems
 
 DoomEAP is beta, and bug reports are welcome. In the launcher, open **Help → Report a Problem**.
-The launcher creates a sanitized Support Report, opens the GitHub bug form, and highlights the report in Windows Explorer.
-Briefly describe what happened, drag the report into the issue, and submit. You generally do not need to collect technical details yourself.
-If the launcher cannot generate a report, you can still report the problem through the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
+The launcher creates a verified local Support ZIP and opens a sanitized report preview. Enter a title and description, review the text, and export it locally. **Save Support Report** supports an active game; if the export path is unavailable, the launcher shows the retained ZIP under its local `data/support-bundles` directory.
+Online submission requires the project's deployed HTTPS reporting service. This checkout has submission disabled until deployment. When configured, **Send Reviewed Report** asks for confirmation and returns the created or recovered issue URL without requiring the player's GitHub account. An uncertain submission retains an immutable draft and the same report key for retry or reopening. A confirmed report permits **Start New Report**.
+The remote report contains reviewed text and bounded redacted diagnostic tails. The ZIP stays local. The maintainer's [deployment instructions](tools/report_backend/DEPLOY.md) cover the GitHub App, Render, persistent state, and qualification. You can also use the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
 
 ## 2. Player options
 
 | Option name | Default | Summary | Other values |
 |---|---|---|---|
-| Progression Balancing | Normal (50) | Moves progression earlier when generation needs more reachable advancement. | 0–99; Disabled (0); Extreme (99) |
-| Accessibility | Full | Keeps every generated location and item reachable. | Minimal: guarantees progression required for victory |
-| Death Link | Off | Shares deaths with DeathLink-enabled worlds. | On |
-| Use DLC Content | On | Adds supported TAG gear, Sentinel Hammer, and Support Runes. | Off: Base item catalog |
-| Include DLC Missions | On | Adds TAG1/TAG2 missions and locations. Requires DLC Content. | Off: Base locations with enabled DLC gear |
-| DLC Logic Timing | Late Game | DLC mission paths enter logic once your inventory reaches their intended combat readiness. | From the Beginning: removes the extra late-game combat-readiness gate; DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (vanilla Dash becomes available after Exultia; World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool) |
-| Goal | Acquire the Unmaykr | Requires six Base Slayer Gates and Unmaykr. | Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
-| Additional Victory Requirements | Enabled Missions, Slayer Gates, Escalation Encounters | Adds selected objectives to victory. | Secret Encounters; Mission Challenges; Weapon Masteries; Unmaykr; any valid subset |
-| Special Weapon | Progressive Special Weapon | Grants the Crucible, then Sentinel Hammer, then fully upgraded Sentinel Hammer. | Progressive Sentinel Hammer; The Crucible |
-| Enhanced Melee Damage | Off | Strengthens normal punches. | On |
-| Randomize Chainsaw | Off | Places Chainsaw in item pool. | On |
-| Randomize Dash | Off | Places Dash in item pool and enables Dash-aware logic. | On |
-| Randomize First Sentinel Battery | Off | Places mandatory Exultia Battery in item pool. | On |
-| Include Weapon Mastery Challenges | On | Adds 13 Weapon Mastery Challenge locations. | Off |
-| Reveal AP Locations on Automap | Off | Displays AP progression-location markers on Automap. | On |
-| Starting Weapon | Combat Shotgun | Selects starting weapon. | Random; Heavy Cannon; Plasma Rifle; Rocket Launcher; Ballista; Chaingun; Super Shotgun |
-| Praetor Suit Upgrades in Pool | 6 | Selects individual suit-upgrade count in pool. | 0–21; All; Random |
-| Trap Percentage | 10% | Replaces filler padding with enabled traps. | 0–100% |
-| Enabled Traps | All 16 types | Selects eligible enemy, drain, Weakness, and Vulnerability traps. | Any subset or empty set |
+| Progression Balancing | normal | Moves progression earlier when generation needs it. | 0–99; Disabled; Extreme; Normal |
+| Accessibility | Full | Sets which generated objectives must be reachable. | Full; Minimal |
+| Death Link | False | Shares deaths with other DeathLink players. | Off; On |
+| Use DLC Content | True | Adds TAG equipment and Support Runes to the item catalog. | Off; On |
+| Mission Pool | Full Saga | Selects eligible missions. | Base; Full Saga; DLC Only; Custom |
+| Custom Missions | ARC Complex, Cultist Base, Doom Hunter Base, Exultia, Final Sin, Hell on Earth, Immora, Mars Core, Nekravol, Nekravol Part II, Reclaimed Earth, Sentinel Prime, Super Gore Nest, Taras Nabad, The Blood Swamps, The Holt, The World Spear, UAC Atlantica Facility, Urdak | Missions included when Mission Pool is set to Custom. | ARC Complex; Cultist Base; Doom Hunter Base; Exultia; Final Sin; Hell on Earth; Immora; Mars Core; Nekravol; Nekravol Part II; Reclaimed Earth; Sentinel Prime; Super Gore Nest; Taras Nabad; The Blood Swamps; The Holt; The World Spear; UAC Atlantica Facility; Urdak |
+| Custom Dark Lord | True | Include The Dark Lord when Mission Pool is set to Custom. | Off; On |
+| Mission Count | all | Sets the number of included missions. | 3–19; All |
+| DLC Logic Timing | Late Game | Choose when The Ancient Gods can enter your Archipelago progression. | Late Game; From the Beginning |
+| Mission Order | Random Mission Order | Selects progression through included missions. | Vanilla Order; Random Mission Order; Mission Access as Items |
+| Campaign Difficulty | Ultra Violence | Sets the campaign difficulty for this player. | Im Too Young To Die; Hurt Me Plenty; Ultra Violence; Nightmare |
+| Starting Missions | 1 | Sets the number of initially accessible missions. | 1–3 |
+| Full Saga Final Boss | Random | Reserve the final Full Saga encounter. Vanilla Order always ends at Davoth. | Random; Icon of Sin; Davoth / The Dark Lord |
+| Goal Mission as Item | False | In Access mode, place the selected boss stage's concrete Access item. | Off; On |
+| Goal | Acquire the Unmaykr | Selects the campaign victory objective. | Acquire the Unmaykr; Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
+| Additional Victory Requirements | Complete All Escalation Encounters, Complete All Included Missions, Complete All Slayer Gates | Adds selected objectives to victory. | Acquire the Unmaykr; Complete All Escalation Encounters; Complete All Included Missions; Complete All Mission Challenges; Complete All Secret Encounters; Complete All Slayer Gates; Complete All Weapon Mastery Challenges |
+| Special Weapon | Progressive Special Weapon | Selects the Crucible or progressive special weapons. | Progressive Special Weapon; Progressive Sentinel Hammer; The Crucible |
+| DeathLink Mode | Soft | Selects which deaths count for DeathLink. | Soft; Hardcore |
+| Enhanced Melee Damage | False | Strengthens normal punches. | Off; On |
+| Randomize Chainsaw | False | Places Chainsaw in the item pool. | Off; On |
+| Randomize Dash | False | Places Dash in the item pool and enables Dash access logic. | Off; On |
+| Randomize First Sentinel Battery | False | When enabled, the mandatory first Sentinel Battery is shuffled into the | Off; On |
+| Include Weapon Mastery Challenges | True | Includes weapon mastery locations. | Off; On |
+| Reveal AP Locations on Automap | False | Shows AP location markers on Automap. | Off; On |
+| Starting Weapon | Combat Shotgun | Selects the starting weapon. | Random; Heavy Cannon; Plasma Rifle; Rocket Launcher; Ballista; Chaingun; Combat Shotgun; Super Shotgun |
+| Praetor Suit Upgrades in Pool | 21 | Sets the number of individual suit upgrades in the pool. | 0–21; Random |
+| Trap Percentage | 10 | Replaces filler with enabled traps. | 0–100 |
+| Enabled Traps | Ammo Drain Trap, Arachnotron Trap, Archvile Trap, BFG Drain Trap, Baron Trap, Carcass Trap, Cueball Trap, Dread Knight Trap, Fuel Drain Trap, Hell Knight Trap, Imp Trap, Marauder Trap, Revenant Trap, Tyrant Trap | Selects the eligible trap types. | Ammo Drain Trap; Arachnotron Trap; Archvile Trap; BFG Drain Trap; Baron Trap; Carcass Trap; Cueball Trap; Dread Knight Trap; Fuel Drain Trap; Hell Knight Trap; Imp Trap; Marauder Trap; Revenant Trap; Tyrant Trap |
 
 ## 3. Installation
 
@@ -317,8 +326,8 @@ Repair/Fix, and a sanitized support report.
 
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
 
-- Create an alternative to meathook to better fit Archipelago needs.
-- Remove all meathook-dependent architecture and work on a new, proprietary, DLL.
+- Develop Sentinel Core as an independent open-source native integration project for Archipelago.
+- Follow an evidence-led Hybrid direction: Meathook may retain its proven RPC role. Windows bootstrap/coexistence smoke has passed; future hooks and broader platform integration still require validation.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 
@@ -370,7 +379,7 @@ Repair/Fix, and a sanitized support report.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model
   and overall very useful help.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
-  logo used by the AP client, the main menu marker and the repository preview.
+  logo used by the AP client (both old and new) and the repository preview.
 
 ## 7. License
 

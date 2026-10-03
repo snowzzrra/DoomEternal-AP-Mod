@@ -198,14 +198,12 @@ def validate_source_contract(repo_root: Path) -> None:
     if not all(marker in build_source for marker in ("content_key", "restore", "publish", "os.replace")):
         raise ValueError("cache source contract lacks content-addressed atomic output flow")
     for relative, markers in {
-        "scripts/build/client.sh": ("NATIVE_CLIENT cache=hit", "NATIVE_CLIENT cache=miss"),
         "tools/release/build_launcher.py": (
             "LAUNCHER cache=hit", "LAUNCHER cache=miss", "_launcher_inputs",
             "sys.version", "sys.platform", "platform.machine",
             "packaging/standalone_runtime",
         ),
         "tools/release/apworld_cache.py": ("APWORLD cache=hit", "APWORLD cache=miss"),
-        "scripts/build/playable_test.sh": ("tools.release.apworld_cache",),
     }.items():
         text = (repo_root / relative).read_text(encoding="utf-8")
         if not all(marker in text for marker in markers):

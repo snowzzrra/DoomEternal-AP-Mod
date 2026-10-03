@@ -14,11 +14,6 @@
         {
           "strategy": "terminal_owner",
           "owner": "game_map_exit_level_transition_relay_852698944"
-        },
-        {
-          "strategy": "native_transition",
-          "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
-          "to_map": "game/hub/hub"
         }
       ],
       "effects": [

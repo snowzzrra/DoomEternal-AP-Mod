@@ -32,7 +32,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterator, Protocol
 
 DOOM_ETERNAL_APP_ID = "782330"
-REQUIRED_DLL_OVERRIDE = "XINPUT1_3=n,b"
+REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
@@ -567,7 +567,7 @@ class RuntimePrerequisiteReport:
 
     @property
     def ok(self) -> bool:
-        """All mandatory 0.5.2 runtime prerequisites must be satisfied."""
+        """Require the game, verified Core pair, and packaged client runtime."""
         mandatory_keys = {"game", "meathook", "client_runtime"}
         return all(
             check.ok
@@ -591,138 +591,26 @@ class RuntimePrerequisiteReport:
 
 
 def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
-    """Probe the canonical Game Link / Meathook runtime library in DOOM Eternal root."""
+    """Verify the Core runtime pair used by Game Link."""
+    from ..contracts.core_distribution import read_manifest
     if game_root is None:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.MISSING,
-            message="DOOM Eternal folder is not configured.",
-            details={
-                "expected_path": "",
-                "present": False,
-                "status": "missing",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "DOOM folder is not configured.")
     try:
-        root = game_root.expanduser().resolve()
-        if root.name.casefold() == "base":
-            root = root.parent
-        dll_path = root / "XINPUT1_3.dll"
-    except (OSError, ValueError) as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Invalid DOOM Eternal folder path: {error}",
-            details={
-                "expected_path": "",
-                "present": False,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
+        root = validate_game_root(game_root)
+        value = read_manifest(root / "sentinel-distribution.json")
+        records = {item["path"]: item for item in value["artifacts"]}
+        for name in ("sentinel_core.dll", "msimg32.dll"):
+            data = (root / name).read_bytes()
+            if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
+                raise ValueError(f"Core runtime hash mismatch: {name}")
+        if (root / "XINPUT1_3.dll").exists():
+            raise ValueError("A foreign XINPUT provider is present; resolve its ownership before Core-only admission.")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, f"Sentinel Core {value['version']} pair verified.",
+                                 {"path": str(root / "sentinel_core.dll"), "sha256": records["sentinel_core.dll"]["sha256"],
+                                  "version": value["version"], "build_id": value["build_id"]})
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, f"Core runtime unavailable: {error}")
 
-    if not dll_path.is_file():
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.MISSING,
-            message="Game Link runtime is not installed. Supported version: Meathook v7.2.",
-            details={
-                "expected_path": str(dll_path),
-                "present": False,
-                "status": "missing",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    try:
-        dll_stat = dll_path.stat()
-        size = dll_stat.st_size
-    except OSError as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Could not read XINPUT1_3.dll: {error}",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    if size <= 0:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message="XINPUT1_3.dll is empty (0 bytes). Replace it with the verified Meathook v7.2 runtime library.",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "size_bytes": 0,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    try:
-        actual_sha = _sha256_file_identity(
-            str(dll_path.resolve()), size, dll_stat.st_mtime_ns, dll_stat.st_ctime_ns
-        )
-    except OSError as error:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.INVALID,
-            message=f"Could not compute hash of XINPUT1_3.dll: {error}",
-            details={
-                "expected_path": str(dll_path),
-                "present": True,
-                "size_bytes": size,
-                "status": "invalid",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    if actual_sha == MEATHOOK.sha256:
-        return PrerequisiteCheck(
-            key="meathook",
-            status=PrerequisiteStatus.OK,
-            message="Game Link runtime verified (Meathook v7.2)",
-            details={
-                "expected_path": str(dll_path),
-                "path": str(dll_path),
-                "present": True,
-                "size_bytes": size,
-                "sha256": actual_sha,
-                "version": MEATHOOK.version,
-                "identity": "verified",
-                "status": "compatible",
-                "expected_version": MEATHOOK.version,
-                "expected_sha256": MEATHOOK.sha256,
-            },
-        )
-
-    return PrerequisiteCheck(
-        key="meathook",
-        status=PrerequisiteStatus.INCOMPATIBLE,
-        message="Installed Game Link runtime does not match supported Meathook v7.2.",
-        details={
-            "expected_path": str(dll_path),
-            "path": str(dll_path),
-            "present": True,
-            "size_bytes": size,
-            "sha256": actual_sha,
-            "status": "incompatible",
-            "expected_version": MEATHOOK.version,
-            "expected_sha256": MEATHOOK.sha256,
-        },
-    )
 
 
 def probe_runtime_prerequisites(
@@ -730,10 +618,10 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe all mandatory and advisory 0.5.2 runtime prerequisites."""
+    """Probe the MOD 0.6.0 game, Core and client prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
-    # 1. Game installation check
+    # game installation check
     if game_root is None:
         checks.append(PrerequisiteCheck(
             key="game",
@@ -758,10 +646,10 @@ def probe_runtime_prerequisites(
                 details={"path": str(game_root)},
             ))
 
-    # 2. Meathook check
+    # check the installed core pair
     checks.append(probe_meathook(game_root))
 
-    # 3. Client runtime check
+    # client runtime check
     if client_dir is not None:
         packaged_bridge = client_dir / "bridge_client.py"
         if packaged_bridge.is_file() or getattr(sys, "frozen", False):
@@ -779,14 +667,14 @@ def probe_runtime_prerequisites(
                 details={"expected_path": str(packaged_bridge)},
             ))
 
-    # 4. Linux Steam Launch Options override check
+    # linux steam launch options override check
     if os.name != "nt" and config is not None:
         launch_opts = str(config.get("steam_launch_options") or "")
         if REQUIRED_DLL_OVERRIDE in launch_opts:
             checks.append(PrerequisiteCheck(
                 key="linux_steam_override",
                 status=PrerequisiteStatus.OK,
-                message="Steam launch option configured with XINPUT1_3 override",
+                message="Steam launch option configured with msimg32 override",
                 details={"configured": True},
             ))
         else:
@@ -868,8 +756,8 @@ def publish_file(
 ) -> Path:
     """Publish a launcher-owned temp/incoming file to its final destination.
 
-    Same-filesystem atomic os.replace remains the mechanism. Linux behavior is
-    effectively unchanged (single attempt). On Windows only, transient
+    Publication uses same-filesystem atomic os.replace. Linux uses one attempt.
+    On Windows, transient
     sharing/access failures (winerror 5/32/33, errno 13) are retried with
     bounded backoff totaling at most ~timeout seconds. Only use where the
     launcher owns source and publication and retrying the replace is safe.
@@ -993,7 +881,7 @@ WINDOWS_MOD_INJECTOR = DependencySpec(
     expected_size=5182727,
 )
 
-# Compatibility alias
+# compatibility alias
 WINDOWS_MOD_MANAGER = WINDOWS_MOD_INJECTOR
 
 LINUX_MOD_INJECTOR = DependencySpec(
@@ -1006,14 +894,6 @@ LINUX_MOD_INJECTOR = DependencySpec(
     expected_size=16754097,
 )
 
-MEATHOOK = DependencySpec(
-    name="Meathook",
-    version="7.2",
-    url="https://github.com/brongo/m3337ho0o0ok/releases/download/v7.2/XINPUT1_3.dll",
-    sha256="02c7159964245e249bcffc12598651b871f6c73925c4e04355510587114cdab3",
-    executable_glob="XINPUT1_3.dll",
-    archive_type="file",
-)
 
 IDFILE_DECOMPRESSOR_LINUX = DependencySpec(
     name="idFileDeCompressor",
@@ -1064,113 +944,127 @@ class GameLinkResult:
     backup_path: str = ""
 
 
-def install_meathook(
-    game_root: Path,
-    dependency_manager: DependencyManager,
-    *,
-    state_dir: Path | None = None,
-    consent: Callable[[DependencySpec], bool],
-    local_artifact: Path | None = None,
-    force_repair: bool = False,
-) -> GameLinkResult:
-    """Safely and atomically install verified Meathook v7.2 runtime library."""
-    root = validate_game_root(game_root)
-    dll_path = root / "XINPUT1_3.dll"
-
-    backup_path = ""
-    if dll_path.is_file():
-        try:
-            current_sha = hashlib.sha256(dll_path.read_bytes()).hexdigest()
-        except OSError as error:
-            raise RuntimeError(f"Could not inspect existing XINPUT1_3.dll: {error}") from error
-
-        if current_sha == MEATHOOK.sha256:
-            return GameLinkResult(
-                state="verified",
-                message="Game Link runtime is already verified (Meathook v7.2).",
-                path=str(dll_path),
-                sha256=current_sha,
-                ownership="preexisting_verified",
-            )
-
-        if not force_repair:
-            return GameLinkResult(
-                state="needs_repair",
-                message="Installed Game Link runtime does not match supported Meathook v7.2.",
-                path=str(dll_path),
-                sha256=current_sha,
-                ownership="unverified_foreign",
-            )
-
-        # Back up existing DLL before replacement
-        if state_dir is not None:
-            backup_root = state_dir / "repair-backups" / "meathook"
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_subdir = backup_root / f"{timestamp_str}_{current_sha[:8]}"
-            backup_subdir.mkdir(parents=True, exist_ok=True)
-            backup_file = backup_subdir / "XINPUT1_3.dll"
-            shutil.copy2(dll_path, backup_file)
-            metadata = {
-                "original_path": str(dll_path),
-                "sha256": current_sha,
-                "size": dll_path.stat().st_size,
-                "timestamp": timestamp_str,
-                "replacement_version": MEATHOOK.version,
-            }
-            (backup_subdir / "metadata.json").write_text(
-                json.dumps(metadata, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            backup_path = str(backup_file)
-
-    # Acquire verified dependency
-    installed = dependency_manager.acquire(
-        MEATHOOK,
-        consent=consent,
-        local_artifact=local_artifact,
-    )
-    source_dll = Path(installed.executable)
-    if not source_dll.is_file():
-        raise RuntimeError("Managed Meathook library is missing from dependency cache.")
-    cached_sha = hashlib.sha256(source_dll.read_bytes()).hexdigest()
-    if cached_sha != MEATHOOK.sha256:
-        raise ValueError(
-            f"Cached Meathook SHA mismatch: expected {MEATHOOK.sha256}, got {cached_sha}"
-        )
-
-    # Atomic installation to <game_root>/XINPUT1_3.dll
-    incoming = root / ".XINPUT1_3.dll.incoming"
+def _core_file_error(path: Path, error: Exception) -> RuntimeError:
+    message = f"Core runtime file could not be read or installed: {path}. {error}"
+    if sys.platform != "win32":
+        return RuntimeError(message)
+    script = r"""$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=1116,1117,5007; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 200 | ForEach-Object {
+    $xml = [xml]$_.ToXml(); $data = @{}
+    foreach ($item in $xml.Event.EventData.Data) { $data[$item.Name] = $item.'#text' }
+    @{time=$_.TimeCreated.ToUniversalTime().ToString('o'); id=$_.Id; data=$data}
+} | ConvertTo-Json -Depth 4 -Compress
+"""
     try:
-        if incoming.exists():
-            incoming.unlink()
-        shutil.copy2(source_dll, incoming)
-        incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
-        if incoming_sha != MEATHOOK.sha256:
-            incoming.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"Staged Meathook DLL hash mismatch: expected {MEATHOOK.sha256}, got {incoming_sha}"
-            )
-        publish_file(incoming, dll_path, operation="meathook_publish")
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                                capture_output=True, encoding="utf-8", errors="replace", timeout=5,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if result.returncode:
+            raise ValueError("Defender history query failed")
+        events = json.loads(result.stdout)
+        if isinstance(events, dict):
+            events = [events]
+        candidates = {str(candidate).casefold() for candidate in
+                      (path, getattr(error, "filename", None), getattr(error, "cause_filename", None),
+                       getattr(error, "source_path", None)) if candidate}
+        for event in events:
+            data = event["data"]
+            resources = {resource.strip().removeprefix("file:_").removeprefix("file:").casefold()
+                         for resource in data.get("Path", "").split(";")}
+            if event["id"] not in (1116, 1117) or not resources & candidates:
+                continue
+            threat_id = data.get("Threat ID", "")
+            setting = next((record for record in events if record["id"] == 5007 and threat_id and
+                            f"\\ThreatIDDefaultAction\\{threat_id} =" in record["data"].get("New Value", "")), None)
+            allowed = setting and setting["data"]["New Value"].endswith("= 0x6")
+            detail = (f"An allow action is recorded at {setting['time']}. Retry setup to restore the verified file. "
+                      "If it is removed again, check Protection History for this exact path."
+                      if allowed else "Review this exact detection in Windows Security > Protection history, then retry setup.")
+            return RuntimeError(f"{message} Defender detected {data.get('Threat Name', 'this file')} at "
+                                f"{event['time']}. {detail}")
+    except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
+        return RuntimeError(message + " Defender history could not be read; export Support for diagnosis.")
+    return RuntimeError(message + " No matching Defender detection was found; export Support for diagnosis.")
+
+
+def install_meathook(
+    game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
+    consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
+) -> GameLinkResult:
+    """Install a verified local Core distribution without replacing foreign providers."""
+    from ..contracts.core_distribution import verify_runtime
+    del dependency_manager, consent, force_repair, state_dir
+    root = validate_game_root(game_root)
+    if detect_doom_processes():
+        raise RuntimeError("Close DOOM Eternal before installing the Core runtime.")
+    installed = probe_meathook(root)
+    if local_artifact is None:
+        bundled = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "core" / "distribution.json"
+        if bundled.is_file():
+            local_artifact = bundled
+    if local_artifact is None:
+        if installed.ok:
+            return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
+                                  sha256=str(installed.details["sha256"]), ownership="verified")
+        raise RuntimeError("Select distribution.json from the compatible Core runtime release; installation is unchanged.")
+    manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
+    try:
+        value, contents = verify_runtime(manifest, bootstrap_from_archive=True)
+    except OSError as error:
+        raise _core_file_error(Path(error.filename) if error.filename else manifest, error) from error
+    if installed.ok:
+        from ..contracts.core_distribution import version_key
+        current = version_key(str(installed.details["version"]))
+        incoming_version = version_key(value["version"])
+        if current > incoming_version:
+            return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
+                                  sha256=str(installed.details["sha256"]), ownership="verified")
+        if current == incoming_version and installed.details["build_id"] != value["build_id"]:
+            raise ValueError("An installed Core version has a different build identity; select a new RC version.")
+    if (root / "XINPUT1_3.dll").exists():
+        raise RuntimeError("Resolve the existing XINPUT provider with its owner before Core-only installation.")
+    existing = root / "sentinel-distribution.json"
+    owned_partial = (not installed.ok and existing.is_file() and existing.read_bytes() == manifest.read_bytes()
+                     and all(not (root / name).exists() or (root / name).read_bytes() == contents[name]
+                             for name in ("sentinel_core.dll", "msimg32.dll")))
+    if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok and not owned_partial:
+        raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
+    names = ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")
+    original = {name: (root / name).read_bytes() if (root / name).exists() else None for name in names}
+    incoming = {name: contents[name] for name in names[:2]}
+    incoming[names[2]] = manifest.read_bytes()
+    try:
+        for name in names:
+            _atomic_write_bytes(root / name, incoming[name])
+        if not probe_meathook(root).ok:
+            for name in names[:2]:
+                if not (root / name).is_file():
+                    raise FileNotFoundError(2, "Core file disappeared after installation", str(root / name))
+            raise RuntimeError("Core pair verification failed after installation")
     except Exception as error:
-        incoming.unlink(missing_ok=True)
-        raise RuntimeError(f"Failed to install Game Link runtime into DOOM folder: {error}") from error
+        failed_path = root / name
+        rollback_errors = []
+        for restore_name in names:
+            try:
+                if original[restore_name] is None:
+                    (root / restore_name).unlink(missing_ok=True)
+                else:
+                    _atomic_write_bytes(root / restore_name, original[restore_name])
+            except OSError as rollback_error:
+                rollback_errors.append(str(rollback_error))
+        if isinstance(error, OSError):
+            detail = _core_file_error(failed_path, error)
+            if rollback_errors:
+                detail = RuntimeError(f"{detail} Rollback incomplete: {'; '.join(rollback_errors)}")
+            raise detail from error
+        if rollback_errors:
+            raise RuntimeError(f"{error} Rollback incomplete: {'; '.join(rollback_errors)}") from error
+        raise
+    return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Sentinel Core {value['version']} installed.",
+                          path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
+                          ownership="launcher_installed")
 
-    final_sha = hashlib.sha256(dll_path.read_bytes()).hexdigest()
-    if final_sha != MEATHOOK.sha256:
-        raise RuntimeError(
-            f"Installed Meathook DLL hash mismatch: expected {MEATHOOK.sha256}, got {final_sha}"
-        )
-
-    ownership = "launcher_replaced" if backup_path else "launcher_installed"
-    state = "repaired" if backup_path else "installed"
-    return GameLinkResult(
-        state=state,
-        message=f"Game Link runtime (Meathook v{MEATHOOK.version}) installed successfully.",
-        path=str(dll_path),
-        sha256=final_sha,
-        ownership=ownership,
-        backup_path=backup_path,
-    )
 
 
 @dataclass(frozen=True)
@@ -2167,7 +2061,7 @@ def hold_sandbox(
         yield
         return
 
-    # 4. Record pre-run identity
+    # record pre-run identity
     original_size = original.stat().st_size
     original_sha = hashlib.sha256(original.read_bytes()).hexdigest()
 
@@ -2183,7 +2077,7 @@ def hold_sandbox(
         }
         tx_file.write_text(json.dumps(tx_data, indent=2) + "\n", encoding="utf-8")
 
-    # 6. Atomically move original -> hold
+    # atomically move original -> hold
     publish_file(original, hold, operation="sandbox_hold")
     if event_sink is not None:
         event_sink(
@@ -2432,6 +2326,12 @@ class WindowsModInjectorAdapter:
 
         confirmed = self.confirmer()
         if confirmed:
+            try:
+                from doom_eap.launcher.campaign_resources import enable_campaign_resources
+                campaign_resources = enable_campaign_resources(game_root, staged)
+            except Exception as error:
+                return AdapterResult(state="failed", message=f"Campaign resource installation failed: {error}",
+                                     command=result.command, returncode=1)
             return AdapterResult(
                 state="applied",
                 message="Mod installed successfully. Start DOOM Eternal through the launcher.",
@@ -2440,6 +2340,7 @@ class WindowsModInjectorAdapter:
                 details={
                     "installation_mode": "windows_injector_assisted",
                     "user_confirmed": True,
+                    "campaign_resources": campaign_resources,
                 },
             )
 
@@ -2458,7 +2359,7 @@ class WindowsModInjectorAdapter:
         )
 
 
-# Compatibility alias
+# compatibility alias
 WindowsModManagerAdapter = WindowsModInjectorAdapter
 
 
@@ -2623,6 +2524,8 @@ class LinuxModManagerAdapter:
         if result.state != "applied":
             return result
         try:
+            from doom_eap.launcher.campaign_resources import enable_campaign_resources
+            campaign_resources = enable_campaign_resources(game_root, staged)
             verification = verify_linux_mod_installation(
                 game_root,
                 staged,
@@ -2654,6 +2557,7 @@ class LinuxModManagerAdapter:
             details={
                 **result.details,
                 "post_install_verification": verification["state"],
+                "campaign_resources": campaign_resources,
                 "required_resources": verification["required_resources"],
                 "packagemapspec_path": verification["packagemapspec_path"],
                 "packagemapspec_sha256": verification["packagemapspec_sha256"],
@@ -3019,7 +2923,7 @@ def detect_doom_processes(
         name = matching_name(*values)
         if name is None:
             continue
-        # tasklist emits name,pid; ps emits pid,comm,args.
+        # tasklist emits name,pid; ps emits pid,comm,args
         value_iterator = iter(values)
         first_value = next(value_iterator, "")
         second_value = next(value_iterator, "")
@@ -3292,6 +3196,57 @@ AMMO_HOTKEY_STATE_HEADER = "AP_AMMO_REFILL_HOTKEY_V1"
 AMMO_HOTKEY_STATE_FILENAME = "ammo_refill_hotkey.state"
 
 
+def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | None:
+    if base is None:
+        return None
+    name = "special_toggle_hotkey.state" if special else AMMO_HOTKEY_STATE_FILENAME
+    header = "AP_SPECIAL_TOGGLE_HOTKEY_V1" if special else AMMO_HOTKEY_STATE_HEADER
+    path = base / "ap_queue" / name
+    legacy = False
+    if not path.exists():
+        path = base / name
+        legacy = True
+        if not path.exists():
+            return None
+    with path.open("rb") as stream:
+        raw = stream.read(128)
+    tokens = raw.decode("ascii").split()
+    if legacy and (len(tokens) != 2 or tokens[0] != header):
+        return None
+    if len(raw) >= 128 or len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header):
+        raise ValueError(f"Invalid AP shortcut file: {name}")
+    return tokens[-1]
+
+
+def write_ap_hotkey_states(base: Path | None, refill: str, special: str) -> Path | None:
+    """Publish validated shortcuts together, restoring both files on failure."""
+    if base is None:
+        return None
+    queue = base / "ap_queue"
+    queue.mkdir(parents=True, exist_ok=True)
+    paths = [queue / AMMO_HOTKEY_STATE_FILENAME, queue / "special_toggle_hotkey.state"]
+    previous = [path.read_bytes() if path.exists() else None for path in paths]
+    try:
+        for path, header, token in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1"), (refill, special)):
+            _atomic_write_bytes(path, f"{header} {token or 'UNBOUND'}\n".encode("ascii"))
+    except OSError:
+        for path, content in zip(paths, previous):
+            if content is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic_write_bytes(path, content)
+        raise
+    for path, header in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1")):
+        legacy = base / path.name
+        try:
+            tokens = legacy.read_bytes().decode("ascii").split()
+            if len(tokens) == 2 and tokens[0] == header:
+                legacy.unlink()
+        except (OSError, UnicodeError):
+            pass
+    return paths[0]
+
+
 def resolve_doom_config_path(config: Mapping[str, object]) -> Path | None:
     """Resolve authoritative DOOMEternalConfig.cfg path from configured or discovered save paths."""
     save_val = config.get("save_games_dir")
@@ -3357,25 +3312,6 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
             temporary.unlink()
         except OSError:
             pass
-
-
-def write_ammo_refill_hotkey_state(base_dir: Path | None, keybind: str) -> Path | None:
-    """Write AP-owned ammo refill hotkey state file atomically."""
-    if base_dir is None:
-        return None
-    queue_dir = base_dir / "ap_queue"
-    try:
-        queue_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return None
-    state_file = queue_dir / AMMO_HOTKEY_STATE_FILENAME
-    token = str(keybind).strip() if str(keybind).strip() else "UNBOUND"
-    content = f"{AMMO_HOTKEY_STATE_HEADER} {token}\n".encode("utf-8")
-    try:
-        _atomic_write_bytes(state_file, content)
-        return state_file
-    except OSError:
-        return None
 
 
 def cleanup_stale_doom_config_bind(config: Mapping[str, object], *, is_game_running: bool = False) -> bool:

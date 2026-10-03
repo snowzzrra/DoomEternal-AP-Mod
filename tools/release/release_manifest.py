@@ -133,6 +133,13 @@ def build_release_manifest(
             },
         },
     }
+    physical_path = root / "data" / "physical_pickups.json"
+    if physical_path.is_file():
+        result["physical_pickups"] = {
+            "path": "client/data/physical_pickups.json",
+            "sha256": _sha256(physical_path),
+            "size": physical_path.stat().st_size,
+        }
     if public_files is not None:
         result["public_files"] = sorted(public_files)
     if apworld is not None:
@@ -229,6 +236,14 @@ def validate_release_manifest(
     ):
         raise ValueError("release manifest generated map hashes are invalid")
 
+    physical = document.get("physical_pickups")
+    if physical is not None:
+        if (not isinstance(physical, Mapping) or set(physical) != {"path", "sha256", "size"}
+                or physical["path"] != "client/data/physical_pickups.json"
+                or not isinstance(physical["size"], int) or physical["size"] <= 0):
+            raise ValueError("release manifest physical pickup projection is invalid")
+        _require_hash(physical["sha256"], "physical pickup projection")
+
     compiler = document.get("room_compiler")
     if not isinstance(compiler, Mapping) or not ROOM_COMPILER_FIELDS <= set(compiler):
         raise ValueError("release manifest room compiler metadata is missing")
@@ -270,6 +285,13 @@ def validate_release_manifest(
             raise ValueError(f"release manifest base-resource disagreement: {key}")
 
     if package_root is not None:
+        if physical is not None:
+            physical_file = package_root / physical["path"]
+            if package_root.name == "client":
+                physical_file = package_root / Path(physical["path"]).relative_to("client")
+            if (not physical_file.is_file() or _sha256(physical_file) != physical["sha256"]
+                    or physical_file.stat().st_size != physical["size"]):
+                raise ValueError("release manifest physical pickup projection hash drifted")
         registry = package_root / visual["path"]
         if not registry.is_file() and package_root.name == "client":
             registry = package_root / Path(visual["path"]).relative_to("client")

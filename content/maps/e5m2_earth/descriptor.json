@@ -19,10 +19,16 @@
   "supported_game_revision": "Steam 6.66 Rev 3.1",
   "route": {
     "regions": [
-      {"name": "Reclaimed Earth", "order": 123}
+      {
+        "name": "Reclaimed Earth",
+        "order": 123
+      }
     ],
     "connections": [],
     "virtual_locations": []
   },
-  "order": 18
+  "order": 18,
+  "campaign_return_owners": [
+    "checkpoints_target_level_transition_1"
+  ]
 }

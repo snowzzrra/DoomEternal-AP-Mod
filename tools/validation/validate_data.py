@@ -45,7 +45,7 @@ from tools.maps.ap_map_generator import (
     generate_target_relay,
     validate_target_policies,
 )
-from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard
+from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard, find_check_source
 from tools.maps.hub_diff_guard import assert_hub_diff_classified
 from tools.maps.map_semantic_baseline import assert_frozen_map_baselines
 
@@ -362,8 +362,7 @@ def validate_automap_family_registry(
             encoding="utf-8"
         )
         for ap_check, location_id in config.get("entities", {}).items():
-            entity_name = ap_check.removeprefix("AP_CHECK_").lower()
-            bounds = find_entity_block_bounds(source_text, entity_name)
+            entity_name, bounds = find_check_source(source_text, ap_check, config["entities"])
             if bounds is None:
                 errors.append(f"Automap source entity missing: {map_key}/{entity_name}")
                 continue
@@ -379,6 +378,16 @@ def validate_automap_family_registry(
                     )
                 ]
                 if len(matches) != 1:
+                    policy = config.get("target_policies", {}).get(entity_name, {})
+                    contract = policy.get("native_entity_contract")
+                    if isinstance(contract, dict) and policy.get("no_auto_automap_helper") is True:
+                        try:
+                            ap_map_generator.apply_native_entity_contract(block, contract)
+                        except ValueError as exc:
+                            errors.append(f"Native Automap owner contract drift: {map_key}/{location_id}: {exc}")
+                        else:
+                            classified[location_id] = "explicit_native_contract"
+                        continue
                     errors.append(
                         f"Automap family coverage for {location_id}/{entity_name}: {matches}"
                     )
@@ -580,9 +589,11 @@ def validate_generated_automap_carriers() -> list[str]:
                         continue
                     carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
                     trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
-                    for field in ("inherit", "class", "automapPropertiesDecl"):
+                    for field in ("inherit", "class"):
                         if entity_scalar(carrier, field) != entity_scalar(source_block, field):
                             errors.append(f"Automap source metadata drift for {location_id}/{field}")
+                    if entity_scalar(carrier, "automapPropertiesDecl") != "default":
+                        errors.append(f"Automap AP marker drift for {location_id}")
                     if f'model = "{expected_visual_model}";' not in carrier:
                         errors.append(f"Automap carrier lacks AP visual for {location_id}")
                     if extract_target_names(carrier):
@@ -751,9 +762,18 @@ def validate_automap_prototypes_only() -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global APWORLD
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--map", dest="map_key")
+    parser.add_argument("--apworld-root", type=Path,
+                        help="Explicit integration checkout: worlds/doometernal directory")
     args = parser.parse_args(argv)
+    if not args.map_key and args.apworld_root is None:
+        parser.error("integration audit requires --apworld-root")
+    if args.apworld_root is not None:
+        APWORLD = args.apworld_root.resolve()
+    if not args.map_key and not (APWORLD / "items.py").is_file():
+        parser.error("--apworld-root must contain the DOOM Eternal APWorld sources")
     if args.map_key:
         from tools.validation.pipeline import Pipeline
 
@@ -780,7 +800,7 @@ def main(argv: list[str] | None = None) -> int:
         classification_path = ROOT / "data" / "item_classifications.json"
         classification_document = read_json(classification_path)
         classification_identity = load_item_classification_identity(classification_path)
-        if classification_document.get("item_mapping_revision") != 7:
+        if classification_document.get("item_mapping_revision") != 9:
             errors.append("Packaged item classification revision drifted")
         if classification_document.get("source") != ITEM_CLASSIFICATION_SOURCE:
             errors.append(
@@ -824,7 +844,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         errors.append(f"Packaged location names invalid: {exc}")
     reserved_item_ids = extract_frozenset_constant(APWORLD / "items.py", "RESERVED_ITEM_IDS")
-    reserved_location_ids = {7770055, 7770068, 7770358}
+    reserved_location_ids = {7770055, 7770068}
     reused_location_ids = sorted(reserved_location_ids & set(location_ids.values()))
     if reused_location_ids:
         errors.append(f"Reserved location IDs must not be reused: {reused_location_ids}")
@@ -945,7 +965,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Aggregate Mission Challenge ID mismatch: "
                 f"{aggregate_entry['name']}"
             )
-    # Parse ast of a few key python files
+    # parse ast of a few key python files
     source_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (
@@ -1021,8 +1041,9 @@ def main(argv: list[str] | None = None) -> int:
         config_data = read_json(path)
         if prohibited_praetor_policy in config_data:
             errors.append(f"Retired Praetor policy remains in {path.name}")
-        if config_data.get("map_key") != map_key:
-            errors.append(f"Missing or divergent map_key in {path.name}")
+        descriptor = read_json(path.with_name("descriptor.json"))
+        if descriptor.get("key") != map_key or config_data.get("map_key", map_key) != map_key:
+            errors.append(f"Divergent catalog/config map identity: {map_key}/{path.relative_to(ROOT)}")
         config = dict(config_data.get("entities", {}))
         for ap_check in config:
             if "PRAETOR" not in ap_check:
@@ -1039,7 +1060,7 @@ def main(argv: list[str] | None = None) -> int:
                 or not policy.get("remove_original")
                 or set(policy) - {
                     "independent_ap_trigger", "remove_original", "drop_targets",
-                    "preserve_targets",
+                    "preserve_targets", "independent_size",
                 }
             ):
                 errors.append(
@@ -1068,9 +1089,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"Unknown location feedback keys in {path.name}: "
                 f"{unknown_feedback}"
             )
-        default_feedback = sorted(
-            declared_checks - set(feedback)
-        )
+        default_feedback = []
+        for ap_check in sorted(declared_checks - set(feedback)):
+            policy = config_data.get("target_policies", {}).get(ap_check.removeprefix("AP_CHECK_").lower(), {})
+            try:
+                ap_map_generator.resolve_location_feedback_policy(feedback, ap_check, policy)
+            except ValueError:
+                default_feedback.append(ap_check)
         if default_feedback:
             errors.append(
                 f"{path.name} has public-package default feedback policies: "
@@ -1105,9 +1130,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 290:
+    if physical_location_count != 350:
         errors.append(
-            f"Expected 290 physical entity locations, found {physical_location_count}"
+            f"Expected 350 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -1269,9 +1294,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(f"Foundation primitive registry is invalid: {exc}")
     if contracts.get("counts") != {
         "items": len(item_ids),
-        "locations": 369,
-        "map_checks": 307,
-        "runtime_locations": 62,
+        "locations": len(location_ids),
+        "map_checks": len(manifest_location_id_set),
+        "runtime_locations": len(runtime_locations),
         "runtime_goals": 1,
         "route_sentinel_batteries": 18,
     }:
@@ -1367,70 +1392,19 @@ def main(argv: list[str] | None = None) -> int:
         (ROOT / "native" / "client" / name).read_text(encoding="utf-8", errors="ignore")
         for name in (
             "ap_client_exe.cpp",
+            "command_queue.cpp",
+            "command_queue.h",
+            "command_queue_contracts.h",
+            "command_transport.h",
             "game_state_probe.cpp",
             "game_state_probe.h",
-            "ap_runtime_rpc_client.cpp",
-            "ap_runtime_rpc_client.h",
-            "ap_runtime_rpc_seh.c",
-            "ap_runtime_rpc_seh.h",
+            "sentinel_command_client.cpp",
+            "sentinel_command_client.h",
         )
     )
-    rpc_idl_path = ROOT / "native" / "client" / "ap_runtime_rpc.idl"
-    rpc_idl = rpc_idl_path.read_text(encoding="utf-8", errors="ignore")
-    normalized_idl = re.sub(r"\s+", " ", rpc_idl).strip()
-    if any(fragment not in normalized_idl for fragment in
-           ("1c9ca7c8-d421-482d-b85d-79fac33b2658", "version(1.0)",
-            "implicit_handle(handle_t ap_runtime_rpc__MIDL_AutoBindHandle)")):
-        errors.append("AP runtime RPC IDL is missing required interface metadata")
-    if "explicit_handle" in normalized_idl:
-        errors.append("AP runtime RPC IDL must use implicit binding")
-    exact_rpc_declarations = (
-        "void ap_execute( [in, string] unsigned char* command);",
-        "void ap_request_entities( [in, string] unsigned char* path, [in] boolean begin, [in] int size);",
-        "void ap_upload_chunk( [in] int size, [in] int offset, [in, size_is(size)] unsigned char* data);",
-        "void ap_retrieve_entities( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_encounter( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_checkpoint( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_retrieve_spawn( [in, out] int* size, [out, size_is(*size)] unsigned char* data);",
-        "void ap_health( [in, out] int* state);",
-    )
-    expected_interface_body = "interface ap_runtime_rpc { " + " ".join(exact_rpc_declarations) + " }"
-    interface_match = re.search(r"interface ap_runtime_rpc \{ (.*) \}", normalized_idl)
-    if interface_match is None or "interface ap_runtime_rpc { " + interface_match.group(1) + " }" != expected_interface_body:
-        errors.append("AP runtime RPC IDL interface does not match the exact eight-operation contract")
-    wrapper_source = (ROOT / "native" / "client" / "ap_runtime_rpc_client.cpp").read_text(encoding="utf-8")
-    if "ncacn_np" not in wrapper_source or r"\\pipe\\meathook_interface_rpc" not in wrapper_source:
-        errors.append("AP runtime RPC wrapper is missing private transport constants")
-    seh_source = (ROOT / "native" / "client" / "ap_runtime_rpc_seh.c").read_text(encoding="utf-8")
-    if (
-        "ApRpcSetImplicitBinding(binding)" not in seh_source
-        or "ApRpcClearImplicitBinding()" not in seh_source
-        or "RpcTryExcept" not in seh_source
-        or "ap_execute(command)" not in seh_source
-    ):
-        errors.append("AP runtime RPC SEH wrapper does not enforce implicit binding ABI")
-    forbidden_paths = [ROOT / name for name in
-                       ("meathook_interface.h", "meathook_interface_c.c", "mhclient.h", "mhclient.cpp",
-                        "native/client/meathook_interface.h", "native/client/meathook_interface_c.c",
-                        "native/client/mhclient.h", "native/client/mhclient.cpp")]
-    if any(path.exists() for path in forbidden_paths):
-        errors.append("Forbidden native RPC path still exists")
-    tracked_native = list((ROOT / "native").rglob("*"))
-    generated_markers = ("ALWAYS GENERATED", "MIDL compiler version", "@@MIDL_FILE_HEADING")
-    for path in tracked_native:
-        if path.is_file() and path.suffix in (".c", ".h", ".cpp"):
-            text = path.read_text(encoding="utf-8", errors="ignore")
-            if any(marker in text for marker in generated_markers):
-                errors.append(f"Generated RPC marker found in tracked native source: {path}")
-            if (path.name.endswith("_c.c") or path.name == "ap_runtime_rpc.h") and path.name != "ap_runtime_rpc_seh.h":
-                errors.append(f"Generated RPC artifact found under native: {path}")
-    if (ROOT / ".git").exists():
-        tracked = subprocess.run(["git", "ls-files", "native"], cwd=ROOT, capture_output=True, text=True, check=False)
-        if tracked.returncode == 0 and any(
-            (ROOT / line).exists() and ("generated-rpc" in line or line.endswith("_c.c"))
-            for line in tracked.stdout.splitlines()
-        ):
-            errors.append("Generated RPC build artifact is tracked")
+    transport_source = (ROOT / "native/client/sentinel_command_client.cpp").read_text(encoding="utf-8")
+    if "query_command" not in transport_source or "ncacn_np" in native_runtime_source or "meathook_interface_rpc" in native_runtime_source:
+        errors.append("Native consumer must use the typed Core command interface")
     for term in native_hook_terms:
         if term in native_runtime_source:
             errors.append(f"Forbidden in-process/remote hook primitive entered runtime: {term}")
@@ -1498,6 +1472,10 @@ def main(argv: list[str] | None = None) -> int:
     for item_id, command_value in commands.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
+            if command_type == "native_weapon_upgrade_points":
+                if item_id != 7770903 or command_value != {"type": "native_weapon_upgrade_points", "amount": 3}:
+                    errors.append(f"Invalid typed Weapon Upgrade Point mapping: {item_id}")
+                continue
             if command_type == "no_op":
                 continue
             if command_type in {"progressive_perk", "progressive_item"}:
@@ -1511,14 +1489,14 @@ def main(argv: list[str] | None = None) -> int:
                     or not perks
                     or not all(
                         isinstance(perk, str)
-                        and (perk.startswith("perk/player/") or perk.startswith("weapon/player/"))
+                        and perk.startswith(("perk/player/", "weapon/player/", "abilities/"))
                         for perk in stage_effects
                     )
                     or not stage_effects
                 ):
                     errors.append(
                         f"Progressive command {item_id} must define "
-                        "player perk or weapon stages"
+                        "native perk, weapon, or ability stages"
                     )
                 if item_id in {7770017, 7770088, 7770092} and (
                     not isinstance(perks, list)

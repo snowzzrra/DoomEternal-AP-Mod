@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "item_mapping_revision": 7,
+  "item_mapping_revision": 9,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "911ef5d72b18cd9ebac01680eb50248ef720fe9a522e9fb1e40addeea09741b5",
+  "source_sha256": "9f4f08056bc62dfec81bd87da9e6dd5991eb390affa8bfd530249ff5e6f9ca82",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -14,7 +14,7 @@
     },
     "7770002": {
       "name": "Rocket Launcher",
-      "classification": 1
+      "classification": 2
     },
     "7770003": {
       "name": "Super Shotgun",
@@ -26,15 +26,15 @@
     },
     "7770005": {
       "name": "Chaingun",
-      "classification": 1
+      "classification": 2
     },
     "7770006": {
       "name": "BFG-9000",
-      "classification": 1
+      "classification": 2
     },
     "7770007": {
       "name": "The Crucible",
-      "classification": 1
+      "classification": 2
     },
     "7770008": {
       "name": "The Unmaykr",
@@ -50,19 +50,19 @@
     },
     "7770011": {
       "name": "Frag Grenade",
-      "classification": 1
+      "classification": 2
     },
     "7770012": {
       "name": "Flame Belch",
-      "classification": 1
+      "classification": 2
     },
     "7770013": {
       "name": "Ice Bomb",
-      "classification": 1
+      "classification": 2
     },
     "7770014": {
       "name": "Blood Punch",
-      "classification": 1
+      "classification": 2
     },
     "7770015": {
       "name": "Dash",
@@ -74,10 +74,6 @@
     },
     "7770017": {
       "name": "Progressive Health Upgrade",
-      "classification": 2
-    },
-    "7770020": {
-      "name": "Rune",
       "classification": 2
     },
     "7770021": {
@@ -234,11 +230,11 @@
     },
     "7770061": {
       "name": "Micro Missiles",
-      "classification": 1
+      "classification": 2
     },
     "7770062": {
       "name": "Heat Blast",
-      "classification": 1
+      "classification": 2
     },
     "7770063": {
       "name": "Heat Blast Mastery",
@@ -270,7 +266,7 @@
     },
     "7770071": {
       "name": "Remote Detonate",
-      "classification": 1
+      "classification": 2
     },
     "7770072": {
       "name": "Remote Detonate Mastery",
@@ -286,7 +282,7 @@
     },
     "7770075": {
       "name": "Arbalest",
-      "classification": 1
+      "classification": 2
     },
     "7770076": {
       "name": "Arbalest Mastery",
@@ -294,7 +290,7 @@
     },
     "7770077": {
       "name": "Destroyer Blade",
-      "classification": 1
+      "classification": 2
     },
     "7770078": {
       "name": "Destroyer Blade Mastery",
@@ -302,7 +298,7 @@
     },
     "7770079": {
       "name": "Energy Shield",
-      "classification": 1
+      "classification": 2
     },
     "7770080": {
       "name": "Energy Shield Mastery",
@@ -310,10 +306,14 @@
     },
     "7770081": {
       "name": "Mobile Turret",
-      "classification": 1
+      "classification": 2
     },
     "7770082": {
       "name": "Mobile Turret Mastery",
+      "classification": 2
+    },
+    "7770083": {
+      "name": "Meat Hook",
       "classification": 2
     },
     "7770084": {
@@ -511,6 +511,14 @@
     "7770902": {
       "name": "Progressive Sentinel Hammer",
       "classification": 1
+    },
+    "7770903": {
+      "name": "Weapon Upgrade Points (3)",
+      "classification": 2
+    },
+    "7770904": {
+      "name": "Progressive Blood Punch",
+      "classification": 2
     }
   }
 }

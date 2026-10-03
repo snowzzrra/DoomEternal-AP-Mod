@@ -9,7 +9,8 @@
       "mission_key": "e5m3_hell",
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell"
+        "runtime_map": "game/dlc2/e5m3_hell/e5m3_hell",
+        "owner": "hangar_target_level_transition_1"
       },
       "order": 21
     }

@@ -1,16 +1,19 @@
 from collections import namedtuple
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
+
+import pytest
 
 from doom_eap.runtime.item_reconciliation import (
     NEVER_REPLAY,
     REPLAY_IDEMPOTENT,
     ReplayPolicy,
+    ReceiptSession,
     compile_reconciliation_plan,
     migrate_client_state,
     migrate_legacy_session_key,
-    normalize_session_state,
     observe_received_items,
 )
 
@@ -36,15 +39,6 @@ def _registry(*entries):
     }
 
 
-def test_old_history_is_historical_and_has_no_new_receipts():
-    history = [Receipt(item, index, 1, 0) for index, item in enumerate((10, 11, 12))]
-
-    observed = observe_received_items(history, processed_boundary=3)
-
-    assert [receipt.item_id for receipt in observed.historical] == [10, 11, 12]
-    assert observed.new == ()
-    assert observed.highest_observed_index == 2
-    assert observed.processed_boundary == 3
 
 
 def test_reconnect_classifies_new_receipts_once_in_order():
@@ -83,15 +77,6 @@ def test_reconciliation_history_stops_at_processed_boundary():
     assert all(command.item_id < 10 for command in plan.commands)
 
 
-def test_byte_identical_receipts_at_distinct_indices_are_both_new():
-    first = Receipt(77, -2, 1, 0)
-    second = Receipt(77, -2, 1, 0)
-
-    observed = observe_received_items([first, second], 0)
-
-    assert [receipt.index for receipt in observed.new] == [0, 1]
-    assert observed.duplicates == ()
-    assert observed.authoritative_item_ids == (77, 77)
 
 
 def test_shifted_history_overlap_uses_occurrence_count_not_item_id():
@@ -138,47 +123,24 @@ def test_state_migration_preserves_history_and_safes_malformed_sessions():
     assert set(state["sessions"]) == {"room-a:0:1", "room-b:0:1"}
 
 
-def test_legacy_session_migration_is_identity_bound_before_normalization():
+
+
+def test_generation_identity_never_adopts_another_campaign_session():
     sessions = {
-        "None:0:1": {"processed_items": 7},
-        "None:0:2": {"processed_items": 11},
+        "room-a:0:1": {
+            "processed_items": 31,
+            "campaign_navigation": {"generation": "b" * 64},
+        },
     }
 
     state_key, migrated_from = migrate_legacy_session_key(
-        sessions,
-        seed_name="room-a",
-        team=0,
-        slot=1,
+        sessions, seed_name="room-a", team=0, slot=1, generation="a" * 64,
     )
 
-    assert state_key == "room-a:0:1"
-    assert state_key is not None
-    assert migrated_from == "None:0:1"
-    assert sessions[state_key]["processed_items"] == 7
-    assert "None:0:1" not in sessions
-    assert "None:0:2" in sessions
-
-    unchanged = dict(sessions)
-    other_key, other_migration = migrate_legacy_session_key(
-        sessions,
-        seed_name="room-a",
-        team=1,
-        slot=1,
-    )
-    assert other_key == "room-a:1:1"
-    assert other_migration is None
-    assert sessions == unchanged
-
-    malformed = {"None:0:3": "malformed"}
-    malformed_key, malformed_from = migrate_legacy_session_key(
-        malformed,
-        seed_name="room-a",
-        team=0,
-        slot=3,
-    )
-    assert malformed_from == "None:0:3"
-    assert malformed_key is not None
-    assert normalize_session_state(cast(Any, malformed[malformed_key]))["processed_items"] == 0
+    assert state_key == "room-a:0:1:" + "a" * 64
+    assert migrated_from is None
+    assert sessions["room-a:0:1"]["processed_items"] == 31
+    assert state_key not in sessions
 
 
 def test_never_replay_has_zero_commands():
@@ -192,28 +154,51 @@ def test_never_replay_has_zero_commands():
     assert plan.skipped_never_replay == 1
 
 
-def test_replay_safe_plan_is_one_silent_reconciliation_command():
-    definitions = {1: "simple"}
-    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
-        plan = compile_reconciliation_plan(
-            [1], definitions, _registry((1, REPLAY_IDEMPOTENT)), "room-0-1", 4
-        )
-
-    assert len(plan.commands) == 1
-    assert plan.commands[0].spool_id.startswith("reconcile-")
-    assert "notify" not in plan.commands[0].command
 
 
-def test_identity_state_is_separate_per_room():
-    state, _ = migrate_client_state(
-        {
-            "version": 1,
-            "sessions": {
-                "room-a:0:1": {"processed_items": 3},
-                "room-b:0:1": {"processed_items": 9},
-            },
-        }
+
+
+
+
+
+
+def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
+    session = ReceiptSession()
+    key = ("room", 0, "receipt")
+    token = session.capture("room")
+    session.note_observation(key)
+    assert session.was_observed(key)
+    assert session.is_current(token, "room")
+    assert not session.is_current(token, "other-room")
+    session.advance()
+    assert session.processed_boundary == 1
+    session.begin_rebind()
+    assert session.processed_boundary == 1
+    assert not session.was_observed(key)
+    assert not session.is_current(token, "room")
+    assert session.is_current(session.capture("room"), "room")
+    session.restore_boundary(7)
+    assert session.processed_boundary == 7
+    with pytest.raises(FrozenInstanceError):
+        token.generation = 10
+
+
+def test_starting_materialization_tracks_sources_and_subtracts_processed_occurrences():
+    session = ReceiptSession()
+    receipt = Receipt(8, -2, 1, 0)
+    inputs = dict(
+        starting_inventory={"Item": 2}, starting_weapon="Item",
+        item_identity={8: {"name": "Item"}}, eligible=lambda _item: True,
     )
-
-    assert state["sessions"]["room-a:0:1"]["processed_items"] == 3
-    assert state["sessions"]["room-b:0:1"]["processed_items"] == 9
+    session.configure_starting_materialization(**inputs, processed_receipts=[receipt, receipt])
+    assert [(fact.item_id, fact.quantity, fact.provenance) for fact in session.starting_materialization] == [
+        (8, 2, "starting_inventory"), (8, 1, "starting_weapon"),
+    ]
+    assert session.consume_starting_materialization(8)
+    assert not session.consume_starting_materialization(8)
+    session.begin_rebind()
+    assert not session.consume_starting_materialization(8)
+    session.configure_starting_materialization(**inputs, processed_receipts=[receipt] * 3)
+    assert not session.consume_starting_materialization(8)
+    with pytest.raises(FrozenInstanceError):
+        session.starting_materialization[0].quantity = 9

@@ -14,11 +14,6 @@
         {
           "strategy": "terminal_owner",
           "owner": "underwater_facility_target_level_transition_1"
-        },
-        {
-          "strategy": "native_transition",
-          "from_map": "game/dlc/e4m1_rig/e4m1_rig",
-          "to_map": "maps/game/dlc/hub/hub.map"
         }
       ],
       "effects": [

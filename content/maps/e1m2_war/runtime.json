@@ -6,7 +6,8 @@
       "location_id": 7770123,
       "signal": {
         "kind": "map_terminal",
-        "runtime_map": "game/sp/e1m2_battle/e1m2_battle"
+        "runtime_map": "game/sp/e1m2_battle/e1m2_battle",
+        "owner": "extraction_map_exit_level_transition_relay_1723732033"
       },
       "mission_key": "e1m2_war",
       "category": "mission_complete",

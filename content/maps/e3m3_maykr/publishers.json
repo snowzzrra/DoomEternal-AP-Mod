@@ -14,11 +14,6 @@
         {
           "strategy": "terminal_owner",
           "owner": "temp_all_scripting_target_level_transition_1"
-        },
-        {
-          "strategy": "native_transition",
-          "from_map": "game/sp/e3m3_maykr/e3m3_maykr",
-          "to_map": "game/sp/e3m4_boss/e3m4_boss"
         }
       ],
       "effects": [

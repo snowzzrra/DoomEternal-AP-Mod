@@ -5,12 +5,16 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import logging
 import os
 import platform
 import re
+import shutil
+import tempfile
 import time
 import zipfile
 from collections.abc import Mapping, Sequence
+from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -357,7 +361,7 @@ def _native_lifecycle_summary(
 
 
 def _read_support_log(path: Path) -> str | None:
-    """Keep complete bounded session logs, otherwise retain meaningful head and tail."""
+    """Retain bounded startup, transition/error events and current tail."""
     try:
         with path.open("rb") as source:
             source.seek(0, os.SEEK_END)
@@ -373,7 +377,25 @@ def _read_support_log(path: Path) -> str | None:
                 head = source.read(head_size)
                 source.seek(max(0, size - head_size))
                 tail = source.read(head_size)
-                payload = head + b"\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
+                source.seek(0)
+                events = deque()
+                retained = 0
+                limit = SUPPORT_LOG_MAX_BYTES - SUPPORT_LOG_TAIL_BYTES - 256
+                while source.tell() < size:
+                    line = source.readline(32768)
+                    if not line:
+                        break
+                    structured = b'DELIVERY_EVENT ' in line and b'PROBE_RESPONSE' not in line
+                    if structured or any(marker in line for marker in (
+                        b" ERROR ", b" WARNING ", b"QUEUE_PUBLICATION_", b"GATE_TRANSITION ",
+                        b"MISSION_SNAPSHOT ", b"Game state transition:", b"AP_STAGE_COMPLETE_",
+                    )):
+                        events.append(line)
+                        retained += len(line)
+                        while retained > limit:
+                            retained -= len(events.popleft())
+                payload = (head + b"\n\n[... RETAINED TRANSITION/ERROR EVENTS ...]\n\n"
+                           + b"".join(events) + b"\n\n[... CURRENT TAIL ...]\n\n" + tail)
         text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
         return text[: SUPPORT_LOG_MAX_BYTES + 128]
     except (OSError, UnicodeError):
@@ -1302,6 +1324,56 @@ def build_support_diagnostics(
     }
 
 
+def _native_startup_diagnostics(config, session):
+    if not os.environ.get("LOCALAPPDATA"):
+        return {"status": "unavailable", "reason": "native_log_location_unavailable"}
+    root = doom_base_dir_from_config(config or {})
+    if root is None:
+        return {"status": "unavailable", "reason": "game_root_unavailable"}
+    directory = Path(os.environ["LOCALAPPDATA"]) / "SentinelCore" / "diagnostics"
+    try:
+        build = json.loads((root.parent / "sentinel-distribution.json").read_text(encoding="utf-8"))["build_id"]
+        candidates = sorted(directory.glob("*.latest.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return {"status": "unavailable", "reason": f"native_log_inspection_failed: {type(error).__name__}"}
+
+    def public(value):
+        if isinstance(value, dict):
+            return {key: public(item) for key, item in value.items() if key != "private"}
+        if isinstance(value, list):
+            return [public(item) for item in value]
+        return value
+
+    records = []
+    errors = []
+    for path in candidates[:SUPPORT_DIAGNOSTIC_MAX_ITEMS]:
+        identity = path.name.removesuffix(".latest.json").split("-")
+        if len(identity) != 2 or not all(part.isdecimal() for part in identity):
+            continue
+        try:
+            with path.open("rb") as stream:
+                raw = stream.read(SUPPORT_DIAGNOSTIC_MAX_BYTES + 1)
+            if len(raw) > SUPPORT_DIAGNOSTIC_MAX_BYTES:
+                raise ValueError("native diagnostic exceeds support limit")
+            data = json.loads(raw)
+            if not isinstance(data, dict) or [str(data.get("pid")), str(data.get("process_created"))] != identity:
+                raise ValueError("native diagnostic process identity mismatch")
+            if data.get("build_id") != build:
+                continue
+            namespace = session.get("namespace_id")
+            if namespace and data.get("admission", {}).get("namespace_id") != namespace:
+                continue
+            current = [str(session.get("pid")), str(session.get("process_created"))] == identity
+            records.append({"source_filename": path.name, "evidence": "current_process" if current else "last_known",
+                            "diagnostic": public(data)})
+            if len(records) == 2:
+                break
+        except (OSError, ValueError, TypeError, AttributeError) as error:
+            errors.append({"source_filename": path.name, "reason": type(error).__name__})
+    return {"status": "available" if records else "unavailable", "records": records,
+            "errors": errors, "reason": None if records else "no_matching_native_diagnostic"}
+
+
 def write_support_bundle(
     destination: Path,
     report: DoctorReport,
@@ -1315,15 +1387,10 @@ def write_support_bundle(
     last_connection_error: Mapping[str, object] | None = None,
     support_condump: Mapping[str, object] | None = None,
     support_diagnostics: Mapping[str, object] | None = None,
+    archive_directory: Path | None = None,
 ) -> Path:
-    """Write bounded diagnostics and redacted logs with freshness metadata.
-
-    The destination is never clobbered: when it already exists a UTC
-    timestamped sibling is used instead, so repeated support reports cannot
-    collide with a locked or in-use previous bundle.
-    """
+    """Retain a verified local archive and export without replacing existing files."""
     destination = destination.expanduser().absolute()
-    destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         candidate = destination.with_name(f"{destination.stem}_{stamp}{destination.suffix}")
@@ -1389,6 +1456,8 @@ def write_support_bundle(
         payload["support_condump"] = sanitize_support_value(condump_metadata)
     if support_diagnostics is not None:
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
+    native_startup = _native_startup_diagnostics(config, payload.get("support_diagnostics", {}).get("ap_session", {}))
+    payload["native_startup"] = sanitize_support_value(native_startup)
     safe_logs = _bound_support_text(
         "\n".join(_sanitize_support_text(str(line)) for line in logs)
     )
@@ -1408,9 +1477,16 @@ def write_support_bundle(
                 "line_count": len(safe_logs.splitlines()),
             }
         payload["log_provenance"] = sanitize_support_value(provenance)
-    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    storage = archive_directory or destination.parent / "support-bundles"
+    storage.mkdir(parents=True, exist_ok=True)
+    owned_directory = Path(tempfile.mkdtemp(prefix="report-", dir=storage))
+    local_archive = owned_directory / destination.name
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".archive.", suffix=".tmp", dir=owned_directory)
+    os.close(descriptor)
+    temporary = Path(temporary_name)
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        archive.writestr("native_startup.json", json.dumps(payload["native_startup"], indent=2, sort_keys=True) + "\n")
         if "launcher.log" not in tails:
             archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
         elif safe_logs:
@@ -1419,12 +1495,40 @@ def write_support_bundle(
             archive.writestr(name, tail)
         if condump_content is not None:
             archive.writestr("AP_SUPPORT_FILE.txt", condump_content)
-    publish_file(temporary, destination, operation="support_bundle_publish")
-    return destination
+    with zipfile.ZipFile(temporary) as archive:
+        if archive.testzip() is not None:
+            raise OSError(f"Support archive verification failed: {temporary}")
+    publish_file(temporary, local_archive, operation="support_bundle_publish")
+    with zipfile.ZipFile(local_archive) as archive:
+        if archive.testzip() is not None:
+            raise OSError(f"Support archive verification failed: {local_archive}")
+    export_owned = False
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as exported, local_archive.open("rb") as source:
+            export_owned = True
+            shutil.copyfileobj(source, exported)
+            exported.flush()
+            os.fsync(exported.fileno())
+        with zipfile.ZipFile(destination) as archive:
+            if archive.testzip() is not None:
+                raise OSError("Support export verification failed")
+        return destination
+    except (OSError, zipfile.BadZipFile) as error:
+        if export_owned:
+            try:
+                destination.unlink()
+            except OSError:
+                pass
+        logging.getLogger(__name__).warning(
+            "Support export unavailable (%s); verified archive retained at %s",
+            type(error).__name__, local_archive,
+        )
+        return local_archive
 
 
 class LauncherDoctor:
-    VERSION = "0.5.3"
+    VERSION = "0.6.0"
 
     def __init__(
         self,
@@ -1468,19 +1572,19 @@ class LauncherDoctor:
                 if meathook_probe.status == PrerequisiteStatus.MISSING:
                     actions.append(RepairAction(
                         "install_game_link", "Install verified Game Link runtime",
-                        ("Download official Meathook v7.2 and install to DOOM Eternal folder",),
+                        ("Select a compatible Core distribution and install its verified pair",),
                         False,
-                        "Downloads verified XINPUT1_3.dll from GitHub release.",
+                        "Requires a verified local Core distribution.",
                     ))
                 elif meathook_probe.status in {PrerequisiteStatus.INCOMPATIBLE, PrerequisiteStatus.INVALID}:
                     actions.append(RepairAction(
                         "repair_game_link", "Repair Game Link runtime",
                         (
-                            "Back up existing XINPUT1_3.dll to repair-backups",
-                            "Install verified Meathook v7.2 runtime library",
+                            "Verify existing Core pair ownership",
+                            "Install the matching Core/bootstrap pair",
                         ),
                         True,
-                        "Backs up foreign/unverified XINPUT1_3.dll before replacing.",
+                        "Preserves foreign providers and restores the owned pair on publication failure.",
                     ))
             except Exception:
                 pass

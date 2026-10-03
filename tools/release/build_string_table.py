@@ -247,7 +247,7 @@ def build_string_table(
     output_path.write_text(
         json.dumps({"strings": serialized_entries}, indent=4, ensure_ascii=False) + "\n",
         encoding="utf-8",
-    )
+    newline="\n")
 
 
 def main() -> int:

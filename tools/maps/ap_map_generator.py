@@ -10,6 +10,7 @@ from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
 from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
+    MASTERY_ITEM_BITS,
     build_primitive,
     validate_primitive_registry,
 )
@@ -1661,9 +1662,9 @@ def build_universal_physical_policy(
             "entity_name": visual_name,
             "class": "idProp2",
             "inherit": None,
-            "automap_properties_decl": policy.get(
-                "independent_automap_properties_decl", "default"
-            ),
+            # A non-inherited visual has no automap DECL; the persistent idInfo
+            # helper owns the marker independently of model removal.
+            "automap_properties_decl": None,
             "model": visual_model,
             "thinkComponentDecl": policy.get("thinkComponentDecl", "bob_rotate_slow"),
             "position": position,
@@ -1743,10 +1744,7 @@ def generate_automap_location_helper(source_block, location_id, policy=None):
         for axis in ("x", "y", "z"):
             match = position_values[axis]
             coordinates[axis] = match.group(1) if match is not None else "0"
-    marker = re.search(
-        r'automapPropertiesDecl\s*=\s*"([^"]+)";', source_block
-    )
-    automap_decl = marker.group(1) if marker else "default"
+    automap_decl = "default"
     return f'''entity {{
 	entityDef ap_automap_location_{location_id} {{
 		inherit = "info/null";
@@ -1953,6 +1951,16 @@ def location_feedback_policy(location_feedback, ap_check_id):
     return policy
 
 
+def resolve_location_feedback_policy(location_feedback, ap_check_id, target_policy):
+    """Native-contract checks have the established AP-only feedback boundary."""
+    if ap_check_id not in location_feedback and (
+        target_policy.get("duplicate_policy") == "native_only"
+        or "native_entity_contract" in target_policy
+    ):
+        return "ap_only"
+    return location_feedback_policy(location_feedback, ap_check_id)
+
+
 def generate_item_notification(item_id, subtext_key, classification, stage=None, slot=None):
     """Generate the one classification-selected received-item notification."""
     style = notification_style_for_item(item_id, classification)
@@ -2055,7 +2063,7 @@ def discover_map_group_unlocks(content):
         # Walk backwards to find the nearest entityDef declaration
         entity_def_pos = content.rfind("entityDef ", 0, pos)
         if entity_def_pos != -1:
-            # Extract the entity name from "entityDef <name> {"
+            # read the entity name from the entity definition header
             snippet = content[entity_def_pos:entity_def_pos + 200]
             match = re.match(r'entityDef\s+(\S+)', snippet)
             if match:
@@ -2091,9 +2099,27 @@ def command_requires_map_side_rpc(command):
     return isinstance(command, str) and bool(command.strip())
 
 
+def remove_blood_punch_grants(text):
+    """Keep native target graphs while making AP receipts own Blood Punch grants."""
+    paths = {"abilities/blood_punch"} | {
+        f"perk/player/blood_punch/{tier}" for tier in ("base", "area_of_effect", "ai_charge_rate", "max_charges")
+    }
+    def project(match):
+        block = match.group(0)
+        items = list(re.finditer(r'(?m)^[ \t]*item\[\d+\]\s*=\s*"([^"\n]+)";\s*$', block))
+        if not any(item.group(1) in paths for item in items):
+            return block
+        kept = [item.group(1) for item in items if item.group(1) not in paths]
+        field = block.split("=", 1)[0].strip()
+        return field + " = {\n\t\t\tnum = " + str(len(kept)) + ";\n" + "".join(
+            f'\t\t\titem[{i}] = "{path}";\n' for i, path in enumerate(kept)
+        ) + "\t\t}"
+    return re.sub(r'\b(?:perkList|itemList)\s*=\s*\{[^{}]*\}', project, text)
+
+
 def progressive_effect_command(effect):
     """Compile physical item effects and perk effects to native-safe commands."""
-    if effect.startswith("weapon/"):
+    if effect.startswith(("weapon/", "abilities/")):
         return f"give {effect}"
     if effect.startswith(("ability_", "equipmentlauncher/", "throwable/", "ammo/", "inventory/")):
         return f"ai_ScriptCmdEnt player1 give {effect}"
@@ -2222,7 +2248,7 @@ def generate_rpc_command_entities(
     for item_id, command_value in items_dict.items():
         if isinstance(command_value, dict):
             command_type = command_value.get("type")
-            if command_type == "no_op":
+            if int(item_id) in MASTERY_ITEM_BITS or command_type in {"no_op", "native_weapon_upgrade_points"}:
                 continue
             if command_type == "transient_effect":
                 continue
@@ -2278,11 +2304,14 @@ def generate_rpc_command_entities(
             command_blocks = []
             for idx, cmd in enumerate(command_value):
                 cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
+                direct_bfg = int(item_id) == 7770006 and idx == 0 and cmd == "give weapon/player/bfg"
                 if command_requires_map_side_rpc(cmd):
                     required_entities.append(cmd_entity_name)
                 relay_targets.append(cmd_entity_name)
                 command_blocks.append(build_primitive(
-                    "target_command", cmd_entity_name, {"command": cmd}
+                    "weapon_grant_direct" if direct_bfg else "target_command",
+                    cmd_entity_name,
+                    {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd},
                 ))
 
             blocks.append(build_primitive(
@@ -2450,9 +2479,22 @@ def validate_ap_lifecycle_entity(content, map_key):
         raise ValueError(f"AP lifecycle target mismatch: {name}")
 
 
-def generate_bootstrap_entities():
-    """Return map bootstrap entities."""
-    return ""
+def generate_bootstrap_entities(runtime_map=""):
+    """Return ownership-gated stat targets for supported maps."""
+    from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ACTIONS, BOOTSTRAP_STAT_PRIMITIVE
+
+    return "".join(f'''entity {{
+    entityDef {action["entity_name"]} {{
+        class = "{BOOTSTRAP_STAT_PRIMITIVE["class"]}";
+        expandInheritance = false;
+        edit = {{
+            gameStat = "{action["stat"]}";
+            value = {BOOTSTRAP_STAT_PRIMITIVE["value"]};
+        }}
+    }}
+}}
+''' for action in BOOTSTRAP_ACTIONS.values()
+        if action["automatic_enabled"] and runtime_map in action["maps_supported"])
 
 def load_item_notification_policies(
     policy_path: str | Path = "data/item_replay_policies.json",
@@ -2503,13 +2545,7 @@ def load_explicit_location_feedback(
 
 def apply_runtime_map_correctives(text: str, map_key: str) -> str:
     """Apply focused runtime correctives for TAG maps."""
-    if map_key == "e4m2_swamp":
-        text = remove_balanced_entity_blocks(
-            text,
-            "fast_travel_target_fast_travel_unlock_2",
-        )
-
-    elif map_key == "e4m1_rig":
+    if map_key == "e4m1_rig":
         bounds = find_entity_block_bounds(text, "slayer_gate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]
@@ -2538,17 +2574,13 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             if "flags = {" in block:
-                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+                if "flags = {\n\t\t\thide = true;" not in block:
+                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
             else:
                 block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
             text = text[:bounds[0]] + block + text[bounds[1]:]
 
     elif map_key == "e4m3_mcity":
-        text = remove_balanced_entity_blocks(
-            text,
-            "fasttravel_target_fast_travel_unlock_1",
-        )
-
         bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
         if bounds:
             block = text[bounds[0]:bounds[1]]
@@ -2582,7 +2614,8 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             if "flags = {" in block:
-                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+                if "flags = {\n\t\t\thide = true;" not in block:
+                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
             else:
                 block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
             text = text[:bounds[0]] + block + text[bounds[1]:]
@@ -2825,15 +2858,9 @@ def generate_map(
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
-                if ap_check_id not in location_feedback and (
-                    target_policy.get("duplicate_policy") == "native_only"
-                    or "native_entity_contract" in target_policy
-                ):
-                    feedback_policy = "ap_only"
-                else:
-                    feedback_policy = location_feedback_policy(
-                        location_feedback, ap_check_id
-                    )
+                feedback_policy = resolve_location_feedback_policy(
+                    location_feedback, ap_check_id, target_policy
+                )
                 include_ap_feedback = True
                 if not target_policy:
                     target_policy = build_universal_physical_policy(
@@ -3187,12 +3214,15 @@ def generate_map(
             receipt_feedback=receipt_feedback,
             enable_notifications=enable_notifications,
         )
-        + generate_bootstrap_entities()
+        + generate_bootstrap_entities(level_config.get("runtime_map", ""))
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
         + generate_ap_lifecycle_entity(map_key)
         + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
     final_content = apply_runtime_map_correctives(final_content, map_key)
+    if map_key == "hub":
+        from tools.maps.fortress_campaign import project_fortress
+        final_content = project_fortress(final_content, level_config)
     validate_ap_lifecycle_entity(final_content, map_key)
     assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
     if canonical_visual and modified_count:

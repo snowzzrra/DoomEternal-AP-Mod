@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import time
-from pathlib import Path
 
 TRANSIENT_EFFECTS = {
     7770156: {"name": "damage_boost", "cvar": "g_damageScaleAllToAI", "factor": 1.50, "duration": 20.0},
@@ -14,107 +12,63 @@ TRANSIENT_EFFECTS = {
     7770159: {"name": "weakness_trap", "cvar": "g_damageScaleAllToAI", "factor": 0.70, "duration": 12.0},
     7770160: {"name": "vulnerability_trap", "cvar": "g_damageScaleAllToSlayer", "factor": 1.35, "duration": 12.0},
 }
-TRANSIENT_EFFECT_BASELINE_FILE = "ap_effect_baseline.state"
-TRANSIENT_SCOPE_HEADER = "AP_TRANSIENT_SCOPE_V1"
-TRANSIENT_SCOPE_PATH = "active_transient_scope"
+from dataclasses import dataclass
+from typing import Protocol
 
 
-def _read_key_value_file(path: Path) -> dict[str, str]:
-    try:
-        lines = path.read_text(encoding="ascii").splitlines()
-    except (OSError, UnicodeError):
-        return {}
-    result = {}
-    for line in lines:
-        key, separator, value = line.partition("=")
-        if separator:
-            result[key] = value
-    return result
+@dataclass(frozen=True)
+class TransientRuntime:
+    state_key: str
+    binding: tuple[str, str] | None
+    ready: bool
 
 
-def transient_baseline_ready(base_directory: str | os.PathLike[str]) -> bool:
-    base = Path(base_directory)
-    data = _read_key_value_file(base / TRANSIENT_EFFECT_BASELINE_FILE)
-    health = _read_key_value_file(base / "ap_rpc_health.state")
-    if data.get("state") != "ready" or not data.get("attachment_epoch", "").isdigit():
-        return False
-    if data.get("pid") != health.get("pid") or health.get("state") != "ready":
-        return False
-    try:
-        timestamp = int(data["timestamp_ms"])
-        freshness = int(data["freshness_ms"])
-    except (KeyError, ValueError):
-        return False
-    return timestamp <= int(time.time() * 1000) <= timestamp + freshness
-
-
-def _baseline_binding(base_directory: str | os.PathLike[str]) -> tuple[str, str] | None:
-    base = Path(base_directory)
-    data = _read_key_value_file(base / TRANSIENT_EFFECT_BASELINE_FILE)
-    health = _read_key_value_file(base / "ap_rpc_health.state")
-    if data.get("state") != "ready" or health.get("state") != "ready":
-        return None
-    pid = data.get("pid")
-    epoch = data.get("attachment_epoch")
-    if not pid or not epoch or pid != health.get("pid"):
-        return None
-    return pid, epoch
+class TransientPublicationPort(Protocol):
+    def publish_scope(self, scope: str | None): ...
+    def send(self, cvar: str, command: str, state_key: str, scope: str, *, room_scoped: bool) -> bool: ...
 
 
 class TransientEffectManager:
     """Owns only five named effects and their monotonic expirations."""
 
-    def __init__(self, owner):
-        self.owner = owner
-        self.active: dict[str, tuple[float, float, str]] = {}
-        self.scope_generation = 0
-        self.bound_baseline: tuple[str, str] | None = None
-        self.reset_pending = False
+    def __init__(self, publication: TransientPublicationPort, process_id: int):
+        self._publication = publication
+        self._process_id = process_id
+        self._active: dict[str, tuple[float, float, str]] = {}
+        self._scope_generation = 0
+        self._bound_baseline: tuple[str, str] | None = None
+        self._reset_pending = False
 
-    def _scope(self) -> str | None:
-        state_key = getattr(self.owner, "state_key", "")
+    def _scope(self, runtime) -> str | None:
+        state_key = runtime.state_key
         if not state_key:
             return None
-        binding = _baseline_binding(self.owner.base_directory)
+        binding = runtime.binding
         if binding is None:
             return None
-        if self.bound_baseline != binding:
-            if self.bound_baseline is not None:
-                self.active.clear()
-                self.reset_pending = False
-                self._publish_scope(None)
-            self.bound_baseline = binding
+        if self._bound_baseline != binding:
+            if self._bound_baseline is not None:
+                self._active.clear()
+                self._reset_pending = False
+                self._publication.publish_scope(None)
+            self._bound_baseline = binding
         session_namespace = hashlib.sha256(str(state_key).encode("utf-8")).hexdigest()[:16]
         identity = "|".join(
             (
                 str(state_key),
                 str(session_namespace),
-                str(os.getpid()),
+                str(self._process_id),
                 binding[0],
                 binding[1],
-                str(self.scope_generation),
+                str(self._scope_generation),
             )
         )
         return f"effectscope-{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:16]}"
 
-    def _publish_scope(self, scope: str | None) -> None:
-        path = Path(self.owner.base_directory) / "ap_queue" / TRANSIENT_SCOPE_PATH
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(".tmp")
-            if scope is None:
-                temporary.unlink(missing_ok=True)
-                path.unlink(missing_ok=True)
-            else:
-                temporary.write_text(scope + "\n", encoding="ascii")
-                os.replace(temporary, path)
-        except OSError:
-            return
-
     def _commands(self, now: float) -> list[tuple[str, str]]:
         factors = {"g_damageScaleAllToAI": 1.0, "g_damageScaleAllToSlayer": 1.0}
         infinite_ammo = 0
-        for _name, (expiry, factor, cvar) in self.active.items():
+        for _name, (expiry, factor, cvar) in self._active.items():
             if expiry > now:
                 if cvar == "g_infiniteAmmo":
                     infinite_ammo = 1
@@ -126,58 +80,55 @@ class TransientEffectManager:
             ("g_infiniteAmmo", f"g_infiniteAmmo {infinite_ammo}"),
         ]
 
-    def _emit(self, now: float, *, room_scoped: bool = True) -> bool:
-        scope = self._scope()
-        if scope is None or not self.owner.transient_effects_ready():
+    def _emit(self, now: float, runtime, *, room_scoped: bool = True) -> bool:
+        scope = self._scope(runtime)
+        if scope is None or not runtime.ready:
             return False
-        self._publish_scope(scope)
+        self._publication.publish_scope(scope)
         for cvar, command in self._commands(now):
-            command_id = self.owner.transient_command_id(cvar, command, scope)
-            if not self.owner.send_transient_command(
-                command, command_id, scope, room_scoped=room_scoped
-            ):
+            if not self._publication.send(cvar, command, runtime.state_key, scope, room_scoped=room_scoped):
                 return False
         return True
 
-    def apply_receipt(self, item_id: int) -> tuple[bool, str, bool]:
+    def apply_receipt(self, item_id: int, runtime: TransientRuntime) -> tuple[bool, str, bool]:
         effect = TRANSIENT_EFFECTS.get(item_id)
         if effect is None:
             return False, "not a transient effect", False
         now = time.monotonic()
-        self.tick(now, emit=False)
-        if not self.owner.transient_effects_ready():
+        self.tick(runtime, now, emit=False)
+        if not runtime.ready:
             return False, "transient baseline or safe gameplay unavailable", False
-        current = self.active.get(effect["name"])
+        current = self._active.get(effect["name"])
         expiry = max(now, current[0] if current is not None else now)
-        self.active[effect["name"]] = (
+        self._active[effect["name"]] = (
             expiry + effect["duration"], effect["factor"], effect["cvar"]
         )
-        if not self._emit(now):
+        if not self._emit(now, runtime):
             return False, "transient command spool rejected", True
-        self.reset_pending = False
+        self._reset_pending = False
         return True, effect["name"], False
 
-    def tick(self, now: float | None = None, *, emit: bool = True) -> bool:
+    def tick(self, runtime: TransientRuntime, now: float | None = None, *, emit: bool = True) -> bool:
         now = time.monotonic() if now is None else now
-        expired = [name for name, (expiry, _factor, _cvar) in self.active.items() if expiry <= now]
+        expired = [name for name, (expiry, _factor, _cvar) in self._active.items() if expiry <= now]
         for name in expired:
-            self.active.pop(name, None)
+            self._active.pop(name, None)
         if expired:
-            self.reset_pending = True
+            self._reset_pending = True
         if not emit:
             return not expired
-        if expired or self.reset_pending:
-            emitted = self._emit(now)
+        if expired or self._reset_pending:
+            emitted = self._emit(now, runtime)
             if emitted:
-                self.reset_pending = False
+                self._reset_pending = False
             return emitted
         return True
 
-    def reset(self, reason: str) -> None:
-        self.active.clear()
-        self.scope_generation += 1
-        self.reset_pending = True
-        self._publish_scope(None)
-        if self.owner.transient_effects_ready():
-            if self._emit(time.monotonic(), room_scoped=False):
-                self.reset_pending = False
+    def reset(self, reason: str, runtime: TransientRuntime) -> None:
+        self._active.clear()
+        self._scope_generation += 1
+        self._reset_pending = True
+        self._publication.publish_scope(None)
+        if runtime.ready:
+            if self._emit(time.monotonic(), runtime, room_scoped=False):
+                self._reset_pending = False

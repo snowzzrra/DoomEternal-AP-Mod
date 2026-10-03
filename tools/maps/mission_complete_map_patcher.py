@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed terminal map hooks for Hell on Earth and Exultia checks."""
+"""Fail-closed map hooks for authored mission-completion publishers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from pathlib import Path
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.contracts.publisher_contracts import (
     PublisherContract,
-    load_publisher_contracts,
     map_publishers_for_owner,
 )
 from tools.maps.ap_map_generator import (
@@ -126,7 +125,8 @@ def _patch_hell(contract: dict, root: Path, mod_root: Path) -> dict:
     }
 
 
-def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
+def _patch_exultia(contract: dict, root: Path, generated_map: Path,
+                   publishers: tuple[PublisherContract, ...] = ()) -> dict:
     source = (root / contract["source_path"]).read_text(encoding="utf-8")
     source_bounds = find_entity_block_bounds(source, contract["owner"])
     if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
@@ -151,11 +151,20 @@ def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
     before = extract_target_names(block)
     if before != contract["original_targets"]:
         raise ValueError(f"Exultia native owner target drift: {before}")
-    after = [contract["ap_check"], *before]
+    compiled = None
+    if contract["patch_strategy"] == "deferred_publishers":
+        compiled = compile_publishers(map_publishers_for_owner(
+            publishers, contract["map_key"], contract["owner"]
+        ))
+        if compiled["preserved_native_targets"] != before:
+            raise ValueError(f"{contract['map_key']}: native transition target drift")
+    after = compiled["owner_targets"] if compiled else [contract["ap_check"], *before]
     patched = replace_targets_block(block, after)
     result = text[:bounds[0]] + patched + text[bounds[1]:]
+    if compiled:
+        result = result.rstrip() + "\n" + compiled["entities"]
     generated_map.write_text(result, encoding="utf-8", newline="")
-    return {
+    audit = {
         "source_path": contract["source_path"],
         "source_sha256": source_sha,
         "expected_source_sha256": expected_source or source_sha,
@@ -163,6 +172,10 @@ def _patch_exultia(contract: dict, root: Path, generated_map: Path) -> dict:
         "after_targets": after,
         "changed_lists": 1,
     }
+    if compiled:
+        audit["publishers"] = compiled["publishers"]
+        audit["preserved_native_targets"] = compiled["preserved_native_targets"]
+    return audit
 
 
 def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -> None:
@@ -331,15 +344,14 @@ def _patch_sentinel_prime_end(
         publisher for publisher in publishers
         if publisher.key == "sentinel_prime_mission_complete"
     )
-    transition = mission_publisher.triggers_for("native_transition")[0]
     event = mission_publisher.triggers_for("map_event_file")[0]
     return {
         "source_path": mission["source_path"],
         "source_sha256": source_sha,
         "owner": mission["owner"],
         "native_owner": mission["native_owner"],
-        "runtime_map": transition["from_map"],
-        "destination_map": transition["to_map"],
+        "runtime_map": "game/sp/e2m4_boss/e2m4_boss",
+        "destination_map": "maps/game/hub/hub.map",
         "before_targets": [],
         "after_targets": compiled["owner_targets"],
         "location_id": mission["location_id"],
@@ -505,8 +517,10 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         strategy = contract.get("patch_strategy")
         if strategy == "logic_node_targets":
             audit = _patch_hell(contract, root, mod_root)
-        elif strategy == "entity_targets":
-            audit = _patch_exultia(contract, root, generated_maps[contract["map_key"]])
+        elif strategy in {"entity_targets", "deferred_publishers"}:
+            audit = _patch_exultia(
+                contract, root, generated_maps[contract["map_key"]], publisher_contracts
+            )
         elif strategy == "terminal_publishers":
             audit = _patch_sentinel_prime_end(
                 contract,
@@ -519,7 +533,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{name}: unknown Mission Complete patch strategy {strategy!r}")
         audits[name] = audit
     for name, contract in contract_items.items():
-        if contract["patch_strategy"] == "terminal_publishers":
+        if contract["patch_strategy"] in {"terminal_publishers", "deferred_publishers"}:
             continue
         _append_standard_event_target(
             generated_maps[contract["map_key"]], contract["ap_check"], contract["location_id"]
@@ -533,7 +547,28 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
             raise ValueError(f"{contract['map_key']}: standard AP event count drift")
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
+    from tools.maps.unified_campaign import project_stage_return
+    catalog = load_content_catalog(root)
+    catalog_audit = {}
+    contract_maps = {contract["map_key"] for contract in contract_items.values()}
+    for key, path in generated_maps.items():
+        if key in contract_maps:
+            continue
+        text = path.read_text(encoding="utf-8")
+        patched, owners = patch_generated_map_text(key, text, root)
+        if patched != text:
+            path.write_text(patched, encoding="utf-8", newline="")
+        catalog_audit.update(owners)
+    return_audit = {}
+    for key, path in generated_maps.items():
+        text = path.read_text(encoding="utf-8")
+        projected, changed = project_stage_return(catalog, key, text)
+        if projected != text:
+            path.write_text(projected, encoding="utf-8", newline="")
+        return_audit[key] = changed
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
+    unrelated_owners.update(name for names in return_audit.values() for name in names)
+    unrelated_owners.update(audit["owner"] for audit in catalog_audit.values())
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),
@@ -545,6 +580,8 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     if terminal_audit is not None:
         res["campaign_goal"] = terminal_audit
     res["unrelated_generated_entity_diff_count"] = unrelated
+    res["unified_campaign_returns"] = return_audit
+    res["catalog_terminal_publishers"] = catalog_audit
     return res
 
 

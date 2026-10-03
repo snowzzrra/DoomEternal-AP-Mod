@@ -1,0 +1,103 @@
+{
+	edit = {
+		missionSelectList = {
+			num = 13;
+			item[0] = {
+				mapName = "game/sp/e1m1_intro/e1m1_intro";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/e1m1_intro/main_level";
+					item[1] = "game/sp/e1m1_intro/cp_01_mission_select";
+				}
+			}
+			item[1] = {
+				mapName = "game/sp/e1m2_battle/e1m2_battle";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/e1m2_battle/e1m2_main_level";
+					item[1] = "game/sp/e1m2_battle/e1m2_mission_select";
+				}
+			}
+			item[2] = {
+				mapName = "game/sp/e1m3_cult/e1m3_cult";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel";
+					item[1] = "game/sp/e1m3_cult/e1m3_cult_mission_select";
+				}
+			}
+			item[3] = {
+				mapName = "game/sp/e1m4_boss/e1m4_boss";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e1m4_boss/main_level";
+				}
+			}
+			item[4] = {
+				mapName = "game/sp/e2m1_nest/e2m1_nest";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/e2m1_nest/main_level";
+					item[1] = "game/sp/e2m1_nest/mission_select";
+				}
+			}
+			item[5] = {
+				mapName = "game/sp/e2m2_base/e2m2_base";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/e2m2_base/main_level";
+					item[1] = "game/sp/e2m2_base/e2m2_base_mission_select";
+				}
+			}
+			item[6] = {
+				mapName = "game/sp/e2m3_core/e2m3_core";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e2m3_core/main_level";
+				}
+			}
+			item[7] = {
+				mapName = "game/sp/e2m4_boss/e2m4_boss";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e2m4_boss/cp_01";
+				}
+			}
+			item[8] = {
+				mapName = "game/sp/e3m1_slayer/e3m1_slayer";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e3m1_slayer/main_level";
+				}
+			}
+			item[9] = {
+				mapName = "game/sp/e3m2_hell/e3m2_hell";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e3m2_hell/main_level";
+				}
+			}
+			item[10] = {
+				mapName = "game/sp/e3m2_hell_b/e3m2_hell_b";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e3m2_hell_b/main_level";
+				}
+			}
+			item[11] = {
+				mapName = "game/sp/e3m3_maykr/e3m3_maykr";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e3m3_maykr/main_level";
+				}
+			}
+			item[12] = {
+				mapName = "game/sp/e3m4_boss/e3m4_boss";
+				activeLayers = {
+					num = 1;
+					item[0] = "game/sp/e3m4_boss/main_level";
+				}
+			}
+		}
+	}
+}

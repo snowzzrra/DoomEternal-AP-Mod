@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.5.3
+# Install DOOM Eternal Archipelago 0.6.0
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.5.3** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.0** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -164,8 +164,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.5.3** identifies the public launcher and mod package. It remains
-compatible with 0.5.2 rooms and their unchanged generated content (APWorld remains 0.5.0).
+Version **0.6.0** identifies public launcher, room package, and generated content (APWorld uses 0.6.0).
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|
@@ -198,7 +197,10 @@ After a level is complete, Fast Travel is enabled when replaying it through Miss
 
 ### DeathLink
 
-When enabled, a received DeathLink applies a short two-hit lethal burst during safe gameplay. Native Extra Life and Saving Throw protections are preserved, and local death is echo-suppressed to prevent loops.
+In Soft mode, one received event applies lethal damage once; an Extra Life or
+Saving Throw can protect the player and fulfills the event. Hardcore causes
+direct death and checkpoint reload without consuming either protection or
+repeating damage. Remote-caused deaths are echo-suppressed to prevent loops.
 
 ### Temporary effects
 

@@ -34,29 +34,6 @@ def _canonical_hash(value: Any) -> str:
     ).hexdigest()
 
 
-def _semantic_hash(text: str) -> str:
-    output: list[str] = []
-    index = 0
-    quoted = False
-    while index < len(text):
-        if not quoted and text.startswith("//", index):
-            end = text.find("\n", index)
-            index = len(text) if end < 0 else end + 1
-            continue
-        if not quoted and text.startswith("/*", index):
-            end = text.find("*/", index + 2)
-            if end < 0:
-                raise ValueError("Unterminated block comment in generated map")
-            index = end + 2
-            continue
-        char = text[index]
-        if char == '"' and (index == 0 or text[index - 1] != "\\"):
-            quoted = not quoted
-            output.append(char)
-        elif quoted or not char.isspace():
-            output.append(char)
-        index += 1
-    return hashlib.sha256("".join(output).encode()).hexdigest()
 
 
 def _field_count(text: str, field: str) -> int:
@@ -157,20 +134,6 @@ def describe_generated_map(
         "content_revision": identity["content_revision"],
         "physical_ap_ids": physical_ids,
         "runtime_location_ids": runtime_ids,
-        "generated_entity_metrics": {
-            "entity_count": len(names),
-            "unique_entity_names": len(set(names)),
-            "classes": _field_count(text, "class"),
-            "targets": len(re.findall(r'item\[\d+\]\s*=\s*"[^"]+";', text)),
-            "bind_parents": _field_count(text, "bindParent"),
-            "layers": len(re.findall(r"\blayers\s*\{", text)),
-            "transforms": sum(_field_count(text, field) for field in (
-                "spawnPosition", "spawnOrientation", "renderModelInfo", "clipModelInfo"
-            )),
-            "byte_size": len(data),
-        },
-        "semantic_sha256": _semantic_hash(text),
-        "byte_sha256": hashlib.sha256(data).hexdigest(),
         "manifest_sha256": _canonical_hash(manifest),
         "scripted_contract_sha256": _canonical_hash({
             "target_policies": config.get("target_policies", {}),
@@ -183,9 +146,6 @@ def describe_generated_map(
             "secret_encounters": config.get("secret_encounters", []),
             "location_feedback": config.get("location_feedback", {}),
         }),
-        "publisher_contract_sha256": _canonical_hash(
-            _publisher_payload(catalog, map_key)
-        ),
         "asset_package_contract_sha256": _canonical_hash(
             _asset_package_payload(catalog, map_key)
         ),
@@ -196,9 +156,7 @@ def _diff(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> dict:
     result: dict[str, Any] = {}
     keys = sorted(set(expected) | set(actual))
     for key in keys:
-        # Release identity is validated globally.  Map baselines are scoped to
-        # map semantics so a version-only bump cannot force every frozen map
-        # to accept an otherwise identical baseline.
+        # Release identity is validated separately from map contracts.
         if key in {"acceptance", "content_revision"}:
             continue
         left, right = expected.get(key), actual.get(key)
@@ -208,15 +166,6 @@ def _diff(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> dict:
                 result[key] = nested
         elif left != right:
             result[key] = {"expected": left, "actual": right}
-    # Runtime publisher effects are validated by the normalized publisher
-    # contract tests.  A runtime-only effect move must not require accepting a
-    # new map baseline when the compiled map bytes and semantics are unchanged.
-    if (
-        "publisher_contract_sha256" in result
-        and "byte_sha256" not in result
-        and "semantic_sha256" not in result
-    ):
-        result.pop("publisher_contract_sha256")
     return result
 
 

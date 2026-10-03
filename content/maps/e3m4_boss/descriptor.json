@@ -27,5 +27,8 @@
     "connections": [],
     "virtual_locations": []
   },
-  "order": 13
+  "order": 13,
+  "campaign_return_owners": [
+    "e3m4_endoflevel_transition"
+  ]
 }

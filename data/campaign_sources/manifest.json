@@ -1,0 +1,37 @@
+{
+  "dlc1": {
+    "source_archive": "gameresources_patch1_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch1_decl_analysis_20260710_210928/files/generated/decls/campaign/campaign/dlc1.decl",
+    "sha256": "7f691e46bd8c23918e57f67825b77af09c90100f111dfff53008afb1ec19ae17"
+  },
+  "dlc2": {
+    "source_archive": "gameresources_patch2_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/campaign/campaign/dlc2.decl",
+    "sha256": "8bc7ee0cb564c40a50b3306a301f085943c9c4a8eb3f71d6108d1e859840c5a4"
+  },
+  "hub": {
+    "source_archive": "gameresources_decl_analysis_20260710_201519.zip",
+    "source_member": "gameresources_decl_analysis_20260710_201519/files/generated/decls/devmenuoption/devmenuoption/hub.decl",
+    "sha256": "a3dab6fa9d77e8ccf4c5a6113ce576f4eb6d959d93ace8bc4dabf245cfa9c3e1"
+  },
+  "missionlist": {
+    "source_archive": "gameresources_patch1_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch1_decl_analysis_20260710_210928/files/generated/decls/missionselectinfolist/missionlist.decl",
+    "sha256": "9198d7da74d8e273579c9776391f8f00773d834d61467898c32a424a281510ec"
+  },
+  "missionlist_dlc1": {
+    "source_archive": "gameresources_patch2_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/missionselectinfolist/missionlist_dlc1.decl",
+    "sha256": "2ce79ed9c11e655a025f40d0dc0d97f03fc33e5666dfa39f3e806ff7cfa289a6"
+  },
+  "missionlist_dlc2": {
+    "source_archive": "gameresources_patch2_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/missionselectinfolist/missionlist_dlc2.decl",
+    "sha256": "0d3c3f6e4b79c5f4f674a65cbe42a2461aa9f5b2ffaffe77ab1725734a2ad9a1"
+  },
+  "main": {
+    "source_archive": "gameresources_patch2_decl_analysis_20260710_210928.zip",
+    "source_member": "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/campaign/campaign/main.decl",
+    "sha256": "b2517b402ff13c2c4c2939918c31e027df390820d49ecab570fd14bd5d008e61"
+  }
+}

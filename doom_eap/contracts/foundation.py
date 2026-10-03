@@ -12,6 +12,15 @@ from doom_eap.content.map_registry import load_map_registry, release_plan
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# Arsenal's mastery-bit order, not the order of rows in global_runtime.json.
+MASTERY_ITEM_BITS = {
+    7770070: 1 << 0, 7770069: 1 << 1, 7770067: 1 << 2,
+    7770068: 1 << 3, 7770063: 1 << 4, 7770065: 1 << 5,
+    7770072: 1 << 6, 7770074: 1 << 7, 7770084: 1 << 8,
+    7770076: 1 << 9, 7770078: 1 << 10, 7770082: 1 << 11,
+    7770080: 1 << 12,
+}
+
 VALID_STATUSES = {
     "runtime_verified",
     "runtime_verified_with_map_exception",
@@ -27,6 +36,12 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
             "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "vanillamaps/e1m1_intro.map", "entity": "AP map-side command runtime evidence", "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"},
             "shape": {"class": "idTarget_Command", "inherit": None, "required_fields": ["commandText"], "forbidden_fields": ["targets", "currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro", "e1m2_war", "hub", "e1m3_cult"], "allowed_in_release": True, "frozen": True,
+        },
+        "weapon_grant_direct": {
+            "family": "weapon", "status": "static_evidence_only",
+            "source": {"map": "game/hub/hub", "container": "hub_patch2.resources", "file": "vanillamaps/hub.map", "entity": "target_give_item_ballista", "source_sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b"},
+            "shape": {"class": "idTarget_GiveItems", "inherit": None, "required_fields": ["itemList", "addUpToCount", "spawnPosition"], "forbidden_fields": ["targets", "commandText", "currencyList"]},
+            "targets": [], "runtime_verified_maps": [], "allowed_in_release": True, "frozen": False,
         },
         "target_count_relay": {
             "family": "relay", "status": "runtime_verified",
@@ -96,13 +111,13 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
         },
         "item_notification_filler": {
             "family": "ap_item_notify_filler", "status": "runtime_verified",
-            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Phase A Codex laboratory runtime approval", "source_sha256": "runtime-evidence"},
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Qualified laboratory runtime approval", "source_sha256": "runtime-evidence"},
             "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "notificationEndHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
         },
         "location_notification_codex": {
             "family": "ap_location_notify", "status": "runtime_verified",
-            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Phase A Codex laboratory runtime approval", "source_sha256": "runtime-evidence"},
+            "source": {"map": "game/sp/e1m1_intro/e1m1_intro", "container": "e1m1_intro_patch3.resources", "file": "hud/codex", "entity": "Qualified laboratory runtime approval", "source_sha256": "runtime-evidence"},
             "shape": {"class": "idTarget_Notification", "inherit": None, "required_fields": ["notificationType", "notificationHudEventID", "notificationEndHudEventID", "doNotShowDuplicate", "rootWidget", "icon", "header", "subtext", "notificationSound"], "forbidden_fields": ["currencyList", "gameStat"]},
             "targets": [], "runtime_verified_maps": ["e1m1_intro"], "allowed_in_release": True, "frozen": False,
         },
@@ -111,7 +126,7 @@ PRIMITIVE_REGISTRY: dict[str, Any] = {
 ITEM_NOTIFICATION_PREFIX = "ap_notify_item_"
 
 DELIVERY_CONTRACTS: dict[str, Any] = {
-    "counts": {"items": 132, "locations": 369, "map_checks": 307, "runtime_locations": 62, "runtime_goals": 1, "route_sentinel_batteries": 18},
+    "counts": {"items": 129, "locations": 443, "map_checks": 374, "runtime_locations": 69, "runtime_goals": 1, "route_sentinel_batteries": 18},
     "family_primitives": {"simple_give": "target_command", "perk": "target_command", "progressive_perk": "target_command", "progressive_item": "target_command", "physical_pickup_spawn": "physical_pickup_spawn", "multi_command": "target_command", "currency": "currency_grant_direct", "extra_life": "target_command", "resource": "target_command", "trap_spawn": "target_command", "transient_effect": "transient_effect", "no_op": "target_command"},
     "location_entrypoints": {
         "7770056": {"map": "game/sp/e1m3_cult/e1m3_cult", "entity": "ap_independent_rocket_launcher_7770056", "primitive_id": "independent_location_trigger", "destructive": True},
@@ -258,6 +273,22 @@ def build_primitive(
         block = f'''{header}
 \t\tedit = {{
 \t\t\tcommandText = "{parameters["command"]}";
+\t\t}}
+\t}}
+}}
+'''
+    elif primitive_id == "weapon_grant_direct":
+        if parameters != {"item": "weapon/player/bfg"}:
+            raise ValueError("weapon_grant_direct accepts only the BFG")
+        block = f'''{header}
+\t\tedit = {{
+\t\t\tflags = {{ noFlood = true; }}
+\t\t\titemList = {{
+\t\t\t\tnum = 1;
+\t\t\t\titem[0] = {{ item = "weapon/player/bfg"; }}
+\t\t\t}}
+\t\t\taddUpToCount = false;
+\t\t\tspawnPosition = {{ x = 0; y = -30.9800339; z = -1.87999964; }}
 \t\t}}
 \t}}
 }}
@@ -503,6 +534,7 @@ def classify_item_definition(definition: Any) -> str:
             "currency": "currency",
             "no_op": "no_op",
             "transient_effect": "transient_effect",
+            "native_weapon_upgrade_points": "native_weapon_upgrade_points",
         }.get(definition.get("type"), "unknown")
     if not isinstance(definition, str):
         return "unknown"
@@ -537,9 +569,28 @@ def compile_item_delivery_plan(
         raise ValueError(f"Unknown item ID: {item_id}")
     definition = definitions[item_id]
     family = classify_item_definition(definition)
-    contracts = load_foundation_contracts()
+    if item_id in MASTERY_ITEM_BITS:
+        # native arsenal owns terminal effects
+        commands = ()
+        if receipt:
+            if classification is None:
+                raise ValueError(f"Received item {item_id} requires classification")
+            entity = notification_entity_name(item_id, classification, slot=notification_slot)
+            commands = (DeliveryCommand(entity, f"ai_ScriptCmdEnt {entity} activate", 0),)
+        return DeliveryPlan(item_id, family, "sentinel.arsenal_mastery.v1", commands, None, str(definition))
+    if family == "native_weapon_upgrade_points":
+        # Notification-only DECL plan. The receipt owner must confirm Sentinel
+        # execution separately; no RPC/currency entity can materialize WUP.
+        commands = ()
+        if receipt:
+            if classification is None:
+                raise ValueError(f"Received item {item_id} requires classification")
+            entity = notification_entity_name(item_id, classification, slot=notification_slot)
+            commands = (DeliveryCommand(entity, f"ai_ScriptCmdEnt {entity} activate", 0),)
+        return DeliveryPlan(item_id, family, "sentinel.weapon_points.v1", commands, None, "Weapon Upgrade Points (3)")
     try:
-        primitive_id = contracts["family_primitives"][family]
+        # Delivery uses the authored family contract; active-map discovery is unrelated.
+        primitive_id = DELIVERY_CONTRACTS["family_primitives"][family]
     except KeyError as error:
         raise ValueError(f"Unregistered item family for {item_id}: {family}") from error
     if family == "transient_effect":

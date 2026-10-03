@@ -110,7 +110,7 @@ def _assert_notifications(
                 raise AssertionError(f"notification has invalid progressive stage: {map_key}/{suffix}")
         if item_id not in checked_rpc_ids:
             checked_rpc_ids.add(item_id)
-            if isinstance(definition, dict) and definition.get("type") == "transient_effect":
+            if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
                 pass
             elif isinstance(definition, dict) and definition.get("type") in {
                 "progressive_perk", "progressive_item",

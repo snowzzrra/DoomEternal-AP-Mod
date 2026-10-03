@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+from ctypes import wintypes
 import hashlib
 import json
 import logging
@@ -64,6 +65,45 @@ def _warn_windows_process_probe_once(message: str) -> None:
         return
     _windows_process_probe_warning_emitted = True
     logger.warning("Windows process detection failed: %s", message)
+
+
+def windows_game_processes() -> tuple[dict[str, object], ...] | None:
+    """Return exact Windows game identities; None means observation failed."""
+    api = _load_kernel32()
+    api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    api.OpenProcess.restype = wintypes.HANDLE
+    api.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    api.GetProcessTimes.restype = wintypes.BOOL
+    api.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    api.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    snapshot = api.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot in (None, INVALID_HANDLE_VALUE):
+        return None
+    rows = []
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(entry)
+    try:
+        if not api.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return () if ctypes.get_last_error() == ERROR_NO_MORE_FILES else None
+        while True:
+            if entry.szExeFile.casefold() == "doometernalx64vk.exe":
+                handle = api.OpenProcess(0x1000, False, entry.th32ProcessID)
+                if not handle:
+                    return None
+                try:
+                    times = [wintypes.FILETIME() for _ in range(4)]
+                    path = ctypes.create_unicode_buffer(32768)
+                    length = wintypes.DWORD(len(path))
+                    if not api.GetProcessTimes(handle, *(ctypes.byref(value) for value in times)) or not api.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(length)):
+                        return None
+                    rows.append({"pid": int(entry.th32ProcessID), "path": path.value,
+                                 "created": (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime})
+                finally:
+                    api.CloseHandle(handle)
+            if not api.Process32NextW(snapshot, ctypes.byref(entry)):
+                return tuple(rows) if ctypes.get_last_error() == ERROR_NO_MORE_FILES else None
+    finally:
+        api.CloseHandle(snapshot)
 
 
 def _windows_process_running(executable: str) -> bool:
@@ -142,22 +182,6 @@ SAVE_OBSERVER_POLICY = EvidencePolicy(
 )
 
 
-def unlockable_record_complete(record: Mapping, signal: Mapping) -> bool:
-    expected_count = signal.get("rule_0_statCount")
-    return (
-        int(record.get("numUnlockableRules", -1)) == signal["numUnlockableRules"]
-        and record.get("rule_0_statname") == signal["rule_0_statname"]
-        and (
-            expected_count is None
-            or int(record.get("rule_0_statCount", -1)) >= expected_count
-        )
-        and int(record.get("rule_0_statDuration", -1))
-        == signal["rule_0_statDuration"]
-        and bool(record.get("rule_0_satisfied", False))
-        is signal["rule_0_satisfied"]
-        and bool(record.get("unlockableIsUnlocked", False))
-        is signal["unlockableIsUnlocked"]
-    )
 
 
 def doom_process_running() -> bool:
@@ -266,74 +290,3 @@ def observer_registry_revision(registry_path: Path | Mapping) -> str:
     }
     encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
-
-
-class SaveObserverBaselineStore:
-    """Persistent false→true edges bound to AP identity and Doom save slot."""
-
-    def __init__(self, state: dict):
-        self.state = state.setdefault("observer_baselines", {})
-
-    @staticmethod
-    def binding_key(
-        *,
-        session_identity: str,
-        team: int,
-        slot: int,
-        doom_save_slot: str,
-        registry_revision: str,
-    ) -> str:
-        return "|".join(
-            (
-                session_identity,
-                str(team),
-                str(slot),
-                doom_save_slot,
-                registry_revision,
-            )
-        )
-
-    def observe(
-        self,
-        *,
-        binding_key: str,
-        observer_key: str,
-        records: Mapping[str, bool],
-        acknowledged_records: set[str],
-    ) -> tuple[set[str], bool, set[str]]:
-        binding = self.state.get(binding_key)
-        created = binding is None
-        if binding is None:
-            binding = self.state[binding_key] = {
-                "observers": {},
-                "registry_revision": binding_key.rsplit("|", 1)[-1],
-            }
-        observers = binding["observers"]
-        observer = observers.get(observer_key)
-        if observer is None:
-            observer = observers[observer_key] = {
-                "baseline_preexisting": sorted(
-                    key for key, complete in records.items() if complete
-                ),
-                "last_observed": {
-                    key: bool(complete) for key, complete in records.items()
-                },
-                "pending_edges": [],
-            }
-            return set(), True, set()
-
-        previous = observer.setdefault("last_observed", {})
-        pending = set(observer.setdefault("pending_edges", []))
-        pending.difference_update(acknowledged_records)
-        new_edges: set[str] = set()
-        for key, complete in records.items():
-            current = bool(complete)
-            if key not in previous:
-                previous[key] = current
-                continue
-            if current and not bool(previous[key]):
-                pending.add(key)
-                new_edges.add(key)
-            previous[key] = current
-        observer["pending_edges"] = sorted(pending)
-        return pending, created, new_edges

@@ -20,11 +20,19 @@
             "transient_effect": {"ownership_primitive": "receipt_only", "replay": "never_replay"}
         },
         "items": {
+            "7770083": {
+                "name": "Meat Hook",
+                "family": "weapon_mods",
+                "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook",
+                "requires_owned_item": [7770003],
+                "automatic_weapon_receipt": false,
+                "reconcile": "reapply_if_owned"
+            },
             "7770084": {
                 "name": "Meat Hook Mastery",
                 "family": "masteries",
                 "ownership_primitive": "perk/player/weapons/double_barrel/meat_hook_mastery",
-                "requires_owned_item": [7770003],
+                "requires_owned_item": [7770003, 7770083],
                 "automatic_weapon_receipt": false,
                 "reconcile": "reapply_if_owned"
             },
@@ -72,8 +80,8 @@
             "name": "Progressive Special Weapon",
             "max_quantity": 3,
             "states": ["none", "crucible", "sentinel_hammer", "sentinel_hammer_upgraded"],
-            "replacement": "derived_highest_state_with_targeted_remove",
-            "selected_representation_only": true,
+            "ownership": "cumulative_native_owner",
+            "selected_representation_only": false,
             "start_inventory_eligible": true,
             "replay": "special_progressive"
         },

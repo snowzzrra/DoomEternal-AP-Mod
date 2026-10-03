@@ -29,6 +29,7 @@ from tools.decls.devinv_builder import (
     output_path_for_map,
 )
 from .launcher_platform import IDFILE_DECOMPRESSOR, publish_file
+from doom_eap.content.compiler_identity import load_compiler_source_identity
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -43,7 +44,10 @@ SLOT_DATA_REVISION = str(_CONTRACT_IDENTITY["slot_data_revision"])
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
-    "slot_data_v4",
+    "slot_data_v5",
+    "unified_campaign_v1",
+    "fortress_economy_v1",
+    "progressive_blood_punch_v1",
     "dlc_missions_v1",
     "goal_events_v1",
     "goal_endpoint_events_v1",
@@ -56,6 +60,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "physical_options_v1",
     "room_options_v1",
     "cross_campaign_materialization_v1",
+    "deathlink_mode_v1",
 })
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
@@ -105,6 +110,7 @@ GOAL_VALUES = frozenset({
 })
 VICTORY_REQUIREMENT_VALUES = frozenset({
     "Complete All Enabled Missions",
+    "Complete All Included Missions",
     "Complete All Slayer Gates",
     "Complete All Escalation Encounters",
     "Complete All Secret Encounters",
@@ -435,7 +441,8 @@ class SeedManifest:
         )
         required_capabilities = {
             "room_mod_v2",
-            "slot_data_v4",
+            "slot_data_v5",
+            "unified_campaign_v1",
             "dlc_missions_v1",
             "goal_events_v1",
             "goal_endpoint_events_v1",
@@ -445,6 +452,9 @@ class SeedManifest:
         }
         required_capabilities.add("physical_options_v1")
         required_capabilities.add("room_options_v1")
+        required_capabilities.update(set(normalized_options.get("required_capabilities", ())) & {
+            "fortress_economy_v1", "progressive_blood_punch_v1",
+        })
         if normalized_options.get("randomize_dash"):
             required_capabilities.add("randomize_dash_v1")
         if normalized_options.get("starting_inventory"):
@@ -540,6 +550,10 @@ class SeedManifest:
             team=snapshot.team,
             slot=snapshot.slot,
             options={
+                "campaign_plan": slot_data["campaign_plan"],
+                "required_capabilities": sorted(required_capabilities),
+                "active_fortress_spend_group_ids": slot_data.get("active_fortress_spend_group_ids"),
+                "native_generation_fingerprint": slot_data["native_generation_fingerprint"],
                 "use_dlc_content": slot_data["use_dlc_content"],
                 "include_dlc_missions": slot_data["include_dlc_missions"],
                 "dlc_logic_timing": slot_data["dlc_logic_timing"],
@@ -680,8 +694,13 @@ class RoomCompiler:
         payload_manifest: object,
     ) -> dict[str, object]:
         from tools.release.room_payloads import canonical_json
+        import sys
+
+        compiler_identity = load_compiler_source_identity(ROOT, frozen=getattr(sys, "frozen", False))
 
         def _file_sha(p: Path) -> str | None:
+            if p.suffix == ".py":
+                return compiler_identity["source_hashes"].get(p.relative_to(ROOT).as_posix())
             return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
 
         tag_decl_hashes: dict[str, str | None] = {}
@@ -695,17 +714,6 @@ class RoomCompiler:
         if catalog_dir.is_dir():
             for p in sorted(catalog_dir.glob("**/*.json")):
                 catalog_hashes[p.relative_to(catalog_dir).as_posix()] = _file_sha(p)
-
-        vanillamaps_hashes: dict[str, str | None] = {}
-        vanilla_dir = ROOT / "vanillamaps"
-        for m in (
-            "e4m1_rig.map", "e4m2_swamp.map", "e4m3_mcity.map",
-            "e5m1_spear.map", "e5m2_earth.map", "e5m3_hell.map",
-            "e5m4_boss.map", "hub.map"
-        ):
-            vp = vanilla_dir / m
-            if vp.is_file():
-                vanillamaps_hashes[m] = _file_sha(vp)
 
         return {
             "schema": 2,
@@ -721,8 +729,12 @@ class RoomCompiler:
                 "fortress_battery_labels": _file_sha(cls.FORTRESS_BATTERY_LABEL_SPEC_PATH),
             },
             "compiler_sources": {
+                "closure_sha256": compiler_identity["fingerprint"],
                 "launcher_core": _file_sha(ROOT / "doom_eap" / "launcher" / "launcher_core.py"),
                 "devinv_builder": _file_sha(ROOT / "tools" / "decls" / "devinv_builder.py"),
+                "tag_prerequisites": _file_sha(ROOT / "doom_eap" / "contracts" / "tag_prerequisites.py"),
+                "runtime_context": _file_sha(ROOT / "doom_eap" / "contracts" / "runtime_context.py"),
+                "lifecycle": _file_sha(ROOT / "doom_eap" / "runtime" / "lifecycle.py"),
                 "mission_complete_map_patcher": _file_sha(ROOT / "tools" / "maps" / "mission_complete_map_patcher.py"),
                 "ap_map_generator": _file_sha(ROOT / "tools" / "maps" / "ap_map_generator.py"),
                 "notification_formatting": _file_sha(ROOT / "tools" / "maps" / "notification_formatting.py"),
@@ -736,7 +748,6 @@ class RoomCompiler:
                 "tag_decls": tag_decl_hashes,
             },
             "content_catalog_data": catalog_hashes,
-            "vanillamaps": vanillamaps_hashes,
         }
 
     @classmethod
@@ -829,7 +840,8 @@ class RoomCompiler:
             ).encode("utf-8")
 
     def _apply_placement_entities(
-        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...]
+        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...],
+        options: dict | None = None,
     ) -> None:
         """Bind packaged location notifications to their room placements."""
         import re
@@ -839,8 +851,10 @@ class RoomCompiler:
         decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
+        selected_groups = (options or {}).get("active_fortress_spend_group_ids")
+        economy_enabled = "fortress_economy_v1" in (options or {}).get("required_capabilities", ())
         fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
-            placement_by_id
+            placement_by_id, selected_groups if economy_enabled else None
         )
         fortress_labels_written = False
         notification_header = re.compile(
@@ -894,11 +908,27 @@ class RoomCompiler:
                         + match.group(3)
                     )
 
+                if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
+                    from tools.maps.ap_map_generator import remove_blood_punch_grants
+                    text = remove_blood_punch_grants(text)
+                if economy_enabled and member.endswith(fortress_member_suffix):
+                    from tools.maps.fortress_campaign import project_spend_groups
+                    text = text.rstrip() + "\n" + fortress_labels
+                    text = project_spend_groups(text, selected_groups)
+                if economy_enabled:
+                    from tools.maps.ap_map_generator import find_entity_block_bounds
+                    inactive = {int(match.group(2)) for match in notification_header.finditer(text)} - placement_by_id.keys()
+                    for location_id in sorted(inactive):
+                        bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                        if bounds is None:
+                            raise ValueError(f"notification entity missing: {location_id}")
+                        text = text[:bounds[0]] + text[bounds[1]:]
                 rewritten_text = notification_header.sub(replace_header, text)
                 if member.endswith(fortress_member_suffix):
                     if fortress_labels_written:
                         raise ValueError("room package contains multiple Fortress hub entity members")
-                    rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
+                    if not economy_enabled:
+                        rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
                     fortress_labels_written = True
                 rewritten = rewritten_text.encode("utf-8")
                 decoded.write_bytes(rewritten)
@@ -939,7 +969,7 @@ class RoomCompiler:
         return normalized.replace("\\", "\\\\").replace('"', '\\"')
 
     def _fortress_battery_label_entities(
-        self, placement_by_id: dict[int, PlacementRecord]
+        self, placement_by_id: dict[int, PlacementRecord], active_group_ids: list[str] | None = None
     ) -> tuple[str, str]:
         """Compile seed-specific pre-purchase labels for all Battery consumers."""
         from doom_eap.presentation import (
@@ -948,7 +978,15 @@ class RoomCompiler:
             item_classification_color_key,
         )
 
-        missing = sorted(self.FORTRESS_BATTERY_LOCATION_IDS - set(placement_by_id))
+        expected = self.FORTRESS_BATTERY_LOCATION_IDS
+        if active_group_ids is not None:
+            from doom_eap.content.content_catalog import load_content_catalog
+            policy = json.loads((ROOT / "content/catalog/fortress.json").read_text(encoding="utf-8"))
+            names = {name for group in policy["spend_groups"] if group["id"] in active_group_ids
+                     for name in group["locations"]}
+            expected = {code for code, name in load_content_catalog().location_names.items() if name in names}
+            expected.add(7770171)
+        missing = sorted(expected - set(placement_by_id))
         if missing:
             raise ValueError(
                 "Fortress Battery placement scout is incomplete; missing location IDs: "
@@ -1006,10 +1044,10 @@ class RoomCompiler:
                 [float(val) for val in vec] for vec in orientation
             ]
         if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
-            raise ValueError("Fortress Battery label specification must cover exactly 13 consumers")
+            raise ValueError("Fortress placement label specification must cover exactly 13 anchors")
 
         entities: list[str] = []
-        for location_id in sorted(rows_by_id):
+        for location_id in sorted(expected):
             record = placement_by_id[location_id]
             if record.trap:
                 display = "A TRAP\\nFOR SOMEONE"
@@ -1152,7 +1190,7 @@ class RoomCompiler:
             temporary_dir = Path(temporary)
             decoded = temporary_dir / "decoded.entities"
             compressed = temporary_dir / "compressed.entities"
-            decoded.write_text(text, encoding="utf-8")
+            decoded.write_text(text, encoding="utf-8", newline="\n")
             try:
                 subprocess.run(
                     [str(decompressor), "--compress", str(decoded), str(compressed)],
@@ -1199,25 +1237,38 @@ class RoomCompiler:
             manifest.options.get("starting_weapon"),
         )
         assembled[devinv_path] = devinv_source.encode("utf-8")
+        # Native NewGame selects sp/e1m1 DevInv; Core redirects its first
+        # map to Fortress. The destination archive must own that room override.
+        hub_devinv_path = output_path_for_map(
+            Path("."), ROOT / "data" / "map_sources.json", "hub"
+        ).as_posix()
+        assembled[hub_devinv_path] = devinv_source.encode("utf-8")
+        from tools.decls.campaign_builder import build_campaign_overrides
+        holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
+        if hashlib.sha256(assembled[holt_member]).hexdigest() != \
+                "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19":
+            raise ValueError("credits overlay drifted")
+        assembled.update(build_campaign_overrides(
+            assembled["hub_patch2/EternalMod/assetsinfo/hub.json"],
+            skip_dlc1_credits=True,
+            skip_dlc2_credits=True,
+        ))
         if manifest.options.get("use_dlc_content", True):
             assembled.update({
                 path: source.encode("utf-8")
                 for path, source in build_tag_devinv_overrides(
                     manifest.options.get("starting_inventory", {}),
                     manifest.options.get("starting_weapon"),
+                    progressive_blood_punch="progressive_blood_punch_v1" in manifest.options.get("required_capabilities", ()),
                 ).items()
             })
             from doom_eap.content.content_catalog import load_content_catalog
             from doom_eap.runtime.context_registry import dlc_contexts
-            from tools.maps.ap_map_generator import generate_context_marker_overlay
             from tools.maps.mission_complete_map_patcher import patch_generated_map_text
 
             catalog = load_content_catalog()
             # DLC mission AP content is scoped by include_dlc_missions; DLC
-            # gameplay/context support stays scoped by use_dlc_content. Excluded
-            # TAG mission maps were already dropped from assembled payloads, so
-            # their overlay members rebuild as vanilla + marker support without
-            # location publishers, while the publisher patch below skips them.
+            # gameplay/context support stays scoped by use_dlc_content.
             include_dlc_missions = manifest.options.get("include_dlc_missions", True)
             excluded_mission_maps = set() if include_dlc_missions else dlc_mission_map_keys()
             for context in dlc_contexts():
@@ -1232,37 +1283,13 @@ class RoomCompiler:
                 spec = catalog.maps.get(map_key)
                 if spec is None:
                     raise ValueError(f"DLC context map spec missing: {map_key}")
-                compiled_content = assembled.get(overlay_member)
-                if compiled_content is not None:
-                    compiled_text = self._decompress_entities_text(compiled_content, overlay_member)
-                    if "idWorldspawn" in compiled_text and "ap_publisher_" not in compiled_text:
-                        continue
-                vanilla_source = (ROOT / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
-                overlay_text = generate_context_marker_overlay(
-                    map_key, context.runtime_maps[0]
-                )
-                import re
-                marker_names = re.findall(r"\bentityDef\s+(\S+)\s*\{", overlay_text)
-                if len(marker_names) != len(set(marker_names)):
-                    raise ValueError(
-                        f"DLC context marker entity names are duplicated: {context.identity}"
-                    )
-                full_text = vanilla_source.rstrip() + "\n" + overlay_text.lstrip()
-                assembled[overlay_member] = self._compress_entities_text(
-                    full_text
-                )
-            for context in dlc_contexts():
-                map_key = context.map_keys[0]
-                spec = catalog.maps.get(map_key)
-                if spec is None or not spec.requires_dlc_content:
-                    continue
-                if map_key in excluded_mission_maps:
-                    continue
-                member = self.payload_manifest["context_targets"][context.identity]
+                member = overlay_member
                 compiled_content = assembled.get(member)
                 if compiled_content is None:
                     raise ValueError(f"DLC map compiled payload is missing: {map_key}/{member}")
                 compiled_text = self._decompress_entities_text(compiled_content, member)
+                if "idWorldspawn" not in compiled_text:
+                    raise ValueError(f"DLC map compiled payload is incomplete: {map_key}/{member}")
                 patched_text, _publisher_audit = patch_generated_map_text(
                     map_key, compiled_text, ROOT
                 )
@@ -1276,7 +1303,7 @@ class RoomCompiler:
         if manifest.options.get("enhanced_melee_damage", False):
             assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
         if not manifest.static_precompile:
-            self._apply_placement_entities(assembled, placements)
+            self._apply_placement_entities(assembled, placements, manifest.options)
             self._apply_placement_strings(assembled, placements)
         incoming = destination.with_name(f".{destination.name}.incoming")
         try:
@@ -1346,7 +1373,7 @@ class InstallPlan:
     def _write_record(self, record: InstallRecord) -> None:
         self.target.mkdir(parents=True, exist_ok=True)
         temporary = self._record_path().with_suffix(".tmp")
-        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         publish_file(temporary, self._record_path(), operation="install_record_publish")
 
     def install(self, record: InstallRecord, *, fail_after: int | None = None) -> InstallRecord:
@@ -1458,13 +1485,13 @@ class ModCompiler:
         room_config = project_room_config(manifest.options)
         (output_root / "seed_manifest.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        , newline="\n")
         if not manifest.static_precompile:
             placement_metadata = [record.document() for record in manifest.placements]
             (output_root / "placement_metadata.json").write_text(
                 json.dumps(placement_metadata, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
-            )
+            newline="\n")
             (output_root / "placement_string_inputs.json").write_text(
                 json.dumps(
                     [
@@ -1475,10 +1502,10 @@ class ModCompiler:
                     sort_keys=True,
                 ) + "\n",
                 encoding="utf-8",
-            )
+            newline="\n")
         (output_root / "room_config.json").write_text(
             json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        , newline="\n")
         from doom_eap.content.content_catalog import load_content_catalog
 
         campaign_maps = tuple(
@@ -1492,7 +1519,7 @@ class ModCompiler:
             projected = self.project_map_config(manifest, map_key)
             (output_root / f"{map_key}.locations.json").write_text(
                 json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            , newline="\n")
         return output_root
 
     def project_map_config(self, manifest: SeedManifest, map_key: str) -> dict[str, Any]:
@@ -1545,7 +1572,7 @@ class ModCompiler:
             config_path = staged / f"{map_key}.locations.json"
             config_path.write_text(
                 json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            , newline="\n")
             generate_map(
                 vanilla_entities,
                 output_entities,
@@ -1569,7 +1596,7 @@ class ModCompiler:
         output_entities.with_suffix(".seed.json").write_text(
             json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
-        )
+        newline="\n")
         return output_entities
 
 
@@ -1760,7 +1787,7 @@ class LaunchWorkflow:
 
 
 def validate_game(game_root: Path, meathook_path: Path, client_dir: Path, saves_dir: Path) -> None:
-    required = [game_root / "DOOMEternalx64vk.exe", game_root / "base", meathook_path, client_dir / "bridge_client.py", saves_dir]
+    required = [game_root / "DOOMEternalx64vk.exe", game_root / "base", game_root / "sentinel_core.dll", game_root / "msimg32.dll", client_dir / "bridge_client.py", saves_dir]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise ValueError("missing required game/install paths: " + ", ".join(missing))

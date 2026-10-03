@@ -75,7 +75,7 @@ def validate_overrides_from_files(
 
     for fpath in override_paths:
         rel = fpath.as_posix()
-        # Extract relative path under generated/decls/
+        # extract relative path under generated/decls/
         if "generated/decls/" in rel:
             rel = rel.split("generated/decls/", 1)[1]
         elif "unlockable/mission_challenge/" in rel:
@@ -94,29 +94,29 @@ def validate_overrides_from_files(
         found_paths.add(assert_path)
         content = fpath.read_text(encoding="utf-8")
 
-        # Check for forbidden currencies
+        # check for forbidden currencies
         if forbidden_currencies.search(content):
             errors.append(f"Override contains forbidden currency: {assert_path}")
 
-        # Validate exactly one currencyToGive
+        # check that there's exactly one currency field
         currency_count = content.count("currencyToGive")
         if currency_count != 1:
             errors.append(
                 f"Override has {currency_count} currencyToGive (expected 1): {assert_path}"
             )
 
-        # Validate exactly one num = 0
+        # validate exactly one num = 0
         num_zero_count = len(re.findall(r'\bnum\s*=\s*0\s*;', content))
         if num_zero_count != 1:
             errors.append(
                 f"Override has {num_zero_count} num = 0 (expected 1): {assert_path}"
             )
 
-        # Find associated entry for location_id validation
+        # find associated entry for location_id validation
         for entry in entries:
             if entry["completion_owner"]["path"] == assert_path:
                 found_ids.append(entry["location_id"])
-                # Verify structure: completionStat preserved
+                # check that the completion stat stays the same
                 expected_stat = entry["completion_owner"]["completion_stat"]
                 if expected_stat not in content:
                     errors.append(
@@ -124,12 +124,12 @@ def validate_overrides_from_files(
                     )
                 break
 
-    # Check for missing paths
+    # check for missing paths
     missing = expected_paths - found_paths
     if missing:
         errors.append(f"Missing override files: {sorted(missing)}")
 
-    # Validate IDs unique
+    # validate ids unique
     id_counts = collections.Counter(found_ids)
     duplicates = [loc_id for loc_id, count in id_counts.items() if count > 1]
     if duplicates:

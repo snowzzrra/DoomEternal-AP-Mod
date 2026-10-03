@@ -1,4 +1,4 @@
-"""Pure/runtime helpers for publisher trigger validation and acknowledgement."""
+"""Explicit file adapters for publisher events and quarantine."""
 
 from __future__ import annotations
 
@@ -7,53 +7,6 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping
-
-from doom_eap.contracts.publisher_contracts import (
-    PublisherContract,
-    publishers_by_trigger,
-    trigger_key,
-)
-
-
-class PublisherEngine:
-    """Generic publisher discovery; effect execution remains caller-owned."""
-
-    def __init__(self, publishers: tuple[PublisherContract, ...]):
-        self.publishers = publishers
-        self.publishers_by_trigger = publishers_by_trigger(publishers)
-
-    def observe(
-        self,
-        strategy: str,
-        payload: Mapping[str, Any],
-    ) -> tuple[PublisherContract, ...]:
-        return self.publishers_by_trigger.get(trigger_key(strategy, payload), ())
-
-
-def effect_acknowledged(
-    effect: Mapping,
-    checked_locations: Iterable[int],
-    goal_sent: bool,
-) -> bool:
-    strategy = effect["strategy"]
-    if strategy == "location_check":
-        return effect["location_id"] in checked_locations
-    if strategy == "campaign_goal":
-        return goal_sent
-    if strategy == "preserved_native_target":
-        return True
-    raise ValueError(f"unsupported publisher effect: {strategy}")
-
-
-def publisher_acknowledged(
-    publisher: PublisherContract,
-    checked_locations: Iterable[int],
-    goal_sent: bool,
-) -> bool:
-    checked = set(checked_locations)
-    return all(effect_acknowledged(effect, checked, goal_sent) for effect in publisher.effects)
-
 
 def read_map_event(path: Path, marker: str) -> tuple[bool, str, str]:
     try:

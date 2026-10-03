@@ -6,9 +6,14 @@
       "map_key": "e1m3_cult",
       "triggers": [
         {
-          "strategy": "native_transition",
-          "from_map": "game/sp/e1m3_cult/e1m3_cult",
-          "to_map": "game/sp/e1m4_boss/e1m4_boss"
+          "strategy": "map_event_file",
+          "owner": "game_target_level_transition_1",
+          "filename": "ap_stage_e1m3_cult_complete.txt",
+          "marker": "AP_STAGE_COMPLETE_E1M3_CULT"
+        },
+        {
+          "strategy": "terminal_owner",
+          "owner": "game_target_level_transition_1"
         }
       ],
       "effects": [

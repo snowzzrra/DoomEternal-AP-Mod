@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,9 +35,9 @@ from tools.content.compile_start_inventory_catalog import (
 )
 from doom_eap.content.automap_visual_registry import (
     load_automap_visual_registry,
-    validate_generated_visuals,
+    validate_generated_visuals as _validate_generated_visuals,
 )
-from tools.maps.ap_map_generator import generate_map, load_item_notification_policies
+from tools.maps.ap_map_generator import generate_map, load_item_notification_policies, extract_target_names, find_entity_block_bounds
 from tools.maps.map_semantic_baseline import (
     assert_map_baseline,
 )
@@ -52,6 +53,34 @@ from tools.release.release_manifest import (
     validate_release_manifest,
     validate_source_layout,
 )
+
+def validate_generated_visuals(document, map_key, content):
+    if map_key == "hub":
+        for entry in document["entries"]:
+            if entry["map_key"] != map_key or entry["classification"] != "visible_cleanup":
+                continue
+            relay = entry["reconciliation_entity"]
+            model = relay + "_model"
+            suppress = f"ap_suppress_checked_{entry['location_id']}"
+            bounds = [find_entity_block_bounds(content, name) for name in (relay, model, suppress)]
+            if any(value is None for value in bounds):
+                raise ValueError(f"Fortress reconciliation endpoint missing: {entry['location_id']}")
+            relay_bounds, model_bounds, suppress_bounds = bounds
+            relay_text = content[slice(*relay_bounds)]
+            if re.findall(r'class\s*=\s*"([^"]+)";', relay_text) != ["idTarget_Count"]:
+                raise ValueError(f"Fortress reconciliation relay class drift: {entry['location_id']}")
+            if extract_target_names(relay_text) != [model, suppress]:
+                raise ValueError(f"Fortress reconciliation relay graph drift: {entry['location_id']}")
+            if 'count = 1;' not in relay_text or 'reuseable = true;' not in relay_text:
+                raise ValueError(f"Fortress reconciliation relay count drift: {entry['location_id']}")
+            suppression = content[slice(*suppress_bounds)]
+            if re.findall(r'class\s*=\s*"([^"]+)";', suppression) != ["idTarget_Remove"] or extract_target_names(suppression) != [entry["ap_check"]]:
+                raise ValueError(f"Fortress suppression must remove only its AP check: {entry['location_id']}")
+            model_text = content[slice(*model_bounds)].replace(model, relay, 1)
+            content = content[:relay_bounds[0]] + model_text + content[relay_bounds[1]:]
+    _validate_generated_visuals(document, map_key, content)
+
+
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent
@@ -75,9 +104,50 @@ CORE_MAP_INPUTS = (
     "tools/maps/mission_complete_map_patcher.py",
     "doom_eap/content/content_catalog.py",
     "doom_eap/content/automap_visual_registry.py",
+    "doom_eap/content/compiler_identity.py",
     "doom_eap/contracts/publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
+    "doom_eap/contracts/save_observation.py",
+    "doom_eap/runtime/save_files.py",
+    "doom_eap/runtime/save_records.py",
+    "doom_eap/runtime/save_observer.py",
+    "doom_eap/contracts/materialization.py",
+    "doom_eap/runtime/materialization.py",
+    "doom_eap/runtime/fast_travel.py",
+    "doom_eap/runtime/checked_visuals.py",
+    "doom_eap/runtime/bootstrap.py",
+    "doom_eap/runtime/transient_effects.py",
+    "doom_eap/runtime/weapon_points.py",
+    "doom_eap/runtime/transient_files.py",
+    "doom_eap/runtime/ammo_refill.py",
+    "doom_eap/runtime/death_observation.py",
+    "doom_eap/contracts/goal_policy.py",
+    "doom_eap/contracts/check_observation.py",
+    "doom_eap/runtime/check_publication.py",
+    "doom_eap/runtime/goal_progress.py",
+    "doom_eap/runtime/publisher_dispatch.py",
+    "doom_eap/runtime/save_checks.py",
+    "doom_eap/contracts/receipt_delivery.py",
+            "doom_eap/contracts/source_bytes.py",
+    "doom_eap/runtime/receipt_delivery.py",
+    "doom_eap/runtime/receipt_publication.py",
+    "doom_eap/runtime/save_check_observation.py",
+    "doom_eap/runtime/deathlink_session.py",
+    "doom_eap/runtime/deathlink_publication.py",
+    "doom_eap/runtime/ammo_adapters.py",
+    "doom_eap/runtime/rune_reconciliation.py",
+    "doom_eap/runtime/materialization_coordinator.py",
+    "doom_eap/runtime/reconciliation_publication.py",
+    "doom_eap/contracts/runtime_context.py",
+    "doom_eap/runtime/lifecycle.py",
+    "doom_eap/runtime/context_registry.py",
+    "doom_eap/contracts/tag_prerequisites.py",
+    "doom_eap/contracts/ownership.py",
+    "doom_eap/contracts/command_publication.py",
+    "doom_eap/runtime/command_spool.py",
+    "doom_eap/runtime/client_state_store.py",
+    "doom_eap/content/publisher_loader.py",
     "doom_eap/contracts/ap_visual_contract.py",
     "doom_eap/runtime/bridge_client.py",
     "doom_eap/content/physical_options.py",
@@ -86,6 +156,9 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/launcher_app.py",
     "doom_eap/launcher/launcher_cli.py",
     "doom_eap/launcher/launcher_controller.py",
+    "doom_eap/launcher/launcher_workers.py",
+    "doom_eap/launcher/launcher_interactions.py",
+    "doom_eap/launcher/launcher_repairs.py",
     "doom_eap/launcher/launcher_core.py",
     "doom_eap/launcher/launcher_doctor.py",
     "doom_eap/launcher/launcher_integration.py",
@@ -112,6 +185,7 @@ PREFLIGHT_PYTHON = (
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",
     "doom_eap/content/automap_visual_registry.py",
+    "doom_eap/content/compiler_identity.py",
 )
 
 
@@ -822,9 +896,12 @@ class Pipeline:
             expected = build_release_manifest(
                 ROOT,
                 generated_maps=generated_root,
+                room_resources=root / "client" / "resources",
                 release_version=manifest["version"],
             )
-            for field in ("checked_location_visuals", "room_compiler", "base_resources"):
+            for field in ("checked_location_visuals", "physical_pickups", "room_compiler", "base_resources"):
+                if field == "physical_pickups" and field not in manifest:
+                    continue
                 actual_value = manifest[field]
                 expected_value = expected[field]
                 if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:
@@ -934,6 +1011,53 @@ class Pipeline:
             if path.is_file() and "__pycache__" not in path.parts
         }
         for relative in (
+            "doom_eap/contracts/tag_prerequisites.py",
+            "doom_eap/contracts/runtime_context.py",
+            "doom_eap/contracts/save_observation.py",
+            "doom_eap/runtime/save_files.py",
+            "doom_eap/runtime/save_records.py",
+            "doom_eap/runtime/save_observer.py",
+            "doom_eap/contracts/materialization.py",
+            "doom_eap/runtime/materialization.py",
+            "doom_eap/runtime/fast_travel.py",
+            "doom_eap/runtime/checked_visuals.py",
+            "doom_eap/runtime/bootstrap.py",
+            "doom_eap/runtime/transient_effects.py",
+            "doom_eap/runtime/weapon_points.py",
+            "doom_eap/runtime/transient_files.py",
+            "doom_eap/runtime/ammo_refill.py",
+            "doom_eap/runtime/death_observation.py",
+            "doom_eap/contracts/goal_policy.py",
+            "doom_eap/contracts/check_observation.py",
+            "doom_eap/runtime/check_publication.py",
+            "doom_eap/runtime/goal_progress.py",
+            "doom_eap/runtime/publisher_dispatch.py",
+            "doom_eap/runtime/save_checks.py",
+            "doom_eap/contracts/receipt_delivery.py",
+            "doom_eap/contracts/source_bytes.py",
+            "doom_eap/runtime/receipt_delivery.py",
+        "doom_eap/runtime/protocol_feed.py",
+        "doom_eap/runtime/location_setup.py",
+        "doom_eap/runtime/level_ready.py",
+    "doom_eap/runtime/task_supervision.py",
+        "doom_eap/runtime/physical_checks.py",
+        "doom_eap/runtime/location_names.py",
+        "doom_eap/runtime/protocol_feed_format.py",
+            "doom_eap/runtime/receipt_publication.py",
+            "doom_eap/runtime/save_check_observation.py",
+            "doom_eap/runtime/deathlink_session.py",
+            "doom_eap/runtime/deathlink_publication.py",
+            "doom_eap/runtime/ammo_adapters.py",
+            "doom_eap/runtime/rune_reconciliation.py",
+            "doom_eap/runtime/materialization_coordinator.py",
+            "doom_eap/runtime/reconciliation_publication.py",
+            "doom_eap/runtime/lifecycle.py",
+            "doom_eap/runtime/context_registry.py",
+            "doom_eap/contracts/ownership.py",
+            "doom_eap/contracts/command_publication.py",
+            "doom_eap/runtime/command_spool.py",
+            "doom_eap/runtime/client_state_store.py",
+            "doom_eap/content/publisher_loader.py",
             "doom_eap/runtime/bridge_client.py",
             "doom_eap/runtime/bootstrap_actions.py",
             "doom_eap/contracts/campaign_goal_contract.py",
@@ -948,6 +1072,9 @@ class Pipeline:
             "doom_eap/launcher/launcher_app.py",
             "doom_eap/launcher/launcher_cli.py",
             "doom_eap/launcher/launcher_controller.py",
+            "doom_eap/launcher/launcher_workers.py",
+            "doom_eap/launcher/launcher_interactions.py",
+            "doom_eap/launcher/launcher_repairs.py",
             "doom_eap/launcher/launcher_core.py",
             "doom_eap/launcher/launcher_doctor.py",
             "doom_eap/launcher/launcher_integration.py",

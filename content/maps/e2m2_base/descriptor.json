@@ -34,5 +34,9 @@
     ],
     "virtual_locations": []
   },
-  "order": 6
+  "order": 6,
+  "campaign_return_owners": [
+    "game_target_level_transition_to_hub",
+    "game_target_level_transition_to_shell"
+  ]
 }

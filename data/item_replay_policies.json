@@ -86,10 +86,6 @@
       "name": "Progressive Health Upgrade",
       "policy": "special_progressive"
     },
-    "7770020": {
-      "name": "Rune",
-      "policy": "never_replay"
-    },
     "7770021": {
       "name": "Suit Point",
       "policy": "special_progressive"
@@ -330,6 +326,10 @@
       "name": "Mobile Turret Mastery",
       "policy": "replay_idempotent"
     },
+    "7770083": {
+      "name": "Meat Hook",
+      "policy": "replay_idempotent"
+    },
     "7770084": {
       "name": "Meat Hook Mastery",
       "policy": "replay_idempotent"
@@ -513,6 +513,14 @@
     "7770155": {
       "name": "Slayer Gate Key Taras Nabad",
       "policy": "replay_idempotent"
+    },
+    "7770903": {
+      "name": "Weapon Upgrade Points (3)",
+      "policy": "never_replay"
+    },
+    "7770904": {
+      "name": "Progressive Blood Punch",
+      "policy": "special_progressive"
     }
   }
 }

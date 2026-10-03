@@ -5,12 +5,12 @@
       "name": "Super Gore Nest - Mission Complete",
       "location_id": 7770210,
       "signal": {
-        "kind": "native_transition",
-        "from": "game/sp/e2m1_nest/e2m1_nest",
-        "to": "game/hub/hub"
+        "kind": "map_terminal",
+        "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
+        "owner": "game_target_level_transition_1"
       },
       "order": 4,
-      "strategy": "native_transition",
+      "strategy": "map_terminal",
       "category": "mission_complete"
     },
     {

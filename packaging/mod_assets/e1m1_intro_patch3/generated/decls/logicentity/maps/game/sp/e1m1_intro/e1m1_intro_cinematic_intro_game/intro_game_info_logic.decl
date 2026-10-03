@@ -1,0 +1,5645 @@
+{
+	edit = {
+		versionNumber = 21;
+		mainGraph = {
+			className = "idLogicGraphAssetEntityMain";
+			object = {
+				id = 1896037028;
+				pos = {
+					x = -510.169495;
+					y = -857.627136;
+				}
+				zoom = 59;
+				variables = {
+					num = 4;
+					item[0] = {
+						id = 822891314;
+						name = "bCin_Started";
+						model = {
+							className = "idLogicVariableModelBool";
+						}
+					}
+					item[1] = {
+						id = 2784269810;
+						name = "bPlayedOnce";
+						model = {
+							className = "idLogicVariableModelBool";
+						}
+					}
+					item[2] = {
+						id = 2529760706;
+						name = "bSkipped";
+						model = {
+							className = "idLogicVariableModelBool";
+						}
+					}
+					item[3] = {
+						id = 531808453;
+						name = "bIsModObtained";
+						model = {
+							className = "idLogicVariableModelBool";
+						}
+					}
+				}
+				nodes = {
+					num = 157;
+					item[0] = {
+						id = 388611092;
+						model = {
+							className = "idLogicNodeModelSceneDirectorControl_v3";
+							object = {
+								scene = "maps/e1m1_intro/cinematics/intro_game";
+								overrideSceneType = "INTRO";
+							}
+						}
+						pos = {
+							x = 200;
+							y = -300;
+						}
+						size = {
+							x = 240;
+							y = 280;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[1] = {
+						id = 1039792017;
+						model = {
+							className = "idLogicNodeModelEventReceive";
+							object = {
+								event = {
+									decl = "game/sp/e1m1_intro/e1m1_intro";
+									id = 3437727308;
+								}
+							}
+						}
+						pos = {
+							x = -1640;
+							y = -300;
+						}
+						size = {
+							x = 260;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[2] = {
+						id = 1028745020;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 680;
+							y = -300;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "change_layer_proloque";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[3] = {
+						id = 2788213351;
+						model = {
+							className = "idLogicNodeModelSetMusicSwitch";
+							object = {
+								soundSwitch = "music_ghost_switch";
+								soundSwitchValue = "intro_music";
+							}
+						}
+						pos = {
+							x = -800;
+							y = -300;
+						}
+						size = {
+							x = 240;
+							y = 80;
+						}
+					}
+					item[4] = {
+						id = 3936682207;
+						model = {
+							className = "idLogicNodeModelSetMusicSwitch";
+							object = {
+								soundSwitch = "music_ghost_switch";
+								soundSwitchValue = "intro_music";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = -1040;
+						}
+						size = {
+							x = 240;
+							y = 80;
+						}
+					}
+					item[5] = {
+						id = 184499591;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/main_ambient";
+							}
+						}
+						pos = {
+							x = 3400;
+							y = -1040;
+						}
+						size = {
+							x = 240;
+							y = 80;
+						}
+					}
+					item[6] = {
+						id = 1974168873;
+						model = {
+							className = "idLogicNodeModelSwitchString_v2";
+							object = {
+								cases = {
+									num = 27;
+									item[0] = {
+										id = 2721174256;
+										value = "cin_start";
+									}
+									item[1] = {
+										id = 3585451312;
+										value = "cin_complete";
+									}
+									item[2] = {
+										id = 4262431888;
+										value = "portal_fx_activate";
+									}
+									item[3] = {
+										id = 1101755104;
+										value = "cine_slayer_castle_hide";
+									}
+									item[4] = {
+										id = 1295537312;
+										value = "cine_slayer_castle_show";
+									}
+									item[5] = {
+										id = 2067506064;
+										value = "cine_mars_hide";
+									}
+									item[6] = {
+										id = 250135872;
+										value = "cine_mars_show";
+									}
+									item[7] = {
+										id = 1316137392;
+										value = "cine_earth_wide_hide";
+									}
+									item[8] = {
+										id = 4155753680;
+										value = "cine_earth_wide_show";
+									}
+									item[9] = {
+										id = 1570752432;
+										value = "cine earth close show";
+									}
+									item[10] = {
+										id = 3422545504;
+										value = "cine earth close hide";
+									}
+									item[11] = {
+										id = 3603966288;
+										value = "s050";
+									}
+									item[12] = {
+										id = 4195543952;
+										value = "s060";
+									}
+									item[13] = {
+										id = 3965174464;
+										value = "s070";
+									}
+									item[14] = {
+										id = 1968074816;
+										value = "s080";
+									}
+									item[15] = {
+										id = 4067249776;
+										value = "s090";
+									}
+									item[16] = {
+										id = 1356370304;
+										value = "s100";
+									}
+									item[17] = {
+										id = 3092786720;
+										value = "s110";
+									}
+									item[18] = {
+										id = 1118816720;
+										value = "s120";
+									}
+									item[19] = {
+										id = 376111040;
+										value = "s130";
+									}
+									item[20] = {
+										id = 2865743744;
+										value = "s140";
+									}
+									item[21] = {
+										id = 1421916000;
+										value = "s150";
+									}
+									item[22] = {
+										id = 2917157392;
+										value = "s160";
+									}
+									item[23] = {
+										id = 1076924224;
+										value = "s170";
+									}
+									item[24] = {
+										id = 2095008992;
+										value = "searching";
+									}
+									item[25] = {
+										id = 2089640976;
+										value = "doomLogoBink";
+									}
+									item[26] = {
+										id = 3561227536;
+										value = "cine_hub_intrior_skybox_show";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 660;
+							y = -140;
+						}
+						size = {
+							x = 240;
+							y = 620;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelString";
+								}
+							}
+						}
+					}
+					item[7] = {
+						id = 2544324308;
+						model = {
+							className = "idLogicNodeModelBegin";
+						}
+						pos = {
+							x = -1680;
+							y = -1080;
+						}
+						size = {
+							x = 80;
+							y = 60;
+						}
+					}
+					item[8] = {
+						id = 3495785283;
+						model = {
+							className = "idLogicNodeModelEventReceive";
+							object = {
+								event = {
+									decl = "game/sp/cinematic/cinematic";
+									id = 491082777;
+								}
+							}
+						}
+						pos = {
+							x = -720;
+							y = 80;
+						}
+						size = {
+							x = 260;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[9] = {
+						id = 2864163807;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = -440;
+							y = 80;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[10] = {
+						id = 868487203;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 822891314;
+								}
+							}
+						}
+						pos = {
+							x = -600;
+							y = 200;
+						}
+						size = {
+							x = 160;
+							y = 80;
+						}
+					}
+					item[11] = {
+						id = 3743572518;
+						model = {
+							className = "idLogicNodeModelClass_v2";
+							object = {
+								class = {
+									decl = "user/tlocke/cin_fade";
+									properties = {
+										tFadeDown = 300;
+										tFadeUp = 300;
+										tDarkness = 200;
+									}
+								}
+							}
+						}
+						pos = {
+							x = -140;
+							y = 80;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+					}
+					item[12] = {
+						id = 1622116226;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 822891314;
+								}
+							}
+						}
+						pos = {
+							x = 2920;
+							y = -1420;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[13] = {
+						id = 2809336706;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "Portal_Geo";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 3080;
+							y = -1640;
+						}
+						size = {
+							x = 220;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 7;
+											item[0] = "slayer_ship_func_dynamic_4_113768550";
+											item[1] = "slayer_ship_func_dynamic_10_113768550";
+											item[2] = "slayer_ship_func_dynamic_8_113768550";
+											item[3] = "slayer_ship_func_dynamic_5_113768550";
+											item[4] = "slayer_ship_func_dynamic_7_113768550";
+											item[5] = "slayer_ship___func_static_21957_113768550";
+											item[6] = "slayer_ship_func_dynamic_9_113768550";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[14] = {
+						id = 3937951357;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 3120;
+							y = -1740;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[15] = {
+						id = 4117381864;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 4100;
+							y = -1040;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 2;
+											item[0] = "change_layer_barge_arena";
+											item[1] = "sound_portal_arrival_barge";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[16] = {
+						id = 2282430336;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "Shotgun from deck";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 3380;
+							y = -1320;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "slayer_ship_func_dynamic_2_113768550";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[17] = {
+						id = 1473475992;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 3420;
+							y = -1420;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[18] = {
+						id = 1143432043;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "Console";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 3760;
+							y = -1320;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 8;
+											item[0] = "slayer_ship___func_static_21957_113768550";
+											item[1] = "slayer_ship_func_dynamic_12_113768550";
+											item[2] = "slayer_ship_func_dynamic_21_113768550";
+											item[3] = "slayer_ship_func_dynamic_19_113768550";
+											item[4] = "slayer_ship_func_dynamic_1_113768550";
+											item[5] = "slayer_ship_func_dynamic_20_113768550";
+											item[6] = "slayer_ship_func_dynamic_17_113768550";
+											item[7] = "slayer_ship_func_dynamic_18_113768550";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[19] = {
+						id = 2903302291;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 3780;
+							y = -1420;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[20] = {
+						id = 1367577457;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "cin_complete";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.36601299;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -1120;
+						}
+						size = {
+							x = 1940;
+							y = 280;
+						}
+					}
+					item[21] = {
+						id = 2042489840;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Skip Cinematic";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.919607997;
+									g = 0.919607997;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = -740;
+						}
+						size = {
+							x = 840;
+							y = 320;
+						}
+					}
+					item[22] = {
+						id = 1252784768;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "cin_start - Hide dynamic set pieces for animated ones";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.596077979;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -1500;
+						}
+						size = {
+							x = 1760;
+							y = 300;
+						}
+					}
+					item[23] = {
+						id = 4110483463;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 2784269810;
+								}
+							}
+						}
+						pos = {
+							x = 2720;
+							y = -1420;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[24] = {
+						id = 1700429718;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = -1300;
+							y = -780;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[25] = {
+						id = 1019757650;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 2784269810;
+								}
+							}
+						}
+						pos = {
+							x = -1520;
+							y = -760;
+						}
+						size = {
+							x = 160;
+							y = 80;
+						}
+					}
+					item[26] = {
+						id = 2610549035;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 4100;
+							y = -1320;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 13;
+											item[0] = "slayer_ship_func_dynamic_1_1140555254_113768550";
+											item[1] = "slayer_ship_func_dynamic_2_1140555254_113768550";
+											item[2] = "slayer_ship_func_dynamic_3_1140555254_113768550";
+											item[3] = "slayer_ship_func_dynamic_4_1140555254_113768550";
+											item[4] = "slayer_ship_func_dynamic_5_1140555254_113768550";
+											item[5] = "slayer_ship_func_dynamic_6_1140555254_113768550";
+											item[6] = "slayer_ship_func_dynamic_7_1140555254_113768550";
+											item[7] = "slayer_ship_func_dynamic_8_1140555254_113768550";
+											item[8] = "slayer_ship_func_dynamic_9_1140555254_113768550";
+											item[9] = "slayer_ship_func_dynamic_10_1140555254_113768550";
+											item[10] = "slayer_ship_func_dynamic_11_1140555254_113768550";
+											item[11] = "slayer_ship_func_dynamic_12_1140555254_113768550";
+											item[12] = "slayer_ship_func_dynamic_13_1140555254_113768550";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[27] = {
+						id = 2944355988;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 4120;
+							y = -1420;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[28] = {
+						id = 1517083632;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2620;
+							y = 420;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 36;
+											item[0] = "intro_game_moon_wide";
+											item[1] = "func_dynamic_5";
+											item[2] = "func_dynamic_13";
+											item[3] = "func_dynamic_26";
+											item[4] = "func_dynamic_27";
+											item[5] = "func_dynamic_28";
+											item[6] = "func_dynamic_29";
+											item[7] = "intro_game_earth_wide";
+											item[8] = "intro_game_earth_wide5";
+											item[9] = "func_dynamic_18";
+											item[10] = "func_dynamic_8";
+											item[11] = "func_dynamic_10";
+											item[12] = "func_dynamic_9";
+											item[13] = "func_dynamic_6";
+											item[14] = "func_dynamic_15";
+											item[15] = "func_dynamic_11";
+											item[16] = "reentry_motes_1";
+											item[17] = "reentry_motes_curved_1";
+											item[18] = "reentry_motes_2";
+											item[19] = "reentry_motes_3";
+											item[20] = "func_dynamic_30";
+											item[21] = "reentry_motes_4";
+											item[22] = "reentry_motes_5";
+											item[23] = "reentry_motes_6";
+											item[24] = "reentry_motes_7";
+											item[25] = "reentry_motes_8";
+											item[26] = "func_dynamic_17";
+											item[27] = "geo_func_dynamic_13";
+											item[28] = "reentry_motes_12";
+											item[29] = "reentry_motes_13";
+											item[30] = "reentry_motes_14";
+											item[31] = "func_dynamic_40";
+											item[32] = "func_dynamic_46";
+											item[33] = "func_dynamic_47";
+											item[34] = "func_dynamic_4848";
+											item[35] = "func_dynamic_4997";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[29] = {
+						id = 3603417055;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "cine_earth_wide_show_hide";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = 360;
+						}
+						size = {
+							x = 460;
+							y = 280;
+						}
+					}
+					item[30] = {
+						id = 3011349596;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "slayer castle hide show";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2580;
+							y = 1080;
+						}
+						size = {
+							x = 400;
+							y = 340;
+						}
+					}
+					item[31] = {
+						id = 2177462465;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2680;
+							y = 760;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 15;
+											item[0] = "geo_func_dynamic_3";
+											item[1] = "geo_func_dynamic_15";
+											item[2] = "geo_func_dynamic_16";
+											item[3] = "geo_func_dynamic_17";
+											item[4] = "geo_func_dynamic_18";
+											item[5] = "geo_func_dynamic_19";
+											item[6] = "geo_func_dynamic_20";
+											item[7] = "geo_func_dynamic_21";
+											item[8] = "geo_func_dynamic_2573";
+											item[9] = "earth_wide_atmo_control";
+											item[10] = "geo_func_dynamic_2557";
+											item[11] = "atmo";
+											item[12] = "geo_func_dynamic_2581";
+											item[13] = "hell_city";
+											item[14] = "func_dynamic_45";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[32] = {
+						id = 967233884;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2620;
+							y = 520;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 36;
+											item[0] = "intro_game_moon_wide";
+											item[1] = "func_dynamic_5";
+											item[2] = "func_dynamic_13";
+											item[3] = "func_dynamic_26";
+											item[4] = "func_dynamic_27";
+											item[5] = "func_dynamic_28";
+											item[6] = "func_dynamic_29";
+											item[7] = "intro_game_earth_wide";
+											item[8] = "intro_game_earth_wide5";
+											item[9] = "func_dynamic_18";
+											item[10] = "func_dynamic_8";
+											item[11] = "func_dynamic_10";
+											item[12] = "func_dynamic_9";
+											item[13] = "func_dynamic_6";
+											item[14] = "func_dynamic_15";
+											item[15] = "func_dynamic_11";
+											item[16] = "reentry_motes_1";
+											item[17] = "reentry_motes_curved_1";
+											item[18] = "reentry_motes_2";
+											item[19] = "reentry_motes_3";
+											item[20] = "func_dynamic_30";
+											item[21] = "reentry_motes_4";
+											item[22] = "reentry_motes_5";
+											item[23] = "reentry_motes_6";
+											item[24] = "reentry_motes_7";
+											item[25] = "reentry_motes_8";
+											item[26] = "func_dynamic_17";
+											item[27] = "geo_func_dynamic_13";
+											item[28] = "reentry_motes_12";
+											item[29] = "reentry_motes_13";
+											item[30] = "reentry_motes_14";
+											item[31] = "func_dynamic_40";
+											item[32] = "func_dynamic_46";
+											item[33] = "func_dynamic_47";
+											item[34] = "func_dynamic_4848";
+											item[35] = "func_dynamic_4997";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[33] = {
+						id = 3795843140;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = 900;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 15;
+											item[0] = "geo_func_dynamic_3";
+											item[1] = "geo_func_dynamic_15";
+											item[2] = "geo_func_dynamic_16";
+											item[3] = "geo_func_dynamic_17";
+											item[4] = "geo_func_dynamic_18";
+											item[5] = "geo_func_dynamic_19";
+											item[6] = "geo_func_dynamic_20";
+											item[7] = "geo_func_dynamic_21";
+											item[8] = "geo_func_dynamic_2573";
+											item[9] = "earth_wide_atmo_control";
+											item[10] = "geo_func_dynamic_2557";
+											item[11] = "atmo";
+											item[12] = "geo_func_dynamic_2581";
+											item[13] = "hell_city";
+											item[14] = "func_dynamic_45";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[34] = {
+						id = 2814385867;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "earth close show hide";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = 680;
+						}
+						size = {
+							x = 400;
+							y = 380;
+						}
+					}
+					item[35] = {
+						id = 934731128;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2680;
+							y = 1160;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 18;
+											item[0] = "func_dynamic_247";
+											item[1] = "func_dynamic_257";
+											item[2] = "geo_func_dynamic_23";
+											item[3] = "geo_func_dynamic_242";
+											item[4] = "geo_func_dynamic_252";
+											item[5] = "geo_func_dynamic_26";
+											item[6] = "geo_func_dynamic_27";
+											item[7] = "geo_func_dynamic_28";
+											item[8] = "geo_func_dynamic_29";
+											item[9] = "geo_func_dynamic_30";
+											item[10] = "geo_func_dynamic_31";
+											item[11] = "geo_light_point_3";
+											item[12] = "geo_func_dynamic_2536";
+											item[13] = "geo_func_dynamic_2546";
+											item[14] = "geo_light_point_4";
+											item[15] = "geo_light_point_5";
+											item[16] = "geo_func_dynamic_2547";
+											item[17] = "geo_light_probe_1";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[36] = {
+						id = 1426027919;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = 1280;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 18;
+											item[0] = "func_dynamic_247";
+											item[1] = "func_dynamic_257";
+											item[2] = "geo_func_dynamic_23";
+											item[3] = "geo_func_dynamic_242";
+											item[4] = "geo_func_dynamic_252";
+											item[5] = "geo_func_dynamic_26";
+											item[6] = "geo_func_dynamic_27";
+											item[7] = "geo_func_dynamic_28";
+											item[8] = "geo_func_dynamic_29";
+											item[9] = "geo_func_dynamic_30";
+											item[10] = "geo_func_dynamic_31";
+											item[11] = "geo_light_point_3";
+											item[12] = "geo_func_dynamic_2536";
+											item[13] = "geo_func_dynamic_2546";
+											item[14] = "geo_light_point_4";
+											item[15] = "geo_light_point_5";
+											item[16] = "geo_func_dynamic_2547";
+											item[17] = "geo_light_probe_1";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[37] = {
+						id = 1881252958;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "cine_slayer_castle show hide";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -380;
+						}
+						size = {
+							x = 400;
+							y = 320;
+						}
+					}
+					item[38] = {
+						id = 308518258;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Cine Mars show hide";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -20;
+						}
+						size = {
+							x = 400;
+							y = 340;
+						}
+					}
+					item[39] = {
+						id = 4178286600;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "relay that brandon wanted to me to activate on complete/skip";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 5500;
+							y = -1000;
+						}
+						size = {
+							x = 400;
+							y = 280;
+						}
+					}
+					item[40] = {
+						id = 1965328205;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "portal_steam_fx";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 2740;
+							y = -560;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 4;
+											item[0] = "steam_rising_slower_m_32";
+											item[1] = "steam_rising_slower_m_33";
+											item[2] = "steam_rising_slower_m_14";
+											item[3] = "steam_rising_slower_m_15";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[41] = {
+						id = 2447964285;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 2780;
+							y = -680;
+						}
+						size = {
+							x = 100;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[42] = {
+						id = 738084441;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 2480;
+							y = -620;
+						}
+						size = {
+							x = 60;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[43] = {
+						id = 859342347;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Portal Opening FX";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.917647004;
+									g = 0.941177011;
+									b = 0.25097999;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = -760;
+						}
+						size = {
+							x = 740;
+							y = 320;
+						}
+					}
+					item[44] = {
+						id = 1612670938;
+						model = {
+							className = "idLogicNodeModelPlayerInventoryCheck";
+							object = {
+								inventoryChecks = {
+									num = 1;
+									item[0] = {
+										invItem = "weapon/player/chainsaw";
+									}
+								}
+							}
+						}
+						pos = {
+							x = -240;
+							y = -1080;
+						}
+						size = {
+							x = 200;
+							y = 140;
+						}
+					}
+					item[45] = {
+						id = 3259203963;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 40;
+							y = -1080;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "barge_target_timeline_get_chainsaw";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[46] = {
+						id = 104032689;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 4;
+									item[0] = {
+										id = 3;
+									}
+									item[1] = {
+										id = 4;
+									}
+									item[2] = {
+										id = 5;
+									}
+									item[3] = {
+										id = 6;
+									}
+								}
+							}
+						}
+						pos = {
+							x = -1500;
+							y = -1080;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+					}
+					item[47] = {
+						id = 3304013102;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Set default intensity on lightProbes";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.752941012;
+									g = 0.435294002;
+									b = 0.560783982;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = 2080;
+							y = 1740;
+						}
+						size = {
+							x = 280;
+							y = 280;
+						}
+					}
+					item[48] = {
+						id = 4275311626;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = -300;
+						}
+						size = {
+							x = 220;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 52;
+											item[0] = "geo_func_dynamic_252";
+											item[1] = "geo_func_dynamic_28";
+											item[2] = "geo_func_dynamic_30";
+											item[3] = "geo_func_dynamic_27";
+											item[4] = "geo_func_dynamic_26";
+											item[5] = "geo_func_dynamic_29";
+											item[6] = "geo_func_dynamic_242";
+											item[7] = "geo_func_decal_3";
+											item[8] = "geo_func_decal_4";
+											item[9] = "geo_func_decal_5";
+											item[10] = "geo_func_decal_6";
+											item[11] = "geo_func_decal_7";
+											item[12] = "geo_func_decal_8";
+											item[13] = "geo_func_decal_9";
+											item[14] = "geo_func_decal_11";
+											item[15] = "geo_func_decal_12";
+											item[16] = "geo_func_decal_13";
+											item[17] = "geo_func_decal_15";
+											item[18] = "geo_func_decal_16";
+											item[19] = "geo_func_decal_17";
+											item[20] = "geo_func_decal_18";
+											item[21] = "geo_func_decal_19";
+											item[22] = "geo_func_decal_20";
+											item[23] = "geo_func_decal_21";
+											item[24] = "geo_func_decal_24";
+											item[25] = "geo_func_decal_25";
+											item[26] = "geo_func_decal_26";
+											item[27] = "geo_func_decal_27";
+											item[28] = "geo_func_decal_28";
+											item[29] = "geo_func_decal_29";
+											item[30] = "geo_func_decal_30";
+											item[31] = "geo_func_decal_31";
+											item[32] = "geo_func_decal_32";
+											item[33] = "geo_func_decal_33";
+											item[34] = "geo_func_decal_34";
+											item[35] = "geo_func_decal_35";
+											item[36] = "geo_func_decal_40";
+											item[37] = "geo_func_dynamic_31";
+											item[38] = "geo_func_decal_14";
+											item[39] = "geo_func_decal_10";
+											item[40] = "geo_func_decal_41";
+											item[41] = "geo_func_decal_42";
+											item[42] = "geo_func_decal_43";
+											item[43] = "geo_func_decal_44";
+											item[44] = "geo_func_decal_45";
+											item[45] = "geo_func_decal_46";
+											item[46] = "geo_func_decal_47";
+											item[47] = "geo_func_decal_48";
+											item[48] = "geo_func_decal_23";
+											item[49] = "geo_func_dynamic_2536";
+											item[50] = "geo_func_dynamic_2583";
+											item[51] = "geo_func_dynamic_2582";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[49] = {
+						id = 1396585809;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2680;
+							y = -180;
+						}
+						size = {
+							x = 220;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 52;
+											item[0] = "geo_func_dynamic_252";
+											item[1] = "geo_func_dynamic_28";
+											item[2] = "geo_func_dynamic_30";
+											item[3] = "geo_func_dynamic_27";
+											item[4] = "geo_func_dynamic_26";
+											item[5] = "geo_func_dynamic_29";
+											item[6] = "geo_func_dynamic_242";
+											item[7] = "geo_func_decal_3";
+											item[8] = "geo_func_decal_4";
+											item[9] = "geo_func_decal_5";
+											item[10] = "geo_func_decal_6";
+											item[11] = "geo_func_decal_7";
+											item[12] = "geo_func_decal_8";
+											item[13] = "geo_func_decal_9";
+											item[14] = "geo_func_decal_11";
+											item[15] = "geo_func_decal_12";
+											item[16] = "geo_func_decal_13";
+											item[17] = "geo_func_decal_15";
+											item[18] = "geo_func_decal_16";
+											item[19] = "geo_func_decal_17";
+											item[20] = "geo_func_decal_18";
+											item[21] = "geo_func_decal_19";
+											item[22] = "geo_func_decal_20";
+											item[23] = "geo_func_decal_21";
+											item[24] = "geo_func_decal_24";
+											item[25] = "geo_func_decal_25";
+											item[26] = "geo_func_decal_26";
+											item[27] = "geo_func_decal_27";
+											item[28] = "geo_func_decal_28";
+											item[29] = "geo_func_decal_29";
+											item[30] = "geo_func_decal_30";
+											item[31] = "geo_func_decal_31";
+											item[32] = "geo_func_decal_32";
+											item[33] = "geo_func_decal_33";
+											item[34] = "geo_func_decal_34";
+											item[35] = "geo_func_decal_35";
+											item[36] = "geo_func_decal_40";
+											item[37] = "geo_func_dynamic_31";
+											item[38] = "geo_func_decal_14";
+											item[39] = "geo_func_decal_10";
+											item[40] = "geo_func_decal_41";
+											item[41] = "geo_func_decal_42";
+											item[42] = "geo_func_decal_43";
+											item[43] = "geo_func_decal_44";
+											item[44] = "geo_func_decal_45";
+											item[45] = "geo_func_decal_46";
+											item[46] = "geo_func_decal_47";
+											item[47] = "geo_func_decal_48";
+											item[48] = "geo_func_decal_23";
+											item[49] = "geo_func_dynamic_2536";
+											item[50] = "geo_func_dynamic_2583";
+											item[51] = "geo_func_dynamic_2582";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[50] = {
+						id = 3003415590;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2680;
+							y = 200;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 47;
+											item[0] = "intro_mars_detailed";
+											item[1] = "mars_crater";
+											item[2] = "mars_cloud3";
+											item[3] = "mars_cloud28";
+											item[4] = "mars_cloud29";
+											item[5] = "func_dynamic_32";
+											item[6] = "func_dynamic_33";
+											item[7] = "geo_light_point_5";
+											item[8] = "geo_func_dynamic_2553";
+											item[9] = "mars_outter_surface";
+											item[10] = "geo_light_point_7";
+											item[11] = "geo_light_point_9";
+											item[12] = "geo_light_point_10";
+											item[13] = "geo_light_point_11";
+											item[14] = "geo_light_point_12";
+											item[15] = "geo_light_point_14";
+											item[16] = "geo_light_point_15";
+											item[17] = "geo_light_point_13";
+											item[18] = "geo_light_point_8";
+											item[19] = "geo_light_point_16";
+											item[20] = "geo_light_point_17";
+											item[21] = "geo_light_point_18";
+											item[22] = "geo_light_point_19";
+											item[23] = "mars_cloud50";
+											item[24] = "geo_light_point_20";
+											item[25] = "geo_func_dynamic_2572";
+											item[26] = "geo_light_point_21";
+											item[27] = "geo_light_point_22";
+											item[28] = "geo_light_point_23";
+											item[29] = "geo_light_point_24";
+											item[30] = "geo_light_point_25";
+											item[31] = "func_dynamic_37";
+											item[32] = "func_dynamic_38";
+											item[33] = "func_dynamic_39";
+											item[34] = "mars_cloud36";
+											item[35] = "mars_atmo";
+											item[36] = "atmo_edge_5";
+											item[37] = "func_dynamic_42";
+											item[38] = "func_dynamic_43";
+											item[39] = "mars_cloud49";
+											item[40] = "mars_cloud48";
+											item[41] = "mars_cloud47";
+											item[42] = "mars_cloud51";
+											item[43] = "mars_cloud52";
+											item[44] = "mars_cloud53";
+											item[45] = "mars_cloud54";
+											item[46] = "mars_cloud55";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[51] = {
+						id = 2980483539;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = 60;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 47;
+											item[0] = "intro_mars_detailed";
+											item[1] = "mars_crater";
+											item[2] = "mars_cloud3";
+											item[3] = "mars_cloud28";
+											item[4] = "mars_cloud29";
+											item[5] = "func_dynamic_32";
+											item[6] = "func_dynamic_33";
+											item[7] = "geo_light_point_5";
+											item[8] = "geo_func_dynamic_2553";
+											item[9] = "mars_outter_surface";
+											item[10] = "geo_light_point_7";
+											item[11] = "geo_light_point_9";
+											item[12] = "geo_light_point_10";
+											item[13] = "geo_light_point_11";
+											item[14] = "geo_light_point_12";
+											item[15] = "geo_light_point_14";
+											item[16] = "geo_light_point_15";
+											item[17] = "geo_light_point_13";
+											item[18] = "geo_light_point_8";
+											item[19] = "geo_light_point_16";
+											item[20] = "geo_light_point_17";
+											item[21] = "geo_light_point_18";
+											item[22] = "geo_light_point_19";
+											item[23] = "mars_cloud50";
+											item[24] = "geo_light_point_20";
+											item[25] = "geo_func_dynamic_2572";
+											item[26] = "geo_light_point_21";
+											item[27] = "geo_light_point_22";
+											item[28] = "geo_light_point_23";
+											item[29] = "geo_light_point_24";
+											item[30] = "geo_light_point_25";
+											item[31] = "func_dynamic_37";
+											item[32] = "func_dynamic_38";
+											item[33] = "func_dynamic_39";
+											item[34] = "mars_cloud36";
+											item[35] = "mars_atmo";
+											item[36] = "atmo_edge_5";
+											item[37] = "func_dynamic_42";
+											item[38] = "func_dynamic_43";
+											item[39] = "mars_cloud49";
+											item[40] = "mars_cloud48";
+											item[41] = "mars_cloud47";
+											item[42] = "mars_cloud51";
+											item[43] = "mars_cloud52";
+											item[44] = "mars_cloud53";
+											item[45] = "mars_cloud54";
+											item[46] = "mars_cloud55";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[52] = {
+						id = 264003385;
+						model = {
+							className = "idLogicNodeModelEventBroadcast";
+							object = {
+								event = {
+									decl = "game/sp/e1m1_intro/stop_camera_shake";
+									id = 364811586;
+								}
+							}
+						}
+						pos = {
+							x = 4640;
+							y = -1040;
+						}
+						size = {
+							x = 240;
+							y = 80;
+						}
+					}
+					item[53] = {
+						id = 3774210736;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Start Camera Shake";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.180391997;
+									b = 0.925490022;
+									a = 0.658999979;
+								}
+							}
+						}
+						pos = {
+							x = 4620;
+							y = -1120;
+						}
+						size = {
+							x = 280;
+							y = 280;
+						}
+					}
+					item[54] = {
+						id = 158865055;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 5580;
+							y = -920;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "barge_target_relay_post_opening_anim";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[55] = {
+						id = 3288721761;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "050";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 1800;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[56] = {
+						id = 2712871630;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "060";
+								rowNames = {
+									num = 2;
+									item[0] = "s060";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 1900;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[57] = {
+						id = 3556478256;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "070";
+								rowNames = {
+									num = 2;
+									item[0] = "s070";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2000;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[58] = {
+						id = 2635595086;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "080";
+								rowNames = {
+									num = 2;
+									item[0] = "s080";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2100;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[59] = {
+						id = 2788030884;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "090";
+								rowNames = {
+									num = 2;
+									item[0] = "s090";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2200;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[60] = {
+						id = 935115251;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "100";
+								rowNames = {
+									num = 2;
+									item[0] = "s100";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2300;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[61] = {
+						id = 2744590269;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "110";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2400;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[62] = {
+						id = 1610633554;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "120";
+								rowNames = {
+									num = 2;
+									item[0] = "s120";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2500;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[63] = {
+						id = 3632963690;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "130";
+								rowNames = {
+									num = 2;
+									item[0] = "s130";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2600;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[64] = {
+						id = 1562116304;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "140";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2700;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[65] = {
+						id = 3119479554;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "150";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2820;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[66] = {
+						id = 3016931031;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "160";
+								rowNames = {
+									num = 2;
+									item[0] = "s160";
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 2920;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[67] = {
+						id = 2629335331;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "170";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 3020;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+					}
+					item[68] = {
+						id = 1494275524;
+						model = {
+							className = "idLogicNodeModelLightControllerCommand_V2";
+							object = {
+								lightCommands = {
+									num = 2;
+									item[0] = "LC_SET_COLOR";
+									item[1] = "LC_SET_INTENSITY";
+								}
+							}
+						}
+						pos = {
+							x = 2120;
+							y = 2820;
+						}
+						size = {
+							x = 200;
+							y = 140;
+						}
+						pinVariables = {
+							num = 3;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "hub_cinematic_light_probe_5";
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3547269939;
+								model = {
+									className = "idLogicVariableModelColor";
+									object = {
+										value = {
+											r = 1;
+											g = 1;
+											b = 1;
+										}
+									}
+								}
+							}
+							item[2] = {
+								id = 833813460;
+								model = {
+									className = "idLogicVariableModelFloat";
+									object = {
+										value = 0.100000001;
+									}
+								}
+							}
+						}
+					}
+					item[69] = {
+						id = 4255400179;
+						model = {
+							className = "idLogicNodeModelLightControllerCommand_V2";
+							object = {
+								lightCommands = {
+									num = 1;
+									item[0] = "LC_SET_INTENSITY";
+								}
+							}
+						}
+						pos = {
+							x = 2120;
+							y = 2400;
+						}
+						size = {
+							x = 200;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "hub_cinematic_light_probe_5";
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 833813459;
+								model = {
+									className = "idLogicVariableModelFloat";
+									object = {
+										value = 1;
+									}
+								}
+							}
+						}
+					}
+					item[70] = {
+						id = 3965090134;
+						model = {
+							className = "idLogicNodeModelLightControllerCommand_V2";
+							object = {
+								lightCommands = {
+									num = 1;
+									item[0] = "LC_SET_COLOR";
+								}
+							}
+						}
+						pos = {
+							x = 2120;
+							y = 2700;
+						}
+						size = {
+							x = 200;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "hub_cinematic_light_probe_5";
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3547269939;
+								model = {
+									className = "idLogicVariableModelColor";
+									object = {
+										value = {
+											r = 0.639216006;
+											g = 1;
+											b = 0.972549021;
+										}
+									}
+								}
+							}
+						}
+					}
+					item[71] = {
+						id = 2456150755;
+						model = {
+							className = "idLogicNodeModelLightControllerCommand_V2";
+							object = {
+								lightCommands = {
+									num = 1;
+									item[0] = "LC_SET_INTENSITY";
+								}
+							}
+						}
+						pos = {
+							x = 2120;
+							y = 3020;
+						}
+						size = {
+							x = 200;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "hub_cinematic_light_probe_106";
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 833813459;
+								model = {
+									className = "idLogicVariableModelFloat";
+									object = {
+										value = 1;
+									}
+								}
+							}
+						}
+					}
+					item[72] = {
+						id = 730547103;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "lightProbes that change";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 2100;
+							y = 1920;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 2;
+											item[0] = "hub_cinematic_light_probe_5";
+											item[1] = "hub_cinematic_light_probe_106";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[73] = {
+						id = 1137737758;
+						model = {
+							className = "idLogicNodeModelLightControllerCommand_V2";
+							object = {
+								lightCommands = {
+									num = 1;
+									item[0] = "LC_SET_INTENSITY";
+								}
+							}
+						}
+						pos = {
+							x = 2140;
+							y = 1800;
+						}
+						size = {
+							x = 120;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+							item[1] = {
+								id = 833813459;
+								model = {
+									className = "idLogicVariableModelFloat";
+									object = {
+										value = 0.100000001;
+									}
+								}
+							}
+						}
+					}
+					item[74] = {
+						id = 3486610844;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = 6060;
+							y = -1280;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+					}
+					item[75] = {
+						id = 3257911271;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = 5260;
+							y = 3160;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+						flipped = true;
+					}
+					item[76] = {
+						id = 1890486436;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = -1080;
+							y = 3160;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+						flipped = true;
+					}
+					item[77] = {
+						id = 912586577;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = -1080;
+							y = 100;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+					}
+					item[78] = {
+						id = 3378170056;
+						model = {
+							className = "idLogicNodeModelBink";
+							object = {
+								binkMaterial = "video/cineractive/e1m1_intro/intro_game/doommarinesymbol_wide_fade";
+							}
+						}
+						pos = {
+							x = 2320;
+							y = -1420;
+						}
+						size = {
+							x = 320;
+							y = 120;
+						}
+					}
+					item[79] = {
+						id = 2541413396;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								name = "Globe_2";
+								typeName = "EntityList";
+							}
+						}
+						pos = {
+							x = 4460;
+							y = -1320;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 6;
+											item[0] = "guis_func_mover_1_satellite_584466303";
+											item[1] = "guis_func_mover_1_globe_584466303";
+											item[2] = "guis_func_dynamic_1_584466303";
+											item[3] = "guis_func_dynamic_13_584466303";
+											item[4] = "guis_func_dynamic_7_584466303";
+											item[5] = "guis_func_dynamic_5_584466303";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[80] = {
+						id = 2316589933;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Show Globe 1";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.322952986;
+									g = 0.610093057;
+									b = 0.784313977;
+									a = 0.470587999;
+								}
+							}
+						}
+						pos = {
+							x = 4400;
+							y = -1500;
+						}
+						size = {
+							x = 320;
+							y = 300;
+						}
+					}
+					item[81] = {
+						id = 4197623485;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 4480;
+							y = -1420;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[82] = {
+						id = 2585531299;
+						model = {
+							className = "idLogicNodeModelEventBroadcast";
+							object = {
+								event = {
+									decl = "game/sp/hub/hub";
+									id = 3960407194;
+								}
+							}
+						}
+						pos = {
+							x = 4780;
+							y = -1420;
+						}
+						size = {
+							x = 300;
+							y = 80;
+						}
+					}
+					item[83] = {
+						id = 485792126;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Darken Portal Glow";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.137254983;
+									g = 0.333332986;
+									b = 0.5;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = 4740;
+							y = -1500;
+						}
+						size = {
+							x = 380;
+							y = 300;
+						}
+					}
+					item[84] = {
+						id = 3775002373;
+						model = {
+							className = "idLogicNodeModelEntityGuiPlay";
+							object = {
+								frameLabel = "start";
+							}
+						}
+						pos = {
+							x = 2080;
+							y = 1580;
+						}
+						size = {
+							x = 200;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "hub_cinematic_gui_leftscreen_1";
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[85] = {
+						id = 1104190852;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								title = "searching";
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1800;
+							y = 1600;
+						}
+						size = {
+							x = 120;
+							y = 20;
+						}
+						minimized = true;
+					}
+					item[86] = {
+						id = 2292597416;
+						model = {
+							className = "idLogicNodeModelSetMusicState";
+							object = {
+								soundStateToSet = "music_ghost_states/cine_1";
+							}
+						}
+						pos = {
+							x = -440;
+							y = -300;
+						}
+						size = {
+							x = 300;
+							y = 80;
+						}
+					}
+					item[87] = {
+						id = 3339073055;
+						model = {
+							className = "idLogicNodeModelSetGameSoundState";
+							object = {
+								soundStateToSet = "cinematic/cinematic_start";
+							}
+						}
+						pos = {
+							x = 1900;
+							y = -1420;
+						}
+						size = {
+							x = 340;
+							y = 80;
+						}
+					}
+					item[88] = {
+						id = 905113531;
+						model = {
+							className = "idLogicNodeModelSetGameSoundState";
+							object = {
+								soundStateToSet = "cinematic/cinematic_stop";
+							}
+						}
+						pos = {
+							x = 2980;
+							y = -1040;
+						}
+						size = {
+							x = 320;
+							y = 80;
+						}
+					}
+					item[89] = {
+						id = 2210096162;
+						model = {
+							className = "idLogicNodeModelEntityRemove";
+						}
+						pos = {
+							x = 360;
+							y = -1080;
+						}
+						size = {
+							x = 100;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelEntityClassList";
+								}
+							}
+						}
+					}
+					item[90] = {
+						id = 311300927;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = 40;
+							y = -960;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "barge_pickup_weapon_chainsaw_1";
+									}
+								}
+							}
+						}
+					}
+					item[91] = {
+						id = 3546847707;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Inventory Check ";
+								bodyText = "Check to determine if player has chainsaw - remove if true and activate pickup timeline";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.909803987;
+									b = 0.00784313958;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = -260;
+							y = -1160;
+						}
+						size = {
+							x = 720;
+							y = 300;
+						}
+					}
+					item[92] = {
+						id = 3530511401;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 2529760706;
+								}
+							}
+						}
+						pos = {
+							x = -300;
+							y = 120;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[93] = {
+						id = 2609254442;
+						model = {
+							className = "idLogicNodeModelBink";
+							object = {
+								binkMaterial = "video/cineractive/e1m1_intro/intro_game/doomlogo";
+							}
+						}
+						pos = {
+							x = 180;
+							y = 960;
+						}
+						size = {
+							x = 280;
+							y = 120;
+						}
+					}
+					item[94] = {
+						id = 322489199;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "title";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 160;
+							y = 800;
+						}
+						size = {
+							x = 920;
+							y = 500;
+						}
+					}
+					item[95] = {
+						id = 4075656008;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 1700;
+							y = -1020;
+						}
+						size = {
+							x = 60;
+							y = 80;
+						}
+					}
+					item[96] = {
+						id = 1036185396;
+						model = {
+							className = "idLogicNodeModelPlayerInhibitLoadCheckpoint";
+							object = {
+								inhibitType = "DISABLE_LOAD_CHECKPOINT";
+							}
+						}
+						pos = {
+							x = 5460;
+							y = -1420;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+					}
+					item[97] = {
+						id = 1593140387;
+						model = {
+							className = "idLogicNodeModelPlayerInhibitLoadCheckpoint";
+						}
+						pos = {
+							x = 4920;
+							y = -740;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+					}
+					item[98] = {
+						id = 2960239788;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "disable cp load";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.308495998;
+									b = 0.25097999;
+									a = 0.37647;
+								}
+							}
+						}
+						pos = {
+							x = 5440;
+							y = -1480;
+						}
+						size = {
+							x = 220;
+							y = 160;
+						}
+					}
+					item[99] = {
+						id = 2638426312;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "enable cp load";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.319999993;
+									g = 0.941177011;
+									b = 0.25097999;
+									a = 0.37647;
+								}
+							}
+						}
+						pos = {
+							x = 4900;
+							y = -800;
+						}
+						size = {
+							x = 220;
+							y = 160;
+						}
+					}
+					item[100] = {
+						id = 3393650802;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+							object = {
+								mode = "HIDE";
+							}
+						}
+						pos = {
+							x = 2680;
+							y = 1640;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 6;
+											item[0] = "slayer_ship_earth_atmo";
+											item[1] = "slayer_ship_earth_clouds";
+											item[2] = "slayer_ship_earth_clouds2";
+											item[3] = "slayer_ship_earth_shadow";
+											item[4] = "slayer_ship_earth_surface";
+											item[5] = "slayer_ship_earth_surface_light";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[101] = {
+						id = 2409402229;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = -940;
+							y = 20;
+						}
+						size = {
+							x = 120;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 18000;
+									}
+								}
+							}
+						}
+					}
+					item[102] = {
+						id = 1360573747;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "slayer castle inteor skybox hide show";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 2600;
+							y = 1460;
+						}
+						size = {
+							x = 400;
+							y = 340;
+						}
+					}
+					item[103] = {
+						id = 1421294259;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2680;
+							y = 1540;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 6;
+											item[0] = "_earth_atmo";
+											item[1] = "_earth_clouds";
+											item[2] = "_earth_clouds2";
+											item[3] = "_earth_shadow";
+											item[4] = "_earth_surface";
+											item[5] = "_earth_surface_light";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[104] = {
+						id = 2185773580;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 800;
+							y = 880;
+						}
+						size = {
+							x = 180;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 50;
+									}
+								}
+							}
+						}
+					}
+					item[105] = {
+						id = 4238451349;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "For turning off helmet lights";
+								bodyText = "GM:  Added helmet lights 9/21/21";
+								headerFillColor = {
+									r = 1;
+									g = 0.0431373045;
+									b = 0.917647004;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 1520;
+							y = -1500;
+						}
+						size = {
+							x = 340;
+							y = 200;
+						}
+					}
+					item[106] = {
+						id = 1562862936;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 660;
+							y = 880;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 50;
+									}
+								}
+							}
+						}
+					}
+					item[107] = {
+						id = 1203568269;
+						model = {
+							className = "idLogicNodeModelFadeView";
+						}
+						pos = {
+							x = 1560;
+							y = -580;
+						}
+						size = {
+							x = 180;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelColor";
+									object = {
+										value = {
+											a = 0;
+										}
+									}
+								}
+							}
+							item[1] = {
+								id = 3;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 16;
+									}
+								}
+							}
+						}
+					}
+					item[108] = {
+						id = 1701438474;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1120;
+							y = -300;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "cin complete";
+									}
+								}
+							}
+						}
+					}
+					item[109] = {
+						id = 1020493627;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 660;
+							y = 1060;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "bink complete";
+									}
+								}
+							}
+						}
+					}
+					item[110] = {
+						id = 1258394660;
+						model = {
+							className = "idLogicNodeModelEntityGetGameTime";
+						}
+						pos = {
+							x = 900;
+							y = 1180;
+						}
+						size = {
+							x = 140;
+							y = 80;
+						}
+					}
+					item[111] = {
+						id = 4254817106;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "SECONDS";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 900;
+							y = 1060;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[112] = {
+						id = 1623646450;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "SECONDS";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1360;
+							y = -540;
+						}
+						size = {
+							x = 140;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelTime";
+								}
+							}
+						}
+					}
+					item[113] = {
+						id = 3773060565;
+						model = {
+							className = "idLogicNodeModelEntityGetGameTime";
+						}
+						pos = {
+							x = 1080;
+							y = -480;
+						}
+						size = {
+							x = 140;
+							y = 80;
+						}
+					}
+					item[114] = {
+						id = 1131575169;
+						model = {
+							className = "idLogicNodeModelLog";
+							object = {
+								elements = {
+									num = 1;
+									item[0] = {
+										name = "Message";
+										type = "STRING";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1180;
+							y = -1080;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelString";
+									object = {
+										value = "bink complete";
+									}
+								}
+							}
+						}
+					}
+					item[115] = {
+						id = 523552840;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 5320;
+							y = -900;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 16;
+									}
+								}
+							}
+						}
+					}
+					item[116] = {
+						id = 230293042;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 3;
+									item[0] = {
+										id = 1;
+									}
+									item[1] = {
+										id = 2;
+									}
+									item[2] = {
+										id = 3;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 5080;
+							y = -1140;
+						}
+						size = {
+							x = 100;
+							y = 120;
+						}
+					}
+					item[117] = {
+						id = 168039227;
+						model = {
+							className = "idLogicNodeModelPlayerGiveCodex";
+							object = {
+								codexToGive = "codex/slayer/arsenal_combat_shotgun";
+							}
+						}
+						pos = {
+							x = 6340;
+							y = -920;
+						}
+						size = {
+							x = 100;
+							y = 80;
+						}
+					}
+					item[118] = {
+						id = 1793774365;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 6180;
+							y = -920;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 1;
+									}
+								}
+							}
+						}
+					}
+					item[119] = {
+						id = 3451838010;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 6540;
+							y = -920;
+						}
+						size = {
+							x = 100;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 2;
+									}
+								}
+							}
+						}
+					}
+					item[120] = {
+						id = 2089250454;
+						model = {
+							className = "idLogicNodeModelPlayerGiveCodex";
+							object = {
+								codexToGive = "codex/slayer/arsenal_doomblade";
+							}
+						}
+						pos = {
+							x = 6700;
+							y = -920;
+						}
+						size = {
+							x = 100;
+							y = 80;
+						}
+					}
+					item[121] = {
+						id = 3763353917;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Give player codex after map start";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.25097999;
+									g = 0.25097999;
+									b = 0.941177011;
+									a = 0.188235;
+								}
+							}
+						}
+						pos = {
+							x = 6160;
+							y = -1000;
+						}
+						size = {
+							x = 660;
+							y = 200;
+						}
+					}
+					item[122] = {
+						id = 304681339;
+						model = {
+							className = "idLogicNodeModelEntityShowHide";
+						}
+						pos = {
+							x = 2840;
+							y = 420;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = "cinematics_func_dynamic_820";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[123] = {
+						id = 3749240546;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Inventory Check - MOD BOT USED TRUE - listen for modbot to be in the \"selection_mod\" node";
+								bodyText = "Check to determine if player has selected from the modbot then activate  triggerFirst for door";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.482352972;
+									b = 0.329412013;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = -260;
+							y = -1940;
+						}
+						size = {
+							x = 780;
+							y = 760;
+						}
+					}
+					item[124] = {
+						id = 2898243159;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 300;
+							y = -1440;
+						}
+						size = {
+							x = 100;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[125] = {
+						id = 280459779;
+						model = {
+							className = "idLogicNodeModelInteractListener";
+						}
+						pos = {
+							x = -200;
+							y = -1700;
+						}
+						size = {
+							x = 180;
+							y = 180;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[1] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+								}
+							}
+						}
+					}
+					item[126] = {
+						id = 1472375715;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = -520;
+							y = -1580;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "barge_progress_mod_bot_1_e1m1";
+									}
+								}
+							}
+						}
+					}
+					item[127] = {
+						id = 3662270328;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = 100;
+							y = -1300;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "barge_trigger_open_modbot_door_failsafe";
+									}
+								}
+							}
+						}
+					}
+					item[128] = {
+						id = 3731670379;
+						model = {
+							className = "idLogicNodeModelSwitchString_v2";
+							object = {
+								cases = {
+									num = 1;
+									item[0] = {
+										id = 2226837152;
+										value = "selection_mod";
+									}
+								}
+							}
+						}
+						pos = {
+							x = 40;
+							y = -1680;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelString";
+								}
+							}
+						}
+					}
+					item[129] = {
+						id = 734948878;
+						parentId = 3749240546;
+						model = {
+							className = "idLogicNodeModelVariableSet_v2";
+							object = {
+								variable = {
+									id = 531808453;
+								}
+							}
+						}
+						pos = {
+							x = 220;
+							y = -1860;
+						}
+						size = {
+							x = 180;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+						}
+					}
+					item[130] = {
+						id = 1928997059;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							y = -1440;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[131] = {
+						id = 486221316;
+						model = {
+							className = "idLogicNodeModelVariableGet_v2";
+							object = {
+								variable = {
+									id = 531808453;
+								}
+							}
+						}
+						pos = {
+							x = -220;
+							y = -1300;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+					}
+					item[132] = {
+						id = 2633626803;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = -200;
+							y = -1440;
+						}
+						size = {
+							x = 120;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 1000;
+									}
+								}
+							}
+						}
+					}
+					item[133] = {
+						id = 1500354199;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = -520;
+							y = -1760;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "barge_target_relay_modbot_used";
+									}
+								}
+							}
+						}
+					}
+					item[134] = {
+						id = 4180243491;
+						model = {
+							className = "idLogicNodeModelEntityOnActivated";
+						}
+						pos = {
+							x = -200;
+							y = -1860;
+						}
+						size = {
+							x = 160;
+							y = 140;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 5;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[1] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelEntity";
+								}
+							}
+						}
+					}
+					item[135] = {
+						id = 617038953;
+						model = {
+							className = "idLogicNodeModelPlayerToggleHud";
+							object = {
+								setType = "HUD_DISABLE";
+							}
+						}
+						pos = {
+							x = 2000;
+							y = -1220;
+						}
+						size = {
+							x = 100;
+							y = 80;
+						}
+					}
+					item[136] = {
+						id = 1459790740;
+						model = {
+							className = "idLogicNodeModelPlayerSetPendingHandsAction";
+							object = {
+								pendingAction = "HANDSACTION_GENERIC_HIDE_INSTANT";
+							}
+						}
+						pos = {
+							x = 2040;
+							y = -820;
+						}
+						size = {
+							x = 140;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[137] = {
+						id = 2276281615;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 2240;
+							y = -960;
+						}
+						size = {
+							x = 120;
+							y = 140;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 2000;
+									}
+								}
+							}
+						}
+					}
+					item[138] = {
+						id = 2633007320;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 2240;
+							y = -820;
+						}
+						size = {
+							x = 80;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 2500;
+									}
+								}
+							}
+						}
+					}
+					item[139] = {
+						id = 1337848659;
+						model = {
+							className = "idLogicNodeModelPlayerSetPendingHandsAction";
+							object = {
+								pendingAction = "HANDSACTION_GENERIC_UNHIDE";
+							}
+						}
+						pos = {
+							x = 2380;
+							y = -820;
+						}
+						size = {
+							x = 140;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[140] = {
+						id = 3961779437;
+						model = {
+							className = "idLogicNodeModelPlayerToggleHud";
+							object = {
+								setType = "HUD_ENABLE";
+							}
+						}
+						pos = {
+							x = 2380;
+							y = -960;
+						}
+						size = {
+							x = 100;
+							y = 80;
+						}
+					}
+					item[141] = {
+						id = 1624111354;
+						model = {
+							className = "idLogicNodeModelPlayerInhibitControls";
+						}
+						pos = {
+							x = 2040;
+							y = -680;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[142] = {
+						id = 4179187249;
+						model = {
+							className = "idLogicNodeModelPlayerInhibitControls";
+							object = {
+								inhibitFlags = "";
+							}
+						}
+						pos = {
+							x = 2360;
+							y = -740;
+						}
+						size = {
+							x = 160;
+							y = 40;
+						}
+						minimized = true;
+					}
+					item[143] = {
+						id = 426342039;
+						model = {
+							className = "idLogicNodeModelDelay";
+						}
+						pos = {
+							x = 2240;
+							y = -680;
+						}
+						size = {
+							x = 80;
+							y = 40;
+						}
+						minimized = true;
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelTime";
+									object = {
+										value = 3000;
+									}
+								}
+							}
+						}
+					}
+					item[144] = {
+						id = 3679983953;
+						model = {
+							className = "idLogicNodeModelSequence_v2";
+							object = {
+								outputs = {
+									num = 5;
+									item[0] = {
+										id = 1;
+									}
+									item[1] = {
+										id = 2;
+										name = "fake";
+									}
+									item[2] = {
+										id = 3;
+										name = "portal";
+									}
+									item[3] = {
+										id = 4;
+										name = "prefab stuff";
+									}
+									item[4] = {
+										id = 5;
+									}
+								}
+							}
+						}
+						pos = {
+							x = 1840;
+							y = -1040;
+						}
+						size = {
+							x = 100;
+							y = 160;
+						}
+					}
+					item[145] = {
+						id = 3757491653;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 780;
+							y = -1080;
+						}
+						size = {
+							x = 100;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[146] = {
+						id = 108566455;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = 540;
+							y = -980;
+						}
+						size = {
+							x = 200;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "barge_activate_relay_379827228";
+									}
+								}
+							}
+						}
+					}
+					item[147] = {
+						id = 55032954;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Turn on punchblock IF player has Chainsaw";
+								bodyText = "punchblock symbol = green";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.835294008;
+									g = 0.835294008;
+									b = 0.941177011;
+									a = 0.184313998;
+								}
+								bodyTextColor = {
+									r = 0.0627451017;
+									b = 0.121569;
+								}
+							}
+						}
+						pos = {
+							x = 500;
+							y = -1160;
+						}
+						size = {
+							x = 420;
+							y = 300;
+						}
+					}
+					item[148] = {
+						id = 957885986;
+						model = {
+							className = "idLogicNodeModelClass_v2";
+							object = {
+								class = {
+									decl = "lighting/disable_helmet_lights";
+								}
+							}
+						}
+						pos = {
+							x = 1560;
+							y = -1420;
+						}
+						size = {
+							x = 260;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 26016416;
+								model = {
+									className = "idLogicVariableModelEntityList";
+									object = {
+										value = {
+											num = 5;
+											item[0] = "hub_cinematic_light_point_face_sl1";
+											item[1] = "hub_cinematic_light_point_face_nose1";
+											item[2] = "hub_cinematic_light_point_face_sr1";
+											item[3] = "hub_cinematic_light_point_face_top_brow_sl1";
+											item[4] = "hub_cinematic_light_point_face_top_brow_sr1";
+										}
+									}
+								}
+							}
+						}
+					}
+					item[149] = {
+						id = 3947516743;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						pos = {
+							x = -1060;
+							y = -500;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[150] = {
+						id = 473128123;
+						model = {
+							className = "idLogicNodeModelGetAutomatedTestingState";
+						}
+						pos = {
+							x = -1360;
+							y = -500;
+						}
+						size = {
+							x = 200;
+							y = 100;
+						}
+					}
+					item[151] = {
+						id = 4254611996;
+						model = {
+							className = "idLogicNodeModelClass_v2";
+							object = {
+								class = {
+									decl = "lighthouse/cinematic_record";
+								}
+							}
+						}
+						pos = {
+							x = -1260;
+							y = -280;
+						}
+						size = {
+							x = 260;
+							y = 120;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 160141547;
+								model = {
+									className = "idLogicVariableModelIntList";
+								}
+							}
+						}
+					}
+					item[152] = {
+						id = 2494165912;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "IntList";
+							}
+						}
+						pos = {
+							x = -1520;
+							y = -160;
+						}
+						size = {
+							x = 140;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelIntList";
+									object = {
+										value = {
+											num = 1;
+											item[0] = 140778;
+										}
+									}
+								}
+							}
+						}
+					}
+					item[153] = {
+						id = 1556038472;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = 3580;
+							y = -820;
+						}
+						size = {
+							x = 60;
+							y = 80;
+						}
+						flipped = true;
+					}
+					item[154] = {
+						id = 695489549;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 2;
+								}
+							}
+						}
+						pos = {
+							x = -1260;
+							y = -640;
+						}
+						size = {
+							x = 60;
+							y = 80;
+						}
+						flipped = true;
+					}
+					item[155] = {
+						id = 4281890189;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = -920;
+							y = -600;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+					}
+					item[156] = {
+						id = 2184183276;
+						model = {
+							className = "idLogicNodeModelAnchor";
+							object = {
+								rowNames = {
+									num = 3;
+								}
+							}
+						}
+						pos = {
+							x = 3940;
+							y = -780;
+						}
+						size = {
+							x = 60;
+							y = 100;
+						}
+					}
+				}
+				links = {
+					num = 139;
+					item[0] = {
+						id = 1993671226;
+						fromNodeId = 1143432043;
+						fromPinId = 0;
+						toNodeId = 2903302291;
+						toPinId = 2;
+					}
+					item[1] = {
+						id = 1855942308;
+						fromNodeId = 388611092;
+						fromPinId = 10;
+						toNodeId = 1028745020;
+						toPinId = 0;
+					}
+					item[2] = {
+						id = 3512718109;
+						fromNodeId = 3339073055;
+						fromPinId = 1;
+						toNodeId = 3378170056;
+						toPinId = 0;
+					}
+					item[3] = {
+						id = 702275727;
+						fromNodeId = 1104190852;
+						fromPinId = 1;
+						toNodeId = 3775002373;
+						toPinId = 0;
+					}
+					item[4] = {
+						id = 1348267676;
+						fromNodeId = 388611092;
+						fromPinId = 6;
+						toNodeId = 1974168873;
+						toPinId = 0;
+					}
+					item[5] = {
+						id = 1722999194;
+						fromNodeId = 388611092;
+						fromPinId = 7;
+						toNodeId = 1974168873;
+						toPinId = 1;
+					}
+					item[6] = {
+						id = 1227723930;
+						fromNodeId = 868487203;
+						fromPinId = 0;
+						toNodeId = 2864163807;
+						toPinId = 1;
+					}
+					item[7] = {
+						id = 191230660;
+						fromNodeId = 3495785283;
+						fromPinId = 3;
+						toNodeId = 2864163807;
+						toPinId = 0;
+					}
+					item[8] = {
+						id = 765188142;
+						fromNodeId = 1624111354;
+						fromPinId = 2;
+						toNodeId = 426342039;
+						toPinId = 0;
+					}
+					item[9] = {
+						id = 484877090;
+						fromNodeId = 3743572518;
+						fromPinId = 160777926;
+						toNodeId = 388611092;
+						toPinId = 17;
+					}
+					item[10] = {
+						id = 1268294738;
+						fromNodeId = 2585531299;
+						fromPinId = 1;
+						toNodeId = 1036185396;
+						toPinId = 0;
+					}
+					item[11] = {
+						id = 2692640042;
+						fromNodeId = 912586577;
+						fromPinId = 3;
+						toNodeId = 3495785283;
+						toPinId = 2;
+					}
+					item[12] = {
+						id = 3484244384;
+						fromNodeId = 4110483463;
+						fromPinId = 1;
+						toNodeId = 1701438474;
+						toPinId = 0;
+					}
+					item[13] = {
+						id = 3641477677;
+						fromNodeId = 158865055;
+						fromPinId = 1;
+						toNodeId = 1793774365;
+						toPinId = 0;
+					}
+					item[14] = {
+						id = 4219881214;
+						fromNodeId = 2809336706;
+						fromPinId = 0;
+						toNodeId = 3937951357;
+						toPinId = 2;
+					}
+					item[15] = {
+						id = 1446921161;
+						fromNodeId = 3451838010;
+						fromPinId = 2;
+						toNodeId = 2089250454;
+						toPinId = 0;
+					}
+					item[16] = {
+						id = 1546208899;
+						fromNodeId = 104032689;
+						fromPinId = 3;
+						toNodeId = 2633626803;
+						toPinId = 0;
+					}
+					item[17] = {
+						id = 3824245982;
+						fromNodeId = 2282430336;
+						fromPinId = 0;
+						toNodeId = 1473475992;
+						toPinId = 2;
+					}
+					item[18] = {
+						id = 666169772;
+						fromNodeId = 1473475992;
+						fromPinId = 1;
+						toNodeId = 2903302291;
+						toPinId = 0;
+					}
+					item[19] = {
+						id = 2923968299;
+						fromNodeId = 1974168873;
+						fromPinId = 3561227536;
+						toNodeId = 1421294259;
+						toPinId = 0;
+					}
+					item[20] = {
+						id = 2805478462;
+						fromNodeId = 1612670938;
+						fromPinId = 2;
+						toNodeId = 3259203963;
+						toPinId = 0;
+					}
+					item[21] = {
+						id = 2158985789;
+						fromNodeId = 1019757650;
+						fromPinId = 0;
+						toNodeId = 1700429718;
+						toPinId = 1;
+					}
+					item[22] = {
+						id = 4104469822;
+						fromNodeId = 2903302291;
+						fromPinId = 1;
+						toNodeId = 2944355988;
+						toPinId = 0;
+					}
+					item[23] = {
+						id = 2844933319;
+						fromNodeId = 2610549035;
+						fromPinId = 0;
+						toNodeId = 2944355988;
+						toPinId = 2;
+					}
+					item[24] = {
+						id = 556696299;
+						fromNodeId = 168039227;
+						fromPinId = 1;
+						toNodeId = 3451838010;
+						toPinId = 0;
+					}
+					item[25] = {
+						id = 3401710167;
+						fromNodeId = 1974168873;
+						fromPinId = 1101755104;
+						toNodeId = 4275311626;
+						toPinId = 0;
+					}
+					item[26] = {
+						id = 3101297801;
+						fromNodeId = 1974168873;
+						fromPinId = 250135872;
+						toNodeId = 3003415590;
+						toPinId = 0;
+					}
+					item[27] = {
+						id = 3710153581;
+						fromNodeId = 1974168873;
+						fromPinId = 1295537312;
+						toNodeId = 1396585809;
+						toPinId = 0;
+					}
+					item[28] = {
+						id = 120082155;
+						fromNodeId = 1974168873;
+						fromPinId = 1570752432;
+						toNodeId = 2177462465;
+						toPinId = 0;
+					}
+					item[29] = {
+						id = 3105446924;
+						fromNodeId = 1974168873;
+						fromPinId = 4155753680;
+						toNodeId = 967233884;
+						toPinId = 0;
+					}
+					item[30] = {
+						id = 1813554221;
+						fromNodeId = 1974168873;
+						fromPinId = 2067506064;
+						toNodeId = 2980483539;
+						toPinId = 0;
+					}
+					item[31] = {
+						id = 2489121541;
+						fromNodeId = 1472375715;
+						fromPinId = 0;
+						toNodeId = 280459779;
+						toPinId = 0;
+					}
+					item[32] = {
+						id = 3638776046;
+						fromNodeId = 1622116226;
+						fromPinId = 1;
+						toNodeId = 1473475992;
+						toPinId = 0;
+					}
+					item[33] = {
+						id = 4145753227;
+						fromNodeId = 1974168873;
+						fromPinId = 1316137392;
+						toNodeId = 1517083632;
+						toPinId = 0;
+					}
+					item[34] = {
+						id = 4268795908;
+						fromNodeId = 1974168873;
+						fromPinId = 3422545504;
+						toNodeId = 3795843140;
+						toPinId = 0;
+					}
+					item[35] = {
+						id = 935103557;
+						fromNodeId = 1965328205;
+						fromPinId = 0;
+						toNodeId = 2447964285;
+						toPinId = 2;
+					}
+					item[36] = {
+						id = 768798513;
+						fromNodeId = 1974168873;
+						fromPinId = 4262431888;
+						toNodeId = 738084441;
+						toPinId = 0;
+					}
+					item[37] = {
+						id = 2269939188;
+						fromNodeId = 738084441;
+						fromPinId = 1;
+						toNodeId = 2447964285;
+						toPinId = 0;
+					}
+					item[38] = {
+						id = 4058352311;
+						fromNodeId = 4117381864;
+						fromPinId = 1;
+						toNodeId = 264003385;
+						toPinId = 0;
+					}
+					item[39] = {
+						id = 1855423586;
+						fromNodeId = 523552840;
+						fromPinId = 2;
+						toNodeId = 158865055;
+						toPinId = 0;
+					}
+					item[40] = {
+						id = 558178257;
+						fromNodeId = 1974168873;
+						fromPinId = 3603966288;
+						toNodeId = 3288721761;
+						toPinId = 0;
+					}
+					item[41] = {
+						id = 886733339;
+						fromNodeId = 1974168873;
+						fromPinId = 4195543952;
+						toNodeId = 2712871630;
+						toPinId = 0;
+					}
+					item[42] = {
+						id = 3293963705;
+						fromNodeId = 1974168873;
+						fromPinId = 3965174464;
+						toNodeId = 3556478256;
+						toPinId = 0;
+					}
+					item[43] = {
+						id = 4061545188;
+						fromNodeId = 1974168873;
+						fromPinId = 1968074816;
+						toNodeId = 2635595086;
+						toPinId = 0;
+					}
+					item[44] = {
+						id = 2661507990;
+						fromNodeId = 1974168873;
+						fromPinId = 4067249776;
+						toNodeId = 2788030884;
+						toPinId = 0;
+					}
+					item[45] = {
+						id = 863426344;
+						fromNodeId = 1974168873;
+						fromPinId = 1356370304;
+						toNodeId = 935115251;
+						toPinId = 0;
+					}
+					item[46] = {
+						id = 3320354508;
+						fromNodeId = 1974168873;
+						fromPinId = 3092786720;
+						toNodeId = 2744590269;
+						toPinId = 0;
+					}
+					item[47] = {
+						id = 2410752906;
+						fromNodeId = 1974168873;
+						fromPinId = 1118816720;
+						toNodeId = 1610633554;
+						toPinId = 0;
+					}
+					item[48] = {
+						id = 3650558020;
+						fromNodeId = 1974168873;
+						fromPinId = 376111040;
+						toNodeId = 3632963690;
+						toPinId = 0;
+					}
+					item[49] = {
+						id = 943273888;
+						fromNodeId = 1974168873;
+						fromPinId = 2865743744;
+						toNodeId = 1562116304;
+						toPinId = 0;
+					}
+					item[50] = {
+						id = 2146983879;
+						fromNodeId = 1974168873;
+						fromPinId = 1421916000;
+						toNodeId = 3119479554;
+						toPinId = 0;
+					}
+					item[51] = {
+						id = 1187112617;
+						fromNodeId = 1974168873;
+						fromPinId = 2917157392;
+						toNodeId = 3016931031;
+						toPinId = 0;
+					}
+					item[52] = {
+						id = 3728751256;
+						fromNodeId = 1974168873;
+						fromPinId = 1076924224;
+						toNodeId = 2629335331;
+						toPinId = 0;
+					}
+					item[53] = {
+						id = 3728147307;
+						fromNodeId = 2744590269;
+						fromPinId = 1;
+						toNodeId = 4255400179;
+						toPinId = 0;
+					}
+					item[54] = {
+						id = 2996528405;
+						fromNodeId = 1562116304;
+						fromPinId = 1;
+						toNodeId = 3965090134;
+						toPinId = 0;
+					}
+					item[55] = {
+						id = 435311234;
+						fromNodeId = 3119479554;
+						fromPinId = 1;
+						toNodeId = 1494275524;
+						toPinId = 0;
+					}
+					item[56] = {
+						id = 2613188945;
+						fromNodeId = 2629335331;
+						fromPinId = 1;
+						toNodeId = 2456150755;
+						toPinId = 0;
+					}
+					item[57] = {
+						id = 2465735519;
+						fromNodeId = 3288721761;
+						fromPinId = 1;
+						toNodeId = 1137737758;
+						toPinId = 0;
+					}
+					item[58] = {
+						id = 1721129422;
+						fromNodeId = 730547103;
+						fromPinId = 0;
+						toNodeId = 1137737758;
+						toPinId = 2;
+					}
+					item[59] = {
+						id = 4000887820;
+						fromNodeId = 2544324308;
+						fromPinId = 0;
+						toNodeId = 104032689;
+						toPinId = 0;
+					}
+					item[60] = {
+						id = 1421582195;
+						fromNodeId = 311300927;
+						fromPinId = 0;
+						toNodeId = 2210096162;
+						toPinId = 2;
+					}
+					item[61] = {
+						id = 2344453741;
+						fromNodeId = 1562862936;
+						fromPinId = 2;
+						toNodeId = 2185773580;
+						toPinId = 0;
+					}
+					item[62] = {
+						id = 491702842;
+						fromNodeId = 3486610844;
+						fromPinId = 1;
+						toNodeId = 3257911271;
+						toPinId = 0;
+					}
+					item[63] = {
+						id = 2685927723;
+						fromNodeId = 3486610844;
+						fromPinId = 3;
+						toNodeId = 3257911271;
+						toPinId = 2;
+					}
+					item[64] = {
+						id = 3830152534;
+						fromNodeId = 3257911271;
+						fromPinId = 1;
+						toNodeId = 1890486436;
+						toPinId = 0;
+					}
+					item[65] = {
+						id = 2181205598;
+						fromNodeId = 3257911271;
+						fromPinId = 3;
+						toNodeId = 1890486436;
+						toPinId = 2;
+					}
+					item[66] = {
+						id = 2342753505;
+						fromNodeId = 1890486436;
+						fromPinId = 1;
+						toNodeId = 912586577;
+						toPinId = 0;
+					}
+					item[67] = {
+						id = 3536269984;
+						fromNodeId = 1890486436;
+						fromPinId = 3;
+						toNodeId = 912586577;
+						toPinId = 2;
+					}
+					item[68] = {
+						id = 2403736803;
+						fromNodeId = 1974168873;
+						fromPinId = 2089640976;
+						toNodeId = 2609254442;
+						toPinId = 0;
+					}
+					item[69] = {
+						id = 724505842;
+						fromNodeId = 2210096162;
+						fromPinId = 1;
+						toNodeId = 3757491653;
+						toPinId = 0;
+					}
+					item[70] = {
+						id = 566872896;
+						fromNodeId = 3378170056;
+						fromPinId = 1;
+						toNodeId = 4110483463;
+						toPinId = 0;
+					}
+					item[71] = {
+						id = 3750118110;
+						fromNodeId = 2944355988;
+						fromPinId = 1;
+						toNodeId = 4197623485;
+						toPinId = 0;
+					}
+					item[72] = {
+						id = 3517615196;
+						fromNodeId = 2541413396;
+						fromPinId = 0;
+						toNodeId = 4197623485;
+						toPinId = 2;
+					}
+					item[73] = {
+						id = 3859802818;
+						fromNodeId = 2864163807;
+						fromPinId = 2;
+						toNodeId = 3530511401;
+						toPinId = 0;
+					}
+					item[74] = {
+						id = 999343083;
+						fromNodeId = 4197623485;
+						fromPinId = 1;
+						toNodeId = 2585531299;
+						toPinId = 0;
+					}
+					item[75] = {
+						id = 3970967771;
+						fromNodeId = 1974168873;
+						fromPinId = 2095008992;
+						toNodeId = 1104190852;
+						toPinId = 0;
+					}
+					item[76] = {
+						id = 2210356671;
+						fromNodeId = 2788213351;
+						fromPinId = 1;
+						toNodeId = 2292597416;
+						toPinId = 0;
+					}
+					item[77] = {
+						id = 700958750;
+						fromNodeId = 3936682207;
+						fromPinId = 1;
+						toNodeId = 905113531;
+						toPinId = 0;
+					}
+					item[78] = {
+						id = 1738350566;
+						fromNodeId = 905113531;
+						fromPinId = 1;
+						toNodeId = 184499591;
+						toPinId = 0;
+					}
+					item[79] = {
+						id = 1482037576;
+						fromNodeId = 3259203963;
+						fromPinId = 1;
+						toNodeId = 2210096162;
+						toPinId = 0;
+					}
+					item[80] = {
+						id = 4261129047;
+						fromNodeId = 3530511401;
+						fromPinId = 1;
+						toNodeId = 3743572518;
+						toPinId = 112369399;
+					}
+					item[81] = {
+						id = 3040709960;
+						fromNodeId = 1036185396;
+						fromPinId = 1;
+						toNodeId = 3486610844;
+						toPinId = 0;
+					}
+					item[82] = {
+						id = 1967656232;
+						fromNodeId = 1701438474;
+						fromPinId = 1;
+						toNodeId = 1623646450;
+						toPinId = 0;
+					}
+					item[83] = {
+						id = 1511398695;
+						fromNodeId = 1623646450;
+						fromPinId = 1;
+						toNodeId = 1203568269;
+						toPinId = 0;
+					}
+					item[84] = {
+						id = 574679756;
+						fromNodeId = 2409402229;
+						fromPinId = 2;
+						toNodeId = 3495785283;
+						toPinId = 1;
+					}
+					item[85] = {
+						id = 1784537314;
+						fromNodeId = 912586577;
+						fromPinId = 1;
+						toNodeId = 2409402229;
+						toPinId = 0;
+					}
+					item[86] = {
+						id = 3316248803;
+						fromNodeId = 2609254442;
+						fromPinId = 1;
+						toNodeId = 1562862936;
+						toPinId = 0;
+					}
+					item[87] = {
+						id = 1223668768;
+						fromNodeId = 1203568269;
+						fromPinId = 1;
+						toNodeId = 4075656008;
+						toPinId = 0;
+					}
+					item[88] = {
+						id = 927276391;
+						fromNodeId = 1974168873;
+						fromPinId = 3585451312;
+						toNodeId = 1701438474;
+						toPinId = 0;
+					}
+					item[89] = {
+						id = 2255478018;
+						fromNodeId = 3773060565;
+						fromPinId = 0;
+						toNodeId = 1623646450;
+						toPinId = 2;
+					}
+					item[90] = {
+						id = 4136873739;
+						fromNodeId = 2609254442;
+						fromPinId = 2;
+						toNodeId = 1020493627;
+						toPinId = 0;
+					}
+					item[91] = {
+						id = 1745646001;
+						fromNodeId = 1020493627;
+						fromPinId = 1;
+						toNodeId = 4254817106;
+						toPinId = 0;
+					}
+					item[92] = {
+						id = 1046141154;
+						fromNodeId = 1258394660;
+						fromPinId = 0;
+						toNodeId = 4254817106;
+						toPinId = 2;
+					}
+					item[93] = {
+						id = 25737127;
+						fromNodeId = 264003385;
+						fromPinId = 1;
+						toNodeId = 1593140387;
+						toPinId = 0;
+					}
+					item[94] = {
+						id = 2653338814;
+						fromNodeId = 1593140387;
+						fromPinId = 1;
+						toNodeId = 230293042;
+						toPinId = 0;
+					}
+					item[95] = {
+						id = 292685043;
+						fromNodeId = 230293042;
+						fromPinId = 1;
+						toNodeId = 3486610844;
+						toPinId = 2;
+					}
+					item[96] = {
+						id = 1173537075;
+						fromNodeId = 230293042;
+						fromPinId = 2;
+						toNodeId = 523552840;
+						toPinId = 0;
+					}
+					item[97] = {
+						id = 1065288770;
+						fromNodeId = 1793774365;
+						fromPinId = 2;
+						toNodeId = 168039227;
+						toPinId = 0;
+					}
+					item[98] = {
+						id = 2781080064;
+						fromNodeId = 1517083632;
+						fromPinId = 1;
+						toNodeId = 304681339;
+						toPinId = 0;
+					}
+					item[99] = {
+						id = 705598434;
+						fromNodeId = 2633626803;
+						fromPinId = 2;
+						toNodeId = 1928997059;
+						toPinId = 0;
+					}
+					item[100] = {
+						id = 2321562180;
+						fromNodeId = 3662270328;
+						fromPinId = 0;
+						toNodeId = 2898243159;
+						toPinId = 2;
+					}
+					item[101] = {
+						id = 3070479886;
+						fromNodeId = 1928997059;
+						fromPinId = 2;
+						toNodeId = 2898243159;
+						toPinId = 0;
+					}
+					item[102] = {
+						id = 612228085;
+						fromNodeId = 486221316;
+						fromPinId = 0;
+						toNodeId = 1928997059;
+						toPinId = 1;
+					}
+					item[103] = {
+						id = 1243460014;
+						fromNodeId = 4180243491;
+						fromPinId = 3;
+						toNodeId = 734948878;
+						toPinId = 0;
+					}
+					item[104] = {
+						id = 3850670316;
+						fromNodeId = 1500354199;
+						fromPinId = 0;
+						toNodeId = 4180243491;
+						toPinId = 1;
+					}
+					item[105] = {
+						id = 2188867697;
+						fromNodeId = 104032689;
+						fromPinId = 5;
+						toNodeId = 1700429718;
+						toPinId = 0;
+					}
+					item[106] = {
+						id = 3254350910;
+						fromNodeId = 104032689;
+						fromPinId = 4;
+						toNodeId = 1612670938;
+						toPinId = 0;
+					}
+					item[107] = {
+						id = 1410893626;
+						fromNodeId = 280459779;
+						fromPinId = 8;
+						toNodeId = 3731670379;
+						toPinId = 0;
+					}
+					item[108] = {
+						id = 2503817320;
+						fromNodeId = 280459779;
+						fromPinId = 6;
+						toNodeId = 3731670379;
+						toPinId = 1;
+					}
+					item[109] = {
+						id = 2329408612;
+						fromNodeId = 3731670379;
+						fromPinId = 2226837152;
+						toNodeId = 734948878;
+						toPinId = 0;
+					}
+					item[110] = {
+						id = 372267147;
+						fromNodeId = 1459790740;
+						fromPinId = 1;
+						toNodeId = 2633007320;
+						toPinId = 0;
+					}
+					item[111] = {
+						id = 185242347;
+						fromNodeId = 3679983953;
+						fromPinId = 4;
+						toNodeId = 1624111354;
+						toPinId = 0;
+					}
+					item[112] = {
+						id = 1408577132;
+						fromNodeId = 2276281615;
+						fromPinId = 2;
+						toNodeId = 3961779437;
+						toPinId = 0;
+					}
+					item[113] = {
+						id = 44628276;
+						fromNodeId = 2633007320;
+						fromPinId = 2;
+						toNodeId = 1337848659;
+						toPinId = 0;
+					}
+					item[114] = {
+						id = 3628487250;
+						fromNodeId = 426342039;
+						fromPinId = 2;
+						toNodeId = 4179187249;
+						toPinId = 0;
+					}
+					item[115] = {
+						id = 1420868331;
+						fromNodeId = 4075656008;
+						fromPinId = 1;
+						toNodeId = 3679983953;
+						toPinId = 0;
+					}
+					item[116] = {
+						id = 4119845288;
+						fromNodeId = 3679983953;
+						fromPinId = 1;
+						toNodeId = 3936682207;
+						toPinId = 0;
+					}
+					item[117] = {
+						id = 607808577;
+						fromNodeId = 3679983953;
+						fromPinId = 3;
+						toNodeId = 1459790740;
+						toPinId = 0;
+					}
+					item[118] = {
+						id = 1225879453;
+						fromNodeId = 3679983953;
+						fromPinId = 2;
+						toNodeId = 2276281615;
+						toPinId = 0;
+					}
+					item[119] = {
+						id = 2351974317;
+						fromNodeId = 388611092;
+						fromPinId = 18;
+						toNodeId = 2609254442;
+						toPinId = 3;
+					}
+					item[120] = {
+						id = 1740919600;
+						fromNodeId = 108566455;
+						fromPinId = 0;
+						toNodeId = 3757491653;
+						toPinId = 2;
+					}
+					item[121] = {
+						id = 4717126;
+						fromNodeId = 1974168873;
+						fromPinId = 2721174256;
+						toNodeId = 957885986;
+						toPinId = 177509965;
+					}
+					item[122] = {
+						id = 1918308145;
+						fromNodeId = 957885986;
+						fromPinId = 84727104;
+						toNodeId = 3339073055;
+						toPinId = 0;
+					}
+					item[123] = {
+						id = 1211309820;
+						fromNodeId = 1700429718;
+						fromPinId = 3;
+						toNodeId = 3947516743;
+						toPinId = 0;
+					}
+					item[124] = {
+						id = 2392606599;
+						fromNodeId = 3947516743;
+						fromPinId = 3;
+						toNodeId = 4110483463;
+						toPinId = 0;
+					}
+					item[125] = {
+						id = 3593342894;
+						fromNodeId = 473128123;
+						fromPinId = 0;
+						toNodeId = 3947516743;
+						toPinId = 1;
+					}
+					item[126] = {
+						id = 803804176;
+						fromNodeId = 2292597416;
+						fromPinId = 1;
+						toNodeId = 388611092;
+						toPinId = 0;
+					}
+					item[127] = {
+						id = 1959780236;
+						fromNodeId = 1039792017;
+						fromPinId = 3;
+						toNodeId = 4254611996;
+						toPinId = 127737865;
+					}
+					item[128] = {
+						id = 3128854213;
+						fromNodeId = 4254611996;
+						fromPinId = 206650094;
+						toNodeId = 2788213351;
+						toPinId = 0;
+					}
+					item[129] = {
+						id = 4226285645;
+						fromNodeId = 2494165912;
+						fromPinId = 0;
+						toNodeId = 4254611996;
+						toPinId = 160141547;
+					}
+					item[130] = {
+						id = 3043398590;
+						fromNodeId = 184499591;
+						fromPinId = 1;
+						toNodeId = 1556038472;
+						toPinId = 0;
+					}
+					item[131] = {
+						id = 1350918206;
+						fromNodeId = 1556038472;
+						fromPinId = 1;
+						toNodeId = 695489549;
+						toPinId = 0;
+					}
+					item[132] = {
+						id = 99490651;
+						fromNodeId = 695489549;
+						fromPinId = 1;
+						toNodeId = 4254611996;
+						toPinId = 254868155;
+					}
+					item[133] = {
+						id = 457637288;
+						fromNodeId = 4254611996;
+						fromPinId = 78545582;
+						toNodeId = 4281890189;
+						toPinId = 0;
+					}
+					item[134] = {
+						id = 3656919116;
+						fromNodeId = 4254611996;
+						fromPinId = 163846018;
+						toNodeId = 4281890189;
+						toPinId = 2;
+					}
+					item[135] = {
+						id = 1013005953;
+						fromNodeId = 4281890189;
+						fromPinId = 1;
+						toNodeId = 2184183276;
+						toPinId = 0;
+					}
+					item[136] = {
+						id = 2826996725;
+						fromNodeId = 4281890189;
+						fromPinId = 3;
+						toNodeId = 2184183276;
+						toPinId = 2;
+					}
+					item[137] = {
+						id = 2017189693;
+						fromNodeId = 2184183276;
+						fromPinId = 1;
+						toNodeId = 4117381864;
+						toPinId = 0;
+					}
+					item[138] = {
+						id = 1544361795;
+						fromNodeId = 2184183276;
+						fromPinId = 3;
+						toNodeId = 4117381864;
+						toPinId = 0;
+					}
+				}
+			}
+		}
+	}
+}

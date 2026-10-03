@@ -1,0 +1,24 @@
+{
+	edit = {
+		missionSelectList = {
+			num = 4;
+			item[0] = {
+				mapName = "game/dlc2/e5m1_spear/e5m1_spear";
+				activeLayers = {
+					num = 2;
+					item[0] = "game/sp/dlc2/e5m1_spear/main";
+					item[1] = "game/sp/dlc2/e5m1_spear/gameplay/e5m1_spear_mission_select";
+				}
+			}
+			item[1] = {
+				mapName = "game/dlc2/e5m2_earth/e5m2_earth";
+			}
+			item[2] = {
+				mapName = "game/dlc2/e5m3_hell/e5m3_hell";
+			}
+			item[3] = {
+				mapName = "game/dlc2/e5m4_boss/e5m4_boss";
+			}
+		}
+	}
+}

@@ -35,7 +35,7 @@ def check_undefined_names(repo_root: Path) -> None:
     target_dirs = [repo_root / "doom_eap", repo_root / "tools/release"]
     ruff_bin = shutil.which("ruff")
     if not ruff_bin:
-        # Also try invoking via sys.executable -m ruff
+        # also try invoking via sys.executable -m ruff
         res_probe = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True)
         if res_probe.returncode == 0:
             cmd = [sys.executable, "-m", "ruff", "check", "--select", "F821,F822,F823", *(str(p) for p in target_dirs)]
@@ -78,7 +78,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
     if not (ap_source / "CommonClient.py").is_file():
         raise RuntimeError(f"Invalid Archipelago source (missing CommonClient.py): {ap_source}")
 
-    # 0. Strict Static Undefined Name & Syntax Checks
+    # strict static undefined name & syntax checks
     check_undefined_names(root)
     check_syntax(root)
 
@@ -95,7 +95,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
     ]:
         sys.modules.pop(mod, None)
 
-    # 1. Verify Third-Party Dependencies
+    # check third-party dependencies
     required_deps = [
         "colorama",
         "websockets",
@@ -125,7 +125,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
         raise RuntimeError("SSL context failed to enforce CERT_REQUIRED and check_hostname")
     print(f"  [OK] certifi CA bundle verified ({ca_path.stat().st_size} bytes) -> {ca_path}")
 
-    # 2. Verify Stub Path Precedence
+    # check stub path precedence
     print("--> Checking standalone runtime stub precedence...")
     stub_checks = [
         ("ModuleUpdate", standalone_runtime),
@@ -144,7 +144,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             )
         print(f"  [OK] {mod_name} stub -> {mod_path}")
 
-    # 3. Verify Archipelago Client Core Modules
+    # check archipelago client core modules
     print("--> Checking Archipelago client core module resolution...")
     ap_core_checks = [
         ("Utils", ap_source),
@@ -163,7 +163,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             )
         print(f"  [OK] {mod_name} -> {mod_path}")
 
-    # 4. Hermetic Bridge Client Verification
+    # isolated bridge client verification
     print("--> Checking DOOM Eternal bridge client importability (hermetic setup)...")
     env_keys = (
         "DOOM_AP_CONFIG_FILE", "DOOM_AP_APPLICATION_DIR", "ARCHIPELAGO_SOURCE",
@@ -204,7 +204,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             sys.modules.pop("doom_eap.runtime.bridge_client", None)
             bridge_mod = importlib.import_module("doom_eap.runtime.bridge_client")
 
-            # Verify hermetic paths are active
+            # check isolated paths are active
             if bridge_mod.CONFIG_FILE.resolve() != fake_config.resolve():
                 raise RuntimeError(
                     f"Bridge client used unexpected config: {bridge_mod.CONFIG_FILE} != {fake_config}"
@@ -231,12 +231,12 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             print(f"  [OK] Hermetic SAVE_GAMES_DIR -> {bridge_mod.SAVE_GAMES_DIR}")
             print(f"  [OK] Hermetic STEAM_REMOTE_DIR -> {bridge_mod.STEAM_REMOTE_DIR}")
 
-            # 5. Verify Launcher App Module
+            # check launcher app module
             print("--> Checking DOOM Eternal launcher app importability...")
             launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
             print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
 
-            # 6. Verify Frozen Mode Identity Resolution
+            # check frozen mode identity resolution
             print("--> Checking bridge runtime identity in simulated frozen environment...")
             from doom_eap.runtime.bridge_client import resolve_bridge_identity
             with tempfile.TemporaryDirectory(prefix="doomeap_preflight_frozen_") as frozen_dir_str:
@@ -294,7 +294,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             print("  [OK] launcher_app --self-test returned code 0")
 
         finally:
-            # Restore environment
+            # restore environment
             for k, v in orig_env.items():
                 if v is None:
                     os.environ.pop(k, None)

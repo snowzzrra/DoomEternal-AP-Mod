@@ -79,21 +79,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "retire experimental CVar items and add Exultia Slayer Gate Complete 7770486"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "c8d699f2e93b8b66287c6c9febf08b466bebb00eba23acdcfe375ce6dd1980c7",
-  "byte_sha256": "9146cbc62de8cd5c639dd7047045308225bca88c2a831bf93b6453f5ef2a7e0b",
   "content_revision": "0.5.0",
-  "generated_entity_metrics": {
-    "bind_parents": 227,
-    "byte_size": 11887227,
-    "classes": 11475,
-    "entity_count": 11475,
-    "layers": 2702,
-    "targets": 8647,
-    "transforms": 22860,
-    "unique_entity_names": 11475
-  },
   "manifest_sha256": "7344f74f51289f2480431baec4238260877cad9bd15ae86faf98d6b02db5b18c",
   "map_key": "e1m2_war",
   "physical_ap_ids": [
@@ -126,11 +119,9 @@
     7770090,
     7770486
   ],
-  "publisher_contract_sha256": "166e4ac35ed56332bbac96f87831205d97d66c60852afe073b676819ff56ca39",
   "runtime_location_ids": [
     7770123
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "2046e2df5d9326679d3ff9471e5956de7c8485bca22995bf09f289d386ed2600",
-  "semantic_sha256": "ab3a3f73037fd1bac4d001af92d88d8e3ab526c2ce3227328a8b6d907268d325"
+  "scripted_contract_sha256": "2046e2df5d9326679d3ff9471e5956de7c8485bca22995bf09f289d386ed2600"
 }

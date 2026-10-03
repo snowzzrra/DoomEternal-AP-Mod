@@ -306,9 +306,16 @@ def player_yaml_document(
 
 
 def dump_player_yaml(
-    schema: Mapping[str, Any], player_name: str, values: Mapping[str, Any]
+    schema: Mapping[str, Any], player_name: str, values: Mapping[str, Any],
+    *, imported: Mapping[str, Any] | None = None,
 ) -> str:
     document = player_yaml_document(schema, player_name, values)
+    if imported is not None:
+        document = {
+            **imported, **document,
+            "description": imported.get("description", document["description"]),
+            GAME_NAME: {**imported[GAME_NAME], **document[GAME_NAME]},
+        }
     return yaml.safe_dump(
         document,
         allow_unicode=True,
@@ -322,6 +329,7 @@ def save_player_yaml(
     schema: Mapping[str, Any],
     player_name: str,
     values: Mapping[str, Any],
+    *, imported: Mapping[str, Any] | None = None,
 ) -> Path:
     destination = path.expanduser()
     if destination.suffix.lower() not in {".yaml", ".yml"}:
@@ -331,7 +339,7 @@ def save_player_yaml(
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
     try:
         temporary.write_text(
-            dump_player_yaml(schema, player_name, values),
+            dump_player_yaml(schema, player_name, values, imported=imported),
             encoding="utf-8",
             newline="\n",
         )
@@ -342,6 +350,62 @@ def save_player_yaml(
         except FileNotFoundError:
             pass
     return destination
+
+
+class _PlayerLoader(yaml.SafeLoader):
+    """Reject duplicate keys so an import cannot silently discard settings."""
+
+    def construct_mapping(self, node, deep=False):
+        self.flatten_mapping(node)
+        keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
+        if any(not isinstance(key, (str, int)) for key in keys) or len(keys) != len(set(keys)):
+            raise ValueError("YAML contains duplicate or unsupported mapping keys")
+        return super().construct_mapping(node, deep=deep)
+
+
+def load_player_yaml(path: Path, schema: Mapping[str, Any]) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    """Import explicit player settings; retain unedited common options on export."""
+    with path.open("rb") as stream:
+        raw = stream.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise ValueError("Player YAML must be smaller than 1 MiB")
+    try:
+        document = yaml.load(raw.decode("utf-8-sig"), Loader=_PlayerLoader)
+    except (yaml.YAMLError, UnicodeError, RecursionError) as error:
+        raise ValueError(f"Could not read Player YAML: {error}") from error
+    if not isinstance(document, dict) or document.get("game") != GAME_NAME:
+        raise ValueError("Select a single DOOM Eternal player YAML")
+    name = validate_player_name(document.get("name"))
+    raw_options = document.get(GAME_NAME)
+    if not isinstance(raw_options, dict):
+        raise ValueError("Player YAML lacks DOOM Eternal settings")
+    values = default_option_values(schema)
+    for option in schema["options"]:
+        key = option["key"]
+        if key not in raw_options:
+            continue
+        value = raw_options[key]
+        kind = option["ui_type"]
+        if kind == "toggle" and value in (0, 1, "true", "false", "on", "off"):
+            value = value in (1, "true", "on")
+        elif kind == "choice":
+            value = next((choice["key"] for choice in option["choices"]
+                          if value == choice["value"] or isinstance(value, str)
+                          and value.casefold() in {choice["key"].casefold(), choice["label"].casefold()}), value)
+        elif kind == "named_range" and isinstance(value, int):
+            value = next((special["key"] for special in option["special_values"] if value == special["value"]), value)
+        elif kind == "option_set" and isinstance(value, list):
+            if any(not isinstance(item, str) for item in value):
+                raise ValueError(f"{key} must contain explicit option names")
+            value = list(dict.fromkeys(next((choice["key"] for choice in option["choices"]
+                                            if item in choice.get("aliases", ())), item) for item in value))
+        values[key] = value
+    values[START_INVENTORY_KEY] = raw_options.get(START_INVENTORY_KEY, {})
+    try:
+        values = validate_option_values(schema, values)
+    except ValueError as error:
+        raise ValueError(f"Use explicit settings rather than weighted/random YAML values: {error}") from error
+    return name, values, document
 
 
 def suggested_yaml_filename(player_name: str) -> str:

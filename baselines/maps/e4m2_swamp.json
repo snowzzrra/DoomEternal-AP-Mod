@@ -19,21 +19,14 @@
     {
       "content_revision": "0.5.0",
       "reason": "0.5.2: make Blood Swamps Fast Travel AP-owned during completed replay"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
     }
   ],
   "asset_package_contract_sha256": "8fab5ab750545ab6033eeee536fd8a4b5b11d24f1f82dee032419e52549d25e2",
-  "byte_sha256": "430e04cdb931f787f7de97c36104cb57e12dd1db6e498cf387b5c10d8ad1025d",
   "content_revision": "0.5.0",
-  "generated_entity_metrics": {
-    "bind_parents": 463,
-    "byte_size": 15854505,
-    "classes": 12999,
-    "entity_count": 13013,
-    "layers": 2027,
-    "targets": 17713,
-    "transforms": 28535,
-    "unique_entity_names": 13000
-  },
   "manifest_sha256": "ad144f5a1d942ac362a902fa3fcd96fa5156aaace5c1a8ab921f125bee36cc3c",
   "map_key": "e4m2_swamp",
   "physical_ap_ids": [
@@ -48,11 +41,9 @@
     7770441,
     7770442
   ],
-  "publisher_contract_sha256": "38e929329897fbb9ca1e57ec74ef274ea3c3de406371d90b86b5f1ff38ea7f4b",
   "runtime_location_ids": [
     7770443
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "c35ee7de5e97e8e01f5c5727a3826b733f85d1dcb4b7c501161875c0eb454e8b",
-  "semantic_sha256": "92e99aa92a341de39aea2038278afefae10da236447eecde07b07138b295a71d"
+  "scripted_contract_sha256": "c35ee7de5e97e8e01f5c5727a3826b733f85d1dcb4b7c501161875c0eb454e8b"
 }

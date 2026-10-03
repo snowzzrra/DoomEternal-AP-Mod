@@ -26,6 +26,7 @@ from tools.release.room_payloads import (
     write_deterministic_zip,
     zip_directory,
 )
+from tools.release.prebuilt_room_resources import compute_room_resource_input_fingerprint
 
 
 def _sha(path: Path) -> str:
@@ -101,13 +102,9 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
     if set(maps) != set(release_keys):
         raise ValueError("room payload map set does not match the content catalog")
 
-    compiler_identity = _sha_files([
-        root / "doom_eap/launcher/launcher_core.py", root / "doom_eap/content/physical_options.py",
-        root / "doom_eap/content/content_catalog.py", root / "tools/maps/mission_complete_map_patcher.py",
-        root / "tools/maps/ap_map_generator.py", root / "data/items.json",
-        root / "data/item_classifications.json", root / "data/location_names.json",
-        root / "data/mission_complete_map_contracts.json", root / "data/publisher_contracts.json", map_sources_path,
-    ])
+    compiler_identity, _ = compute_room_resource_input_fingerprint(root)
+    # A caller may supply a registry outside the default source tree.
+    compiler_identity = hashlib.sha256((compiler_identity + _sha(map_sources_path)).encode("ascii")).hexdigest()
     compressor_identity = _sha(compressor)
     cache = StateCache(cache_root.resolve())
     canonical_options = {key: False for key in PHYSICAL_OPTION_KEYS}

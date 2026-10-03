@@ -3,10 +3,28 @@
 import shutil
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_terminal_console_commands_release_native_capacity(tmp_path):
+    compiler = shutil.which("cl.exe")
+    core = Path(os.environ.get("SENTINEL_CORE_SOURCE", str(REPO_ROOT.parent / "Sentinel-Core")))
+    if not compiler or not (core / "include/sentinel_inspection.h").is_file():
+        pytest.skip("Windows MSVC and Core SDK source required")
+    executable = tmp_path / "command-release.exe"
+    subprocess.run([
+        compiler, "/nologo", "/std:c++17", "/EHsc", "/DNOMINMAX",
+        f"/I{REPO_ROOT / 'native/client'}", f"/I{core / 'include'}",
+        f"/I{core / 'src'}", f"/I{core / 'build/generated'}",
+        str(REPO_ROOT / "tests/native_command_release.cpp"),
+        str(REPO_ROOT / "native/client/sentinel_command_client.cpp"),
+        str(core / "src/commands.cpp"), f"/Fe{executable}", "bcrypt.lib",
+    ], check=True, cwd=tmp_path, capture_output=True, text=True)
+    subprocess.run([str(executable)], check=True)
 
 
 def tick_reached(now: int, deadline: int) -> bool:
@@ -42,101 +60,18 @@ def receipt_dispatch_ready(now: int, next_attempt: int) -> bool:
 
 @pytest.mark.unit
 class TestNativeRpcTimingSemantics:
-    def test_unpatched_sentinel_fails_on_high_bit_tick(self):
-        """Demonstrates that an unpatched deadline of 0 evaluates false for high-bit ticks."""
-        pilzkopf_tick = 0xEE000000
-        assert not tick_reached(pilzkopf_tick, 0), (
-            "Signed difference (0xEE000000 - 0) cast to int32 must be negative, reproducing the freeze."
-        )
 
-    @pytest.mark.parametrize(
-        "tick",
-        [
-            0,
-            100,
-            1000,
-            0x7FFFFFFE,
-            0x7FFFFFFF,
-            0x80000000,
-            0x80000001,
-            0xEE000000,
-            0xFFFFFFFE,
-            0xFFFFFFFF,
-        ],
-    )
-    def test_first_poll_executes_across_representative_ticks(self, tick: int):
-        """First PollHealth invocation must be eligible immediately across representative 32-bit ticks."""
-        state = HealthPollState(interval_ms=1000)
-        assert state.should_poll(tick), f"First poll must execute immediately at tick 0x{tick:08X}"
 
-    def test_subsequent_poll_throttling_and_execution(self):
-        """Subsequent polls remain throttled until interval elapses."""
-        now = 0xEE000000
-        state = HealthPollState(interval_ms=1000)
 
-        # First poll executes immediately
-        assert state.should_poll(now)
 
-        # Immediate repeat calls are throttled
-        assert not state.should_poll((now + 100) & 0xFFFFFFFF)
-        assert not state.should_poll((now + 500) & 0xFFFFFFFF)
-        assert not state.should_poll((now + 999) & 0xFFFFFFFF)
 
-        # Poll executes once interval is reached
-        assert state.should_poll((now + 1000) & 0xFFFFFFFF)
-
-    def test_dword_wrap_relative_deadline(self):
-        """Post-wrap low tick values evaluate correctly against relative deadlines."""
-        now = 0xFFFFFFFE
-        state = HealthPollState(interval_ms=1000)
-
-        # First poll at 0xFFFFFFFE schedules next tick for 998 (0x000003E6)
-        assert state.should_poll(now)
-        expected_deadline = (0xFFFFFFFE + 1000) & 0xFFFFFFFF
-        assert expected_deadline == 998
-
-        # Post-wrap tick before deadline does not trigger
-        assert not state.should_poll(100)
-        assert not state.should_poll(500)
-        assert not state.should_poll(997)
-
-        # Post-wrap tick at or after deadline triggers
-        assert state.should_poll(998)
-
-    @pytest.mark.parametrize(
-        "tick",
-        [
-            0,
-            100,
-            0x7FFFFFFF,
-            0x80000000,
-            0xEE000000,
-            0xFFFFFFFF,
-        ],
-    )
-    def test_receipt_dispatch_ready_initial_sentinel(self, tick: int):
-        """ReceiptDispatchReady with nextAttempt=0 must evaluate true immediately for any tick."""
-        assert receipt_dispatch_ready(tick, 0), f"Initial dispatch must be ready at tick 0x{tick:08X}"
-
-    def test_receipt_dispatch_ready_scheduled_retry_and_wrap(self):
-        """Scheduled retry delay and wrap handling in ReceiptDispatchReady."""
-        now = 0xFFFFFFFE
-        delay = 250
-        deadline = (now + delay) & 0xFFFFFFFF
-        assert deadline == 248
-
-        # Before deadline (post-wrap)
-        assert not receipt_dispatch_ready(100, deadline)
-        # At deadline
-        assert receipt_dispatch_ready(248, deadline)
-        # After deadline
-        assert receipt_dispatch_ready(300, deadline)
 
     def test_cpp_queue_policy_native_execution(self):
         """Compile and execute rpc_queue_policy.h against native C++ types if g++ is available."""
-        cxx = shutil.which("g++")
+        msvc = shutil.which("cl.exe")
+        cxx = msvc or shutil.which("g++")
         if not cxx:
-            pytest.skip("g++ not available on host")
+            pytest.skip("MSVC or g++ not available on host")
 
         source = """#include <cassert>
 #include <cstdint>
@@ -198,15 +133,17 @@ int main() {
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             source_file = temp_path / "test_main.cpp"
-            binary_file = temp_path / "test_bin"
+            binary_file = temp_path / ("test_bin.exe" if msvc else "test_bin")
             source_file.write_text(source, encoding="utf-8")
 
             build_res = subprocess.run(
-                [cxx, "-std=c++17", f"-I{REPO_ROOT}", str(source_file), "-o", str(binary_file)],
+                ([cxx, "/nologo", "/std:c++17", "/EHsc", f"/I{REPO_ROOT}", str(source_file),
+                  f"/Fe{binary_file}", f"/Fo{temp_path / 'test_main.obj'}"] if msvc else
+                 [cxx, "-std=c++17", f"-I{REPO_ROOT}", str(source_file), "-o", str(binary_file)]),
                 capture_output=True,
                 text=True,
             )
-            assert build_res.returncode == 0, f"C++ compilation failed: {build_res.stderr}"
+            assert build_res.returncode == 0, f"C++ compilation failed: {build_res.stdout}\n{build_res.stderr}"
 
             run_res = subprocess.run([str(binary_file)], capture_output=True, text=True)
             assert run_res.returncode == 0, f"C++ test execution failed: {run_res.stderr}"

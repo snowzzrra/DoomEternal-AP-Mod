@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import queue
 import re
-import threading
 import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPen, QPolygonF, QShortcut, QStandardItemModel
+from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
-    QKeySequenceEdit,
     QLayout,
     QLabel,
     QLineEdit,
@@ -41,21 +40,20 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
     QGraphicsOpacityEffect,
 )
 
-from doom_eap.content.options_foundation import load_start_inventory_catalog, suggested_yaml_filename
+from doom_eap.content.options_foundation import load_player_yaml, load_start_inventory_catalog, suggested_yaml_filename
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .connection_errors import enrich_connection_failure
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
-from .launcher_reporting import report_problem
 from .launcher_platform import (
     doom_saved_games_base,
     is_saved_games_base_shape,
-    probe_meathook,
     redact_secrets,
 )
 
@@ -209,7 +207,7 @@ class AmmoRefillKeyControl(QWidget):
     changed = Signal(str)
     rejected = Signal(str)
 
-    def __init__(self, value: str = "F9"):
+    def __init__(self, value: str = "F9", *, default: str = "F9"):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -221,7 +219,7 @@ class AmmoRefillKeyControl(QWidget):
         clear = QPushButton("CLEAR")
         clear.clicked.connect(self._clear)
         reset = QPushButton("RESET")
-        reset.clicked.connect(lambda: self.set_value("F9", emit=True))
+        reset.clicked.connect(lambda: self.set_value(default, emit=True))
         layout.addWidget(self.editor, 1)
         layout.addWidget(clear)
         layout.addWidget(reset)
@@ -240,6 +238,49 @@ class AmmoRefillKeyControl(QWidget):
     def _clear(self) -> None:
         self.editor.set_value("")
         self._emit_value()
+
+
+class _OptionCategory(QFrame):
+    """Keyboard-accessible category with a short, interruptible reveal."""
+
+    def __init__(self, title: str):
+        super().__init__()
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 14, 20, 14)
+        self.toggle = QToolButton()
+        self.toggle.setText(title.replace("&", "&&"))
+        self.toggle.setCheckable(True)
+        self.toggle.setChecked(True)
+        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.toggle.setStyleSheet("QToolButton { color: #e9a64b; font-weight: 800; padding: 7px; text-align: left; } QToolButton:focus { border: 1px solid #e9a64b; }")
+        layout.addWidget(self.toggle)
+        self.body = QWidget()
+        self.contents = QVBoxLayout(self.body)
+        self.contents.setContentsMargins(0, 8, 0, 0)
+        self.contents.setSpacing(9)
+        layout.addWidget(self.body)
+        self.animation = QPropertyAnimation(self.body, b"maximumHeight", self)
+        self.animation.setDuration(160)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.animation.finished.connect(self._finished)
+        self.toggle.toggled.connect(self._toggle)
+
+    def _toggle(self, expanded: bool) -> None:
+        self.animation.stop()
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        current = self.body.height() if self.body.isVisible() else 0
+        self.body.setVisible(True)
+        self.animation.setStartValue(current)
+        self.animation.setEndValue(self.body.sizeHint().height() if expanded else 0)
+        self.animation.start()
+
+    def _finished(self) -> None:
+        self.body.setVisible(self.toggle.isChecked())
+        if self.toggle.isChecked():
+            self.body.setMaximumHeight(16777215)
 
 
 class NamedRangeControl(QWidget):
@@ -308,7 +349,7 @@ class OptionSetControl(QWidget):
 
     TOOLTIPS = {
         "Acquire the Unmaykr": "Claim the Unmaykr from its case in the Fortress of Doom. The six Base Campaign Slayer Gates provide the Empyrean Keys needed to unlock it, but you must actually pick up the weapon.",
-        "Complete All Enabled Missions": "Finish every mission included in this room: all 13 Base Campaign missions in a Base-only world, or all 19 Base, TAG1, and TAG2 missions in a Full Saga world.",
+        "Complete All Included Missions": "Finish every mission included in this room, including its selected terminal boss.",
         "Complete All Slayer Gates": "Complete every Slayer Gate included in the room. This means the six Base Campaign Gates, plus the UAC Atlantica and The Holt Gates when DLC content is enabled.",
         "Complete All Escalation Encounters": "Complete both Wave 1 and Wave 2 of every Escalation Encounter in The World Spear, Reclaimed Earth, and Immora.",
         "Complete All Secret Encounters": "Complete every Secret Encounter included in the room — the optional timed combat encounters found throughout the enabled campaigns.",
@@ -333,9 +374,9 @@ class OptionSetControl(QWidget):
         actions.addWidget(clear)
         actions.addStretch(1)
         layout.addLayout(actions)
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(5)
+        self.grid = QGridLayout()
+        self.grid.setHorizontalSpacing(12)
+        self.grid.setVerticalSpacing(5)
         default = option.get("default", [])
         selected = set(default) if isinstance(default, list) else set()
         for index, choice in enumerate(cast(list[object], option.get("choices", []))):
@@ -346,10 +387,18 @@ class OptionSetControl(QWidget):
             check.setObjectName("requirementOption")
             check.setToolTip(self.TOOLTIPS.get(str(key), ""))
             check.setChecked(key in selected)
-            grid.addWidget(check, index // 2, index % 2)
+            self.grid.addWidget(check, index, 0)
             self.checks.append((key, check))
-        layout.addLayout(grid)
+        layout.addLayout(self.grid)
         self._refresh_lock_state()
+
+    def resizeEvent(self, event) -> None:
+        columns = 2 if self.width() >= 650 else 1
+        if columns != getattr(self, "_columns", None):
+            self._columns = columns
+            for index, (_, check) in enumerate(self.checks):
+                self.grid.addWidget(check, index // columns, index % columns)
+        super().resizeEvent(event)
 
     def set_dependencies(self, locked: set[str], unavailable: set[str]) -> None:
         """Mark requirements implied by the Goal (locked) or absent from the room."""
@@ -362,10 +411,6 @@ class OptionSetControl(QWidget):
             name = str(key)
             locked = name in self._locked
             unavailable = name in self._unavailable
-            if locked:
-                check.setChecked(True)
-            elif unavailable:
-                check.setChecked(False)
             check.setEnabled(not locked and not unavailable)
             check.setProperty("goalLocked", locked)
             prefix = self.LOCKED_PREFIX if locked else self.UNAVAILABLE_PREFIX if unavailable else ""
@@ -382,15 +427,11 @@ class OptionSetControl(QWidget):
             check.setChecked(checked)
 
     def value(self) -> list[object]:
-        return [key for key, check in self.checks
-                if str(key) not in self._locked and str(key) not in self._unavailable
-                and check.isChecked()]
+        return [key for key, check in self.checks if check.isChecked()]
 
     def setValue(self, value: object) -> None:
         selected = set(value) if isinstance(value, list) else set()
         for key, check in self.checks:
-            if str(key) in self._locked:
-                continue
             check.setChecked(key in selected)
 
 
@@ -436,9 +477,6 @@ class LauncherUI(QMainWindow):
         self._set_hints_state("disconnected")
         self._set_setup_state("disconnected")
         self._load_icon()
-        self._qt_application = QApplication.instance()
-        if self._qt_application is not None:
-            self._qt_application.installEventFilter(self)
         self._install_shortcuts()
         self._discover()
         self.timer = QTimer(self)
@@ -668,7 +706,10 @@ class LauncherUI(QMainWindow):
         return strip
 
     def _arrange_status_strip(self) -> None:
-        available = self.status_strip.contentsRect().width()
+        page = cast(QScrollArea, self.pages.widget(2))
+        outer = page.widget().layout().contentsMargins()
+        inner = self.status_strip.parentWidget().layout().contentsMargins()
+        available = page.viewport().width() - outer.left() - outer.right() - inner.left() - inner.right()
         if available <= 0:
             QTimer.singleShot(0, self._arrange_status_strip)
             return
@@ -699,7 +740,7 @@ class LauncherUI(QMainWindow):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if hasattr(self, "status_strip"):
-            self._arrange_status_strip()
+            QTimer.singleShot(0, self._arrange_status_strip)
 
     def _join_page(self) -> QScrollArea:
         body = QWidget()
@@ -732,6 +773,8 @@ class LauncherUI(QMainWindow):
             str(self.controller.config.get("ammo_refill_keybind", "F9"))
         )
         self.ammo_refill_keybind.changed.connect(self._save_ammo_refill_keybind)
+        self.special_toggle_keybind = AmmoRefillKeyControl(str(self.controller.config.get("special_toggle_keybind", "F10")), default="F10")
+        self.special_toggle_keybind.changed.connect(self._save_special_toggle_keybind)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.detected_paths = self._label("Checking for DOOM Eternal…", "muted")
@@ -750,13 +793,14 @@ class LauncherUI(QMainWindow):
         self._entry_row(layout, 7, "PLAYER", self.slot)
         self._entry_row(layout, 8, "PASSWORD", self.password)
         self._entry_row(layout, 9, "AMMO REFILL KEY", self.ammo_refill_keybind)
+        self._entry_row(layout, 10, "SPECIAL TOGGLE KEY", self.special_toggle_keybind)
         self.join_button = _ScanlineButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, 10, 1, 1, 2)
+        layout.addWidget(self.join_button, 11, 1, 1, 2)
         self.join_error = self._label("", "warning")
         self.join_error.hide()
-        layout.addWidget(self.join_error, 11, 0, 1, 3)
+        layout.addWidget(self.join_error, 12, 0, 1, 3)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -806,7 +850,7 @@ class LauncherUI(QMainWindow):
         copy.setSpacing(3)
         copy.addWidget(self._label("CURRENT SESSION", "eyebrow"))
         self.session_player_name = self._label("NO ROOM CONNECTED", "sessionPlayerName")
-        self.session_player_name.setWordWrap(False)
+        self.session_player_name.setWordWrap(True)
         copy.addWidget(self.session_player_name)
         identity_copy = QWidget()
         identity_copy.setLayout(copy)
@@ -872,6 +916,13 @@ class LauncherUI(QMainWindow):
         self.stop_button.setEnabled(False)
         actions.addWidget(self.stop_button)
         layout.addLayout(actions)
+        backup_actions = QHBoxLayout()
+        backup_button = QPushButton("AP SAVE…")
+        backup_button.setToolTip("Back up, restore or start a new game save in the same room. Restart and restore require DOOM Eternal to be closed.")
+        backup_button.clicked.connect(self._ap_save_actions)
+        backup_actions.addWidget(backup_button)
+        backup_actions.addStretch()
+        layout.addLayout(backup_actions)
         self.session_setup = self._card("actionStrip")
         self.session_setup.setProperty("actionTone", "warning")
         setup_layout = QVBoxLayout(self.session_setup)
@@ -1009,8 +1060,18 @@ class LauncherUI(QMainWindow):
         header = self._card("hero")
         head = QVBoxLayout(header)
         head.setContentsMargins(24, 20, 24, 20)
-        head.addWidget(self._label("CREATE PLAYER YAML", "title"))
-        head.addWidget(self._label("Choose your DOOM Eternal settings, Starting Inventory, and save your player file.", "muted"))
+        heading = QHBoxLayout()
+        text = QVBoxLayout()
+        text.addWidget(self._label("CREATE PLAYER YAML", "title"))
+        description = self._label("Choose your DOOM Eternal settings, Starting Inventory, and save your player file.", "muted")
+        description.setWordWrap(True)
+        text.addWidget(description)
+        heading.addLayout(text, 1)
+        self.difficulty_skull = QLabel()
+        self.difficulty_skull.setFixedSize(64, 64)
+        self.difficulty_skull.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        heading.addWidget(self.difficulty_skull)
+        head.addLayout(heading)
         layout.addWidget(header)
         player = self._card()
         player_layout = QVBoxLayout(player)
@@ -1019,6 +1080,7 @@ class LauncherUI(QMainWindow):
         self.player_name = QLineEdit("Player")
         self.player_name.setPlaceholderText("Player name")
         player_layout.addWidget(self.player_name)
+        self._imported_player = None
         layout.addWidget(player)
         layout.addWidget(self._effective_config_widget())
         options_by_key = {
@@ -1026,24 +1088,33 @@ class LauncherUI(QMainWindow):
             for option in cast(list[dict[str, object]], self.controller.options_schema["options"])
         }
         groups = (
-            ("GOAL & CAMPAIGN", ("goal", "use_dlc_content", "include_dlc_missions", "dlc_logic_timing", "additional_victory_requirements")),
+            ("GOAL & CAMPAIGN", ("mission_pool", "custom_missions", "custom_dark_lord", "mission_order", "mission_count", "starting_missions", "full_saga_final_boss", "goal", "goal_mission_as_item", "use_dlc_content", "dlc_logic_timing", "additional_victory_requirements")),
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
             ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "randomize_first_battery", "include_weapon_mastery_challenges", "praetor_suit_upgrades_in_pool")),
-            ("COMBAT & QoL", ("reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
-            ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link")),
+            ("COMBAT & QoL", ("campaign_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
+            ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link", "death_link_mode")),
         )
+        self.option_categories = []
+        displayed = set()
         for group, keys in groups:
-            card = self._card()
-            group_layout = QVBoxLayout(card)
-            group_layout.setContentsMargins(20, 18, 20, 20)
-            group_layout.setSpacing(9)
-            group_layout.addWidget(self._label(group, "section"))
+            card = _OptionCategory(group)
+            self.option_categories.append(card)
+            group_layout = card.contents
             if group == "STARTING LOADOUT":
                 group_layout.addWidget(self._start_inventory_widget())
             for key in keys:
                 option = options_by_key.get(key)
                 if option is not None:
                     group_layout.addWidget(self._option_widget(option))
+                    displayed.add(key)
+            layout.addWidget(card)
+        remaining = set(options_by_key) - displayed
+        if remaining:
+            card = _OptionCategory("OTHER SETTINGS")
+            self.option_categories.append(card)
+            for key in options_by_key:
+                if key in remaining:
+                    card.contents.addWidget(self._option_widget(options_by_key[key]))
             layout.addWidget(card)
         self._wire_create_dependencies()
         self._refresh_create_dependencies()
@@ -1054,6 +1125,9 @@ class LauncherUI(QMainWindow):
         save.setObjectName("primary")
         save.clicked.connect(self._save_player_options)
         actions.addWidget(reset)
+        import_button = QPushButton("IMPORT YAML…")
+        import_button.clicked.connect(self._import_player_options)
+        actions.addWidget(import_button)
         actions.addStretch(1)
         actions.addWidget(save)
         layout.addLayout(actions)
@@ -1086,7 +1160,7 @@ class LauncherUI(QMainWindow):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
-        for key in ("goal", "special_weapon", "starting_weapon", "dlc_logic_timing"):
+        for key in ("goal", "special_weapon", "starting_weapon", "dlc_logic_timing", "mission_pool", "mission_order", "full_saga_final_boss", "campaign_difficulty"):
             control = self.option_controls.get(key)
             if isinstance(control, QComboBox):
                 cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
@@ -1100,6 +1174,26 @@ class LauncherUI(QMainWindow):
                 checkbox = cast(QCheckBox, control)
                 self._warning_state[key] = checkbox.isChecked()
                 checkbox.toggled.connect(lambda checked, option_key=key: self._confirm_randomization(option_key, checked))
+
+    def _refresh_difficulty_skull(self) -> None:
+        key = str(self._choice_value("campaign_difficulty"))
+        if self.difficulty_skull.property("difficulty") == key:
+            return
+        name = {"im_too_young_to_die": "itytd", "hurt_me_plenty": "hurtmeplenty",
+                "ultra_violence": "ultraviolence", "nightmare": "nightmare"}.get(key)
+        if name is None:
+            self.difficulty_skull.clear()
+            return
+        scale = self.difficulty_skull.devicePixelRatioF()
+        source = QPixmap(str(self.controller.bundle_dir / "assets" / "launcher" / f"logo_{name}.png"))
+        pixmap = source.scaled(round(64 * scale), round(64 * scale),
+                               Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        pixmap.setDevicePixelRatio(scale)
+        self.difficulty_skull.setPixmap(pixmap)
+        self.difficulty_skull.setProperty("difficulty", key)
+        label = self._selected_label("campaign_difficulty")
+        self.difficulty_skull.setAccessibleName(label)
+        self.difficulty_skull.setToolTip(label)
 
     def _choice_value(self, key: str) -> object:
         control = self.option_controls.get(key)
@@ -1128,28 +1222,21 @@ class LauncherUI(QMainWindow):
         self._syncing_create_dependencies = True
         try:
             dlc_enabled = self._choice_value("use_dlc_content") is True
-            missions_control = self.option_controls.get("include_dlc_missions")
-            if isinstance(missions_control, QCheckBox):
-                missions_control.setEnabled(dlc_enabled)
-                if not dlc_enabled and missions_control.isChecked():
-                    missions_control.blockSignals(True)
-                    missions_control.setChecked(False)
-                    missions_control.blockSignals(False)
-            dlc_missions = bool(dlc_enabled and isinstance(missions_control, QCheckBox) and missions_control.isChecked())
+            pool = self._choice_value("mission_pool")
+            self._refresh_difficulty_skull()
+            custom = pool == "custom"
+            access = self._choice_value("mission_order") == "mission_access_as_items"
+            for key, enabled in (("custom_missions", custom), ("custom_dark_lord", custom),
+                                 ("starting_missions", access), ("goal_mission_as_item", access),
+                                 ("mission_count", self._choice_value("mission_order") != "vanilla_order")):
+                if key in self.option_rows:
+                    self.option_rows[key].setVisible(enabled)
+            dlc_missions = pool in {"full_saga", "dlc_only", "custom"}
             special_weapon = self.option_controls.get("special_weapon")
             special_row = self.option_rows.get("special_weapon")
             dlc_timing_row = self.option_rows.get("dlc_logic_timing")
             self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_missions)
             self._set_choice_enabled("goal", "complete_the_full_saga", dlc_missions)
-            if not dlc_enabled:
-                if self._choice_value("goal") in {"kill_the_dark_lord", "complete_the_full_saga"}:
-                    goal_control = self.option_controls.get("goal")
-                    if isinstance(goal_control, QComboBox):
-                        goal = cast(QComboBox, goal_control)
-                        goal.setCurrentIndex(max(0, goal.findData("acquire_the_unmaykr")))
-                if isinstance(special_weapon, QComboBox):
-                    special = cast(QComboBox, special_weapon)
-                    special.setCurrentIndex(max(0, special.findData("the_crucible")))
             if special_row is not None:
                 special_row.setVisible(dlc_enabled)
             if dlc_timing_row is not None:
@@ -1165,7 +1252,7 @@ class LauncherUI(QMainWindow):
                 if not dlc_missions:
                     locked.add("Complete All Slayer Gates")
             if goal_key == "complete_the_full_saga":
-                locked.add("Complete All Enabled Missions")
+                locked.add("Complete All Included Missions")
             if not dlc_missions:
                 unavailable.add("Complete All Escalation Encounters")
             if not mastery_enabled:
@@ -1182,7 +1269,7 @@ class LauncherUI(QMainWindow):
                 victory_summary = f"Goal + {requirement_count} extra objective{plural}"
             values = {
                 "goal": goal_label,
-                "campaign": "Full Saga · 19 missions" if dlc_missions else ("Base Campaign + DLC Gear" if dlc_enabled else "Base Campaign"),
+                "campaign": self._selected_label("mission_pool") + " · " + self._selected_label("mission_order"),
                 "dlc": self._selected_label("dlc_logic_timing") if dlc_missions else "Not active",
                 "special": special_label,
                 "starting": self._selected_label("starting_weapon"),
@@ -1302,30 +1389,24 @@ class LauncherUI(QMainWindow):
         primary = QShortcut(QKeySequence("Ctrl+Return"), self)
         primary.activated.connect(self._primary_action)
 
-    def eventFilter(self, watched, event) -> bool:
-        if (
-            event.type() == QEvent.Type.KeyPress
-            and self.isActiveWindow()
-            and watched is not self.ammo_refill_keybind.editor
-            and not self.ammo_refill_keybind.editor.isAncestorOf(watched)
-        ):
-            token = _simple_physical_key_token(event)
-            if token == self.ammo_refill_keybind.value():
-                self.controller.request_ammo_refill()
-                return True
-        return super().eventFilter(watched, event)
-
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
         value = captured.strip()
         try:
             self.controller.set_ammo_refill_keybind(value)
-        except ValueError as error:
+        except (ValueError, OSError) as error:
             self.ammo_refill_keybind.set_value(
                 str(self.controller.config.get("ammo_refill_keybind", "F9"))
             )
             self._append_log(f"Ammo Refill keybind rejected: {error}")
             return
         self._set_ammo_refill_indicator(self._ammo_refills_available)
+
+    def _save_special_toggle_keybind(self, captured: str) -> None:
+        try:
+            self.controller.set_ap_keybinds(self.ammo_refill_keybind.value(), captured)
+        except (ValueError, OSError) as error:
+            self.special_toggle_keybind.set_value(str(self.controller.config.get("special_toggle_keybind", "F10")))
+            QMessageBox.warning(self, "AP shortcut", str(error))
 
     def _set_ammo_refill_indicator(self, value: object) -> None:
         """Render Ammo Refill availability in three fixed indicator slots."""
@@ -1366,7 +1447,10 @@ class LauncherUI(QMainWindow):
         self._update_ammo_refill_button()
 
     def _show_page(self, index: int) -> None:
+        changed = self.pages.currentIndex() != index
         self.pages.setCurrentIndex(index)
+        if changed:
+            self._fade_in(self.pages.currentWidget())
         if index == 2:
             QTimer.singleShot(0, self._arrange_status_strip)
         if index == 4:
@@ -1525,20 +1609,21 @@ class LauncherUI(QMainWindow):
         elif self._setup_state == "manual_install_required":
             self._open_manual_install_guide()
         elif self._setup_state == "game_link_update_needed":
+            generation = self.controller.operation_generation
             confirm = QMessageBox.question(
                 self,
                 "Repair game integration",
-                "A different XINPUT1_3.dll is installed in your DOOM Eternal folder.\n\n"
-                "Repair game integration will back up its current game file to the launcher state folder "
-                "and replace it with the verified version.\n\n"
+                "The Core runtime pair requires verification.\n\n"
+                "Repair game integration verifies the selected Core distribution "
+                "and publishes its matching pair. Foreign providers require their owner's action.\n\n"
                 "Do you want to proceed with repair?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
             )
             if confirm == QMessageBox.StandardButton.Yes:
                 try:
-                    self.controller.install_game_link(force_repair=True)
-                    self._prepare(force=True)
+                    if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
+                        self._set_setup_state("installing", "Repairing game integration...")
                 except Exception as error:
                     self._append_log(f"Game integration repair error: {error}")
                     self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
@@ -1571,6 +1656,7 @@ class LauncherUI(QMainWindow):
 
     def _confirm_manual_installation(self) -> None:
         """Prompt user confirmation for manual mod installation completion."""
+        generation = self.controller.operation_generation
         reply = QMessageBox.question(
             self,
             "Confirm Manual Installation",
@@ -1581,7 +1667,7 @@ class LauncherUI(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.controller.confirm_manual_installation()
+                self.controller.confirm_manual_installation(generation=generation)
                 self._append_log("Manual mod installation confirmed.")
             except Exception as error:
                 self._append_log(f"Manual installation confirmation error: {error}")
@@ -1715,6 +1801,7 @@ class LauncherUI(QMainWindow):
     def _uninstall_room_package(self) -> None:
         if not self._room_connected:
             return
+        generation = self.controller.operation_generation
         confirmation = QMessageBox.question(
             self,
             "Uninstall room package",
@@ -1724,24 +1811,77 @@ class LauncherUI(QMainWindow):
         )
         if confirmation != QMessageBox.StandardButton.Yes:
             return
+        if self.controller.operation_generation != generation:
+            return
         self.uninstall_button.setEnabled(False)
         self.doctor_room_status.setText("UNINSTALL REQUESTED")
         self.doctor_room_evidence.setText("Waiting to queue room package removal.")
         try:
-            self.controller.uninstall_setup()
+            self.controller.uninstall_setup(generation=generation)
         except Exception:
             self.uninstall_button.setEnabled(self._room_connected)
             self.doctor_room_status.setText("UNINSTALL NEEDS ATTENTION")
             self.doctor_room_evidence.setText("Room package could not be removed. Close the game and try again.")
             self._append_log("Room package uninstall failed.")
 
+    def _ap_save_actions(self) -> None:
+        choices=["Create backup", "Open backup folder", "Restore compatible backup", "New DOOM save in this room"]
+        action,accepted=QInputDialog.getItem(self,"AP game save",
+            "Manage this room's DOOM Eternal save.\nA new game save keeps the same multiworld and backs up your local progress first.",choices,0,False)
+        if not accepted:
+            return
+        try:
+            if action=="Open backup folder":
+                from PySide6.QtCore import QUrl
+                from PySide6.QtGui import QDesktopServices
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.controller.user_paths.data_dir / "campaigns")))
+            elif action=="Create backup":
+                self.controller.request_ap_backup()
+            elif action=="New DOOM save in this room":
+                if QMessageBox.question(self,"New DOOM Eternal save",
+                        "Back up this room's game save and local AP progress, then start a fresh DOOM Eternal save in the same room?\n\n"
+                        "Exit DOOM Eternal first. The launcher will disconnect. Reconnect to the same room, wait for AP save preparation, then start the game through Steam. "
+                        "Server progress is kept; its current items will be delivered to the new save. Other rooms and vanilla saves are kept.",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
+                    self.controller.request_new_ap_save()
+            else:
+                backups=self.controller.ap_backups()
+                if not backups:
+                    raise RuntimeError("No compatible AP backup is available for this room")
+                basename,accepted=QInputDialog.getItem(self,"Restore AP save","Backup",backups,0,False)
+                if accepted and QMessageBox.question(self,"Restore AP save",
+                        "Stage this backup for recovery? Exit DOOM Eternal first. Receipt history, purchases and consumables will be preserved.",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
+                    self.controller.request_ap_backup(restore=basename)
+        except Exception as error:
+            QMessageBox.warning(self,"AP save",str(error))
+
     def _request_inventory_resync(self) -> None:
         if not self._room_connected:
             return
+        from doom_eap.contracts.inventory_domain import ALL_PERSISTENT_DOMAIN_IDS, classify_inventory_domain
+        choices = {"Everything": "all", "Weapons": "weapons", "Equipment": "equipment",
+                   "Capacities": "capacities", "Persistent upgrades": "persistent_upgrades",
+                   "Special weapons": "special_weapons", "Specific item": "item"}
+        choice, accepted = QInputDialog.getItem(self, "Repair inventory", "Repair scope", list(choices), 0, False)
+        if not accepted:
+            return
+        domain = choices[choice]
+        item_id = None
+        if domain == "item":
+            catalog = json.loads((self.controller.client_dir / "data/item_classifications.json").read_text(encoding="utf-8"))
+            items = {str(item["name"]): int(item_id) for item_id, item in catalog["items"].items()
+                     if int(item_id) in ALL_PERSISTENT_DOMAIN_IDS}
+            selected, accepted = QInputDialog.getItem(self, "Repair inventory", "Persistent item", sorted(items), 0, False)
+            if not accepted:
+                return
+            item_id = items[selected]
+            domain = classify_inventory_domain(item_id)
         self.resync_inventory_button.setEnabled(False)
         self._set_inventory_tile("resync requested", self.COLORS["warn"])
         try:
-            self.controller.request_inventory_resync()
+            self.controller.request_inventory_resync(domain=domain, item_id=item_id)
         except Exception as error:
             self.resync_inventory_button.setEnabled(True)
             self.player_inventory.setText("Inventory: Resync unavailable")
@@ -1755,10 +1895,11 @@ class LauncherUI(QMainWindow):
         if self._setup_state in {"installing", "updating"}:
             self._append_log("Room mod setup is already active.")
             return
+        generation = self.controller.operation_generation
         if QMessageBox.question(self, "Confirm room package", "Prepare and install package bound to this room?") != QMessageBox.StandardButton.Yes:
             return
         try:
-            started = self.controller.reinstall_setup() if force else self.controller.prepare_setup()
+            started = self.controller.reinstall_setup(generation=generation) if force else self.controller.prepare_setup(generation=generation)
             if not started:
                 self._append_log("Setup is already active or room is unavailable.")
                 return
@@ -1882,6 +2023,13 @@ class LauncherUI(QMainWindow):
         if value:
             self.saves_root.setText(value)
 
+    def _render_item_history_status(self, event: dict[str, object]) -> None:
+        blocked = event.get("status") == "blocked"
+        self.player_inventory.setText(str(event.get("message", "")))
+        self._set_inventory_tile("server history mismatch" if blocked else "history matches",
+                                 self.COLORS["bad"] if blocked else self.COLORS["good"])
+        self.resync_inventory_button.setEnabled(not blocked and self._room_connected)
+
     def _render_room(self, event: dict[str, object]) -> None:
         self.room_event = dict(event)
         def text_or(value: object, fallback: str) -> str:
@@ -1903,6 +2051,9 @@ class LauncherUI(QMainWindow):
         self._set_inventory_tile("synced", self.COLORS["good"])
         self._set_ammo_refill_indicator(event.get("ammo_refills_available"))
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
+        history = self.controller.item_history_status
+        if history:
+            self._render_item_history_status(history)
         self.session_uninstall_button.setEnabled(self._room_connected)
         self._clear_drift()
         raw_slot_data = event.get("slot_data")
@@ -2182,11 +2333,6 @@ class LauncherUI(QMainWindow):
         self.inventory_picker.setEnabled(enabled)
         self.inventory_quantity.setEnabled(enabled)
         self.inventory_add_button.setEnabled(enabled)
-        allowed_names = {item["name"] for item in allowed}
-        for row in reversed(range(self.inventory.rowCount())):
-            item = self.inventory.item(row, 0)
-            if item is not None and str(item.data(Qt.ItemDataRole.UserRole)) not in allowed_names:
-                self.inventory.removeRow(row)
 
     def _add_inventory(self) -> None:
         name = self.inventory_picker.currentData()
@@ -2220,14 +2366,49 @@ class LauncherUI(QMainWindow):
         return values
 
     def _reset_options(self) -> None:
+        self._imported_player = None
+        self._apply_player_values(self.option_defaults)
+
+    def _apply_player_values(self, values: dict[str, object]) -> None:
+        self._syncing_create_dependencies = True
         for key, control in self.option_controls.items():
-            value = self.option_defaults[key]
+            value = values[key]
+            control.blockSignals(True)
             if isinstance(control, QCheckBox): control.setChecked(bool(value))
             elif isinstance(control, QComboBox): control.setCurrentIndex(max(0, control.findData(value)))
             elif isinstance(control, QSpinBox): control.setValue(cast(int, value))
             elif isinstance(control, (NamedRangeControl, OptionSetControl)): control.setValue(value)
+            control.blockSignals(False)
+            if key in self._warning_state:
+                self._warning_state[key] = bool(value)
+        self._syncing_create_dependencies = False
         self.inventory.setRowCount(0)
         self._refresh_create_dependencies()
+        for name, quantity in cast(dict[str, int], values.get("start_inventory", {})).items():
+            row = self.inventory.rowCount()
+            self.inventory.insertRow(row)
+            item = QTableWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            self.inventory.setItem(row, 0, item)
+            self.inventory.setItem(row, 1, QTableWidgetItem(str(quantity)))
+
+    def _import_player_options(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(self, "Import Player YAML", "", "YAML files (*.yaml *.yml)")
+        if not filename:
+            return
+        try:
+            name, values, document = load_player_yaml(Path(filename), self.controller.options_schema)
+            known_items = {item["name"] for item in self.start_inventory_catalog}
+            unknown = set(values["start_inventory"]) - known_items
+            if unknown:
+                raise ValueError(f"Unsupported Starting Inventory items: {', '.join(sorted(unknown))}")
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(self, "Could not import Player YAML", str(error))
+            return
+        self._apply_player_values(values)
+        self.player_name.setText(name)
+        self._imported_player = document
+        self._activity_event({"type": "player_yaml_imported", "path": filename})
 
     def _save_player_options(self) -> None:
         try:
@@ -2239,7 +2420,11 @@ class LauncherUI(QMainWindow):
         if not filename:
             return
         try:
-            saved = self.controller.save_player_options(Path(filename), self.player_name.text(), self._option_values())
+            inventory = self._option_values()["start_inventory"]
+            unavailable = set(inventory) - {str(self.inventory_picker.itemData(index)) for index in range(self.inventory_picker.count())}
+            if unavailable:
+                raise ValueError("Remove unavailable Starting Inventory items before exporting: " + ", ".join(sorted(unavailable)))
+            saved = self.controller.save_player_options(Path(filename), self.player_name.text(), self._option_values(), imported=self._imported_player)
         except Exception as error:
             self._append_log(f"Player YAML save error: {error}")
             QMessageBox.critical(self, "Could not save Player YAML", str(error))
@@ -2293,12 +2478,7 @@ class LauncherUI(QMainWindow):
         dialog.exec()
 
     def _run_doctor(self) -> None:
-        try:
-            self._render_doctor_report(self.controller.run_doctor().document())
-        except Exception as error:
-            self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
-            self.doctor_evidence.setText("Setup could not be checked. Try again or save a support report.")
-            self._append_log(f"Setup check error: {error}")
+        self.controller.request_doctor()
 
     def _render_doctor_report(self, report: object) -> None:
         if not isinstance(report, dict):
@@ -2361,45 +2541,116 @@ class LauncherUI(QMainWindow):
             self._append_log(f"Game connection check error: {error}")
 
     def _report_problem(self) -> None:
-        result = report_problem(self.controller, logs=self.log.toPlainText().splitlines())
-        self.doctor_action.setText(result.message)
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Report a Problem")
-        dialog.setTextFormat(Qt.TextFormat.PlainText)
-        dialog.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        dialog.setText(result.message)
+        self.controller.request_problem_report(logs=self.log.toPlainText().splitlines())
+
+    def _present_problem_report(self, event) -> None:
+        from .launcher_doctor import sanitize_support_value
+        from .launcher_reporting import submission_endpoint
+        payload = dict(event["payload"])
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Review Problem Report")
+        dialog.resize(660, 560)
+        layout = QVBoxLayout(dialog)
+        message = QLabel(event["message"]); message.setWordWrap(True)
+        layout.addWidget(message)
+        title = QLineEdit(payload["title"]); title.setMaxLength(120)
+        layout.addWidget(QLabel("Title")); layout.addWidget(title)
+        description = QPlainTextEdit(); description.setPlaceholderText("What happened, and what did you expect?")
+        description.setPlainText(payload["description"])
+        title.setReadOnly(bool(event.get("submitted")))
+        description.setReadOnly(bool(event.get("submitted")))
+        description.setMaximumHeight(120)
+        layout.addWidget(description)
+        preview = QPlainTextEdit(); preview.setReadOnly(True)
+        preview.setPlainText(payload["diagnostics"])
+        layout.addWidget(QLabel("Sanitized diagnostics")); layout.addWidget(preview)
+        path = QLabel("Local support ZIP: " + str(event.get("path") or "unavailable"))
+        path.setWordWrap(True); path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(path)
+        actions = QHBoxLayout()
+        export = QPushButton("EXPORT REPORT")
+        def document():
+            return sanitize_support_value({**payload, "title": title.text(), "description": description.toPlainText()[:8000]})
+        def export_report():
+            filename, _ = QFileDialog.getSaveFileName(dialog, "Export Problem Report", "problem-report.json", "JSON (*.json)")
+            if filename:
+                try:
+                    Path(filename).write_text(json.dumps(document(), ensure_ascii=False, indent=2), encoding="utf-8")
+                except OSError as error:
+                    QMessageBox.critical(dialog, "Could not export", str(error))
+        export.clicked.connect(export_report)
+        send = QPushButton("SEND REVIEWED REPORT")
+        if event.get("url"):
+            send.setText("START NEW REPORT")
+        self._report_send = send
+        self._report_message = message
+        self._report_event = event
+        try:
+            available = submission_endpoint(self.controller.bundle_dir) is not None
+        except (OSError, ValueError):
+            available = False
+        send.setEnabled(available or bool(event.get("url")))
+        if not available:
+            send.setToolTip("Online submission is awaiting service deployment. Export locally.")
+            message.setText(message.text() + " Online submission is awaiting service deployment; local export is available.")
+        new_report = False
+        def submit():
+            nonlocal new_report
+            if event.get("url"):
+                new_report = True
+                dialog.accept()
+                return
+            review = document()
+            # Edits must be visible after redaction before the user confirms submission.
+            confirmation = QMessageBox.question(dialog, "Send this report?", review["title"] + "\n\n" + review["description"])
+            if confirmation != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                self.controller.save_problem_report(review)
+                self.controller.request_report_submission(review)
+            except Exception as error:
+                QMessageBox.critical(dialog, "Report unavailable", str(error)); return
+            send.setEnabled(False)
+            title.setReadOnly(True)
+            description.setReadOnly(True)
+            message.setText("Submission pending. A confirmed issue URL will appear in the launcher log.")
+        send.clicked.connect(submit)
+        close = QPushButton("CLOSE"); close.clicked.connect(dialog.accept)
+        for button in (export, send, close): actions.addWidget(button)
+        layout.addLayout(actions)
         dialog.exec()
+        try:
+            if new_report:
+                self.controller.start_new_problem_report(logs=self.log.toPlainText().splitlines())
+            else:
+                self.controller.save_problem_report(document())
+        except (OSError, ValueError) as error:
+            self._append_log(f"Report draft: {error}")
+        self._report_send = None
+        self._report_message = None
+        self._report_event = None
 
     def _save_support_bundle(self) -> None:
-        try:
-            path = self.controller.create_support_bundle(Path.home() / "DOOM-Eternal-Archipelago-support.zip", logs=self.log.toPlainText().splitlines())
-            self.doctor_action.setText(f"Support report saved: {path}")
-        except Exception as error: self._append_log(f"Support bundle error: {error}")
+        self.controller.request_support_bundle(
+            Path.home() / "DOOM-Eternal-Archipelago-support.zip",
+            logs=self.log.toPlainText().splitlines(),
+        )
 
     def _preview_repairs(self) -> None:
         if self._setup_state in {"package_failed", "package_incompatible"}:
             self._prepare(force=True)
             return
-        try: actions = self.controller.repair_preview()
-        except Exception as error:
-            self._append_log(f"Repair preview error: {error}")
-            return
+        self.controller.request_doctor(preview=True)
+
+    def _present_repair_preview(self, actions, generation) -> None:
         if not actions:
             self.doctor_action.setText("No safe repair is needed.")
             return
         action = actions[0]
-        prompt = f"{action.title}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action.changes) + f"\n\nRollback: {action.rollback}"
+        prompt = f"{action['title']}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action['changes']) + f"\n\nRollback: {action['rollback']}"
         if QMessageBox.question(self, "Apply repair", prompt) != QMessageBox.StandardButton.Yes: return
-        self.doctor_action.setText("Applying repair...")
-
-        def _run_repair() -> None:
-            try:
-                msg = str(self.controller.apply_repair(action.key))
-                self.controller.emit("ui_repair_result", message=msg, success=True)
-            except Exception as error:
-                self.controller.emit("ui_repair_result", message=f"Repair error: {error}", success=False)
-
-        threading.Thread(target=_run_repair, name="DoomDoctorRepair", daemon=True).start()
+        if self.controller.request_repair(action['key'], generation=generation):
+            self.doctor_action.setText("Applying repair...")
 
     def _poll_events(self) -> None:
         self._event_poll_scheduled = False
@@ -2408,8 +2659,8 @@ class LauncherUI(QMainWindow):
         while processed < 100 and (time.perf_counter() - started) < 0.005:
             try: event = self.controller.events.get_nowait()
             except queue.Empty: break
-            self.controller.process_event(event)
-            self._present_event(event)
+            if self.controller.process_event(event) is not False:
+                self._present_event(event)
             processed += 1
         if not self.controller.events.empty() and not self._event_poll_scheduled:
             self._event_poll_scheduled = True
@@ -2420,31 +2671,34 @@ class LauncherUI(QMainWindow):
         self._refresh_native_health()
 
     def _refresh_native_health(self) -> None:
-        game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-        root = Path(str(game_root)).expanduser().resolve() if game_root else None
-        meathook = probe_meathook(root)
+        self.controller.request_integration_status()
+
+    def _render_native_health(self, event) -> None:
         if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
-            if meathook.ok:
+            if event["meathook_ok"]:
                 self._set_status("rpc", "waiting", self.COLORS["ap"])
                 self._set_setup_state("ready")
             else:
                 self._set_status("rpc", "needs setup", self.COLORS["warn"])
-                target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                 if self._setup_state != target_state:
-                    self._set_setup_state(target_state, meathook.message)
+                    self._set_setup_state(target_state, event["meathook_message"])
                 return
-        elif self._setup_state == "ready" and not meathook.ok:
+        elif self._setup_state == "ready" and not event["meathook_ok"]:
             self._set_status("rpc", "needs setup", self.COLORS["warn"])
-            target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
-            self._set_setup_state(target_state, meathook.message)
+            target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+            self._set_setup_state(target_state, event["meathook_message"])
             return
 
-        try:
-            health = self.controller.native_health()
-            state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
-        except Exception:
-            state = "not_ready"
-        if state == "ready":
+        state = event["native_state"]
+        session_state = event.get("session", {}).get("state")
+        if session_state in {"process_unknown", "process_ambiguous", "process_changed", "supervisor_unavailable", "admission_refused"}:
+            presentation = ("needs attention", self.COLORS["warn"])
+        elif session_state == "prelaunch_ready":
+            presentation = ("prepared", self.COLORS["ap"])
+        elif session_state == "awaiting_admission":
+            presentation = ("checking session", self.COLORS["ap"])
+        elif state == "ready":
             presentation = ("ready", self.COLORS["good"])
         elif state == "degraded":
             presentation = ("needs attention", self.COLORS["warn"])
@@ -2562,6 +2816,61 @@ class LauncherUI(QMainWindow):
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
+        if kind == "support_bundle_ready":
+            self.doctor_action.setText(f"Support report saved: {event.get('path', '')}")
+            return
+        if kind == "support_bundle_failed":
+            self._append_log(f"Support bundle error: {event.get('message', '')}")
+            return
+        if kind == "problem_report_ready":
+            self._present_problem_report(event)
+            return
+        if kind == "ap_backup_result":
+            self._append_log(str(event["message"]))
+            QMessageBox.information(self,"AP save",str(event["message"]))
+            return
+        if kind == "problem_report_submitted":
+            self._append_log("Problem report submitted: " + event["url"])
+            if getattr(self, "_report_send", None) is not None:
+                self._report_event["url"] = event["url"]
+                self._report_send.setEnabled(True)
+                self._report_send.setText("START NEW REPORT")
+                self._report_message.setText("Report confirmed: " + event["url"])
+            QMessageBox.information(self, "Report submitted", event["url"])
+            return
+        if kind == "problem_report_retry":
+            message = "Submission unconfirmed. Retry the saved report; its key is preserved. " + event["message"]
+            self._append_log(message)
+            if getattr(self, "_report_send", None) is not None:
+                self._report_send.setEnabled(True)
+                self._report_send.setText("RETRY REVIEWED REPORT")
+                self._report_message.setText(message)
+            return
+        if kind == "integration_status":
+            self._render_native_health(event)
+            return
+        if kind == "doctor_report":
+            self._render_doctor_report(event.get("report"))
+            return
+        if kind == "repair_preview_result":
+            self._present_repair_preview(event.get("actions", ()), event["launcher_job_generation"])
+            return
+        if kind == "doctor_failed":
+            if event.get("preview"):
+                self._append_log(f"Repair preview error: {event.get('message', '')}")
+            else:
+                self.doctor_status.setText("SETUP CHECK COULD NOT RUN")
+                self.doctor_evidence.setText("Setup could not be checked. Try again or save a support report.")
+                self._append_log(f"Setup check error: {event.get('message', '')}")
+            return
+        if kind == "integration_repair_result":
+            if event.get("success", False):
+                self._set_setup_state("game_link_update_needed")
+                self._prepare(force=True)
+            else:
+                self._append_log(str(event.get("message", "")))
+                self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
+            return
         if kind == "ui_repair_result":
             msg = str(event.get("message", ""))
             self.doctor_action.setText(msg)
@@ -2578,9 +2887,15 @@ class LauncherUI(QMainWindow):
                 str(event.get("message") or "Generate a Support Report for details."),
             )
             return
+        if kind == "item_history_status":
+            message = str(event.get("message", ""))
+            self._render_item_history_status(event)
+            self._append_log(message)
+            return
         if kind == "inventory_resync":
             status = str(event.get("status", ""))
             presentation = {
+                "observed": ("Inventory: Repair observed by game", True),
                 "queued": ("Inventory: Restoration queued for game", True),
                 "noop": ("Inventory: Already current", True),
                 "error": ("Inventory: Resync unavailable", True),
@@ -2589,6 +2904,7 @@ class LauncherUI(QMainWindow):
                 detail, enabled = presentation
                 self.player_inventory.setText(detail)
                 tile = {
+                    "observed": ("repair observed", self.COLORS["good"]),
                     "queued": ("restoration queued", self.COLORS["ap"]),
                     "noop": ("synced", self.COLORS["good"]),
                     "error": ("resync unavailable", self.COLORS["bad"]),
@@ -2691,10 +3007,7 @@ class LauncherUI(QMainWindow):
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-                    root = Path(str(game_root)).expanduser().resolve() if game_root else None
-                    meathook = probe_meathook(root)
-                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                     self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
@@ -2727,13 +3040,10 @@ class LauncherUI(QMainWindow):
                 self.launch_option.setText(option); self._set_status("game", "ready", self.COLORS["good"])
             if state == "applied":
                 self._clear_drift()
-                game_root = self.controller.config.get("game_root") or self.controller.config.get("doom_base_dir")
-                root = Path(str(game_root)).expanduser().resolve() if game_root else None
-                meathook = probe_meathook(root)
-                if not meathook.ok:
+                if not event["meathook_ok"]:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    target_state = "game_link_update_needed" if meathook.status.value == "incompatible" else "game_link_needed"
+                    target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                     self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
@@ -2894,6 +3204,11 @@ class LauncherUI(QMainWindow):
         kind = str(event.get("type", "event"))
         if "heartbeat" in kind.casefold() or kind == "log":
             return
+        if kind == "integration_status":
+            semantic = tuple(event.get(key) for key in ("meathook_ok", "meathook_status", "native_state", "reason")) + (event.get("session", {}).get("state"),)
+            if semantic == getattr(self, "_last_integration_status", None):
+                return
+            self._last_integration_status = semantic
         details = []
         for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
             value = event.get(key)
@@ -2904,16 +3219,24 @@ class LauncherUI(QMainWindow):
         )
 
     def _load_icon(self) -> None:
-        icon = self.controller.client_dir / "doom_logo.png"
-        if icon.is_file(): self.setWindowIcon(QIcon(str(icon)))
+        icon = self.controller.bundle_dir / "assets/launcher/EternalAP.ico"
+        if icon.is_file():
+            self.setWindowIcon(QIcon(str(icon)))
 
     def closeEvent(self, event) -> None:
-        if self._qt_application is not None:
-            self._qt_application.removeEventFilter(self)
+        if not self.controller.workflow.session_owner.can_close():
+            QMessageBox.information(self, "AP session active", "Keep the launcher open until DOOM Eternal has exited so its AP session stays supervised.")
+            event.ignore()
+            return
+        try:
+            self.controller.close()
+        except RuntimeError as error:
+            QMessageBox.information(self, "AP session active", str(error))
+            event.ignore()
+            return
         self.timer.stop()
         self.lifecycle_timer.stop()
-        try: self.controller.close()
-        finally: event.accept()
+        event.accept()
 
     def run(self) -> None:
         self.show()

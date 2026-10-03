@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from doom_eap.content.map_registry import load_map_registry
+from doom_eap.contracts.tag_prerequisites import (
+    TAG_PAID_NORMAL_MOD_UPGRADES, TAG_REQUIRED_ENGINE_PERKS, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+)
 
 SOURCE_OWNER = "gameresources"
 SOURCE_PATH = "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl"
@@ -281,7 +284,7 @@ STARTING_WEAPON_NAMES = frozenset({
     "Heavy Cannon", "Plasma Rifle", "Rocket Launcher", "Super Shotgun", "Ballista", "Chaingun", "Combat Shotgun",
 })
 
-# Retail source markers required by the patcher.
+# retail source markers required by the patcher
 REQUIRED_MARKERS = frozenset({
     "clearAllBeforeApply",
     "currencyToGive",
@@ -289,7 +292,7 @@ REQUIRED_MARKERS = frozenset({
     "CURRENCY_PRAETOR_UPGRADE",
 })
 
-# Markers introduced by the generated room loadout.
+# markers introduced by the generated room loadout
 FORBIDDEN_MARKERS = frozenset({
     "STAT_SUIT_PAGE_UNLOCKED",
     "statsToGive",
@@ -498,7 +501,8 @@ def _materialized_representations(
         tiers = entry["tiers"]
         if quantity > len(tiers):
             raise ValueError(f"starting_inventory quantity for {name!r} exceeds {len(tiers)} progressive tiers")
-        return [(entry["field"], path, ()) for path in tiers[:quantity]]
+        return [(entry["field"], path, ("equip",) if path == "perk/player/blood_punch/base" else ())
+                for path in tiers[:quantity]]
     materialized = []
     for raw in entry["representations"]:
         dedupe = raw.get("dedupe")
@@ -565,7 +569,7 @@ def _patch(source: str) -> str:
         1,
     )
 
-    # Verify patch succeeded
+    # check patch succeeded
     if "STAT_SUIT_PAGE_UNLOCKED" not in override:
         raise ValueError("DevInvLoadout patch: STAT_SUIT_PAGE_UNLOCKED not injected")
     if "STAT_RUNE_PAGE_UNLOCKED" not in override:
@@ -901,39 +905,6 @@ TAG_FORBIDDEN_MASTERIES = frozenset({
     "perk/player/weapons/chaingun/energy_shell_mastery",
 })
 
-TAG_REQUIRED_NORMAL_MOD_UPGRADES = frozenset({
-    "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
-    "perk/player/weapons/shotgun/pop_rocket_faster_recharge",
-    "perk/player/weapons/shotgun/pop_rocket_larger_explosion",
-    "perk/player/weapons/shotgun/secondary_full_auto_faster_recovery",
-    "perk/player/weapons/shotgun/secondary_full_auto_faster_charge",
-    "perk/player/weapons/shotgun/secondary_full_auto_increased_movement_speed",
-    "perk/player/weapons/heavy_cannon/bolt_action_faster_movement",
-    "perk/player/weapons/heavy_cannon/bolt_action_faster_reload",
-    "perk/player/weapons/heavy_cannon/burst_detonate_faster_charge",
-    "perk/player/weapons/heavy_cannon/burst_detonate_primary_charge",
-    "perk/player/weapons/heavy_cannon/burst_detonate_faster_recharge",
-    "perk/player/weapons/plasma_rifle/secondary_aoe_no_primary_delay",
-    "perk/player/weapons/plasma_rifle/secondary_aoe_faster_charge",
-    "perk/player/weapons/plasma_rifle/secondary_microwave_faster_charge",
-    "perk/player/weapons/plasma_rifle/secondary_microwave_max_range",
-    "perk/player/weapons/rocket_launcher/detonate_proximity_flare",
-    "perk/player/weapons/rocket_launcher/detonate_concussive",
-    "perk/player/weapons/rocket_launcher/lockon_faster_recovery",
-    "perk/player/weapons/rocket_launcher/lockon_decrease_lock_time",
-    "perk/player/weapons/double_barrel/meat_hook_faster_reload",
-    "perk/player/weapons/double_barrel/default_faster_reload",
-    "perk/player/weapons/gauss_cannon/ballista_movement",
-    "perk/player/weapons/gauss_cannon/ballista_larger_explosion",
-    "perk/player/weapons/gauss_cannon/destroyer_charge_levels_aoe",
-    "perk/player/weapons/gauss_cannon/destroyer_faster_charge_and_recovery",
-    "perk/player/weapons/chaingun/turret_faster_equip",
-    "perk/player/weapons/chaingun/turret_faster_movement",
-    "perk/player/weapons/chaingun/energy_shell_faster_recharge",
-    "perk/player/weapons/chaingun/energy_shell_dash_smash",
-})
-
-
 TAG_FORBIDDEN_AP_ITEMS = frozenset({
     "ability_dash",
     "weapon/player/shotgun",
@@ -969,12 +940,6 @@ TAG_FORBIDDEN_AP_PERKS = frozenset({
     "perk/player/weapons/chaingun/energy_shell",
 })
 
-TAG_REQUIRED_BLOOD_PUNCH_PERKS = frozenset({
-    "perk/player/blood_punch/area_of_effect",
-    "perk/player/blood_punch/ai_charge_rate",
-    "perk/player/blood_punch/max_charges",
-})
-
 TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
     '\t\t\t\tperk = "perk/player/blood_punch/area_of_effect";',
     '\t\t\t\tperk = "perk/player/blood_punch/ai_charge_rate";',
@@ -982,8 +947,8 @@ TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
 )
 
 
-def validate_tag_devinv_source(source: str) -> None:
-    """Validate that TAG DevInv loadout contains normal mod upgrades and NO masteries."""
+def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = False) -> None:
+    """Keep authored engine prerequisites; paid upgrades belong to native WUP purchases."""
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
         "STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED",
@@ -1030,12 +995,15 @@ def validate_tag_devinv_source(source: str) -> None:
         if p.startswith("perk/player/argent/") or p.startswith("perk/player/runes/") or p.startswith("perk/player/suit/"):
             raise ValueError(f"TAG DevInvLoadout contains forbidden AP perk: {p}")
 
-    missing_upgrades = TAG_REQUIRED_NORMAL_MOD_UPGRADES - perk_paths
-    if missing_upgrades:
-        raise ValueError(f"TAG DevInvLoadout missing required mod upgrades: {missing_upgrades}")
+    pregranted = TAG_PAID_NORMAL_MOD_UPGRADES & perk_paths
+    if pregranted:
+        raise ValueError(f"TAG DevInvLoadout pregrants paid WUP upgrades: {pregranted}")
+    missing_engine = TAG_REQUIRED_ENGINE_PERKS - perk_paths
+    if missing_engine:
+        raise ValueError(f"TAG DevInvLoadout missing authored engine perks: {missing_engine}")
 
     missing_bp = TAG_REQUIRED_BLOOD_PUNCH_PERKS - perk_paths
-    if missing_bp:
+    if missing_bp and not progressive_blood_punch:
         raise ValueError(f"TAG DevInvLoadout missing required Blood Punch perks: {missing_bp}")
 
 
@@ -1048,6 +1016,7 @@ def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
 def build_tag_devinv_overrides(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
+    *, progressive_blood_punch: bool = False,
 ) -> dict[str, str]:
     """Build exact TAG archive overrides from project-owned declaration inputs."""
     manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
@@ -1059,8 +1028,17 @@ def build_tag_devinv_overrides(
     baseline_currency = _CURRENCY_BLOCK_RE.search(tag_root_source)
     if baseline_inventory is None or baseline_currency is None:
         raise ValueError("TAG root DevInv lacks replaceable loadout blocks")
-    existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))]
-    all_bodies = existing_bodies[:4] + list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS) + existing_bodies[4:]
+    existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))
+                       if not ((perk := _PERK_PATH_RE.search(m.group("body"))) and
+                               perk.group("path") in TAG_PAID_NORMAL_MOD_UPGRADES)]
+    blood_punch_bodies = [] if progressive_blood_punch else list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS)
+    if progressive_blood_punch:
+        existing_bodies = [body for body in existing_bodies if "perk/player/blood_punch/" not in body]
+        quantity = (starting_inventory or {}).get("Progressive Blood Punch", 0)
+        for field, path, flags in _materialized_representations(
+                "Progressive Blood Punch", quantity, load_devinv_mapping(), set()):
+            blood_punch_bodies.append(_ITEM_BLOCK_RE.search(_decl_item(field, path, flags, 0)).group("body"))
+    all_bodies = existing_bodies[:4] + blood_punch_bodies + existing_bodies[4:]
     new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
     baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)
     baseline_inventory_block = (
@@ -1141,7 +1119,7 @@ def build_tag_devinv_overrides(
         override = _INHERIT_DECL_RE.sub("", override)
         if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
             raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
-        validate_tag_devinv_source(override)
+        validate_tag_devinv_source(override, progressive_blood_punch=progressive_blood_punch)
         archive = Path(record["archive"])
         map_key = record["map_key"]
         result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override
@@ -1168,7 +1146,7 @@ def main() -> None:
 
     output_path = output_path_for_map(args.mod_root, args.map_registry, args.map_key)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(override, encoding="utf-8")
+    output_path.write_text(override, encoding="utf-8", newline="\n")
 
     audit = {
         "source_path": SOURCE_PATH,
@@ -1182,7 +1160,7 @@ def main() -> None:
         "clearAllBeforeApply_preserved": True,
         "currencyToGive_preserved": True,
     }
-    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"DevInvLoadout patched: {output_path}")
 
 

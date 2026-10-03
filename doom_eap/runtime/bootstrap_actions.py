@@ -13,7 +13,7 @@ TRIGGER_POLICIES = (
 REAPPLY_POLICIES = ("once_per_slot_revision", "once_per_map_load", "manual_only")
 SUPPORTED_MAPS = (
     "game/sp/e1m1_intro/e1m1_intro",
-    "game/sp/hub/hub",
+    "game/hub/hub",
     "game/sp/e1m2_battle/e1m2_battle",
     "game/sp/e1m3_cult/e1m3_cult",
 )
@@ -34,13 +34,7 @@ BOOTSTRAP_STAT_PRIMITIVE = {
 }
 INVALID_BOOTSTRAP_INHERITS = frozenset({"target/player_stat_modifier"})
 
-# Canonical APWorld metadata is ``SUIT_PAGE_UNLOCKING_ITEM_IDS`` in
-# Archipelago/worlds/doometernal/items.py.  This compact mirror is packaged
-# with the bridge; validate_data verifies it remains exactly synchronized.
-# Crystal progressives unlock the parent Suit tab. Frag/Ice base equipment is
-# included because the vanilla Suit perk groups have their own acquisition
-# preReqStat. Flame Belch is intentionally absent: it has no family in that
-# Suit group, so no local UI/DECL evidence makes it a parent-tab unlocker.
+# mirror the suit unlock ids from apworld and check them in validate_data; crystals, frag and ice unlock suit tabs, flame belch has no suit perk group
 SUIT_PAGE_UNLOCKING_ITEM_IDS = frozenset({
     7770011, 7770013, 7770017, 7770088, 7770092,
     7770097, 7770098, 7770099, 7770100, 7770101, 7770102, 7770103, 7770104,
@@ -81,7 +75,7 @@ def received_any_suit_upgrade(received_item_ids: Collection[int]) -> bool:
     return not SUIT_PAGE_UNLOCKING_ITEM_IDS.isdisjoint(received_item_ids)
 
 
-def _action(action, ownership, description, triggers):
+def _action(action, ownership, description, triggers, *, automatic_enabled=False):
     stat = BOOTSTRAP_STAT_ALLOWLIST[action]
     return {
         "action": action,
@@ -95,7 +89,7 @@ def _action(action, ownership, description, triggers):
         "effects": ((stat, 1),),
         "forbidden_effects": FORBIDDEN_EFFECT_TERMS,
         "status": "experimental",
-        "automatic_enabled": False,
+        "automatic_enabled": automatic_enabled,
         "description": description,
     }
 
@@ -115,6 +109,7 @@ BOOTSTRAP_ACTIONS = {
         "ice_acquired", "ice_bomb",
         "Set only the Ice acquisition stat after AP Ice receipt.",
         ("on_connect", "on_reconnect", "on_item_received", "on_supported_map_load"),
+        automatic_enabled=True,
     ),
 }
 
@@ -145,7 +140,7 @@ def validate_bootstrap_catalogue(catalogue=BOOTSTRAP_ACTIONS):
         action_names.add(key)
         if action.get("revision") != BOOTSTRAP_REVISION:
             raise ValueError(f"Bootstrap action {key} has an unexpected revision")
-        if action.get("status") != "experimental" or action.get("automatic_enabled") is not False:
+        if action.get("status") != "experimental" or action.get("automatic_enabled") is not (key == "ice_acquired"):
             raise ValueError(f"Bootstrap action {key} has an invalid runtime status")
         if action.get("entity_name") != f"{BOOTSTRAP_ENTITY_PREFIX}{key}":
             raise ValueError(f"Bootstrap action {key} has an unsafe entity name")

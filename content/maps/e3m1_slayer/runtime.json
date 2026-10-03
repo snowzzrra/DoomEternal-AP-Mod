@@ -124,12 +124,7 @@
       "signal": {
         "kind": "map_terminal",
         "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
-        "owner": "game_map_exit_level_transition_relay_852698944",
-        "fallback": {
-          "kind": "native_transition",
-          "from": "game/sp/e3m1_slayer/e3m1_slayer",
-          "to": "game/hub/hub"
-        }
+        "owner": "game_map_exit_level_transition_relay_852698944"
       },
       "order": 45
     }
