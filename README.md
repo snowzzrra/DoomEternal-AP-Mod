@@ -184,7 +184,7 @@ equipment, currencies, resources, traps, and other effects. Replay policy is
 defined per item. Permanent ownership is reconciled after reconnect, while
 consumable and one-shot effects follow their delivery receipt state.
 
-The external `ap_client.exe` carries commands between the bridge and Meathook's
+The external `ap_client.exe` carries commands between the bridge and Sentinel Core's
 in-game RPC server. Command dispatch is gated by supported executable identity,
 native memory safety, active map, gameplay state, room identity, and load epoch.
 This keeps delivery synchronized with the mission that owns the command
@@ -269,7 +269,7 @@ The active runtime has three cooperating layers:
    entities.
 2. **`doom_eap.runtime.bridge_client`** speaks the Archipelago protocol, owns
    durable session state, and coordinates observers and item delivery.
-3. **`ap_client.exe` and Meathook** provide external RPC and native telemetry for
+3. **`ap_client.exe` and Sentinel Core** provide external RPC and native telemetry for
    the running game.
 
 The launcher surrounds those layers. It reads the room schema, creates player
@@ -327,7 +327,7 @@ Repair/Fix, and a sanitized support report.
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
 
 - Develop Sentinel Core as an independent open-source native integration project for Archipelago.
-- Follow an evidence-led Hybrid direction: Meathook may retain its proven RPC role. Windows bootstrap/coexistence smoke has passed; future hooks and broader platform integration still require validation.
+- Use Sentinel Core for native RPC and telemetry, with a bundled Windows bootstrap and verified runtime pair. Broader platform integration requires validation.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 
@@ -385,6 +385,6 @@ Repair/Fix, and a sanitized support report.
 
 This project is distributed under the [MIT License](docs/LICENSE).
 
-Every dependency is **external only**. Meathook and the injectors are downloaded at
-install, and are not packaged inside this repository. They are owned exclusively
-by their creators credited above.
+Release packages bundle Sentinel Core with its runtime manifest and license
+notices. External injectors are acquired from verified providers during setup
+and remain owned by their creators credited above.

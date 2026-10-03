@@ -68,7 +68,7 @@ from the server.
 After room connection reports that setup is required, select the explicit
 **Prepare and install** action. Launcher then:
 
-1. acquires, verifies, and installs the verified Meathook v7.2 Game Link runtime;
+1. verifies and installs the bundled Sentinel Core Game Link runtime;
 2. validates room identity and options;
 3. builds the room-specific mod package;
 4. stages the package in DOOM Eternal's mod directory;
@@ -77,6 +77,15 @@ After room connection reports that setup is required, select the explicit
 
 Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
 normally through Steam after setup.
+
+The launcher installs `sentinel_core.dll`, `msimg32.dll`, and
+`sentinel-distribution.json` together. A separate DLL download or manual DLL copy
+is not required.
+
+If migrating from Meathook, close DOOM Eternal and move its known `XINPUT1_3.dll`
+out of the game installation folder before setup. Keep it as a backup. If that
+file belongs to another tool, resolve it with that tool's installation guide.
+Launcher preserves files whose ownership it cannot verify.
 
 ### Windows
 
@@ -148,10 +157,10 @@ executable directly through Wine.
 
 ## Steam launch option
 
-Meathook under Proton requires this Steam launch option:
+Sentinel Core under Proton requires this Steam launch option:
 
 ```text
-WINEDLLOVERRIDES="XINPUT1_3=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
+WINEDLLOVERRIDES="msimg32=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
 ```
 
 Change the path to your client and copy the option 
@@ -217,7 +226,8 @@ before sharing.
 
 ## Troubleshooting
 
-- **Game Link / Meathook missing or incompatible:** launcher automatically downloads and verifies the official Meathook v7.2 runtime library. For manual setup, download `XINPUT1_3.dll` from the official Meathook v7.2 release and place it in the DOOM Eternal root directory.
+- **Game Link missing or incompatible:** use **Prepare and install** with the complete release package to install and verify its bundled Sentinel Core runtime.
+- **Existing XINPUT provider:** move a known Meathook `XINPUT1_3.dll` out of the game root before setup. Resolve files from other tools with their owners.
 - **Client runtime not found:** keep bundled client files with release launcher.
 - **Game integration helper missing:** Windows Security may have quarantined
   `client/ap_client.exe`. Check Protection history, reinstall the official package,
@@ -236,4 +246,4 @@ before sharing.
   script shebang. If exit 127 still reports `rl_print_keybinding`, attach the
   Support Report with the sanitized stderr.
 - **Bridge cannot reach game:** verify mod installation, one bridge instance,
-  Meathook availability, and the Proton DLL override.
+  Sentinel Core verification, and the Proton DLL override.
