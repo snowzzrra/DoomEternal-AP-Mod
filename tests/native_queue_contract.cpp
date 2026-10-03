@@ -1,6 +1,7 @@
 #include "native/client/command_queue.h"
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -46,6 +47,83 @@ int main() {
     std::vector<std::string> logs;
     const auto log = [&](const std::string& line) { logs.push_back(line); };
     FakeTransport transport;
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope();
+        const std::string id = "base/ap_queue/recv-0123456789abcdef-fortress-open-reader";
+        Write(id + ".cmd", "ai_ScriptCmdEnt ap_fortress_phase_4 activate player1\n");
+        queue.Import();
+        const HANDLE reader = CreateFileA((id + ".processing").c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+        assert(reader != INVALID_HANDLE_VALUE);
+        Write(id + ".consumer.tmp", "AP_NATIVE_ATTEMPT_V1\n");
+        assert(!MoveFileExA((id + ".consumer.tmp").c_str(), (id + ".processing").c_str(),
+                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+        const DWORD replaceError = GetLastError();
+        std::printf("Win32 replacement with retained read handle: winerror=%lu\n", replaceError);
+        assert(replaceError == ERROR_ACCESS_DENIED);
+        assert(DeleteFileA((id + ".consumer.tmp").c_str()));
+        Dispatch(queue, transport);
+        assert(transport.commands.size() == 1);
+        assert(std::filesystem::exists(id + ".processing.attempt"));
+        Dispatch(queue, transport);
+        assert(transport.commands.size() == 1);
+        CloseHandle(reader);
+        Sleep(1050); queue.Import();
+        assert(!std::filesystem::exists(id + ".processing"));
+        assert(!std::filesystem::exists(id + ".processing.attempt"));
+        transport.commands.clear();
+    }
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope();
+        const std::string id = "base/ap_queue/recv-0123456789abcdef-persist-denied";
+        Write(id + ".cmd", "give ammo\n"); queue.Import();
+        assert(CreateDirectoryA((id + ".processing.attempt").c_str(), nullptr));
+        Dispatch(queue, transport);
+        assert(transport.commands.empty() && queue.PublicationBlocked());
+        assert(queue.PublicationError() == ERROR_ACCESS_DENIED);
+        assert(RemoveDirectoryA((id + ".processing.attempt").c_str()));
+        Sleep(260); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1 && !queue.PublicationBlocked());
+        transport.commands.clear();
+    }
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope();
+        const std::string id = "base/ap_queue/recv-0123456789abcdef-held-journal";
+        Write(id + ".cmd", "give ammo\n"); queue.Import();
+        transport.deletionLockPath = id + ".processing.attempt";
+        Dispatch(queue, transport);
+        assert(transport.commands.size() == 1 && !std::filesystem::exists(id + ".processing"));
+        assert(std::filesystem::exists(id + ".processing.attempt"));
+        Write(id + ".cmd", "give ammo\n"); queue.Import(); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1);
+        CloseHandle(transport.deletionLock); transport.deletionLockPath.clear();
+        Sleep(1050); queue.Import();
+        assert(!std::filesystem::exists(id + ".processing.attempt"));
+        transport.commands.clear();
+    }
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope();
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 1:2\n");
+        const std::string headers = "AP_EXECUTION_CLASS_V1 MAP_ENTITY_SAFE\n"
+            "AP_MAP_ENTITY_OPERATION_V1 FORTRESS_LAYER\nAP_MATERIALIZATION_LEASE_V1 1:2\n";
+        const std::string key = "base/ap_queue/recv-0123456789abcdef-fortress-";
+        Write(key + "phase2.cmd", "AP_MATERIALIZATION_LEASE_V1 1:2\n"
+              "ai_ScriptCmdEnt ap_fortress_phase_2 activate player1\n");
+        Write(key + "phase4.cmd", headers + "ai_ScriptCmdEnt ap_fortress_phase_4 activate player1\n");
+        queue.Import(); queue.DiscardInvalidScopes(true); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1);
+        assert(transport.commands.back() == "ai_ScriptCmdEnt ap_fortress_phase_4 activate player1");
+        assert(!std::filesystem::exists(key + "phase2.processing"));
+        Write(key + "phase3.cmd", headers + "ai_ScriptCmdEnt ap_fortress_phase_3 activate player1\n");
+        queue.Import(); queue.DiscardInvalidScopes(true); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1);
+        const std::string crashed = "base/ap_queue/recv-0123456789abcdef-attempt-crash";
+        Write(crashed + ".processing", "give ammo\n");
+        Write(crashed + ".processing.attempt", "partial attempt record");
+        queue.Import(); assert(std::filesystem::exists(crashed + ".failed"));
+        assert(transport.commands.size() == 1);
+        transport.commands.clear();
+    }
     {
         NativeCommandQueue queue(log);
         queue.Initialize();

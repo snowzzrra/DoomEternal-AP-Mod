@@ -189,6 +189,8 @@ bool NativeCommandQueue::ReadCommandFile(
                 parsedMapEntityOperation = MapEntityOperation::CheckedVisualHide;
             } else if (value == "FAST_TRAVEL_UNLOCK") {
                 parsedMapEntityOperation = MapEntityOperation::FastTravelUnlock;
+            } else if (value == "FORTRESS_LAYER") {
+                parsedMapEntityOperation = MapEntityOperation::FortressLayer;
             } else {
                 return false;
             }
@@ -424,7 +426,8 @@ void NativeCommandQueue::EnsureQueueDirectory(
             }
             std::ifstream interrupted(processingPath);
             std::string firstLine; std::getline(interrupted, firstLine); interrupted.close();
-            if (TrimLine(firstLine) == "AP_NATIVE_ATTEMPT_V1") {
+            if (TrimLine(firstLine) == "AP_NATIVE_ATTEMPT_V1"
+                    || GetFileAttributesA((processingPath + ".attempt").c_str()) != INVALID_FILE_ATTRIBUTES) {
                 CommandJob unknown{}; unknown.path = processingPath;
                 QuarantineFailedJob(unknown);
                 LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + commandId + " automatic_replay=disabled");
@@ -495,6 +498,10 @@ bool NativeCommandQueue::MapEntityOperationMatchesCommand(
 ) {
     if (operation == MapEntityOperation::FastTravelUnlock) {
         return command == "ai_ScriptCmdEnt ap_fast_travel_unlock activate";
+    }
+    if (operation == MapEntityOperation::FortressLayer) {
+        static const std::regex fortress(R"(^ai_ScriptCmdEnt ap_fortress_phase_[0-7] activate player1$)");
+        return std::regex_match(command, fortress);
     }
     if (operation != MapEntityOperation::CheckedVisualHide) return false;
     static const std::regex cleanup(
@@ -868,10 +875,13 @@ void NativeCommandQueue::QuarantineFailedJob(const CommandJob& job) {
 
 bool NativeCommandQueue::SpoolRemoved(const std::string& path) {
     if (DeleteFileA(path.c_str())) {
-        return true;
+        return RemoveNativeAttempt(path);
     }
     const DWORD error = GetLastError();
-    return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) {
+        return RemoveNativeAttempt(path);
+    }
+    return false;
 }
 
 
@@ -911,7 +921,57 @@ void NativeCommandQueue::RetryDeliveredSpoolRemovals(
 }
 
 
-bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport* rpc) {
+bool NativeCommandQueue::RemoveNativeAttempt(const std::string& path) {
+    if (DeleteFileA((path + ".attempt").c_str())) return true;
+    const DWORD error = GetLastError();
+    return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+}
+
+bool NativeCommandQueue::PersistNativeAttempt(CommandJob& job) {
+    const std::string attempt = job.path + ".attempt";
+    const std::string marker = "AP_NATIVE_ATTEMPT_V1\n" + CommandIdFromPath(job.path) + "\n";
+    const HANDLE handle = CreateFileA(attempt.c_str(), GENERIC_WRITE, 0, nullptr,
+                                     CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    DWORD written = 0;
+    DWORD error = handle == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
+    if (handle != INVALID_HANDLE_VALUE) {
+        if (!WriteFile(handle, marker.data(), static_cast<DWORD>(marker.size()), &written, nullptr)
+                || written != marker.size() || !FlushFileBuffers(handle)) {
+            error = GetLastError();
+            if (error == ERROR_SUCCESS) error = ERROR_WRITE_FAULT;
+        }
+        CloseHandle(handle);
+        if (error != ERROR_SUCCESS) job.attemptCleanupPending = !RemoveNativeAttempt(job.path);
+    }
+    if (error != ERROR_SUCCESS) {
+        job.publicationBlocked = true;
+        publicationError = error;
+        const auto signature = job.path + ":persist_attempt:" + std::to_string(error);
+        if (publicationFailure != signature) {
+            LogDebug("QUEUE_PUBLICATION_BLOCKED command_id=" + CommandIdFromPath(job.path)
+                + " stage=persist_attempt winerror=" + std::to_string(error)
+                + " consumer_pid=" + std::to_string(GetCurrentProcessId())
+                + " source=" + job.path + " destination=" + attempt
+                + " source_attributes=" + std::to_string(GetFileAttributesA(job.path.c_str()))
+                + " parent=" + std::filesystem::path(job.path).parent_path().string());
+            publicationFailure = signature;
+        }
+        return false;
+    }
+    if (!publicationFailure.empty()) {
+        LogDebug("QUEUE_PUBLICATION_RECOVERED command_id=" + CommandIdFromPath(job.path));
+        publicationFailure.clear();
+    }
+    return true;
+}
+
+bool NativeCommandQueue::PublicationBlocked() const {
+    return std::any_of(queue.begin(), queue.end(), [](const CommandJob& job) {
+        return job.publicationBlocked;
+    });
+}
+
+bool NativeCommandQueue::ExecuteCommand(CommandJob& job, CommandTransport* rpc) {
     const std::string commandId = CommandIdFromPath(job.path);
     const std::string& command = job.command;
     LogDebug("RPC_EXECUTE command_id=" + commandId + DeliveryContextFields());
@@ -926,6 +986,15 @@ bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport*
     }
 
     submittedToNative = false;
+    job.publicationBlocked = false;
+    if (job.attemptCleanupPending) {
+        if (!RemoveNativeAttempt(job.path)) {
+            job.publicationBlocked = true;
+            publicationError = GetLastError();
+            return false;
+        }
+        job.attemptCleanupPending = false;
+    }
     SetLastError(ERROR_SUCCESS);
     std::ifstream source(job.path, std::ios::binary);
     const std::string original{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
@@ -933,6 +1002,8 @@ bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport*
     const bool readFailed=source.bad() || original.empty();
     source.close();
     if (readFailed) {
+        job.publicationBlocked = true;
+        publicationError = readError ? readError : ERROR_READ_FAULT;
         const auto signature=job.path+":read_source:"+std::to_string(readError);
         if (publicationFailure!=signature) {
             LogDebug("QUEUE_PUBLICATION_BLOCKED command_id="+CommandIdFromPath(job.path)
@@ -943,11 +1014,16 @@ bool NativeCommandQueue::ExecuteCommand(const CommandJob& job, CommandTransport*
         }
         return false;
     }
-    if (!WriteCommandFile(job.path, "AP_NATIVE_ATTEMPT_V1\n" + original)) return false;
+    if (!PersistNativeAttempt(job)) return false;
     submittedToNative = true;
     const bool dispatched = rpc->ExecuteConsoleCommand(command);
-    if (!dispatched && rpc->LastResult() != AP_RPC_AMBIGUOUS && rpc->LastResult() != AP_RPC_EXCEPTION)
-        WriteCommandFile(job.path, original);
+    if (!dispatched && rpc->LastResult() != AP_RPC_AMBIGUOUS && rpc->LastResult() != AP_RPC_EXCEPTION) {
+        job.attemptCleanupPending = !RemoveNativeAttempt(job.path);
+        if (job.attemptCleanupPending) {
+            job.publicationBlocked = true;
+            publicationError = GetLastError();
+        }
+    }
     return dispatched;
 }
 
@@ -1005,6 +1081,34 @@ std::optional<std::string> NativeCommandQueue::Import() {
     return activeNamespace;
 }
 
+void NativeCommandQueue::DiscardSupersededFortressJobs() {
+    const auto activeNamespace = ActiveQueueSessionNamespace();
+    const auto activeLease = ActiveMaterializationLease();
+    if (fortressNamespace != activeNamespace) {
+        fortressNamespace = activeNamespace;
+        fortressPhase = -1;
+    }
+    const auto phase = [&](const CommandJob& job) -> int {
+        if (!activeNamespace || !activeLease || job.receiptNamespace != activeNamespace
+                || job.materializationLease != activeLease
+                || !StartsWith(CommandIdFromPath(job.path), "recv-" + *activeNamespace + "-fortress-")) return -1;
+        static const std::regex command(R"(^ai_ScriptCmdEnt ap_fortress_phase_([0-7]) activate player1$)");
+        std::smatch match;
+        return std::regex_match(job.command, match, command) ? std::stoi(match[1].str()) : -1;
+    };
+    for (const auto& job : queue) fortressPhase = std::max(fortressPhase, phase(job));
+    for (auto job = queue.begin(); job != queue.end();) {
+        const int value = phase(*job);
+        if (value >= 0 && value < fortressPhase) {
+            LogDebug("FORTRESS_INTENT_SUPERSEDED command_id=" + CommandIdFromPath(job->path)
+                     + " phase=" + std::to_string(value) + " desired=" + std::to_string(fortressPhase));
+            SpoolRemoved(job->path);
+            knownCommandIds.erase(CommandIdFromPath(job->path));
+            job = queue.erase(job);
+        } else ++job;
+    }
+}
+
 bool NativeCommandQueue::ArmIfPending() {
         bool rpcArmed = IsRpcExecutionEnabled();
         const bool normalCommandPending = std::any_of(
@@ -1022,6 +1126,7 @@ bool NativeCommandQueue::ArmIfPending() {
 }
 
 void NativeCommandQueue::DiscardInvalidScopes(bool rpcEnabled) {
+        DiscardSupersededFortressJobs();
         if (!rpcEnabled) {
             DiscardTelemetryJobs(queue);
         }

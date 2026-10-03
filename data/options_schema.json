@@ -688,12 +688,12 @@
       "ui_type": "choice"
     },
     {
-      "default": 21,
+      "default": 17,
       "description": "Number of individual Praetor Suit upgrades placed in the item pool.\n\n``Random`` is resolved from the seeded world RNG. Its bounded, middle-biased\nrange avoids both empty and nearly-complete upgrade sets while explicit\nvalues remain available across the full catalog range.",
       "display_name": "Praetor Suit Upgrades in Pool",
       "group": "Game Options",
       "key": "praetor_suit_upgrades_in_pool",
-      "maximum": 21,
+      "maximum": 17,
       "maximum_label": "All",
       "minimum": 0,
       "source_class": "PraetorSuitUpgradesInPool",
@@ -802,5 +802,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "7a348bfca241bea9925459b1374a86f926836c9625d93102663a65a713fc4abf"
+  "source_sha256": "66d40a6be7161931e06c92e2e0b4774657e768138f881bb009c15f3ea95cd4c1"
 }

@@ -61,7 +61,7 @@ from doom_eap.runtime.bootstrap_actions import (
 from doom_eap.contracts.campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
 from doom_eap.contracts.command_publication import (
     build_materialization_epoch,
-    PLAYER_RUNTIME, MATERIALIZATION_LEASE_HEADER, MATERIALIZATION_LEASE_MARKER,
+    PLAYER_RUNTIME, MAP_ENTITY_SAFE, FORTRESS_LAYER, MATERIALIZATION_LEASE_HEADER, MATERIALIZATION_LEASE_MARKER,
     queue_session_namespace, stable_spool_id, valid_materialization_epoch,
 )
 from doom_eap.runtime.command_spool import CommandSpool, discard_unclaimed_command
@@ -694,6 +694,7 @@ def configure_bridge_logger():
 def start_bridge_logger(path=None):
     """Start a fresh production log for an active client session."""
     target = Path(path or BRIDGE_LOG_PATH)
+    _native_probe_log_signatures.clear()
     target.parent.mkdir(parents=True, exist_ok=True)
     previous = target.with_name("bridge.previous.log")
     for handler in list(logger.handlers):
@@ -721,6 +722,7 @@ def start_bridge_logger(path=None):
 
 
 logger = configure_bridge_logger()
+_native_probe_log_signatures = {}
 
 
 def log_effective_runtime_paths():
@@ -1514,20 +1516,6 @@ DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
 ]
 
 
-def should_materialize_dash(
-    randomize_dash,
-    received,
-    checked_locations,
-    server_checked_ready,
-):
-    if randomize_dash:
-        return 7770015 in received
-    return bool(
-        server_checked_ready
-        and EXULTIA_COMPLETE_LOCATION in checked_locations
-    )
-
-
 CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
 OBSERVER_REGISTRY_REVISION = observer_registry_revision(CHALLENGE_LOCATION_REGISTRY)
 WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
@@ -1656,6 +1644,20 @@ def log_item_event(event: str, **fields) -> None:
     """Emit structured item diagnostics with a stable ITEM_* event name."""
     if not event.startswith("ITEM_"):
         event = f"ITEM_{event}"
+    if (event == "ITEM_NATIVE_PROBE_RESPONSE" and fields.get("returncode") == 0
+            and fields.get("stage") in {"--native", "--inspect", "--save-admission"}):
+        try:
+            response = json.loads(fields.get("stdout", ""))
+        except (TypeError, ValueError):
+            response = None
+        if isinstance(response, dict) and response.get("result") == "ok":
+            signature = json.dumps({key: value for key, value in response.items()
+                                    if key not in {"callback_sequence", "callback_at_ms", "context_sampled_at_ms"}},
+                                   sort_keys=True, separators=(",", ":"))
+            key = (fields["stage"], response.get("target_pid"), fields.get("sha256"))
+            if _native_probe_log_signatures.get(key) == signature:
+                return
+            _native_probe_log_signatures[key] = signature
     fields.setdefault("bridge_revision", globals().get("BRIDGE_REVISION"))
     fields.setdefault("protocol_version", globals().get("BRIDGE_PROTOCOL"))
     fields.setdefault("mapping_revision", globals().get("ITEM_MAPPING_REVISION"))
@@ -2688,7 +2690,11 @@ class SentinelInventoryObservation:
         if ice != 255:
             items[7770013] = ItemObservation(7770013, OWNED if ice else MISSING,
                                              source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice)
+        dash = result.get("dash_after", 255)
+        if dash in (0, 1):
+            items[7770015] = ItemObservation(7770015, OWNED if dash else MISSING,
+                                             source="sentinel_inventory")
+        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice, dash)
         if signature != self.last_logged:
             log_item_event(
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
@@ -2696,7 +2702,8 @@ class SentinelInventoryObservation:
                 context=context_identity, rocket=items.get(7770002, ItemObservation(7770002)).state,
                 bfg=items.get(7770006, ItemObservation(7770006)).state,
                 ice=items.get(7770013, ItemObservation(7770013)).state,
-                weapons_mask=weapons, ice_bomb=ice,
+                dash=items.get(7770015, ItemObservation(7770015)).state,
+                weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
             )
             self.last_logged = signature
         return InventoryObservation(
@@ -4389,7 +4396,9 @@ class DoomEternalContext(CommonContext):
             }
             projection["masteries"] = self._mission_presentations.mastery_snapshot(
                 facts, placements, WEAPON_MASTERY_ENTRIES)
-            ratings = self._connected_slot_data.get("mission_presentation_v1", {})
+            ratings = self._connected_slot_data.get("mission_presentation_v2",
+                                                    self._connected_slot_data.get("mission_presentation_v1", {}))
+            projection["ratings_version"] = 2 if "mission_presentation_v2" in self._connected_slot_data else 1
             projection["ratings"] = {row["stage"]: ratings[row["stage"]]
                                      for row in projection["rows"]
                                      if row["revealed"] and row["stage"] in ratings}
@@ -4442,7 +4451,8 @@ class DoomEternalContext(CommonContext):
         command = f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate player1"
         if send_command(command,
                         coalesce_key=stable_spool_id("fortress", lease, phase), state_key=self.state_key,
-                        materialization_lease=lease, already_queued_ok=True):
+                        materialization_lease=lease, already_queued_ok=True,
+                        execution_class=MAP_ENTITY_SAFE, operation=FORTRESS_LAYER):
             self._fortress_phase_publication = identity
             logger.info("[Campaign] Fortress phase=%s queued for lease=%s; native execution pending", phase, lease)
 

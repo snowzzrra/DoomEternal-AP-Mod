@@ -2574,7 +2574,8 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             if "flags = {" in block:
-                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+                if "flags = {\n\t\t\thide = true;" not in block:
+                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
             else:
                 block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
             text = text[:bounds[0]] + block + text[bounds[1]:]
@@ -2613,7 +2614,8 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
             block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
             if "flags = {" in block:
-                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+                if "flags = {\n\t\t\thide = true;" not in block:
+                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
             else:
                 block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
             text = text[:bounds[0]] + block + text[bounds[1]:]

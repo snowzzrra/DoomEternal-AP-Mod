@@ -259,33 +259,11 @@ def compile_materialization_plan(
                     )
                 )
 
-    dash_commands = []
-    if (
-        context.campaign != "Base"
-        and ownership.vanilla_dash
-    ):
-        if not (valid_obs and (observation.is_owned(7770015) or not observation.is_proven_missing(7770015))):
-            dash_commands.append(
-                ReconciliationCommand(
-                    7770015,
-                    "Dash",
-                    "replay_idempotent",
-                    0,
-                    stable_spool_id(
-                        "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                        context.identity, "unrandomized-dash",
-                    ),
-                    "give ability_dash",
-                    "Vanilla Dash proven by Exultia mission completion",
-                )
-            )
-
     raw_commands = (
         tuple(plan_commands)
         + tuple(special_commands)
         + tuple(support_commands)
         + tuple(blood_punch_commands)
-        + tuple(dash_commands)
     )
     commands = []
     semantic_operations = set()

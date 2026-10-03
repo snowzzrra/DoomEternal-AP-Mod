@@ -1513,9 +1513,11 @@ int main(int argc, char** argv) {
             );
         }
         healthStatePublisher.PublishHealth(
-            rpcTransportReady,
-            g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
-            g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
+            rpcTransportReady && !commandQueue.PublicationBlocked(),
+            commandQueue.PublicationBlocked() ? AP_RPC_NONE :
+                g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
+            commandQueue.PublicationBlocked() ? commandQueue.PublicationError() :
+                g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
         );
         const bool rpcEnabled =
             rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();

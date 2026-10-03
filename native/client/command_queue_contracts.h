@@ -33,6 +33,7 @@ enum class MapEntityOperation {
     None,
     CheckedVisualHide,
     FastTravelUnlock,
+    FortressLayer,
 };
 
 struct CommandJob {
@@ -48,6 +49,8 @@ struct CommandJob {
     CommandExecutionClass executionClass = CommandExecutionClass::PlayerRuntime;
     MapEntityOperation mapEntityOperation = MapEntityOperation::None;
     bool diagnosticCondump = false;
+    bool publicationBlocked = false;
+    bool attemptCleanupPending = false;
 };
 
 using CommandSourceMap = std::unordered_map<std::string, std::string>;

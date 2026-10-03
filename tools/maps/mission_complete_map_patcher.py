@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed terminal map hooks for Hell on Earth and Exultia checks."""
+"""Fail-closed map hooks for authored mission-completion publishers."""
 
 from __future__ import annotations
 
@@ -549,6 +549,16 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         audit["owner_target_references"] = 1
     from tools.maps.unified_campaign import project_stage_return
     catalog = load_content_catalog(root)
+    catalog_audit = {}
+    contract_maps = {contract["map_key"] for contract in contract_items.values()}
+    for key, path in generated_maps.items():
+        if key in contract_maps:
+            continue
+        text = path.read_text(encoding="utf-8")
+        patched, owners = patch_generated_map_text(key, text, root)
+        if patched != text:
+            path.write_text(patched, encoding="utf-8", newline="")
+        catalog_audit.update(owners)
     return_audit = {}
     for key, path in generated_maps.items():
         text = path.read_text(encoding="utf-8")
@@ -558,6 +568,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         return_audit[key] = changed
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
     unrelated_owners.update(name for names in return_audit.values() for name in names)
+    unrelated_owners.update(audit["owner"] for audit in catalog_audit.values())
     unrelated = sum(
         _unrelated_entity_diff_count(
             before_maps[key], path.read_text(encoding="utf-8"),
@@ -570,6 +581,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
         res["campaign_goal"] = terminal_audit
     res["unrelated_generated_entity_diff_count"] = unrelated
     res["unified_campaign_returns"] = return_audit
+    res["catalog_terminal_publishers"] = catalog_audit
     return res
 
 

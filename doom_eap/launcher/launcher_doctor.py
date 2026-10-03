@@ -14,6 +14,7 @@ import tempfile
 import time
 import zipfile
 from collections.abc import Mapping, Sequence
+from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -360,7 +361,7 @@ def _native_lifecycle_summary(
 
 
 def _read_support_log(path: Path) -> str | None:
-    """Keep complete bounded session logs, otherwise retain meaningful head and tail."""
+    """Retain bounded startup, transition/error events and current tail."""
     try:
         with path.open("rb") as source:
             source.seek(0, os.SEEK_END)
@@ -376,7 +377,25 @@ def _read_support_log(path: Path) -> str | None:
                 head = source.read(head_size)
                 source.seek(max(0, size - head_size))
                 tail = source.read(head_size)
-                payload = head + b"\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
+                source.seek(0)
+                events = deque()
+                retained = 0
+                limit = SUPPORT_LOG_MAX_BYTES - SUPPORT_LOG_TAIL_BYTES - 256
+                while source.tell() < size:
+                    line = source.readline(32768)
+                    if not line:
+                        break
+                    structured = b'DELIVERY_EVENT ' in line and b'PROBE_RESPONSE' not in line
+                    if structured or any(marker in line for marker in (
+                        b" ERROR ", b" WARNING ", b"QUEUE_PUBLICATION_", b"GATE_TRANSITION ",
+                        b"MISSION_SNAPSHOT ", b"Game state transition:", b"AP_STAGE_COMPLETE_",
+                    )):
+                        events.append(line)
+                        retained += len(line)
+                        while retained > limit:
+                            retained -= len(events.popleft())
+                payload = (head + b"\n\n[... RETAINED TRANSITION/ERROR EVENTS ...]\n\n"
+                           + b"".join(events) + b"\n\n[... CURRENT TAIL ...]\n\n" + tail)
         text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
         return text[: SUPPORT_LOG_MAX_BYTES + 128]
     except (OSError, UnicodeError):

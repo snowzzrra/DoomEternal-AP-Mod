@@ -40,3 +40,12 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
     (tmp_path / "sentinel_core.dll").write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="differs from ZIP"):
         verify_runtime(tmp_path / "distribution.json")
+
+
+@pytest.mark.parametrize("inventory_abi", [4, 5])
+def test_matched_inventory_distributions(tmp_path, inventory_abi):
+    manifest = fixture(tmp_path)
+    manifest["abi"] = {**manifest["abi"], "inventory": inventory_abi}
+    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
+    accepted, _ = verify_runtime(tmp_path / "distribution.json")
+    assert accepted["abi"]["inventory"] == inventory_abi

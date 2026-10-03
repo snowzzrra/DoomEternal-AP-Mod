@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 
 ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
-       "campaign_menu": 1, "inventory": 4, "arsenal": 1, "runes": 1,
+       "campaign_menu": 1, "inventory": 5, "arsenal": 1, "runes": 1,
        "special": 1, "deathlink": 1, "automap": 1, "commands": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
@@ -44,7 +44,7 @@ def validate_manifest(value):
         raise ValueError("Inconsistent version fields")
     if base != "1.0.0" or value["mod_versions"] != ["0.6.0"] or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
-    if value["abi"] != ABI or any(type(number) is not int for number in value["abi"].values()) or value["required_capabilities"] != [2097152]:
+    if value["abi"] not in (ABI, {**ABI, "inventory": 4}) or any(type(number) is not int for number in value["abi"].values()) or value["required_capabilities"] != [2097152]:
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")

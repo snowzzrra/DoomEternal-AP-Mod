@@ -477,16 +477,18 @@ def effective_ownership(
         for index, receipt in enumerate(receipts)
     ]
     if vanilla_chainsaw:
-        # Keep existing persisted materialization keys, not a synthetic ReceivedItems entry.
         records.append({
             "index": len(records), "item_id": 7770010,
             "receipt_id": "network:" + json.dumps([0, slot, 7770010, None], separators=(",", ":")),
         })
+    if vanilla_dash:
+        records.append({"derived_item_id": 7770015, "provenance": "unrandomized_dash_server_mission_complete"})
     fingerprint = hashlib.sha256(
         json.dumps(records, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     return EffectiveOwnership(
-        item_ids, item_ids + ((7770010,) if vanilla_chainsaw else ()), tuple(facts),
+        item_ids, item_ids + ((7770010,) if vanilla_chainsaw else ())
+        + ((7770015,) if vanilla_dash and 7770015 not in item_ids else ()), tuple(facts),
         vanilla_dash, upgrades, fingerprint, AUTHORED_TAG_PREREQUISITES,
     )
 

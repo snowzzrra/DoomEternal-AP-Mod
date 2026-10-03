@@ -8,6 +8,7 @@ import uuid
 import logging
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -995,29 +996,44 @@ class LauncherController:
                 "message": f"Saved Games path unavailable: {type(error).__name__}: {error}",
                 "requested_at": requested_at,
             }
-        source = save_dir / "AP_SUPPORT_FILE.txt"
         with self._condump_lock:
             scope = self.workflow.session_owner.observe()
             if not scope.get("ready") or not scope.get("pid") or not scope.get("process_created"):
                 return {"status":"unavailable", "reason":"qualified_process_unavailable"}
-            identity = (scope["pid"], scope["process_created"])
-            if self._condump_pending == identity:
-                return {"status":"pending", "reason":"previous_capture_not_confirmed"}
-            previous = source.stat() if source.exists() else None
-            self._condump_pending = identity
-            supervisor.request_support_condump()
+            def process_scope(value):
+                admission = value.get("admission", {})
+                return (value.get("pid"), value.get("process_created"),
+                        admission.get("namespace_id"), admission.get("build_id"), admission.get("instance_id"))
+
+            identity = process_scope(scope)
+            def sources():
+                return [path for path in save_dir.glob("AP_SUPPORT_FILE*.txt")
+                        if re.fullmatch(r"AP_SUPPORT_FILE(?:_[0-9]+)*\.txt", path.name)]
+
+            pending = self._condump_pending
+            if pending is None or pending["identity"] != identity:
+                previous = {}
+                for path in sources():
+                    stat = path.stat()
+                    previous[path.name] = (stat.st_size, stat.st_mtime_ns)
+                pending = {"identity": identity, "requested_at": requested_at, "previous": previous}
+                self._condump_pending = pending
+                supervisor.request_support_condump()
+            requested_at = pending["requested_at"]
+            previous = pending["previous"]
             deadline = time.monotonic() + 4
             while time.monotonic() < deadline:
                 if job is not None:
                     job.check()
                 current = self.workflow.session_owner.observe()
-                if not current.get("ready") or (current.get("pid"), current.get("process_created")) != identity:
+                if not current.get("ready") or process_scope(current) != identity:
                     return {"status":"unavailable", "reason":"process_scope_changed"}
-                try:
-                    stat = source.stat()
-                    changed = previous is None or (stat.st_size,stat.st_mtime_ns) != (previous.st_size,previous.st_mtime_ns)
-                    if changed and stat.st_mtime >= requested_at - 1:
-                        import uuid
+                for source in sources():
+                    try:
+                        stat = source.stat()
+                        changed = previous.get(source.name) != (stat.st_size, stat.st_mtime_ns)
+                        if not changed or stat.st_mtime < requested_at - 1:
+                            continue
                         capture_dir = self.user_paths.data_dir / "support-captures"
                         capture_dir.mkdir(parents=True,exist_ok=True)
                         destination = capture_dir / (uuid.uuid4().hex + ".txt")
@@ -1028,6 +1044,9 @@ class LauncherController:
                             continue
                         if len(payload) > 16*1024*1024:
                             return {"status":"unavailable", "reason":"condump_too_large"}
+                        current = self.workflow.session_owner.observe()
+                        if not current.get("ready") or process_scope(current) != identity:
+                            return {"status":"unavailable", "reason":"process_scope_changed"}
                         with destination.open("xb") as outgoing:
                             outgoing.write(payload)
                             outgoing.flush()
@@ -1036,9 +1055,12 @@ class LauncherController:
                         return {"status":"available", "path":str(destination), "owned_capture":True,
                             "source_filename":source.name, "source_size":len(payload),
                             "pid":scope["pid"], "process_created":scope["process_created"],
+                            "namespace":scope.get("admission", {}).get("namespace_id"),
+                            "build_id":scope.get("admission", {}).get("build_id"),
+                            "instance_id":scope.get("admission", {}).get("instance_id"),
                             "requested_at":requested_at, "freshness":"request_copy"}
-                except FileNotFoundError:
-                    pass
+                    except FileNotFoundError:
+                        continue
                 time.sleep(.1)
             return {"status":"pending", "reason":"game_diagnostic_condump_not_observed_within_timeout"}
 

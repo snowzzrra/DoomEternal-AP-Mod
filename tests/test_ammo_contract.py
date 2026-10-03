@@ -190,3 +190,33 @@ def test_request_file_worker_cancels_old_room_without_replaying_removed_files(tm
         ammo.invalidate("test shutdown")
 
     asyncio.run(run())
+
+
+def test_one_refill_file_observation_debits_at_most_once(tmp_path):
+    async def run():
+        messages = []
+
+        async def send(packets):
+            messages.extend(packets)
+
+        ammo, _, _, _ = setup_ammo(tmp_path, send)
+        scope = AmmoCommandScope("room-A", "map", "slot", True)
+        accepted = asyncio.Event()
+
+        async def request():
+            assert await ammo.request(scope, (None, {}))
+            accepted.set()
+
+        pump = AmmoRequestPump(ammo, request, asyncio.Event(), logging.getLogger("ammo-contract"))
+        path = tmp_path / "AP_REFILL_REQUEST.txt"
+        path.write_text("request")
+        assert pump.consume([path])
+        assert not pump.consume([path])
+        await asyncio.wait_for(accepted.wait(), timeout=5)
+        assert len(messages) == 1
+        assert messages[0]["operations"] == [{"operation": "add", "value": 1}]
+        assert ammo.pending
+        pump.reset()
+        ammo.invalidate("test shutdown")
+
+    asyncio.run(run())

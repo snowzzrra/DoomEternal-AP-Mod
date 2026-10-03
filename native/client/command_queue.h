@@ -26,6 +26,8 @@ public:
                   const QueueSafetySnapshot& safety, bool transientBaselineReady,
                   const std::string& gateReason, CommandTransport* rpc);
     void Wait();
+    bool PublicationBlocked() const;
+    DWORD PublicationError() const { return publicationError; }
 private:
     void LogDebug(const std::string& message) const { logger_(message); }
     void finishSilentBurst(const char* reason);
@@ -51,6 +53,9 @@ private:
     size_t silentBurstOperations = 0;
     std::string publicationFailure;
     bool submittedToNative = false;
+    DWORD publicationError = ERROR_SUCCESS;
+    std::optional<std::string> fortressNamespace;
+    int fortressPhase = -1;
 
     std::string TrimLine(std::string value);
     std::string CommandIdFromPath(const std::string& path);
@@ -67,6 +72,9 @@ private:
     std::optional<std::string>* transientScope = nullptr
 );
     bool WriteCommandFile(const std::string& path, const std::string& command);
+    bool PersistNativeAttempt(CommandJob& job);
+    bool RemoveNativeAttempt(const std::string& path);
+    void DiscardSupersededFortressJobs();
     bool StartsWith(const std::string& value, const std::string& prefix);
     std::optional<std::string> MigratedDirectItemCommand(
     const std::string& filename,
@@ -135,5 +143,5 @@ private:
     std::unordered_map<std::string, DeliveredSpool>& deliveredSpools,
     std::unordered_set<std::string>& knownCommandIds
 );
-    bool ExecuteCommand(const CommandJob& job, CommandTransport* rpc);
+    bool ExecuteCommand(CommandJob& job, CommandTransport* rpc);
 };

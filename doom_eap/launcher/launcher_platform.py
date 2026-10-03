@@ -3201,12 +3201,18 @@ def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | N
         return None
     name = "special_toggle_hotkey.state" if special else AMMO_HOTKEY_STATE_FILENAME
     header = "AP_SPECIAL_TOGGLE_HOTKEY_V1" if special else AMMO_HOTKEY_STATE_HEADER
-    path = base / name
+    path = base / "ap_queue" / name
+    legacy = False
     if not path.exists():
-        return None
+        path = base / name
+        legacy = True
+        if not path.exists():
+            return None
     with path.open("rb") as stream:
         raw = stream.read(128)
     tokens = raw.decode("ascii").split()
+    if legacy and (len(tokens) != 2 or tokens[0] != header):
+        return None
     if len(raw) >= 128 or len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header):
         raise ValueError(f"Invalid AP shortcut file: {name}")
     return tokens[-1]
@@ -3216,12 +3222,13 @@ def write_ap_hotkey_states(base: Path | None, refill: str, special: str) -> Path
     """Publish validated shortcuts together, restoring both files on failure."""
     if base is None:
         return None
-    base.mkdir(parents=True, exist_ok=True)
-    paths = [base / AMMO_HOTKEY_STATE_FILENAME, base / "special_toggle_hotkey.state"]
+    queue = base / "ap_queue"
+    queue.mkdir(parents=True, exist_ok=True)
+    paths = [queue / AMMO_HOTKEY_STATE_FILENAME, queue / "special_toggle_hotkey.state"]
     previous = [path.read_bytes() if path.exists() else None for path in paths]
     try:
         for path, header, token in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1"), (refill, special)):
-            _atomic_write_bytes(path, f"{header}\n{token or 'UNBOUND'}\n".encode("ascii"))
+            _atomic_write_bytes(path, f"{header} {token or 'UNBOUND'}\n".encode("ascii"))
     except OSError:
         for path, content in zip(paths, previous):
             if content is None:
@@ -3229,6 +3236,14 @@ def write_ap_hotkey_states(base: Path | None, refill: str, special: str) -> Path
             else:
                 _atomic_write_bytes(path, content)
         raise
+    for path, header in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1")):
+        legacy = base / path.name
+        try:
+            tokens = legacy.read_bytes().decode("ascii").split()
+            if len(tokens) == 2 and tokens[0] == header:
+                legacy.unlink()
+        except (OSError, UnicodeError):
+            pass
     return paths[0]
 
 
@@ -3297,25 +3312,6 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
             temporary.unlink()
         except OSError:
             pass
-
-
-def write_ammo_refill_hotkey_state(base_dir: Path | None, keybind: str) -> Path | None:
-    """Write AP-owned ammo refill hotkey state file atomically."""
-    if base_dir is None:
-        return None
-    queue_dir = base_dir / "ap_queue"
-    try:
-        queue_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return None
-    state_file = queue_dir / AMMO_HOTKEY_STATE_FILENAME
-    token = str(keybind).strip() if str(keybind).strip() else "UNBOUND"
-    content = f"{AMMO_HOTKEY_STATE_HEADER} {token}\n".encode("utf-8")
-    try:
-        _atomic_write_bytes(state_file, content)
-        return state_file
-    except OSError:
-        return None
 
 
 def cleanup_stale_doom_config_bind(config: Mapping[str, object], *, is_game_running: bool = False) -> bool:

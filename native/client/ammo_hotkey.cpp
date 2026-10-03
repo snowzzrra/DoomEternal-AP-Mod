@@ -41,13 +41,13 @@ AmmoHotkeyHandler::AmmoHotkeyHandler(LogFunction logFunction, std::string stateF
 
 std::string AmmoHotkeyHandler::CanonicalToken(const std::string& input) {
     const std::string upper = ToUpperTrimmed(input);
-    if (upper.empty() || upper == "UNBOUND" || upper == "NONE") {
+    if (upper.empty() || upper == "UNBOUND") {
         return "UNBOUND";
     }
-    if (upper == "PGUP" || upper == "PAGE_UP") {
+    if (upper == "PGUP") {
         return "PAGEUP";
     }
-    if (upper == "PGDN" || upper == "PAGE_DOWN") {
+    if (upper == "PGDN") {
         return "PAGEDOWN";
     }
     return upper;
@@ -60,14 +60,13 @@ int AmmoHotkeyHandler::TokenToVirtualKey(const std::string& token) {
     }
 
     // function keys f1..f12
-    if (canonical.size() >= 2 && canonical[0] == 'F') {
-        const std::string numStr = canonical.substr(1);
-        if (!numStr.empty() && std::all_of(numStr.begin(), numStr.end(), ::isdigit)) {
-            int num = std::stoi(numStr);
-            if (num >= 1 && num <= 12) {
-                return VK_F1 + (num - 1);
-            }
+    if (canonical.size() >= 2 && canonical.size() <= 15 && canonical[0] == 'F') {
+        int num = 0;
+        for (size_t i = 1; i < canonical.size(); ++i) {
+            if (canonical[i] < '0' || canonical[i] > '9' || num > 12) return 0;
+            num = num * 10 + canonical[i] - '0';
         }
+        if (num >= 1 && num <= 12) return VK_F1 + num - 1;
     }
 
     // letters a..z
@@ -144,21 +143,17 @@ void AmmoHotkeyHandler::CheckConfigFile() {
     fileExisted_ = true;
     lastWriteTime_ = attr.ftLastWriteTime;
 
-    std::ifstream file(stateFilePath_);
-    std::string rawLine;
+    std::ifstream file(stateFilePath_, std::ios::binary);
+    char bytes[128]{};
     std::string newToken = "UNBOUND";
-    if (file && std::getline(file, rawLine)) {
-        std::istringstream stream(rawLine);
-        std::string header;
-        if (stream >> header) {
-            if (header == "AP_AMMO_REFILL_HOTKEY_V1") {
-                std::string key;
-                if (stream >> key) {
-                    newToken = CanonicalToken(key);
-                }
-            } else {
-                newToken = CanonicalToken(header);
-            }
+    if (file && file.read(bytes, sizeof(bytes) - 1).eof() &&
+        std::find(bytes, bytes + file.gcount(), '\0') == bytes + file.gcount()) {
+        std::istringstream stream(std::string(bytes, static_cast<size_t>(file.gcount())));
+        std::string first, second, extra;
+        if (stream >> first) {
+            if (!(stream >> second)) newToken = CanonicalToken(first);
+            else if (first == "AP_AMMO_REFILL_HOTKEY_V1" && !(stream >> extra))
+                newToken = CanonicalToken(second);
         }
     }
 
@@ -167,7 +162,7 @@ void AmmoHotkeyHandler::CheckConfigFile() {
         token_ = newToken;
         vk_ = newVk;
         wasDown_ = false;
-        latched_ = false;
+        latched_ = true;
         releaseStartTick_ = 0;
         if (log_) {
             if (vk_ != 0) {

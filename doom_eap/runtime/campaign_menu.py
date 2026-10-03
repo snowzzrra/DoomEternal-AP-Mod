@@ -51,13 +51,17 @@ class CampaignMenu:
             summary = snapshot.get("summaries", {}).get(row["stage"])
             rating = snapshot.get("ratings", {}).get(row["stage"]) if row["revealed"] else None
             band = 0
-            if rating is not None and "expected_player_cr" in rating:
+            if rating is not None and snapshot.get("ratings_version", 1) == 2:
+                band = rating.get("skull_tier")
+                if type(band) is not int or not 1 <= band <= 4:
+                    raise ValueError("Native intrinsic difficulty tier is invalid")
+            elif rating is not None and "expected_player_cr" in rating:
                 base, expected, allowance = (float(rating[key]) for key in
                                               ("base_cr", "expected_player_cr", "skill_allowance"))
                 if not all(math.isfinite(value) and 0 <= value <= 100
                            for value in (base, expected, allowance)):
                     raise ValueError("Native relative difficulty facts are invalid")
-                # Derive the visual tier from frozen facts, including rooms with an absolute skull_tier.
+                # Relative contract uses frozen base, expected kit and allowance.
                 deficit = round((base - expected - allowance) * 100)
                 band = 1 + sum(deficit > cut for cut in (-1000, 0, 1000))
                 band |= (round(expected * 100) + 1) << 8
