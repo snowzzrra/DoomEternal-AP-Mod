@@ -715,17 +715,6 @@ class RoomCompiler:
             for p in sorted(catalog_dir.glob("**/*.json")):
                 catalog_hashes[p.relative_to(catalog_dir).as_posix()] = _file_sha(p)
 
-        vanillamaps_hashes: dict[str, str | None] = {}
-        vanilla_dir = ROOT / "vanillamaps"
-        for m in (
-            "e4m1_rig.map", "e4m2_swamp.map", "e4m3_mcity.map",
-            "e5m1_spear.map", "e5m2_earth.map", "e5m3_hell.map",
-            "e5m4_boss.map", "hub.map"
-        ):
-            vp = vanilla_dir / m
-            if vp.is_file():
-                vanillamaps_hashes[m] = _file_sha(vp)
-
         return {
             "schema": 2,
             "base_mod_sha256": _file_sha(base_resource),
@@ -759,7 +748,6 @@ class RoomCompiler:
                 "tag_decls": tag_decl_hashes,
             },
             "content_catalog_data": catalog_hashes,
-            "vanillamaps": vanillamaps_hashes,
         }
 
     @classmethod
@@ -1276,14 +1264,11 @@ class RoomCompiler:
             })
             from doom_eap.content.content_catalog import load_content_catalog
             from doom_eap.runtime.context_registry import dlc_contexts
-            from tools.maps.ap_map_generator import generate_context_marker_overlay
             from tools.maps.mission_complete_map_patcher import patch_generated_map_text
 
             catalog = load_content_catalog()
             # DLC mission AP content is scoped by include_dlc_missions; DLC
             # gameplay/context support stays scoped by use_dlc_content.
-            # Excluded TAG mission overlays contain vanilla + marker support without
-            # location publishers, while the publisher patch below skips them.
             include_dlc_missions = manifest.options.get("include_dlc_missions", True)
             excluded_mission_maps = set() if include_dlc_missions else dlc_mission_map_keys()
             for context in dlc_contexts():
@@ -1298,37 +1283,13 @@ class RoomCompiler:
                 spec = catalog.maps.get(map_key)
                 if spec is None:
                     raise ValueError(f"DLC context map spec missing: {map_key}")
-                compiled_content = assembled.get(overlay_member)
-                if compiled_content is not None:
-                    compiled_text = self._decompress_entities_text(compiled_content, overlay_member)
-                    if "idWorldspawn" in compiled_text and "ap_publisher_" not in compiled_text:
-                        continue
-                vanilla_source = (ROOT / "vanillamaps" / spec.source_file).read_text(encoding="utf-8")
-                overlay_text = generate_context_marker_overlay(
-                    map_key, context.runtime_maps[0]
-                )
-                import re
-                marker_names = re.findall(r"\bentityDef\s+(\S+)\s*\{", overlay_text)
-                if len(marker_names) != len(set(marker_names)):
-                    raise ValueError(
-                        f"DLC context marker entity names are duplicated: {context.identity}"
-                    )
-                full_text = vanilla_source.rstrip() + "\n" + overlay_text.lstrip()
-                assembled[overlay_member] = self._compress_entities_text(
-                    full_text
-                )
-            for context in dlc_contexts():
-                map_key = context.map_keys[0]
-                spec = catalog.maps.get(map_key)
-                if spec is None or not spec.requires_dlc_content:
-                    continue
-                if map_key in excluded_mission_maps:
-                    continue
-                member = self.payload_manifest["context_targets"][context.identity]
+                member = overlay_member
                 compiled_content = assembled.get(member)
                 if compiled_content is None:
                     raise ValueError(f"DLC map compiled payload is missing: {map_key}/{member}")
                 compiled_text = self._decompress_entities_text(compiled_content, member)
+                if "idWorldspawn" not in compiled_text:
+                    raise ValueError(f"DLC map compiled payload is incomplete: {map_key}/{member}")
                 patched_text, _publisher_audit = patch_generated_map_text(
                     map_key, compiled_text, ROOT
                 )

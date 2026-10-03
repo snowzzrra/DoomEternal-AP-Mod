@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: doometernal-ap-reports
+    runtime: docker
+    branch: main
+    plan: starter
+    dockerfilePath: ./tools/report_backend/Dockerfile
+    dockerContext: ./tools/report_backend
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_INSTALLATION_ID
+        sync: false
+      - key: GITHUB_APP_KEY_FILE
+        value: /etc/secrets/github_app_key.pem
+      - key: REPORT_DATA_DIR
+        value: /data
+      - key: REPORT_TRUSTED_PROXY_HOPS
+        value: "1"
+    disk:
+      name: report-state
+      mountPath: /data
+      sizeGB: 1

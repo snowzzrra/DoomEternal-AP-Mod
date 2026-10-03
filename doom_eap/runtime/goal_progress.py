@@ -15,6 +15,7 @@ class GoalProgress:
         self._candidate_revision = 0
         self._last_details_mtime = None
         self._completion_states = {}
+        self._pending_objectives = None
 
     @property
     def sent(self):
@@ -43,6 +44,7 @@ class GoalProgress:
     def connected(self, persist):
         self.invalidate_publication()
         self._sent = False
+        self._pending_objectives = None
         self._state["goal_sent"] = False
         persist()
 
@@ -80,7 +82,13 @@ class GoalProgress:
         if not facts.checked_ready:
             return False
         checked_locations = facts.checked
-        if not objective_ids or not objective_ids <= set(checked_locations):
+        missing = frozenset(objective_ids - checked_locations)
+        pending = (bool(objective_ids), missing)
+        if pending != self._pending_objectives:
+            self._pending_objectives = pending
+            self._logger.info("[Goal] OBJECTIVES_OBSERVED contract_ready=%s missing=%s",
+                              bool(objective_ids), sorted(missing))
+        if not objective_ids or missing:
             return False
         if not facts.connected:
             return False

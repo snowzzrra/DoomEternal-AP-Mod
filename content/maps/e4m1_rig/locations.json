@@ -55,9 +55,7 @@
       "preserve_targets": [
         "slayer_gate_corridor_temp_sunken_rig_geo_func_mover_key_grate_961496569_1"
       ],
-      "drop_targets": ["checkpoints_target_relay_54"],
-      "no_auto_automap_helper": true,
-      "independent_automap_properties_decl": "slayer_key"
+      "drop_targets": ["checkpoints_target_relay_54"]
     },
     "slayer_gate_progress_support_rune_1": {
       "native_entity_contract": {

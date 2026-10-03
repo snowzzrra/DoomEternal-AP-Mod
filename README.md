@@ -31,7 +31,7 @@ Launcher creates player YAML files, connects to rooms, prepares matching room pa
 DoomEAP is beta, and bug reports are welcome. In the launcher, open **Help → Report a Problem**.
 The launcher creates a verified local Support ZIP and opens a sanitized report preview. Enter a title and description, review the text, and export it locally. **Save Support Report** supports an active game; if the export path is unavailable, the launcher shows the retained ZIP under its local `data/support-bundles` directory.
 Online submission requires the project's deployed HTTPS reporting service. This checkout has submission disabled until deployment. When configured, **Send Reviewed Report** asks for confirmation and returns the created or recovered issue URL without requiring the player's GitHub account. An uncertain submission retains an immutable draft and the same report key for retry or reopening. A confirmed report permits **Start New Report**.
-The remote report contains reviewed text and bounded redacted diagnostic tails. The ZIP stays local. The maintainer's [deployment instructions](tools/report_backend/deploy.txt) cover the GitHub App, HTTPS hosting, persistent state, and qualification. You can also use the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
+The remote report contains reviewed text and bounded redacted diagnostic tails. The ZIP stays local. The maintainer's [deployment instructions](tools/report_backend/DEPLOY.md) cover the GitHub App, Render, persistent state, and qualification. You can also use the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
 
 ## 2. Player options
 

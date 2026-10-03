@@ -1,7 +1,6 @@
 FROM node:24.19.0-alpine
 WORKDIR /service
-COPY server.cjs .
+COPY server.cjs start.sh ./
 RUN mkdir /data && chown node:node /data
-USER node
 EXPOSE 8080
-CMD ["node", "server.cjs"]
+CMD ["sh", "start.sh"]

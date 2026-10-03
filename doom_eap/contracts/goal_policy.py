@@ -11,8 +11,8 @@ class GoalPolicy:
         self._goal_names = frozenset(endpoint_ids)
         self._requirement_names = frozenset(suffixes) | {"Acquire the Unmaykr"}
 
-    def _active_goal_location_names(self, slot_data):
-        names = set(self._locations.values())
+    def _active_goal_location_names(self, slot_data, server_locations):
+        names = {name for identity, name in self._locations.items() if identity in server_locations}
         if not slot_data.get("use_dlc_content") or not slot_data.get("include_dlc_missions", True):
             names = {
                 name for name in names
@@ -21,7 +21,7 @@ class GoalPolicy:
         return names
 
 
-    def objective_ids(self, slot_data):
+    def objective_ids(self, slot_data, server_locations):
         if not isinstance(slot_data, dict):
             return frozenset()
         goal = slot_data.get("goal")
@@ -46,7 +46,7 @@ class GoalPolicy:
         if not requirements <= self._requirement_names:
             return frozenset()
 
-        active_names = self._active_goal_location_names(slot_data)
+        active_names = self._active_goal_location_names(slot_data, server_locations)
         objective_ids = {self._endpoint_ids[goal]}
         if goal == "Complete the Full Saga":
             final = slot_data['campaign_plan']['goal_stage']

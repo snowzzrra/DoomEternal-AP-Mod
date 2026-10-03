@@ -137,6 +137,6 @@ if (require.main === module) {
   const server = createServer({directory:process.env.REPORT_DATA_DIR || '/data', appId:process.env.GITHUB_APP_ID,
     installationId:process.env.GITHUB_INSTALLATION_ID, privateKey:fs.readFileSync(process.env.GITHUB_APP_KEY_FILE),
     trustedProxyHops:Number(process.env.REPORT_TRUSTED_PROXY_HOPS || 0)});
-  server.listen(8080, '0.0.0.0');
+  server.listen(Number(process.env.PORT || 8080), '0.0.0.0');
 }
 module.exports = {validate, createServer};

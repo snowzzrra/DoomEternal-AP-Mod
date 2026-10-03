@@ -835,7 +835,7 @@ class LauncherController:
         return self.request_problem_report(logs=logs)
 
     def request_report_submission(self, payload: dict) -> bool:
-        endpoint = submission_endpoint(self.bundle_dir)
+        endpoint = submission_endpoint(self.client_dir)
         if endpoint is None:
             raise RuntimeError("Online submission is awaiting service deployment. Export the report locally.")
         payload = deepcopy(payload)

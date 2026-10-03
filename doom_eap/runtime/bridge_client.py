@@ -6129,8 +6129,8 @@ class DoomEternalContext(CommonContext):
         await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication())
 
     @staticmethod
-    def goal_objective_ids(slot_data):
-        return GOAL_POLICY.objective_ids(slot_data)
+    def goal_objective_ids(slot_data, server_locations):
+        return GOAL_POLICY.objective_ids(slot_data, server_locations)
 
     @property
     def goal_dispatch_sent(self):
@@ -6155,9 +6155,11 @@ class DoomEternalContext(CommonContext):
         if not hasattr(self, "unified_campaign") or not self.unified_campaign.goal_admitted(
                 self.checked_locations, self.items_received):
             return False
+        observation = DoomEternalContext.check_observation(self)
         return await self.goals.evaluate(
-            source_description, GOAL_POLICY.objective_ids(getattr(self, "_connected_slot_data", {})),
-            DoomEternalContext.check_observation(self), DoomEternalContext.check_publication(self),
+            source_description,
+            GOAL_POLICY.objective_ids(getattr(self, "_connected_slot_data", {}), observation.server_locations),
+            observation, DoomEternalContext.check_publication(self),
         )
 
     async def execute_publisher(self, publisher, trigger_strategy, source_description):
