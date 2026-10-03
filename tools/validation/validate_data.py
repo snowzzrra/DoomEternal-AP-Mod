@@ -1341,8 +1341,8 @@ def main(argv: list[str] | None = None) -> int:
         or "count = 1;" not in generated_commands
         or f'item[0] = "{RPC_ENTITY_PREFIX}_4_0";' not in generated_commands
         or f'item[1] = "{RPC_ENTITY_PREFIX}_4_1";' not in generated_commands
-        or 'commandText = "give first";' not in generated_commands
-        or 'commandText = "give second";' not in generated_commands
+        or 'commandText = "give first;";' not in generated_commands
+        or 'commandText = "give second;";' not in generated_commands
         or 'class = "idTarget_Relay";' in generated_commands
     ):
         errors.append("Multi-command items do not use the validated target/count relay")

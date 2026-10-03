@@ -2273,7 +2273,7 @@ def generate_rpc_command_entities(
                         )
                         blocks.append(build_primitive(
                             "target_command", entity_name,
-                            {"command": progressive_effect_command(effect)},
+                            {"command": progressive_effect_command(effect) + ";"},
                         ))
                 continue
 
@@ -2283,7 +2283,7 @@ def generate_rpc_command_entities(
                     raise ValueError(f"Perk item {item_id} has no perk path")
                 blocks.append(build_primitive(
                     "target_command", f"{RPC_ENTITY_PREFIX}_{item_id}",
-                    {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk}"},
+                    {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk};"},
                 ))
                 continue
 
@@ -2311,7 +2311,7 @@ def generate_rpc_command_entities(
                 command_blocks.append(build_primitive(
                     "weapon_grant_direct" if direct_bfg else "target_command",
                     cmd_entity_name,
-                    {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd},
+                    {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd + ";"},
                 ))
 
             blocks.append(build_primitive(
@@ -2324,7 +2324,7 @@ def generate_rpc_command_entities(
             if command_requires_map_side_rpc(command_value):
                 required_entities.append(entity_name)
             blocks.append(build_primitive(
-                "target_command", entity_name, {"command": command_value}
+                "target_command", entity_name, {"command": command_value + ";"}
             ))
 
     # Only non-no_op items generate independent notification entities.
