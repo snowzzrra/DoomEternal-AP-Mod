@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from doom_eap.launcher.launcher_session import APSessionOwner, _verify_new_campaign_receipts
+from doom_eap.launcher.launcher_session import APSessionOwner
 
 
 def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
@@ -153,7 +153,6 @@ def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeyp
     assert foreign.read_bytes() == b"other room"
     assert not goal.exists() and not marker.exists()
     assert not old_backup.exists() and owner.list_backups(snapshot) == []
-    _verify_new_campaign_receipts(state_file, snapshot)
 
 
 def test_admission_identity_and_unknown_exit_preserve_owner(tmp_path):
@@ -191,74 +190,8 @@ def test_admission_identity_and_unknown_exit_preserve_owner(tmp_path):
     assert not owner._control_bytes or not (tmp_path / "sentinel-prelaunch.txt").exists()
 
 
-def test_create_refuses_receipts_without_native_save(tmp_path):
-    snapshot = SimpleNamespace(seed_name="seed", team=0, slot=1, slot_data={
-        "native_generation_fingerprint": "a" * 64,
-        "starting_inventory": {}, "starting_weapon": "Combat Shotgun",
-    })
-    state_file = tmp_path / "client_state.json"
-    session = {"processed_items": 0, "receipt_history": {"receipt_counts": {"item": 1}}}
-    state_file.write_text(json.dumps({"sessions": {"seed:0:1:generation": session}}))
-    with pytest.raises(RuntimeError, match="recover the campaign"):
-        _verify_new_campaign_receipts(state_file, snapshot)
-    session["receipt_history"] = {"processed_boundary": 0, "highest_observed_index": -1}
-    state_file.write_text(json.dumps({"sessions": {"seed:0:1:generation": session}}))
-    _verify_new_campaign_receipts(state_file, snapshot)
-    session["processed_items"] = "0"
-    state_file.write_text(json.dumps({"sessions": {"seed:0:1:generation": session}}))
-    with pytest.raises(RuntimeError, match="ambiguous"):
-        _verify_new_campaign_receipts(state_file, snapshot)
-
-
-def test_create_preserves_initial_receipts_and_pending_ownership(tmp_path):
-    from doom_eap.runtime.item_reconciliation import (
-        default_session_state, observe_received_items, project_receipt_history,
-        record_processed_receipt,
-    )
-    snapshot = SimpleNamespace(seed_name="seed", team=0, slot=1, slot_data={
-        "native_generation_fingerprint": "a" * 64,
-        "starting_inventory": {"Frag Grenade": 1}, "starting_weapon": "Combat Shotgun",
-    })
-    state_file = tmp_path / "client_state.json"
-    session = default_session_state()
-    receipts = [SimpleNamespace(item=item, location=-2, player=0, flags=0)
-                for item in (7770900, 7770011)]
-
-    def write(boundary):
-        session["processed_items"] = boundary
-        project_receipt_history(session, receipts, boundary,
-                                observe_received_items(receipts, boundary))
-        state_file.write_text(json.dumps({"sessions": {"seed:0:1:" + "a" * 64: session}}))
-        return state_file.read_bytes()
-
-    for receipt in receipts:
-        record_processed_receipt(session, receipt)
-    before = write(2)
-    _verify_new_campaign_receipts(state_file, snapshot)
-    assert state_file.read_bytes() == before
-    receipts.append(SimpleNamespace(item=7770903, location=7770300, player=1, flags=0))
-    write(2)
-    _verify_new_campaign_receipts(state_file, snapshot)
-    record_processed_receipt(session, receipts[-1])
-    write(3)
-    with pytest.raises(RuntimeError, match="recover the campaign"):
-        _verify_new_campaign_receipts(state_file, snapshot)
-    receipts[:] = [receipts[0], receipts[0]]
-    session["receipt_history"]["receipt_counts"] = {}
-    for receipt in receipts:
-        record_processed_receipt(session, receipt)
-    write(2)
-    with pytest.raises(RuntimeError, match="recover the campaign"):
-        _verify_new_campaign_receipts(state_file, snapshot)
-    receipts[:] = [SimpleNamespace(item=7770900, location=7770300, player=1, flags=0)]
-    session["receipt_history"]["receipt_counts"] = {}
-    record_processed_receipt(session, receipts[0])
-    write(1)
-    with pytest.raises(RuntimeError, match="recover the campaign"):
-        _verify_new_campaign_receipts(state_file, snapshot)
-
-
-def test_core_prepares_launcher_session(monkeypatch):
+@pytest.mark.parametrize("receipt_origin", ("empty", "starting", "multiworld"))
+def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
     import ctypes
     import os
     import shutil
@@ -292,11 +225,32 @@ def test_core_prepares_launcher_session(monkeypatch):
         assert installed.state == "installed"
         snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data={
             "native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 1},
+            "starting_inventory": {"Frag Grenade": 1}, "starting_weapon": "Combat Shotgun",
         })
         owner = APSessionOwner(root, data, state)
         config = {"game_root": str(game), "save_games_dir": str(local),
                   "client_state_file": str(data / "client_state.json"),
                   "steam_remote_dir": str(remote), "core_runtime_manifest": str(runtime / "distribution.json")}
+        from doom_eap.runtime.item_reconciliation import (
+            default_session_state, observe_received_items, project_receipt_history, record_processed_receipt,
+        )
+        receipts = [] if receipt_origin == "empty" else [
+            SimpleNamespace(item=item, location=-2, player=0, flags=0) for item in (7770900, 7770011)
+        ]
+        if receipt_origin == "multiworld":
+            receipts += [SimpleNamespace(item=item, location=7770300 + i, player=2, flags=0)
+                         for i, item in enumerate((7770904, 7770025, 7770903))]
+        session = default_session_state()
+        boundary = len(receipts) - 1 if receipt_origin == "multiworld" else len(receipts)
+        for receipt in receipts[:boundary]:
+            record_processed_receipt(session, receipt)
+        session["processed_items"] = boundary
+        project_receipt_history(session, receipts, boundary, observe_received_items(receipts, boundary))
+        client_state = Path(config["client_state_file"])
+        client_state.write_text(json.dumps({"version": 2, "sessions": {
+            "sala-á:0:1:" + "a" * 64: session, "other-room:0:1": default_session_state(),
+        }}), encoding="utf-8")
+        receipt_bytes = client_state.read_bytes()
         system = Path(os.environ["SystemRoot"]) / "System32"
         shutil.copyfile(system / "cmd.exe", root / "steam.exe")
         steam = subprocess.Popen([str(root / "steam.exe"), "/d", "/q", "/c", str(system / "more.com")],
@@ -308,6 +262,7 @@ def test_core_prepares_launcher_session(monkeypatch):
             assert prepared["state"] == "prelaunch_ready"
             lease = (game / "sentinel-prelaunch.txt").read_bytes()
             assert owner.prepare(snapshot, config) == prepared
+            assert client_state.read_bytes() == receipt_bytes
             assert (game / "sentinel-prelaunch.txt").read_bytes() == lease
             descriptor = (state / "ap-session-descriptor.txt").read_text(encoding="utf-8")
             assert "seed_hex=" + snapshot.seed_name.encode("utf-8").hex() + "\n" in descriptor
@@ -325,7 +280,42 @@ def test_core_prepares_launcher_session(monkeypatch):
                 f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
                 f"team=0\nslot=1\ngeneration_fingerprint={'a' * 64}\nprovenance=synthetic-fixture\n", encoding="utf-8", newline="\n")
             assert owner.prepare(snapshot, config)["intent"] == "create"
+            assert client_state.read_bytes() == receipt_bytes
             assert _campaign_native_root(data / "campaigns", namespace) == first
+            owner.retire()
+            contract = data / "campaigns" / namespace / "campaign.contract"
+            checkpoint = contract.with_name("campaign.checkpoint")
+            for records in ((contract,), (checkpoint,), (contract, checkpoint)):
+                for record in records:
+                    record.write_bytes(b"existing campaign metadata")
+                refusal = "identity or immutable options differ" if len(records) == 2 else "metadata and native saves disagree"
+                with pytest.raises(RuntimeError, match=refusal):
+                    owner.prepare(snapshot, config)
+                assert client_state.read_bytes() == receipt_bytes
+                for record in records:
+                    assert record.read_bytes() == b"existing campaign metadata"
+                    record.unlink()
+            native_save = native / "GAME-AUTOSAVE0"
+            native_save.mkdir()
+            with pytest.raises(RuntimeError, match="metadata and native saves disagree"):
+                owner.prepare(snapshot, config)
+            assert native_save.is_dir() and client_state.read_bytes() == receipt_bytes
+            native_save.rmdir()
+            orphan = native / "save.fixture"
+            orphan.write_bytes(b"retained native payload")
+            contract.write_text(
+                f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={'a' * 64}\n"
+                "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=1\nslot=AUTOSAVE0\n",
+                encoding="utf-8", newline="\n",
+            )
+            checkpoint.write_bytes(b"retained checkpoint")
+            with pytest.raises(RuntimeError, match="native campaign is missing"):
+                owner.prepare(snapshot, config)
+            assert orphan.read_bytes() == b"retained native payload"
+            assert checkpoint.read_bytes() == b"retained checkpoint"
+            assert client_state.read_bytes() == receipt_bytes
+            for retained in (orphan, contract, checkpoint):
+                retained.unlink()
             config["doom_base_dir"] = str(game / "base")
             archive = owner.restart_campaign(snapshot, config)
             assert archive.is_file() and steam.poll() is None

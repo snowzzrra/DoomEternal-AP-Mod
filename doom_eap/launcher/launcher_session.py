@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import ctypes
-from collections import Counter
 from itertools import chain
 from dataclasses import asdict
 from ctypes import wintypes
@@ -40,77 +39,6 @@ def _campaign_native_root(campaign_root, namespace):
     if not text.startswith(header) or not re.fullmatch(rb"ap-[0-9a-f]{40}\n", text[len(header):]):
         raise RuntimeError("AP campaign provider metadata is unreadable")
     return text[len(header):-1].decode("ascii")
-
-
-def _initial_receipts_only(session, snapshot):
-    from doom_eap.content.item_classification import load_item_classification_identity
-    from doom_eap.contracts.item_contracts import start_inventory_eligible
-    from doom_eap.runtime.item_reconciliation import ReceiptSession
-    from doom_eap.runtime.unified_campaign import ACCESS_IDS
-
-    history = session.get("receipt_history", {})
-    boundary = session.get("processed_items", 0)
-    receipts, items = history.get("receipt_ids"), history.get("receipt_item_ids")
-    if (not isinstance(receipts, list) or not isinstance(items, list)
-            or not boundary or len(receipts) != boundary or len(items) != boundary
-            or any(not isinstance(receipt, str) for receipt in receipts)
-            or history.get("processed_boundary") != boundary
-            or history.get("receipt_counts") != dict(Counter(receipts))):
-        return False
-    starting = ReceiptSession()
-    starting.configure_starting_materialization(
-        starting_inventory=snapshot.slot_data["starting_inventory"],
-        starting_weapon=snapshot.slot_data["starting_weapon"],
-        item_identity=load_item_classification_identity(
-            Path(__file__).resolve().parents[2] / "data/item_classifications.json"),
-        processed_receipts=(), eligible=start_inventory_eligible,
-    )
-    for receipt, item in zip(receipts, items):
-        if not receipt.startswith("network:"):
-            return False
-        try:
-            fields = json.loads(receipt[len("network:"):])
-        except ValueError:
-            return False
-        if (not isinstance(fields, list) or len(fields) != 4
-                or any(type(field) is not int for field in fields)
-                or type(item) is not int or fields[2] != item):
-            return False
-        if item in ACCESS_IDS:
-            continue
-        if fields[0] != -2 or fields[1] != 0 or not starting.consume_starting_materialization(item):
-            return False
-    return True
-
-
-def _verify_new_campaign_receipts(state_file, snapshot):
-    if not state_file.exists():
-        return
-    with state_file.open("rb") as stream:
-        raw = stream.read(16 * 1024 * 1024 + 1)
-    if len(raw) > 16 * 1024 * 1024:
-        raise RuntimeError("Local AP receipt state is too large to verify")
-    state = json.loads(raw)
-    sessions = state.get("sessions") if isinstance(state, dict) else None
-    if not isinstance(sessions, dict):
-        raise RuntimeError("Local AP receipt state is unreadable; inspect it before creating a campaign")
-    prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
-    for key, session in sessions.items():
-        if key != prefix and not key.startswith(prefix + ":"):
-            continue
-        if not isinstance(session, dict) or type(session.get("processed_items", 0)) is not int or session.get("processed_items", 0) < 0:
-            raise RuntimeError("Local AP receipt state is ambiguous; inspect it before creating a campaign")
-        history = session.get("receipt_history", {})
-        if not isinstance(history, dict):
-            raise RuntimeError("Local AP receipt history is ambiguous; inspect it before creating a campaign")
-        processed = session.get("processed_items", 0) or any(history.get(field) for field in
-            ("receipt_ids", "receipt_counts", "receipt_item_ids", "processed_boundary"))
-        initial = (processed and key == prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]
-                   and _initial_receipts_only(session, snapshot))
-        if ((processed and not initial) or session.get("weapon_points")
-                or any(session.get(key) for key in ("item_command_groups", "never_replay_history", "never_replay_items", "never_replayed", "never_replay"))
-                or session.get("bootstrap", {}).get("actions")):
-            raise RuntimeError("Local AP receipts exist without native saves; recover the campaign before playing")
 
 
 class _ProtonSessionOwner:
@@ -337,8 +265,6 @@ class APSessionOwner:
                 if not re.fullmatch(r"[a-z0-9-]{1,128}", str(recovery_basename)):
                     raise ValueError("Invalid AP backup basename")
                 intent = "recover"
-            if intent == "create":
-                _verify_new_campaign_receipts(Path(str(config["client_state_file"])), snapshot)
             difficulty = snapshot.slot_data["campaign_plan"].get("difficulty")
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError("Room campaign difficulty is unsupported")
