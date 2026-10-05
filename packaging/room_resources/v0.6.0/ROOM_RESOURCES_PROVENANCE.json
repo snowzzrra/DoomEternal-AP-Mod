@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "cee8123fa4dc0b840bb31dfba779bea05711a727ddc3725268b2371aad83d674",
-    "size": 13632047
+    "sha256": "9cff9150d60e96d4a45b3f53600bab0895c91aeed66271036706d3341083d8e1",
+    "size": 13632089
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
   "inputs_count": 380,
   "release_version": "0.6.0",
   "room_payload_manifest": {
-    "sha256": "5a167ee05fbcc356080d77b5656b7b8ea29c701b3824bdc69a6194633cb1cdfc",
+    "sha256": "3745378e3a95cfacccee20064401c49a7d4a96f03faaa38d9c9c8dc8282e8cad",
     "size": 25706
   },
   "room_payloads": {
     "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
     "size": 2202253
   },
-  "room_resource_input_fingerprint": "e5e67195ae4bf4798fa21be036169c4a14aabe719d56675662b32a90f29ad455",
+  "room_resource_input_fingerprint": "02cc313d231498f09496b4c26c9ba6a08b26289690ffe3cd50ade6d08ddd4522",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -59,7 +59,7 @@
     "content/maps/e2m2_base/runtime.json": "94aa4a26a29d1d7ea110a63c744b57ac4e405fc16c622f4eeff685d4d82dac31",
     "content/maps/e2m3_core/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
     "content/maps/e2m3_core/descriptor.json": "a6e176f5d5a09136565f4522eb3ef480e8585df89e450fa2eadef7c24e19c5ff",
-    "content/maps/e2m3_core/locations.json": "bfda48939a568e0875e010f01e3575054425ff65b19daee2791daae2badff418",
+    "content/maps/e2m3_core/locations.json": "c2ccaa8e2864ae6b0b4a17b7bf7242d1602cdc469b0af4a5fc026941f3d5e912",
     "content/maps/e2m3_core/onboarding.json": "7d263e39d09ff3a450a01d32abc0e41997b9b9cd6442a9348be91edd09e16fde",
     "content/maps/e2m3_core/publishers.json": "880bc89028b3756fd3fdbb331f93b331ded3662364450c2411a2e1d809377ec4",
     "content/maps/e2m3_core/runtime.json": "5d780f79ddac2888db6c1042ef84263caa4eb02bbabf37004ced42db084d211a",
@@ -400,7 +400,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "6a30869b811da49574455bca876eb934ae7cb3a4",
+      "base_commit_sha": "2424c9ec872472ad8acd4e305914e3c1801ee80a",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13226,7 +13226,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "29f6f12e9b2eda629307047e27be7eac2bdf3716",
+      "base_commit_sha": "01849074445aa90c307c05c78dce79045a73bd19",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13439,8 +13439,8 @@
             "size": 1194
           },
           "content/maps/e2m3_core/locations.json": {
-            "sha256": "bfda48939a568e0875e010f01e3575054425ff65b19daee2791daae2badff418",
-            "size": 6126
+            "sha256": "c2ccaa8e2864ae6b0b4a17b7bf7242d1602cdc469b0af4a5fc026941f3d5e912",
+            "size": 6169
           },
           "content/maps/e2m3_core/onboarding.json": {
             "sha256": "7d263e39d09ff3a450a01d32abc0e41997b9b9cd6442a9348be91edd09e16fde",
@@ -15395,7 +15395,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "604446b654e122f027278216652fbe14f6fd7c27a12bd44daf91e45937b25dc1",
+        "fingerprint": "0e7d9afd89ddc7479f14a091de9c0439d0c98a5ec5c1c9dc6986fdfc12f89dbb",
         "kind": "working_tree_snapshot"
       }
     }
