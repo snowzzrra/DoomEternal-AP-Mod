@@ -162,6 +162,7 @@
     "gameresources/generated/decls/unlockable/weapon_mastery/rocket_launcher/lock_on.decl",
     "gameresources/generated/decls/unlockable/weapon_mastery/shotgun/full_auto.decl",
     "gameresources/generated/decls/unlockable/weapon_mastery/shotgun/sticky_bomb.decl",
+    "gameresources/generated/decls/violenceevent/violenceevent/weapon_mastery/shotgun/full_auto_kill_pinky.decl",
     "gameresources/generated/decls/weapon/weapon/player/double_barrel.decl",
     "gameresources/swf/hud/menus/dossier/dossier_challenges.swf",
     "gameresources/textures/swf_images/start_screen/doom_logo_base.png$bc7$streamed$mtlkind=ui",

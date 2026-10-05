@@ -214,17 +214,18 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Native Meat Hook authorization failed: {result}")
         return result
 
-    def ensure_progressive_special_weapon(self, count):
-        if type(count) is not int or not 1 <= count <= 3:
+    def ensure_progressive_special_weapon(self, count, *, hammer_only=False):
+        if type(count) is not int or not 1 <= count <= (2 if hammer_only else 3):
             raise WeaponPointsBlocked("Invalid Progressive Special Weapon count")
-        own_hammer = int(count >= 2)
-        hammer_tier = 2 if count >= 3 else own_hammer
-        body = struct.pack("<IIIIIIIQII", 1, 1, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
+        own_crucible = int(not hammer_only)
+        own_hammer = int(hammer_only or count >= 2)
+        hammer_tier = 2 if count >= (2 if hammer_only else 3) else own_hammer
+        body = struct.pack("<IIIIIIIQII", 1, own_crucible, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
         result = self._execute_typed(65536, "--special", 37, 38, 40, body)
-        required_known = 1 | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
+        required_known = own_crucible | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
         required_flags = 34 | (64 if result["outcome"] == 1 else 0)
         if (result["outcome"] not in (0, 1) or result["flags"] & required_flags != required_flags
-                or result["owns_crucible"] != 1 or result["native_crucible"] != 1
+                or (own_crucible and (result["owns_crucible"] != 1 or result["native_crucible"] != 1))
                 or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
                 or result["hammer_tier"] < hammer_tier
                 or (hammer_tier == 2 and result["native_hammer_perks"] != 3)

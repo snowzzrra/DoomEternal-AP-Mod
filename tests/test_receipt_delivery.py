@@ -7,7 +7,8 @@ import pytest
 from types import SimpleNamespace
 
 
-def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monkeypatch):
+@pytest.mark.parametrize("following_item", (7770904, 7770902))
+def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monkeypatch, following_item):
     root = Path(__file__).resolve().parents[1]
     archipelago = root.parent / "Archipelago"
     if not (archipelago / "CommonClient.py").is_file():
@@ -27,6 +28,7 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
     monkeypatch.syspath_prepend(str(archipelago))
     monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
     bridge = importlib.import_module("doom_eap.runtime.bridge_client")
+    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", True)
 
     async def consume():
         context = bridge.DoomEternalContext(None, None)
@@ -39,10 +41,17 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
         context.session_state["weapon_points"] = {"version": 1}
         context.items_received = [
             SimpleNamespace(item=7770016, location=11, player=1, flags=0),
-            SimpleNamespace(item=7770904, location=12, player=1, flags=1),
+            SimpleNamespace(item=following_item, location=12, player=1, flags=1),
         ]
         checkpoint = []
         notifications = []
+        native_calls = []
+
+        def ensure_special(count, *, hammer_only=False):
+            native_calls.append((count, hammer_only))
+            return {"outcome": 0}
+
+        monkeypatch.setattr(context, "native_game_link", lambda: SimpleNamespace(ensure_progressive_special_weapon=ensure_special))
 
         def reconcile(_history):
             checkpoint.append(True)
@@ -63,18 +72,28 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
         await context.process_pending_item_receipts("received_items")
         assert checkpoint == [True]
         assert context.items_processed == 2
-        assert notifications == [(7770016, 0), (7770904, 1)]
+        assert notifications == [(7770016, 0), (following_item, 1)]
+        assert native_calls == ([(1, True)] if following_item == 7770902 else [])
         assert context.session_state["weapon_points"] == {"version": 1}
+
+        if following_item == 7770902:
+            context.items_received.append(SimpleNamespace(item=7770902, location=13, player=1, flags=1))
+            await context.process_pending_item_receipts("received_items")
+            assert context.items_processed == 3 and native_calls[-1] == (2, True)
+            native_calls.clear()
+            bridge.DoomEternalContext._reconcile_native_receipt_owners(context, "reconnect")
+            assert native_calls == [(2, True)]
 
         saved = copy.deepcopy(context.session_state)
         history = context.items_received
+        expected_notifications = list(notifications)
         events = []
         monkeypatch.setattr(bridge, "emit_launcher_event", lambda kind, **event: events.append((kind, event)))
         context.items_received = history[:1]
         assert not await context.process_pending_item_receipts("server_save_reset")
         assert not await context.process_pending_item_receipts("tracker")
-        assert context.items_processed == 2 and context.session_state == saved
-        assert notifications == [(7770016, 0), (7770904, 1)]
+        assert context.items_processed == len(history) and context.session_state == saved
+        assert notifications == expected_notifications
         assert len(events) == 1 and events[0][1]["status"] == "blocked"
         assert context.item_delivery_blocked and "Resync cannot repair" in events[0][1]["message"]
         context.items_received = history

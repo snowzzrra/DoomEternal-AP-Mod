@@ -1,0 +1,19 @@
+{
+	edit = {
+		validAttackers = {
+			num = 1;
+			item[0] = "ENTITY_TYPE_PLAYER";
+		}
+		validVictims = {
+			num = 1;
+			item[0] = "ENTITY_TYPE_AI";
+		}
+		damageDecls = {
+			num = 2;
+			item[0] = "damage/firearm/12_gauge_full_auto";
+			item[1] = "damage/firearm/12_gauge_full_auto_ammo_giveback";
+		}
+		requiredMonsterType = "AI_MONSTER_PINKY AI_MONSTER_SPECTRE";
+		stat = "STAT_SHOTGUN_FULL_AUTO_MASTERY";
+	}
+}

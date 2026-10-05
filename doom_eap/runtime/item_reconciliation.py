@@ -133,7 +133,7 @@ class ReceiptSession:
         self._starting_materialization = tuple(facts)
 
     def consume_starting_materialization(self, item_id):
-        if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS:
+        if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS:
             return False
         if self._starting_counts.get(item_id, 0) > 0:
             self._starting_counts[item_id] -= 1

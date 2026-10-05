@@ -3735,7 +3735,7 @@ class DoomEternalContext(CommonContext):
                     logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
                     continue
 
-                if item_id in {7770083, 7770901} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS:
+                if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS:
                     try:
                         result = self._apply_native_owner_receipt(item_index, network_item)
                     except (RuntimeError, OSError, ValueError) as error:
@@ -5116,6 +5116,10 @@ class DoomEternalContext(CommonContext):
             starting_special_count,
             sum(item.item == 7770901 for item in authoritative),
         ))
+        hammer_count = min(2, max(
+            sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770902),
+            sum(item.item == 7770902 for item in authoritative),
+        ))
         log_item_event(
             "ITEM_NATIVE_OWNER_PLAN",
             trigger=trigger,
@@ -5127,11 +5131,13 @@ class DoomEternalContext(CommonContext):
             rune_mask=rune_mask,
             special_count=special_count,
             starting_special_count=starting_special_count,
+            hammer_count=hammer_count,
             state_key=getattr(self, "state_key", None),
         )
-        if not hook_owned and not special_count and not mastery_mask and not rune_mask:
+        if not hook_owned and not special_count and not hammer_count and not mastery_mask and not rune_mask:
             return
         for domain, desired in (("arsenal", hook_owned), ("special", special_count),
+                                ("hammer", hammer_count),
                                 ("arsenal_mastery", mastery_mask), ("normal_runes", rune_mask)):
             if not desired:
                 continue
@@ -5140,8 +5146,9 @@ class DoomEternalContext(CommonContext):
                 result = (link.ensure_meat_hook() if domain == "arsenal" else
                            link.ensure_normal_runes(desired) if domain == "normal_runes" else
                            link.ensure_masteries(desired) if domain == "arsenal_mastery" else
+                           link.ensure_progressive_special_weapon(desired, hammer_only=True) if domain == "hammer" else
                           link.ensure_progressive_special_weapon(desired))
-                if domain == "special":
+                if domain in {"special", "hammer"}:
                     self._synchronize_special_preference(link, result)
                 log_item_event(
                     "ITEM_NATIVE_OWNER_RECONCILED", domain=domain, trigger=trigger,
@@ -5195,13 +5202,15 @@ class DoomEternalContext(CommonContext):
                 mask |= NORMAL_RUNE_ITEM_BITS.get(receipt.item, 0)
             result = link.ensure_normal_runes(mask)
         else:
-            count = min(3, max(
-                sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770901),
-                sum(receipt.item == 7770901 for receipt in self.items_received[:index + 1]),
+            hammer_only = item.item == 7770902
+            count = min(2 if hammer_only else 3, max(
+                sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == item.item),
+                sum(receipt.item == item.item for receipt in self.items_received[:index + 1]),
             ))
             if not count:
                 raise ValueError("Progressive Special Weapon receipt count is empty")
-            result = link.ensure_progressive_special_weapon(count)
+            result = (link.ensure_progressive_special_weapon(count, hammer_only=True) if hammer_only
+                      else link.ensure_progressive_special_weapon(count))
         if ENABLE_ITEM_NOTIFICATIONS:
             accepted, description = self.spool_deferred_receipt_notification(item.item, index)
             if not accepted:

@@ -66,6 +66,26 @@ def test_special_tier2_requires_observed_native_perks():
     assert link.ensure_progressive_special_weapon(2)["hammer_tier"] == 2
 
 
+def test_progressive_hammer_does_not_authorize_crucible_and_requires_native_tier():
+    for tier in (1, 2):
+        def response(_flag, _operation, request_id):
+            return {**queued_result("--special", 37, request_id), "owns_crucible": 0,
+                    "native_crucible": 0, "hammer_tier": tier,
+                    "native_hammer_perks": 3 if tier == 2 else 0, "native_state_known": 6}
+
+        link, messages = link_with(response)
+        assert link.ensure_progressive_special_weapon(tier, hammer_only=True)["hammer_tier"] == tier
+        assert struct.unpack_from("<IIII", messages[0][2], 16 + 72 + 65) == (1, 0, 1, tier)
+
+    link, _ = link_with(queued_result)
+    try:
+        link.ensure_progressive_special_weapon(2, hammer_only=True)
+    except WeaponPointsBlocked:
+        pass
+    else:
+        raise AssertionError("missing Hammer upgrades certified tier2")
+
+
 def test_hook_and_special_use_typed_submit_and_release():
     link, messages = link_with(queued_result)
     link.ensure_meat_hook()
