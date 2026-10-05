@@ -45,3 +45,18 @@ def test_independent_dash_observation(abi, dash):
     reply["dash_after"] = 2
     with pytest.raises(WeaponPointsBlocked):
         link.observe_inventory()
+
+
+@pytest.mark.parametrize("abi,key", [(4, 1), (5, 0), (5, 1), (6, 0), (6, 1), (6, 255)])
+def test_independent_slayer_key_observation(abi, key):
+    link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)
+    reply = {"inventory_abi": abi, "kind": 0, "outcome": 1, "flags": 3,
+             "ice_bomb_after": 255, "dash_after": 1, "slayer_key_after": key}
+    link._execute_typed = lambda *args: reply
+    assert link.observe_inventory()["slayer_key_after"] == (key if abi == 6 else 255)
+    reply.update(inventory_abi=6, slayer_key_after=2)
+    with pytest.raises(WeaponPointsBlocked):
+        link.observe_inventory()
+    reply.update(slayer_key_after=0, flags=1)
+    with pytest.raises(WeaponPointsBlocked):
+        link.observe_inventory()

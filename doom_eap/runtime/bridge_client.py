@@ -22,7 +22,7 @@ import time
 import traceback
 import uuid
 from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort, ItemObservation, OWNED, MISSING, UNKNOWN
-from doom_eap.contracts.materialization import MaterializationScope
+from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
 from doom_eap.runtime.death_observation import DeathObservation
 from doom_eap.contracts.goal_policy import GoalPolicy
 from doom_eap.contracts.check_observation import CheckObservation
@@ -2694,7 +2694,14 @@ class SentinelInventoryObservation:
         if dash in (0, 1):
             items[7770015] = ItemObservation(7770015, OWNED if dash else MISSING,
                                              source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice, dash)
+        key = result.get("slayer_key_after", 255)
+        runtime_context = CONTEXT_BY_IDENTITY.get(context_identity)
+        if key in (0, 1) and runtime_context is not None and runtime_context.campaign == campaign:
+            for item_id, map_key in GATE_KEY_TO_MAP.items():
+                if map_key in runtime_context.map_keys:
+                    items[item_id] = ItemObservation(item_id, OWNED if key else MISSING,
+                                                     source="sentinel_inventory")
+        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice, dash, key)
         if signature != self.last_logged:
             log_item_event(
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
@@ -2704,6 +2711,9 @@ class SentinelInventoryObservation:
                 ice=items.get(7770013, ItemObservation(7770013)).state,
                 dash=items.get(7770015, ItemObservation(7770015)).state,
                 weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
+                slayer_key_owned=key,
+                gate_keys={str(item_id): item.state for item_id, item in items.items()
+                           if item_id in GATE_KEY_TO_MAP},
             )
             self.last_logged = signature
         return InventoryObservation(

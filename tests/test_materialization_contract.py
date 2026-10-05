@@ -8,12 +8,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from doom_eap.contracts.materialization import MaterializationScope
-from doom_eap.contracts.inventory_domain import InventoryObservation, ItemObservation, MISSING
+from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
+from doom_eap.contracts.inventory_domain import InventoryObservation, ItemObservation, MISSING, OWNED, UNKNOWN
 from doom_eap.contracts.runtime_context import RuntimeContext
 from doom_eap.runtime.command_spool import CommandSpool
 from doom_eap.runtime.item_reconciliation import effective_ownership, load_policy_registry
-from doom_eap.runtime.materialization import compile_materialization_plan
+from doom_eap.runtime.materialization import MaterializationPlanError, compile_materialization_plan
 from doom_eap.runtime.materialization_coordinator import MaterializationCoordinator
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 
@@ -180,3 +180,58 @@ def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs(
     assert document["processed_boundary"] == 12
     coordinator.reset_automatic()
     assert document == {}
+
+
+@pytest.fixture
+def inventory_adapter():
+    import ast
+    import time
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    root = Path(__file__).resolve().parents[1]
+    # Load the production adapter without CommonClient's application configuration.
+    tree = ast.parse((root / "doom_eap/runtime/bridge_client.py").read_text(encoding="utf-8-sig"))
+    node = next(row for row in tree.body if isinstance(row, ast.ClassDef) and row.name == "SentinelInventoryObservation")
+    namespace = dict(InventoryObservation=InventoryObservation, ItemObservation=ItemObservation,
+        OWNED=OWNED, MISSING=MISSING, GATE_KEY_TO_MAP=GATE_KEY_TO_MAP, CONTEXT_BY_IDENTITY=CONTEXT_BY_IDENTITY,
+        time=time, logger=logging.getLogger(__name__), log_item_event=lambda *args, **kwargs: None)
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "production-observation-adapter", "exec"), namespace)
+    link = SimpleNamespace(pid=123, namespace="offline")
+    adapter = namespace["SentinelInventoryObservation"](SimpleNamespace(state_key="published-room", native_game_link=lambda: link))
+    return adapter, link
+
+
+@pytest.mark.parametrize("item_id,map_key", list(GATE_KEY_TO_MAP.items()))
+@pytest.mark.parametrize("key,state", [(0, MISSING), (1, OWNED), (255, UNKNOWN)])
+def test_slayer_key_observation_and_replay_are_map_scoped(inputs, inventory_adapter, item_id, map_key, key, state):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = next(row for row in CONTEXT_BY_IDENTITY.values() if map_key in row.map_keys)
+    adapter, link = inventory_adapter
+    link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
+                                      "dash_after": 255, "slayer_key_after": key}
+    observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign)
+    assert observation.get_state(item_id) == state
+    assert all(observation.get_state(other) == UNKNOWN for other in GATE_KEY_TO_MAP if other != item_id)
+    for manual in (False, True):
+        arguments = (ownership(tuple(GATE_KEY_TO_MAP)), context, replace(scope, manual=manual), definitions,
+                     policies, "the_crucible")
+        if state == UNKNOWN:
+            with pytest.raises(MaterializationPlanError, match="unresolved native observations"):
+                compile_materialization_plan(*arguments, observation=observation)
+        else:
+            plan = compile_materialization_plan(*arguments, observation=observation)
+            assert [command.item_id for command in plan.reconciliation.commands] == ([item_id] if key == 0 else [])
+    plan = compile_materialization_plan(ownership(()), context, scope, definitions, policies,
+                                       "the_crucible", observation=observation)
+    assert not plan.reconciliation.commands
+
+
+@pytest.mark.parametrize("identity,campaign", [("base/hub", "Base"), ("unknown", "Base"),
+                                             ("base/e1m2_war", "TAG2")])
+def test_slayer_key_observation_needs_matching_map_context(inventory_adapter, identity, campaign):
+    adapter, link = inventory_adapter
+    link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
+                                      "dash_after": 255, "slayer_key_after": 0}
+    observation = adapter.observe_inventory(room_seed_name="seed", epoch=4, context_identity=identity, campaign=campaign)
+    assert all(observation.get_state(item_id) == UNKNOWN for item_id in GATE_KEY_TO_MAP)

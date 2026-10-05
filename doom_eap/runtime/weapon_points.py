@@ -265,7 +265,7 @@ class SentinelWeaponPoints:
     def observe_blood_punch(self):
         body = struct.pack("<5I4B", *([0] * 9))
         result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
-        if (result.get("inventory_abi") not in (4, 5) or result.get("outcome") != 1
+        if (result.get("inventory_abi") not in (4, 5, 6) or result.get("outcome") != 1
                 or result.get("flags", 0) & 3 != 3 or result.get("upgrades_after") == 0xffffffff):
             raise WeaponPointsBlocked(f"Blood Punch native observation is unknown or incompatible: {result}")
         return (result["upgrades_after"] >> 11) & 15
@@ -275,10 +275,13 @@ class SentinelWeaponPoints:
         result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
         if result.get("inventory_abi") == 4:
             result["dash_before"] = result["dash_after"] = 255
-        if (result.get("inventory_abi") not in (4, 5) or result.get("kind") != 0
+        if result.get("inventory_abi") in (4, 5):
+            result["slayer_key_before"] = result["slayer_key_after"] = 255
+        if (result.get("inventory_abi") not in (4, 5, 6) or result.get("kind") != 0
                 or result.get("outcome") != 1 or result.get("flags", 0) & 3 != 3
                 or result.get("ice_bomb_after") not in (0, 1, 255)
-                or result.get("dash_after") not in (0, 1, 255)):
+                or result.get("dash_after") not in (0, 1, 255)
+                or result.get("slayer_key_after") not in (0, 1, 255)):
             raise WeaponPointsBlocked(f"Native inventory observation is unknown or incompatible: {result}")
         return result
 
