@@ -351,7 +351,7 @@
         }
       ],
       "default": "late_game",
-      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 DLC mission paths enter logic once your inventory reaches their intended combat readiness.\n\nFrom the Beginning \u2014 Removes the extra late-game combat-readiness gate. DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (vanilla Dash becomes available after Exultia; The World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool).\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
+      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 DLC mission paths enter logic once your inventory reaches their intended combat readiness.\n\nFrom the Beginning \u2014 Removes the extra late-game combat-readiness gate. DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (fixed Dash follows the campaign's starting kit or first included mission completion; The World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool).\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
       "display_name": "DLC Logic Timing",
       "group": "Game Options",
       "key": "dlc_logic_timing",
@@ -602,7 +602,7 @@
     },
     {
       "default": false,
-      "description": "Shuffle the Dash pickup into the item pool.",
+      "description": "Shuffle the Dash pickup into the item pool.\n\nWarning: routes before finding Dash can require advanced movement such as\nbunny hopping (bhop) or Ballista boosting. Enable this only if you are\ncomfortable playing without Dash until you find it.",
       "display_name": "Randomize Dash",
       "group": "Game Options",
       "key": "randomize_dash",
@@ -802,5 +802,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "66d40a6be7161931e06c92e2e0b4774657e768138f881bb009c15f3ea95cd4c1"
+  "source_sha256": "aaee434c64c3b7d7864ab545c6e8ba6b1071eea8095d7154cb14f429e7f25403"
 }

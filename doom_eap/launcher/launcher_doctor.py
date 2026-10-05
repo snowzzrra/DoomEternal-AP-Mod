@@ -940,6 +940,16 @@ def _expected_room_compiler_digest(application_dir: Path | None = None) -> str |
     return None
 
 
+def _preparation_failure_summary(state_dir):
+    if not state_dir:
+        return {"status": "unavailable"}
+    try:
+        document = json.loads((state_dir / "session_prepare_failure.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return {"status": "unavailable"}
+    return {"status": "retained", "source": "last_preparation_failure", "evidence": sanitize_support_value(document)}
+
+
 def _room_install_receipt_summary(
     state_dir: Path | None,
     application_dir: Path | None = None,
@@ -1306,6 +1316,7 @@ def build_support_diagnostics(
     return {
         "item_state": _item_state_summary(config, config_path),
         "room_install_receipt": _room_install_receipt_summary(state_dir, app_dir),
+        "session_preparation_failure": _preparation_failure_summary(state_dir),
         "game_link": _support_game_link_diagnostics(
             config, config_path, paths, processes, runtime, meathook, live=live
         ),

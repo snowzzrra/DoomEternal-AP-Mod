@@ -45,10 +45,38 @@ class SentinelWeaponPoints:
     def _diagnose(self, evidence):
         if self.diagnostic:
             key = (evidence["stage"], evidence["operation"])
-            signature = json.dumps(evidence, sort_keys=True)
-            if self._diagnostic_signatures.get(key) != signature:
-                self._diagnostic_signatures[key] = signature
-                self.diagnostic(evidence)
+            try:
+                response = json.loads(evidence.get("stdout", "{}"))
+            except ValueError:
+                response = evidence.get("stdout")
+            def semantic(value):
+                if isinstance(value, dict):
+                    return {key: (item not in (0, "0", None) if key == "event_gap_count" else semantic(item)) for key, item in value.items()
+                            if key not in {"sequence", "timestamp_ms", "at_monotonic", "sampled_at_ms",
+                                "event_sequence", "callback_sequence", "callback_at_ms", "context_sampled_at_ms",
+                                "history_oldest", "history_overwritten", "events", "at_ms"}}
+                if isinstance(value, list):
+                    return [semantic(item) for item in value]
+                return value
+            signature = json.dumps((evidence.get("predicate"), evidence.get("error"),
+                evidence.get("returncode"), evidence.get("argv"), semantic(response)), sort_keys=True)
+            now = time.monotonic()
+            previous = self._diagnostic_signatures.get(key)
+            if previous is None or previous["signature"] != signature:
+                row = {"signature": signature, "first_seen": now, "last_seen": now, "count": 1, "emitted_at": now}
+                first_error = previous.get("first_error") if previous else None
+                if first_error is None and (evidence.get("error") or evidence.get("returncode", 0)):
+                    first_error = {**evidence, "at_monotonic": now}
+                if first_error is not None:
+                    row["first_error"] = first_error
+                self._diagnostic_signatures[key] = row
+                self.diagnostic({**evidence, "first_seen": now, "last_seen": now, "count": 1})
+            else:
+                previous.update(last_seen=now, count=previous["count"] + 1)
+                if now - previous["emitted_at"] >= 60:
+                    self.diagnostic({"stage": key[0], "operation": key[1], "summary": "unchanged",
+                        **{field: previous[field] for field in ("first_seen", "last_seen", "count")}})
+                    previous["emitted_at"] = now
 
     def _run(self, args, payload=None):
         evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
@@ -167,6 +195,7 @@ class SentinelWeaponPoints:
                 or not facts.get("route_retained") or facts.get("state") != "admitted"
                 or not re.fullmatch(r"ap-[0-9a-f]{40}", str(facts.get("native_root", "")))):
             raise WeaponPointsBlocked("AP save provider is not admitted for this identity")
+        self.save_admission = facts
         return facts["native_root"]
 
     def grant_weapon_upgrade_points(self, amount, expected_gained):

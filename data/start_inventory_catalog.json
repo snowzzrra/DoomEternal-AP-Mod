@@ -163,10 +163,6 @@
       "label": "Ice Bomb Cooldown"
     },
     {
-      "name": "Larger Automap Reveal",
-      "label": "Larger Automap Reveal"
-    },
-    {
       "name": "Lock-on Burst",
       "label": "Lock-on Burst"
     },
@@ -269,18 +265,6 @@
     {
       "name": "Respawning Barrels",
       "label": "Respawning Barrels"
-    },
-    {
-      "name": "Reveal Automap Progression Items",
-      "label": "Reveal Automap Progression Items"
-    },
-    {
-      "name": "Reveal Automap Stations",
-      "label": "Reveal Automap Stations"
-    },
-    {
-      "name": "Reveal Dossier Progression Items",
-      "label": "Reveal Dossier Progression Items"
     },
     {
       "name": "Rocket Launcher",

@@ -71,6 +71,7 @@ def read_gameplay_save_evidence(path):
         epoch = int(values.get("epoch", "-1"))
         slot_directory = values.get("slot", "")
         map_name = canonical_map_name(values.get("map_name", "")) or ""
+        pid = int(values.get("pid", "0"))
     except (OSError, UnicodeError, ValueError):
         return None
     if state == "menu":
@@ -85,6 +86,9 @@ def read_gameplay_save_evidence(path):
         state, epoch, slot_directory, map_name,
         values.get("provisional", "false").lower() == "true",
         values.get("native_safe", "false").lower() == "true",
+        values.get("namespace", ""), values.get("native_root", ""), pid,
+        values.get("process_created", ""), values.get("instance_id", ""),
+        values.get("source_file", ""),
     )
 
 

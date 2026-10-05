@@ -1292,8 +1292,9 @@ class LauncherUI(QMainWindow):
         if key == "randomize_dash":
             title = "Randomize Dash"
             message = (
-                "Randomizing Dash can make some routes significantly harder and may require advanced "
-                "movement depending on your seed.\n\nContinue?"
+                "Routes before finding Dash can require advanced movement such as bunny hopping "
+                "(bhop) or Ballista boosting. Enable this only if you are comfortable playing without "
+                "Dash until you find it.\n\nContinue?"
             )
         else:
             title = "Randomize Chainsaw"
@@ -1926,6 +1927,8 @@ class LauncherUI(QMainWindow):
     def _is_room_package_failure(event: dict[str, object] | None = None, detail: str = "") -> bool:
         event = event or {}
         domain = str(event.get("failure_domain", "")).casefold()
+        if domain == "campaign_session":
+            return False
         recovery = str(event.get("recovery_action", "")).casefold()
         if domain in {"room_package", "room-package", "package", "mod_package"}:
             return True

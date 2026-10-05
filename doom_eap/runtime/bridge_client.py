@@ -2980,6 +2980,14 @@ class DoomEternalContext(CommonContext):
     def runtime_effects_ready(self, evidence=None):
         """Canonical admission predicate for map-scoped runtime effects."""
         evidence = evidence or read_gameplay_save_evidence()
+        from doom_eap.contracts.save_observation import admitted_evidence_matches
+        admitted = self.admitted_campaign_save()
+        if admitted is None:
+            return False
+        link = self.native_game_link()
+        if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid,
+                                        getattr(link, "save_admission", {})):
+            return False
         marker = getattr(self, "cached_map_identity", None)
         context = classify_runtime_context(
             marker.get("runtime_map", "") if isinstance(marker, Mapping) else ""
@@ -3029,6 +3037,9 @@ class DoomEternalContext(CommonContext):
             "materialization": self.context_materialization_status,
             "materialization_mode": self.context_materialization_mode,
             "materialization_block": self.context_materialization_block,
+            "native_probe_events": {"/".join(key): {field: row[field] for field in
+                ("first_seen", "last_seen", "count", "first_error") if field in row}
+                for key, row in getattr(getattr(self, "_weapon_points_link", None), "_diagnostic_signatures", {}).items()},
             "special_stage": materialization.get("special_stage", 0),
         }
 
@@ -4444,13 +4455,25 @@ class DoomEternalContext(CommonContext):
             return
         phase = projection["fortress_phase"]
         identity = (self.state_key, lease, phase)
-        if getattr(self, "_fortress_phase_publication", None) == identity:
+        command_id = stable_spool_id("fortress", lease, phase)
+        outcome = command_spool().fortress_outcome(command_id, self.state_key, lease)
+        if outcome == "command_consumed_unverified":
+            self._fortress_phase_publication = identity
+            return
+        if outcome in {"effect_unknown", "stale_lease", "superseded"}:
+            if getattr(self, "_fortress_terminal_block", None) != (identity, outcome):
+                logger.info("FORTRESS_PHASE_BLOCKED phase=%s lease=%s outcome=%s", phase, lease, outcome)
+                self._fortress_terminal_block = identity, outcome
+            return
+        if command_spool_exists(command_id, self.state_key):
+            return
+        if getattr(self, "_fortress_phase_publication", None) == identity and outcome is None:
             return
         # Layer activation and checked cleanup use separate scoped queue jobs.
         # The checked-visual reconciler owns retries after content materialization.
         command = f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate player1"
         if send_command(command,
-                        coalesce_key=stable_spool_id("fortress", lease, phase), state_key=self.state_key,
+                        coalesce_key=command_id, state_key=self.state_key,
                         materialization_lease=lease, already_queued_ok=True,
                         execution_class=MAP_ENTITY_SAFE, operation=FORTRESS_LAYER):
             self._fortress_phase_publication = identity
@@ -4459,6 +4482,17 @@ class DoomEternalContext(CommonContext):
     def update_save_slot_lifecycle(self):
         """Keep an authoritative slot through transient samples; prove switches."""
         evidence = read_gameplay_save_evidence()
+        admitted = self.admitted_campaign_save()
+        if admitted is not None and evidence is not None and evidence.state == "gameplay":
+            from doom_eap.contracts.save_observation import admitted_evidence_matches
+            link = self.native_game_link()
+            facts = getattr(link, "save_admission", {})
+            if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, facts):
+                self.save_observer.set_frozen(True)
+                self.log_save_proof_rejected("provider_process_evidence_mismatch",
+                    evidence_slot=evidence.slot_directory, candidate_slot=admitted.slot_directory,
+                    candidate_mtime=admitted.mtime_ns, active_slot=self.active_save_slot, marker_map=evidence.map_name)
+                return None
         self.ingest_visible_runtime_lifecycle(evidence=evidence)
         marker = self.read_active_map_identity(evidence=evidence)
         marker_map = marker["runtime_map"] if marker else None
@@ -4494,7 +4528,6 @@ class DoomEternalContext(CommonContext):
             evidence_slot = None
         evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
 
-        admitted = self.admitted_campaign_save()
         candidates = [admitted] if admitted else []
         for selected in candidates:
             if self.save_observer.observe_candidate(selected):
@@ -6071,7 +6104,8 @@ class DoomEternalContext(CommonContext):
             return  # Do not consume the first complete baseline before checked Locations arrive.
         self.save_checks.observe_challenges(records, path, slot_directory,
             self.mission_select_observation_map, self.mission_select_observation_epoch, self.save_check_observations(),
-            authoritative=self.has_authoritative_save_proof())
+            authoritative=self.has_authoritative_save_proof(),
+            first_sample_locations=frozenset(self.server_locations) - frozenset(self.checked_locations))
 
     def observe_sticky_mastery(self, snapshot, path):
         """Sticky compatibility wrapper used by the proven 24→25 regression."""

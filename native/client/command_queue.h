@@ -31,6 +31,7 @@ public:
 private:
     void LogDebug(const std::string& message) const { logger_(message); }
     void finishSilentBurst(const char* reason);
+    void WriteFortressOutcome(const CommandJob& job, const char* outcome) const;
     LogCallback logger_;
     CommandSourceMap recoveredSources;
     std::unordered_set<std::string> heldReceiptLogs;

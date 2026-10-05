@@ -694,7 +694,7 @@ public:
             || loading != loading_
             || !nativeSafeInitialized_
             || nativeSafe != nativeSafe_;
-        if (!stateChanged && now < nextPollTick_) {
+        if ((!stateChanged || nativeRoot_.empty()) && now < nextPollTick_) {
             return;
         }
         nextPollTick_ = now + kGoalMonitorPollMs;
@@ -705,6 +705,31 @@ public:
         if (!EnsureConfigured()) {
             return;
         }
+        const auto admission = sentinel::query_save_admission(g_ApRpc ? g_ApRpc->TargetProcess() : 0, 250);
+        if (admission.result != sentinel::ProbeResult::ok
+                || admission.admission.state != SC_SAVE_SESSION_ADMITTED
+                || !(admission.admission.flags & SC_SAVE_SESSION_ACCEPTING)
+                || !(admission.admission.flags & SC_SAVE_SESSION_ROUTED)) {
+            gameplayLoaded_ = false;
+            gameplayStateInitialized_ = false;
+            lastSnapshot_ = {};
+            nativeRoot_.clear();
+            WriteGameplayEvidence(std::nullopt);
+            return;
+        }
+        const std::string root(admission.admission.native_root);
+        if (saveIdentity_.process_created != admission.snapshot.process_created
+                || saveIdentity_.instance != admission.snapshot.instance || nativeRoot_ != root) {
+            gameplayStateInitialized_ = false;
+            loadingStateInitialized_ = false;
+            lastSnapshot_ = {};
+            activeSlotDirectory_.clear();
+            menuSlotTokens_.clear();
+            sawLoadingForEpoch_ = false;
+        }
+        saveIdentity_ = admission.snapshot;
+        nativeRoot_ = root;
+        namespace_ = admission.admission.namespace_id;
 
         if (!loadingStateInitialized_ || loading != loading_) {
             loadingStateInitialized_ = true;
@@ -884,97 +909,13 @@ private:
     }
 
     std::optional<SaveSnapshot> ReadLatestSnapshot() {
-        std::error_code error;
-        const std::filesystem::path remoteRoot(steamRemoteDir_);
-        if (!std::filesystem::is_directory(remoteRoot, error)) {
-            if (!loggedRemoteFailure_) {
-                LogDebug("[Goal] Goal transition monitor disabled: steam_remote_dir is not readable.");
-                loggedRemoteFailure_ = true;
-            }
-            return std::nullopt;
-        }
-
-        std::filesystem::path latestPath;
-        long long latestToken = 0;
-        bool found = false;
-        for (const auto& entry : std::filesystem::directory_iterator(remoteRoot, error)) {
-            if (error) {
-                return std::nullopt;
-            }
-            if (!entry.is_directory(error)) {
-                continue;
-            }
-            const std::string directoryName = entry.path().filename().string();
-            if (!std::regex_match(directoryName, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
-                continue;
-            }
-
-            const std::filesystem::path detailsPath = entry.path() / "game.details";
-            if (!std::filesystem::is_regular_file(detailsPath, error)) {
-                continue;
-            }
-
-            const auto writeTime = std::filesystem::last_write_time(detailsPath, error);
-            if (error) {
-                continue;
-            }
-            const long long token = writeTime.time_since_epoch().count();
-            if (!found || token > latestToken) {
-                latestToken = token;
-                latestPath = detailsPath;
-                found = true;
-            }
-        }
-
-        if (!found) {
-            return std::nullopt;
-        }
-
-        std::string plaintext;
-        if (!DecryptGameDetails(latestPath, plaintext)) {
-            return std::nullopt;
-        }
-
-        SaveSnapshot snapshot;
-        snapshot.slotDirectory = latestPath.parent_path().filename().string();
-        snapshot.path = latestPath.string();
-        snapshot.mtimeToken = latestToken;
-        snapshot.mapName = ExtractMapName(plaintext);
-        if (snapshot.mapName.empty()) {
-            return std::nullopt;
-        }
-        return snapshot;
+        return ReadSlotSnapshot("GAME-AUTOSAVE0");
     }
 
-    std::vector<std::pair<std::string, long long>> ReadSlotTokens() const {
-        std::vector<std::pair<std::string, long long>> tokens;
-        std::error_code error;
-        const std::filesystem::path remoteRoot(steamRemoteDir_);
-        if (!std::filesystem::is_directory(remoteRoot, error)) {
-            return tokens;
-        }
-        for (const auto& entry : std::filesystem::directory_iterator(remoteRoot, error)) {
-            if (error) {
-                break;
-            }
-            if (!entry.is_directory(error)) {
-                continue;
-            }
-            const std::string slot = entry.path().filename().string();
-            if (!std::regex_match(slot, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
-                continue;
-            }
-            const std::filesystem::path detailsPath = entry.path() / "game.details";
-            if (!std::filesystem::is_regular_file(detailsPath, error)) {
-                continue;
-            }
-            const auto writeTime = std::filesystem::last_write_time(detailsPath, error);
-            if (!error) {
-                tokens.emplace_back(slot, writeTime.time_since_epoch().count());
-            }
-            error.clear();
-        }
-        return tokens;
+    std::vector<std::pair<std::string, long long>> ReadSlotTokens() {
+        const auto snapshot = ReadSlotSnapshot("GAME-AUTOSAVE0");
+        if (!snapshot) return {};
+        return {{snapshot->slotDirectory, snapshot->mtimeToken}};
     }
 
     void CaptureMenuSlotTokens() {
@@ -1005,12 +946,12 @@ private:
     }
 
     std::optional<SaveSnapshot> ReadSlotSnapshot(const std::string& slotDirectory) {
-        if (!std::regex_match(slotDirectory, std::regex("(?:GAME|DLC[12]|HORDE)-AUTOSAVE[0-9]+"))) {
+        if (nativeRoot_.empty() || slotDirectory != "GAME-AUTOSAVE0") {
             return std::nullopt;
         }
         std::error_code error;
         const std::filesystem::path detailsPath =
-            std::filesystem::path(steamRemoteDir_) / slotDirectory / "game.details";
+            std::filesystem::path(steamRemoteDir_) / nativeRoot_ / slotDirectory / "game.details";
         if (!std::filesystem::is_regular_file(detailsPath, error)) {
             return std::nullopt;
         }
@@ -1045,11 +986,19 @@ private:
             ) + "\n"
             + "epoch=" + std::to_string(gameplayEpoch_) + "\n";
         if (gameplayLoaded_ && snapshot.has_value()) {
+            std::ostringstream instance;
+            for (const auto byte : saveIdentity_.instance)
+                instance << std::hex << std::setw(2) << std::setfill('0') << static_cast<unsigned>(byte);
             contents += "slot=" + snapshot->slotDirectory + "\n"
                 + "map_name=" + snapshot->mapName + "\n"
                 + "provisional=" + std::string(provisional ? "true" : "false") + "\n"
                 + "native_safe=" + std::string(nativeSafe_ ? "true" : "false") + "\n"
-                + "source_file=" + snapshot->path + "\n";
+                + "source_file=" + snapshot->path + "\n"
+                + "namespace=" + namespace_ + "\n"
+                + "native_root=" + nativeRoot_ + "\n"
+                + "pid=" + std::to_string(saveIdentity_.pid) + "\n"
+                + "process_created=" + std::to_string(saveIdentity_.process_created) + "\n"
+                + "instance_id=" + instance.str() + "\n";
         }
         fwrite(contents.data(), 1, contents.size(), output);
         fflush(output);
@@ -1203,6 +1152,8 @@ private:
     bool loggedConfigurationFailure_ = false;
     bool loggedRemoteFailure_ = false;
     std::string steamRemoteDir_;
+    std::string nativeRoot_, namespace_;
+    sentinel::Snapshot saveIdentity_{};
     unsigned long long steamId3_ = 0;
     SaveSnapshot lastSnapshot_;
     bool lastSnapshotProvisional_ = false;

@@ -87,6 +87,8 @@ UNINSTALL_OWNED_STATES = frozenset({
 
 def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
     """Classify setup failures without weakening any validation boundary."""
+    if phase == "campaign_session" or getattr(error, "failure_domain", None) == "campaign_session":
+        return "campaign_session"
     text = f"{type(error).__name__}: {error}".casefold()
     app_tokens = (
         "component=map_package",
@@ -158,6 +160,11 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
             user_title = ROOM_PACKAGE_FAILURE_TITLE
             user_message = ROOM_PACKAGE_FAILURE_MESSAGE
             user_action = ROOM_PACKAGE_FAILURE_ACTION
+    elif failure_domain == "campaign_session":
+        recovery_action = "inspect_campaign"
+        user_title = "AP campaign preparation needs attention"
+        user_message = "The installed room package is retained. Inspect AP SAVE and the preparation diagnostic before retrying this room."
+        user_action = "AP SAVE"
     else:
         recovery_action = "repair_game_integration"
         user_title = GAME_SETUP_FAILURE_TITLE
@@ -183,7 +190,7 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "source_path": getattr(error, "source_path", None),
         "destination_path": getattr(error, "destination_path", None),
         "attempt_count": getattr(error, "attempt_count", None),
-        "stage": phase or "setup",
+        "stage": getattr(error, "stage", None) or phase or "setup",
         "failure_domain": failure_domain,
         "recovery_action": recovery_action,
         "user_title": user_title,

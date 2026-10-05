@@ -46,6 +46,23 @@ def missing_special(scope, context):
     )
 
 
+def test_fixed_dash_uses_configured_completion_ack_and_native_missing(inputs):
+    definitions, policies, context, scope = inputs
+    def derived(checked=(), ready=True):
+        return effective_ownership((), randomize_chainsaw=True, randomize_dash=False,
+            checked_locations=frozenset(checked), local_checked_locations=frozenset({7770122}),
+            server_checked_ready=ready, hell_on_earth_locations=frozenset(),
+            exultia_complete_location=7770122, slot=1)
+    assert not derived().vanilla_dash and not derived({7770122}, False).vanilla_dash
+    owned = derived({7770122})
+    assert owned.reconciliation_item_ids == (7770015,) and owned.vanilla_dash
+    context = RuntimeContext("base-hub", "Base", ("game/hub/hub",), ("hub",), frozenset())
+    observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, "Base",
+        {7770015: ItemObservation(7770015, MISSING)})
+    plan = compile_materialization_plan(owned, context, scope, definitions, policies, "the_crucible", observation=observation)
+    assert any(command.item_id == 7770015 for command in plan.reconciliation.commands)
+
+
 def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, monkeypatch):
     definitions, policies, context, scope = inputs
     never_replay = tuple(item_id for item_id, policy in policies.items() if policy.policy == "never_replay")
@@ -136,6 +153,17 @@ def test_rebind_discards_old_room_completion_and_triggers(inputs):
     assert not coordinator.snapshot.triggers
     assert not coordinator.poll_completion(publisher)
     assert old_state == original
+
+
+def test_fortress_terminal_result_requires_same_lease(tmp_path):
+    spool = CommandSpool(tmp_path, arm_rpc=lambda *a: None, log_delivery=lambda *a, **k: None,
+                         logger=logging.getLogger("fortress-contract"))
+    scoped = spool.scoped_id("fortress-phase1", "seed:0:1:generation")
+    (tmp_path / (scoped + ".result")).write_text("outcome=stale_lease\nlease=1:2\n")
+    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:2") == "stale_lease"
+    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:3") is None
+    (tmp_path / (scoped + ".result")).write_text("outcome=command_consumed_unverified\nlease=1:2\n")
+    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:2") == "command_consumed_unverified"
 
 
 def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs():

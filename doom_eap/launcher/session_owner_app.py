@@ -54,7 +54,8 @@ def main():
                 else:
                     raise ValueError("Unsupported session action")
             except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as error:
-                respond({"error": str(error), "can_close": False})
+                from .launcher_integration import setup_failure_payload
+                respond({"error": str(error), "failure": setup_failure_payload(error), "can_close": False})
     finally:
         if owner is not None:
             while not owner.can_close():

@@ -148,6 +148,14 @@ jobs:
           cd DoomEternal-AP-Mod
           python -m tools.release.prebuilt_room_resources --export-dir build/release/client/resources
 
+      - name: Verify Behavioral Contracts
+        env:
+          AP_TEST_WORLDS: doometernal
+          SKIP_REQUIREMENTS_UPDATE: '1'
+        run: |
+          cd DoomEternal-AP-Mod
+          python -m pytest tests -q --disable-warnings
+
       - name: Upload Room Resources Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -229,8 +237,8 @@ jobs:
           $installation = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (!(Test-Path -LiteralPath "$installation\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\cl.exe")) { throw 'MSVC 14.44.35207 is required' }
           $cmakeDirectory = Join-Path $installation 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin'
-          $cmakeVersion = & (Join-Path $cmakeDirectory 'cmake.exe') --version
-          if ($cmakeVersion[0] -notmatch '3\.31\.6') { throw 'CMake 3.31.6 is required' }
+          & (Join-Path $cmakeDirectory 'cmake.exe') --version
+          if ($LASTEXITCODE -ne 0) { throw 'Installed CMake is unavailable' }
           "SC_VCVARS=$installation\VC\Auxiliary\Build\vcvars64.bat" >> $env:GITHUB_ENV
           "SC_CMAKE=$cmakeDirectory" >> $env:GITHUB_ENV
 
@@ -253,6 +261,8 @@ jobs:
           "%SC_CMAKE%\cmake.exe" --build Sentinel-Core/build
           if errorlevel 1 exit /b 1
           "%SC_CMAKE%\ctest.exe" --test-dir Sentinel-Core/build --output-on-failure --timeout 60
+          if errorlevel 1 exit /b 1
+          python -m unittest discover -s Sentinel-Core/tests -p "test_*.py"
           if errorlevel 1 exit /b 1
           python Sentinel-Core\tools\qualify_distribution.py --output Sentinel-Core\build\distribution\candidate --commit "%SELECTED_CORE_COMMIT%"
           if errorlevel 1 exit /b 1

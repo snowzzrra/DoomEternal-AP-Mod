@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Build permanent, hash-locked weapon-ownership DECL overrides.
 
-Only ownership payloads are changed. Cinematic graphs, timelines, objectives,
-codex rewards, ammo transactions, and use-weapon hand choreography remain
-native. Map pickup entities are neutralized by locations.json through the
-canonical map generator.
+Ownership payloads are neutralized. Mars Core resets hands without selecting
+an unowned Plasma Rifle. Map pickups use the canonical map generator.
 """
 
 from __future__ import annotations
@@ -36,6 +34,7 @@ OWNERS = (
         "sha256": "ca960747e4464ec379d42ddcf340c2294d987d76eb66bd2a82eef2ab1456c0b4",
         "inventory_item": "weapon/player/plasma_rifle",
         "desired_count": "1",
+        "reset_weapon": "weapon/player/plasma_rifle",
     },
     {
         "name": "ssg_revenant_cinematic",
@@ -131,6 +130,16 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
     line_number, old_line, new_line = changed[0] if changed else (None, "num = 0;", "num = 0;")
     if changed and (old_line.strip() != "num = 1;" or new_line.strip() != "num = 0;"):
         raise ValueError(f"{owner['name']}: unexpected ownership payload diff")
+    if "reset_weapon" in owner:
+        pattern = re.compile(
+            r'(id = 1198990637;\s*model = \{\s*'
+            r'className = "idLogicNodeModelPlayerResetHands";\s*object = \{\s*'
+            r'resetInfo = \{\s*useWeapon = ")'
+            + rf'(?:{re.escape(owner["reset_weapon"])}|)(";)'
+        )
+        result, count = pattern.subn(r'\g<1>\g<2>', result)
+        if count != 1:
+            raise ValueError(f"{owner['name']}: expected one Plasma Rifle hand reset, found {count}")
     return result, {
         "name": owner["name"],
         "container": owner["container"],
@@ -141,6 +150,7 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
         "changed_line": line_number,
         "before": old_line,
         "after": new_line,
+        "reset_weapon": "" if "reset_weapon" in owner else None,
     }
 
 

@@ -7,6 +7,62 @@ import pytest
 from doom_eap.launcher.launcher_session import APSessionOwner, _verify_new_campaign_receipts
 
 
+def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
+    from doom_eap.launcher.launcher_integration import classify_setup_failure, setup_failure_payload
+    from doom_eap.launcher.launcher_doctor import _preparation_failure_summary
+    owner = APSessionOwner(tmp_path, tmp_path, tmp_path)
+    failure = RuntimeError("campaign contract fixture refusal")
+    failure.stage, failure.operation = "copy_and_readback", "readback"
+    failure.source_path = r"C:\Users\fixture-user\Saved Games\DOOM\game.details"
+    failure.destination_path = r"C:\Users\fixture-user\backup\game.details"
+    missing = FileNotFoundError(2, "fixture missing source", failure.source_path)
+    missing.winerror, missing.filename2 = 3, failure.destination_path
+    failure.cause_errno, failure.cause_winerror = missing.errno, missing.winerror
+    failure.cause_filename, failure.cause_filename2 = missing.filename, missing.filename2
+    def refuse(*args, **kwargs):
+        try:
+            raise missing
+        except FileNotFoundError as cause:
+            raise failure from cause
+    with patch.object(owner, "_prepare", side_effect=refuse):
+        with pytest.raises(RuntimeError) as refused:
+            owner.prepare(None, {})
+    assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
+    assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
+    diagnostic = json.loads((tmp_path / "session_prepare_failure.json").read_text())
+    expected = dict(stage=failure.stage, operation=failure.operation, source_path=failure.source_path,
+        destination_path=failure.destination_path, errno=2, winerror=3,
+        filename=missing.filename, filename2=missing.filename2)
+    for key, value in expected.items():
+        assert diagnostic[key] == value
+    from datetime import datetime, timezone
+    assert datetime.fromisoformat(diagnostic["at_utc"]).tzinfo == timezone.utc
+    assert "FileNotFoundError" in diagnostic["traceback"] and "RuntimeError" in diagnostic["traceback"]
+    assert repr(missing.filename) in diagnostic["traceback"]
+    support = _preparation_failure_summary(tmp_path)
+    assert support["source"] == "last_preparation_failure"
+    assert "fixture-user" not in json.dumps(support)
+    assert "game.details" in json.dumps(support)
+
+
+def test_proton_supervisor_preserves_structured_preparation_failure(tmp_path):
+    import io
+    from doom_eap.launcher.launcher_session import _ProtonSessionOwner
+    owner = _ProtonSessionOwner(tmp_path, tmp_path, tmp_path)
+    failure = dict(failure_domain="campaign_session", stage="copy_and_readback", operation="readback",
+        source_path=r"D:\fixture\remote\game.details", destination_path=r"E:\fixture\backup\game.details",
+        errno=2, winerror=3, filename=r"D:\fixture\remote\game.details", filename2=None)
+    owner.process = Mock(stdin=io.StringIO(), stdout=io.StringIO(json.dumps(dict(
+        error="fixture missing source", can_close=False, failure=failure)) + "\n"))
+    owner.process.poll.return_value = None
+    with patch("doom_eap.launcher.launcher_session.selectors.DefaultSelector") as selector:
+        selector.return_value.__enter__.return_value.select.return_value = [(None, None)]
+        with pytest.raises(RuntimeError) as caught:
+            owner.request("prepare")
+    for key, value in failure.items():
+        assert getattr(caught.value, key) == value
+
+
 def test_support_condump_uses_workflow_session_owner(tmp_path):
     import threading
     from doom_eap.launcher.launcher_controller import LauncherController

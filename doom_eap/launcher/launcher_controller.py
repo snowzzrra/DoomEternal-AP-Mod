@@ -1490,7 +1490,14 @@ class LauncherController:
                 return
             if state.state == "already_installed" and state.readiness != "blocked":
                 job.check()
-                status = workflow.session_owner.prepare(snapshot, configuration)
+                try:
+                    status = workflow.session_owner.prepare(snapshot, configuration)
+                except (RuntimeError, OSError, ValueError) as error:
+                    emit("room_install_state", state="already_installed", manifest_hash=state.manifest_hash,
+                         staged_mod=state.staged_mod, steam_launch_option=state.steam_launch_option,
+                         readiness="blocked", readiness_reason=str(error),
+                         **setup_failure_payload(error, phase="campaign_session"))
+                    return
                 job.check()
                 emit("ap_session_status", **status)
             emit(
@@ -1563,6 +1570,7 @@ class LauncherController:
                 current_running = self.is_game_running()
                 status = self.workflow.session_owner.observe()
             semantic = (status.get("state"), status.get("pid"), status.get("namespace_id"),
+                        status.get("process_created"),
                         status.get("admission", {}).get("instance_id"))
             if semantic != getattr(self, "_last_ap_session_status", None):
                 self._last_ap_session_status = semantic

@@ -1,5 +1,5 @@
 {
-  "authoritative_fingerprint": "618d99bdea0dd73024961674312caf59637fb4e3ad41ee7040509f6772890d9a",
+  "authoritative_fingerprint": "84060b761992bb4e5f39cdc062a445574daecac03af781ecf8dbf39922f079c0",
   "catalog_fingerprint": "f6a7a5d0e82ad9543f94704adbe778c3a146c6c7b3a2b0959b9030e477817759",
   "compiler_revision": 4,
   "content_revision": "0.5.0",
@@ -8150,7 +8150,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8178,7 +8178,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8202,7 +8202,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "SECRET_ENCOUNTER_E4M1_1",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8230,7 +8230,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PROGRESS_CODEX_5",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8245,8 +8245,8 @@
       "runtime_map": "game/dlc/e4m1_rig/e4m1_rig",
       "source_identity": {
         "descriptor_sha256": "89ece98d06e69f213034c34d11b3ac48d966b4122af4839380b9b4cc70d3c9f7",
-        "location_descriptor_sha256": "6fe09b62b2bd8b3a8b713f56d9d43098d0397b0ec22866e118aa95a5406812a9",
-        "policy_sha256": "bd4b061db825eadaae4d8cacff5bd4be5a2e0eaeb9a2b420f9d583b57ad10948",
+        "location_descriptor_sha256": "da5e84d315aa36c5338d537aa0a7b997b3f767ca8070b953b3c9b8179cbd8980",
+        "policy_sha256": "ef1111010543baa4cb1623a13ade0a55aae790242e6a0b66d97f78f61e309770",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/dlc/e4m1_rig/e4m1_rig.entities",
@@ -8258,7 +8258,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8282,7 +8282,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "SLAYER_GATE_PROGRESS_SUPPORT_RUNE_1",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8306,7 +8306,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "SECRET_ENCOUNTER_E4M1_2",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8334,7 +8334,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_10",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8362,7 +8362,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8390,7 +8390,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8418,7 +8418,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PROGRESS_CODEX_6",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {
@@ -8446,7 +8446,7 @@
         "resource_sha256": "3aa92ef3b24f66cf44821f40e60ed1c3247e7b59bd717626b9f740a9a4cbc4bb",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11",
         "source_file": "content/maps/e4m1_rig/locations.json",
-        "source_sha256": "a0963e9cfd401ab0253b36134714e28d28a201f8d45ffab5e1b3ab44613196eb"
+        "source_sha256": "83572f4e649ce2f5e415974fe90b7faef656d8b9e6a882319107dc9421065672"
       }
     },
     {

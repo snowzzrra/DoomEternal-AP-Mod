@@ -289,9 +289,12 @@ def test_reconnect_prepares_installed_room_before_starting_native_client(fail):
         assert workers.submit("sentinel", lambda job: done.set())
         assert done.wait(3)
         if fail:
-            assert calls == ["prepare"] and len(errors) == 1
-            assert str(errors[0]) == "admission fixture blocked"
-            assert events == []
+            assert calls == ["prepare"] and errors == []
+            assert len(events) == 1 and events[0][0] == "room_install_state"
+            payload = events[0][1]
+            assert payload["state"] == "already_installed" and payload["readiness"] == "blocked"
+            assert payload["readiness_reason"] == "admission fixture blocked"
+            assert payload["failure_domain"] == "campaign_session"
         else:
             assert calls == ["prepare", "native"] and errors == []
             assert events[0][0] == "ap_session_status" and events[0][1]["state"] == "prelaunch_ready"

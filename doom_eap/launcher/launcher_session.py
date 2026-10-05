@@ -137,7 +137,11 @@ class _ProtonSessionOwner:
             raise RuntimeError("Invalid Windows session supervisor response")
         self.closable = response["can_close"]
         if "error" in response:
-            raise RuntimeError(response["error"])
+            error = RuntimeError(response["error"])
+            for key, value in response.get("failure", {}).items():
+                if key in {"failure_domain", "stage", "operation", "source_path", "destination_path", "errno", "winerror", "filename", "filename2"}:
+                    setattr(error, key, value)
+            raise error
         if "status" in response:
             if not isinstance(response["status"], dict):
                 raise RuntimeError("Invalid Windows session status")
@@ -156,7 +160,10 @@ class _ProtonSessionOwner:
             if namespace != self.status.get("namespace_id") or config_identity != self._config_identity:
                 self.retire()
             else:
-                return self.request("observe")
+                status = self.request("observe")
+                if status.get("state") != "game_exited":
+                    return status
+                self.retire()
         executable = self.client_dir / "APSessionOwner.exe"
         if not executable.is_file():
             raise RuntimeError("The packaged Windows AP session supervisor is unavailable")
@@ -238,6 +245,27 @@ class APSessionOwner:
         return value
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None) -> dict:
+        try:
+            return self._prepare(snapshot, config, recovery_basename=recovery_basename)
+        except (RuntimeError, OSError, ValueError) as error:
+            from .launcher_integration import setup_failure_payload
+            error.failure_domain = "campaign_session"
+            diagnostic = setup_failure_payload(error, phase="campaign_session")
+            import traceback
+            diagnostic["traceback"] = traceback.format_exc()
+            from datetime import datetime, timezone
+            diagnostic["at_utc"] = datetime.now(timezone.utc).isoformat()
+            diagnostic["metadata"] = getattr(error.__cause__, "private_metadata", None)
+            try:
+                self.state_dir.mkdir(parents=True, exist_ok=True)
+                (self.state_dir / "session_prepare_failure.json").write_text(
+                    json.dumps(diagnostic, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+            except OSError:
+                logging.getLogger(__name__).exception("AP_SESSION_DIAGNOSTIC_WRITE_FAILED")
+            logging.getLogger(__name__).exception("AP_SESSION_PREPARATION_REFUSED %s", diagnostic)
+            raise
+
+    def _prepare(self, snapshot, config: dict, *, recovery_basename=None) -> dict:
         with self._lock:
             config_identity = tuple(config.get(key) for key in _INSTALL_KEYS)
             namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
@@ -350,7 +378,17 @@ class APSessionOwner:
                     ap_root=str(campaign_root), uninstall_root=[str(self.state_dir)], reference_directory=None,
                     run_backup_parent=None))
             except (module.Refused, OSError, ValueError) as error:
-                raise RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}") from error
+                refused = RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}")
+                refused.stage = getattr(error, "stage", "vanilla_protection")
+                metadata = getattr(error, "private_metadata", None) or {}
+                refused.operation = metadata.get("operation", refused.stage)
+                refused.source_path = metadata.get("source_path") or metadata.get("path") or getattr(error, "filename", None)
+                refused.destination_path = metadata.get("destination_path") or getattr(error, "filename2", None) or str(backup)
+                refused.cause_errno = getattr(error, "errno", None) or metadata.get("errno")
+                refused.cause_winerror = getattr(error, "win32_error", None) or getattr(error, "winerror", None)
+                refused.cause_filename = getattr(error, "filename", None) or metadata.get("filename")
+                refused.cause_filename2 = getattr(error, "filename2", None) or metadata.get("filename2")
+                raise refused from error
             api = ctypes.WinDLL("kernel32", use_last_error=True)
             api.GetCurrentProcess.restype = wintypes.HANDLE
             api.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4

@@ -76,6 +76,16 @@ class CommandSpool:
         processing_path = os.path.join(self.queue_dir, f"{command_id}.processing")
         return os.path.exists(queued_path) or os.path.exists(processing_path)
 
+    def fortress_outcome(self, command_id, state_key, lease):
+        scoped_id = self.scoped_id(command_id, state_key)
+        validate_spool_id(scoped_id)
+        try:
+            lines = (Path(self.queue_dir) / f"{scoped_id}.result").read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError):
+            return None
+        facts = dict(line.split("=", 1) for line in lines if "=" in line)
+        return facts.get("outcome") if facts.get("lease") == lease else None
+
     def publish(
         self, cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False,
         delivery_fields=None, state_key=None, room_scoped=True,

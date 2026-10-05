@@ -34,6 +34,26 @@ const char* RpcCallResultName(ApRpcResult result) {
     }
 }
 
+void NativeCommandQueue::WriteFortressOutcome(const CommandJob& job, const char* outcome) const {
+    if (job.mapEntityOperation != MapEntityOperation::FortressLayer || !job.materializationLease) return;
+    auto path = std::filesystem::path(job.path);
+    path.replace_extension(".result");
+    const auto temporary = path.string() + ".tmp";
+    const std::string payload = "outcome=" + std::string(outcome) + "\nlease=" + *job.materializationLease + "\n";
+    const auto file = CreateFileA(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    DWORD written = 0;
+    bool ok = file != INVALID_HANDLE_VALUE;
+    if (ok) {
+        ok = WriteFile(file, payload.data(), static_cast<DWORD>(payload.size()), &written, nullptr)
+            && written == payload.size() && FlushFileBuffers(file);
+        CloseHandle(file);
+    }
+    if (ok) ok = MoveFileExA(temporary.c_str(), path.string().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    LogDebug("FORTRESS_TERMINAL outcome=" + std::string(outcome)
+        + " lease=" + *job.materializationLease + " evidence=" + (ok ? "published" : "unavailable")
+        + DeliveryContextFields());
+}
+
 
 std::string DeliveryContextFields() {
     return " active_map=unavailable slot=unavailable bridge_protocol_version=unavailable"
@@ -778,6 +798,7 @@ void NativeCommandQueue::DiscardMapEntitySafeJobsWithMismatchedLease(
             continue;
         }
         const std::string commandId = CommandIdFromPath(job->path);
+        WriteFortressOutcome(*job, "stale_lease");
         DeleteFileA(job->path.c_str());
         knownCommandIds.erase(commandId);
         LogDebug(
@@ -1102,6 +1123,7 @@ void NativeCommandQueue::DiscardSupersededFortressJobs() {
         if (value >= 0 && value < fortressPhase) {
             LogDebug("FORTRESS_INTENT_SUPERSEDED command_id=" + CommandIdFromPath(job->path)
                      + " phase=" + std::to_string(value) + " desired=" + std::to_string(fortressPhase));
+            WriteFortressOutcome(*job, "superseded");
             SpoolRemoved(job->path);
             knownCommandIds.erase(CommandIdFromPath(job->path));
             job = queue.erase(job);
@@ -1254,6 +1276,7 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 return true;
             }
             if (GetFileAttributesA(job.path.c_str()) == INVALID_FILE_ATTRIBUTES) {
+                WriteFortressOutcome(job, "cancelled_before_dispatch");
                 LogDebug(
                     "QUEUE_CANCELLED command_id=" + commandId + DeliveryContextFields()
                 );
@@ -1280,6 +1303,7 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 }
             }
             if (!MapEntitySafeLeaseMatchesCurrent(job)) {
+                WriteFortressOutcome(job, "stale_lease");
                 LogDebug(
                     "QUEUE_STALE_DROP command_id=" + commandId
                     + " kind=map_entity_safe reason=materialization_lease_mismatch"
@@ -1308,6 +1332,7 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 );
             }
             if (ExecuteCommand(job, rpc)) {
+                WriteFortressOutcome(job, "command_consumed_unverified");
                 const DWORD rpcElapsedMs = GetTickCount() - dispatchTick;
                 const bool spoolRemoved = SpoolRemoved(job.path);
                 if (normalReceipt) {
@@ -1368,6 +1393,7 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                 }
                 const auto failure=submittedToNative ? rpc->LastResult() : AP_RPC_NONE;
                 if (failure == AP_RPC_AMBIGUOUS || failure == AP_RPC_EXCEPTION) {
+                    WriteFortressOutcome(job, "effect_unknown");
                     QuarantineFailedJob(job);
                     LogDebug("CORE_EFFECT_UNKNOWN_HOLD command_id=" + commandId + " automatic_replay=disabled");
                     knownCommandIds.erase(commandId);

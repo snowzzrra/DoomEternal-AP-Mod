@@ -113,6 +113,11 @@ int main() {
         queue.Import(); queue.DiscardInvalidScopes(true); Dispatch(queue, transport);
         assert(transport.commands.size() == 1);
         assert(transport.commands.back() == "ai_ScriptCmdEnt ap_fortress_phase_4 activate player1");
+        assert(std::filesystem::exists(key + "phase4.result"));
+        std::ifstream terminal(key + "phase4.result");
+        std::string outcome;
+        std::getline(terminal, outcome);
+        assert(outcome == "outcome=command_consumed_unverified");
         assert(!std::filesystem::exists(key + "phase2.processing"));
         Write(key + "phase3.cmd", headers + "ai_ScriptCmdEnt ap_fortress_phase_3 activate player1\n");
         queue.Import(); queue.DiscardInvalidScopes(true); Dispatch(queue, transport);

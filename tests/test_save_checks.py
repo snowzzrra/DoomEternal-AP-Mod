@@ -59,6 +59,21 @@ def test_native_edges_remain_observer_owned_and_mastery_submission_is_separate()
     assert submitted == {101} and commits
 
 
+def test_save_challenge_catchup_requires_bound_pending_completion():
+    service = SaveChecks({}, {"mastery": dict(MASTERY)}, {}, [AGGREGATE], logging.getLogger("checks"))
+    observer = SaveObserver(baselines=SaveObserverBaselineStore({}))
+    observer.bind_ap_provider("namespace", "ap-" + "a" * 40)
+    binding = SaveCheckBinding("seed", 0, 1, "room", "revision", frozenset(), True, True)
+    observations = SaveCheckObservations(observer, binding, lambda: None, logging.getLogger("checks"))
+    record = {key: value for key, value in SIGNAL.items() if key != "kind"}
+    service.observe_challenges({"mastery": record}, "save", "GAME-AUTOSAVE0", None, None,
+        observations, authoritative=True)
+    assert not service._challenges.get("mastery", False)
+    service.observe_challenges({"mastery": record}, "save", "GAME-AUTOSAVE0", None, None,
+        observations, authoritative=True, first_sample_locations=frozenset({101}))
+    assert service._challenges["mastery"]
+
+
 def test_physical_and_aggregate_checks_require_confirmed_children_without_save_proof():
     service, packets, submitted = owner(), [], set()
 

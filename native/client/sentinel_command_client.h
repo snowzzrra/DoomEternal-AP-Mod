@@ -8,6 +8,7 @@ public:
     using LogCallback = std::function<void(const std::string&)>;
     void SetLogCallback(LogCallback callback) { log_ = std::move(callback); }
     void SetTargetProcess(DWORD pid);
+    DWORD TargetProcess() const { return pid_; }
     bool Initialize() { return PollHealth(); }
     bool PollHealth();
     bool Ready() const override { return ready_; }

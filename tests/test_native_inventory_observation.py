@@ -3,6 +3,35 @@ import pytest
 from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
 
 
+def test_probe_diagnostics_preserve_first_error_and_aggregate_sampling(tmp_path, monkeypatch):
+    import json
+    import doom_eap.runtime.weapon_points as module
+    now = [1.0]
+    monkeypatch.setattr(module.time, "monotonic", lambda: now[0])
+    emitted = []
+    link = SentinelWeaponPoints(tmp_path / "probe.exe", 71, "a" * 64, emitted.append)
+    def response(index):
+        return json.dumps(dict(result="refused", process_created="101", sequence=index, native=dict(
+            event_sequence=str(index), callback_sequence=str(index), callback_at_ms=str(index * 10),
+            context_sampled_at_ms=str(index * 10), history_oldest=str(index), history_overwritten=str(index),
+            event_gap_count=str(index), context_generation="2", game_state=2,
+            events=[dict(sequence=str(index), at_ms=str(index * 10))])))
+    row = dict(stage="native_probe", operation="save-admission", returncode=2,
+        stdout=response(1), error="missing provider")
+    link._diagnose(row)
+    for i in range(2, 40):
+        row["stdout"] = response(i)
+        link._diagnose(row)
+    assert len(emitted) == 1
+    state = link._diagnostic_signatures[("native_probe", "save-admission")]
+    assert state["count"] == 39 and state["first_error"]["error"] == "missing provider"
+    now[0] = 62.0
+    link._diagnose(row)
+    assert emitted[-1]["summary"] == "unchanged" and emitted[-1]["count"] == 40
+    link._diagnose({**row, "returncode": 0, "error": None, "stdout": '{"result":"ok"}'})
+    assert link._diagnostic_signatures[("native_probe", "save-admission")]["first_error"]["error"] == "missing provider"
+
+
 @pytest.mark.parametrize("abi,dash", [(4, 0), (4, 1), (5, 0), (5, 1), (5, 255)])
 def test_independent_dash_observation(abi, dash):
     link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)

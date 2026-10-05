@@ -315,6 +315,7 @@ class SaveObserverBaselineStore:
 
         previous = observer.setdefault("last_observed", {})
         pending = set(observer.setdefault("pending_edges", []))
+        pending.update(key for key in first_sample_pending if records.get(key) and key not in acknowledged_records)
         pending.difference_update(acknowledged_records)
         new_edges: set[str] = set()
         for key, complete in records.items():

@@ -20,6 +20,45 @@ ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
 
 
+def test_project_owned_decl_inputs_use_canonical_lf():
+    provenance = json.loads((get_frozen_bundle_dir(ROOT) / "ROOM_RESOURCES_PROVENANCE.json").read_text())
+    for name in provenance["source_hashes"]:
+        if name.endswith(".decl"):
+            assert b"\r\n" not in (ROOT / name).read_bytes(), name
+
+
+def test_mars_ownership_patch_preserves_graph_and_does_not_select_plasma():
+    from tools.decls.weapon_stripping_builder import OWNERS, _neutralize
+    owner = next(entry for entry in OWNERS if entry["name"] == "plasma_mars_cinematic")
+    source = '''className = "idLogicNodeModelPlayerModifyInventory";
+itemsToModify = {
+    num = 1;
+    item[0] = {
+        inventoryItem = "weapon/player/plasma_rifle";
+        desiredCount = 1;
+    }
+}
+id = 1198990637;
+model = {
+    className = "idLogicNodeModelPlayerResetHands";
+    object = {
+        resetInfo = {
+            useWeapon = "weapon/player/plasma_rifle";
+            useBringup = true;
+            introBringup = true;
+            clearPendingWeapon = true;
+        }
+    }
+}
+'''
+    expected = source.replace("num = 1;", "num = 0;").replace('useWeapon = "weapon/player/plasma_rifle";', 'useWeapon = "";')
+    result, _ = _neutralize(owner, source.encode())
+    assert result == expected
+    assert _neutralize(owner, result.encode())[0] == result
+    with pytest.raises(ValueError, match="hand reset"):
+        _neutralize(owner, source.replace("1198990637", "1198990638").encode())
+
+
 def test_every_hud_counter_is_a_root_sibling():
     recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
     variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]
