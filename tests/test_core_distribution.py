@@ -26,7 +26,7 @@ def fixture(root):
             artifacts.append({"path": name, "role": role, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     data = (root / "sentinel-runtime.zip").read_bytes()
     artifacts.append({"path": "sentinel-runtime.zip", "role": "runtime_zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-    document = {"schema": 1, "product": "sentinel-core", "version": "1.0.1-rc-1", "base_version": "1.0.1",
+    document = {"schema": 1, "product": "sentinel-core", "version": "1.0.2-rc-1", "base_version": "1.0.2",
                 "channel": "rc", "rc_number": 1, "mod_versions": ["0.6.0"], "architecture": "x64", "platform": "windows",
                 "abi": ABI, "required_capabilities": [2097152], "source_commit": "a" * 40,
                 "source_dirty": False, "build_id": "b" * 64, "pair_id": "b" * 64, "artifacts": artifacts}
@@ -42,7 +42,7 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6)])
 def test_matched_inventory_distributions(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest["version"] = base + "-rc-1"
@@ -53,7 +53,7 @@ def test_matched_inventory_distributions(tmp_path, base, inventory_abi):
     assert accepted["abi"]["inventory"] == inventory_abi
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 6), ("1.0.1", 5), ("1.0.2", 6)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 6), ("1.0.1", 5), ("1.0.2", 5), ("1.0.3", 6)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest.update(version=base + "-rc-1", base_version=base, abi={**ABI, "inventory": inventory_abi})

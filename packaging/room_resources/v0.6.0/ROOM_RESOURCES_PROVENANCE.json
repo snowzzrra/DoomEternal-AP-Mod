@@ -14,7 +14,7 @@
     "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
     "size": 2202253
   },
-  "room_resource_input_fingerprint": "449f8dfaee40846914b23e34553679308e661851112b19f8423646682a4cb19f",
+  "room_resource_input_fingerprint": "a91dff06a23da99e8e5daa3c80667ed0b16ddee805f13129e3010fbf0b344484",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -212,7 +212,7 @@
     "doom_eap/contracts/challenge_registry.py": "1c3d2721b2f500a857e31cc033a66bff6e54493026fee729b446ae90b43d2044",
     "doom_eap/contracts/check_observation.py": "9d460751c0857e7db7045ec6f2238f5728d136d2fd0e4068b7b4e0c16231f658",
     "doom_eap/contracts/command_publication.py": "ad6a4dcdd321862d2d70542c1428daa4155678f3fda749ecf337e5a0c6d0313e",
-    "doom_eap/contracts/core_distribution.py": "8c3f89be015761bbe1a3c3df2555105d295330fd1850afb40550970fddc35434",
+    "doom_eap/contracts/core_distribution.py": "f0ad3e6e1339bda7b3796a6a2b7d1a1fa5789bb5ead636fade29cb95b6cde59e",
     "doom_eap/contracts/foundation.py": "7e837e9cb3b8d98615708b3d6c266d77f8d9eda000b4ddb4ecdd9a799aa0fc93",
     "doom_eap/contracts/goal_policy.py": "e9e1bdea06aef1ac6ad7942881523bd0f0b2429253dccec9d2a7a4c7267d40f4",
     "doom_eap/contracts/inventory_domain.py": "e52e3d57c444afd85d2cba4d41a0b38b681190c3fc7abd9ffc94aad4d673b656",
@@ -13227,7 +13227,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "8a423238b7f924ceef24443359559ed9a44470cb",
+      "base_commit_sha": "57b04fd9080a44daa0ece2bc86bcae1b4ed0475b",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14056,8 +14056,8 @@
             "size": 4289
           },
           "doom_eap/contracts/core_distribution.py": {
-            "sha256": "35671eedbed341b327bdf494a1541bfef0842a3c2eca402da680739d22b191a9",
-            "size": 6144
+            "sha256": "b502535ac437b9135a8fef9319574bbc3187f75fd291ffd5ba9dae2cc97d74aa",
+            "size": 6153
           },
           "doom_eap/contracts/foundation.py": {
             "sha256": "efe2b5492eb5ad8331dff230e6ccb108823577a0add6868c7f7fc9e4da0303e8",
@@ -15400,7 +15400,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "a0dcb7f778422c27a73d92617d50a298d2f8ab81df03f4d2fcf9a0ff99774038",
+        "fingerprint": "d7e60c08c9a1e1eb36e820cd83d9358ec449309cc8bdf800242378ded2faae2c",
         "kind": "working_tree_snapshot"
       }
     }
