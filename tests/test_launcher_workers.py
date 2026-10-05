@@ -258,7 +258,8 @@ def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(t
 
 
 @pytest.mark.parametrize("fail", [False, True])
-def test_reconnect_prepares_installed_room_before_starting_native_client(fail):
+@pytest.mark.parametrize("trigger", ["reconnect", "game_exit", "delayed_exit", "disconnected_exit"])
+def test_room_readiness_prepares_session_before_starting_native_client(fail, trigger, monkeypatch):
     from doom_eap.launcher.launcher_controller import LauncherController
 
     events, errors, calls = [], [], []
@@ -285,9 +286,28 @@ def test_reconnect_prepares_installed_room_before_starting_native_client(fail):
                                  _setup_event=lambda kind, payload: events.append((kind, payload)),
                                  _ensure_native_client=lambda **kwargs: calls.append("native"))
     try:
-        assert LauncherController._queue_room_readiness(controller, room_event())
+        if trigger == "reconnect":
+            assert LauncherController._queue_room_readiness(controller, room_event())
+        else:
+            from doom_eap.launcher import launcher_controller
+            from doom_eap.runtime import observer_lifecycle
+            monkeypatch.setattr(launcher_controller, "os", SimpleNamespace(name="nt"))
+            processes = iter((None, (), ()) if trigger == "delayed_exit" else ((), (), ()))
+            monkeypatch.setattr(observer_lifecycle, "windows_game_processes", lambda: next(processes))
+            owner.observe = lambda processes: {"state": "game_exited", "ready": False}
+            controller._lifecycle_lock = threading.Lock()
+            controller.setup.current_event = None if trigger == "disconnected_exit" else room_event()
+            controller._queue_room_readiness = lambda event: LauncherController._queue_room_readiness(controller, event)
+            controller.emit = lambda *args, **kwargs: None
+            iterations = iter((False, False, False, True))
+            controller._game_lifecycle_stop = SimpleNamespace(is_set=lambda: next(iterations), wait=lambda _: None)
+            controller._game_lifecycle_sample_lock = threading.Lock()
+            LauncherController._sample_game_lifecycle(controller)
         assert workers.submit("sentinel", lambda job: done.set())
         assert done.wait(3)
+        if trigger == "disconnected_exit":
+            assert calls == [] and events == [] and errors == []
+            return
         if fail:
             assert calls == ["prepare"] and errors == []
             assert len(events) == 1 and events[0][0] == "room_install_state"

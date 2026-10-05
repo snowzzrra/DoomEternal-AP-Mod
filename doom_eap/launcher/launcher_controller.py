@@ -1569,12 +1569,17 @@ class LauncherController:
             else:
                 current_running = self.is_game_running()
                 status = self.workflow.session_owner.observe()
-            semantic = (status.get("state"), status.get("pid"), status.get("namespace_id"),
+            semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
                         status.get("process_created"),
                         status.get("admission", {}).get("instance_id"))
             if semantic != getattr(self, "_last_ap_session_status", None):
                 self._last_ap_session_status = semantic
                 self.emit("ap_session_status", **status)
+                if status.get("state") == "game_exited" and current_running is False:
+                    with self._lifecycle_lock:
+                        event = self.setup.current_event
+                        if event is not None:
+                            self._queue_room_readiness(event)
             with self._game_lifecycle_sample_lock:
                 self._game_lifecycle_sample = current_running
             self._game_lifecycle_stop.wait(1.0)
