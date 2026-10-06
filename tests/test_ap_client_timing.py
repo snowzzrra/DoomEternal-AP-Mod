@@ -10,7 +10,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_terminal_console_commands_release_native_capacity(tmp_path):
+def test_console_transport_accepts_qualified_core_and_releases_native_capacity(tmp_path):
     compiler = shutil.which("cl.exe")
     core = Path(os.environ.get("SENTINEL_CORE_SOURCE", str(REPO_ROOT.parent / "Sentinel-Core")))
     if not compiler or not (core / "include/sentinel_inspection.h").is_file():

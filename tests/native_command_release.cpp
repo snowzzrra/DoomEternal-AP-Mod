@@ -1,4 +1,6 @@
+#undef NDEBUG
 #include "sentinel_command_client.h"
+#include "sentinel_version.h"
 #include <cassert>
 #include <cstring>
 
@@ -6,13 +8,16 @@ namespace {
 unsigned retained = 0, released = 0;
 uint32_t terminal = SC_DIAGNOSTIC_EXECUTED;
 sc_command_request submitted{};
+const char* nativeVersion = SC_PRODUCT_VERSION;
+sentinel::ProbeResult nativeResult = sentinel::ProbeResult::ok;
+uint32_t nativeAvailability = SC_NATIVE_ENABLED;
 }
 namespace sentinel {
 Inspection query_native(uint32_t, uint32_t, uint64_t) {
     Inspection reply{};
-    reply.result = ProbeResult::ok;
-    std::strcpy(reply.snapshot.core.version, "1.0.0-rc-3");
-    reply.native.availability = SC_NATIVE_ENABLED;
+    reply.result = nativeResult;
+    std::strcpy(reply.snapshot.core.version, nativeVersion);
+    reply.native.availability = nativeAvailability;
     return reply;
 }
 Inspection query_save_admission(uint32_t, uint32_t) {
@@ -43,6 +48,29 @@ Inspection query_command(uint32_t, uint32_t, uint16_t operation, const sc_comman
 int main() {
     SentinelCommandClient client;
     client.SetTargetProcess(42);
+    for (const char* version : {"1.0.0", "1.0.1", "1.0.2", "1.0.0-rc-3", "1.0.1-rc-1", "1.0.2-rc-10"}) {
+        nativeVersion = version;
+        assert(client.PollHealth() && client.Ready() && client.LastResult() == AP_RPC_DELIVERED);
+        const auto before = released;
+        assert(client.ExecuteConsoleCommand("give ammo"));
+        assert(retained == 0 && released == before + 1 && submitted.kind == SC_COMMAND_AMMO_REFILL);
+    }
+    for (const char* version : {"1.0.3", "1.1.0", "1.0.2-rc-0", "1.0.2-rc-01", "invalid"}) {
+        nativeVersion = version;
+        assert(!client.PollHealth() && !client.Ready());
+        const auto before = released;
+        assert(!client.ExecuteConsoleCommand("give ammo"));
+        assert(client.LastResult() == AP_RPC_REJECTED && retained == 0 && released == before);
+    }
+    nativeVersion = SC_PRODUCT_VERSION;
+    nativeResult = sentinel::ProbeResult::endpoint_absent;
+    assert(!client.PollHealth() && client.LastResult() == AP_RPC_PIPE_MISSING);
+    nativeResult = sentinel::ProbeResult::ok;
+    nativeAvailability = SC_NATIVE_DISABLED;
+    assert(!client.PollHealth() && !client.Ready());
+    nativeAvailability = SC_NATIVE_ENABLED;
+    assert(client.PollHealth() && client.Ready());
+    released = 0;
     for (unsigned i = 0; i < SC_DIAGNOSTIC_CAPACITY * 3; ++i) {
         assert(client.ExecuteConsoleCommand("echo receipt"));
         assert(retained == 0 && released == i + 1);
@@ -50,4 +78,6 @@ int main() {
     terminal = SC_DIAGNOSTIC_REJECTED;
     assert(!client.ExecuteConsoleCommand("echo refused"));
     assert(retained == 0 && released == SC_DIAGNOSTIC_CAPACITY * 3 + 1);
+    client.SetTargetProcess(0);
+    assert(!client.PollHealth() && !client.Ready() && client.LastResult() == AP_RPC_PIPE_MISSING);
 }
