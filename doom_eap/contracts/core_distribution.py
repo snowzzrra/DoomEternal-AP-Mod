@@ -1,4 +1,4 @@
-"""Core runtime distribution contract for the MOD 0.6.0 consumer."""
+"""Verified Core runtime distributions for the MOD consumer."""
 import hashlib
 import json
 import re
@@ -13,14 +13,37 @@ ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
-SUPPORTED_CORE_BASES = {(1, 0, 0), (1, 0, 1), (1, 0, 2)}
+from doom_eap import __version__ as MOD_VERSION
+SUPPORTED_CAPABILITIES = {2097152}
 
 def version_key(value):
-    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-rc-([1-9]\d*))?", value)
+    match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc-([1-9]\d*))?(?:\+[0-9A-Za-z.-]+)?", value)
     if not match:
         raise ValueError("Invalid full Core version")
     major, minor, patch, rc = match.groups()
     return (int(major), int(minor), int(patch), 1 if rc is None else 0, int(rc or 0))
+
+def mod_compatible(value):
+    minimum = value.get("minimum_launcher_version")
+    if minimum and version_key(MOD_VERSION) < version_key(minimum):
+        return False
+    if "mod_version_range" not in value:
+        versions = value["mod_versions"]
+        return isinstance(versions, list) and any(version in versions for version in ("0.6.0", MOD_VERSION))
+    terms = value["mod_version_range"].split(",")
+    if not terms:
+        return False
+    current = version_key(MOD_VERSION)
+    for term in terms:
+        match = re.fullmatch(r"(>=|<=|>|<|==)(.+)", term.strip())
+        if not match:
+            raise ValueError("Invalid MOD version range")
+        operator, version = match.groups()
+        target = version_key(version)
+        if not {">=": current >= target, "<=": current <= target, ">": current > target,
+                "<": current < target, "==": current == target}[operator]:
+            return False
+    return True
 
 def _unique(pairs):
     result = {}
@@ -43,10 +66,10 @@ def validate_manifest(value):
     channel = "stable" if key[3] else "rc"
     if value["base_version"] != base or value["channel"] != channel or type(value["rc_number"]) is not int or value["rc_number"] != key[4]:
         raise ValueError("Inconsistent version fields")
-    if key[:3] not in SUPPORTED_CORE_BASES or value["mod_versions"] != ["0.6.0"] or value["architecture"] != "x64" or value["platform"] != "windows":
+    if not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
-    inventory_abis = (4, 5) if base == "1.0.0" else (6,)
-    if value["abi"] not in tuple({**ABI, "inventory": number} for number in inventory_abis) or any(type(number) is not int for number in value["abi"].values()) or value["required_capabilities"] != [2097152]:
+    if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list) or any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
+           ((4, 5, 6) if name == "inventory" else (number,)) for name, number in ABI.items()) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")

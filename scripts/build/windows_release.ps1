@@ -8,7 +8,6 @@ param(
     [string]$MapSources,
     [string]$Compressor,
     [string]$CoreSource,
-    [string]$CoreRuntime,
     [string]$Python,
     [string]$PipelineReceipt
 )
@@ -126,9 +125,9 @@ try {
     Copy-Item -LiteralPath (Join-Path $clientBuild "ap_client.exe") -Destination $clientHandoff -Force
     Copy-Item -LiteralPath (Join-Path $clientBuild "save_death_probe.exe") -Destination $clientHandoff -Force
     Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.6.0", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
-    Invoke-Python @("-m", "tools.release.build_session_owner", "--output", $clientBuild, "--core-runtime", $CoreRuntime)
+    Invoke-Python @("-m", "tools.release.build_session_owner", "--output", $clientBuild)
     Copy-Item -LiteralPath (Join-Path $clientBuild "APSessionOwner.exe") -Destination $clientHandoff -Force
-    Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago, "--core-runtime", $CoreRuntime)
+    Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago)
     $launcher = Join-Path $launcherHandoff "DoomEternalArchipelagoLauncher.exe"
     & $launcher --self-test
     if ($LASTEXITCODE -ne 0) { throw "Frozen Windows launcher self-test failed" }
@@ -136,8 +135,8 @@ try {
     $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
     $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
     Invoke-Python @("-m", "tools.release.source_provenance", "--repo-root", $repoRoot, "--archipelago-source", $archipelago, "--output", $buildSourceState, "--verify")
-    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.6.0", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows", "--source-state", $buildSourceState)
-    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.6.0", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
+    Invoke-Python @("-m", "tools.release.handoff", "--root", $handoff, "--version", "v0.6.1", "--mod-sha", $modSha, "--apworld-sha", $apSha, "--platform", "windows", "--source-state", $buildSourceState)
+    Invoke-Python @((Join-Path $repoRoot "scripts\release\assemble_ci_artifact.py"), "--handoff", $handoff, "--room-resources-dir", $resources, "--platform", "windows", "--version", "v0.6.1", "--repo-root", $repoRoot, "--output-dir", (Join-Path $repoRoot "build\final-release"))
     Write-Output "WINDOWS_RELEASE status=PASS output=$(Join-Path $repoRoot 'build\final-release')"
 } finally {
     Pop-Location

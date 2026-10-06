@@ -44,7 +44,7 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6), ("1.0.3", 6), ("1.0.4", 6)])
 @pytest.mark.parametrize("suffix", ["", "-rc-1"])
 def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_abi, suffix):
     manifest = fixture(tmp_path)
@@ -63,13 +63,10 @@ def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_
 
 
 @pytest.mark.parametrize("version,result,returncode,predicate", [
-    ("1.0.3", "ok", 0, "core_version_supported"),
-    ("invalid", "ok", 0, "core_version_supported"),
-    (None, "ok", 0, "core_version_supported"),
     ("1.0.2", "refused", 0, "exit_or_result"),
     ("1.0.2", "ok", 1, "exit_or_result"),
 ])
-def test_native_probe_refuses_unsupported_or_failed_response(tmp_path, monkeypatch, version, result, returncode, predicate):
+def test_native_probe_refuses_failed_response(tmp_path, monkeypatch, version, result, returncode, predicate):
     probe = tmp_path / "sentinel_probe.exe"
     probe.write_bytes(b"isolated probe")
     response = {"result": result, "core_version": version}
@@ -80,7 +77,7 @@ def test_native_probe_refuses_unsupported_or_failed_response(tmp_path, monkeypat
         link._run(["--pid", "7", "--native", "--json"])
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 6), ("1.0.1", 5), ("1.0.2", 5), ("1.0.3", 6)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 3), ("1.0.1", 7), ("1.0.4", 99)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest.update(version=base + "-rc-1", base_version=base, abi={**ABI, "inventory": inventory_abi})

@@ -1,8 +1,8 @@
 #include <windows.h>
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,6,0,0
- PRODUCTVERSION 0,6,0,0
+ FILEVERSION 0,6,1,0
+ PRODUCTVERSION 0,6,1,0
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_APP
@@ -13,12 +13,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "DOOM Eternal Archipelago Project\0"
             VALUE "FileDescription", "DoomEAP Game Integration Helper\0"
-            VALUE "FileVersion", "0.6.0\0"
+            VALUE "FileVersion", "0.6.1\0"
             VALUE "InternalName", "ap_client.exe\0"
             VALUE "LegalCopyright", "DOOM Eternal Archipelago Project\0"
             VALUE "OriginalFilename", "ap_client.exe\0"
             VALUE "ProductName", "DOOM Eternal Archipelago Game Integration Helper\0"
-            VALUE "ProductVersion", "0.6.0\0"
+            VALUE "ProductVersion", "0.6.1\0"
         END
     END
     BLOCK "VarFileInfo"

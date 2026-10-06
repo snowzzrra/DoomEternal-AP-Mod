@@ -200,19 +200,56 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                     calls = 0
                     def fail_once(path, data):
                         nonlocal calls
-                        calls += 1
-                        if calls == 2:
+                        calls += int(path == root / "msimg32.dll")
+                        if path == root / "msimg32.dll" and calls == 1:
                             raise OSError("transaction interrupted")
                         return original_write(path, data)
                     write.side_effect = fail_once
                     with self.assertRaisesRegex(RuntimeError, "transaction interrupted"):
-                        install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                        install_meathook(root, None, consent=lambda _: False, local_artifact=manifest, force_repair=True)
                 self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
                 (root / "XINPUT1_3.dll").write_bytes(b"foreign")
                 with self.assertRaises(RuntimeError):
                     install_meathook(root, None, consent=lambda _: True, local_artifact=manifest, force_repair=True)
                 self.assertEqual((root / "XINPUT1_3.dll").read_bytes(), b"foreign")
 
+
+    def test_core_build_collision_is_backed_up_and_new_patch_upgrades(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._create_mock_game_root(Path(directory) / "doom")
+            old_runtime = Path(directory) / "old-runtime"
+            old_runtime.mkdir()
+            old = core_distribution_fixture(old_runtime)
+            old.update(version="1.0.2", base_version="1.0.2", channel="stable", rc_number=0)
+            old_manifest = old_runtime / "distribution.json"
+            old_manifest.write_text(json.dumps(old), encoding="utf-8")
+            new_runtime = Path(directory) / "new-runtime"
+            new_runtime.mkdir()
+            incoming = core_distribution_fixture(new_runtime)
+            incoming.update(version="1.0.2", base_version="1.0.2", channel="stable", rc_number=0,
+                            build_id="c" * 64, pair_id="c" * 64)
+            new_manifest = new_runtime / "distribution.json"
+            new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
+            with patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()):
+                install_meathook(root, None, consent=lambda _: False, local_artifact=old_manifest)
+                before = {name: (root / name).read_bytes() for name in
+                          ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")}
+                result = install_meathook(root, None, consent=lambda _: False, local_artifact=new_manifest)
+                self.assertEqual(result.state, "installed")
+                self.assertEqual(launcher_platform_mod.probe_meathook(root).details["build_id"], "c" * 64)
+                backup = Path(result.backup_path) / "original"
+                self.assertEqual(before, {name: (backup / name).read_bytes() for name in before})
+                for name in before:
+                    (backup / name).replace(root / name)
+                self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
+                incoming.update(version="1.0.3", base_version="1.0.3")
+                new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
+                result = install_meathook(root, None, consent=lambda _: False, local_artifact=new_manifest)
+                self.assertEqual(result.state, "installed")
+                verified = launcher_platform_mod.probe_meathook(root)
+                self.assertTrue(verified.ok)
+                self.assertEqual(verified.details["version"], "1.0.3")
+                self.assertEqual(verified.details["build_id"], "c" * 64)
 
     def test_bootstrap_recovery_uses_verified_zip_and_reports_defender(self):
         from doom_eap.contracts.core_distribution import verify_runtime
@@ -248,8 +285,8 @@ class TestCorePrerequisiteGate(unittest.TestCase):
 
                 def fail_once(path, data):
                     nonlocal calls
-                    calls += 1
-                    if calls == 2:
+                    calls += int(path == bootstrap)
+                    if path == bootstrap and calls == 1:
                         raise FileNotFoundError(2, "quarantine fixture", str(path))
                     write(path, data)
 
@@ -258,7 +295,7 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                          returncode=0, stdout=json.dumps(events))) as query, \
                      patch.object(launcher_platform_mod, "_atomic_write_bytes", side_effect=fail_once):
                     with self.assertRaisesRegex(RuntimeError, "An allow action is recorded") as failure:
-                        install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                        install_meathook(root, None, consent=lambda _: False, local_artifact=manifest, force_repair=True)
                     self.assertIn(str(bootstrap), str(failure.exception))
                     self.assertEqual(query.call_count, 1)
                 self.assertEqual(original, {name: (root / name).read_bytes() for name in original})
@@ -293,11 +330,12 @@ class TestCorePrerequisiteGate(unittest.TestCase):
 
             mock_digest = "0" * 64
             with patch.object(RoomCompiler, "__init__", return_value=None), \
-                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True):
+                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
+                 patch.object(workflow.core_runtime, "check", return_value=None):
                 with self.assertRaises(RuntimeError) as ctx:
                     workflow.execute(_snapshot())
 
-            self.assertIn("compatible Core runtime release", str(ctx.exception))
+            self.assertIn("Repair Core", str(ctx.exception))
             # assert zero mutations
             self.assertFalse((game_root / "XINPUT1_3.dll").exists())
             self.assertEqual(list((game_root / "Mods").glob("*.zip")), [])

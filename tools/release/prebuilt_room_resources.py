@@ -78,6 +78,8 @@ def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tu
         for p in d.rglob("*"):
             if p.is_file() and not p.name.endswith((".pyc", ".pyo")) and "__pycache__" not in p.parts:
                 rel = p.relative_to(root).as_posix()
+                if rel == "doom_eap/contracts/core_distribution.py":
+                    continue
                 files_to_hash[rel] = hashlib.sha256(compiler_source_bytes(p)).hexdigest()
 
     for rel_file in DEPENDENCY_FILES:

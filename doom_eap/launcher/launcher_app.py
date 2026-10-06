@@ -30,9 +30,8 @@ def _run_self_test(arguments: list[str]) -> int:
     print("--> Executing DOOM Eternal Archipelago Launcher self-test...")
     if "--core-only" in arguments:
         from doom_eap.contracts.core_distribution import verify_runtime
-        bundle = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[3] / "Sentinel-Core/build/distribution/1.0.0-rc-1"))
-        manifest = bundle / "core/distribution.json" if getattr(sys, "frozen", False) else bundle / "distribution.json"
         try:
+            manifest = Path(arguments[arguments.index("--core-runtime") + 1])
             value, _ = verify_runtime(manifest, bootstrap_from_archive=True)
             print(json.dumps({"product": value["product"], "version": value["version"],
                               "build_id": value["build_id"], "mod_versions": value["mod_versions"],
@@ -138,6 +137,10 @@ def _run_self_test(arguments: list[str]) -> int:
             try:
                 for k, v in env_override.items():
                     os.environ[k] = v
+                from doom_eap.launcher.launcher_platform import launcher_user_paths
+                fake_paths = launcher_user_paths()
+                fake_paths.config_dir.mkdir(parents=True, exist_ok=True)
+                (fake_paths.config_dir / "launcher.json").write_text(json.dumps({"core_auto_update": False}))
                 controller = LauncherController(application_dir=fake_app)
                 if controller.state != LauncherState.IDLE:
                     raise RuntimeError(f"Unexpected initial controller state: {controller.state}")

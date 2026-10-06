@@ -11,7 +11,6 @@ bool SentinelCommandClient::PollHealth() {
     if (!pid_) { ready_ = false; result_ = AP_RPC_PIPE_MISSING; status_ = ERROR_FILE_NOT_FOUND; return false; }
     const auto observation = sentinel::query_native(pid_, 250);
     ready_ = observation.result == sentinel::ProbeResult::ok &&
-        sentinel::commands::compatible_product(observation.snapshot.core.version) &&
         observation.native.availability == SC_NATIVE_ENABLED;
     status_ = observation.win32_error;
     if (ready_) {
@@ -27,8 +26,7 @@ bool SentinelCommandClient::ExecuteConsoleCommand(const std::string& command) {
         result_ = AP_RPC_REJECTED; status_ = ERROR_INVALID_DATA; return false;
     }
     const auto native = sentinel::query_native(pid_, 500);
-    if (native.result != sentinel::ProbeResult::ok ||
-        !sentinel::commands::compatible_product(native.snapshot.core.version)) {
+    if (native.result != sentinel::ProbeResult::ok) {
         result_ = AP_RPC_REJECTED; status_ = ERROR_NOT_READY; return false;
     }
     request.execution.expected = native.native.scope;

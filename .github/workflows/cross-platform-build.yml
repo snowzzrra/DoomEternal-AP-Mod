@@ -271,7 +271,7 @@ jobs:
       - name: Build Windows Session Supervisor
         run: |
           python -m pip install -r requirements-launcher.txt
-          python -m tools.release.build_session_owner --output build/release/build/client --core-runtime Sentinel-Core/build/distribution/candidate
+          python -m tools.release.build_session_owner --output build/release/build/client
 
       - name: Verify Launcher and Core Session Contract
         shell: pwsh
@@ -343,19 +343,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-launcher.txt
 
-      - name: Download Qualified Core Runtime
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: core-runtime-artifact
-          path: build/qualified-core
-
       - name: Build Linux Frozen Launcher
         run: |
           mkdir -p build/release
           python3 -m tools.release.build_launcher \
             --output-dir build/release \
             --archipelago-source Archipelago \
-            --core-runtime build/qualified-core \
             --name DoomEternalArchipelagoLauncher
 
       - name: Validate Linux Frozen Launcher
@@ -409,15 +402,9 @@ jobs:
         run: |
           python -m pytest tests/test_install_workflow.py::TestWindowsFilesystemCorrective -q
 
-      - name: Download Qualified Core Runtime
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: core-runtime-artifact
-          path: build/qualified-core
-
       - name: Build Windows Frozen Launcher
         run: |
-          python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher --core-runtime build/qualified-core
+          python -m tools.release.build_launcher --output-dir build/release --archipelago-source Archipelago --name DoomEternalArchipelagoLauncher
 
       - name: Validate Windows Frozen Launcher
         shell: pwsh

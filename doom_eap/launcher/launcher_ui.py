@@ -1366,6 +1366,25 @@ class LauncherUI(QMainWindow):
         buttons.addWidget(self.uninstall_button)
         buttons.addStretch(1)
         card_layout.addLayout(buttons)
+        self.core_auto_update = QCheckBox("Automatically update compatible Core releases")
+        self.core_auto_update.setChecked(bool(self.controller.config.get("core_auto_update", True)))
+        self.core_auto_update.toggled.connect(lambda checked: self.controller.save_config({"core_auto_update": checked}))
+        card_layout.addWidget(self.core_auto_update)
+        core_actions = QHBoxLayout()
+        for text, action in (("REPAIR CORE", "repair_core"), ("REPAIR SESSION", "repair_session"), ("RESTORE PREVIOUS CORE", "rollback_core")):
+            button = QPushButton(text)
+            button.clicked.connect(lambda checked=False, key=action: self._runtime_repair(key))
+            core_actions.addWidget(button)
+        local_core = QPushButton("LOCAL CORE…")
+        local_core.setToolTip("Select a development distribution; this overrides automatic Core selection.")
+        local_core.clicked.connect(self._select_local_core)
+        core_actions.addWidget(local_core)
+        clear_core = QPushButton("USE RELEASES")
+        clear_core.clicked.connect(self._clear_local_core)
+        core_actions.addWidget(clear_core)
+        card_layout.addLayout(core_actions)
+        self.core_status = self._label("Local development override" if self.controller.config.get("core_runtime_manifest") else "Core distributed separately", "muted")
+        card_layout.addWidget(self.core_status)
         layout.addWidget(card)
         details = self._card()
         details_layout = QVBoxLayout(details)
@@ -1389,6 +1408,24 @@ class LauncherUI(QMainWindow):
             shortcut.activated.connect(lambda target=page: self._show_page(target))
         primary = QShortcut(QKeySequence("Ctrl+Return"), self)
         primary.activated.connect(self._primary_action)
+
+    def _select_local_core(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Select local Core distribution", "", "Core manifest (distribution.json)")
+        if path:
+            self.controller.save_config({"core_runtime_manifest": path})
+            self.core_status.setText("Local development override: " + path)
+
+    def _clear_local_core(self):
+        self.controller.save_config({"core_runtime_manifest": None})
+        self.core_status.setText("Core distributed separately")
+
+    def _runtime_repair(self, action):
+        if action in {"repair_session", "rollback_core"}:
+            message = ("With DOOM closed, recover a stale preparation or archive an incomplete prelaunch marker. Existing saves and receipts are preserved."
+                       if action == "repair_session" else "Restore the previous Core pair and disable automatic updates. Existing room and saves are preserved.")
+            if QMessageBox.question(self, "Confirm recovery", message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+                return
+        self.controller.request_repair(action)
 
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
         value = captured.strip()
@@ -2652,7 +2689,7 @@ class LauncherUI(QMainWindow):
         action = actions[0]
         prompt = f"{action['title']}\n\nChanges:\n" + "\n".join(f"• {change}" for change in action['changes']) + f"\n\nRollback: {action['rollback']}"
         if QMessageBox.question(self, "Apply repair", prompt) != QMessageBox.StandardButton.Yes: return
-        if self.controller.request_repair(action['key'], generation=generation):
+        if self.controller.request_repair(action['action_id'], generation=generation):
             self.doctor_action.setText("Applying repair...")
 
     def _poll_events(self) -> None:
@@ -2819,6 +2856,9 @@ class LauncherUI(QMainWindow):
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
+        if kind in {"core_update_status", "core_runtime_selected"}:
+            self.core_status.setText(str(event.get("message") or ("Local development override: " if event.get("development_override") else "Selected Core: ") + str(event.get("path", ""))))
+            return
         if kind == "support_bundle_ready":
             self.doctor_action.setText(f"Support report saved: {event.get('path', '')}")
             return

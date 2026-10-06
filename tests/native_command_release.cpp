@@ -48,21 +48,16 @@ Inspection query_command(uint32_t, uint32_t, uint16_t operation, const sc_comman
 int main() {
     SentinelCommandClient client;
     client.SetTargetProcess(42);
-    for (const char* version : {"1.0.0", "1.0.1", "1.0.2", "1.0.0-rc-3", "1.0.1-rc-1", "1.0.2-rc-10"}) {
+    for (const char* version : {"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.1.0", "1.0.0-rc-3", "1.0.1-rc-1", "1.0.2-rc-10", "1.0.3-rc-1"}) {
         nativeVersion = version;
         assert(client.PollHealth() && client.Ready() && client.LastResult() == AP_RPC_DELIVERED);
         const auto before = released;
         assert(client.ExecuteConsoleCommand("give ammo"));
         assert(retained == 0 && released == before + 1 && submitted.kind == SC_COMMAND_AMMO_REFILL);
     }
-    for (const char* version : {"1.0.3", "1.1.0", "1.0.2-rc-0", "1.0.2-rc-01", "invalid"}) {
-        nativeVersion = version;
-        assert(!client.PollHealth() && !client.Ready());
-        const auto before = released;
-        assert(!client.ExecuteConsoleCommand("give ammo"));
-        assert(client.LastResult() == AP_RPC_REJECTED && retained == 0 && released == before);
-    }
     nativeVersion = SC_PRODUCT_VERSION;
+    assert(client.ExecuteConsoleCommand("ai_ScriptCmdEnt AP_DEATHLINK_KILL activate player1"));
+    assert(retained == 0 && submitted.kind == SC_COMMAND_ACTIVATE);
     nativeResult = sentinel::ProbeResult::endpoint_absent;
     assert(!client.PollHealth() && client.LastResult() == AP_RPC_PIPE_MISSING);
     nativeResult = sentinel::ProbeResult::ok;

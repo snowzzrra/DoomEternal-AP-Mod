@@ -7,17 +7,25 @@ from pathlib import Path
 
 from doom_eap.contracts.source_bytes import SOURCE_BYTE_CONTRACT, first_party_text_bytes
 
-SOURCE_ROOTS = ("doom_eap", "tools/decls", "tools/maps", "tools/release")
+SOURCE_ROOTS = ("doom_eap/content", "doom_eap/contracts", "tools/decls", "tools/maps")
+SOURCE_FILES = ("doom_eap/launcher/launcher_core.py", "doom_eap/runtime/save_records.py",
+                "doom_eap/runtime/context_registry.py", "tools/release/room_payloads.py",
+                "tools/release/build_room_resources.py", "tools/release/stage_room_resources.py",
+                "tools/release/source_bytes.py")
 BUNDLED_IDENTITY_PATH = "data/compiler_source_identity.json"
 
 
 def capture_compiler_sources(root: Path) -> dict[str, str]:
     hashes = {}
+    paths = [root / name for name in SOURCE_FILES]
     for relative in SOURCE_ROOTS:
-        for path in sorted((root / relative).rglob("*.py")):
-            if path.is_symlink():
-                raise ValueError(f"Compiler source cannot be a symlink: {path}")
-            hashes[path.relative_to(root).as_posix()] = hashlib.sha256(first_party_text_bytes(path.read_bytes())).hexdigest()
+        paths.extend((root / relative).rglob("*.py"))
+    for path in sorted(paths):
+        if path.relative_to(root).as_posix() == "doom_eap/contracts/core_distribution.py":
+            continue
+        if path.is_symlink():
+            raise ValueError(f"Compiler source cannot be a symlink: {path}")
+        hashes[path.relative_to(root).as_posix()] = hashlib.sha256(first_party_text_bytes(path.read_bytes())).hexdigest()
     return hashes
 
 

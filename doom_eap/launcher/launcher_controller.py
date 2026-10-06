@@ -144,6 +144,7 @@ class LauncherController:
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
+        self.config.setdefault("core_auto_update", True)
         if not self.config.get("client_state_file"):
             receipt_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) if os.name == "nt" else Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
             self.config["client_state_file"] = str(receipt_root / "doom-eternal-ap/client_state.json")
@@ -205,6 +206,8 @@ class LauncherController:
         self._game_lifecycle_sample_lock = threading.Lock()
         self._game_lifecycle_stop = threading.Event()
         self._game_lifecycle_thread: threading.Thread | None = None
+        if self.config["core_auto_update"] and not self.config.get("core_runtime_manifest"):
+            threading.Thread(target=self.workflow.core_runtime.check, name="CoreUpdateCheck", daemon=True).start()
 
     def _native_start_failure(
         self,
@@ -625,8 +628,13 @@ class LauncherController:
             installed = workflow.install_state(snapshot)
             if installed.state != "already_installed":
                 raise RuntimeError("Prepare the room package before playing")
+            workflow.ensure_game_link(root)
+            configuration.update(workflow._config())
             status = workflow.session_owner.prepare(snapshot, configuration)
             job.check()
+            if status["state"] in {"admitted", "awaiting_admission"}:
+                self.emit("ap_session_status", **status)
+                return
             if status["state"] != "prelaunch_ready":
                 raise RuntimeError("An AP game process is already active or requires attention")
             if (platform or os.name) == "nt" and not self._ensure_native_client(generation=generation):
@@ -834,7 +842,34 @@ class LauncherController:
                 def emit(kind, **payload):
                     self._setup_event(kind, job.event(payload))
 
-                if integration_only:
+                if action_key in {"repair_core", "repair_session", "rollback_core"}:
+                    root = workflow._game_root(config)
+                    if workflow.session_owner.game_processes(config) != ():
+                        raise RuntimeError("Close DOOM Eternal before repairing its session or restoring Core")
+                    if action_key == "rollback_core":
+                        from .launcher_core_install import rollback_core
+                        self.save_config({"core_auto_update": False})
+                        workflow.session_owner.retire()
+                        self._stop_native_client()
+                        backup = rollback_core(root, self.state_dir)
+                        self.save_config({"core_auto_update": False, "core_runtime_manifest": None, "selected_core_runtime_manifest": None})
+                        workflow.core_runtime.checked = False
+                        message = f"Previous Core restored: {backup}. Automatic update is off; reconnect to the same room."
+                    elif action_key == "repair_core":
+                        workflow.session_owner.retire()
+                        self._stop_native_client()
+                        message = workflow.ensure_game_link(root, force_repair=True).message
+                    else:
+                        event = self.setup.current_event
+                        if not event:
+                            raise RuntimeError("Connect to the same room before repairing its session")
+                        workflow.ensure_game_link(root)
+                        config.update(workflow._config())
+                        status = workflow.session_owner.prepare(RoomSnapshot.from_event(event), config, recover_prelaunch=True)
+                        self.last_setup_failure = None
+                        self.emit("ap_session_status", **status)
+                        message = "Session prepared in the same room; saves and receipts preserved."
+                elif integration_only:
                     result = install_game_link(config, workflow, emit, force_repair=True)
                     message = result.message
                 else:
@@ -1255,10 +1290,16 @@ class LauncherController:
         })
 
     def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
+        runtime_changed = False
         with self._lifecycle_lock:
             generation = payload.get("launcher_job_generation")
             if generation is not None and not self.workers.accepts(generation):
                 return
+            if kind == "core_runtime_selected":
+                old = self.config.get("selected_core_runtime_manifest")
+                self.config["selected_core_runtime_manifest"] = payload["path"]
+                self._persist_config()
+                runtime_changed = old != payload["path"]
             if (kind == "setup_ready" and payload.get("adapter_state") == "applied") or (
                 kind == "room_install_state" and payload.get("state") == "already_installed"
                 and payload.get("readiness") == "blocked"
@@ -1277,7 +1318,12 @@ class LauncherController:
             elif kind == "setup_ready":
                 self.last_setup_failure = None
                 self.last_room_package_issue = None
+            elif kind in {"ap_session_status", "room_install_state"} and (payload.get("state") in {"prelaunch_ready", "admitted"} or payload.get("readiness") == "ready"):
+                if self.last_setup_failure and self.last_setup_failure.get("failure_domain") == "campaign_session":
+                    self.last_setup_failure = None
             self.emit(kind, **payload)
+        if runtime_changed:
+            self._stop_native_client()
         if kind == "setup_ready" and payload.get("adapter_state") == "applied":
             self._ensure_native_client(generation=generation)
 
@@ -1491,6 +1537,9 @@ class LauncherController:
             if state.state == "already_installed" and state.readiness != "blocked":
                 job.check()
                 try:
+                    root = workflow._game_root(configuration)
+                    workflow.ensure_game_link(root)
+                    configuration.update(workflow._config())
                     status = workflow.session_owner.prepare(snapshot, configuration)
                 except (RuntimeError, OSError, ValueError) as error:
                     emit("room_install_state", state="already_installed", manifest_hash=state.manifest_hash,

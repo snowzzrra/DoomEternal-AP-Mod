@@ -5044,8 +5044,10 @@ class DoomEternalContext(CommonContext):
                                  self._connected_slot_data.get("native_generation_fingerprint", ""))
         default_probe = (Path(getattr(sys, "_MEIPASS", APPLICATION_DIR)) / "core/sentinel_probe.exe" if getattr(sys, "frozen", False)
                          else REPO_ROOT.parent / "Sentinel-Core/build/bin/sentinel_probe.exe")
-        if config.get("core_runtime_manifest"):
-            default_probe = Path(config["core_runtime_manifest"]).parent / "sentinel_probe.exe"
+        runtime_manifest = config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest")
+        if runtime_manifest:
+            runtime_directory = Path(str(runtime_manifest))
+            default_probe = (runtime_directory if runtime_directory.is_dir() else runtime_directory.parent) / "sentinel_probe.exe"
         probe = Path(os.environ.get("SENTINEL_PROBE", default_probe))
         key = (identity, namespace, str(probe))
         if getattr(self, "_native_link_key", None) != key:

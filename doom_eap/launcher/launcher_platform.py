@@ -74,6 +74,7 @@ class DownloadTransport(Protocol):
 class DownloadResult:
     final_url: str
     content_length: int | None
+    headers: dict[str, str] | None = None
 
 
 def is_transient_download_error(exc: Exception) -> bool:
@@ -107,13 +108,13 @@ class UrlDownloadTransport:
         self.max_retries = max(0, max_retries)
         self.backoff_base = max(0.0, backoff_base)
 
-    def fetch(self, url: str, destination: Path) -> DownloadResult:
+    def fetch(self, url: str, destination: Path, *, headers: dict[str, str] | None = None) -> DownloadResult:
         total_attempts = self.max_retries + 1
         for attempt in range(1, total_attempts + 1):
             try:
                 request = urllib.request.Request(
                     url,
-                    headers={"User-Agent": "DoomEternal-AP-Launcher"},
+                    headers={"User-Agent": "DoomEternal-AP-Launcher", **(headers or {})},
                 )
                 with urllib.request.urlopen(
                     request,
@@ -128,7 +129,7 @@ class UrlDownloadTransport:
                     except ValueError:
                         content_length = None
                     final_url = response.geturl() if hasattr(response, "geturl") else url
-                    return DownloadResult(final_url, content_length)
+                    return DownloadResult(final_url, content_length, dict(response.headers))
             except Exception as error:
                 if destination.exists():
                     try:
@@ -992,17 +993,23 @@ def install_meathook(
     game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
     consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
 ) -> GameLinkResult:
-    """Install a verified local Core distribution without replacing foreign providers."""
-    from ..contracts.core_distribution import verify_runtime
-    del dependency_manager, consent, force_repair, state_dir
+    from .launcher_core_install import game_write_lock, recover_interrupted
     root = validate_game_root(game_root)
-    if detect_doom_processes():
-        raise RuntimeError("Close DOOM Eternal before installing the Core runtime.")
+    with game_write_lock(root):
+        if detect_doom_processes():
+            if probe_meathook(root).ok and not force_repair:
+                installed = probe_meathook(root)
+                return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
+            raise RuntimeError("Close DOOM Eternal before installing the Core runtime.")
+        recover_interrupted(root, state_dir)
+        return _install_core_pair(root, state_dir, consent, local_artifact, force_repair)
+
+
+def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
+    """Install a verified local Core distribution without replacing foreign providers."""
+    from ..contracts.core_distribution import verify_runtime, read_manifest
+    from .launcher_core_install import replace_pair, NAMES
     installed = probe_meathook(root)
-    if local_artifact is None:
-        bundled = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "core" / "distribution.json"
-        if bundled.is_file():
-            local_artifact = bundled
     if local_artifact is None:
         if installed.ok:
             return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
@@ -1020,50 +1027,35 @@ def install_meathook(
         if current > incoming_version:
             return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
                                   sha256=str(installed.details["sha256"]), ownership="verified")
-        if current == incoming_version and installed.details["build_id"] != value["build_id"]:
-            raise ValueError("An installed Core version has a different build identity; select a new RC version.")
+        if installed.details["build_id"] == value["build_id"] and not force_repair:
+            return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
     if (root / "XINPUT1_3.dll").exists():
         raise RuntimeError("Resolve the existing XINPUT provider with its owner before Core-only installation.")
     existing = root / "sentinel-distribution.json"
-    owned_partial = (not installed.ok and existing.is_file() and existing.read_bytes() == manifest.read_bytes()
-                     and all(not (root / name).exists() or (root / name).read_bytes() == contents[name]
-                             for name in ("sentinel_core.dll", "msimg32.dll")))
+    owned_partial = False
+    if not installed.ok and existing.is_file():
+        try:
+            previous = {item["path"]: item for item in read_manifest(existing)["artifacts"]}
+            owned_partial = all(not (root / name).exists() or
+                (len((root / name).read_bytes()) == previous[name]["size"] and
+                 hashlib.sha256((root / name).read_bytes()).hexdigest() == previous[name]["sha256"])
+                for name in ("sentinel_core.dll", "msimg32.dll"))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok and not owned_partial:
-        raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
-    names = ("sentinel_core.dll", "msimg32.dll", "sentinel-distribution.json")
-    original = {name: (root / name).read_bytes() if (root / name).exists() else None for name in names}
-    incoming = {name: contents[name] for name in names[:2]}
-    incoming[names[2]] = manifest.read_bytes()
+        spec = DependencySpec("Replace foreign Core/bootstrap with backup", value["version"],
+            str(root), value["build_id"], "", "local")
+        if not force_repair or not consent(spec):
+            raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
+    incoming = {name: contents[name] for name in NAMES[:2]}
+    incoming[NAMES[2]] = manifest.read_bytes()
     try:
-        for name in names:
-            _atomic_write_bytes(root / name, incoming[name])
-        if not probe_meathook(root).ok:
-            for name in names[:2]:
-                if not (root / name).is_file():
-                    raise FileNotFoundError(2, "Core file disappeared after installation", str(root / name))
-            raise RuntimeError("Core pair verification failed after installation")
-    except Exception as error:
-        failed_path = root / name
-        rollback_errors = []
-        for restore_name in names:
-            try:
-                if original[restore_name] is None:
-                    (root / restore_name).unlink(missing_ok=True)
-                else:
-                    _atomic_write_bytes(root / restore_name, original[restore_name])
-            except OSError as rollback_error:
-                rollback_errors.append(str(rollback_error))
-        if isinstance(error, OSError):
-            detail = _core_file_error(failed_path, error)
-            if rollback_errors:
-                detail = RuntimeError(f"{detail} Rollback incomplete: {'; '.join(rollback_errors)}")
-            raise detail from error
-        if rollback_errors:
-            raise RuntimeError(f"{error} Rollback incomplete: {'; '.join(rollback_errors)}") from error
-        raise
+        backup = replace_pair(root, state_dir, incoming)
+    except OSError as error:
+        raise _core_file_error(Path(error.filename) if error.filename else root / "sentinel_core.dll", error) from error
     return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Sentinel Core {value['version']} installed.",
                           path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
-                          ownership="launcher_installed")
+                          ownership="launcher_installed", backup_path=str(backup))
 
 
 

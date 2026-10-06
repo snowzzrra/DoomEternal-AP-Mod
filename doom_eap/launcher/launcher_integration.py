@@ -17,6 +17,7 @@ from pathlib import Path
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
 from .launcher_workers import LauncherJob, LauncherWorkCancelled, LauncherWorkers
 from .launcher_session import APSessionOwner
+from .launcher_core_runtime import CoreRuntime
 from .launcher_interactions import LauncherInteractions, ScopedInteractions
 from .launcher_platform import (
     IDFILE_DECOMPRESSOR_LINUX,
@@ -292,6 +293,7 @@ class IntegratedLaunchWorkflow:
         self._failure_phase = "game_setup"
         self._configuration_snapshot: dict[str, object] | None = None
         self._job: LauncherJob | None = None
+        self.core_runtime = CoreRuntime(self.data_dir / "core-runtime", emit=lambda kind, **payload: self._emit(kind, **payload))
 
     def for_job(self, job: LauncherJob, event_sink: EventSink,
                 interactions: ScopedInteractions) -> IntegratedLaunchWorkflow:
@@ -311,6 +313,7 @@ class IntegratedLaunchWorkflow:
         )
         workflow._configuration_snapshot = configuration
         workflow._job = job
+        workflow.core_runtime = self.core_runtime
         return workflow
 
     def check_cancelled(self) -> None:
@@ -717,16 +720,24 @@ class IntegratedLaunchWorkflow:
         local_artifact: Path | None = None,
         force_repair: bool = False,
     ) -> GameLinkResult:
+        config = self._config()
+        if local_artifact is not None:
+            config["core_runtime_manifest"] = str(local_artifact)
+        selected = self.core_runtime.resolve(config, game_root, refresh=force_repair and local_artifact is None)
+        config["selected_core_runtime_manifest"] = str(selected)
+        self._configuration_snapshot = config
+        self._emit("core_runtime_selected", path=str(selected), development_override=bool(config.get("core_runtime_manifest")))
         dep_manager = DependencyManager(self.state_dir / "dependencies")
         result = install_meathook(
             game_root,
             dep_manager,
             state_dir=self.state_dir,
             consent=self.consent,
-            local_artifact=local_artifact,
+            local_artifact=selected,
             force_repair=force_repair,
         )
         if result.state in {"installed", "repaired"}:
+            self.session_owner.retire()
             post_probe = probe_meathook(game_root)
             if not post_probe.ok:
                 return GameLinkResult(
@@ -747,14 +758,12 @@ class IntegratedLaunchWorkflow:
             )
         return result
 
-    def _cached_linux_install(
+    def _cached_install(
         self,
         snapshot: RoomSnapshot,
         state: InstallState,
     ) -> IntegratedSetupRecord | None:
-        """Return receipt-backed room setup when Linux runtime is already ready."""
-        if self.platform_name != "linux":
-            return None
+        """Return the verified room installation independently of session readiness."""
         if state.state != "already_installed" or state.readiness != "ready":
             return None
 
@@ -807,15 +816,19 @@ class IntegratedLaunchWorkflow:
         game_root = self._game_root(config)
         self._failure_phase = "room_package"
         pre_install_state = self.install_state(snapshot)
-        cached = self._cached_linux_install(snapshot, pre_install_state)
+        cached = self._cached_install(snapshot, pre_install_state)
         if cached is not None:
             self.check_cancelled()
+            self.ensure_game_link(game_root)
+            config = self._config()
             runtime_config = self._publish_client_config(
                 endpoint=endpoint or str(config.get("server_address") or ""),
                 manifest_hash=cached.manifest_hash,
                 runtime_config=config,
             )
             self._emit("runtime_config_ready", path=str(runtime_config))
+            self._failure_phase = "campaign_session"
+            self.session_owner.prepare(snapshot, config)
             return cached
 
         # Verify the selected Core pair before preparing the room mod.
@@ -828,6 +841,7 @@ class IntegratedLaunchWorkflow:
                 local_artifact=local_artifact,
                 force_repair=False,
             )
+            config = self._config()
             if game_link.state == "needs_repair":
                 self._emit(
                     "prerequisite_missing",
@@ -997,6 +1011,7 @@ class IntegratedLaunchWorkflow:
             )
         if adapter.state == "applied":
             self.check_cancelled()
+            self._failure_phase = "campaign_session"
             self.session_owner.prepare(snapshot, config)
         return record
 

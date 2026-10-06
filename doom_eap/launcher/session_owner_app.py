@@ -36,7 +36,7 @@ def main():
                         raise RuntimeError("The packaged Windows integration helper is unavailable")
                     owner = APSessionOwner(Path(request["client_dir"]), Path(request["data_dir"]), Path(request["state_dir"]))
                     snapshot = RoomSnapshot.from_event(request["room"])
-                    status = owner.prepare(snapshot, request["config"])
+                    status = owner.prepare(snapshot, request["config"], recover_prelaunch=bool(request.get("recover_prelaunch")))
                     log = (Path(request["state_dir"]) / "native_client.log").open("ab")
                     native = subprocess.Popen([str(executable), request["config"]["game_root"]],
                                               stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)

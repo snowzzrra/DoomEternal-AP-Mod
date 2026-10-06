@@ -26,7 +26,63 @@ from doom_eap.runtime.observer_lifecycle import windows_game_processes
 from doom_eap.runtime.weapon_points import namespace_id
 
 _UNSET = object()
-_INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
+_INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
+
+
+def prelaunch_owner_state(pid, created):
+    api = ctypes.WinDLL("kernel32", use_last_error=True)
+    api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    api.OpenProcess.restype = wintypes.HANDLE
+    api.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    api.GetProcessTimes.restype = wintypes.BOOL
+    api.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    api.WaitForSingleObject.restype = wintypes.DWORD
+    api.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = api.OpenProcess(0x100000 | 0x1000, False, pid)
+    if not handle:
+        return "ended" if ctypes.get_last_error() == 87 else "unknown"
+    try:
+        times = [wintypes.FILETIME() for _ in range(4)]
+        if not api.GetProcessTimes(handle, *(ctypes.byref(value) for value in times)):
+            return "unknown"
+        actual = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        waited = api.WaitForSingleObject(handle, 0)
+        return "ended" if actual != created or waited == 0 else "alive" if waited == 258 else "unknown"
+    finally:
+        api.CloseHandle(handle)
+
+
+def archive_prelaunch(path, state_dir, *, explicit=False):
+    if not path.exists():
+        return None
+    with path.open("rb") as stream:
+        raw = stream.read(65537)
+    match = re.match(rb"sentinel-run-v1\nrun=[0-9a-f]{32}\nprotection=[0-9a-f]{64}\nowner=([1-9][0-9]*)\ncreated=([1-9][0-9]*)\nsentinel-test-session-v2\n", raw)
+    recognized = match and len(raw) <= 65536 and int(match[1]) <= 0xffffffff and int(match[2]) <= 0xffffffffffffffff
+    state = prelaunch_owner_state(int(match[1]), int(match[2])) if recognized else "legacy"
+    if state == "alive":
+        raise RuntimeError("Another live launcher owns this game preparation; close that launcher before retrying")
+    if state == "unknown" or (state == "legacy" and not explicit):
+        raise RuntimeError("Prelaunch ownership is unknown. Use Repair Session with DOOM closed to inspect or archive this marker")
+    if state == "legacy":
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        api.OpenSemaphoreW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+        api.OpenSemaphoreW.restype = wintypes.HANDLE
+        api.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = api.OpenSemaphoreW(0x100000, False, "Local\\SentinelA-" + hashlib.sha256(raw).hexdigest())
+        if handle:
+            api.CloseHandle(handle)
+            raise RuntimeError("A live prelaunch lease exists; its marker was preserved")
+        if ctypes.get_last_error() != 2:
+            raise RuntimeError("Prelaunch lease ownership cannot be inspected; marker preserved")
+    directory = state_dir / "prelaunch-backups"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / (hashlib.sha256(raw).hexdigest() + "-" + secrets.token_hex(8) + ".txt")
+    if path.read_bytes() != raw:
+        raise RuntimeError("Prelaunch marker changed during recovery; retry inspection")
+    os.replace(path, target)
+    logging.getLogger(__name__).info("AP_PRELAUNCH_ARCHIVED owner_state=%s source=%s destination=%s", state, path, target)
+    return target
 
 
 def _campaign_native_root(campaign_root, namespace):
@@ -76,7 +132,7 @@ class _ProtonSessionOwner:
             self.status = response["status"]
         return self.status
 
-    def prepare(self, snapshot, config):
+    def prepare(self, snapshot, config, *, recover_prelaunch=False):
         from doom_eap.runtime.proton import runtime, windows_path
         namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
                                  snapshot.slot_data["native_generation_fingerprint"])
@@ -96,8 +152,8 @@ class _ProtonSessionOwner:
         if not executable.is_file():
             raise RuntimeError("The packaged Windows AP session supervisor is unavailable")
         command, environment = runtime(config)
-        converted = {key: config[key] for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "client_state_file") if key in config}
-        for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "client_state_file"):
+        converted = {key: config[key] for key in _INSTALL_KEYS if key in config}
+        for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file"):
             if converted.get(key):
                 converted[key] = windows_path(converted[key])
         if not converted.get("game_root"):
@@ -110,6 +166,7 @@ class _ProtonSessionOwner:
         try:
             self._config_identity = config_identity
             return self.request("prepare", timeout=300, room=asdict(snapshot), config=converted,
+                                recover_prelaunch=recover_prelaunch,
                                 client_dir=windows_path(self.client_dir), data_dir=windows_path(self.data_dir),
                                 state_dir=windows_path(self.state_dir))
         except (OSError, ValueError, RuntimeError):
@@ -172,9 +229,16 @@ class APSessionOwner:
             raise RuntimeError(f"Core session refused: {outcome} (error {value.get('win32_error', 0)})")
         return value
 
-    def prepare(self, snapshot, config: dict, *, recovery_basename=None) -> dict:
+    def prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
         try:
-            return self._prepare(snapshot, config, recovery_basename=recovery_basename)
+            if os.name != "nt" or not (config.get("game_root") or config.get("doom_base_dir")):
+                return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
+            from .launcher_core_install import game_write_lock
+            root = Path(str(config.get("game_root") or config["doom_base_dir"])).resolve()
+            if root.name.casefold() == "base":
+                root = root.parent
+            with self._lock, game_write_lock(root):
+                return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
         except (RuntimeError, OSError, ValueError) as error:
             from .launcher_integration import setup_failure_payload
             error.failure_domain = "campaign_session"
@@ -193,7 +257,7 @@ class APSessionOwner:
             logging.getLogger(__name__).exception("AP_SESSION_PREPARATION_REFUSED %s", diagnostic)
             raise
 
-    def _prepare(self, snapshot, config: dict, *, recovery_basename=None) -> dict:
+    def _prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
         with self._lock:
             config_identity = tuple(config.get(key) for key in _INSTALL_KEYS)
             namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
@@ -203,7 +267,7 @@ class APSessionOwner:
                     raise RuntimeError("Recovery requires a qualified native helper in this environment")
                 if self._remote is None:
                     self._remote = _ProtonSessionOwner(self.client_dir, self.data_dir, self.state_dir)
-                self.status = self._remote.prepare(snapshot, config)
+                self.status = self._remote.prepare(snapshot, config, recover_prelaunch=recover_prelaunch)
                 self.namespace = namespace
                 return dict(self.status)
             processes = windows_game_processes()
@@ -224,9 +288,12 @@ class APSessionOwner:
             if root.name.casefold() == "base":
                 root = root.parent
             self._game_exe = root / "DOOMEternalx64vk.exe"
-            runtime_manifest = config.get("core_runtime_manifest")
-            bundled = Path(getattr(sys, "_MEIPASS", self.client_dir)) / "core" / "distribution.json"
-            self._runtime = Path(str(runtime_manifest)).resolve().parent if runtime_manifest else bundled.parent
+            runtime_manifest = config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest")
+            if not runtime_manifest:
+                raise RuntimeError("Select or download a compatible Core runtime before preparing this session")
+            self._runtime = Path(str(runtime_manifest)).resolve()
+            if not self._runtime.is_dir():
+                self._runtime = self._runtime.parent
             manifest, contents = verify_runtime(self._runtime / "distribution.json", bootstrap_from_archive=True)
             helper = self._runtime / "prepare_vanilla_backup.py"
             if "prepare_vanilla_backup.py" not in contents or helper.read_bytes() != contents["prepare_vanilla_backup.py"]:
@@ -235,6 +302,7 @@ class APSessionOwner:
             for name in ("sentinel_core.dll", "msimg32.dll"):
                 if not (root / name).is_file() or (root / name).read_bytes() != contents[name]:
                     raise RuntimeError("Installed game integration differs from the qualified runtime; prepare setup again")
+            archive_prelaunch(root / "sentinel-prelaunch.txt", self.state_dir, explicit=recover_prelaunch)
             remote = Path(str(config.get("steam_remote_dir", ""))).resolve()
             if remote.name.casefold() != "remote" or remote.parent.name != "782330" or remote.parent.parent.parent.name.casefold() != "userdata":
                 raise RuntimeError("Select the Steam account save provider before preparing the AP session")
@@ -559,6 +627,14 @@ class APSessionOwner:
         return processes == ()
 
     def retire(self, processes=_UNSET) -> None:
+        from .launcher_core_install import game_write_lock
+        with self._lock:
+            if self._control is not None:
+                with game_write_lock(self._control.parent):
+                    return self._retire(processes)
+            return self._retire(processes)
+
+    def _retire(self, processes=_UNSET) -> None:
         with self._lock:
             if self._remote is not None:
                 self._remote.retire()

@@ -166,8 +166,8 @@ def check_workflow_contract(repo_root: Path) -> None:
         raise RuntimeError("Core repository and full commit must be explicit workflow inputs")
     for name in ("build-linux-launcher", "build-windows-launcher"):
         job = doc["jobs"][name]
-        if "build-native-support" not in job.get("needs", []) or not any("--core-runtime build/qualified-core" in step.get("run", "") for step in job["steps"]):
-            raise RuntimeError(f"{name} must consume the qualified Core artifact")
+        if any("--core-runtime" in step.get("run", "") or step.get("with", {}).get("name") == "core-runtime-artifact" for step in job["steps"]):
+            raise RuntimeError(f"{name} must build independently of the Core runtime")
 
     # check apworld_ref default
     apworld_default = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {}).get("apworld_ref", {}).get("default")
