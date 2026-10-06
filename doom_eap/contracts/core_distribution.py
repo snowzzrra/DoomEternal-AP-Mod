@@ -13,6 +13,7 @@ ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
+SUPPORTED_CORE_BASES = {(1, 0, 0), (1, 0, 1), (1, 0, 2)}
 
 def version_key(value):
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-rc-([1-9]\d*))?", value)
@@ -42,7 +43,7 @@ def validate_manifest(value):
     channel = "stable" if key[3] else "rc"
     if value["base_version"] != base or value["channel"] != channel or type(value["rc_number"]) is not int or value["rc_number"] != key[4]:
         raise ValueError("Inconsistent version fields")
-    if base not in ("1.0.0", "1.0.1", "1.0.2") or value["mod_versions"] != ["0.6.0"] or value["architecture"] != "x64" or value["platform"] != "windows":
+    if key[:3] not in SUPPORTED_CORE_BASES or value["mod_versions"] != ["0.6.0"] or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
     inventory_abis = (4, 5) if base == "1.0.0" else (6,)
     if value["abi"] not in tuple({**ABI, "inventory": number} for number in inventory_abis) or any(type(number) is not int for number in value["abi"].values()) or value["required_capabilities"] != [2097152]:

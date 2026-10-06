@@ -2,10 +2,12 @@ import hashlib
 import json
 import struct
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 
 from doom_eap.contracts.core_distribution import ABI, REQUIRED, verify_runtime
+from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
 
 
 def fixture(root):
@@ -43,14 +45,39 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
 
 
 @pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6)])
-def test_matched_inventory_distributions(tmp_path, base, inventory_abi):
+@pytest.mark.parametrize("suffix", ["", "-rc-1"])
+def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_abi, suffix):
     manifest = fixture(tmp_path)
-    manifest["version"] = base + "-rc-1"
+    manifest["version"] = base + suffix
     manifest["base_version"] = base
+    manifest.update(channel="rc" if suffix else "stable", rc_number=1 if suffix else 0)
     manifest["abi"] = {**manifest["abi"], "inventory": inventory_abi}
     (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
     accepted, _ = verify_runtime(tmp_path / "distribution.json")
     assert accepted["abi"]["inventory"] == inventory_abi
+    response = {"result": "ok", "core_version": accepted["version"], "build_id": accepted["build_id"]}
+    monkeypatch.setattr("doom_eap.runtime.weapon_points.subprocess.run",
+                        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=json.dumps(response).encode(), stderr=b""))
+    link = SentinelWeaponPoints(tmp_path / "sentinel_probe.exe", 7, "a" * 64)
+    assert link._run(["--pid", "7", "--native", "--json"]) == response
+
+
+@pytest.mark.parametrize("version,result,returncode,predicate", [
+    ("1.0.3", "ok", 0, "core_version_supported"),
+    ("invalid", "ok", 0, "core_version_supported"),
+    (None, "ok", 0, "core_version_supported"),
+    ("1.0.2", "refused", 0, "exit_or_result"),
+    ("1.0.2", "ok", 1, "exit_or_result"),
+])
+def test_native_probe_refuses_unsupported_or_failed_response(tmp_path, monkeypatch, version, result, returncode, predicate):
+    probe = tmp_path / "sentinel_probe.exe"
+    probe.write_bytes(b"isolated probe")
+    response = {"result": result, "core_version": version}
+    monkeypatch.setattr("doom_eap.runtime.weapon_points.subprocess.run",
+                        lambda *args, **kwargs: SimpleNamespace(returncode=returncode, stdout=json.dumps(response).encode(), stderr=b""))
+    link = SentinelWeaponPoints(probe, 7, "a" * 64)
+    with pytest.raises(WeaponPointsBlocked, match=predicate):
+        link._run(["--pid", "7", "--native", "--json"])
 
 
 @pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 6), ("1.0.1", 5), ("1.0.2", 5), ("1.0.3", 6)])
