@@ -2939,6 +2939,7 @@ class LauncherUI(QMainWindow):
         if kind == "inventory_resync":
             status = str(event.get("status", ""))
             presentation = {
+                "waiting": ("Inventory: Return to DOOM and unpause", False),
                 "observed": ("Inventory: Repair observed by game", True),
                 "queued": ("Inventory: Restoration queued for game", True),
                 "noop": ("Inventory: Already current", True),
@@ -2948,6 +2949,7 @@ class LauncherUI(QMainWindow):
                 detail, enabled = presentation
                 self.player_inventory.setText(detail)
                 tile = {
+                    "waiting": ("waiting for gameplay", self.COLORS["warn"]),
                     "observed": ("repair observed", self.COLORS["good"]),
                     "queued": ("restoration queued", self.COLORS["ap"]),
                     "noop": ("synced", self.COLORS["good"]),
@@ -2956,6 +2958,8 @@ class LauncherUI(QMainWindow):
                 if tile:
                     self._set_inventory_tile(*tile)
                 self.resync_inventory_button.setEnabled(enabled and self._room_connected)
+                if event.get("message"):
+                    self._append_log(str(event["message"]))
             return
         if kind == "ammo_refill":
             available = event.get("available")

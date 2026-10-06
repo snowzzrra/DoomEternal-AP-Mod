@@ -5419,7 +5419,34 @@ class DoomEternalContext(CommonContext):
     async def manual_reconcile_inventory_async(self, *, observation=None, domain="all", item_id=None):
         from doom_eap.contracts.inventory_domain import selected_persistent_items
         selected = selected_persistent_items(domain, item_id)
+        work = self.runtime_lifecycle.capture_work()
+        identity = (self.state_key, self.room_seed_name, self.context_identity)
+        deadline = time.monotonic() + 30
+        waiting = False
+        while True:
+            if self.exit_event.is_set():
+                raise asyncio.CancelledError
+            if (not self.runtime_lifecycle.work_is_current(work)
+                    or identity != (self.state_key, self.room_seed_name, self.context_identity)):
+                return None, "Inventory resync cancelled: the room, save or level changed. Request it again."
+            _, error = self._reconciliation_eligibility(require_connection=True)
+            if not error:
+                break
+            evidence = read_gameplay_save_evidence()
+            if (error != "runtime effects are not level-ready" or evidence is None
+                    or evidence.state != "gameplay" or evidence.native_safe):
+                return None, error
+            if not waiting:
+                emit_launcher_event("inventory_resync", status="waiting",
+                    message="Return to DOOM and unpause within 30 seconds. Inventory resync is waiting for safe gameplay.")
+                waiting = True
+            if time.monotonic() >= deadline:
+                return None, "Inventory resync timed out waiting for safe gameplay. Unpause DOOM and request it again."
+            await asyncio.sleep(0.25)
         async with self._item_delivery_lock:
+            if (not self.runtime_lifecycle.work_is_current(work)
+                    or identity != (self.state_key, self.room_seed_name, self.context_identity)):
+                return None, "Inventory resync cancelled: the room, save or level changed. Request it again."
             plan, error = self._manual_reconcile_inventory_unlocked(
                 observation=observation, selected_item_ids=selected,
             )
@@ -6708,6 +6735,22 @@ class DoomEternalContext(CommonContext):
 
     
 
+async def _launcher_inventory_resync(ctx, control):
+    try:
+        plan, error = await ctx.manual_reconcile_inventory_async(
+            domain=control.get("domain", "all"), item_id=control.get("item_id"))
+    except Exception as error:
+        logger.warning("[Resync] Manual inventory resync failed: %s", error)
+        emit_launcher_event("inventory_resync", status="error",
+            message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT))
+        return
+    if error or plan is None:
+        emit_launcher_event("inventory_resync", status="error",
+            message=_bounded_event_text(str(error or "manual inventory resync returned no plan"), ARCHIPELAGO_EVENT_PLAIN_LIMIT))
+    else:
+        emit_launcher_event("inventory_resync", status="observed", command_count=len(plan.commands))
+
+
 async def launcher_control_loop(ctx):
     """Receive launcher IPC without invoking CommonClient's console parser."""
     while not ctx.exit_event.is_set():
@@ -6759,36 +6802,9 @@ async def launcher_control_loop(ctx):
                 emit_launcher_event("support_condump", status=status)
             continue
         if control.get("type") == "inventory_resync":
-            try:
-                plan, error = await ctx.manual_reconcile_inventory_async(domain=control.get("domain", "all"), item_id=control.get("item_id"))
-            except Exception as error:
-                logger.warning("[Resync] Manual inventory resync failed: %s", error)
-                emit_launcher_event(
-                    "inventory_resync",
-                    status="error",
-                    message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
-                )
-            else:
-                if error:
-                    emit_launcher_event(
-                        "inventory_resync",
-                        status="error",
-                        message=_bounded_event_text(
-                            str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT
-                        ),
-                    )
-                elif plan is None:
-                    emit_launcher_event(
-                        "inventory_resync",
-                        status="error",
-                        message="manual inventory resync returned no plan",
-                    )
-                else:
-                    emit_launcher_event(
-                        "inventory_resync",
-                        status="observed",
-                        command_count=len(plan.commands),
-                    )
+            task = getattr(ctx, "_inventory_resync_task", None)
+            if task is None or task.done():
+                ctx._inventory_resync_task = asyncio.create_task(_launcher_inventory_resync(ctx, control))
             continue
         if control.get("type") == "ammo_refill":
             try:
@@ -6898,6 +6914,9 @@ async def amain(launch_args=None):
     item_delivery_task = ctx._item_delivery_task
     if item_delivery_task is not None:
         tasks.append(item_delivery_task)
+    inventory_resync_task = getattr(ctx, "_inventory_resync_task", None)
+    if inventory_resync_task is not None:
+        tasks.append(inventory_resync_task)
     for task in tasks:
         task.cancel()
     await ctx.session_tasks.close()

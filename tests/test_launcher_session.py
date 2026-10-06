@@ -198,11 +198,13 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
     import subprocess
     import tempfile
     from pathlib import Path
-    from doom_eap.launcher.launcher_platform import DependencyManager, install_meathook
+    from doom_eap.launcher.launcher_platform import DependencyManager, detect_doom_processes, install_meathook
 
     selected = os.environ.get("SENTINEL_CORE_RUNTIME")
     if os.name != "nt" or not selected:
         pytest.skip("requires an explicitly selected Windows Core distribution")
+    if detect_doom_processes():
+        pytest.skip("requires DOOM closed for the distribution's vanilla protection helper")
     monkeypatch.setattr("doom_eap.launcher.launcher_session.windows_game_processes", lambda: ())
     runtime = Path(selected).resolve()
     with tempfile.TemporaryDirectory(prefix="ap-") as temporary:

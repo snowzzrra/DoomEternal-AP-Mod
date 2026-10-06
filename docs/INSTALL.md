@@ -217,6 +217,13 @@ repeating damage. Remote-caused deaths are echo-suppressed to prevent loops.
 
 Damage Boost, Damage Resistance, Infinite Ammo, Weakness, and Vulnerability activate from live item receipts during safe gameplay. Duplicate receipts extend duration. Lifecycle cleanup restores baseline CVAR values. Reconnect restoration and Resync Inventory reconcile permanent inventory.
 
+### Inventory repair
+
+Use **RESYNC INVENTORY** from a loaded level, choose the scope, then return to
+DOOM and unpause within 30 seconds. The request waits for safe gameplay and
+cancels if the room, save or level changes. Menus are not eligible.
+Only confirmed missing items are restored; unknown ownership is preserved.
+
 ## Setup checks and support
 
 When available in launcher, run **Setup check** for bounded checks covering
