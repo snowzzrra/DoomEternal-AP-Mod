@@ -1323,6 +1323,13 @@ class LauncherController:
                     self.last_setup_failure = None
             self.emit(kind, **payload)
         if runtime_changed:
+            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            supervisor = self.supervisor
+            if supervisor is not None and supervisor.running:
+                try:
+                    supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
+                except (OSError, RuntimeError) as error:
+                    self.emit("core_runtime_rebind_pending", message=str(error))
             self._stop_native_client()
         if kind == "setup_ready" and payload.get("adapter_state") == "applied":
             self._ensure_native_client(generation=generation)

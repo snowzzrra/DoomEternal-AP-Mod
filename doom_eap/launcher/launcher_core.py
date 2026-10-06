@@ -130,6 +130,8 @@ CLIENT_CONFIG_FIELDS = frozenset({
     "save_games_dir",
     "server_address",
     "seed_manifest_hash",
+    "core_runtime_manifest",
+    "selected_core_runtime_manifest",
 })
 
 
@@ -1722,6 +1724,8 @@ class LaunchWorkflow:
                 value = manifest_hash
             if value is not None:
                 config[key] = value
+            elif runtime_config is not None and key in {"core_runtime_manifest", "selected_core_runtime_manifest"}:
+                config.pop(key, None)
 
         remote = source.get("steam_remote_dir") or config.get("steam_remote_dir")
         configured_id = source.get("steam_id3")

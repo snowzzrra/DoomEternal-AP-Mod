@@ -16,7 +16,7 @@ def test_official_selection_pagination_integrity_and_offline_reuse(tmp_path, mon
     manifest = fixture(source)
     manifest.update(version="1.0.12", base_version="1.0.12", channel="stable", rc_number=0,
                     mod_version_range=">=0.6.0,<0.7.0", minimum_launcher_version="0.6.1",
-                    abi={**manifest["abi"], "optional_future_interface": 99})
+                    abi={**manifest["abi"], "deathlink": 2, "optional_future_interface": 99})
     base = "https://github.com/snowzzrra/Sentinel-Core/releases/download/v1.0.12/"
     release = {"draft": False, "prerelease": False, "assets": [
         {"name": name, "browser_download_url": base + name} for name in ("distribution.json", "sentinel-runtime.zip")]}
@@ -38,6 +38,8 @@ def test_official_selection_pagination_integrity_and_offline_reuse(tmp_path, mon
     assert verify_runtime(selected)[0]["version"] == "1.0.12"
     (source / "sentinel-runtime.zip").unlink()
     assert runtime.resolve({}, tmp_path / "game") == selected
+    offline = CoreRuntime(tmp_path / "cache", transport=SimpleNamespace(fetch=lambda *a, **kw: pytest.fail("network required for verified cache")))
+    assert offline.resolve({}, tmp_path / "game") == selected
     (selected.parent / "sentinel_core.dll").write_bytes(b"damaged")
     with pytest.raises(RuntimeError, match="Repair Core"):
         runtime.resolve({}, tmp_path / "game")
@@ -64,6 +66,48 @@ def test_metadata_conditional_request_and_rate_limit_preserve_cache(tmp_path):
     runtime.check()
     assert len(calls) == 3
     assert list(tmp_path.glob("*.json"))
+
+
+def test_selected_runtime_is_published_without_stale_override(tmp_path):
+    from doom_eap.launcher.launcher_core import LaunchWorkflow
+    path = LaunchWorkflow.write_client_config(tmp_path, runtime_config={"core_runtime_manifest": "old"})
+    LaunchWorkflow.write_client_config(tmp_path, runtime_config={"selected_core_runtime_manifest": "selected"})
+    published = json.loads(path.read_text())
+    assert published["selected_core_runtime_manifest"] == "selected"
+    assert "core_runtime_manifest" not in published
+
+
+def test_doctor_offers_core_install_for_configured_base_directory(tmp_path):
+    from doom_eap.launcher.launcher_doctor import LauncherDoctor
+    (tmp_path / "base").mkdir()
+    (tmp_path / "DOOMEternalx64vk.exe").write_bytes(b"MZ")
+    actions = LauncherDoctor(config={"doom_base_dir": str(tmp_path / "base")}).repair_actions()
+    assert "install_game_link" in {action.action_id for action in actions}
+
+
+def test_interrupted_pair_replacement_restores_original_bytes(tmp_path, monkeypatch):
+    from doom_eap.launcher import launcher_platform
+    from doom_eap.launcher.launcher_core_install import NAMES, replace_pair, recover_interrupted
+    root = tmp_path / "game"
+    root.mkdir()
+    original = {name: ("old " + name).encode() for name in NAMES}
+    incoming = {name: ("new " + name).encode() for name in NAMES}
+    for name, data in original.items():
+        (root / name).write_bytes(data)
+    write = launcher_platform._atomic_write_bytes
+    def interrupt(path, data):
+        if path == root / "msimg32.dll":
+            raise SystemExit("interrupted")
+        write(path, data)
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda: [])
+    monkeypatch.setattr(launcher_platform, "_atomic_write_bytes", interrupt)
+    with pytest.raises(SystemExit):
+        replace_pair(root, tmp_path / "state", incoming)
+    assert (root / "sentinel_core.dll").read_bytes() == incoming["sentinel_core.dll"]
+    monkeypatch.setattr(launcher_platform, "_atomic_write_bytes", write)
+    recover_interrupted(root, tmp_path / "state")
+    assert {name: (root / name).read_bytes() for name in NAMES} == original
+    assert not (root / "sentinel-core-update.txt").exists()
 
 
 def test_prelaunch_stale_owner_recovery_preserves_bytes_and_live_owner(tmp_path, monkeypatch):

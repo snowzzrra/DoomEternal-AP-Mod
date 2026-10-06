@@ -250,6 +250,9 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 self.assertTrue(verified.ok)
                 self.assertEqual(verified.details["version"], "1.0.3")
                 self.assertEqual(verified.details["build_id"], "c" * 64)
+                from doom_eap.launcher.launcher_core_install import rollback_core
+                rollback_core(root, None)
+                self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
 
     def test_bootstrap_recovery_uses_verified_zip_and_reports_defender(self):
         from doom_eap.contracts.core_distribution import verify_runtime
@@ -451,6 +454,10 @@ class TestWindowsNativeClientLifecycle(unittest.TestCase):
         for k, v in self.env_override.items():
             os.environ[k] = v
 
+        from doom_eap.launcher.launcher_platform import launcher_user_paths
+        config = launcher_user_paths().config_dir / "launcher.json"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(json.dumps({"core_auto_update": False}), encoding="utf-8")
         self.controller = LauncherController(application_dir=self.app_dir)
         self.controller.config = {
             "game_root": str(self.game_root),

@@ -6738,6 +6738,16 @@ async def launcher_control_loop(ctx):
             continue
         if not isinstance(control, dict):
             continue
+        if control.get("type") == "core_runtime_reload":
+            updated = load_config()
+            for key in ("core_runtime_manifest", "selected_core_runtime_manifest"):
+                if key in updated:
+                    config[key] = updated[key]
+                else:
+                    config.pop(key, None)
+            ctx._native_link_key = None
+            emit_launcher_event("core_runtime_bound", path=config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest"))
+            continue
         if control.get("type") == "support_condump":
             try:
                 queued = await asyncio.to_thread(request_support_condump)

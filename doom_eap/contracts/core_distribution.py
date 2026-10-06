@@ -15,6 +15,7 @@ REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
 HELPERS = {"prepare_vanilla_backup.py"}
 from doom_eap import __version__ as MOD_VERSION
 SUPPORTED_CAPABILITIES = {2097152}
+REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "commands"}
 
 def version_key(value):
     match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc-([1-9]\d*))?(?:\+[0-9A-Za-z.-]+)?", value)
@@ -69,7 +70,7 @@ def validate_manifest(value):
     if not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
     if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list) or any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
-           ((4, 5, 6) if name == "inventory" else (number,)) for name, number in ABI.items()) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
+           ((4, 5, 6) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")

@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.6.0
+# Install DOOM Eternal Archipelago 0.6.1
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.6.0** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.1** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -68,7 +68,7 @@ from the server.
 After room connection reports that setup is required, select the explicit
 **Prepare and install** action. Launcher then:
 
-1. verifies and installs the bundled Sentinel Core Game Link runtime;
+1. selects a compatible Sentinel Core distribution from its official releases or verified local cache and installs its matching Core/bootstrap pair;
 2. validates room identity and options;
 3. builds the room-specific mod package;
 4. stages the package in DOOM Eternal's mod directory;
@@ -173,7 +173,9 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Version **0.6.0** identifies public launcher, room package, and generated content (APWorld uses 0.6.0).
+The launcher version is **0.6.1**. APWorld and room content use revision **0.6.0**. Update with DOOM closed and reconnect to the same room to retain its seed, placements and AP save. Rebuild the room package when the launcher requests a content update.
+
+**Game Setup** provides **REPAIR CORE**, **REPAIR SESSION** and **RESTORE PREVIOUS CORE**. Automatic compatible Core updates default to enabled; the checkbox preserves your choice. **LOCAL CORE** selects a complete development distribution's `distribution.json`; **USE RELEASES** restores official release selection. The launcher and its session helper use Core from the persistent user cache. A verified cached distribution supports offline preparation.
 
 | DLC Content | DLC Missions | Campaign scope |
 |---|---|---|
@@ -226,7 +228,7 @@ before sharing.
 
 ## Troubleshooting
 
-- **Game Link missing or incompatible:** use **Prepare and install** with the complete release package to install and verify its bundled Sentinel Core runtime.
+- **Game Link missing or incompatible:** use **REPAIR CORE** to acquire and verify a complete matching Core/bootstrap distribution. With an unpublished candidate, select its separate `distribution.json` through **LOCAL CORE** first.
 - **Existing XINPUT provider:** move a known Meathook `XINPUT1_3.dll` out of the game root before setup. Resolve files from other tools with their owners.
 - **Client runtime not found:** keep bundled client files with release launcher.
 - **Game integration helper missing:** Windows Security may have quarantined

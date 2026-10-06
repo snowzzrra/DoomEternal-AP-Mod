@@ -4,7 +4,7 @@
     "size": 13632606
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
-  "inputs_count": 381,
+  "inputs_count": 380,
   "release_version": "0.6.0",
   "room_payload_manifest": {
     "sha256": "3d8b5b176d5a34946c30253b335951df8cfd83c3fafe3fbcd449a76a09776de0",
@@ -14,7 +14,7 @@
     "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
     "size": 2202253
   },
-  "room_resource_input_fingerprint": "842e107820ace57a2f81a0ff5b39e4f8968d9366ddd4111a7921de643a55ff1d",
+  "room_resource_input_fingerprint": "8ea5151e6d128fcc954000639426aa137e1b0a45614dbaac41c8c6b823eab93f",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -199,7 +199,7 @@
     "doom_eap/content/__init__.py": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
     "doom_eap/content/automap_visual_registry.py": "f76afa334311bbc90889b7010a36522c1981b977c386bf94e74f5bad82b4b19b",
     "doom_eap/content/campaign_stages.py": "871eb77f3b66753f3d2e8105e3eb0ed041235650046706411eb9f539c7c6e914",
-    "doom_eap/content/compiler_identity.py": "dc2575d3b2d8d925a4146e415cd279b057f743473bcecdd66f2d7866bf0dde76",
+    "doom_eap/content/compiler_identity.py": "bf117579d0d630c37552edd995472dece18061fe4c5d686d78b40ce401391542",
     "doom_eap/content/content_catalog.py": "285230b06d5f196a195023569a770f4bb967e6dee7731426182927cb841ffba0",
     "doom_eap/content/item_classification.py": "3979d509c8111e600f66a78bacdbc7550b053f2dfe25f1cf2aadeb16b7caec1f",
     "doom_eap/content/map_registry.py": "08f6dfc337469d779aa944406dd6417f7ebb1d3ff5493ebdb287b184dae042a3",
@@ -212,7 +212,6 @@
     "doom_eap/contracts/challenge_registry.py": "1c3d2721b2f500a857e31cc033a66bff6e54493026fee729b446ae90b43d2044",
     "doom_eap/contracts/check_observation.py": "9d460751c0857e7db7045ec6f2238f5728d136d2fd0e4068b7b4e0c16231f658",
     "doom_eap/contracts/command_publication.py": "ad6a4dcdd321862d2d70542c1428daa4155678f3fda749ecf337e5a0c6d0313e",
-    "doom_eap/contracts/core_distribution.py": "2cee1509da83507322a72b3fb26ebdf4ea7287d500dd0809381238bacb30f408",
     "doom_eap/contracts/foundation.py": "7e837e9cb3b8d98615708b3d6c266d77f8d9eda000b4ddb4ecdd9a799aa0fc93",
     "doom_eap/contracts/goal_policy.py": "e9e1bdea06aef1ac6ad7942881523bd0f0b2429253dccec9d2a7a4c7267d40f4",
     "doom_eap/contracts/inventory_domain.py": "e52e3d57c444afd85d2cba4d41a0b38b681190c3fc7abd9ffc94aad4d673b656",
@@ -225,7 +224,7 @@
     "doom_eap/contracts/save_observation.py": "672f27a9a86d32fe58b890b978d4b199031f478720417ba571f5200f90a453c8",
     "doom_eap/contracts/source_bytes.py": "9a9c41e4d61d7c84e4cf16167bcb36c3f6403f44334d52c6dfdc0ccda356bcba",
     "doom_eap/contracts/tag_prerequisites.py": "76f605b03424824de269aaa4fed88425e950f0d687a09095dcdd5d8e73cad907",
-    "doom_eap/launcher/launcher_core.py": "cd69a3f5c13787bc757814b60d2ef544eb7ec4af30f2121726df224074445ef9",
+    "doom_eap/launcher/launcher_core.py": "76e2878e18000464e8148d5aae89d52d01ec1fe79ad6fb6712d21b2ef8686591",
     "doom_eap/runtime/context_registry.py": "8b813d6a4b6de566255dba8f7b39ecb40706e679f5112e5f860315939cfee67b",
     "doom_eap/runtime/save_records.py": "96065b79896e964c47e5855c4035b1eb3ea13b56c0bcb7025b0593c25955a106",
     "manifests/e1m1_intro.json": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",

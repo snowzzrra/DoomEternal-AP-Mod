@@ -1578,7 +1578,8 @@ class LauncherDoctor:
         game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
         if game_root:
             try:
-                root = validate_game_root(Path(str(game_root)))
+                root = Path(str(game_root))
+                root = validate_game_root(root.parent if root.name.lower() == "base" else root)
                 meathook_probe = probe_meathook(root)
                 if meathook_probe.status == PrerequisiteStatus.MISSING:
                     actions.append(RepairAction(

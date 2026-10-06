@@ -2915,6 +2915,7 @@ class LauncherUI(QMainWindow):
                 self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
             return
         if kind == "ui_repair_result":
+            self.core_auto_update.setChecked(bool(self.controller.config.get("core_auto_update", True)))
             msg = str(event.get("message", ""))
             self.doctor_action.setText(msg)
             if not event.get("success", False):

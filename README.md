@@ -327,7 +327,7 @@ Repair/Fix, and a sanitized support report.
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
 
 - Develop Sentinel Core as an independent open-source native integration project for Archipelago.
-- Use Sentinel Core for native RPC and telemetry, with a bundled Windows bootstrap and verified runtime pair. Broader platform integration requires validation.
+- Use Sentinel Core for native RPC and telemetry, with a separate distribution containing the verified Windows Core/bootstrap pair. Broader platform integration requires validation.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 
@@ -385,6 +385,6 @@ Repair/Fix, and a sanitized support report.
 
 This project is distributed under the [MIT License](docs/LICENSE).
 
-Release packages bundle Sentinel Core with its runtime manifest and license
-notices. External injectors are acquired from verified providers during setup
+Sentinel Core distributions include their runtime manifest and license
+notices. The launcher acquires compatible Core releases from `snowzzrra/Sentinel-Core` or uses a verified local distribution. External injectors are acquired from verified providers during setup
 and remain owned by their creators credited above.

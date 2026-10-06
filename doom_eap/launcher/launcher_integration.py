@@ -764,7 +764,7 @@ class IntegratedLaunchWorkflow:
         state: InstallState,
     ) -> IntegratedSetupRecord | None:
         """Return the verified room installation independently of session readiness."""
-        if state.state != "already_installed" or state.readiness != "ready":
+        if state.state != "already_installed":
             return None
 
         receipt_path = self.state_dir / "launcher_setup.json"
@@ -819,6 +819,7 @@ class IntegratedLaunchWorkflow:
         cached = self._cached_install(snapshot, pre_install_state)
         if cached is not None:
             self.check_cancelled()
+            self._failure_phase = "game_setup"
             self.ensure_game_link(game_root)
             config = self._config()
             runtime_config = self._publish_client_config(

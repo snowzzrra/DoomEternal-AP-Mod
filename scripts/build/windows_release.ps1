@@ -124,7 +124,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Native client build failed" }
     Copy-Item -LiteralPath (Join-Path $clientBuild "ap_client.exe") -Destination $clientHandoff -Force
     Copy-Item -LiteralPath (Join-Path $clientBuild "save_death_probe.exe") -Destination $clientHandoff -Force
-    Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.6.0", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
+    Invoke-Python @("-m", "tools.release.audit_binary", "--binary", (Join-Path $clientBuild "ap_client.exe"), "--required", "0.6.1", "--forbid", "v0.3.8-alpha", "--forbid", "v0.3.9-alpha")
     Invoke-Python @("-m", "tools.release.build_session_owner", "--output", $clientBuild)
     Copy-Item -LiteralPath (Join-Path $clientBuild "APSessionOwner.exe") -Destination $clientHandoff -Force
     Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago)

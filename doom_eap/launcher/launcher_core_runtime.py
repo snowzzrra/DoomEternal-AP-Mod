@@ -28,7 +28,12 @@ class CoreRuntime:
     def _metadata(self, url):
         key = hashlib.sha256(url.encode()).hexdigest()
         saved = self.root / (key + ".json")
-        cached = json.loads(saved.read_text()) if saved.exists() else {}
+        try:
+            cached = json.loads(saved.read_text()) if saved.exists() else {}
+            if not isinstance(cached, dict):
+                cached = {}
+        except (OSError, ValueError):
+            cached = {}
         headers = {"Accept": "application/vnd.github+json"}
         if cached.get("etag"):
             headers["If-None-Match"] = cached["etag"]
@@ -42,8 +47,12 @@ class CoreRuntime:
                 if error.code in (403, 429, 503):
                     delay = error.headers.get("Retry-After", "60")
                     reset = error.headers.get("X-RateLimit-Reset", "0")
-                    retry = max(time.time() + (int(delay) if delay.isdecimal() else 60),
-                                int(reset) if reset.isdecimal() else 0)
+                    from email.utils import parsedate_to_datetime
+                    try:
+                        retry = time.time() + int(delay) if delay.isdecimal() else parsedate_to_datetime(delay).timestamp()
+                    except (ValueError, TypeError, OverflowError):
+                        retry = time.time() + 60
+                    retry = max(time.time(), retry, int(reset) if reset.isdecimal() else 0)
                     (self.root / "retry.json").write_text(json.dumps({"after": retry}))
                 raise
             value = json.loads(path.read_text(encoding="utf-8"))
@@ -73,7 +82,11 @@ class CoreRuntime:
             self.root.mkdir(parents=True, exist_ok=True)
             self.checked = True
             retry = self.root / "retry.json"
-            if retry.exists() and json.loads(retry.read_text()).get("after", 0) > time.time():
+            try:
+                deferred_until = json.loads(retry.read_text()).get("after", 0) if retry.exists() else 0
+            except (OSError, ValueError):
+                deferred_until = 0
+            if isinstance(deferred_until, (int, float)) and deferred_until > time.time():
                 self.emit("core_update_status", state="deferred", message="Core update check deferred by the server.")
                 return
             self.emit("core_update_status", state="checking", message="Checking compatible Core releases...")
@@ -159,24 +172,33 @@ class CoreRuntime:
             verify_runtime(path, bootstrap_from_archive=True)
             return path
         installed = probe_meathook(game_root)
+        selected = config.get("selected_core_runtime_manifest")
+        if selected:
+            try:
+                manifest, _ = verify_runtime(Path(str(selected)), bootstrap_from_archive=True)
+                if not installed.ok or manifest["build_id"] != installed.details["build_id"]:
+                    selected = None
+            except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile):
+                selected = None
+        hold = installed.ok and (detect_doom_processes() or (not config.get("core_auto_update", True) and not refresh))
+        if hold and selected and not refresh:
+            return Path(str(selected))
         preferred_build = installed.details["build_id"] if installed.ok and not config.get("core_auto_update", True) else None
-        if refresh or (not self.checked and (not installed.ok or preferred_build)):
+        available = selected or any(
+            not installed.ok or (row[0]["build_id"] == installed.details["build_id"] if hold else
+                                version_key(row[0]["version"]) >= version_key(installed.details["version"]))
+            for row in self.cached())
+        if refresh or (not self.checked and not available):
             self.check(preferred_build=preferred_build)
-        with self._lock if not self.cached() else contextlib.nullcontext():
+        with self._lock if not available else contextlib.nullcontext():
             candidates = self.cached()
         if installed.ok:
-            if detect_doom_processes() or not config.get("core_auto_update", True):
+            if hold:
                 candidates = [row for row in candidates if row[0]["build_id"] == installed.details["build_id"]]
             else:
                 candidates = [row for row in candidates if version_key(row[0]["version"]) >= version_key(installed.details["version"])]
         if candidates:
             return candidates[0][1]
-        selected = config.get("selected_core_runtime_manifest")
         if selected:
-            try:
-                manifest, _ = verify_runtime(Path(str(selected)), bootstrap_from_archive=True)
-                if installed.ok and manifest["build_id"] == installed.details["build_id"]:
-                    return Path(str(selected))
-            except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile):
-                pass
+            return Path(str(selected))
         raise RuntimeError("A complete compatible Core runtime is unavailable. Repair Core to retry the download or select a local distribution.")
