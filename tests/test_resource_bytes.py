@@ -136,10 +136,14 @@ def test_source_fingerprint_normalizes_only_owned_text_and_preserves_real_change
 
 
 def test_frozen_compiler_identity_retains_untracked_dependencies_and_content_changes(tmp_path):
-    from doom_eap.content.compiler_identity import load_compiler_source_identity, BUNDLED_IDENTITY_PATH
+    from doom_eap.content.compiler_identity import load_compiler_source_identity, BUNDLED_IDENTITY_PATH, SOURCE_FILES
     source = tmp_path / "source"
-    module = source / "doom_eap/runtime/new_owner.py"
-    module.parent.mkdir(parents=True)
+    for name in SOURCE_FILES:
+        required = source / name
+        required.parent.mkdir(parents=True, exist_ok=True)
+        required.write_bytes(b"VALUE = 1\n")
+    module = source / "doom_eap/content/new_transform.py"
+    module.parent.mkdir(parents=True, exist_ok=True)
     module.write_bytes(b"VALUE = 1\r\n")
     document = load_compiler_source_identity(source, frozen=False)
     frozen = tmp_path / "frozen"
@@ -149,9 +153,14 @@ def test_frozen_compiler_identity_retains_untracked_dependencies_and_content_cha
     assert load_compiler_source_identity(frozen, frozen=True) == document
     module.write_bytes(b"VALUE = 1\n")
     assert load_compiler_source_identity(source, frozen=False) == document
+    for name in ("doom_eap/runtime/new_owner.py", "doom_eap/contracts/core_distribution.py"):
+        excluded = source / name
+        excluded.parent.mkdir(parents=True, exist_ok=True)
+        excluded.write_bytes(b"VALUE = 2\n")
+    assert load_compiler_source_identity(source, frozen=False) == document
     module.write_bytes(b"VALUE = 2\n")
     assert load_compiler_source_identity(source, frozen=False)["fingerprint"] != document["fingerprint"]
-    document["source_hashes"]["doom_eap/runtime/new_owner.py"] = "0" * 64
+    document["source_hashes"][module.relative_to(source).as_posix()] = "0" * 64
     manifest.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(ValueError, match="compiler source identity"):
         load_compiler_source_identity(frozen, frozen=True)

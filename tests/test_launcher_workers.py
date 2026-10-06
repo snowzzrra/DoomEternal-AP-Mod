@@ -259,7 +259,7 @@ def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(t
 
 @pytest.mark.parametrize("fail", [False, True])
 @pytest.mark.parametrize("trigger", ["reconnect", "game_exit", "delayed_exit", "disconnected_exit"])
-def test_room_readiness_prepares_session_before_starting_native_client(fail, trigger, monkeypatch):
+def test_room_readiness_prepares_session_before_starting_native_client(fail, trigger, monkeypatch, tmp_path):
     from doom_eap.launcher.launcher_controller import LauncherController
 
     events, errors, calls = [], [], []
@@ -267,10 +267,19 @@ def test_room_readiness_prepares_session_before_starting_native_client(fail, tri
     workers = LauncherWorkers(lambda job, error: errors.append(error))
     interactions = LauncherInteractions(lambda *args: None)
     owner = SimpleNamespace(status={"state": "not_prepared", "ready": False})
+    game = tmp_path / "game"
+    (game / "base").mkdir(parents=True)
+    (game / "DOOMEternalx64vk.exe").write_bytes(b"MZ")
+    configuration = {"room": "existing", "game_root": str(game), "doom_base_dir": str(game / "base")}
+    runtime = {"selected_core_runtime_manifest": str(tmp_path / "core" / "distribution.json")}
+
+    def ensure_game_link(root):
+        assert root == tmp_path / "game"
+        calls.append("core")
 
     def prepare(snapshot, config):
         calls.append("prepare")
-        assert snapshot.seed_name == "install-seed" and config == {"room": "existing"}
+        assert snapshot.seed_name == "install-seed" and config == {**configuration, **runtime}
         if fail:
             raise RuntimeError("admission fixture blocked")
         owner.status = {"state": "prelaunch_ready", "ready": False, "intent": "create"}
@@ -281,7 +290,11 @@ def test_room_readiness_prepares_session_before_starting_native_client(fail, tri
         state="already_installed", manifest_hash="same-package", staged_mod="room.zip", steam_launch_option="",
         reason="", readiness="ready", readiness_reason=""))
     workflow.for_job = lambda *args: workflow
-    controller = SimpleNamespace(workers=workers, config={"room": "existing"}, workflow=workflow,
+    from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
+    workflow._game_root = IntegratedLaunchWorkflow._game_root
+    workflow.ensure_game_link = ensure_game_link
+    workflow._config = lambda: runtime
+    controller = SimpleNamespace(workers=workers, config=configuration, workflow=workflow,
                                  setup=SimpleNamespace(room_key=RoomSetupCoordinator.room_key), interactions=interactions,
                                  _setup_event=lambda kind, payload: events.append((kind, payload)),
                                  _ensure_native_client=lambda **kwargs: calls.append("native"))
@@ -309,14 +322,14 @@ def test_room_readiness_prepares_session_before_starting_native_client(fail, tri
             assert calls == [] and events == [] and errors == []
             return
         if fail:
-            assert calls == ["prepare"] and errors == []
+            assert calls == ["core", "prepare"] and errors == []
             assert len(events) == 1 and events[0][0] == "room_install_state"
             payload = events[0][1]
             assert payload["state"] == "already_installed" and payload["readiness"] == "blocked"
             assert payload["readiness_reason"] == "admission fixture blocked"
             assert payload["failure_domain"] == "campaign_session"
         else:
-            assert calls == ["prepare", "native"] and errors == []
+            assert calls == ["core", "prepare", "native"] and errors == []
             assert events[0][0] == "ap_session_status" and events[0][1]["state"] == "prelaunch_ready"
             assert events[1][0] == "room_install_state" and events[1][1]["state"] == "already_installed"
     finally:
