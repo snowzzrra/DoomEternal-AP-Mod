@@ -1599,6 +1599,10 @@ class LauncherUI(QMainWindow):
         self.top_state.setText(state)
 
     def _set_setup_state(self, state: str, detail: str = "") -> None:
+        failure = getattr(self.controller, "last_setup_failure", None)
+        if state == "failed" and isinstance(failure, dict) and failure.get("failure_domain") == "campaign_session":
+            state = "campaign_failed"
+            detail = str(failure.get("user_message") or "")
         presentations = {
             "disconnected": ("ROOM PACKAGE", "Connect to a room to check its package.", "", False, "READY"),
             "checking": ("CHECKING ROOM PACKAGE", "Checking this room's package before play.", "CHECKING...", False, "CONNECTED"),
@@ -1619,6 +1623,7 @@ class LauncherUI(QMainWindow):
                 "READY",
             ),
             "failed": ("GAME SETUP NEEDS ATTENTION", "Game setup did not finish. Repair game integration and try again.", "FIX SETUP", True, "ACTION NEEDED"),
+            "campaign_failed": ("AP SESSION NEEDS ATTENTION", "The room package is retained. Inspect AP SAVE and the preparation diagnostic, then retry with DOOM closed.", "AP SAVE", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
@@ -1637,6 +1642,8 @@ class LauncherUI(QMainWindow):
         if strip_visible and state != self._previous_setup_state:
             self._fade_in(self.session_setup)
         self._previous_setup_state = state
+        if state == "campaign_failed":
+            self.controller.request_doctor()
         self.session_manual_complete_action.setVisible(state == "manual_install_required")
         self.session_manual_retry_action.setVisible(state == "manual_install_required")
         self.reinstall_button.setText(action)
@@ -1655,6 +1662,8 @@ class LauncherUI(QMainWindow):
             self._prepare(force=True)
         elif self._setup_state == "failed":
             self._show_page(4)
+        elif self._setup_state == "campaign_failed":
+            self._ap_save_actions()
         elif self._setup_state == "game_link_needed":
             self._prepare(force=True)
         elif self._setup_state == "manual_install_required":
@@ -1786,7 +1795,7 @@ class LauncherUI(QMainWindow):
         if self._setup_state == "ready":
             self._show_page(2)
             return
-        if self._setup_state in {"install_needed", "update_required", "package_failed", "package_incompatible", "failed", "manual_install_required"}:
+        if self._setup_state in {"install_needed", "update_required", "package_failed", "package_incompatible", "failed", "campaign_failed", "manual_install_required"}:
             self._run_setup_action()
             return
         text = self.hero_action.text()
@@ -2596,15 +2605,20 @@ class LauncherUI(QMainWindow):
             return "NOT REQUIRED" if statuses else "NOT CHECKED"
 
         room_issue = self._current_room_package_failure() or self._setup_state in {"install_needed", "update_required"}
+        failure = getattr(self.controller, "last_setup_failure", None)
+        failure = failure if isinstance(failure, dict) else None
         summary = [f"{name}: {group_state(statuses)}" for name, statuses in groups.items()]
+        if failure:
+            name = "AP Session" if failure.get("failure_domain") == "campaign_session" else "Preparation"
+            summary.append(f"{name}: NEEDS ATTENTION")
         summary.append(f"CURRENT ROOM: {'CONNECTED' if self._room_connected else 'NOT CONNECTED'}")
-        game_ready = not any(group_state(statuses) == "NEEDS ATTENTION" for statuses in groups.values())
+        game_ready = not failure and not any(group_state(statuses) == "NEEDS ATTENTION" for statuses in groups.values())
         title = "GAME SETUP READY" if game_ready else "GAME SETUP NEEDS ATTENTION"
         self.doctor_status.setText(title)
         self.doctor_status.setStyleSheet(f"color:{self.COLORS['good' if game_ready else 'warn']};")
         self.doctor_evidence.setText("\n".join(summary))
         self._refresh_help_room_package()
-        self.doctor_action.setText("Use Rebuild Room Package in Session." if room_issue else "You are ready to play." if healthy else "Review failed checks, then use Fix Setup or try again.")
+        self.doctor_action.setText(str(failure.get("user_message") or "Inspect the preparation diagnostic before retrying.") if failure else "Use Rebuild Room Package in Session." if room_issue else "You are ready to play." if healthy and game_ready else "Review failed checks, then use Fix Setup or try again.")
         for line in technical_lines:
             self._append_log(line)
 

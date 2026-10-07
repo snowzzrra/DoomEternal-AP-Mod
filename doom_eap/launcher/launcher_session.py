@@ -13,6 +13,7 @@ import os
 import re
 from pathlib import Path
 import secrets
+import shutil
 import selectors
 import subprocess
 import sys
@@ -80,7 +81,7 @@ def archive_prelaunch(path, state_dir, *, explicit=False):
     target = directory / (hashlib.sha256(raw).hexdigest() + "-" + secrets.token_hex(8) + ".txt")
     if path.read_bytes() != raw:
         raise RuntimeError("Prelaunch marker changed during recovery; retry inspection")
-    os.replace(path, target)
+    shutil.move(path, target)
     logging.getLogger(__name__).info("AP_PRELAUNCH_ARCHIVED owner_state=%s source=%s destination=%s", state, path, target)
     return target
 
