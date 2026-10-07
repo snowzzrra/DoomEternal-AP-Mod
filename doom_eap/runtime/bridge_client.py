@@ -4378,7 +4378,7 @@ class DoomEternalContext(CommonContext):
             self._campaign_menu = CampaignMenu()
         try:
             projection = self.campaign_projection()
-            owned = set(self.owned_item_ids())
+            owned = self.received_item_ids()
             gate_checks = {name: int(location) for location, name in DOOM_LOCATION_NAMES.items()
                            if name.endswith(" - Slayer Gate Complete")}
             for row in projection["rows"]:
