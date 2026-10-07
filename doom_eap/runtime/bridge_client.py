@@ -3824,7 +3824,8 @@ class DoomEternalContext(CommonContext):
                     and replay_policy.policy in {"replay_idempotent", "replay_manual_only"}
                     and (materialization_lease is None or not context_allows_item)
                 )
-                if item_id == 7770904 or item_id in SUPPORT_RUNE_IDS or defer_special or defer_replayable:
+                defer_frag = item_id in {7770111, 7770112, 7770113, 7770114} and not self._has_received_frag()
+                if item_id == 7770904 or item_id in SUPPORT_RUNE_IDS or defer_special or defer_replayable or defer_frag:
                     logger.info(
                         "[To Game] Item %s deferred to supported runtime context.",
                         item_id,
@@ -3842,6 +3843,8 @@ class DoomEternalContext(CommonContext):
                             notification_error,
                         )
                         break
+                    if item_id in {7770011, 7770111, 7770112, 7770113, 7770114}:
+                        self.session_state.setdefault("deferred_frag_items", {})[str(item_index)] = item_id
                     self._record_processed_receipt(network_item)
                     self.receipt_session.advance()
                     self.persist_session_state()
@@ -3850,7 +3853,7 @@ class DoomEternalContext(CommonContext):
                         receipt_index=item_index,
                         item_id=item_id,
                         receipt_id=receipt_identity(network_item),
-                        reason="context_deferred",
+                        reason="frag_base_missing" if defer_frag else "context_deferred",
                         boundary=self.items_processed,
                         trigger=trigger,
                         state_key=getattr(self, "state_key", None),
@@ -4005,6 +4008,7 @@ class DoomEternalContext(CommonContext):
                     if not self.receipt_session.is_current(receipt_session_token, getattr(self, "state_key", "")):
                         return False
 
+            self._flush_deferred_frag_upgrades()
             self.receipt_session.prune_processed_packets()
             return True
 
@@ -5090,7 +5094,40 @@ class DoomEternalContext(CommonContext):
             log_item_event("ITEM_BLOOD_PUNCH_DEFERRED", detail=str(error), trigger=trigger,
                            state_key=self.state_key, decision="native_effect_unconfirmed")
 
+    def _has_received_frag(self):
+        if 7770011 in self.session_state.get("deferred_frag_items", {}).values():
+            return False
+        return any(item.item == 7770011 for item in self.items_received[:self.items_processed]) or any(
+            fact.item_id == 7770011 and fact.quantity for fact in self.receipt_session.starting_materialization
+        )
+
+    def _flush_deferred_frag_upgrades(self):
+        pending = self.session_state.get("deferred_frag_items", {})
+        if not pending or not self.runtime_effects_ready():
+            return
+        context = self._refresh_runtime_context(getattr(self, "_connected_slot_data", {}))
+        lease = self._active_materialization_lease(context)
+        if lease is None:
+            return
+        for key, item_id in sorted(pending.items(), key=lambda entry: (entry[1] != 7770011, int(entry[0]))):
+            index = int(key)
+            if index < 0 or index >= self.items_processed or index >= len(self.items_received):
+                continue
+            if self.items_received[index].item != item_id or item_id not in {7770011, 7770111, 7770112, 7770113, 7770114}:
+                continue
+            if item_id != 7770011 and not self._has_received_frag():
+                continue
+            accepted, _ = self.spool_item_commands(
+                item_id, index, intent=RECONCILIATION_REPAIR, include_notification=False,
+                materialization_lease=lease, context_identity=context.identity,
+            )
+            if not accepted:
+                break
+            del pending[key]
+            self.persist_session_state()
+
     def _reconcile_native_receipt_owners(self, trigger):
+        self._flush_deferred_frag_upgrades()
         self._reconcile_blood_punch(trigger)
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)

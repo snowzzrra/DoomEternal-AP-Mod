@@ -721,6 +721,12 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     normalized = copy.deepcopy(dict(session))
     processed = _safe_nonnegative_int(normalized.get("processed_items"), 0)
     normalized["processed_items"] = processed
+    frag = normalized.get("deferred_frag_items")
+    normalized["deferred_frag_items"] = {
+        key: item_id for key, item_id in (frag.items() if isinstance(frag, Mapping) else ())
+        if isinstance(key, str) and key.isdecimal() and isinstance(item_id, int)
+        and item_id in {7770011, 7770111, 7770112, 7770113, 7770114}
+    }
 
     history = normalized.get("receipt_history")
     if not isinstance(history, Mapping):
