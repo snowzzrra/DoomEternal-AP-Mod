@@ -68,17 +68,15 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "dlc_logic_timing": "Late Game",
     "goal": "Acquire the Unmaykr",
     "goal_endpoint_event": "Internal Goal Endpoint: Acquire the Unmaykr",
-    "additional_victory_requirements": [
-        "Complete All Enabled Missions",
-        "Complete All Escalation Encounters",
-        "Complete All Slayer Gates",
-    ],
+    "additional_victory_requirements": [],
     "special_weapon": "Progressive Special Weapon",
     "enhanced_melee_damage": False,
     "randomize_chainsaw": False,
     "randomize_dash": False,
     "randomize_first_battery": False,
     "include_weapon_mastery_challenges": True,
+    "include_slayer_gates": True,
+    "include_secret_encounters": True,
     REVEAL_AP_LOCATIONS_OPTION_KEY: False,
     "starting_weapon": "Combat Shotgun",
     "praetor_suit_upgrades_in_pool": 6,
@@ -164,6 +162,8 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
         "randomize_dash",
         "randomize_first_battery",
         "include_weapon_mastery_challenges",
+        "include_slayer_gates",
+        "include_secret_encounters",
         REVEAL_AP_LOCATIONS_OPTION_KEY,
     )
     for key in boolean_keys:
@@ -571,6 +571,8 @@ class SeedManifest:
                 "include_weapon_mastery_challenges": slot_data[
                     "include_weapon_mastery_challenges"
                 ],
+                "include_slayer_gates": slot_data["include_slayer_gates"],
+                "include_secret_encounters": slot_data["include_secret_encounters"],
                 "praetor_suit_upgrades_in_pool": slot_data[
                     "praetor_suit_upgrades_in_pool"
                 ],
@@ -1470,7 +1472,7 @@ class ModCompiler:
             options = {
                 "randomize_chainsaw": False,
                 "randomize_dash": options,
-                "randomize_first_battery": False,
+                "randomize_first_battery": True,
             }
         physical_ids = {
             int(spec["location_id"])
@@ -1479,6 +1481,9 @@ class ModCompiler:
         return [
             location_id for location_id in ids
             if location_id not in (physical_ids - physical_location_ids(options))
+            and (options.get("include_slayer_gates", True) or not names[str(location_id)].endswith(" - Slayer Gate Complete"))
+            and (options.get("include_secret_encounters", True) or " - Secret Encounter - " not in names[str(location_id)])
+            and (options.get("include_slayer_gates", True) or names[str(location_id)] != "Fortress of Doom - Unmaykr Acquired")
         ]
 
     def known_location_ids(self) -> set[int]:
@@ -1767,11 +1772,14 @@ class LaunchWorkflow:
         physical_options = {
             "randomize_chainsaw": bool(options.get("randomize_chainsaw", False)),
             "randomize_dash": dash,
-            "randomize_first_battery": bool(options.get("randomize_first_battery", False)),
+            "randomize_first_battery": True,
         }
-        active = self.compiler.active_location_ids(physical_options)
+        active = self.compiler.active_location_ids({**physical_options, **{
+            key: options.get(key, True) for key in ("include_slayer_gates", "include_secret_encounters")
+        }})
         slot_data = {
             **physical_options,
+            **{key: options.get(key, True) for key in ("include_slayer_gates", "include_secret_encounters")},
             REVEAL_AP_LOCATIONS_OPTION_KEY: bool(
                 options.get(REVEAL_AP_LOCATIONS_OPTION_KEY, False)
             ),

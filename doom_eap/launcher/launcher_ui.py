@@ -1100,7 +1100,7 @@ class LauncherUI(QMainWindow):
         groups = (
             ("GOAL & CAMPAIGN", ("mission_pool", "custom_missions", "custom_dark_lord", "mission_order", "mission_count", "starting_missions", "full_saga_final_boss", "goal", "goal_mission_as_item", "use_dlc_content", "dlc_logic_timing", "additional_victory_requirements")),
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
-            ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "randomize_first_battery", "include_weapon_mastery_challenges", "praetor_suit_upgrades_in_pool")),
+            ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "include_weapon_mastery_challenges", "include_slayer_gates", "include_secret_encounters", "praetor_suit_upgrades_in_pool")),
             ("COMBAT & QoL", ("campaign_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
             ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link", "death_link_mode")),
         )
@@ -1166,7 +1166,7 @@ class LauncherUI(QMainWindow):
         return card
 
     def _wire_create_dependencies(self) -> None:
-        for key in ("use_dlc_content", "include_dlc_missions", "enhanced_melee_damage", "include_weapon_mastery_challenges"):
+        for key in ("use_dlc_content", "include_dlc_missions", "enhanced_melee_damage", "include_weapon_mastery_challenges", "include_slayer_gates", "include_secret_encounters"):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
@@ -1213,7 +1213,7 @@ class LauncherUI(QMainWindow):
             return cast(QComboBox, control).currentData()
         return None
 
-    def _set_choice_enabled(self, key: str, value: str, enabled: bool) -> None:
+    def _set_choice_enabled(self, key: str, value: str, enabled: bool, reason: str = "Requires DLC Missions.") -> None:
         control = self.option_controls.get(key)
         if not isinstance(control, QComboBox):
             return
@@ -1224,7 +1224,7 @@ class LauncherUI(QMainWindow):
         item = cast(QStandardItemModel, combo.model()).item(index)
         if item is not None:
             item.setEnabled(enabled)
-        combo.setItemData(index, None if enabled else "Requires DLC Missions.", Qt.ItemDataRole.ToolTipRole)
+        combo.setItemData(index, None if enabled else reason, Qt.ItemDataRole.ToolTipRole)
 
     def _refresh_create_dependencies(self) -> None:
         if self._syncing_create_dependencies:
@@ -1247,6 +1247,8 @@ class LauncherUI(QMainWindow):
             dlc_timing_row = self.option_rows.get("dlc_logic_timing")
             self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_missions)
             self._set_choice_enabled("goal", "complete_the_full_saga", dlc_missions)
+            self._set_choice_enabled("goal", "acquire_the_unmaykr", self._choice_value("include_slayer_gates") is not False,
+                                     "Requires Include Slayer Gates.")
             if special_row is not None:
                 special_row.setVisible(dlc_enabled)
             if dlc_timing_row is not None:
@@ -1255,21 +1257,22 @@ class LauncherUI(QMainWindow):
             goal_key = self._choice_value("goal")
             mastery_control = self.option_controls.get("include_weapon_mastery_challenges")
             mastery_enabled = bool(cast(QCheckBox, mastery_control).isChecked()) if isinstance(mastery_control, QCheckBox) else True
-            locked: set[str] = set()
             unavailable: set[str] = set()
-            if goal_key in {"acquire_the_unmaykr", "complete_the_full_saga"}:
-                locked.add("Acquire the Unmaykr")
+            if goal_key == "acquire_the_unmaykr":
+                unavailable.add("Acquire the Unmaykr")
                 if not dlc_missions:
-                    locked.add("Complete All Slayer Gates")
-            if goal_key == "complete_the_full_saga":
-                locked.add("Complete All Included Missions")
+                    unavailable.add("Complete All Slayer Gates")
             if not dlc_missions:
                 unavailable.add("Complete All Escalation Encounters")
             if not mastery_enabled:
                 unavailable.add("Complete All Weapon Mastery Challenges")
+            if self._choice_value("include_slayer_gates") is False:
+                unavailable.update({"Complete All Slayer Gates", "Acquire the Unmaykr"})
+            if self._choice_value("include_secret_encounters") is False:
+                unavailable.add("Complete All Secret Encounters")
             requirements = self.option_controls.get("additional_victory_requirements")
             if isinstance(requirements, OptionSetControl):
-                requirements.set_dependencies(locked, unavailable)
+                requirements.set_dependencies(set(), unavailable)
             goal_label = self._selected_label("goal")
             special_label = "The Crucible" if not dlc_enabled else self._selected_label("special_weapon")
             requirement_count = len(requirements.value()) if isinstance(requirements, OptionSetControl) else 0

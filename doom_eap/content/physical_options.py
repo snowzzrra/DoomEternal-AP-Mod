@@ -53,7 +53,7 @@ def normalize_physical_options(options: Mapping[str, Any], *, require_all: bool 
         if key not in options:
             if require_all:
                 raise ValueError(f"missing physical option: {key}")
-            result[key] = False
+            result[key] = key == "randomize_first_battery"
             continue
         value = options[key]
         if not isinstance(value, bool):

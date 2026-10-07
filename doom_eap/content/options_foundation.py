@@ -316,6 +316,7 @@ def dump_player_yaml(
             "description": imported.get("description", document["description"]),
             GAME_NAME: {**imported[GAME_NAME], **document[GAME_NAME]},
         }
+    document[GAME_NAME].pop("randomize_first_battery", None)
     return yaml.safe_dump(
         document,
         allow_unicode=True,

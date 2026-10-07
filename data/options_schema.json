@@ -523,11 +523,7 @@
           "label": "Complete All Weapon Mastery Challenges"
         }
       ],
-      "default": [
-        "Complete All Escalation Encounters",
-        "Complete All Included Missions",
-        "Complete All Slayer Gates"
-      ],
+      "default": [],
       "description": "Choose extra objectives that must also be completed before your Goal counts as victory. Hover an objective to see exactly what it requires.",
       "display_name": "Additional Victory Requirements",
       "group": "Game Options",
@@ -610,12 +606,21 @@
       "ui_type": "toggle"
     },
     {
-      "default": false,
-      "description": "When enabled, the mandatory first Sentinel Battery is shuffled into the\nitem pool instead of being locked to its Exultia pickup.",
-      "display_name": "Randomize First Sentinel Battery",
+      "default": true,
+      "description": "Include Slayer Gate completion checks and their keys in the item pool. Acquire the Unmaykr requires this option.",
+      "display_name": "Include Slayer Gates",
       "group": "Game Options",
-      "key": "randomize_first_battery",
-      "source_class": "RandomizeFirstBattery",
+      "key": "include_slayer_gates",
+      "source_class": "IncludeSlayerGates",
+      "ui_type": "toggle"
+    },
+    {
+      "default": true,
+      "description": "Include Secret Encounter completion checks.",
+      "display_name": "Include Secret Encounters",
+      "group": "Game Options",
+      "key": "include_secret_encounters",
+      "source_class": "IncludeSecretEncounters",
       "ui_type": "toggle"
     },
     {
@@ -802,5 +807,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "aaee434c64c3b7d7864ab545c6e8ba6b1071eea8095d7154cb14f429e7f25403"
+  "source_sha256": "a294516d14ce7082b6075d683cad053fc5c311a603fdee287d9b6357f6434569"
 }
