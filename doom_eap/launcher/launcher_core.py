@@ -1249,6 +1249,12 @@ class RoomCompiler:
             Path("."), ROOT / "data" / "map_sources.json", "hub"
         ).as_posix()
         assembled[hub_devinv_path] = devinv_source.encode("utf-8")
+        # Mars Core's inherited replay loadout grants weapons outside AP ownership.
+        assembled["e2m3_core_patch3/generated/decls/devinvloadout/devinvloadout/sp/e2m3.decl"] = (
+            '{\n\tedit = {\n\t\tclearAllBeforeApply = false;\n'
+            '\t\tstartingInventory = { num = 0; }\n'
+            '\t\tcurrencyToGive = { num = 0; }\n\t}\n}\n'
+        ).encode("utf-8")
         from tools.decls.campaign_builder import build_campaign_overrides
         holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
         if hashlib.sha256(assembled[holt_member]).hexdigest() != \

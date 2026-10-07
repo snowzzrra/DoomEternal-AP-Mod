@@ -7,7 +7,6 @@ import pytest
 from doom_eap.runtime import deathlink_session as domain
 from doom_eap.runtime.deathlink_receive import DeathLinkReceiver
 from doom_eap.runtime.deathlink_publication import DeathLinkPublication
-from doom_eap.runtime.command_spool import CommandSpool, discard_unclaimed_command
 
 
 def setup_session(tmp_path):
@@ -17,13 +16,16 @@ def setup_session(tmp_path):
     state = {}
     owner.bind("room-A", state)
     owner.configure(True)
-    spool = CommandSpool(tmp_path, arm_rpc=lambda *_: None, log_delivery=lambda *_, **__: None,
-                         logger=logging.getLogger("deathlink"))
-    publication = DeathLinkPublication(
-        lambda command, **kwargs: spool.publish(command, **kwargs).accepted,
-        spool.exists,
-        lambda key, room: discard_unclaimed_command(tmp_path, spool.scoped_id(key, room)),
-    )
+    class Native:
+        calls = []
+        event_id = 0
+        def deathlink_request(self, kind, **args):
+            self.calls.append(kind)
+            if kind == 2:
+                self.event_id = args["event_id"]
+            return dict(outcome=0, remote_state=2, remote_event_id=self.event_id)
+    native = Native()
+    publication = DeathLinkPublication(lambda: native, None, owner.mode)
     return owner, state, publication, events
 
 
@@ -40,19 +42,19 @@ def test_receive_history_safe_gate_and_echo_cancellation_preserve_native_claim(t
     event_id = owner.receive(data, persist)
     assert event_id and len(persisted) == 1
     assert owner.receive(data, persist) is None and len(persisted) == 1
+    publication._event = owner.active_event
     owner.advance(False, publication)
     assert not list(tmp_path.glob("*.cmd"))
     owner.advance(True, publication)
-    command = next(tmp_path.glob("*.cmd"))
-    processing = command.with_suffix(".processing")
-    command.rename(processing)
+    assert publication._link().calls == [1, 2]
     sent = []
 
     async def send(cause):
         sent.append(cause)
 
     asyncio.run(owner.report_local_death("Slayer", send, publication))
-    assert sent == [] and events == [] and processing.exists()
+    assert sent == [] and events == []
+    assert publication._link().calls == [1, 2, 5]
     assert owner.mode == "soft"
     snapshot = owner.instrumentation()
     with pytest.raises(TypeError):

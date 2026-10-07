@@ -39,15 +39,19 @@ class DeathLinkSession:
         return self._receiver.active is not None
 
     @property
+    def active_event(self):
+        return self._receiver.active
+
+    @property
     def seen_events(self):
         return frozenset(self._seen)
 
     def instrumentation(self):
         return tuple(MappingProxyType(row) for row in self._receiver.instrumentation_dicts())
 
-    def configure(self, enabled):
+    def configure(self, enabled, mode="soft"):
         self._enabled = bool(enabled)
-        self._receiver.configure_mode("soft")
+        self._receiver.configure_mode(mode)
 
     def invalidate_outbound(self):
         self._generation += 1
@@ -106,24 +110,19 @@ class DeathLinkSession:
         if result.detail == "dispatched":
             hit_num = active.attempts if active else 1
             self._logger.info(
-                "[DeathLink] %s hit %d queued; command in flight.",
+                "[DeathLink] %s native operation %d queued; effect pending.",
                 event_id,
                 hit_num,
             )
-        elif result.detail == "burst_wait":
-            self._logger.info(
-                "[DeathLink] %s hit 1 delivered; waiting ~500ms before second hit.",
-                event_id,
-            )
         elif result.state is ReceiveState.APPLIED:
             self._logger.info(
-                "[DeathLink] %s lethal burst complete (%s).",
+                "[DeathLink] %s native operation terminal (%s).",
                 event_id,
                 result.detail,
             )
         elif result.state is ReceiveState.RESOLVED:
             self._logger.info(
-                "[DeathLink] %s lethal burst resolved (%s).",
+                "[DeathLink] %s native event resolved (%s).",
                 event_id,
                 result.detail,
             )

@@ -26,13 +26,6 @@ Randomized progression includes:
 
 Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, displays session activity, and provides setup checks, repair actions, logs, and support reports. After setup, start DOOM Eternal normally through Steam and keep launcher open.
 
-### Reporting problems
-
-DoomEAP is beta, and bug reports are welcome. In the launcher, open **Help → Report a Problem**.
-The launcher creates a verified local Support ZIP and opens a sanitized report preview. Enter a title and description, review the text, and export it locally. **Save Support Report** supports an active game; if the export path is unavailable, the launcher shows the retained ZIP under its local `data/support-bundles` directory.
-Online submission requires the project's deployed HTTPS reporting service. This checkout has submission disabled until deployment. When configured, **Send Reviewed Report** asks for confirmation and returns the created or recovered issue URL without requiring the player's GitHub account. An uncertain submission retains an immutable draft and the same report key for retry or reopening. A confirmed report permits **Start New Report**.
-The remote report contains reviewed text and bounded redacted diagnostic tails. The ZIP stays local. The maintainer's [deployment instructions](tools/report_backend/DEPLOY.md) cover the GitHub App, Render, persistent state, and qualification. You can also use the [GitHub issue chooser](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
-
 ## 2. Player options
 
 | Option name | Default | Summary | Other values |
@@ -333,8 +326,7 @@ Repair/Fix, and a sanitized support report.
 
 ### 0.7.x Beta — Enemizer
 
-- Randomize enemy placements and encounter compositions while respecting arena
-  structure, progression-critical encounters, and runtime safety.
+- Randomize enemy placements and encounters while keeping the CR formula.
 
 ### 0.8.x–0.9.x — Content freeze and polish
 
@@ -343,15 +335,11 @@ Repair/Fix, and a sanitized support report.
   discoverability, and community testing.
 - Complete documentation, diagnostics, support tooling, and release-candidate
   validation.
+- Hard Mode and Master Levels.
 
 ### 1.0
 
 - Stable public release of the supported campaigns and systems.
-
-### Post-1.0 / 2.0
-
-- Horde Mode and Master Levels.
-- Hard Mode and checkpoint removal.
 
 ## 6. Credits
 
@@ -386,5 +374,6 @@ Repair/Fix, and a sanitized support report.
 This project is distributed under the [MIT License](docs/LICENSE).
 
 Sentinel Core distributions include their runtime manifest and license
-notices. The launcher acquires compatible Core releases from `snowzzrra/Sentinel-Core` or uses a verified local distribution. External injectors are acquired from verified providers during setup
-and remain owned by their creators credited above.
+notices. The launcher acquires compatible Core releases from `snowzzrra/Sentinel-Core` or 
+uses a verified local distribution. External injectors are acquired from verified providers during setup
+and are owned by their creators credited above.

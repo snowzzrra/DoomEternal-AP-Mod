@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "5ef63e17fab7afc5405ee194a5e4dbb5b2f84bf6ba87d62c91dac6a3a106b3ce",
-    "size": 13633256
+    "sha256": "e26bb0f83770419359170d3e903e5b4d518a345b5d9a200b84ad2eda3844d13a",
+    "size": 13888553
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
-  "inputs_count": 381,
+  "inputs_count": 386,
   "release_version": "0.6.0",
   "room_payload_manifest": {
-    "sha256": "eaab37c132e74b74517fd50b2b6af5b01fdba50f0be34eb2f458444b36c33569",
-    "size": 25920
+    "sha256": "c283a1963257adc93bc7c2a3020a3eb5cc0d231357c340956f3c8e6a8e865c1d",
+    "size": 26144
   },
   "room_payloads": {
     "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
     "size": 2202253
   },
-  "room_resource_input_fingerprint": "7d6583595ec746143c752e4f535ee72d08d2c4f499ed32986f25b0f4cd0b090a",
+  "room_resource_input_fingerprint": "58011d95499157f1fdedfbff40f49e51eedf64b85d8830cdd11155115311a275",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -224,7 +224,7 @@
     "doom_eap/contracts/save_observation.py": "672f27a9a86d32fe58b890b978d4b199031f478720417ba571f5200f90a453c8",
     "doom_eap/contracts/source_bytes.py": "9a9c41e4d61d7c84e4cf16167bcb36c3f6403f44334d52c6dfdc0ccda356bcba",
     "doom_eap/contracts/tag_prerequisites.py": "76f605b03424824de269aaa4fed88425e950f0d687a09095dcdd5d8e73cad907",
-    "doom_eap/launcher/launcher_core.py": "30b2b1e6bc694d422a8bdb0e1041109f4550d17bf44766a679b1631a4e2c3a8a",
+    "doom_eap/launcher/launcher_core.py": "336c028635f120a5e6124e802b24794d0c4edd2ce950531a3c4ac2cf94663805",
     "doom_eap/runtime/context_registry.py": "8b813d6a4b6de566255dba8f7b39ecb40706e679f5112e5f860315939cfee67b",
     "doom_eap/runtime/save_records.py": "96065b79896e964c47e5855c4035b1eb3ea13b56c0bcb7025b0593c25955a106",
     "manifests/e1m1_intro.json": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
@@ -252,11 +252,16 @@
     "packaging/mod_assets/e1m1_intro/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m1_intro/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m1_intro/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+    "packaging/mod_assets/e1m1_intro/swf/hud/hud_score.swf": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
+    "packaging/mod_assets/e1m1_intro_patch1/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
+    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
     "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": "24e7f41600c64891afda3709952ac11232f2a11b8b8aa7c66428fafbe7ed5d0f",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m2_battle/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
+    "packaging/mod_assets/e1m2_battle/swf/hud/hud_score.swf": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
+    "packaging/mod_assets/e1m2_battle_patch1/swf/hud/hud_score.swf": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
+    "packaging/mod_assets/e1m2_battle_patch2/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m3_cult/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
@@ -352,7 +357,7 @@
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_map.swf": "70b1317db301c4bd069f52a42cfc2e36287f7f39143bcee5fc0f513d0d4fffb1",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/end_of_level/eol_challenges.swf": "96465b1e8fa9eb501222a610248d64aa8219894895882336bb0a2d2efdd77437",
-    "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": "a6d505590fd389fbfab1bb741a01c682ffdb34e3c410418df3d94a2b2978bf1d",
+    "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": "58606752439e503e007b933ba9921f6f6ee5f9fe59a306092a2e47d6a89af75d",
     "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/start.swf": "554abc5176edcf6f577404f8af7d3db4ef67b986c1f8932575b86dfa658eab95",
     "packaging/mod_assets/gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl": "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19",
     "packaging/mod_assets/gameresources_patch2/swf/hud/menus/dossier/dossier_challenges.swf": "dd153bc846a1a7bbd2f692724b1574683507453e0dfbbcbf0769840b0c104c13",
@@ -401,7 +406,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "c1fd45ba49d859e94d2e62ab5c73b83b557ce098",
+      "base_commit_sha": "60f938e611f73d550830b61548a296e56e96314d",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -4290,8 +4295,8 @@
             "size": 126
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "ba5f9d9f357e53155f0d4824e97c6271941c55fcfb0b2e12978b16c9d33e07de",
-            "size": 35574
+            "sha256": "3415aefffe33a907cda2e13b06cf147bc5d3c1a523bfd516d142a6662e66734b",
+            "size": 35593
           },
           "archipelago/worlds/doometernal/classification.py": {
             "sha256": "a875a237423299a3e2e3118eba6e109335ecb42189d1c45b11e9bcaff0c49407",
@@ -13170,12 +13175,12 @@
             "size": 136
           }
         },
-        "fingerprint": "89565d5079a07b0c540adf8254ff5fe867f8e7b115b97efcbfb2e13e7946e908",
+        "fingerprint": "69eca692eb7d39d9240cbe887ac0fd7cad8c6c6fffac97fd38dee1b1162fc576",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "ae8b7fdf370935bce04523f13763662e9740d175",
+      "base_commit_sha": "c59bf99970c924891aede52ba08bb8a335c72865",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14080,8 +14085,8 @@
             "size": 90136
           },
           "doom_eap/launcher/launcher_core.py": {
-            "sha256": "2b483547214642e28e9e64379c630f01561aab1fec85d77da2ebf5ba1ca5e2ac",
-            "size": 84896
+            "sha256": "8c275ea5f948f028bc43888189a34d592b7d4247c1afca695eb412dbedc7bf27",
+            "size": 85279
           },
           "doom_eap/launcher/launcher_core_install.py": {
             "sha256": "b5f550782e1e935d3629da52ddc7926b0acaf0b8477805ae21dc9a9f770259b5",
@@ -14168,8 +14173,8 @@
             "size": 7301
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "3aaa494c52072a57f1ccef75e3b2dcaac1a0fa0710d1accee10447ddfa54a2aa",
-            "size": 313815
+            "sha256": "56bae5e875fa1daacb06b7e367ba68813406ca54163c0f71097b0dcdbdfdbd3c",
+            "size": 314034
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "aa7aed38f1218b0a4d6269a2d56700e08bdbf7d88ef3e55694ee75bb58689b68",
@@ -14200,16 +14205,16 @@
             "size": 5338
           },
           "doom_eap/runtime/deathlink_publication.py": {
-            "sha256": "316c9618314d0d7ffb8650c561f50f0ee7fcede87f8218e58ded727e7f60b86a",
-            "size": 688
+            "sha256": "76f613e4810685a1a88a053d739f928fbc11b769c923306cc46f349d2e144191",
+            "size": 1617
           },
           "doom_eap/runtime/deathlink_receive.py": {
-            "sha256": "b9792b7fc0a1743a05d74725b0b2b29ee2e7b4733d0b323438ae4f9d377cc9ad",
-            "size": 13431
+            "sha256": "ed1c79543673aaa3a5ecebdc78cdebddf4225b5d0eddf9ed59dee64de15cc3c7",
+            "size": 11801
           },
           "doom_eap/runtime/deathlink_session.py": {
-            "sha256": "d127688ea9ed8ac3ba0c065e52f417d8fa18b56a62de4c40c9d255b30bc56cf3",
-            "size": 6546
+            "sha256": "5cf3b106989ee1a229de203b5e2e70ce9ea81945770e3d05b3ae5ed62eab066d",
+            "size": 6450
           },
           "doom_eap/runtime/fast_travel.py": {
             "sha256": "7f239832f8a50883c428b4d335643369f4674b8944de5cfd716924ba02bc66ff",
@@ -14340,8 +14345,8 @@
             "size": 10645
           },
           "doom_eap/runtime/weapon_points.py": {
-            "sha256": "d6c4ac8b06b5414793f5999941484d34c7dc9846d1e100f7a50200a7e2bd9f17",
-            "size": 23902
+            "sha256": "468a0b3d29faa877cddf9d38d314919b57f2ef536ae4a7b482ed20c6a96c3d39",
+            "size": 24280
           },
           "manifests/e1m1_intro.json": {
             "sha256": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
@@ -14523,8 +14528,16 @@
             "sha256": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
             "size": 660
           },
+          "packaging/mod_assets/e1m1_intro/swf/hud/hud_score.swf": {
+            "sha256": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
+            "size": 177722
+          },
+          "packaging/mod_assets/e1m1_intro_patch1/swf/hud/hud_score.swf": {
+            "sha256": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
+            "size": 180955
+          },
           "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": {
-            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+            "sha256": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
             "size": 179901
           },
           "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": {
@@ -14542,6 +14555,18 @@
           "packaging/mod_assets/e1m2_battle/generated/decls/material2/art/pickups/codex.decl": {
             "sha256": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
             "size": 660
+          },
+          "packaging/mod_assets/e1m2_battle/swf/hud/hud_score.swf": {
+            "sha256": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
+            "size": 177722
+          },
+          "packaging/mod_assets/e1m2_battle_patch1/swf/hud/hud_score.swf": {
+            "sha256": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
+            "size": 179901
+          },
+          "packaging/mod_assets/e1m2_battle_patch2/swf/hud/hud_score.swf": {
+            "sha256": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
+            "size": 180955
           },
           "packaging/mod_assets/e1m3_cult/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14924,8 +14949,8 @@
             "size": 77832
           },
           "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": {
-            "sha256": "a6d505590fd389fbfab1bb741a01c682ffdb34e3c410418df3d94a2b2978bf1d",
-            "size": 204719
+            "sha256": "58606752439e503e007b933ba9921f6f6ee5f9fe59a306092a2e47d6a89af75d",
+            "size": 205870
           },
           "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/start.swf": {
             "sha256": "554abc5176edcf6f577404f8af7d3db4ef67b986c1f8932575b86dfa658eab95",
@@ -15360,7 +15385,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "a006872f0fab9fecb29a5a82fc8307e6708d1af08a414855b0264b5dfdd3584a",
+        "fingerprint": "795bfc3a3b06d1c43793f8f300ef4f9537d3b6c3bfacb30de107579efd972de7",
         "kind": "working_tree_snapshot"
       }
     }

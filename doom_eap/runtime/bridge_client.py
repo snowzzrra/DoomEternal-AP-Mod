@@ -1832,8 +1832,8 @@ def delegated_rpc_command(item_id, command_index=None):
     return f"ai_ScriptCmdEnt {entity_name} activate"
 
 
-def deathlink_publication():
-    return DeathLinkPublication(send_command, command_spool_exists, discard_queued_coalesced_command)
+def deathlink_publication(ctx):
+    return DeathLinkPublication(ctx.native_game_link, ctx.deathlink.active_event, ctx.deathlink.mode)
 
 
 def reconciliation_publisher():
@@ -3334,10 +3334,11 @@ class DoomEternalContext(CommonContext):
                 return
             self.goals.connected(self.persist_session_state)
             self._refresh_runtime_context(slot_data)
-            self.deathlink.configure(slot_data.get("death_link", False))
+            self.deathlink.configure(slot_data.get("death_link", False), slot_data.get("death_link_mode", "soft"))
             logger.info(
-                "[DeathLink] enabled=%s receive_policy=single_burst",
+                "[DeathLink] enabled=%s receive_policy=native mode=%s",
                 self.death_link_enabled,
+                self.deathlink.mode,
             )
             self.receipt_session.configure_starting_materialization(
                 starting_inventory=slot_data.get("starting_inventory", {}),
@@ -6098,10 +6099,17 @@ class DoomEternalContext(CommonContext):
 
 
     def queue_received_deathlink(self):
-        self.deathlink.advance(
-            not self.runtime_observers_frozen and self.has_authoritative_save_proof(),
-            deathlink_publication(),
-        )
+        try:
+            ready = (not self.runtime_observers_frozen and self.has_authoritative_save_proof()
+                     and self.runtime_effects_ready())
+            if ready and self.deathlink.receiving:
+                discard_queued_coalesced_command("deathlink-kill", self.state_key)
+            self.deathlink.advance(
+                ready,
+                deathlink_publication(self),
+            )
+        except RuntimeError as error:
+            logger.info("[DeathLink] Native receive pending: %s", error)
 
     async def check_game_duration_death(self):
         selected = self.update_save_slot_lifecycle()
@@ -6238,7 +6246,7 @@ class DoomEternalContext(CommonContext):
             await self.report_local_death()
 
     async def report_local_death(self):
-        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication())
+        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self))
 
     @staticmethod
     def goal_objective_ids(slot_data, server_locations):

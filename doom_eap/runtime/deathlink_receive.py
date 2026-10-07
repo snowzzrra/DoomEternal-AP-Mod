@@ -55,7 +55,7 @@ class DeathLinkInstrumentation:
 
 
 class DeathLinkReceiver:
-    """Bounded logical events with two-hit burst and temporal window."""
+    """Bounded logical events dispatched once to the native domain."""
 
     def __init__(
         self,
@@ -80,9 +80,9 @@ class DeathLinkReceiver:
         self.burst_interval = burst_interval
         self.total_timeout = total_timeout
         self.late_suppression_grace = late_suppression_grace
-        self.mode = "soft"
-        self.max_burst_hits = max_burst_hits
-        self.max_attempts: int | None = max_burst_hits
+        self.mode = self._validate_mode(mode)
+        self.max_burst_hits = 1
+        self.max_attempts: int | None = 1
         self.max_queue = max_queue
         self._queue: deque[ReceivedDeathLink] = deque()
         self._recent: dict[str, float] = {}
@@ -92,7 +92,9 @@ class DeathLinkReceiver:
 
     @staticmethod
     def _validate_mode(mode: str) -> str:
-        return "soft"
+        if mode not in {"soft", "hardcore"}:
+            raise ValueError("invalid DeathLink mode")
+        return mode
 
     @property
     def instrumentation(self) -> tuple[DeathLinkInstrumentation, ...]:
@@ -118,9 +120,9 @@ class DeathLinkReceiver:
         )
 
     def configure_mode(self, mode: str) -> None:
-        """Tolerate legacy mode strings while enforcing single-burst delivery."""
+        """One native operation owns the selected mode's effect."""
         self.mode = self._validate_mode(mode)
-        self.max_attempts = self.max_burst_hits
+        self.max_attempts = 1
 
     def _result(
         self,
@@ -194,46 +196,12 @@ class DeathLinkReceiver:
             if in_flight:
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
             event.deliveries += 1
-            if event.attempts < self.max_burst_hits:
-                event.state = ReceiveState.BURST_IN_FLIGHT
-                event.next_attempt_at = now + self.burst_interval
-                return self._result(event.event_id, event.state, "burst_wait", now)
             return self._finish(
                 ReceiveState.APPLIED,
                 "accepted",
                 now=now,
                 allow_late_suppression=True,
             )
-
-        if event.state is ReceiveState.BURST_IN_FLIGHT:
-            if in_flight:
-                event.state = ReceiveState.COMMAND_IN_FLIGHT
-                return self._result(event.event_id, event.state, "awaiting_delivery", now)
-            if now < event.next_attempt_at:
-                return self._result(event.event_id, event.state, "burst_wait", now)
-            if not safe_gameplay:
-                # Environment unsafe at scheduled second-hit time; drop second hit fail-safe
-                return self._finish(
-                    ReceiveState.APPLIED,
-                    "second_hit_cancelled_unsafe",
-                    now=now,
-                    allow_late_suppression=True,
-                )
-            try:
-                accepted = dispatch()
-            except Exception as error:
-                return self._finish(ReceiveState.FAILED, f"dispatch_error:{type(error).__name__}", now=now)
-            if not accepted:
-                return self._finish(
-                    ReceiveState.APPLIED,
-                    "second_hit_not_accepted",
-                    now=now,
-                    allow_late_suppression=True,
-                )
-            event.attempts += 1
-            event.state = ReceiveState.COMMAND_IN_FLIGHT
-            self._suppression_event_id = event.event_id
-            return self._result(event.event_id, event.state, "dispatched", now)
 
         if in_flight:
             if event.attempts:

@@ -176,6 +176,12 @@ class SentinelWeaponPoints:
             operation = result_operation
             time.sleep(0.025)
 
+    def deathlink_request(self, kind, *, enabled=False, mode="soft", event_id=0,
+                          event_hash=bytes(16), ack_sequence=0):
+        body = struct.pack("<IIIIQ16sQI", kind, int(enabled), int(mode == "hardcore"),
+                           0, event_id, event_hash, ack_sequence, 0)
+        return self._execute_typed(131072, "--deathlink", 41, 42, 44, body)
+
     def observe(self):
         result = self._execute()
         if result["outcome"] not in (1, 2) or not result["flags"] & 16:
