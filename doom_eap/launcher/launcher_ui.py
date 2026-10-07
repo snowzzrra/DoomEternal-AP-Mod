@@ -7,6 +7,7 @@ import json
 import os
 import queue
 import re
+import sys
 import time
 import webbrowser
 from datetime import datetime
@@ -789,18 +790,27 @@ class LauncherUI(QMainWindow):
         self.game_browse = QPushButton("BROWSE"); self.game_browse.clicked.connect(self._browse_game)
         self.save_browse = QPushButton("BROWSE"); self.save_browse.clicked.connect(self._browse_saves)
         layout.addWidget(self.game_browse, 4, 2); layout.addWidget(self.save_browse, 5, 2)
-        self._entry_row(layout, 6, "SERVER", self.server)
-        self._entry_row(layout, 7, "PLAYER", self.slot)
-        self._entry_row(layout, 8, "PASSWORD", self.password)
-        self._entry_row(layout, 9, "AMMO REFILL KEY", self.ammo_refill_keybind)
-        self._entry_row(layout, 10, "SPECIAL TOGGLE KEY", self.special_toggle_keybind)
+        row = 6
+        self.proton_executable = None
+        if sys.platform.startswith("linux"):
+            self.proton_executable = QLineEdit(str(self.controller.config.get("proton_executable") or ""))
+            self.proton_executable.setPlaceholderText("Automatic; browse if setup asks")
+            self.proton_executable.setToolTip("Select the file named proton from the same Proton version selected in Steam's DOOM Eternal Compatibility settings.")
+            self.proton_executable.editingFinished.connect(self._save_proton)
+            self._path_row(layout, row, "PROTON EXECUTABLE", self.proton_executable, self._browse_proton)
+            row += 1
+        self._entry_row(layout, row, "SERVER", self.server)
+        self._entry_row(layout, row + 1, "PLAYER", self.slot)
+        self._entry_row(layout, row + 2, "PASSWORD", self.password)
+        self._entry_row(layout, row + 3, "AMMO REFILL KEY", self.ammo_refill_keybind)
+        self._entry_row(layout, row + 4, "SPECIAL TOGGLE KEY", self.special_toggle_keybind)
         self.join_button = _ScanlineButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, 11, 1, 1, 2)
+        layout.addWidget(self.join_button, row + 5, 1, 1, 2)
         self.join_error = self._label("", "warning")
         self.join_error.hide()
-        layout.addWidget(self.join_error, 12, 0, 1, 3)
+        layout.addWidget(self.join_error, row + 6, 0, 1, 3)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -1786,6 +1796,8 @@ class LauncherUI(QMainWindow):
 
     def _connect(self) -> None:
         try:
+            if self.proton_executable is not None:
+                self._persist_proton()
             self.controller.connect(endpoint=self.server.text(), slot=self.slot.text(), password=self.password.text(), game_root=self.game_root.text(), saves_root=self.saves_root.text())
         except Exception as error:
             raw = str(error)
@@ -2046,6 +2058,29 @@ class LauncherUI(QMainWindow):
         value = QFileDialog.getExistingDirectory(self, "Select DOOM Eternal folder")
         if value:
             self.game_root.setText(value)
+
+    def _persist_proton(self) -> None:
+        value = self.proton_executable.text().strip()
+        if value:
+            path = Path(value).expanduser().resolve()
+            if path.name != "proton" or not path.is_file():
+                raise ValueError("Select the file named proton inside the Proton version used by DOOM Eternal.")
+            value = str(path)
+        if self.controller.config.get("proton_executable") != (value or None):
+            self.controller.save_config({"proton_executable": value or None})
+
+    def _save_proton(self) -> None:
+        try:
+            self._persist_proton()
+        except (OSError, ValueError, RuntimeError) as error:
+            QMessageBox.warning(self, "Proton executable", str(error))
+
+    def _browse_proton(self) -> None:
+        value, _ = QFileDialog.getOpenFileName(self, "Select DOOM Eternal's Proton executable",
+            self.proton_executable.text(), "Proton executable (proton);;All files (*)")
+        if value:
+            self.proton_executable.setText(value)
+            self._save_proton()
 
     def _browse_saves(self) -> None:
         start_dir = ""

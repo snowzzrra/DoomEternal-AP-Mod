@@ -493,12 +493,21 @@ class LauncherController:
         return self.ensure_ammo_refill_keybind()
 
     def save_config(self, updates: dict[str, object]) -> None:
+        proton_changed = any(key in updates and updates[key] != self.config.get(key)
+            for key in ("proton_executable", "proton_compat_data_dir"))
+        if proton_changed and self.is_game_running():
+            raise RuntimeError("Close DOOM Eternal before changing its Proton runtime.")
         self.config.update(updates)
         self._persist_config()
         LaunchWorkflow.write_client_config(
             self.client_dir,
             runtime_config=self.config,
         )
+        if proton_changed and self.supervisor is not None and self.supervisor.running:
+            try:
+                self.supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
+            except (OSError, RuntimeError) as error:
+                self.emit("core_runtime_rebind_pending", message=str(error))
 
     def resolve_saved_games_dir(
         self,

@@ -1,0 +1,22 @@
+{
+	edit = {
+		damageParms = {
+			damageName = "#str_damage_killed_by_world";
+			damageTypes = "DAMAGETYPE_HEALTH DAMAGETYPE_PLAYER_KILL DAMAGETYPE_HAZARD";
+			playerBodyReactionDescriptor = {
+				type = "PLAYER_BODY_REACTION_GIB";
+			}
+			kickTime = 0;
+			kickAmplitude = 0;
+			kickDir = {
+				y = 0;
+			}
+		}
+		maxDamage = {
+			defaultValue = 1000;
+		}
+		minDamage = {
+			defaultValue = 1000;
+		}
+	}
+}

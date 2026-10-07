@@ -14,9 +14,9 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.6.0)'
+        description: 'Release version label (e.g. v0.6.2)'
         required: true
-        default: 'v0.6.0'
+        default: 'v0.6.2'
         type: string
       core_repo:
         description: 'Repository containing Sentinel Core source (owner/repository)'

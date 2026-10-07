@@ -46,7 +46,8 @@ class CampaignMenu:
             stage_id = STAGES[row["stage"]]["access_id"]
             stage_ids[stage_id] = row["stage"]
             flags = sum(bit for field, bit in (("revealed", 1), ("unlocked", 2), ("completed", 4),
-                                              ("goal", 8), ("details_visible", 32)) if row[field])
+                                              ("goal", 8), ("details_visible", 32), ("slayer_gate", 64),
+                                              ("gate_key", 128), ("gate_complete", 256)) if row.get(field, False))
             rows.append((stage_id, flags, STAGES[row["stage"]]["native_index"], row["map"], row["title"].upper()))
             summary = snapshot.get("summaries", {}).get(row["stage"])
             rating = snapshot.get("ratings", {}).get(row["stage"]) if row["revealed"] else None

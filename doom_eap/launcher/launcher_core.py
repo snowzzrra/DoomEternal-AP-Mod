@@ -132,6 +132,8 @@ CLIENT_CONFIG_FIELDS = frozenset({
     "seed_manifest_hash",
     "core_runtime_manifest",
     "selected_core_runtime_manifest",
+    "proton_executable",
+    "proton_compat_data_dir",
 })
 
 
@@ -1724,7 +1726,7 @@ class LaunchWorkflow:
                 value = manifest_hash
             if value is not None:
                 config[key] = value
-            elif runtime_config is not None and key in {"core_runtime_manifest", "selected_core_runtime_manifest"}:
+            elif runtime_config is not None and key in {"core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"}:
                 config.pop(key, None)
 
         remote = source.get("steam_remote_dir") or config.get("steam_remote_dir")

@@ -124,7 +124,7 @@
       "signal": {
         "kind": "map_terminal",
         "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
-        "owner": "game_map_exit_level_transition_relay_852698944"
+        "owner": "ai_target_level_transition_1"
       },
       "order": 45
     }

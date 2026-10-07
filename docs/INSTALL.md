@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.6.1
+# Install DOOM Eternal Archipelago 0.6.2
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.6.1** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.2** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -64,6 +64,21 @@ Create Player writes player options for room generation. Active room options com
 from the server.
 
 ## Prepare and Install
+
+Core 1.0.4 supplies the v0.6.2 Slayer Gate indicators in Mission Select and the
+gameplay HUD correction. The key uses its native on/off icon. The gate icon is
+white while unchecked and green after server confirmation. Hidden missions do
+not reveal these states.
+
+Update/rebuild the existing room package for the global original DeathLink
+damage declaration, Elena Richardson AP pickups and Taras completion hook.
+Keep the same seed, slot and AP save.
+
+New v0.6.2 seeds classify capacities as progression and promote at least one
+pooled Progressive Blood Punch. In Random Mission Order, the three missions
+after the starting mission use CR 63 or lower when the pool permits; restricted
+pools use their lowest remaining CR instead. Taras/Urdak require the existing
+endurance preparation floors. Existing seed orders and placements are retained.
 
 After room connection reports that setup is required, select the explicit
 **Prepare and install** action. Launcher then:
@@ -147,6 +162,19 @@ Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
 by Steam inside the configured Proton prefix. Do not launch the Windows game
 executable directly through Wine.
 
+If Proton detection fails, open **Join a Room → PROTON EXECUTABLE → BROWSE**.
+Select the file named `proton` from the version chosen in Steam's
+**DOOM Eternal → Properties → Compatibility**, then retry preparation.
+For example, Proton Experimental commonly uses
+`~/.local/share/Steam/steamapps/common/Proton - Experimental/proton`;
+GE-Proton commonly lives under `~/.local/share/Steam/compatibilitytools.d/`.
+
+For a package without this selector, close DOOM and the launcher, then add
+`proton_executable` and `proton_path`, both pointing to that absolute executable,
+to the existing `~/.config/doom-eternal-archipelago/launcher.json`
+(`$XDG_CONFIG_HOME` overrides `~/.config`) and the package's `client/ap_config.json`.
+Preserve the other settings, restart the launcher and retry preparation.
+
 1. Approve verified EternalModInjectorShell 6.66-rev3.16 acquisition or provide
    an official verified local artifact.
 2. Launcher stages the generated mod.
@@ -173,7 +201,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-The launcher version is **0.6.1**. APWorld and room content use revision **0.6.0**. Update with DOOM closed and reconnect to the same room to retain its seed, placements and AP save. Rebuild the room package when the launcher requests a content update.
+The launcher version is **0.6.2**. APWorld and room content use revision **0.6.0**. Update with DOOM closed and reconnect to the same room to retain its seed, placements and AP save. Rebuild the room package when the launcher requests a content update.
 
 **Game Setup** provides **REPAIR CORE**, **REPAIR SESSION** and **RESTORE PREVIOUS CORE**. Automatic compatible Core updates default to enabled; the checkbox preserves your choice. **LOCAL CORE** selects a complete development distribution's `distribution.json`; **USE RELEASES** restores official release selection. The launcher and its session helper use Core from the persistent user cache. A verified cached distribution supports offline preparation.
 

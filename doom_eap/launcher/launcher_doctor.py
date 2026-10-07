@@ -381,10 +381,20 @@ def _read_support_log(path: Path) -> str | None:
                 events = deque()
                 retained = 0
                 limit = SUPPORT_LOG_MAX_BYTES - SUPPORT_LOG_TAIL_BYTES - 256
+                death_events = deque()
+                death_retained = 0
+                death_limit = min(128 * 1024, limit // 4)
+                limit -= death_limit
                 while source.tell() < size:
                     line = source.readline(32768)
                     if not line:
                         break
+                    if b"[DeathLink]" in line or b"deathlink-kill" in line:
+                        death_events.append(line)
+                        death_retained += len(line)
+                        while death_retained > death_limit:
+                            death_retained -= len(death_events.popleft())
+                        continue
                     structured = b'DELIVERY_EVENT ' in line and b'PROBE_RESPONSE' not in line
                     if structured or any(marker in line for marker in (
                         b" ERROR ", b" WARNING ", b"QUEUE_PUBLICATION_", b"GATE_TRANSITION ",
@@ -395,7 +405,8 @@ def _read_support_log(path: Path) -> str | None:
                         while retained > limit:
                             retained -= len(events.popleft())
                 payload = (head + b"\n\n[... RETAINED TRANSITION/ERROR EVENTS ...]\n\n"
-                           + b"".join(events) + b"\n\n[... CURRENT TAIL ...]\n\n" + tail)
+                           + b"".join(events) + b"\n\n[... DEATHLINK EVENTS ...]\n\n"
+                           + b"".join(death_events) + b"\n\n[... CURRENT TAIL ...]\n\n" + tail)
         text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
         return text[: SUPPORT_LOG_MAX_BYTES + 128]
     except (OSError, UnicodeError):
@@ -1539,7 +1550,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.6.1"
+    VERSION = "0.6.2"
 
     def __init__(
         self,

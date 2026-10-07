@@ -27,8 +27,6 @@ done
 
 echo "Starting AP Client: ${NEW_CMD[@]}" >> "$DIR/bridge_debug.log"
 
-# Remove injector processes left behind by an earlier game session. They can
-# reconnect to a new Meathook server and create multiple competing RPC clients.
 pkill -f '[/\\]ap_client\.exe' 2>/dev/null || true
 
 # Let DOOM and Meathook finish their initial startup before opening the RPC

@@ -23,11 +23,11 @@ def runtime(configuration):
     else:
         info = prefix / "config_info"
         if not info.is_file() or info.stat().st_size > 65536:
-            raise RuntimeError("Select the Proton executable used by DOOM Eternal in launcher settings")
+            raise RuntimeError("Choose DOOM Eternal's Proton executable under Join a Room > PROTON EXECUTABLE")
         candidates = {Path(line) / "proton" for line in info.read_text(encoding="utf-8").splitlines()
                       if line.startswith("/") and (Path(line) / "proton").is_file()}
         if len(candidates) != 1:
-            raise RuntimeError("Select the Proton executable used by DOOM Eternal in launcher settings")
+            raise RuntimeError("Choose DOOM Eternal's Proton executable under Join a Room > PROTON EXECUTABLE")
         proton = candidates.pop().resolve()
     if proton.name != "proton" or not proton.is_file():
         raise RuntimeError("Select a valid installed Proton executable")

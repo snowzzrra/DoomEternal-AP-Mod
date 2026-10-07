@@ -1228,40 +1228,23 @@ def discover_oodle_dll():
     return next((path for path in candidates if path.is_file()), Path())
 
 
-def discover_proton():
-    configured = config.get("proton_path")
-    if configured and Path(configured).is_file():
-        return Path(configured)
-
-    common_dir = Path(DOOM_BASE_DIR).parent.parent
-    candidates = sorted(
-        common_dir.glob("Proton*/proton"),
-        key=lambda path: ("Experimental" not in path.parent.name, path.parent.name),
-    )
-    return next((path for path in candidates if path.is_file()), Path())
-
-
-def discover_compat_data():
-    for parent in Path(SAVE_GAMES_DIR).parents:
-        if parent.name == "pfx":
-            return parent.parent
-    return Path()
-
-
-def discover_steam_install():
-    if STEAM_REMOTE_DIR is None:
-        return Path()
-
-    for parent in STEAM_REMOTE_DIR.parents:
-        if parent.name == "userdata":
-            return parent.parent
-    return Path()
+def refresh_death_probe_proton():
+    global PROTON_PATH, STEAM_COMPAT_DATA, STEAM_INSTALL
+    if os.name == "nt":
+        return
+    from doom_eap.runtime.proton import runtime
+    try:
+        command, environment = runtime(config)
+        PROTON_PATH = Path(command[0])
+        STEAM_COMPAT_DATA = Path(environment["STEAM_COMPAT_DATA_PATH"])
+        STEAM_INSTALL = Path(environment["STEAM_COMPAT_CLIENT_INSTALL_PATH"])
+    except (OSError, ValueError, RuntimeError, KeyError):
+        PROTON_PATH = STEAM_COMPAT_DATA = STEAM_INSTALL = Path()
 
 
 OODLE_DLL = discover_oodle_dll()
-PROTON_PATH = discover_proton()
-STEAM_COMPAT_DATA = discover_compat_data()
-STEAM_INSTALL = discover_steam_install()
+PROTON_PATH = STEAM_COMPAT_DATA = STEAM_INSTALL = Path()
+refresh_death_probe_proton()
 DEATH_PROBE_COMPAT_DATA = Path(
     config.get(
         "death_probe_compat_data",
@@ -4121,7 +4104,7 @@ class DoomEternalContext(CommonContext):
         started = getattr(lease, "started_ns", None) if lease else None
         action = self.runtime_lifecycle.authored_timestamp_action(newest_mtime, started)
         if action == "ignore":
-            return False
+            return self.advance_known_map_materialization(evidence)
         if action == "native_fallback":
             return self.advance_known_map_materialization(evidence)
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
@@ -4391,6 +4374,16 @@ class DoomEternalContext(CommonContext):
             self._campaign_menu = CampaignMenu()
         try:
             projection = self.campaign_projection()
+            owned = set(self.owned_item_ids())
+            gate_checks = {name: int(location) for location, name in DOOM_LOCATION_NAMES.items()
+                           if name.endswith(" - Slayer Gate Complete")}
+            for row in projection["rows"]:
+                gate_key = next((item for item, map_key in GATE_KEY_TO_MAP.items()
+                                 if row["stage"] == map_key), None)
+                row["slayer_gate"] = gate_key is not None and row["revealed"]
+                row["gate_key"] = row["slayer_gate"] and gate_key in owned
+                row["gate_complete"] = row["slayer_gate"] and gate_checks.get(
+                    row["title"] + " - Slayer Gate Complete") in self.checked_locations
             self.synchronize_fortress_phase(projection)
             from doom_eap.runtime.mission_presentation import MissionPresentations
             if not hasattr(self, "_mission_presentations"):
@@ -6783,12 +6776,13 @@ async def launcher_control_loop(ctx):
             continue
         if control.get("type") == "core_runtime_reload":
             updated = load_config()
-            for key in ("core_runtime_manifest", "selected_core_runtime_manifest"):
+            for key in ("core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"):
                 if key in updated:
                     config[key] = updated[key]
                 else:
                     config.pop(key, None)
             ctx._native_link_key = None
+            refresh_death_probe_proton()
             emit_launcher_event("core_runtime_bound", path=config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest"))
             continue
         if control.get("type") == "support_condump":

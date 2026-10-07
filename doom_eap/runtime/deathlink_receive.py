@@ -92,7 +92,6 @@ class DeathLinkReceiver:
 
     @staticmethod
     def _validate_mode(mode: str) -> str:
-        # Legacy slot compatibility; normalized to single-burst delivery
         return "soft"
 
     @property

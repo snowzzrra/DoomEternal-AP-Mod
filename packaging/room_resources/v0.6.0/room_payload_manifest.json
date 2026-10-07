@@ -182,6 +182,7 @@
     "gameresources/textures/swf_images/start_screen/scanline_a.png$bc7$streamed$mtlkind=ui",
     "gameresources_patch1/EternalMod/strings/english.json",
     "gameresources_patch1/EternalMod/strings/portuguese.json",
+    "gameresources_patch1/generated/decls/damage/damage/triggerhurt/triggerhurt1000_instagib.decl",
     "gameresources_patch1/generated/decls/entitydef/player.decl",
     "gameresources_patch1/generated/decls/menuelement/hud/dossier/runes.decl",
     "gameresources_patch1/swf/hud/hud_score.swf",
@@ -337,7 +338,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "4f83ab6fb7135f93a90a9c096e9c1e09c7171e4b98b9c2c4626eaac203acdc0a",
+          "sha256": "4edfea38d906b5cd226a3a748a9302254d96de4a5e2a7b3226ec9667f15b2e6c",
           "source": "base"
         }
       ],
@@ -376,7 +377,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "e0991b4fd2c0ff8de1ab64d32e0ac4fbe30902aa0052ae56d3a9585a1c5b2268",
+          "sha256": "41272832156877167d02ba3201ac281bb8c855e07dfffaf707d29f8d4e05c2e2",
           "source": "base"
         }
       ],

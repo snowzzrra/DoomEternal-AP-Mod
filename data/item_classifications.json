@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 9,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "46e88a2a65b97f975e15538b3692e68444b9c4bc1a23d85e04c1af4625948f66",
+  "source_sha256": "4c649360a924108d1cc96acaee3246e4d14a4d3e9b6cffd91272d399f4d9df8c",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -74,7 +74,7 @@
     },
     "7770017": {
       "name": "Progressive Health Upgrade",
-      "classification": 2
+      "classification": 1
     },
     "7770021": {
       "name": "Suit Point",
@@ -334,7 +334,7 @@
     },
     "7770088": {
       "name": "Progressive Armor Upgrade",
-      "classification": 2
+      "classification": 1
     },
     "7770089": {
       "name": "Air Control",
@@ -350,7 +350,7 @@
     },
     "7770092": {
       "name": "Progressive Ammo Upgrade",
-      "classification": 2
+      "classification": 1
     },
     "7770093": {
       "name": "Chrono Strike",
