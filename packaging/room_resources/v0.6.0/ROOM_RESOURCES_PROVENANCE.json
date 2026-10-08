@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "e26bb0f83770419359170d3e903e5b4d518a345b5d9a200b84ad2eda3844d13a",
-    "size": 13888553
+    "sha256": "b3d34cd02a0f5d2fa309563d44289615f9172c05e46a585a7176f4bf6b7a7398",
+    "size": 13892498
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
   "inputs_count": 386,
   "release_version": "0.6.0",
   "room_payload_manifest": {
-    "sha256": "c283a1963257adc93bc7c2a3020a3eb5cc0d231357c340956f3c8e6a8e865c1d",
-    "size": 26144
+    "sha256": "9da687a1412f32d9ad2bc645fc738fb5654960e265e1703e05e2760be5c8c697",
+    "size": 26294
   },
   "room_payloads": {
     "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
     "size": 2202253
   },
-  "room_resource_input_fingerprint": "58011d95499157f1fdedfbff40f49e51eedf64b85d8830cdd11155115311a275",
+  "room_resource_input_fingerprint": "ed688763a2afeea2c71382fa90a3e657105478b702c17b62ac7cd5a1b83cae8e",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -224,7 +224,7 @@
     "doom_eap/contracts/save_observation.py": "672f27a9a86d32fe58b890b978d4b199031f478720417ba571f5200f90a453c8",
     "doom_eap/contracts/source_bytes.py": "9a9c41e4d61d7c84e4cf16167bcb36c3f6403f44334d52c6dfdc0ccda356bcba",
     "doom_eap/contracts/tag_prerequisites.py": "76f605b03424824de269aaa4fed88425e950f0d687a09095dcdd5d8e73cad907",
-    "doom_eap/launcher/launcher_core.py": "336c028635f120a5e6124e802b24794d0c4edd2ce950531a3c4ac2cf94663805",
+    "doom_eap/launcher/launcher_core.py": "f407e62a93b4bb292f92f0660b2548878ae90af0c49d73d78b6681f8fd8926fc",
     "doom_eap/runtime/context_registry.py": "8b813d6a4b6de566255dba8f7b39ecb40706e679f5112e5f860315939cfee67b",
     "doom_eap/runtime/save_records.py": "96065b79896e964c47e5855c4035b1eb3ea13b56c0bcb7025b0593c25955a106",
     "manifests/e1m1_intro.json": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
@@ -357,7 +357,7 @@
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_map.swf": "70b1317db301c4bd069f52a42cfc2e36287f7f39143bcee5fc0f513d0d4fffb1",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/end_of_level/eol_challenges.swf": "96465b1e8fa9eb501222a610248d64aa8219894895882336bb0a2d2efdd77437",
-    "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": "58606752439e503e007b933ba9921f6f6ee5f9fe59a306092a2e47d6a89af75d",
+    "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": "d652fcf05339ace07de198f8ec5bdec42d3aaf6814b87172cec8a3f4c7970693",
     "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/start.swf": "554abc5176edcf6f577404f8af7d3db4ef67b986c1f8932575b86dfa658eab95",
     "packaging/mod_assets/gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl": "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19",
     "packaging/mod_assets/gameresources_patch2/swf/hud/menus/dossier/dossier_challenges.swf": "dd153bc846a1a7bbd2f692724b1574683507453e0dfbbcbf0769840b0c104c13",
@@ -382,7 +382,7 @@
     "tools/decls/mission_challenge_decl_builder.py": "3fe1b1c8e4ae29a2815079037309149685d07f507c19aa9fb042f20e52ec5182",
     "tools/decls/rune_decl_builder.py": "fd9c0cc2d21e476790671b561b9ff0df8a39459ee013f95f7fe1374ca8d895ba",
     "tools/decls/rune_slot_builder.py": "657f5e08a322a065532ef48a8b85e0be3167685ceb14223e0e132a11085c41c8",
-    "tools/decls/weapon_stripping_builder.py": "ab35a15f4d2fdad9abb40cc8d1045ddd1191be8c03955cec49f8fd3d2faec816",
+    "tools/decls/weapon_stripping_builder.py": "3ce588ce14bfb542b3638f0032669647ebc6f40d26d1f1490245214efd3cc649",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/maps/ap_map_generator.py": "d138376e5b17e2bc248a99aaf331f981584b05534359a1a9362463a30f3f8122",
     "tools/maps/automap_baseline_guard.py": "d7d280015c3dc61627089326cdb44a868356b8e412422f506cb56738ca63d6ad",
@@ -406,7 +406,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "60f938e611f73d550830b61548a296e56e96314d",
+      "base_commit_sha": "cb00e1af4511eba9a2eb0aa278568839f507efc2",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13180,7 +13180,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "c59bf99970c924891aede52ba08bb8a335c72865",
+      "base_commit_sha": "6055543ffd83141361f04717a830bab2ca40de6d",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14085,8 +14085,8 @@
             "size": 90136
           },
           "doom_eap/launcher/launcher_core.py": {
-            "sha256": "8c275ea5f948f028bc43888189a34d592b7d4247c1afca695eb412dbedc7bf27",
-            "size": 85279
+            "sha256": "5ece87814974b3a90ca7c7161a716a339aa05dc8e13916b98bcc887956c480c5",
+            "size": 85272
           },
           "doom_eap/launcher/launcher_core_install.py": {
             "sha256": "b5f550782e1e935d3629da52ddc7926b0acaf0b8477805ae21dc9a9f770259b5",
@@ -14125,16 +14125,16 @@
             "size": 6793
           },
           "doom_eap/launcher/launcher_session.py": {
-            "sha256": "8558e64ff41070ef7615eff09e0f3366d78b1f61b8a6aedb6d7a498efc2c8e81",
-            "size": 40894
+            "sha256": "7edbd5cb2d5db3599e4f408948eb9bb0dba559c6dd01c71d0135ba9fc9665478",
+            "size": 40908
           },
           "doom_eap/launcher/launcher_supervisor.py": {
             "sha256": "5152a101cda5c3708fa2109e9a0f982dbce55ae51b4813002a21ed696b0afc7b",
             "size": 11605
           },
           "doom_eap/launcher/launcher_ui.py": {
-            "sha256": "463fe9f146c069b98f6588c2b85ac252f21910c74b4ef223176bbeeabc2eb2e4",
-            "size": 180631
+            "sha256": "551193277448dd59995778b05eba6b9312a5fab927962a39ef8076280f6e3ed4",
+            "size": 181754
           },
           "doom_eap/launcher/launcher_workers.py": {
             "sha256": "336795d007b9648de7f0d4186adff717bceffd0da839249c1ec4a2dd70dd6481",
@@ -14173,8 +14173,8 @@
             "size": 7301
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "56bae5e875fa1daacb06b7e367ba68813406ca54163c0f71097b0dcdbdfdbd3c",
-            "size": 314034
+            "sha256": "4a1ce7213e842772f1349b5588d4631d2ee021ceea482162d4e473e473778e9d",
+            "size": 314250
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "aa7aed38f1218b0a4d6269a2d56700e08bdbf7d88ef3e55694ee75bb58689b68",
@@ -14949,8 +14949,8 @@
             "size": 77832
           },
           "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/mission_select.swf": {
-            "sha256": "58606752439e503e007b933ba9921f6f6ee5f9fe59a306092a2e47d6a89af75d",
-            "size": 205870
+            "sha256": "d652fcf05339ace07de198f8ec5bdec42d3aaf6814b87172cec8a3f4c7970693",
+            "size": 205827
           },
           "packaging/mod_assets/gameresources_patch1/swf/main_menu/screens/start.swf": {
             "sha256": "554abc5176edcf6f577404f8af7d3db4ef67b986c1f8932575b86dfa658eab95",
@@ -15161,8 +15161,8 @@
             "size": 101309
           },
           "tools/decls/weapon_stripping_builder.py": {
-            "sha256": "f5417547bc8189017f65816854b5ef8625bb8780eb376a1308b555e9a6973c20",
-            "size": 10363
+            "sha256": "3b54dbe0c1b96d3783d59c2c9a6e784e8ba14e6700aa69d682004470db3de68e",
+            "size": 11050
           },
           "tools/diagnostics/save_inspector.py": {
             "sha256": "07f33df7eb331743cc19b8d611f4799b3ae7516cbcf6ef9d16521649ec7ae59b",
@@ -15385,7 +15385,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "795bfc3a3b06d1c43793f8f300ef4f9537d3b6c3bfacb30de107579efd972de7",
+        "fingerprint": "63776c0317aa9e0b6f51c440a0d38a59a83bd445539c82f1cc23fb5673982ae2",
         "kind": "working_tree_snapshot"
       }
     }

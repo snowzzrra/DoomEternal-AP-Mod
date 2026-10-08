@@ -1250,7 +1250,7 @@ class RoomCompiler:
         ).as_posix()
         assembled[hub_devinv_path] = devinv_source.encode("utf-8")
         # Mars Core's inherited replay loadout grants weapons outside AP ownership.
-        assembled["e2m3_core_patch3/generated/decls/devinvloadout/devinvloadout/sp/e2m3.decl"] = (
+        assembled["e2m3_core/generated/decls/devinvloadout/devinvloadout/sp/e2m3.decl"] = (
             '{\n\tedit = {\n\t\tclearAllBeforeApply = false;\n'
             '\t\tstartingInventory = { num = 0; }\n'
             '\t\tcurrencyToGive = { num = 0; }\n\t}\n}\n'
