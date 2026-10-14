@@ -21,10 +21,10 @@ WORKSPACE = ROOT.parent
 OWNERS = (
     {
         "name": "hammer_world_spear_cinematic",
-        "container": "e5m1_spear_patch2",
-        "source": ROOT / "vanilla_decls/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
+        "container": "e5m1_spear_patch1",
+        "source": ROOT / "vanilla_decls/resource_owners/e5m1_spear_patch1/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
         "path": "logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
-        "sha256": "e4a79b99f9d10643db1ee4bcb664839c4f7e0669d2826f93fb5a5e7fa383f790",
+        "sha256": "b2f28cb34ebea75ac3781d096e3509139b93bd040811b475227ff16c80c1a2ef",
         "inventory_item": "weapon/player/hammer",
         "desired_count": "1",
     },

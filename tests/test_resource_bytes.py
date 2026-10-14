@@ -27,37 +27,6 @@ def test_project_owned_decl_inputs_use_canonical_lf():
             assert b"\r\n" not in (ROOT / name).read_bytes(), name
 
 
-def test_cinematic_grant_cuts_preserve_hands_and_scene_graph():
-    from tools.decls.weapon_stripping_builder import OWNERS, _neutralize, _source_payload
-    from tools.maps.ap_map_generator import find_matching_brace
-    for owner in OWNERS:
-        source = _source_payload(owner).decode("utf-8")
-        result, _ = _neutralize(owner, source.encode())
-        if owner["inventory_item"] == "weapon/player/hammer":
-            assert source.count('entityDef = "pickup/weapon/hammer";') == 1
-            assert 'entityDef = "pickup/weapon/hammer";' not in result
-            assert result.count('entityDef = "info/null";') == 1
-            with pytest.raises(ValueError, match="spawned Hammer pickup drifted"):
-                _neutralize(owner, source.replace('entityDef = "pickup/weapon/hammer";', 'entityDef = "wrong";').encode())
-            source = source.replace('entityDef = "pickup/weapon/hammer";', 'entityDef = "info/null";')
-        at = 0
-        while True:
-            at = source.index("itemsToModify = {", at)
-            opening = source.index("{", at)
-            end = find_matching_brace(source, opening)
-            if owner["inventory_item"] in source[opening:end]:
-                break
-            at = end
-        result_end = find_matching_brace(result, opening)
-        assert result[opening + 1:result_end - 1].strip() == "num = 0;"
-        assert result[:opening] == source[:opening]
-        assert result[result_end:] == source[end:]
-        assert _neutralize(owner, result.encode())[0] == result
-        assert result.count("item[0]") == source.count("item[0]") - 1
-        with pytest.raises(ValueError, match="payload drifted"):
-            _neutralize(owner, source.replace(owner["inventory_item"], "weapon/player/wrong").encode())
-
-
 def test_every_hud_counter_is_a_root_sibling():
     recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
     variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]

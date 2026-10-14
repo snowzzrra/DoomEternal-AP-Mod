@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "5f59022b4c331b329f9fc10d14e3ea558afdcc1422c68d60d2c31c4ac4d8718e",
-    "size": 13902252
+    "sha256": "91fb65e05f408c9f93d597c6918f2593c49ffe8d252102ce71a653c6de00714b",
+    "size": 13902448
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
   "inputs_count": 386,
   "release_version": "0.6.0",
   "room_payload_manifest": {
-    "sha256": "c1c02250a70d360c1f27cbe46fcd9d3f6a694f36796f710106e9ef5893bf2689",
+    "sha256": "52526ec98ef7c2315ec0e969fac1332c1ff9e9009930ef03febd3c835a1972ef",
     "size": 26586
   },
   "room_payloads": {
     "sha256": "9a9529f4dd040aa257294f8e1491f841092664b556cb30787ed3ff93c235fa61",
     "size": 2202373
   },
-  "room_resource_input_fingerprint": "8f1694a563ec4074cfa2fb1fb0f61ef567671b33eff7d6dc4e8e47a6583b2668",
+  "room_resource_input_fingerprint": "f759e895993c8e237efb9397446ef505a1eabbe9bd54d6e0ef8970d58fbad0bb",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -382,7 +382,7 @@
     "tools/decls/mission_challenge_decl_builder.py": "3fe1b1c8e4ae29a2815079037309149685d07f507c19aa9fb042f20e52ec5182",
     "tools/decls/rune_decl_builder.py": "fd9c0cc2d21e476790671b561b9ff0df8a39459ee013f95f7fe1374ca8d895ba",
     "tools/decls/rune_slot_builder.py": "657f5e08a322a065532ef48a8b85e0be3167685ceb14223e0e132a11085c41c8",
-    "tools/decls/weapon_stripping_builder.py": "2e713c7a5fcbe56f6c159c8c62be59d9f8cd5c014acc8c2154143cf2c12527b7",
+    "tools/decls/weapon_stripping_builder.py": "a24c61e1e6b99b9ec2e4734d2acdf871bd75390ceec8be66bcc8b80d45bc5138",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/maps/ap_map_generator.py": "4d8ab6a750f9ceb920ab65915a3e052651d10fd6f6a518355977c9095b1debb2",
     "tools/maps/automap_baseline_guard.py": "80f4697708701ab10eb64764d0ebc12c19de2cf711e74ea06a870fe4c253b10d",
@@ -13228,7 +13228,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "bfd43dcf716d259021f7716131ad3b1375b9d7fc",
+      "base_commit_sha": "0001c95d388aee6c37308cbd1cee41fa2a381658",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -15209,8 +15209,8 @@
             "size": 101309
           },
           "tools/decls/weapon_stripping_builder.py": {
-            "sha256": "2e713c7a5fcbe56f6c159c8c62be59d9f8cd5c014acc8c2154143cf2c12527b7",
-            "size": 12316
+            "sha256": "a24c61e1e6b99b9ec2e4734d2acdf871bd75390ceec8be66bcc8b80d45bc5138",
+            "size": 12350
           },
           "tools/diagnostics/save_inspector.py": {
             "sha256": "07f33df7eb331743cc19b8d611f4799b3ae7516cbcf6ef9d16521649ec7ae59b",
@@ -15433,7 +15433,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "2ee3b381c07c27085ae5b1c5d513f695d39bbaef692a2309234b8050f1f3e47e",
+        "fingerprint": "b35aef6f5979bb2ca72e140729a118c4bfa387ca21a66805549191b46c3f7040",
         "kind": "working_tree_snapshot"
       }
     }
