@@ -71,9 +71,8 @@ def assert_separate_automap_helper_guard() -> int:
             generated = output.read_text()
             helper_names = re.findall(r'entityDef\s+(ap_automap_location_\d+)\s*\{', generated)
             secret_automap_owners = {
-                entry["location_id"]: entry["automap_owner"]
+                entry["location_id"]: entry.get("automap_owner") or entry.get("manager", entry.get("manager_entity"))
                 for entry in config.get("secret_encounters", [])
-                if entry.get("automap_owner")
             }
             target_policies = config.get("target_policies", {})
             expected_names = {
@@ -145,6 +144,9 @@ def assert_separate_automap_helper_guard() -> int:
                 expected_position = target_policy.get(
                     "independent_position", _position(source_block)
                 )
+                if ap_check.endswith("_B") and entity_name == ap_check[:-2].removeprefix("AP_CHECK_").lower():
+                    expected_position = list(expected_position)
+                    expected_position[0] += 1.5
                 _assert_close(
                     _position(helper), expected_position, f"{map_key}/{location_id}"
                 )

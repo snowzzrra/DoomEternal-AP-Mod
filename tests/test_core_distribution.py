@@ -44,7 +44,7 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6), ("1.0.3", 6), ("1.0.4", 6)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6), ("1.0.3", 6), ("1.0.4", 6), ("1.0.5", 7)])
 @pytest.mark.parametrize("suffix", ["", "-rc-1"])
 def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_abi, suffix):
     manifest = fixture(tmp_path)
@@ -77,7 +77,7 @@ def test_native_probe_refuses_failed_response(tmp_path, monkeypatch, version, re
         link._run(["--pid", "7", "--native", "--json"])
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 3), ("1.0.1", 7), ("1.0.4", 99)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 3), ("1.0.5", 8), ("1.0.4", 99)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest.update(version=base + "-rc-1", base_version=base, abi={**ABI, "inventory": inventory_abi})

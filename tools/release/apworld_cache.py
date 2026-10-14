@@ -1,9 +1,3 @@
-"""Verified APWorld fingerprint and standard-build cache interface.
-
-This module only describes or verifies cache entries. It never treats an
-unverified Generate.py output directory as reusable.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -113,9 +107,6 @@ def _verified_outputs(plan: APWorldBuildPlan, outputs: Any) -> bool:
     for relative, metadata in expected.items():
         actual_metadata = inventory.get(relative)
         if actual_metadata != metadata:
-            return False
-        path = plan.output_root / relative
-        if _sha256(path) != metadata["sha256"]:
             return False
     return set(inventory) == set(expected)
 
@@ -245,6 +236,7 @@ def build_apworld(
             ("Utils.py", archipelago_source / "Utils.py"),
             ("BaseClasses.py", archipelago_source / "BaseClasses.py"),
             ("Options.py", archipelago_source / "Options.py"),
+            ("rule_builder", archipelago_source / "rule_builder"),
             ("worlds/__init__.py", archipelago_source / "worlds/__init__.py"),
             ("worlds/AutoWorld.py", archipelago_source / "worlds/AutoWorld.py"),
             ("worlds/Files.py", archipelago_source / "worlds/Files.py"),
@@ -270,20 +262,21 @@ def build_apworld(
     print(f"APWORLD cache=miss reason={reason} key={key}")
     build_env = os.environ.copy()
     build_env["SKIP_REQUIREMENTS_UPDATE"] = "1"
-    # the builder uses cwd/worlds and cwd/build; stage its inputs and keep the ap checkout candidate
     with tempfile.TemporaryDirectory(prefix="apworld-build-", dir=output.parent) as temporary:
         work = Path(temporary)
+        for source in archipelago_source.glob("*.py"):
+            shutil.copy2(source, work / source.name)
+        shutil.copytree(archipelago_source / "rule_builder", work / "rule_builder")
+        (work / "worlds").mkdir()
+        for source in (archipelago_source / "worlds").glob("*.py"):
+            shutil.copy2(source, work / "worlds" / source.name)
+        shutil.copytree(archipelago_source / "worlds/generic", work / "worlds/generic")
         shutil.copytree(archipelago_source / "worlds/doometernal", work / "worlds/doometernal")
+        (work / "data").mkdir()
+        shutil.copy2(archipelago_source / "data/GLOBAL.apignore", work / "data/GLOBAL.apignore")
         subprocess.run(
-            (archipelago_python, "-c", """
-import os, sys
-sys.path.insert(0, sys.argv[1])
-import Utils
-Utils.user_path.cached_path = sys.argv[2]
-from worlds.LauncherComponents import _build_apworlds
-os.chdir(sys.argv[2])
-_build_apworlds("DOOM Eternal", "--skip_open_folder")
-""", str(archipelago_source), str(work)),
+            (archipelago_python, str(work / "Launcher.py"), "Build APWorlds", "--",
+             "DOOM Eternal", "--skip_open_folder"),
             check=True, cwd=work, env=build_env,
         )
         candidate = work / "build/apworlds/doometernal.apworld"

@@ -47,6 +47,19 @@ def test_independent_dash_observation(abi, dash):
         link.observe_inventory()
 
 
+@pytest.mark.parametrize("abi,frag", [(6, 1), (7, 0), (7, 1), (7, 255)])
+def test_frag_observation_is_independent_of_ice(abi, frag):
+    link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)
+    reply = {"inventory_abi": abi, "kind": 0, "outcome": 1, "flags": 3,
+             "ice_bomb_after": 0, "dash_after": 255, "slayer_key_after": 255,
+             "frag_grenade_after": frag}
+    link._execute_typed = lambda *args: reply
+    assert link.observe_inventory()["frag_grenade_after"] == (frag if abi == 7 else 255)
+    reply.update(inventory_abi=7, frag_grenade_after=2)
+    with pytest.raises(WeaponPointsBlocked):
+        link.observe_inventory()
+
+
 @pytest.mark.parametrize("abi,key", [(4, 1), (5, 0), (5, 1), (6, 0), (6, 1), (6, 255)])
 def test_independent_slayer_key_observation(abi, key):
     link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)

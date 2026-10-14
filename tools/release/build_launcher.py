@@ -76,6 +76,32 @@ def _dependency_version(name: str) -> str:
         return "missing"
 
 
+def _linux_xcb_libraries(plugin: Path) -> dict[str, Path]:
+    from PyInstaller.depend.bindepend import get_imports
+
+    if not plugin.is_file():
+        raise RuntimeError(f"Qt xcb plugin is missing: {plugin}")
+    libraries: dict[str, Path] = {}
+    pending = [plugin]
+    visited = set()
+    while pending:
+        binary = pending.pop()
+        if binary in visited:
+            continue
+        visited.add(binary)
+        for name, path in get_imports(str(binary)):
+            if not name.startswith(("libxcb-", "libxkbcommon", "libX11-xcb")):
+                continue
+            if path is None:
+                raise RuntimeError(f"Qt xcb dependency is missing: {name} ({binary})")
+            library = Path(path)
+            libraries[name] = library
+            pending.append(library)
+    for name, path in sorted(libraries.items()):
+        print(f"LINUX_QT_DEPENDENCY name={name} path={path}")
+    return libraries
+
+
 def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     output_dir = output_dir.expanduser().resolve()
     archipelago_source = archipelago_source.expanduser().resolve()
@@ -85,9 +111,15 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         raise ValueError(f"invalid Archipelago source: {archipelago_source}")
     cache_root = Path(os.environ.get("AP_BUILD_CACHE_ROOT", REPO_ROOT / ".cache/ap-build"))
     executable_name = f"{name}.exe" if os.name == "nt" else name
+    xcb_libraries: dict[str, Path] = {}
+    if sys.platform.startswith("linux"):
+        from PySide6.QtCore import QLibraryInfo
+
+        plugin = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)) / "platforms/libqxcb.so"
+        xcb_libraries = _linux_xcb_libraries(plugin)
     key = content_key(
         "launcher",
-        _launcher_inputs(archipelago_source),
+        _launcher_inputs(archipelago_source) + [(f"linux-xcb/{name}", path) for name, path in sorted(xcb_libraries.items())],
         config={
             "name": name,
             "python": sys.executable,
@@ -169,6 +201,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     ]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
+    for path in xcb_libraries.values():
+        command[-1:-1] = ["--add-binary", f"{path}{data_separator}."]
     if os.name == "nt":
         command[-1:-1] = ["--hide-console", "hide-early", "--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
     build_environment = os.environ.copy()

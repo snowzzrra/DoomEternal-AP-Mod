@@ -3241,8 +3241,9 @@ class LauncherUI(QMainWindow):
             self._set_setup_state("disconnected")
             self._set_home("SESSION ENDED", "Update room details or reconnect.", "JOIN A ROOM", "OFFLINE")
         elif kind == "connection_lost":
+            if self.connection_badge.text() == "RECONNECTING":
+                return
             self._set_connection_badge("RECONNECTING", False)
-            self._set_status("ap", "reconnecting", self.COLORS["warn"])
             self._set_home(
                 "ROOM CONNECTION INTERRUPTED",
                 "DoomEAP is reconnecting in the background. Gameplay state is preserved.",

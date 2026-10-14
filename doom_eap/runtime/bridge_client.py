@@ -484,7 +484,7 @@ SAVE_GAMES_SELECTION_SOURCE = "unresolved"
 SAVE_GAMES_SELECTION_REASON = "configuration has not been resolved"
 
 AP_SOURCE_PATH = os.environ.get("ARCHIPELAGO_SOURCE")
-if AP_SOURCE_PATH:
+if not getattr(sys, "frozen", False) and AP_SOURCE_PATH:
     sys.path.insert(0, os.path.abspath(AP_SOURCE_PATH))
 
 import colorama  # noqa: E402
@@ -2665,10 +2665,14 @@ class SentinelInventoryObservation:
         items = {}
         weapons = result["weapons_after"]
         if weapons != 0xffffffff:
-            items[7770002] = ItemObservation(7770002, OWNED if weapons & (1 << 6) else MISSING,
-                                             source="sentinel_inventory")
-            items[7770006] = ItemObservation(7770006, OWNED if weapons & (1 << 7) else MISSING,
-                                             source="sentinel_inventory")
+            for bit, item_id in enumerate((7770900, 7770003, 7770000, 7770005, 7770001,
+                                           7770004, 7770002, 7770006, 7770010, 7770008)):
+                items[item_id] = ItemObservation(item_id, OWNED if weapons & (1 << bit) else MISSING,
+                                                source="sentinel_inventory")
+        frag = result.get("frag_grenade_after", 255)
+        if frag in (0, 1):
+            items[7770011] = ItemObservation(7770011, OWNED if frag else MISSING,
+                                            source="sentinel_inventory")
         ice = result["ice_bomb_after"]
         if ice != 255:
             items[7770013] = ItemObservation(7770013, OWNED if ice else MISSING,
@@ -2684,13 +2688,15 @@ class SentinelInventoryObservation:
                 if map_key in runtime_context.map_keys:
                     items[item_id] = ItemObservation(item_id, OWNED if key else MISSING,
                                                      source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, ice, dash, key)
+        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, frag, ice, dash, key)
         if signature != self.last_logged:
             log_item_event(
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
                 namespace=link.namespace, process_id=link.pid, epoch=epoch,
                 context=context_identity, rocket=items.get(7770002, ItemObservation(7770002)).state,
                 bfg=items.get(7770006, ItemObservation(7770006)).state,
+                ballista=items.get(7770004, ItemObservation(7770004)).state,
+                frag=items.get(7770011, ItemObservation(7770011)).state,
                 ice=items.get(7770013, ItemObservation(7770013)).state,
                 dash=items.get(7770015, ItemObservation(7770015)).state,
                 weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
@@ -3273,12 +3279,35 @@ class DoomEternalContext(CommonContext):
 
     async def request_ammo_refill(self):
         self._observe_ammo_receipts()
+        work = self.runtime_lifecycle.capture_work()
+        identity = (self.state_key, self.active_save_slot, self._active_materialization_lease())
+        deadline = time.monotonic() + 30
+        waiting = False
+        while True:
+            if self.exit_event.is_set():
+                raise asyncio.CancelledError
+            evidence = read_gameplay_save_evidence()
+            if (not self.runtime_lifecycle.work_is_current(work)
+                    or identity != (self.state_key, self.active_save_slot, self._active_materialization_lease())
+                    or evidence is None or evidence.state != "gameplay"):
+                emit_launcher_event("ammo_refill", status="cancelled", message="Ammo Refill cancelled: the room, save or level changed.")
+                return False
+            readiness = self._ammo_refill_readiness()
+            if readiness[0] not in {"native_safe", "runtime_effects_ready"}:
+                break
+            if not waiting:
+                emit_launcher_event("ammo_refill", status="waiting", message="Return to DOOM and unpause within 30 seconds to use Ammo Refill.")
+                waiting = True
+            if time.monotonic() >= deadline:
+                emit_launcher_event("ammo_refill", status="cancelled", message="Ammo Refill timed out. Return to DOOM and request it again.")
+                return False
+            await asyncio.sleep(0.25)
         scope = AmmoCommandScope(
             self.state_key, self.runtime_lifecycle.map_identity.current_map, self.active_save_slot,
             active_crucible(self._connected_slot_data.get("special_weapon"),
                             receipt_item_ids(self.items_received[: self.items_processed])),
         )
-        return await self.ammo.request(scope, self._ammo_refill_readiness())
+        return await self.ammo.request(scope, readiness)
 
     def _consume_ammo_refill_request_file(self):
         return self.ammo_requests.consume(ammo_refill_request_files())
@@ -3401,6 +3430,7 @@ class DoomEternalContext(CommonContext):
             self.reconcile_checked_automap_cleanup("server_checked_update")
             self.reconcile_fast_travel_unlock("server_checked_update")
             self.session_tasks.start(self.check_mission_challenge_locations)
+            self.session_tasks.start(lambda: self.evaluate_campaign_goal("server checked update"))
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             self.deathlink.observe_echo(data.get("time"), self.last_death_link)
@@ -3454,6 +3484,7 @@ class DoomEternalContext(CommonContext):
         self.reconcile_checked_automap_cleanup("server_connected")
         self.reconcile_fast_travel_unlock("connected")
         self.session_tasks.start(self.check_mission_challenge_locations)
+        self.session_tasks.start(lambda: self.evaluate_campaign_goal("server connected"))
         if self._item_delivery_wakeup:
             self._schedule_item_delivery("connected")
         balance = self._ammo_refill_balance_payload()
@@ -5483,31 +5514,42 @@ class DoomEternalContext(CommonContext):
             )
             if error or plan is None:
                 return plan, error
-            relevant = plan.entitlement_item_ids
-            identity = (self.state_key, self.room_seed_name, self.context_identity)
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                await asyncio.sleep(0.1)
-                evidence, eligibility_error = self._reconciliation_eligibility(require_connection=True)
-                if eligibility_error or identity != (self.state_key, self.room_seed_name, self.context_identity):
-                    return plan, "Repair dispatched; context changed before ownership could be observed"
-                port = getattr(self, "inventory_observation_port", None)
-                if port is None:
-                    break
-                native = port.observe_inventory(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
-                    context_identity=self.context_identity, campaign=CONTEXT_BY_IDENTITY[self.context_identity].campaign)
-                if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
-                                       context_identity=self.context_identity):
-                    continue
-                if all(native.items.get(command.item_id) is not None
-                       and native.items[command.item_id].state == OWNED
-                       and (command.item_id not in (7770017, 7770088, 7770092, 7770901, 7770902)
-                            or native.get_observed_stage(command.item_id) > command.stage)
-                       for command in plan.commands):
-                    if any(native.get_state(item_id) == UNKNOWN for item_id in relevant):
-                        return plan, "Some entitled items have UNKNOWN native ownership; they were not replayed."
-                    return plan, None
-            return plan, "Repair dispatched; native ownership has not been confirmed. Consumables were preserved."
+            return await self._observe_inventory_repair(plan, work, identity)
+
+    async def _observe_inventory_repair(self, plan, work, identity):
+        relevant = plan.entitlement_item_ids
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
+            evidence, eligibility_error = self._reconciliation_eligibility(require_connection=True)
+            if (eligibility_error or not self.runtime_lifecycle.work_is_current(work)
+                    or identity != (self.state_key, self.room_seed_name, self.context_identity)):
+                return plan, "Repair dispatched; context changed before ownership could be observed"
+            port = getattr(self, "inventory_observation_port", None)
+            if port is None:
+                break
+            native = port.observe_inventory(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
+                context_identity=self.context_identity, campaign=CONTEXT_BY_IDENTITY[self.context_identity].campaign)
+            if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
+                                   context_identity=self.context_identity):
+                continue
+            if all(native.items.get(command.item_id) is not None
+                   and native.items[command.item_id].state == OWNED
+                   and (command.item_id not in (7770017, 7770088, 7770092, 7770901, 7770902)
+                        or native.get_observed_stage(command.item_id) > command.stage)
+                   for command in plan.commands):
+                if any(native.get_state(item_id) == UNKNOWN for item_id in relevant):
+                    return plan, "Native ownership pending for item IDs: " + ", ".join(
+                            str(item_id) for item_id in sorted(relevant) if native.get_state(item_id) == UNKNOWN)
+                return plan, None
+        return plan, "Repair dispatched; native ownership has not been confirmed. Consumables were preserved."
+
+    async def _observe_automatic_repair(self, plan, work, identity, epoch, fingerprint):
+        _, error = await self._observe_inventory_repair(plan, work, identity)
+        if self.runtime_lifecycle.work_is_current(work):
+            self.materialization.record_automatic_observation(error, epoch, fingerprint)
+            self.persist_session_state()
+            logger.info("RESYNC_READBACK status=%s detail=%s", "pending" if error else "observed", error or "owned")
 
     def automatic_reconcile_inventory(self, reason, *, observation=None):
         """Run one guarded resync routing through the single reconciliation authority."""
@@ -5597,6 +5639,10 @@ class DoomEternalContext(CommonContext):
             reason, evidence.epoch, fingerprint, self.items_processed,
         )
         self.persist_session_state()
+        if plan is not None and plan.commands:
+            work = self.runtime_lifecycle.capture_work()
+            identity = (self.state_key, self.room_seed_name, self.context_identity)
+            self.session_tasks.start(lambda: self._observe_automatic_repair(plan, work, identity, evidence.epoch, fingerprint))
         if plan is None or not plan.commands:
             self.materialization.log_automatic_noop(
                 reason, "no_commands", evidence.epoch, fingerprint

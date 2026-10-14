@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "b3d34cd02a0f5d2fa309563d44289615f9172c05e46a585a7176f4bf6b7a7398",
-    "size": 13892498
+    "sha256": "5f59022b4c331b329f9fc10d14e3ea558afdcc1422c68d60d2c31c4ac4d8718e",
+    "size": 13902252
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
   "inputs_count": 386,
   "release_version": "0.6.0",
   "room_payload_manifest": {
-    "sha256": "9da687a1412f32d9ad2bc645fc738fb5654960e265e1703e05e2760be5c8c697",
-    "size": 26294
+    "sha256": "c1c02250a70d360c1f27cbe46fcd9d3f6a694f36796f710106e9ef5893bf2689",
+    "size": 26586
   },
   "room_payloads": {
-    "sha256": "93b41960a579d1f3eaeeca7ba3099c2747dc0c113c24cbf85cbc3cbf35dadbf5",
-    "size": 2202253
+    "sha256": "9a9529f4dd040aa257294f8e1491f841092664b556cb30787ed3ff93c235fa61",
+    "size": 2202373
   },
-  "room_resource_input_fingerprint": "ed688763a2afeea2c71382fa90a3e657105478b702c17b62ac7cd5a1b83cae8e",
+  "room_resource_input_fingerprint": "8f1694a563ec4074cfa2fb1fb0f61ef567671b33eff7d6dc4e8e47a6583b2668",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/fast_travel_anchors.json": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
@@ -53,7 +53,7 @@
     "content/maps/e2m1_nest/runtime.json": "16a12906568dd58f5499f436251c62501d30700b5cf81b81b8e1ed982c5a5266",
     "content/maps/e2m2_base/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
     "content/maps/e2m2_base/descriptor.json": "bdde19511507dbbd488c76ec114f6bf81228605434436ee7da93cdc3cc3d7a85",
-    "content/maps/e2m2_base/locations.json": "3049b29b56887cfd7815bd7e41692a1d3354aef09a1fc60618707c9e73dc8bf7",
+    "content/maps/e2m2_base/locations.json": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee",
     "content/maps/e2m2_base/onboarding.json": "09336ad4e586b9be54c817d144afb251ac340ced4534fe19c2052f12747411cb",
     "content/maps/e2m2_base/publishers.json": "51afaa9fe8c63d3b0ab435a6093601be59e3d8aaed97c7638cd873d3d6036529",
     "content/maps/e2m2_base/runtime.json": "94aa4a26a29d1d7ea110a63c744b57ac4e405fc16c622f4eeff685d4d82dac31",
@@ -163,9 +163,9 @@
     "data/campaign_sources/missionlist_dlc2.decl": "0d3c3f6e4b79c5f4f674a65cbe42a2461aa9f5b2ffaffe77ab1725734a2ad9a1",
     "data/campaign_stages.json": "19a18381059532b035b6cb7949baa83765c13c294ea9cad6948f6e6bd9a61403",
     "data/challenge_location_registry.json": "0e339dd14900f6cbfce7f77d06dfbca7b013d0bc218c50b92ca58a3931ed1e6e",
-    "data/checked_location_visuals.json": "da4fa65dc476b4e0f93aa6989ca33fdde5a6ac489a0084a8b7d50f309fe1fdad",
+    "data/checked_location_visuals.json": "e647a4f7ac47a98d066b0dd5bbbff40bf926e56040044fd0dabbc33fcf0de1b1",
     "data/content_identity.json": "278541e678d49338202aa31215dfb05a37ab5f4b01e31e9322403480f4087467",
-    "data/contextual_location_names.json": "22ca0eba0c0433809fef6db237b6e040d527bcd9046d2ab1ed104b53da911b17",
+    "data/contextual_location_names.json": "d94cb728d64d006d32af93e4600685b6b4b32c96766fba97fc78e495c36ce6a3",
     "data/devinv_sources/tag/e4m1_rig.decl": "bddcb02c136895c470bbd88a03216086a2e00406bd6fe1d80f347d7f0a797660",
     "data/devinv_sources/tag/e4m2_swamp.decl": "843cdf89f2a48936f7b40ba4bf3ec90a4d73da8368de373d769145cdfa491094",
     "data/devinv_sources/tag/e4m3_mcity.decl": "d1c5c55c49ceba17ed56b2d2f72195d286253b41a33cca72b75a4423e0c6cc59",
@@ -182,7 +182,7 @@
     "data/item_runtime_contracts.json": "c133cf5801ca81237a1b4df4c05d6f5747f416775864eb9fd0ba2f1886f1e953",
     "data/items.json": "7b96ca90eba34154ca7b129358e1755babb3dd0691c1362ce34d1ca011b025b3",
     "data/location_feedback_policies.json": "ebdddb4d8744c7cd391a245bbb6537f8353566eb60e6149e567fec11a31233d3",
-    "data/location_names.json": "4ef9283fabcf77f36a09318032049c61cf4a29e338e41bcb3d6599c1a77f77c7",
+    "data/location_names.json": "d99f920ea2e19efedcb4fdb489c154df2b433c8ed907afe7edbfbf3da49fbf1e",
     "data/map_sources.json": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
     "data/mission_complete_map_contracts.json": "f1b4cfbf45f7960cc4f2bfa765a4ffc35ce72641092e87a566df0b8266edb2e9",
     "data/observer_contracts.json": "3e604750ef57c6164eeb30edd785e1efc286062b981c51efddd040bfe74a4b98",
@@ -382,10 +382,10 @@
     "tools/decls/mission_challenge_decl_builder.py": "3fe1b1c8e4ae29a2815079037309149685d07f507c19aa9fb042f20e52ec5182",
     "tools/decls/rune_decl_builder.py": "fd9c0cc2d21e476790671b561b9ff0df8a39459ee013f95f7fe1374ca8d895ba",
     "tools/decls/rune_slot_builder.py": "657f5e08a322a065532ef48a8b85e0be3167685ceb14223e0e132a11085c41c8",
-    "tools/decls/weapon_stripping_builder.py": "3ce588ce14bfb542b3638f0032669647ebc6f40d26d1f1490245214efd3cc649",
+    "tools/decls/weapon_stripping_builder.py": "2e713c7a5fcbe56f6c159c8c62be59d9f8cd5c014acc8c2154143cf2c12527b7",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/maps/ap_map_generator.py": "d138376e5b17e2bc248a99aaf331f981584b05534359a1a9362463a30f3f8122",
-    "tools/maps/automap_baseline_guard.py": "d7d280015c3dc61627089326cdb44a868356b8e412422f506cb56738ca63d6ad",
+    "tools/maps/ap_map_generator.py": "4d8ab6a750f9ceb920ab65915a3e052651d10fd6f6a518355977c9095b1debb2",
+    "tools/maps/automap_baseline_guard.py": "80f4697708701ab10eb64764d0ebc12c19de2cf711e74ea06a870fe4c253b10d",
     "tools/maps/automap_native_decl_builder.py": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
     "tools/maps/final_credits.py": "80993bfa95b3775a713bd49f66415bd0f3e377cc4d8d48b81a04612908e8ec97",
     "tools/maps/fortress_campaign.py": "f74dc536948f1d54ae4b03b6a9ac2a3b348454122b491cd2365518b90f125dc1",
@@ -406,7 +406,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "cb00e1af4511eba9a2eb0aa278568839f507efc2",
+      "base_commit_sha": "ffa87c3711ee34a41e82bda3a62a0fc584ee7e6f",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -415,8 +415,8 @@
             "size": 98
           },
           "archipelago/.dockerignore": {
-            "sha256": "608c8c72dfbfffde1f6ff45c8a77d84f37a8d5f8342e64860bbc6175b0180dab",
-            "size": 2171
+            "sha256": "93eecc0cf51587df775a95f0755ae8031d0cb4bccaae40b16a8965f39be22ed2",
+            "size": 2393
           },
           "archipelago/.gitattributes": {
             "sha256": "7675e2e6d0cbc56d910bd493e366258de14842e5aec6581160b811971f96904f",
@@ -495,8 +495,8 @@
             "size": 2781
           },
           "archipelago/.gitignore": {
-            "sha256": "6871fb048b932d8acf4debe0d8dbe7b624bcebb285f12fca79e3e4db4a36c58b",
-            "size": 2109
+            "sha256": "29189ca8c95c5e39a9fd7b059fc34a70fafe2dfb2f1284908003de1c8374c843",
+            "size": 2337
           },
           "archipelago/.mypy_cache/.gitignore": {
             "sha256": "6a69da670d11530d37f0f0cfdc7bed30b78ea6434e24f7a73208b982e29d322c",
@@ -623,16 +623,16 @@
             "size": 6687
           },
           "archipelago/CommonClient.py": {
-            "sha256": "0834cc25ba4358d8141a270415f978b46b109dfb918775fa6076416d89e40fec",
-            "size": 54955
+            "sha256": "9606e3b3b4131d658f90c9dd6dd85ae2632739c9023c52d79d2e9c8d8b3d8507",
+            "size": 56438
           },
           "archipelago/Dockerfile": {
             "sha256": "43e39efe3f49c0be88b93dd0474bf26bd6a8b1e9ff9f12cf0e179cfa1694a8b1",
             "size": 1602
           },
           "archipelago/Fill.py": {
-            "sha256": "74c4fb0528e47a4672ac335530e8d3d954f9ef5371812290f5050fa7eb2abef1",
-            "size": 61869
+            "sha256": "39adf5ce1a73bd1a1087fefcb02f9341c03b81ba256fa63ce5b4edb7d48d26de",
+            "size": 108932
           },
           "archipelago/Generate.py": {
             "sha256": "ac70e743970314dfb68df421640d07620db2067f6e6338616ca297803d6e8ce7",
@@ -643,16 +643,16 @@
             "size": 1424
           },
           "archipelago/Launcher.py": {
-            "sha256": "321b5e562244adc8ee0f2789704e14fac47314a9618b3730a3c3be9fbc912244",
-            "size": 20403
+            "sha256": "6fee77a7b77c8d8a09ccbdf6308833013bec0bcb23d8d45f5ccc5b8c78a9c4f8",
+            "size": 19904
           },
           "archipelago/LttPAdjuster.py": {
             "sha256": "efa007d4a2453458b93889468fd2957a956cd2e94efe6472a046f8a2c63e2326",
             "size": 57646
           },
           "archipelago/MMBN3Client.py": {
-            "sha256": "c51777c7f040bd3c94da99a6691d774b8532b1b220d6c4d7f62a64ef547c66a3",
-            "size": 13942
+            "sha256": "d2e8d698336a4e309abc532365bc0bdb97558ed0a46cc5a45cb66f17619c70fb",
+            "size": 14327
           },
           "archipelago/Main.py": {
             "sha256": "c1446ad2f773cb3b3db85cc1cdba44a8c760b4a392b3596a5d3b76ab6d5ee09d",
@@ -663,12 +663,12 @@
             "size": 7268
           },
           "archipelago/MultiServer.py": {
-            "sha256": "5a2224e769fc4a0b2c62ab8446a0200347e6b7b17c848f6c1b85c9ab9540b610",
-            "size": 129067
+            "sha256": "3116dd18fdc2a8cc36173cbff3f66230a8baf2903eb9a0ac1e4d6a8278b2c26f",
+            "size": 135976
           },
           "archipelago/NetUtils.py": {
-            "sha256": "a5acc17d3ab523ad77220b8b7bfeb8c1efe10ca389f89fe459c4718a465c0ec6",
-            "size": 18597
+            "sha256": "a1d329f03a317c9f852aea0d2ed5b61e3cd3f552efc4675612cdaf19c7175274",
+            "size": 20081
           },
           "archipelago/OoTAdjuster.py": {
             "sha256": "3485a8470fc4d751cd62995b30fd6173add108e88997dcafb97e06949fc1cc33",
@@ -679,8 +679,8 @@
             "size": 13293
           },
           "archipelago/Options.py": {
-            "sha256": "d0aa7e36a24747dd7e0a310e127f91150247a24287882bd21acc02bf3076e2a2",
-            "size": 78102
+            "sha256": "493bd8a23b1b20678f2ae1e14fe21b915797486398c26a79a9700cd5815fb550",
+            "size": 80416
           },
           "archipelago/OptionsCreator.py": {
             "sha256": "d7ab52200097a053d7ec55044a1b8cef90df3c363f4e34b14f3dd6a1dd6cfc20",
@@ -711,8 +711,8 @@
             "size": 26934
           },
           "archipelago/Utils.py": {
-            "sha256": "9ffa114a38becd98f9bc87954137072c3658fc0258231f6abe93e41664170841",
-            "size": 55030
+            "sha256": "377640273e14daa201924f0ca784297ee5fd4d34cfd323d9f23d9faa1d8724a0",
+            "size": 58668
           },
           "archipelago/WebHost.py": {
             "sha256": "60a2f7f9c504aa76c29e939a79da14ea8e923f0268427352d03ef86b751617da",
@@ -767,8 +767,8 @@
             "size": 1342
           },
           "archipelago/WebHostLib/customserver.py": {
-            "sha256": "e702d529003649a9eab1785372d153f42d5b88fcbd9f0ab8bd4c166c434a21a4",
-            "size": 19901
+            "sha256": "435feb12300da9b3d1b23d750445e323aad4425eff72fe646ee87c2d2c2edbd9",
+            "size": 18684
           },
           "archipelago/WebHostLib/downloads.py": {
             "sha256": "46ecf69875afddd6eb82d27d6529b1cf631bee03fd57aa287f1383bae8a6ef31",
@@ -1707,12 +1707,36 @@
             "size": 29220
           },
           "archipelago/_speedups.pyx": {
-            "sha256": "450f13b8fa4be4129c909afd5181f7f8e267371b1445ab927d49b65d8206772c",
-            "size": 15722
+            "sha256": "64df2298c9ec62ada0f9b5d760136fac1fb0bd866314638fd301f1702b687388",
+            "size": 16809
           },
           "archipelago/_speedups.pyxbld": {
             "sha256": "1f712620ec7bad60edc4c39f25c94b8a535a283caa240a47fe15ea2aac93fdc4",
             "size": 742
+          },
+          "archipelago/apmw/__init__.py": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          "archipelago/apmw/multiserver/__init__.py": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          "archipelago/apmw/multiserver/gamespackagecache.py": {
+            "sha256": "20dd358ca642c28fb7c75d6c5fee2e301fad0608bd041062531d18c866ce51ce",
+            "size": 4317
+          },
+          "archipelago/apmw/webhost/__init__.py": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          "archipelago/apmw/webhost/customserver/__init__.py": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          "archipelago/apmw/webhost/customserver/gamespackagecache.py": {
+            "sha256": "8fb91da990e345987026483b43d539bc9b58ced38ed954fe9a5e6b594db402fd",
+            "size": 1890
           },
           "archipelago/ci-requirements.txt": {
             "sha256": "bb3652ec1c8f0e6d581614c818a225583e157b21f6dac175240a28f29ef4f079",
@@ -1795,8 +1819,8 @@
             "size": 170732
           },
           "archipelago/data/GLOBAL.apignore": {
-            "sha256": "88c2d4555a0b0f557cf32e5132e041d6dece1286a2c5cccd1b95f6cdb3b60d4c",
-            "size": 340
+            "sha256": "fbb781811f805afa1d3f4e26edb90b0e14754f868c9117f4d1d0d775f2c77a07",
+            "size": 461
           },
           "archipelago/data/adventure_basepatch.bsdiff4": {
             "sha256": "0eec0f039c3e15a271c6b7c8bd79f5afa053eafbf55a301978a863f748314cbd",
@@ -1831,8 +1855,8 @@
             "size": 5558
           },
           "archipelago/data/lua/base64.lua": {
-            "sha256": "53be6fb3227f36e4fcad2a595abb76978638809704991c79025c27d1cc37ff32",
-            "size": 4136
+            "sha256": "5758afc3e1115513ee4c9aea3236854178d52aadb9110a9ffa04540561c33d14",
+            "size": 4235
           },
           "archipelago/data/lua/common.lua": {
             "sha256": "a9c5474b6cb4a4618920622e324aa75eca7e4647e76187e359e0915648bc2b1b",
@@ -1843,8 +1867,8 @@
             "size": 29099
           },
           "archipelago/data/lua/connector_bizhawk_generic.lua": {
-            "sha256": "3f508849f138361a4d6b0c96451005422c10308a58bfc776edab83db59d36b03",
-            "size": 18101
+            "sha256": "38071b4ab9f1615bbdf1e7872a8078c7038020864d45af09eb9be6e268284064",
+            "size": 18781
           },
           "archipelago/data/lua/connector_ladx_bizhawk.lua": {
             "sha256": "329e34f79bdc0fd39b4a637df9454671721bb4ea4df4ecab72fe1238b949ccdc",
@@ -2111,16 +2135,16 @@
             "size": 281
           },
           "archipelago/docs/CODEOWNERS": {
-            "sha256": "1233708318cc11852068b5435c09341befea39bbf8559e0cf9fdb86948f146f2",
-            "size": 5055
+            "sha256": "baa204df6c3bba95860bc5aea1c3b6e8e70dd9e3233c03ffa3f291a41585e805",
+            "size": 5328
           },
           "archipelago/docs/adding games.md": {
-            "sha256": "f79fbf23c2d905bc0f74b1c01e0ce5b197933b3235e8a7d9eda261016e957788",
-            "size": 11094
+            "sha256": "3f746cfe467374caff5ff18d29b855ec29f0f2b5a17704ee40e65bb543ae1ee7",
+            "size": 11274
           },
           "archipelago/docs/apworld specification.md": {
-            "sha256": "b135737be76468517a71a82c6206cf53c6ece4e5b593193d90081863699aa932",
-            "size": 6318
+            "sha256": "5c56d3380ba67b766eed73614865174ed0de68a252f46fc9d11e2a98b684f9f3",
+            "size": 6549
           },
           "archipelago/docs/apworld_dev_faq.md": {
             "sha256": "3de4968b2f0451c9b481690e2046696fcdd3711efd159bd0f754e9a8d959b6d7",
@@ -2191,8 +2215,8 @@
             "size": 92737
           },
           "archipelago/docs/network protocol.md": {
-            "sha256": "8d90fb96c210052b62e4431fc9a2ea7fde1ba7e2ff60ed0ff7eed9394604d837",
-            "size": 52634
+            "sha256": "c9e384e44ebc7e1b7dd8f694a882da8be10507762402fc6430fc957fab054838",
+            "size": 55658
           },
           "archipelago/docs/options api.md": {
             "sha256": "03f8c3630432f970bbf4f35c7471899318a54b5eeb5eedcf7174dd794ec9febe",
@@ -2259,8 +2283,8 @@
             "size": 3547
           },
           "archipelago/kvui.py": {
-            "sha256": "a3814ad8e2bdf6c4912b239009cef1d064467e5bea45c30eea7f30680b1ce202",
-            "size": 57174
+            "sha256": "ccda4e830630343f314eb1a9397dfd25897dce06297db9212c61636856044250",
+            "size": 58570
           },
           "archipelago/logs/DoomEternalClient_2026_10_01_19_12_33.txt": {
             "sha256": "c414d154eb0ee01b4fb7759df45da490852659502a6dfae5e971eae101db86eb",
@@ -2547,8 +2571,8 @@
             "size": 3372
           },
           "archipelago/rule_builder/rules.py": {
-            "sha256": "ba4467e9a8968da04a19c5682050f785772d4defd06abd695fde41308e2694c9",
-            "size": 83431
+            "sha256": "914487363e60fa6b7c943387a458b6c56b2ad3aee1806566477496fdc32a1b6d",
+            "size": 85487
           },
           "archipelago/settings.py": {
             "sha256": "2713575becebd384e00ccf89f0ccfba062df56e59914ce083ff95dbcf230c371",
@@ -2639,12 +2663,12 @@
             "size": 20848
           },
           "archipelago/worlds/LauncherComponents.py": {
-            "sha256": "de6b69611413bdb88d9bf774a3288ae6ef0d6f4fcbe81d08e36460a7ad2c9519",
-            "size": 19278
+            "sha256": "2c7257dd0bea01323b1ebbd49b2903b9d2ec2b3799c081b80d87e7a245d55dc0",
+            "size": 19954
           },
           "archipelago/worlds/__init__.py": {
-            "sha256": "38ea648c117a6eb61706a8d303e3bf1dfe6246c7955e22f6fedf08ca93b3019d",
-            "size": 10665
+            "sha256": "cc2d61c61c6c2d744551d3a6987a89bbd77cc69871c5986205936d9330268825",
+            "size": 11403
           },
           "archipelago/worlds/_bizhawk/README.md": {
             "sha256": "82ca5b9176b2a47f19198f7c04380825c21ae2df18f7af1c91e6a148fde0858f",
@@ -2659,8 +2683,8 @@
             "size": 4452
           },
           "archipelago/worlds/_bizhawk/context.py": {
-            "sha256": "4524438898457d465e5375ba98f93d82064eeaf92b98f51a290fcd9720f75fec",
-            "size": 14163
+            "sha256": "22225c3c3f045b26cc93e767657055d82272d95096c0e51aa8271e833e75c139",
+            "size": 14429
           },
           "archipelago/worlds/_sc2common/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -2995,8 +3019,8 @@
             "size": 155069
           },
           "archipelago/worlds/alttp/Rules.py": {
-            "sha256": "b6bc97dc2278df97120dd2a3945ba32da3ac8a485123ebc3f2314e40fa627f3e",
-            "size": 156926
+            "sha256": "a970cf9c6c06867a9b6e2c7e61cb2dcce9fee8be0f59553ea2e0e37f4bc27398",
+            "size": 158697
           },
           "archipelago/worlds/alttp/Shops.py": {
             "sha256": "1087c8b2cda9400e03ee3af0a5632f953c8882e2b8bbb396752bcf4c99e691c1",
@@ -3163,8 +3187,8 @@
             "size": 602
           },
           "archipelago/worlds/apquest/components.py": {
-            "sha256": "51ba9fc670a22a396fb79093d0470c3c65095324578540044bf3001b84951010",
-            "size": 3346
+            "sha256": "2270678660871647e7f7d160203b903340b05a3538e85c19730c27633c5a46fd",
+            "size": 3475
           },
           "archipelago/worlds/apquest/docs/de_APQuest.md": {
             "sha256": "c363d4e9c20ca0346f4d0288f851c696ebd2b222d28e0bbddd4a4413a40a58c9",
@@ -3243,8 +3267,8 @@
             "size": 421
           },
           "archipelago/worlds/apquest/game/game.py": {
-            "sha256": "529db00b528ddbbf667f2aa8dbad99c0094ec632181fa03b65219ffc4d1c581b",
-            "size": 9605
+            "sha256": "d0a7d40796df24f8b12a0c10597d67d388845aff9946a1592bd2deefeba2f836",
+            "size": 9710
           },
           "archipelago/worlds/apquest/game/gameboard.py": {
             "sha256": "9cd7964d7645289e10143ecd6f1704ca679e88c103c7f472a55d098a8dd5d95d",
@@ -3323,8 +3347,8 @@
             "size": 1000
           },
           "archipelago/worlds/apquest/game/path_finding.py": {
-            "sha256": "58d38f8515458bac6b1cd718bbfa6fc187d7fb278f545568ab890f743a2912cf",
-            "size": 2480
+            "sha256": "a8afd3c405495b873b3c7ddc1e95c94a9f1df9f2f613f70d72175ba87cd1f5fe",
+            "size": 2366
           },
           "archipelago/worlds/apquest/game/play_in_console.py": {
             "sha256": "0c85041d22e399c75364702e7cd4d0c84a7d112656670d359e345df50b265ef4",
@@ -3351,8 +3375,8 @@
             "size": 4201
           },
           "archipelago/worlds/apquest/rules.py": {
-            "sha256": "02232add6dc54f5ff39fe8d6e152c3190f79beba10a828651d1d9a688c545579",
-            "size": 9109
+            "sha256": "fe06ad0c803774617aa150f3326e48b51de6ee34aebb4ea230c0d8f5bc0d4a83",
+            "size": 9263
           },
           "archipelago/worlds/apquest/web_world.py": {
             "sha256": "c4d89adc71f9cf0a7efe0f4be6702ace2929623bdfad0812ad9fdeaabd776d86",
@@ -3382,13 +3406,21 @@
             "sha256": "f2dcaff5ec787ea5fe3dc0c1989199c90395282ceb1c61b06ed0309e87852857",
             "size": 14665
           },
+          "archipelago/worlds/aquaria/ai.md": {
+            "sha256": "cc0f17f1d38bd8db3b790427bc50db5fac043edac07cf6e7b2c0600d788d2899",
+            "size": 391
+          },
+          "archipelago/worlds/aquaria/archipelago.json": {
+            "sha256": "52efc10e1e99922ab387b1d94148b60594885abb4243bc5037574c28cc907e35",
+            "size": 123
+          },
           "archipelago/worlds/aquaria/docs/en_Aquaria.md": {
-            "sha256": "64376893e7feb8f97daf82790eec87507c4df22363b40d98fd5994167f68921e",
-            "size": 2635
+            "sha256": "5816b79fd73dd703899ac20845edb001d26e5a519be727957ce0b3dec81013cd",
+            "size": 3074
           },
           "archipelago/worlds/aquaria/docs/fr_Aquaria.md": {
-            "sha256": "88ac2765b8f41ae2703efb6fd38976d5da45dd434b505992637d6dba6fffb6e1",
-            "size": 3013
+            "sha256": "24003e67228283f32e72f07f812126b66a9940482a41400229207fb897776e23",
+            "size": 3560
           },
           "archipelago/worlds/aquaria/docs/setup_en.md": {
             "sha256": "c5eb66d982aaafa7d545ad4121773365592211ddb3b692822f78f121e4d11a53",
@@ -3771,8 +3803,8 @@
             "size": 0
           },
           "archipelago/worlds/civ_6/data/boosts.py": {
-            "sha256": "25682c1cc271edbd58353f174c4757d749e5c4b1946f0b2e57c12d0da69f9e06",
-            "size": 20691
+            "sha256": "d3cce000ee99a3340ec7400a158be7100e5fafb69d85c4a906e8a5a4a256dddd",
+            "size": 20692
           },
           "archipelago/worlds/civ_6/data/era_required_items.py": {
             "sha256": "a088381d548597657170b07781456c9829f82e99b23b6819ebb306bde9be538e",
@@ -3815,8 +3847,8 @@
             "size": 7265
           },
           "archipelago/worlds/civ_6/docs/setup_en.md": {
-            "sha256": "d4c7b243e01d0b2eb6308c920c9a170b50475f2c4a5537fd99c099413aff5272",
-            "size": 5852
+            "sha256": "bd1e1b1a8fafc5583262c094c05f26fe6151e617c805e8c4d31f6a4239e297fe",
+            "size": 6767
           },
           "archipelago/worlds/cv64/__init__.py": {
             "sha256": "5c6a3c0fa46f4a3fed83885b7cd70b0ecf932b61fc55041d7bae6c5cc12946dc",
@@ -4287,20 +4319,20 @@
             "size": 32
           },
           "archipelago/worlds/doometernal/__init__.py": {
-            "sha256": "83187921649132a307022985180d50e35460e6f9d304d61954929aac6151d555",
-            "size": 36468
+            "sha256": "ee55418c790424ea4f9d3a709de4e569d9531b9a3b1042a7717a664cc28947ab",
+            "size": 36141
           },
           "archipelago/worlds/doometernal/archipelago.json": {
-            "sha256": "3353f1bf9807b84cf5d46f0809c12a054c8d407cdeeb133f53c071056c44be36",
+            "sha256": "d21b6e644a587c4fd6c2994f424c724dfe63050abb7a3ff2d7ad58f1f1263981",
             "size": 126
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "3415aefffe33a907cda2e13b06cf147bc5d3c1a523bfd516d142a6662e66734b",
-            "size": 35593
+            "sha256": "9045dac498831077ca59b298feaa7403eb3a1bcb791357190ff83578513d7e67",
+            "size": 34728
           },
           "archipelago/worlds/doometernal/classification.py": {
-            "sha256": "a875a237423299a3e2e3118eba6e109335ecb42189d1c45b11e9bcaff0c49407",
-            "size": 13914
+            "sha256": "c7fa51845fb9f950a4d2abf0ae2759900a3318a01727d9ef0c825da43b7e9bd4",
+            "size": 14050
           },
           "archipelago/worlds/doometernal/combat_rating.py": {
             "sha256": "07b0dfb94b7d611e5567890cd272ea2cfa58d49f0bc43f9eebdaeef9e06ccd06",
@@ -4323,7 +4355,7 @@
             "size": 215140
           },
           "archipelago/worlds/doometernal/generated_content.py": {
-            "sha256": "a838fffe114cdbd37198b43e11a05a28acbc2fa668ecb4670d385c47eb5d6076",
+            "sha256": "aa26beb744f10b6dadffe777deed49a9fd38616151c9b7bc7331ce37fb786af2",
             "size": 118673
           },
           "archipelago/worlds/doometernal/identity.py": {
@@ -4983,16 +5015,16 @@
             "size": 3207
           },
           "archipelago/worlds/hk/Options.py": {
-            "sha256": "9d42f5c41f59057f112c377a07d6e9df852679abf07bc6ee1cd26c976a3c59f6",
-            "size": 24615
+            "sha256": "ccbfd18372ecc20d19ea93d821df4f14deb781fe5c7970dfd96d7dea392d13bb",
+            "size": 25208
           },
           "archipelago/worlds/hk/Rules.py": {
             "sha256": "b612c617080d36aae730e4611de2a0bcd19944b19a87af25e3c24e30aac76838",
             "size": 3024
           },
           "archipelago/worlds/hk/__init__.py": {
-            "sha256": "402a8ef6edade00fd897c576506bb78377b55ce0ab38236fb21422538508a75e",
-            "size": 33602
+            "sha256": "727a43ab4afa76c0c6b5841662b457407bc54aeac4983a6ab2121ae1975576cb",
+            "size": 34396
           },
           "archipelago/worlds/hk/archipelago.json": {
             "sha256": "066329278a3b014f9fcbe4cb1bb1e56e8a6ee57ffdd7b100b3e613c32f4ee2dc",
@@ -5099,20 +5131,24 @@
             "size": 0
           },
           "archipelago/worlds/jakanddaxter/agents/memory_reader.py": {
-            "sha256": "81cc92c78101a33760798acc6ba0fd5167196797822535dee8872bece86f637f",
-            "size": 23410
+            "sha256": "98e8a34ca936a0a178f39a150ec3003e8b96a92b9dd33641c8e92bbf372d7d47",
+            "size": 23742
           },
           "archipelago/worlds/jakanddaxter/agents/repl_client.py": {
-            "sha256": "d03dfec190116141a5e4fd7dc3a554170f4e5842baf6723c401aef1bdd1a3411",
-            "size": 24630
+            "sha256": "1898c4472e3c788dd4b1b012de2c627d9eb5f54a1ad609fe3c7b5afed48a1d32",
+            "size": 24916
+          },
+          "archipelago/worlds/jakanddaxter/agents/utils.py": {
+            "sha256": "293d4aebf9c3562fc94bc0d2330ed5f2f40ece1d341d2191cad8abb445c2950a",
+            "size": 607
           },
           "archipelago/worlds/jakanddaxter/archipelago.json": {
-            "sha256": "bd4654cb382c73a725cfcd4473866c692a9f6776baaf6523333629f830ab1444",
-            "size": 160
+            "sha256": "a72f82839151b3379345d8515dbd37c52ba6e4a1eaa64aafc8781f4646f7b92a",
+            "size": 166
           },
           "archipelago/worlds/jakanddaxter/client.py": {
-            "sha256": "bc2dd03cdbc9fe2570734b8e7d8b0251b2b7aa27f07a3d4dc48dca779e632f38",
-            "size": 33450
+            "sha256": "290a39a2ef16dca7c27743aa1d71d8d35725f90736fca1f624dd411498b4b615",
+            "size": 35081
           },
           "archipelago/worlds/jakanddaxter/docs/en_Jak and Daxter The Precursor Legacy.md": {
             "sha256": "d6ab49a74fa519a3bd6622994173b8ce842fa63747c63169b5af499d8a27aa82",
@@ -5251,8 +5287,8 @@
             "size": 2880
           },
           "archipelago/worlds/jakanddaxter/requirements.txt": {
-            "sha256": "2708e4aa5a4403bb84b5250089ffe967ca6e908978ec9ca550c2fadf1d549998",
-            "size": 22
+            "sha256": "04f7c87d92afb120eb565bdf83d63553c39ed509a7fd6fba42e57dd380d46536",
+            "size": 23
           },
           "archipelago/worlds/jakanddaxter/rules.py": {
             "sha256": "b3bce2d6cf56cbb251c85a5e039efa5d68eb80174a21fcb31e3af2649f4d646e",
@@ -5431,16 +5467,16 @@
             "size": 5022
           },
           "archipelago/worlds/kh2/ClientStuff/Client.py": {
-            "sha256": "0d2bdab839b34a45c2ca642f675c1585f492a0b74899848768e29a5b9b63047e",
-            "size": 37005
+            "sha256": "4f218ec2643df043c0691ead99b26b13338f91947b78de235081f55504de0398",
+            "size": 37675
           },
           "archipelago/worlds/kh2/ClientStuff/ReadAndWrite.py": {
             "sha256": "5b64a4a8d071cef0b26d4a9d2b2a77969c89cb3ea24e42ebebb101c4d75b4ce4",
             "size": 1429
           },
           "archipelago/worlds/kh2/ClientStuff/RecieveItems.py": {
-            "sha256": "dcfcb0a94087848add729d4c03d7732b5306d01b498499cf762203a595d990ab",
-            "size": 24401
+            "sha256": "ef8ab406e120280dfc020da06bbae1b612a3833226ee69c899ceee58de3bc068",
+            "size": 24347
           },
           "archipelago/worlds/kh2/ClientStuff/SendChecks.py": {
             "sha256": "4a03566536abbebb492e26bff7620637204289df52359a937e55f0b6f04a3e89",
@@ -5483,8 +5519,8 @@
             "size": 0
           },
           "archipelago/worlds/kh2/OpenKH.py": {
-            "sha256": "8560fc3e2c5d4f4d5d5acebdb74f9d292b3369cc5fb27fe48fc1f302a93f2ea7",
-            "size": 20392
+            "sha256": "e8c3f52ab6e33798c586a336f2a5553a94c17f41a266a87c94627a50207eeda1",
+            "size": 21094
           },
           "archipelago/worlds/kh2/Options.py": {
             "sha256": "a9839b9d497f3abb24561cda50682b394c007246f9ea3a561aec5878df967b34",
@@ -5507,8 +5543,8 @@
             "size": 1616
           },
           "archipelago/worlds/kh2/__init__.py": {
-            "sha256": "4215782344e5f5e2c6a93ea4e2514deb453cd9cd376a6d8762a257abcff938e2",
-            "size": 27309
+            "sha256": "a90d25d801ec8d59d78f170514b35e61d32d601a4c19f99232f3f8e159d80721",
+            "size": 27974
           },
           "archipelago/worlds/kh2/archipelago.json": {
             "sha256": "4b90c530f1aa1d6c96b6465d095c701557c9d61d38247c141f06680137433c75",
@@ -6359,8 +6395,8 @@
             "size": 110
           },
           "archipelago/worlds/lingo/data/LL1.yaml": {
-            "sha256": "9c26fb0654c05c6f7d39b7a78ee1c92a57c1d9206335b48d97df464bf79976ed",
-            "size": 235144
+            "sha256": "c4f028833bddab6c99717741f7050bdbe26cc792310115dfe6a6f39aa3845e1e",
+            "size": 243954
           },
           "archipelago/worlds/lingo/data/README.md": {
             "sha256": "87f85abd4d910d80723d4398f107067e831a7bf3c235b1851b134c5c193d996a",
@@ -6371,8 +6407,8 @@
             "size": 0
           },
           "archipelago/worlds/lingo/data/generated.dat": {
-            "sha256": "d69679c5e4670ae667c5aec1a3574918dd078fb2c48ccd0bbfe3ed37513ccb95",
-            "size": 149954
+            "sha256": "96fa5e437d006a23cb086765299f762275a9ced7dbf8d337e15b61328937f8f9",
+            "size": 149976
           },
           "archipelago/worlds/lingo/data/ids.yaml": {
             "sha256": "e9d9e03aa6eb5a8fe7047a38d1e10b9f71bd54e97c3f23eef48e3ed349f02aa4",
@@ -6607,8 +6643,8 @@
             "size": 11088
           },
           "archipelago/worlds/messenger/connections.py": {
-            "sha256": "09a5cebb56407cf9293af7fbd19121f06d9f2380891ccc0478133c792cde6aa1",
-            "size": 24455
+            "sha256": "847da14d124e0cd75899c97a0386f60519b6afa4e22a80bf713643709661fe47",
+            "size": 25125
           },
           "archipelago/worlds/messenger/constants.py": {
             "sha256": "e41fd3218d525c4d37aabdc8c737c5e2092948d84d54a3ff945faa66b83fae6b",
@@ -6843,8 +6879,8 @@
             "size": 9628
           },
           "archipelago/worlds/mm3/options.py": {
-            "sha256": "62d1feb490784a85449a1aef88fd4a1dd43a40836fc1e15376a97e5d7bdf04dc",
-            "size": 4953
+            "sha256": "fc296f0d71ee114f764519a772e69d5c3debdab66f7e4a32aaab540aa9b36f11",
+            "size": 6183
           },
           "archipelago/worlds/mm3/rom.py": {
             "sha256": "e1b6fad45069edb5b70502195bc8402860e74081d009cdb8d3206cb1b9fa6488",
@@ -6939,12 +6975,12 @@
             "size": 4967
           },
           "archipelago/worlds/musedash/MuseDashData.py": {
-            "sha256": "fa7fbd6b27da15541a445a581f74b3dd31850c82199cf9b75f487d1efa7ec008",
-            "size": 64132
+            "sha256": "205dcaea770699b9d705259a0dfdb9ee7f01125b89861e65ebd8ad62e02bb644",
+            "size": 67644
           },
           "archipelago/worlds/musedash/Options.py": {
-            "sha256": "b4b332c7eac070accd80dcd03c6af6649d9ead1d97803805b0babd19e0d5abce",
-            "size": 6729
+            "sha256": "1c8fbe7ff0f8ffddcc7fc5c501273d52d7dd7d262a34965e0f222cceffa36359",
+            "size": 6958
           },
           "archipelago/worlds/musedash/Presets.py": {
             "sha256": "6dd639abd996c645d9831f57746b7e75c5991b87d02e942f16eb6e491ac52219",
@@ -6955,8 +6991,8 @@
             "size": 16319
           },
           "archipelago/worlds/musedash/archipelago.json": {
-            "sha256": "223717e4ee69801d15b28f565cfb6884efd101caf175423758c16a7fc2fe6ef4",
-            "size": 118
+            "sha256": "2613abc82472c6874d69c07960b5cf072b5521d640b96771e9c33163f8570165",
+            "size": 123
           },
           "archipelago/worlds/musedash/docs/en_Muse Dash.md": {
             "sha256": "0c36fb88bfe33fdd73bca027e9b1288cac2d6ca1e4c204299389272a5f28508d",
@@ -7779,32 +7815,32 @@
             "size": 2226
           },
           "archipelago/worlds/pokemon_emerald/CHANGELOG.md": {
-            "sha256": "cab48bd5fb2fca4fff6ad0c377819f032b59b895275ed433fd0803bab6c93cfc",
-            "size": 18983
+            "sha256": "379fa6ee3fbe7f6d4dea7c9972237dd38aa31c4020b25fc4eb2e1a7e80873df3",
+            "size": 19553
           },
           "archipelago/worlds/pokemon_emerald/LICENSE": {
             "sha256": "7dcc69e5f856ba8369b414e17fda2af6a6d9b2474d90ab3364ea8f21f772f5a8",
             "size": 1050
           },
           "archipelago/worlds/pokemon_emerald/__init__.py": {
-            "sha256": "66f6792c97f3b0bc71c1394c6b4cc689e799d970e3458c1a0dee8c673fd32127",
-            "size": 35369
+            "sha256": "215a9ead4281cc4869be8867554cba606a7ac88f614c4d4a21e1a006da859f76",
+            "size": 38359
           },
           "archipelago/worlds/pokemon_emerald/adjuster_constants.py": {
             "sha256": "9cf78eee85c20eb75b53de402dc6b659ea011e67222c29571b0d2a5ba3333bc4",
             "size": 12404
           },
           "archipelago/worlds/pokemon_emerald/archipelago.json": {
-            "sha256": "ce739b193a2ed5a980a652091dde9e4e807971cde0d950b2b4866a6a81738521",
-            "size": 126
+            "sha256": "b3c6af6264b1a9c74109e3dc3e62f6980b489fb9139f9a7dfa8150a772fc1abd",
+            "size": 132
           },
           "archipelago/worlds/pokemon_emerald/client.py": {
             "sha256": "fc9450373a858610e85e24a65d5d8471cd1d0f40f3be01a606169efb579430a7",
             "size": 33347
           },
           "archipelago/worlds/pokemon_emerald/data.py": {
-            "sha256": "a3cdd706084dfd3c18ffc978d7d7880136dbedcbd783334e387efbd7fddaa36f",
-            "size": 57654
+            "sha256": "a7cb3745f9e642d9b4efbff96766b19c3a032a27da7ebfd5fab3eafcbcb3ed9e",
+            "size": 59099
           },
           "archipelago/worlds/pokemon_emerald/data/base_patch.bsdiff4": {
             "sha256": "4445662968649ebaf4cf2005e34932b200af2ffb6402ad089d4e00f7bc54ba51",
@@ -7907,8 +7943,8 @@
             "size": 25167
           },
           "archipelago/worlds/pokemon_emerald/items.py": {
-            "sha256": "3a8f53ca04c38c2042a947119c64c682934e8a37b636abad8c6044f5544144e2",
-            "size": 1515
+            "sha256": "c9c4383d3f0dc6505829238ba0f98c039254fc5cc86d2219211a17d72882a860",
+            "size": 2078
           },
           "archipelago/worlds/pokemon_emerald/locations.py": {
             "sha256": "ebb55db963cd0f507ba5c9f31cd19232662ae035242e68be4d376e5362af24e8",
@@ -7919,32 +7955,32 @@
             "size": 4906
           },
           "archipelago/worlds/pokemon_emerald/options.py": {
-            "sha256": "cca8f2315c9044a3edbdaa1b81f48bfd1574f57f8727d2fe17cc09deef1a6aac",
-            "size": 29482
+            "sha256": "225265a9066ee24951c42e7924c46e35316a3b07205f98e18261b77c5ee3b4ba",
+            "size": 30429
           },
           "archipelago/worlds/pokemon_emerald/pokemon.py": {
-            "sha256": "37ca68426e6c349f525ca6e21cda3bf51f71b9e6c4bf2905823c0e14720b68cb",
-            "size": 33936
+            "sha256": "b3909d8f36830e4a5145268f488d5f60b326ac57acda7b63cade2d673814183a",
+            "size": 34512
           },
           "archipelago/worlds/pokemon_emerald/regions.py": {
-            "sha256": "73210754212e817a19ee5d6613f3df77b4baf530e25bd05d8cfbf3df1d30b909",
-            "size": 6448
+            "sha256": "b12f9418992842cd89387b06b4f2145871330ad55d7ec6f66229ccdf56c5366d",
+            "size": 6533
           },
           "archipelago/worlds/pokemon_emerald/rom.py": {
             "sha256": "a13e3997270fdf8f26361cdfa5386f8cc27d392c96e0139d1a6b50d6d3efd0b5",
             "size": 39162
           },
           "archipelago/worlds/pokemon_emerald/rules.py": {
-            "sha256": "0e87668ccd4d80d3eb95780137aa1aab6f0689a9d771adf6bb2bbedb430a81c2",
-            "size": 48921
+            "sha256": "9d4da25201cb2d4064f8cefd0a2d703c2709287fee2fcba45e6054e1564321e8",
+            "size": 49669
           },
           "archipelago/worlds/pokemon_emerald/sanity_check.py": {
             "sha256": "c4b521d80f6e1ab2686ccfc9fc5fa581ee82e19211bca95dcbd9ca6004d22400",
             "size": 15983
           },
           "archipelago/worlds/pokemon_emerald/util.py": {
-            "sha256": "4950371b0bee8066b2c65fa53b536dde34d0c6545d78309b75dece549b0337b2",
-            "size": 13798
+            "sha256": "f5bd96e56f9817971675b48b59abf0ecb9d7f0706c566171e6b0bdf8ce4c3af7",
+            "size": 14169
           },
           "archipelago/worlds/pokemon_rb/LICENSE": {
             "sha256": "17652af6993054eded0ceb79a4038ac42248f0b0788eaf5c402a0de221338c6f",
@@ -8063,8 +8099,8 @@
             "size": 2473
           },
           "archipelago/worlds/raft/docs/setup_en.md": {
-            "sha256": "05516fb5a3d0ccd84bf63f818c39b4c5d8d5cf248fe9eab8e9eb11ce9e84ff3b",
-            "size": 5508
+            "sha256": "c11bcc816247e349a01e104abcd017a072fc08d038db9cafb3d2bec914d06d63",
+            "size": 5812
           },
           "archipelago/worlds/raft/items.json": {
             "sha256": "68bc59617f1e5473b979514da7fd528d628398be93ea8e82c7a88d09786c6d51",
@@ -8127,8 +8163,8 @@
             "size": 9309
           },
           "archipelago/worlds/sa2b/AestheticData.py": {
-            "sha256": "204cfc8f4bd6fe58b879ac8c7aa2bf465305860d4dea793f638897d97b97a8eb",
-            "size": 8278
+            "sha256": "df548fa81331cdb9bd2d23c017ba40e08b619b9b65c1f0c01e9bb3ca6387db58",
+            "size": 9387
           },
           "archipelago/worlds/sa2b/CHANGELOG.md": {
             "sha256": "391b9283c0681eee9d66169ff016f4d2a47a27e801cb97b66d23fdaff5bd7f67",
@@ -8179,24 +8215,24 @@
             "size": 84856
           },
           "archipelago/worlds/sa2b/Rules.py": {
-            "sha256": "e20a13f192ca5267bad9151bbdddd2fe25cfd9e3bbf0f4ead7544981ddad88aa",
-            "size": 296478
+            "sha256": "4d115725ef922e581f71fad90f7e48455f9ac63b93c8534b76c165e93324f132",
+            "size": 300768
           },
           "archipelago/worlds/sa2b/__init__.py": {
-            "sha256": "1d269ab3522bc618e39deeb177772d84fa2690a6d3224c3476b9eaf294b99bb5",
-            "size": 44066
+            "sha256": "08e26d58dea1b1caaac235ddcc31db6973582f787a7b6741712eedc8f0d22d2d",
+            "size": 45003
           },
           "archipelago/worlds/sa2b/archipelago.json": {
-            "sha256": "21887b3bb79780ac6305a7f880b3e907fbda184dc124e8293120961ca52fc15d",
-            "size": 156
+            "sha256": "b27829ebbc14f6945e172315e3179a65caf748eda079bfb7c792715fb74674c0",
+            "size": 161
           },
           "archipelago/worlds/sa2b/docs/en_Sonic Adventure 2 Battle.md": {
             "sha256": "1570b4437b21e524d18bd02235a5fabe36b3c35d23368d37b6613206baec2d98",
             "size": 3270
           },
           "archipelago/worlds/sa2b/docs/setup_en.md": {
-            "sha256": "b29911e871b5de3af99b200b0363c24f438e25218c5f6f76199363de2a4c1d74",
-            "size": 9654
+            "sha256": "2b4c8ad0613a120c6551b02f428b3a59e7efd386314e4be7da2328f79c0f80de",
+            "size": 9526
           },
           "archipelago/worlds/satisfactory/CriticalPathCalculator.py": {
             "sha256": "6eb719c03ff9dd539a09ee80a098cd91b53a0e692b2c5ad35b836b600e41f86d",
@@ -8243,12 +8279,12 @@
             "size": 152
           },
           "archipelago/worlds/satisfactory/docs/en_Satisfactory.md": {
-            "sha256": "89058505392951d773d9feb59bee7c1c8cbbef17cb44d7da4859ce88a638c4b3",
-            "size": 12254
+            "sha256": "851f925db8093bab6f04170f274e2f0907ee07cd8f761b02501877489fd8aea8",
+            "size": 12454
           },
           "archipelago/worlds/satisfactory/docs/setup_en.md": {
-            "sha256": "48ebd659d7e51bdf51306a96d12925069597e0fe91cd0622b6a58db198445b4f",
-            "size": 13051
+            "sha256": "5696c7b3d6efd7d67d85a29a964df13a4681451160df9a4d29a9908706838f13",
+            "size": 13279
           },
           "archipelago/worlds/saving_princess/Client.py": {
             "sha256": "93e2289318ee1ea36727988599a60f5638e0b2b3be17808191a3aa36c4479a89",
@@ -11275,12 +11311,12 @@
             "size": 1558
           },
           "archipelago/worlds/stardew_valley/__init__.py": {
-            "sha256": "f9f9bc85c7d034f1712fb31300ad28ecbdbc482e9ac3ac3f1d6415870e14fbf8",
-            "size": 29755
+            "sha256": "0e46e7d5a0a6b5bb4b2d9430bdb4f8d9a1066efd013e45d07879b09c8356d93c",
+            "size": 30155
           },
           "archipelago/worlds/stardew_valley/archipelago.json": {
-            "sha256": "1ae74e70c76a6043b2200445c05459590a5d492213c91f01145aa6eca46f953a",
-            "size": 190
+            "sha256": "b9db67c5143019672b7790bb73af5daa9808cf3efe233182763110541110ad20",
+            "size": 197
           },
           "archipelago/worlds/stardew_valley/bundles/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -11303,8 +11339,8 @@
             "size": 9731
           },
           "archipelago/worlds/stardew_valley/client.py": {
-            "sha256": "aa82c6bcd4cab8d3a11961e6a59a7341b3c1aa95b309aa0b4ae4fdee0521d237",
-            "size": 10714
+            "sha256": "1ba7e0b4b8fa24a0be2934d75769ccf95445e152334c12e9292748b0d504e70f",
+            "size": 4608
           },
           "archipelago/worlds/stardew_valley/content/__init__.py": {
             "sha256": "e062dbfc371813214332c0d028b3111c878ca6c0993e2ef476d0c78982be357c",
@@ -11503,8 +11539,8 @@
             "size": 1870
           },
           "archipelago/worlds/stardew_valley/data/bundles_data/meme_bundles.py": {
-            "sha256": "20519236d88f85f8c8331b25e2b6088740896f6a42a0573309940bd913eee11e",
-            "size": 28328
+            "sha256": "bdb164fae5ab18f819c9357c95cf8f3e9659dcae64bdd74fe021820e27f5dde9",
+            "size": 28356
           },
           "archipelago/worlds/stardew_valley/data/bundles_data/meme_bundles_data/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -11639,8 +11675,8 @@
             "size": 8253
           },
           "archipelago/worlds/stardew_valley/items/filters.py": {
-            "sha256": "af5ac637ecb7bf146311a5d9cb94523449d80bcb43a746ccf68863cb852fd6e9",
-            "size": 1139
+            "sha256": "b89f63a7c8436237e5e74eae882934633f5924d6656fde8031b0b7304a2c060a",
+            "size": 1189
           },
           "archipelago/worlds/stardew_valley/items/item_creation.py": {
             "sha256": "1fe0bc6118030ed252edee5dc818d1e48c8650ec1d24188f70b7f3e0a6dbf706",
@@ -11767,20 +11803,20 @@
             "size": 5941
           },
           "archipelago/worlds/stardew_valley/logic/money_logic.py": {
-            "sha256": "06c0bdf87b587ab0312c8f5f8830e1d8370a397f927086f8c311a84b14780ca9",
-            "size": 9230
+            "sha256": "d53548da1655ccbd7ec9b0c278f436ffed48c88716d94b11d1a623a51f4136d0",
+            "size": 9382
           },
           "archipelago/worlds/stardew_valley/logic/monster_logic.py": {
-            "sha256": "6d0b9bab98fe3d32e772f1259f24c16cf154dc0e06646b607500cd6325327ee2",
-            "size": 3331
+            "sha256": "926fec3bf26e83b4479e083714976f645daefd36596ac3637b96b2e5594765cb",
+            "size": 3332
           },
           "archipelago/worlds/stardew_valley/logic/movie_logic.py": {
             "sha256": "0073efbc8caad552dd30dbb8fe6dc3e0914151e5e800ca71b90d692a636480dc",
             "size": 2513
           },
           "archipelago/worlds/stardew_valley/logic/museum_logic.py": {
-            "sha256": "9a8c2b9a952dc5e7d8765f8500d222ff3feea05d0cbd12756a3f8e8ed57b3f60",
-            "size": 4026
+            "sha256": "c991e3040a11b5662a22c323ae327ac9417fe528afb39767cb4a85ff85eadc87",
+            "size": 4192
           },
           "archipelago/worlds/stardew_valley/logic/pet_logic.py": {
             "sha256": "4be1b7fcfe470ec61ca824366f3904a25ef5261c47428d9d96d8fa4094c3612a",
@@ -11807,8 +11843,8 @@
             "size": 8849
           },
           "archipelago/worlds/stardew_valley/logic/requirement_logic.py": {
-            "sha256": "556a9ed211f66851572b90cf2dbf3ad08ce027755f7410b5088d7e8112210582",
-            "size": 9073
+            "sha256": "7f23f2bd2573b99a2b170d6a246b42633adf6d13696433a27fc1b14c8aa8c4ac",
+            "size": 9280
           },
           "archipelago/worlds/stardew_valley/logic/season_logic.py": {
             "sha256": "843165183a03b79c09c899b99387475c9efa18774fccd1a39413b38604fbcd86",
@@ -11931,12 +11967,12 @@
             "size": 3069
           },
           "archipelago/worlds/stardew_valley/options/option_groups.py": {
-            "sha256": "a7d42440ac3bba37d675c9a45c82f449cddafb969521d336e4a4d14c70c1ac82",
-            "size": 2953
+            "sha256": "984c1b8d57206c447af3847cb882c6db507a200873a014414ef78e43ac5930bb",
+            "size": 3104
           },
           "archipelago/worlds/stardew_valley/options/options.py": {
-            "sha256": "86c687b0723a35ef75132cdb97f9e058f613f4e077a72af8454e7a60dd8ac3a8",
-            "size": 49851
+            "sha256": "44e1d0027436bc1f3b36be04e4bbfc86e510d17501a05cec4a856988476ff55b",
+            "size": 50813
           },
           "archipelago/worlds/stardew_valley/options/presets.py": {
             "sha256": "91410fa1646bee5b32c1db8f97c82ee353414aba5bb08a269cbcd0a3e85580c2",
@@ -11975,8 +12011,8 @@
             "size": 44140
           },
           "archipelago/worlds/stardew_valley/rules.py": {
-            "sha256": "97fe49526579996eed1310600749e3fe5b70920b6a6a02b75dc792dabaa080b1",
-            "size": 90532
+            "sha256": "af1d7fa0a54a0614cb116003b6b37d0b99b0c68c9b1971a8d16158cd282a32b6",
+            "size": 92035
           },
           "archipelago/worlds/stardew_valley/scripts/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -12019,8 +12055,8 @@
             "size": 579
           },
           "archipelago/worlds/stardew_valley/stardew_rule/rule_explain.py": {
-            "sha256": "17942e9bd40320fdb9ab65dd020db77b0d6178b70f60854f679c8e5f8d51d917",
-            "size": 11298
+            "sha256": "b47822b65c631a36aa176c0f0ff966a66a464b0b8233343ffa0244dabf1a2e25",
+            "size": 11573
           },
           "archipelago/worlds/stardew_valley/stardew_rule/state.py": {
             "sha256": "8a9b7fa5705e1d808b57d43e0b4e2c4153e4ddbe6d382b16df787eef28564733",
@@ -12279,8 +12315,8 @@
             "size": 1177
           },
           "archipelago/worlds/subnautica/__init__.py": {
-            "sha256": "c5b0661e639403566182b7ad68e6bea96bed3ec1a987588c50e2a155d7053afc",
-            "size": 6789
+            "sha256": "8744068231171ffca4f3cc185dd3ea6f68f0c39adc229a0ec9cb052298bd5a96",
+            "size": 7063
           },
           "archipelago/worlds/subnautica/creatures.py": {
             "sha256": "d8d7b411fdcf7aa6e94257b75e4b35f2343bf206518f4c5dcb975244a8647b3c",
@@ -12347,8 +12383,8 @@
             "size": 13725
           },
           "archipelago/worlds/timespinner/Locations.py": {
-            "sha256": "3551ce72e5a81f8527f6044c3a2c3ebd4deff4aaa6b5fc6da69d664117fc66e5",
-            "size": 105341
+            "sha256": "291fe7e459cafe27e385ff943129b37902856af488f7a5d8b4fb4d5bf2b7a94f",
+            "size": 110174
           },
           "archipelago/worlds/timespinner/LogicExtensions.py": {
             "sha256": "f6053a0499f01e8b2274750f6c5ea2ee092b1be06b8b08f89298239b5320cafa",
@@ -12363,16 +12399,16 @@
             "size": 9187
           },
           "archipelago/worlds/timespinner/Regions.py": {
-            "sha256": "da8ae5b94adb3df5445370d4f82b6853c9a0a9f55a6a5dd2035b2170bdaa1cf1",
-            "size": 23407
+            "sha256": "f0c91ea2e741610b2c9982e0d3a0f8990859cf66fe7336f7aa571fac2e521c4e",
+            "size": 23424
           },
           "archipelago/worlds/timespinner/__init__.py": {
             "sha256": "9b93aebde2676183a99033344397d76e20119c581f7bc71cd3d13436ec069f98",
             "size": 23280
           },
           "archipelago/worlds/timespinner/archipelago.json": {
-            "sha256": "a984afd681c22c4ff710ad2383950b2686540421f3f61f33808058636d3c2163",
-            "size": 122
+            "sha256": "ff8e0b6e5473d310b14305a754c271943841b65e0d204c3964f5059703de370b",
+            "size": 128
           },
           "archipelago/worlds/timespinner/docs/en_Timespinner.md": {
             "sha256": "b20f0f4a3f536ce81f3a6958775291bab9bbf39273bb95833513608276cb83c7",
@@ -12399,8 +12435,8 @@
             "size": 14991
           },
           "archipelago/worlds/tloz/Options.py": {
-            "sha256": "59f76478a46c3469d98fc4421b35d15d755844dab05dc5d49b42f07f65716db0",
-            "size": 1698
+            "sha256": "a8b04af969e5da412e8d51a61cbbbaf2f2d0645bc93273b56be0aa82914bb76f",
+            "size": 2094
           },
           "archipelago/worlds/tloz/Rom.py": {
             "sha256": "cb8b717c2afbd5f51299bf020c61d5f10bc95983c880dc3bd940a7571bee1b01",
@@ -12411,8 +12447,8 @@
             "size": 8644
           },
           "archipelago/worlds/tloz/__init__.py": {
-            "sha256": "bbe7b7e4af4364bea27ebe1df19ad921d380d34a499abb5fb7bd4728904364f7",
-            "size": 15554
+            "sha256": "79f5a848fbebbb23c096a6081d7e63d08b4108b426733642787a72f75ac6e665",
+            "size": 16625
           },
           "archipelago/worlds/tloz/archipelago.json": {
             "sha256": "df30d01be59c2cd4bdecfc495b02501f0333bb01402231501b2abc7e29841ba8",
@@ -12435,44 +12471,48 @@
             "size": 1648
           },
           "archipelago/worlds/tunic/__init__.py": {
-            "sha256": "49dd265902a33ab773fab587b721c44dc68c2c89b5ec1f9e65d2ca7512792dbf",
-            "size": 46352
+            "sha256": "9babebff597561a24155c8f6e6901db9fb40aead3d28434cc1e4b11c83d712b2",
+            "size": 50680
           },
           "archipelago/worlds/tunic/archipelago.json": {
-            "sha256": "a1f921b0bf25f5cbc5c0449a896d121140f32cc67e9225a9011565eaf2b00897",
-            "size": 134
+            "sha256": "cb72e49c3d546221a4e09877f54a0ffa82f9602154a1a9bb00c2e253ec63eaed",
+            "size": 140
           },
           "archipelago/worlds/tunic/bells.py": {
             "sha256": "5445b36d3287bac0539574ffab3c9582326d98077ac3b9099dcc9663e1634150",
             "size": 1451
           },
           "archipelago/worlds/tunic/breakables.py": {
-            "sha256": "c4306a9bb39a37da34c5462e3eef099bf7d23eec57a56c998d5ae29bcba50a22",
-            "size": 38329
+            "sha256": "bca688a102e82c42a11116fd1f766d379219ed2e0dc06a438d6a70e1c6bbd707",
+            "size": 38142
           },
           "archipelago/worlds/tunic/combat_logic.py": {
             "sha256": "1731bdcf337d90ca01a7e1504dc8b2eb643387c83543c7c8794ad0e6773b8cb6",
             "size": 20728
           },
           "archipelago/worlds/tunic/constants.py": {
-            "sha256": "f8f778ab58257e35a940ab348d72bab71ca5f6e09af9afdedd4a1b93b3026dc1",
-            "size": 2036
+            "sha256": "3415a6e4dba5de545f5759d89f489405ec38262b8b8c1038e5139104653297d9",
+            "size": 3790
           },
           "archipelago/worlds/tunic/docs/en_TUNIC.md": {
-            "sha256": "f0834ce7c7ded70e801515e8f0713809f1819db54fa3972dfb97724a6acfe8e3",
-            "size": 6756
+            "sha256": "2857a9b9eda08e4cbee77e0b0193a7a91ceda0dcf414dc6cfdd0cfe2043cb0e6",
+            "size": 7098
           },
           "archipelago/worlds/tunic/docs/setup_en.md": {
-            "sha256": "2ff599a04f944f88e019513566d14792119976debafc7f47c02f95a0c512ace6",
-            "size": 3715
+            "sha256": "412b72ec17e254000d3b8258ae947617242a8c3b578121bc5929440e841921b8",
+            "size": 5571
+          },
+          "archipelago/worlds/tunic/enemy_drops.py": {
+            "sha256": "71510a0d9a03f2ef09f4b8d7fdc75b5149ede2e6507b9482c0a7454f9c3e4c0a",
+            "size": 94516
           },
           "archipelago/worlds/tunic/er_data.py": {
-            "sha256": "70c56899fb781c7bcff7b799ec9bd9db09af3d921fe1945993cb657559ec3be1",
-            "size": 80179
+            "sha256": "38dd93690570d8e02c214a962b03ba46bab7cab5346277aab3fb6d2068c9de37",
+            "size": 82075
           },
           "archipelago/worlds/tunic/er_rules.py": {
-            "sha256": "5016f1307941adf4083a3afd1e74b8ab4a1cebfdc05831be38a535e4673c0d3a",
-            "size": 107752
+            "sha256": "3473d170ff3d8a78b3390a15eb7b8c0fd07c3903acaca741daaeb03266078652",
+            "size": 118859
           },
           "archipelago/worlds/tunic/er_scripts.py": {
             "sha256": "0292d3384e80a6cc265e8b46d9b82e6bf2243180d2294a6b866ed0729e19b592",
@@ -12483,32 +12523,36 @@
             "size": 7966
           },
           "archipelago/worlds/tunic/grass.py": {
-            "sha256": "a89f0d1cc822fcee93669720dec8ce87ba42d44a9fed013f73ead9803e944b8c",
-            "size": 868914
+            "sha256": "acbac37d0a8c377dac36feb4cef2857a5c5caa011ab2f17e40ed6a571f0786a6",
+            "size": 877124
           },
           "archipelago/worlds/tunic/items.py": {
-            "sha256": "10f7cbbc5aa7730fd180550097e6853690cf46d0b656f0fee23631a3f830f53c",
-            "size": 17188
+            "sha256": "ef9fc7cbb14d7dfdf9f1afd4a8d38a5d9bee6dcb00af177ab331d413f6c4cf64",
+            "size": 20730
           },
           "archipelago/worlds/tunic/ladder_storage_data.py": {
-            "sha256": "ef9bf8c0a7d643cdad2065a1fd8ecff6e446d6afbcf5e80edbe1e26a46a1e144",
-            "size": 11183
+            "sha256": "3e212253794fcf336908ede523c85d50e1b0204a07c754877c1f0fe6ba55a953",
+            "size": 12406
+          },
+          "archipelago/worlds/tunic/launcher.py": {
+            "sha256": "21234e6cfdf7a54799f4cc20be82bd61f06fae6dc81ab134483436cffb20f0a3",
+            "size": 1880
           },
           "archipelago/worlds/tunic/locations.py": {
-            "sha256": "daeaaa405cceb936293e63308eb9ef9bfe31a4da0b7cd07dd1eee81ab5a7abdf",
-            "size": 33290
+            "sha256": "b6092856cb4134bcfccbb418836af12d4fba67255bbdcf219858e1d27be33e15",
+            "size": 33750
           },
           "archipelago/worlds/tunic/logic_helpers.py": {
-            "sha256": "63b3ebda63c7d49a113f1fd5f94d5f304d5e05c19832c9f25eb543e6bd1ac02f",
-            "size": 5806
+            "sha256": "2e23f84b72ff0831bf664037a8358db3028a9aa35577c091855c0ac43b77f55c",
+            "size": 7484
           },
           "archipelago/worlds/tunic/options.py": {
-            "sha256": "c7499b54f8973d47429f7a79bf63434afeffa8046556c37543161944b302b8aa",
-            "size": 17917
+            "sha256": "e1ce681d9646cd41cba77e74436e485d2ba68bbc0337c32ed9b6dad3648ef6e6",
+            "size": 19782
           },
           "archipelago/worlds/tunic/ut_stuff.py": {
-            "sha256": "60c9deb6cc27bd5e1a5433e88e03550b7ea6462e2861852fff0603dc2b7dac84",
-            "size": 37022
+            "sha256": "8bb9391d6cfd599c2426fa898d0ecb1ccdd2d637fc887599e098fc3504207009",
+            "size": 41985
           },
           "archipelago/worlds/tww/Items.py": {
             "sha256": "21dfec6e42a5a5f1d02079218b63045625eca2e87cf5c9621aa765d5c2dc1522",
@@ -12535,8 +12579,8 @@
             "size": 64291
           },
           "archipelago/worlds/tww/TWWClient.py": {
-            "sha256": "b84076c81819a68065979434b6d586689dcfe8a6d1193924115b74bc318c322c",
-            "size": 31298
+            "sha256": "35c7a9a4049b884e0047963ce436e36f220f2e025bc87b72153ca9259c6924ce",
+            "size": 31889
           },
           "archipelago/worlds/tww/__init__.py": {
             "sha256": "07870a5ae4bf1f2ebe546da1145e01434d137a9fc909d8481be73c9774d69b20",
@@ -12667,8 +12711,8 @@
             "size": 28374
           },
           "archipelago/worlds/wargroove/Items.py": {
-            "sha256": "ff523417aa16f34dfc150da1cc4f7d6ec761e7df88011d5083a60701e0c14e95",
-            "size": 3461
+            "sha256": "cc67d1322adfac5dc2d9fa56c34a85030f3e22999111fb77967a40e79dfd9afd",
+            "size": 4067
           },
           "archipelago/worlds/wargroove/Locations.py": {
             "sha256": "b92e5178c337d885cbc71e00403558306a886b4823fb4df6171154957b218bbf",
@@ -12691,8 +12735,8 @@
             "size": 540
           },
           "archipelago/worlds/wargroove/__init__.py": {
-            "sha256": "8fe5b9f3fd6e5bbb87885d270e01ed3c7589e203cf324763a0021c5285358902",
-            "size": 6820
+            "sha256": "d7da81caf14a7c47deeef7ccea5208c03210d687b06420e3e4c7073f5ea02148",
+            "size": 7062
           },
           "archipelago/worlds/wargroove/archipelago.json": {
             "sha256": "defb3b7c5527a9c8b010735b30446132608deba1d3085fb9fa586126141f1532",
@@ -12727,8 +12771,8 @@
             "size": 5243
           },
           "archipelago/worlds/witness/__init__.py": {
-            "sha256": "ea29ada2544adf43b50661dbc0ef2b8ae2e63b677e95df33ba90680ffd87c612",
-            "size": 21328
+            "sha256": "7a0ff12e0c4a1a91e00149f403264e895ad476da63a863a72a9f9a41b55ab77c",
+            "size": 22076
           },
           "archipelago/worlds/witness/archipelago.json": {
             "sha256": "f37f3a021c0eb6beb602453f777332f373c51b65c0f195c7fffe0634b318f848",
@@ -12879,8 +12923,8 @@
             "size": 15337
           },
           "archipelago/worlds/witness/data/utils.py": {
-            "sha256": "f7e384188b8e9e01eaf651c3c87800912ccfb1c9614b77d1c51b8f2894e0dd05",
-            "size": 8993
+            "sha256": "78afefcb6a017e021e61b5e25e572f323774ca98f88521c6bdc63901f9b0a0e9",
+            "size": 9385
           },
           "archipelago/worlds/witness/docs/en_The Witness.md": {
             "sha256": "26e90ccbea1ede38ec48b1538dfa49d5efe927fe26cd47fe74aa07456b14d3d3",
@@ -12915,8 +12959,8 @@
             "size": 3188
           },
           "archipelago/worlds/witness/options.py": {
-            "sha256": "d7416b485a8b2c4ff304485a8a6dd8e5e6fcbdaf1c709a04901fa6078ccbafb6",
-            "size": 26651
+            "sha256": "4bc748c1b3138578bd33963cbd901e3083a8869b4cafe9fc72f6df4600edb806",
+            "size": 31078
           },
           "archipelago/worlds/witness/place_early_item.py": {
             "sha256": "2cd7434266b0c35efa04157ce4d55c181953c8e298129955656186c4a91d667b",
@@ -12927,8 +12971,8 @@
             "size": 17217
           },
           "archipelago/worlds/witness/player_logic.py": {
-            "sha256": "da16865da33155ca975da4e870ecfc0f4cba4c4efd0886cb52fc728d2bea4204",
-            "size": 58736
+            "sha256": "27ea1878b6f5f5cf81f5a6c69e9970b6c5b869025335d7e8fc653453ca5f076c",
+            "size": 61171
           },
           "archipelago/worlds/witness/presets.py": {
             "sha256": "512b64c98e2c568d7f00c03545349f8d8d5d9de2f915151ef1a8be995e46c8eb",
@@ -12945,6 +12989,10 @@
           "archipelago/worlds/witness/rules.py": {
             "sha256": "1ece3d1d8a690d4fdc12d03d467bdab8082f1311f1bf4302ae34b5a8b24e751c",
             "size": 14107
+          },
+          "archipelago/worlds/witness/universal_tracker.py": {
+            "sha256": "079615dace964d9d689136390c01df154a630b7f90bac541b058356b2aa6fe8b",
+            "size": 1725
           },
           "archipelago/worlds/yachtdice/Items.py": {
             "sha256": "7f7b994337d14fc919c0a2bbb26491b5e07c8bbcb47c20f5c83728508096df68",
@@ -13175,12 +13223,12 @@
             "size": 136
           }
         },
-        "fingerprint": "69eca692eb7d39d9240cbe887ac0fd7cad8c6c6fffac97fd38dee1b1162fc576",
+        "fingerprint": "901315e1f882d9145e4d888c7ee7a6ee08d6de86fb0caa8b0503f3203e82347a",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "6055543ffd83141361f04717a830bab2ca40de6d",
+      "base_commit_sha": "bfd43dcf716d259021f7716131ad3b1375b9d7fc",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13189,8 +13237,8 @@
             "size": 1305
           },
           ".github/workflows/cross-platform-build.yml": {
-            "sha256": "1a130288f2d845801fc543c30e5f2483b6427728abecbd0ca44549ed23beb774",
-            "size": 25145
+            "sha256": "4be7f0746769305f4f9acfa0497cf21d9290b7686719546ba12ed14f70351366",
+            "size": 25341
           },
           ".github/workflows/integration-audit.yml": {
             "sha256": "4de070bc84d3aeac92f97377c75459c2773ae1a477488ebc7910ee1def2bd492",
@@ -13369,7 +13417,7 @@
             "size": 1271
           },
           "content/maps/e2m2_base/locations.json": {
-            "sha256": "4399d373e5ed12c866300eb80e1a38766a3368eaa3f61aedf4b2e5b9b6f53ce4",
+            "sha256": "950dccf2e48accd9a801be309f9d404bc52ce6454ecf558b195d376ecc39475a",
             "size": 6848
           },
           "content/maps/e2m2_base/onboarding.json": {
@@ -13809,7 +13857,7 @@
             "size": 61355
           },
           "data/checked_location_visuals.json": {
-            "sha256": "da4fa65dc476b4e0f93aa6989ca33fdde5a6ac489a0084a8b7d50f309fe1fdad",
+            "sha256": "e647a4f7ac47a98d066b0dd5bbbff40bf926e56040044fd0dabbc33fcf0de1b1",
             "size": 569443
           },
           "data/content_identity.json": {
@@ -13817,7 +13865,7 @@
             "size": 359
           },
           "data/contextual_location_names.json": {
-            "sha256": "e47d511809032c0139b3e385d30f4c103a8b9fe61c749a0c2c733e7e0e6932fa",
+            "sha256": "b5cc1d0892462485236848631902195669a8932f2627a59ff9000cdad7991117",
             "size": 36122
           },
           "data/devinv_sources/tag/e4m1_rig.decl": {
@@ -13885,8 +13933,8 @@
             "size": 8611
           },
           "data/location_names.json": {
-            "sha256": "f78e57cbbbfce31241c4f3e10b4d4a0a65d7dd9a07b3b48f735db67925f7b9fd",
-            "size": 29294
+            "sha256": "d99f920ea2e19efedcb4fdb489c154df2b433c8ed907afe7edbfbf3da49fbf1e",
+            "size": 28845
           },
           "data/map_sources.json": {
             "sha256": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
@@ -13941,8 +13989,8 @@
             "size": 7351
           },
           "doom_eap/__init__.py": {
-            "sha256": "e6b8f36230fded2e577394fd973a1d59963f60be1b1161b05e75e9c0372b5d5b",
-            "size": 73
+            "sha256": "9be2285cb18cadf5aefa4015abf85a1b10f6c8ce4221786d177620d2d2e96c4b",
+            "size": 71
           },
           "doom_eap/content/__init__.py": {
             "sha256": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
@@ -14009,8 +14057,8 @@
             "size": 4289
           },
           "doom_eap/contracts/core_distribution.py": {
-            "sha256": "1cca80aa91f8aebfc77d1986eb1c5ea3251a47d99bbfef1701a2e2cb4f68e4ee",
-            "size": 7394
+            "sha256": "0cc2e40e0dfdc06289a486892397ba5e10e27aa4bea14d5d14115a4f0f09e093",
+            "size": 7397
           },
           "doom_eap/contracts/foundation.py": {
             "sha256": "efe2b5492eb5ad8331dff230e6ccb108823577a0add6868c7f7fc9e4da0303e8",
@@ -14073,8 +14121,8 @@
             "size": 7542
           },
           "doom_eap/launcher/launcher_app.py": {
-            "sha256": "ab67081542cc1ad913f52b0578a5c3f6a15f515611aac3e1dec9f0aa651328c0",
-            "size": 16614
+            "sha256": "8f37c4e9b0f962283514992f2e5ff703d8a5df751e22758c17cda6981f8b2c9f",
+            "size": 17295
           },
           "doom_eap/launcher/launcher_cli.py": {
             "sha256": "183614039a8364f2cdd3c4374a54ee2793fb8a3d1b6a48c04985f5d255513db9",
@@ -14097,8 +14145,8 @@
             "size": 11108
           },
           "doom_eap/launcher/launcher_doctor.py": {
-            "sha256": "a5e8827f8b8f194ac9cd8067c7e62c5b1ca86d4901b6e923e7cdb73f4e997ef0",
-            "size": 90820
+            "sha256": "a360a24ea9899a86d8a57365df7732123593a8f434d2a65b63877ae2de8a3fdb",
+            "size": 88864
           },
           "doom_eap/launcher/launcher_integration.py": {
             "sha256": "f1073915f5edf0cde6725ffc3b4329433626d0a480948dfd961109c5278f24e9",
@@ -14133,8 +14181,8 @@
             "size": 11605
           },
           "doom_eap/launcher/launcher_ui.py": {
-            "sha256": "551193277448dd59995778b05eba6b9312a5fab927962a39ef8076280f6e3ed4",
-            "size": 181754
+            "sha256": "41aa75b32d4b3a5b4e5a3b1c739752f217e8a86addad0b7509e80500bfc7e992",
+            "size": 178580
           },
           "doom_eap/launcher/launcher_workers.py": {
             "sha256": "336795d007b9648de7f0d4186adff717bceffd0da839249c1ec4a2dd70dd6481",
@@ -14173,8 +14221,8 @@
             "size": 7301
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "4a1ce7213e842772f1349b5588d4631d2ee021ceea482162d4e473e473778e9d",
-            "size": 314250
+            "sha256": "3eafb117acae5fe67f7503022df5bc5883f7aa25c18dc3c4f94886631a3ba1c5",
+            "size": 310477
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "aa7aed38f1218b0a4d6269a2d56700e08bdbf7d88ef3e55694ee75bb58689b68",
@@ -14249,8 +14297,8 @@
             "size": 15859
           },
           "doom_eap/runtime/materialization_coordinator.py": {
-            "sha256": "3a4d9b470a3f298461498ff947260bfe084d65c3962a6ba8872e339f30892d31",
-            "size": 13239
+            "sha256": "f4b312305e2539e3ec0f89e19405f2f40df6e0472dbaa5fb615bc862188a811d",
+            "size": 13654
           },
           "doom_eap/runtime/mission_presentation.py": {
             "sha256": "31421a71460af187845f00efc7e9941db0ac626cf44aff55c17ab8d5df68dd1b",
@@ -14345,8 +14393,8 @@
             "size": 10645
           },
           "doom_eap/runtime/weapon_points.py": {
-            "sha256": "468a0b3d29faa877cddf9d38d314919b57f2ef536ae4a7b482ed20c6a96c3d39",
-            "size": 24280
+            "sha256": "0e408b30edf6ba6482b13287ba994bc7d811fcdbd21139e7a98bcbcda55c7a26",
+            "size": 24145
           },
           "manifests/e1m1_intro.json": {
             "sha256": "4e1d8ae4ebb624bfbbddffcb17ee8bdd744d836f5aa9c9c6e18880e29de77b32",
@@ -14445,8 +14493,8 @@
             "size": 891
           },
           "native/client/ap_client_exe.cpp": {
-            "sha256": "78c56ecc12a496be4e4f11eaa895ff1ace63ce09299b4a274ec39cac1a62ed5c",
-            "size": 54572
+            "sha256": "a8b7c166d77b5e84b2c468a74dba6662d5c1f32b012e3c63c618ea8cd79a26b8",
+            "size": 53049
           },
           "native/client/ap_client_path_utils.cpp": {
             "sha256": "47e0c1b37be9d39cf7c3da972f3170731ece24366971215bdd7affb8dba14710",
@@ -15161,8 +15209,8 @@
             "size": 101309
           },
           "tools/decls/weapon_stripping_builder.py": {
-            "sha256": "3b54dbe0c1b96d3783d59c2c9a6e784e8ba14e6700aa69d682004470db3de68e",
-            "size": 11050
+            "sha256": "2e713c7a5fcbe56f6c159c8c62be59d9f8cd5c014acc8c2154143cf2c12527b7",
+            "size": 12316
           },
           "tools/diagnostics/save_inspector.py": {
             "sha256": "07f33df7eb331743cc19b8d611f4799b3ae7516cbcf6ef9d16521649ec7ae59b",
@@ -15177,12 +15225,12 @@
             "size": 0
           },
           "tools/maps/ap_map_generator.py": {
-            "sha256": "9811c03a6349bf1132adfed8ea8935bcc453a00b77298eaa380dedee48f1244c",
-            "size": 138143
+            "sha256": "4d8ab6a750f9ceb920ab65915a3e052651d10fd6f6a518355977c9095b1debb2",
+            "size": 135329
           },
           "tools/maps/automap_baseline_guard.py": {
-            "sha256": "2907b96a7edc208bd92f9a94ab2c9052871f28a57562c70385b8f27ee3fb5e13",
-            "size": 11423
+            "sha256": "b10a4c71fd0243ceee8180cf31134ec47d3778c7a43095ec9137e94def39fb51",
+            "size": 11659
           },
           "tools/maps/automap_native_decl_builder.py": {
             "sha256": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
@@ -15241,8 +15289,8 @@
             "size": 36
           },
           "tools/release/apworld_cache.py": {
-            "sha256": "2585d2786bf7fa39ac922c38045472730b4c3354221b908fadc3218d0a62c0bc",
-            "size": 12477
+            "sha256": "fd24c4b7f9138c3c5e52a0dd893170f6eb8f58ae0bb276a1f5f026f9808b500e",
+            "size": 12514
           },
           "tools/release/audit_binary.py": {
             "sha256": "cb4364da1e7fb8646315c3aa5dc8bc7e3d53f952411d55ed9faa525a56e67fd0",
@@ -15253,8 +15301,8 @@
             "size": 10717
           },
           "tools/release/build_launcher.py": {
-            "sha256": "5b556f3cf02f8c45b922749c1eb40a86baef5f44b17c8df43b389a87b0deb07b",
-            "size": 8325
+            "sha256": "1e168c76414eb1ae4b345cd8bcebd773c09309de50736b7d7e6644c7329c8a0a",
+            "size": 9770
           },
           "tools/release/build_playtest_presets.py": {
             "sha256": "b8e4236aa0192872d8262f9cf05fd3f6fd5086326e2fa0079a5ed5bfa632b12f",
@@ -15385,7 +15433,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "63776c0317aa9e0b6f51c440a0d38a59a83bd445539c82f1cc23fb5673982ae2",
+        "fingerprint": "2ee3b381c07c27085ae5b1c5d513f695d39bbaef692a2309234b8050f1f3e47e",
         "kind": "working_tree_snapshot"
       }
     }

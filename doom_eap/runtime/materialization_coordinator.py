@@ -6,6 +6,7 @@ from typing import Callable, Protocol
 from doom_eap.contracts.inventory_domain import (
     DISPATCHED,
     OBSERVED,
+    WEAPON_ITEM_IDS,
     InventoryObservation,
 )
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
@@ -74,12 +75,18 @@ class MaterializationCoordinator:
         self._resync.update(runtime_epoch=epoch, history_fingerprint=fingerprint, status="blocked", reason=reason)
 
     def record_automatic_success(self, plan, reason, epoch, fingerprint, boundary):
-        status = "noop" if not plan.commands else "complete"
+        status = "noop" if not plan.commands else "dispatched"
         self._resync.update(
             runtime_epoch=epoch, history_fingerprint=fingerprint, status=status, reason=reason,
             processed_boundary=boundary, timestamp=time.time(),
         )
         return status
+
+    def record_automatic_observation(self, error, runtime_epoch, history_fingerprint):
+        if (self._resync.get("runtime_epoch") != runtime_epoch
+                or self._resync.get("history_fingerprint") != history_fingerprint):
+            return
+        self._resync.update(status="pending" if error else "complete", observation_error=error)
 
     def log_automatic_noop(self, reason, detail, epoch, history_fingerprint):
         signature = (reason, str(detail), epoch, history_fingerprint)
@@ -266,7 +273,8 @@ class MaterializationCoordinator:
             semantic_state=semantic_state,
             dispatched_key=dispatch_key,
             dispatched_item_ids=sorted(attempted_items | {
-                command.item_id for command in commands if command.item_id in (7770002, 7770006, 7770013)
+                command.item_id for command in commands
+                if command.item_id in WEAPON_ITEM_IDS | {7770011, 7770013, 7770015}
             }),
         )
         persist()

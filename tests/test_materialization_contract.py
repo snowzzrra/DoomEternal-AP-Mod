@@ -173,7 +173,13 @@ def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs(
     plan = SimpleNamespace(commands=("published",))
     coordinator.record_automatic_failure("repair", 7, "history-a")
     assert not coordinator.automatic_already_applied(7, "history-a")
-    assert coordinator.record_automatic_success(plan, "repair", 7, "history-a", 12) == "complete"
+    assert coordinator.record_automatic_success(plan, "repair", 7, "history-a", 12) == "dispatched"
+    assert not coordinator.automatic_already_applied(7, "history-a")
+    coordinator.record_automatic_observation("UNKNOWN item 7770011", 7, "history-a")
+    assert not coordinator.automatic_already_applied(7, "history-a")
+    coordinator.record_automatic_observation(None, 7, "history-b")
+    assert not coordinator.automatic_already_applied(7, "history-a")
+    coordinator.record_automatic_observation(None, 7, "history-a")
     assert coordinator.automatic_already_applied(7, "history-a")
     assert not coordinator.automatic_already_applied(8, "history-a")
     assert not coordinator.automatic_already_applied(7, "history-b")
@@ -235,3 +241,25 @@ def test_slayer_key_observation_needs_matching_map_context(inventory_adapter, id
                                       "dash_after": 255, "slayer_key_after": 0}
     observation = adapter.observe_inventory(room_seed_name="seed", epoch=4, context_identity=identity, campaign=campaign)
     assert all(observation.get_state(item_id) == UNKNOWN for item_id in GATE_KEY_TO_MAP)
+
+
+@pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("frag", [0, 1, 255])
+def test_ballista_and_frag_repair_does_not_wait_for_unknown_items(inputs, inventory_adapter, manual, frag):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY["base/e3m1_slayer"]
+    adapter, link = inventory_adapter
+    link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
+                                      "dash_after": 255, "frag_grenade_after": frag}
+    observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign)
+    plan = compile_materialization_plan(ownership((7770004, 7770011, 7770013)), context,
+        replace(scope, manual=manual), definitions, policies, "the_crucible", observation=observation)
+    repaired = {command.item_id for command in plan.reconciliation.commands}
+    assert repaired == ({7770004, 7770011} if frag == 0 else {7770004})
+    link.observe_inventory = lambda: {"weapons_after": 1 << 5, "ice_bomb_after": 0,
+                                      "dash_after": 255, "frag_grenade_after": 1}
+    observed = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign)
+    assert observed.get_state(7770004) == OWNED and observed.get_state(7770011) == OWNED

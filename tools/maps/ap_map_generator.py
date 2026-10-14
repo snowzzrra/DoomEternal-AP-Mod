@@ -3091,32 +3091,39 @@ def generate_map(
                     completion_targets = list(target_policy.get("completion_targets") or [])
                     if secondary_location_id is not None:
                         manifest_data[secondary_ap_check_id] = secondary_location_id
-                        completion_targets.append(f"{EVENT_ENTITY_PREFIX}{secondary_location_id}")
+                        completion_targets.append(secondary_ap_check_id)
                         if include_ap_feedback:
-                            completion_targets.append(f"{LOCATION_NOTIFICATION_PREFIX}{secondary_location_id}")
                             new_blocks.append(
                                 generate_pickup_notification(
                                     secondary_location_id, placement_by_id.get(secondary_location_id)
                                 )
                             )
                         new_blocks.append(generate_check_event(secondary_location_id))
+                        secondary_policy = copy.deepcopy(target_policy)
+                        secondary_position = list(
+                            target_policy.get("independent_position") or _spawn_position_from_block(block)
+                        )
+                        secondary_position[0] += 1.5
+                        secondary_policy["independent_position"] = secondary_position
                         if not target_policy.get("no_auto_automap_helper"):
-                            new_blocks.append(
-                                generate_automap_location_helper(block, secondary_location_id, policy=target_policy)
-                            )
+                            new_blocks.append(generate_automap_location_helper(
+                                block, secondary_location_id, policy=secondary_policy
+                            ))
                         secondary_universal = build_universal_physical_policy(
                             secondary_ap_check_id,
                             secondary_location_id,
                             block,
                             default_visual_model,
-                            policy=target_policy,
+                            policy=secondary_policy,
                         )
                         secondary_visual = generate_inert_location_visual(block, secondary_universal)
                         if secondary_visual:
                             new_blocks.append(secondary_visual)
-                        completion_targets.append(
-                            secondary_universal["independent_visual"]["cleanup_entity"]
-                        )
+                        new_blocks.append(generate_target_relay(
+                            secondary_ap_check_id, secondary_location_id, "",
+                            completion_targets=[secondary_universal["independent_visual"]["cleanup_entity"]],
+                            include_notification=include_ap_feedback,
+                        ))
                     new_blocks.append(generate_target_relay(
                         ap_check_id,
                         location_id,
@@ -3159,20 +3166,21 @@ def generate_map(
             )
         expected_last_event_index = secret_hook["after_event_index"]
         automap_owner = secret_hook.get("automap_owner")
-        if automap_owner:
-            if len(re.findall(rf"\bentityDef\s+{re.escape(automap_owner)}\b", map_content)) != 1:
-                raise ValueError(
-                    f"Secret encounter automap owner is missing or duplicated: {automap_owner}"
-                )
-            automap_bounds = find_entity_block_bounds(map_content, automap_owner)
-            if automap_bounds is None:
-                raise ValueError(
-                    f"Secret encounter automap owner not found: {automap_owner}"
-                )
-            automap_block = map_content[automap_bounds[0]:automap_bounds[1]]
-            secret_blocks.append(
-                generate_automap_location_helper(automap_block, location_id)
+        automap_source = automap_owner or manager_name
+        if len(re.findall(rf"\bentityDef\s+{re.escape(automap_source)}\b", map_content)) != 1:
+            raise ValueError(
+                f"Secret encounter automap source is missing or duplicated: {automap_source}"
             )
+        automap_bounds = find_entity_block_bounds(map_content, automap_source)
+        if automap_bounds is None:
+            raise ValueError(
+                f"Secret encounter automap source not found: {automap_source}"
+            )
+        automap_block = map_content[automap_bounds[0]:automap_bounds[1]]
+        secret_blocks.append(
+            generate_automap_location_helper(automap_block, location_id)
+        )
+        if automap_owner:
             map_content = (
                 map_content[:automap_bounds[0]]
                 + map_content[automap_bounds[1]:]

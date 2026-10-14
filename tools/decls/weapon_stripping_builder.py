@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build permanent, hash-locked weapon-ownership DECL overrides.
 
-Ownership payloads are neutralized. Mars Core resets hands without selecting
-an unowned Plasma Rifle. Map pickups use the canonical map generator.
+Ownership payloads are empty and spawned weapon pickups are inert.
+Native scene flow and hand selection are preserved.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ import hashlib
 import json
 import re
 from pathlib import Path
+
+from tools.maps.ap_map_generator import find_matching_brace
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT.parent
@@ -34,7 +36,6 @@ OWNERS = (
         "sha256": "769bbfde6092d3fdc6f5a13ef3e8c614fdea6ea130df5df705fde0289ed2daee",
         "inventory_item": "weapon/player/plasma_rifle",
         "desired_count": "1",
-        "reset_weapon": "weapon/player/plasma_rifle",
     },
     {
         "name": "plasma_mars_cinematic_patch2",
@@ -44,7 +45,6 @@ OWNERS = (
         "sha256": "ec2d96aeabeaa72b272e9ed7ab9bdf8b9f58457080470b015b1d1b5991572f6a",
         "inventory_item": "weapon/player/plasma_rifle",
         "desired_count": "1",
-        "reset_weapon": "weapon/player/plasma_rifle",
     },
     {
         "name": "ssg_revenant_cinematic",
@@ -71,6 +71,24 @@ OWNERS = (
         "path": "logicentity/maps/game/sp/e3m1_slayer/e3m1_slayer_cinematic_crucible/cinematic_crucible_info_logic.decl",
         "sha256": "71693874af8425a398615587c82fa253175766315a16c571ae23d04a7a4b51e2",
         "inventory_item": "weapon/player/crucible",
+        "desired_count": "1",
+    },
+    {
+        "name": "plasma_mars_cinematic_patch3",
+        "container": "e2m3_core_patch3",
+        "source": ROOT / "vanilla_decls/resource_owners/e2m3_core_patch3/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+        "path": "logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+        "sha256": "8c6b25c5d97b0fefdcf05cba70395f856e5c0defb4d4999c2a3627fee8639627",
+        "inventory_item": "weapon/player/plasma_rifle",
+        "desired_count": "1",
+    },
+    {
+        "name": "bfg10k_cinematic_patch3",
+        "container": "e2m3_core_patch3",
+        "source": ROOT / "vanilla_decls/resource_owners/e2m3_core_patch3/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic/cinematic_info_logic_bfg10k_firing.decl",
+        "path": "logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic/cinematic_info_logic_bfg10k_firing.decl",
+        "sha256": "d39addeb00af62f74d1dabf124c73b32d688396629370be2bb2db1bbfc4c19ad",
+        "inventory_item": "weapon/player/bfg",
         "desired_count": "1",
     },
 )
@@ -117,50 +135,50 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
             and match.group("desired_count") == owner["desired_count"]
         ):
             matches.append(match)
-    if len(matches) != 1:
-        raise ValueError(
-            f"{owner['name']}: expected one ownership payload, found {len(matches)}"
-        )
-    match = matches[0]
-    if match.group("num") not in ("0", "1"):
-        raise ValueError(
-            f"{owner['name']}: ownership payload count drifted: {match.group('num')}"
-        )
-    start, end = match.span("num")
-    result = text[:start] + "0" + text[end:]
-    before = text.splitlines()
-    after = result.splitlines()
-    changed = [
-        (index + 1, left, right)
-        for index, (left, right) in enumerate(zip(before, after))
-        if left != right
+    canonical = _source_payload(owner).decode("utf-8")
+    canonical_matches = [
+        entry for entry in PAYLOAD_RE.finditer(canonical)
+        if entry.group("inventory_item") == owner["inventory_item"]
+        and entry.group("desired_count") == owner["desired_count"]
     ]
-    if len(before) != len(after) or len(changed) != (match.group("num") == "1"):
-        raise ValueError(f"{owner['name']}: override changed more than num=1 to num=0")
-    line_number, old_line, new_line = changed[0] if changed else (None, "num = 0;", "num = 0;")
-    if changed and (old_line.strip() != "num = 1;" or new_line.strip() != "num = 0;"):
-        raise ValueError(f"{owner['name']}: unexpected ownership payload diff")
-    if "reset_weapon" in owner:
-        pattern = re.compile(
-            r'(id = 1198990637;\s*model = \{\s*'
-            r'className = "idLogicNodeModelPlayerResetHands";\s*object = \{\s*'
-            r'resetInfo = \{\s*useWeapon = ")'
-            + rf'(?:{re.escape(owner["reset_weapon"])}|)(";)'
-        )
-        result, count = pattern.subn(r'\g<1>\g<2>', result)
-        if count != 1:
-            raise ValueError(f"{owner['name']}: expected one Plasma Rifle hand reset, found {count}")
+    if len(canonical_matches) != 1:
+        raise ValueError(f"{owner['name']}: canonical ownership payload drifted")
+    canonical_match = canonical_matches[0]
+    node = re.findall(r"\bid = (\d+);\s*model = \{", canonical[:canonical_match.start("num")])[-1]
+    pattern = re.compile(
+        rf'\bid = {node};\s*model = \{{\s*'
+        r'className = "idLogicNodeModelPlayerModifyInventory";.*?itemsToModify = \{',
+        re.DOTALL,
+    )
+    headers = list(pattern.finditer(text))
+    if len(headers) != 1:
+        raise ValueError(f"{owner['name']}: expected one inventory node {node}")
+    opening = headers[0].end() - 1
+    closing = find_matching_brace(text, opening) - 1
+    body = text[opening + 1:closing]
+    if not re.fullmatch(r"\s*num = 0;\s*", body):
+        if (len(matches) != 1 or matches[0].group("num") not in ("0", "1")
+                or not opening < matches[0].start("num") < closing):
+            raise ValueError(f"{owner['name']}: ownership payload drifted")
+    indent = canonical_match.group("indent")
+    closing_indent = text[text.rfind("\n", opening, closing) + 1:closing]
+    newline = "\r\n" if "\r\n" in body else "\n"
+    empty = f"{newline}{indent}num = 0;{newline}{closing_indent}"
+    result = text[:opening + 1] + empty + text[closing:]
+    if owner["inventory_item"] == "weapon/player/hammer":
+        pickup = 'entityDef = "pickup/weapon/hammer";'
+        inert = 'entityDef = "info/null";'
+        if result.count(pickup) + result.count(inert) != 1:
+            raise ValueError(f"{owner['name']}: spawned Hammer pickup drifted")
+        result = result.replace(pickup, inert)
     return result, {
-        "name": owner["name"],
-        "container": owner["container"],
-        "path": owner["path"],
+        "name": owner["name"], "container": owner["container"], "path": owner["path"],
         "source_sha256": owner["sha256"],
         "override_sha256": hashlib.sha256(result.encode("utf-8")).hexdigest(),
         "inventory_item": owner["inventory_item"],
-        "changed_line": line_number,
-        "before": old_line,
-        "after": new_line,
-        "reset_weapon": "" if "reset_weapon" in owner else None,
+        "changed_line": text[:opening].count("\n") + 1,
+        "before": body, "after": empty,
+        "spawned_pickup_neutralized": owner["inventory_item"] == "weapon/player/hammer",
     }
 
 

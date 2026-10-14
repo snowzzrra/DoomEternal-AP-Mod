@@ -9,7 +9,7 @@ from pathlib import Path
 
 def _run_bridge_worker(arguments: list[str]) -> int:
     archipelago_source = os.environ.get("ARCHIPELAGO_SOURCE", "").strip()
-    if archipelago_source and archipelago_source not in sys.path:
+    if not getattr(sys, "frozen", False) and archipelago_source and archipelago_source not in sys.path:
         sys.path.insert(0, archipelago_source)
 
     from doom_eap.runtime.bridge_client import launch
@@ -307,6 +307,17 @@ def _run_self_test(arguments: list[str]) -> int:
 
 
 def _run_ui() -> int:
+    if sys.platform.startswith("linux"):
+        import faulthandler
+        from .launcher_platform import launcher_user_paths
+        state = launcher_user_paths().state_dir
+        state.mkdir(parents=True, exist_ok=True)
+        with (state / "launcher-boot.log").open("w", encoding="utf-8") as boot:
+            os.dup2(boot.fileno(), 2)
+        faulthandler.enable()
+        print(f"Launcher boot: {sys.version}; display={os.environ.get('DISPLAY', '')}; "
+              f"wayland={os.environ.get('WAYLAND_DISPLAY', '')}; "
+              f"qt_platform={os.environ.get('QT_QPA_PLATFORM', 'auto')}", file=sys.stderr, flush=True)
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
