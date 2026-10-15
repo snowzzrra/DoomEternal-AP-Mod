@@ -117,9 +117,13 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
 
         plugin = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)) / "platforms/libqxcb.so"
         xcb_libraries = _linux_xcb_libraries(plugin)
+    # Hash library targets while keeping SONAME symlinks for PyInstaller.
     key = content_key(
         "launcher",
-        _launcher_inputs(archipelago_source) + [(f"linux-xcb/{name}", path) for name, path in sorted(xcb_libraries.items())],
+        _launcher_inputs(archipelago_source) + [
+            (f"linux-xcb/{name}", path.resolve(strict=True))
+            for name, path in sorted(xcb_libraries.items())
+        ],
         config={
             "name": name,
             "python": sys.executable,
