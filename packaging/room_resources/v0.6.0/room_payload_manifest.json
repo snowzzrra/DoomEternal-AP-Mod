@@ -240,7 +240,7 @@
           "options": {
             "randomize_chainsaw": false
           },
-          "sha256": "4c33f56bf48862416ccad255e4e8ba06b3dd823b5d013accafb0951dd10e2b76",
+          "sha256": "be9cf8b7a073dfe93e541bb9cf8b345a7d1a44cefa1dc62bb6b58d9d6e4f2c4a",
           "source": "base"
         },
         {
@@ -248,7 +248,7 @@
           "options": {
             "randomize_chainsaw": true
           },
-          "sha256": "549a8848e2776490c77c72c2c17e862a3eaec1738eb7add5f478dc8c428836db",
+          "sha256": "85207c2e4fafcc401cca5ce1b3e9db09b4a129fcb98bee9c62b3b6b1508478e6",
           "source": "replacement"
         }
       ],
@@ -267,7 +267,7 @@
             "randomize_dash": false,
             "randomize_first_battery": false
           },
-          "sha256": "0ad073127554ab983f5559e2083e6169b464d8f8de134b7b2b2e7be245b37328",
+          "sha256": "043e97347ec59999a24b2fec01456d24c5419c70b77d64f9e4cbab210c437cd2",
           "source": "base"
         },
         {
@@ -276,7 +276,7 @@
             "randomize_dash": false,
             "randomize_first_battery": true
           },
-          "sha256": "aa7d7c0f771c20b765715c3f11baf5f88245c1a8477d6ba74cc109c9670471e2",
+          "sha256": "68ebf55f0bb195229f37bd078fd8838af2e5563338faf042f9c89599afe5120d",
           "source": "replacement"
         },
         {
@@ -285,7 +285,7 @@
             "randomize_dash": true,
             "randomize_first_battery": false
           },
-          "sha256": "515fa1d40f30f76e6301165706a2311d42d72acbfd679a8f97c5823de3eee8f7",
+          "sha256": "8f3c053823ffeaeb78473e00a87f911dcb0afa9f3ca7e3dd7e1df7105950ee43",
           "source": "replacement"
         },
         {
@@ -294,7 +294,7 @@
             "randomize_dash": true,
             "randomize_first_battery": true
           },
-          "sha256": "64acdd8c36a3c1d3e1308ff071d7d34d8a6bf482553037ac0820aac1e31889bb",
+          "sha256": "659aff431b8ff50c72677eb57ba9fd2d64b6360b1428da434b319a8e954b006e",
           "source": "replacement"
         }
       ],
@@ -307,7 +307,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "1ed1be6371bf6ac86d6e48505f6601582e378338eb59ae44559a333664b863f4",
+          "sha256": "a37a168b2acc20e7a238c390438105832e7474b1ba254afaddb6b0e01d7c7924",
           "source": "base"
         }
       ],
@@ -320,7 +320,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "2fed6e03585848c2163171cb6da5fd499b8eae3c7dab9dec608cfa50a921f5c8",
+          "sha256": "1d881b3fa2a396cbdb6fef4ce3506effc14f07692618db3122a2e76f5d071e27",
           "source": "base"
         }
       ],
@@ -333,7 +333,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "88c610623be36e0ca9e3f3a9737974e7a22b731840b2ed8ffd45a1865ee48263",
+          "sha256": "cfe59917a76a6f574fb03f078385c88f6eba11be2037e07807f22b68cd6cc755",
           "source": "base"
         }
       ],
@@ -346,7 +346,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "b429a7222721160b96caa35377a03d0045a4ad7cfa6a4958b8957dda18538c82",
+          "sha256": "9649af172fd8385697c57898ecdb5fc8e64e02da677b7ed7073da6f6391b7344",
           "source": "base"
         }
       ],
@@ -359,7 +359,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "426c0efb66b44d2423014f92319440612867edccea10a56710a412858893e04a",
+          "sha256": "8001cdd3fc954b78ce4331f8aae4f9330631ce0ad6ca6db7a83eaeb7fd72b273",
           "source": "base"
         }
       ],
@@ -372,7 +372,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "7670a8452ea6168e922d7b92bd8290facf107488d430d9afe37bbf0a88e1068d",
+          "sha256": "053a036a26d7fb6d52412dc081933264d234733fdab880ab5cbbe5fc283680c1",
           "source": "base"
         }
       ],
@@ -385,7 +385,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "41272832156877167d02ba3201ac281bb8c855e07dfffaf707d29f8d4e05c2e2",
+          "sha256": "d728c75e9df9e2ed0f01e056c7b6c155bae5303e410c1e79a967f136a9b8aeb3",
           "source": "base"
         }
       ],
@@ -398,7 +398,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "e189a5e3162281ae12b17fd7bed47fa542ee9453d3fb6416474e05e5e6bfd42c",
+          "sha256": "a615a1b3baa0987b69dde679c536ef716f83a34d2540a81ff246135b82b6aabd",
           "source": "base"
         }
       ],
@@ -411,7 +411,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "9a700b854d90627aab22873d8f15ff7272ff3917ee03612a11600baa784b8012",
+          "sha256": "213ef11d5499082b635265773874b75c294b69bb19ed015dce97d5bf2b846bca",
           "source": "base"
         }
       ],
@@ -424,7 +424,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "9d084e831fcd1c5fbf95943c01a20d41e341bed859d69840e015367e49129254",
+          "sha256": "f848c6fde5ba9293b1674816aa30fc7e5a7484c21e715ff2e95479780d3ff3b1",
           "source": "base"
         }
       ],
@@ -437,7 +437,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "1747408c756e01d8477d15d14900665f28a407e5541f9a510ef6eba4937b6090",
+          "sha256": "af3ca948e9085d66e28336db1fa5b0007d80a68c5d850ce86bcfe789f5bfddc6",
           "source": "base"
         }
       ],
@@ -450,7 +450,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "e3d428cefda6d8609e7862cb1a68f3f07a3be9eb52be069a2ae3485382ed3704",
+          "sha256": "b06637e2af4c469c0bfa7b093c57cd74770bab785eb1d21360f4b9d17f224fb4",
           "source": "base"
         }
       ],
@@ -463,7 +463,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "e3f42af00f241ad1508ad9cd77621b930fc55cec09cb51e6e5d182ec528b98f4",
+          "sha256": "651646363871095c507f2916e099da10822b268ec90073d77e685c655e8f8d36",
           "source": "base"
         }
       ],
@@ -476,7 +476,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "26fe277bd745f72feea69291add08505abdab31de810489531a678db94b5a094",
+          "sha256": "6ddd0b0bcc7beee9528313fa78ec72990003de24baf11337c45817230b939943",
           "source": "base"
         }
       ],
@@ -489,7 +489,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "40ad8aed7ec00639daf3800722d72d6d363795ab132a7912e650d0d51dbf4ab6",
+          "sha256": "1d1ee0d512d6744074e51a6a3319127933724925b9079ef04177f8b20a431a72",
           "source": "base"
         }
       ],
@@ -502,7 +502,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "8b02416ce0edea9f01da551ab4b2bbdfaf01cfa08d4ba11694e9361aa1f7d51e",
+          "sha256": "ef50d861e9488a638a386ea7cdff85b1eb59be3e9aa5ea5156910c07ec0ae7aa",
           "source": "base"
         }
       ],
@@ -515,7 +515,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "aa883ffc5898e4a3a9eaf73914704a6dfec3b2846e10727b25e51b3b9aedf36c",
+          "sha256": "181ef94244605210382d39590325c2175d82c37bceee849343bbe020a14f029b",
           "source": "base"
         }
       ],
@@ -528,7 +528,7 @@
         {
           "member": null,
           "options": {},
-          "sha256": "b40b37d8dfca678439a4f4a2302539229951c56feb538aa3c4670174eb62ffd9",
+          "sha256": "556ed34ffe982535c763dacc4d304834e1f50c19caec4e8cbddaeb2045da65a8",
           "source": "base"
         }
       ],

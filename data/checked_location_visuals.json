@@ -1,5 +1,5 @@
 {
-  "authoritative_fingerprint": "1810c2d8e7091631fb82849c0402fe29fec21ec2b2bd45e69c74852692f8d56e",
+  "authoritative_fingerprint": "2760260e90e2efe07cff1b9c8d6c06fae2999f159762ba7ca7fd10c6fcb4b44f",
   "catalog_fingerprint": "f6a7a5d0e82ad9543f94704adbe778c3a146c6c7b3a2b0959b9030e477817759",
   "compiler_revision": 4,
   "content_revision": "0.5.0",
@@ -3494,7 +3494,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3522,7 +3522,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3550,7 +3550,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3578,7 +3578,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3606,7 +3606,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_6_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3634,7 +3634,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_MOD_BOT_1_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3662,7 +3662,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_MOD_BOT_2_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3690,7 +3690,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_1_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3718,7 +3718,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3746,7 +3746,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3774,7 +3774,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_RUNE_1_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3802,7 +3802,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_RUNE_2_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3830,7 +3830,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3858,7 +3858,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3886,7 +3886,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3914,7 +3914,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_MANCUBUS_FIRE_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3942,7 +3942,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_WHIPLASH_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3970,7 +3970,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_CUEBALL_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -3998,7 +3998,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_06_2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4026,7 +4026,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_07_2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4054,7 +4054,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_ALL_MASTERED_WEAPONS_EQUIPMENT_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4082,7 +4082,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4110,7 +4110,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CODEX_2_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4138,7 +4138,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CODEX_3_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4166,7 +4166,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4194,7 +4194,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_CODEX_5_E2M2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4222,7 +4222,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PICKUP_KEYCARD_SLAYER_KEY_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4250,7 +4250,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "PICKUPS_PROGRESS_ARGENT_CELL_1_1763022446",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4274,7 +4274,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "SECRET_ENCOUNTER_E2M2_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4285,7 +4285,7 @@
       "runtime_map": "game/sp/e2m2_base/e2m2_base",
       "source_identity": {
         "descriptor_sha256": "bdde19511507dbbd488c76ec114f6bf81228605434436ee7da93cdc3cc3d7a85",
-        "location_descriptor_sha256": "37de1257fd8438cd701e11428b0986fbbb13ecbed1e983b59dc0e3f1743eff18",
+        "location_descriptor_sha256": "7a6c5d9f6c0db4c6c22dd7068d7651cb4b0ae1e0c342e9a462c8b1d29cd82edb",
         "policy_sha256": "8dd5e13fed01c88a9e327975531e446060b3b8125738c2bff2f74ec98b6ca8f3",
         "resolved_policy": "secret_encounter",
         "resource": {
@@ -4298,7 +4298,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "SECRET_ENCOUNTER_E2M2_2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4326,7 +4326,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4354,7 +4354,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_2",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4382,7 +4382,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_3",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4410,7 +4410,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "ECHOES_INTERACT_USE_PANEL_LORE_KIOSK_CONSOLE_4",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -4434,7 +4434,7 @@
         "resource_sha256": "1d0b13194994b0675e204b178369b03708093129c8fd65c9232409c920951579",
         "source_entity": "GAMEPLAY_TARGET_RELAY_SLAYERGATE_4_COMBAT_END1",
         "source_file": "content/maps/e2m2_base/locations.json",
-        "source_sha256": "b050a49885b2554ca8986305ac7e9a5d607389623c8b7199163220390693fbee"
+        "source_sha256": "4975f7236e5719de46ef06fe61fc47a40a7d334ee2a1e770e07f5611d529283a"
       }
     },
     {
@@ -9790,7 +9790,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "GAME_PROGRESS_CODEX_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9818,7 +9818,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PICKUP_EQUIPMENT_FLAME_BELCH_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9846,7 +9846,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PICKUP_EQUIPMENT_ICE_BOMB",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9874,7 +9874,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_PRAETOR_POINT_HUB_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9902,7 +9902,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_ARGENT_CELL_1_1072112848",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9930,7 +9930,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_ARGENT_CELL_1_750400652",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9958,7 +9958,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_ARGENT_CELL_1_2075197287",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -9986,7 +9986,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10014,7 +10014,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "SENTINEL_BATTERY_ROOM_PROGRESS_PRAETOR_TOKEN_2",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10042,7 +10042,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "SENTINEL_BATTERY_ROOM_PROGRESS_MOD_BOT_3",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10070,7 +10070,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "SENTINEL_BATTERY_ROOM_PROGRESS_MOD_BOT_4",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10098,7 +10098,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_PRAETOR_TOKEN_3",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10126,7 +10126,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_PRAETOR_TOKEN_4",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10154,7 +10154,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_CHEATS_ALL_MASTERED_RUNES_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10182,7 +10182,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PICKUP_WEAPON_GAUSS_RIFLE_HUB_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10210,7 +10210,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "PROGRESS_CHEATS_FULLY_UPGRADED_PROGRESSION_WHEEL_FINAL",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10238,7 +10238,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "INTERACT_HUB_2_BATTERY_STATION_1",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10266,7 +10266,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "INTERACT_HUB_2_BATTERY_STATION_2",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10294,7 +10294,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "INTERACT_HUB_2_BATTERY_STATION_3",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     },
     {
@@ -10305,8 +10305,8 @@
       "runtime_map": "game/hub/hub",
       "source_identity": {
         "descriptor_sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
-        "location_descriptor_sha256": "783e3913e0d7637fadb596e0e930e4b8b73897c9bd9b8c3417aad74d491cd034",
-        "policy_sha256": "fe30af07aefc3bf8a5dede696f07ea313475c2a293c7911db727875c0b91d85b",
+        "location_descriptor_sha256": "d12f87045b045bdbe45e10d4b1ede1c7778bedadc7c766b3b106f4dfcd6e4434",
+        "policy_sha256": "fedfed89c39ad9ceef8caf0f9b8a6e941948ecc146d4e31125e74ed003996dbb",
         "resolved_policy": "no_auto_visual",
         "resource": {
           "relative_entities_path": "game/hub/hub.entities",
@@ -10318,7 +10318,7 @@
         "resource_sha256": "75c7d083d18b01d4b791ad07718e12e4723d9929af4115deeec59e1a7be30375",
         "source_entity": "SENTINEL_BATTERY_ROOM_INTERACT_HUB_UNMAYKR_CASE_1_1829410956",
         "source_file": "content/maps/hub/locations.json",
-        "source_sha256": "bb05116e975ac4ce68f5fe1714cec801d647162ed694a2f52df29d038dd32157"
+        "source_sha256": "36cd2f1325da3e5d4aaa0fbc5e71229e61efe942bd47620eec99c424533cbecb"
       }
     }
   ],

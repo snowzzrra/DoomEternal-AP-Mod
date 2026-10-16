@@ -95,6 +95,10 @@
     {
       "content_revision": "0.5.0",
       "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.6.4 CI audit: synchronize the baseline with v0.6.3 native Plasma Rifle suppression; preserve progression and AP checks."
     }
   ],
   "asset_package_contract_sha256": "44f245d18af308a34e53a687aff0079bad3ada1dcec8663deb79a77b29501511",
@@ -134,5 +138,5 @@
   ],
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "c5328178b208e37dde69238adf7520d7d84c6c0582a64402bf1581d1782f8b0d"
+  "scripted_contract_sha256": "163b22f9466e1f09a065ce2fa3bbe1f822d64b34fbd1414809869fdd19b37e00"
 }

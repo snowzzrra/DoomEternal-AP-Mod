@@ -87,6 +87,10 @@
     {
       "content_revision": "0.5.0",
       "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
+    },
+    {
+      "content_revision": "0.5.0",
+      "reason": "v0.6.4 CI audit: synchronize the baseline with the v0.6.3 ARC Complex console policy cleanup; preserve public IDs and native targets."
     }
   ],
   "asset_package_contract_sha256": "2e588bf2d2a403e3911f57fa3f5d765568586850f45ed4af54657508382e33cb",
@@ -132,5 +136,5 @@
   ],
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "55b573f52883bed875e87730ad03dfbce3e7942c346b99c489c99671fa4df8a1"
+  "scripted_contract_sha256": "93bf216a2a858775804764886b99773b87daf1e06780342b953bf4737c0b1203"
 }
