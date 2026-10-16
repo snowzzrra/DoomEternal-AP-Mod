@@ -29,7 +29,8 @@
     "AP_CHECK_HELL_CHUNK_2_PROGRESS_CODEX_1": 7770279,
     "AP_CHECK_SLAYER_ARENA_PICKUP_KEYCARD_SLAYER_KEY_1": 7770280,
     "AP_CHECK_SLAYER_GATE_PROGRESS_ARGENT_CELL_1_1335273921_E2M3": 7770281,
-    "AP_CHECK_SLAYER_ARENA_TARGET_RELAY_SLAYERGATE_4_COMBAT_END": 7770490
+    "AP_CHECK_SLAYER_ARENA_TARGET_RELAY_SLAYERGATE_4_COMBAT_END": 7770490,
+    "AP_CHECK_PHOBOS_INTERACT_AUTOMAP_1_E2M3": 7770500
   },
   "location_feedback": {},
   "neutralize_pickups": [
@@ -91,6 +92,20 @@
       "duplicate_policy": "native_only",
       "no_auto_automap_helper": true,
       "no_auto_visual": true
+    },
+    "phobos_interact_automap_1_e2m3": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
     }
   },
   "remove_entities": [],
@@ -140,6 +155,7 @@
     "7770281": "Mars Core - Sentinel Crystal - Flying-Island Blue-Vent Landing",
     "7770283": "Mars Core - Secret Encounter - Post-BFG Cracked-Wall Side Room",
     "7770284": "Mars Core - Secret Encounter - Tentacle Portal Arena",
-    "7770490": "Mars Core - Slayer Gate Complete"
+    "7770490": "Mars Core - Slayer Gate Complete",
+    "7770500": "Mars Core - Automap Station"
   }
 }

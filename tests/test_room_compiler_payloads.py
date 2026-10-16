@@ -65,6 +65,7 @@ def check(resources, room, decompressor, output, frozen_launcher=None):
             active = set(manifest.active_location_ids)
             checked = {}
             with zipfile.ZipFile(package) as result:
+                assert not set(result.namelist()) & {record["member"] for record in compiler.payload_manifest["source_snapshots"].values()}
                 for identity, member in compiler.payload_manifest["context_targets"].items():
                     if member not in before or member not in result.namelist():
                         continue

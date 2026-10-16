@@ -113,7 +113,8 @@
           7770208
         ],
         "required_count": 3,
-        "authority": "server_checked_locations"
+        "authority": "server_checked_locations",
+        "mission_complete_location_id": 7770210
       },
       "order": 38,
       "strategy": "aggregate",

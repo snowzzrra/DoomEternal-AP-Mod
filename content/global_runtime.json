@@ -31,7 +31,11 @@
       "order": 8,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "shotgun"
+      "mission_key": "shotgun",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 25
+      }
     },
     {
       "name": "Full Auto - Weapon Mastery Challenge",
@@ -63,7 +67,11 @@
       "order": 9,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "shotgun"
+      "mission_key": "shotgun",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      }
     },
     {
       "name": "Precision Bolt - Weapon Mastery Challenge",
@@ -95,7 +103,11 @@
       "order": 10,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "heavy_cannon"
+      "mission_key": "heavy_cannon",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 75
+      }
     },
     {
       "name": "Micro Missiles - Weapon Mastery Challenge",
@@ -127,7 +139,11 @@
       "order": 11,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "heavy_cannon"
+      "mission_key": "heavy_cannon",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      }
     },
     {
       "name": "Heat Blast - Weapon Mastery Challenge",
@@ -159,7 +175,11 @@
       "order": 12,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "plasma_rifle"
+      "mission_key": "plasma_rifle",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 30
+      }
     },
     {
       "name": "Microwave Beam - Weapon Mastery Challenge",
@@ -191,7 +211,11 @@
       "order": 13,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "plasma_rifle"
+      "mission_key": "plasma_rifle",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      }
     },
     {
       "name": "Lock-on Burst - Weapon Mastery Challenge",
@@ -223,7 +247,11 @@
       "order": 14,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "rocket_launcher"
+      "mission_key": "rocket_launcher",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      }
     },
     {
       "name": "Remote Detonate - Weapon Mastery Challenge",
@@ -255,7 +283,11 @@
       "order": 15,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "rocket_launcher"
+      "mission_key": "rocket_launcher",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 60
+      }
     },
     {
       "name": "Destroyer Blade - Weapon Mastery Challenge",
@@ -287,7 +319,11 @@
       "order": 16,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "ballista"
+      "mission_key": "ballista",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      }
     },
     {
       "name": "Arbalest - Weapon Mastery Challenge",
@@ -319,7 +355,11 @@
       "order": 17,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "ballista"
+      "mission_key": "ballista",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 20
+      }
     },
     {
       "name": "Mobile Turret - Weapon Mastery Challenge",
@@ -351,7 +391,11 @@
       "order": 18,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "chaingun"
+      "mission_key": "chaingun",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 10
+      }
     },
     {
       "name": "Energy Shield - Weapon Mastery Challenge",
@@ -383,7 +427,11 @@
       "order": 19,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "chaingun"
+      "mission_key": "chaingun",
+      "requirement": {
+        "kind": "damage",
+        "original_count": 20000
+      }
     },
     {
       "name": "Meat Hook - Weapon Mastery Challenge",
@@ -415,7 +463,11 @@
       "order": 20,
       "strategy": "unlockable_record",
       "category": "weapon_masteries",
-      "mission_key": "double_barrel"
+      "mission_key": "double_barrel",
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 50
+      }
     }
   ]
 }

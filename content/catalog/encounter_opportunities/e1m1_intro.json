@@ -1,0 +1,4531 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m1_intro",
+  "source": {
+    "path": "vanillamaps/e1m1_intro.map",
+    "sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"
+  },
+  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "logic_sources": {
+    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_base.decl": {
+      "sha256": "3d9bcc2a7090915c0327838f028e00058642ed05b1f01126d2d5cfbf4ebacfd8",
+      "logic_entity": "mech_street_info_logic_hand_imp_condition",
+      "variant": "base",
+      "source_installation_pristine": false,
+      "qualification": "equivalent_authored_graph_with_native_getter_gap"
+    },
+    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_patch1.decl": {
+      "sha256": "178488d5550219c0e50ac787d3cc684cb7e6d3516eb67024d25b934b20c82ade",
+      "logic_entity": "mech_street_info_logic_hand_imp_condition",
+      "variant": "patch1",
+      "source_installation_pristine": false,
+      "qualification": "typed_native_getter"
+    }
+  },
+  "counting": {
+    "unit": "finite_authored_combat_opportunity",
+    "scope": "one_initial_pass_of_each_selected_segment",
+    "identity_fields": [
+      "map_key",
+      "manager",
+      "script_index",
+      "event_index",
+      "ordinal"
+    ],
+    "replays_add_to_N": false,
+    "requires_forced_deaths": false,
+    "map_N": null,
+    "campaign_N": null
+  },
+  "qualification": {
+    "runtime_qualified": false,
+    "activation": "segment_N applies when its named context and Commit/target path activate the manager",
+    "fleeing": "exit-trigger fleeing does not add deaths or remove the first authored opportunity",
+    "replacement": "finite original opportunities include preserved actors; replacement qualification is recorded separately",
+    "protected": "boss, checkpoint-alternative, maintenance, migration, cleanup and unresolved-identity segments require separate review",
+    "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+    "native_functions": {
+      "register_trigger_owners": "0x140b9dfb0",
+      "commit": "0x140bacea0",
+      "notify": "0x140bb1110",
+      "activate": "0x140bac170",
+      "set_next_script": "0x140bb7300"
+    }
+  },
+  "segments": [
+    {
+      "id": "subway_entrance",
+      "manager": "subway_encounter_manager_subway_entrance",
+      "script_index": 0,
+      "segment_N": 10,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "subway_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "subway_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": [
+            {
+              "entity": "subway_encounter_trigger_user_flag_1",
+              "label": "disable_soldier_defend"
+            },
+            {
+              "entity": "subway_encounter_trigger_user_flag_2",
+              "label": "subway_demon_gate"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 16,
+            "event_def": "waitForEventFlag",
+            "args": [
+              {
+                "eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_USER_EVENT"
+              },
+              {
+                "string": "subway_demon_gate"
+              },
+              {
+                "bool": true
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 18,
+            "event_def": "waitForEventFlag",
+            "args": [
+              {
+                "eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_USER_EVENT"
+              },
+              {
+                "string": "disable_soldier_defend"
+              },
+              {
+                "bool": true
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "572cde09116ab5027597ab3680f3e3551b131438f5298ecbf136a87fe3972f12",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_19",
+          "members": [
+            {
+              "spawner": "target_spawn_19",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "843bf93c25674d3f5bc1b5c7d5fb70f1e9e9b9dfe8afef826ab08b096be60ea8",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_20",
+          "members": [
+            {
+              "spawner": "target_spawn_20",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "933e30c90e768f282516105181caa0b7394980ad4e248888f60f9305a6934892",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_14",
+          "members": [
+            {
+              "spawner": "target_spawn_14",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 5,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "94ac0bc43ad080a25ad6a10ea88f2d26bae38a2e1cd60bc087de2e08c27e929b",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_12",
+          "members": [
+            {
+              "spawner": "target_spawn_12",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 7,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "0fb24aebfeff3786796440da3f037786d75a83bec19c1f713835310cc19a1560",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_11",
+          "members": [
+            {
+              "spawner": "target_spawn_11",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 8,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "8ff94cd365d1acfce552e7c3848b79f6f16d8cddc37e832729e24cc772a02c8a",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_13",
+          "members": [
+            {
+              "spawner": "target_spawn_13",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 10,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "695bc7ded0572ce3bf018da5368bb127de8f6068fab283bf711e7ce67e680430",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "subway_zombie",
+          "spawner": "target_spawn_134",
+          "members": [
+            {
+              "spawner": "target_spawn_134",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 12,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "aaab3beea441ca244c8ab8670a532656bbc17b78820416cf942af1c2db1de309",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "subway_soldier_defend",
+          "spawner": "target_spawn_207",
+          "members": [
+            {
+              "spawner": "target_spawn_207",
+              "ai": "ai_fodder_soldier_blaster_6"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 19,
+              "event_def": "clearCombatRoles",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 13,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "007f76970e06e60bc4e08e5538958973097ff774bac239b9b53daae9d3e60f5d",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "subway_soldier_defend",
+          "spawner": "target_spawn_208",
+          "members": [
+            {
+              "spawner": "target_spawn_208",
+              "ai": "ai_fodder_soldier_blaster_6"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 19,
+              "event_def": "clearCombatRoles",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 14,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "f1e8e0b7a4e039a44413d9d0e30c7630e077c6d0324642e50fe73a80d365122f",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "subway_soldier_defend",
+          "spawner": "target_spawn_209",
+          "members": [
+            {
+              "spawner": "target_spawn_209",
+              "ai": "ai_fodder_soldier_blaster_6"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 19,
+              "event_def": "clearCombatRoles",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subway_hall",
+      "manager": "subway_encounter_manager_subway_hall",
+      "script_index": 0,
+      "segment_N": 6,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "subway_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "subway_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "7f6dec569de4369c1dcb6f5de0cb213cc7ee1ee63f0a13f712e1d5d54c5a8f68",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "subway_soldier",
+          "spawner": "target_spawn_151",
+          "members": [
+            {
+              "spawner": "target_spawn_151",
+              "ai": "ai_fodder_soldier_blaster_6"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "ae69a3075858b3da489f4f58bbec06de1cd54c5f05d903d2c4125c960d326d56",
+          "species": "arachnotron",
+          "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+          "count": 1,
+          "label": "",
+          "spawner": "target_spawn_206",
+          "members": [
+            {
+              "spawner": "target_spawn_206",
+              "ai": "subway_ai_heavy_arachnotron_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnAI",
+          "event_sha256": "7dda56a93509e45b20fd3704667435b0cf6389102f355c59f83432dbbff4e820",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 4,
+          "label": "subway_entrance_zombies",
+          "spawner": "subway_encounter_spawn_subway_hall_zombies",
+          "members": [
+            {
+              "spawner": "target_spawn_137",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_138",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_136",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_139",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_70",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_71",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_69",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "target_spawn_68",
+              "ai": "subway_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "uac_hq_zombies",
+      "manager": "uac_hq_encounter_uac_hq_enc01",
+      "script_index": 0,
+      "segment_N": 5,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "0b6328cd5d286304511be0d10b66348589d7c63cbc89e4a2468c9394f00d18db",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 5,
+          "label": "uac_hq_zombies",
+          "spawner": "uac_hq_encounter_spawn_uac_hq_enc01_zombies",
+          "members": [
+            {
+              "spawner": "target_spawn_111",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_112",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_114",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_180",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_210",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_211",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            },
+            {
+              "spawner": "target_spawn_212",
+              "ai": "ai_fodder_zombie_tier_1_9"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 1,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "uac_hq_two_soldiers",
+      "manager": "uac_hq_encounter_uac_hq_enc03",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "valid_commit_7_with_unresolved_alternative_bindings",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_commit_3",
+              "source_resolved": false
+            },
+            {
+              "entity": "uac_hq_encounter_trigger_commit_4",
+              "source_resolved": false
+            },
+            {
+              "entity": "uac_hq_encounter_trigger_commit_7"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "gaps": [
+          "initial_entity_reference_lookup_phase_unqualified"
+        ],
+        "native_registration": {
+          "function": "0x140b9dfb0",
+          "null_guard": "0x140b9e1e5",
+          "next_binding": "0x140b9e341",
+          "qualification": "null entries are skipped while valid Commit7 registration continues"
+        }
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "290750937862f3b6f5c90dad3bc338aa41b97a231f2f9c750950e6be142dbd53",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "uac_hq_soldier_window",
+          "spawner": "uac_hq_target_spawn_7",
+          "members": [
+            {
+              "spawner": "uac_hq_target_spawn_7",
+              "ai": "uac_hq_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "1b5881b91c88cfef10ba5272e5cf0aa13ae06c94ab25959ed432fc66ee3b965a",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "uac_hq_soldier_window",
+          "spawner": "uac_hq_target_spawn_210",
+          "members": [
+            {
+              "spawner": "uac_hq_target_spawn_210",
+              "ai": "uac_hq_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "uac_hq_heavy_pair",
+      "manager": "uac_hq_encounter_uac_hq_enc04",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "new_heavy_pair_with_external_cohorts_excluded",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_commit_6"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "uac_hq_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_pair_population_zero",
+        "phase_anchor": {
+          "event_index": 7,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "7c1922abfb1a94d0d852036476258a6614adf76b57a075bf26cb7f5fc810323e"
+        },
+        "gaps": [
+          "migrated_and_maintenance_cohorts_are_outside_this_slice"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "52e84caecb7d77ddb9a02ac65fc067c7e5c8c54c28c12279b3a6ad9fc2cc7c47",
+          "species": "arachnotron",
+          "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+          "count": 1,
+          "label": "uac_hq_arachno",
+          "spawner": "uac_hq_target_spawn_arach_1",
+          "members": [
+            {
+              "spawner": "uac_hq_target_spawn_arach_1",
+              "ai": "uac_hq_ai_heavy_arachnotron_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 7,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 6,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "a7d3250e3162d5812e02bbaba785934cdb5b04abcd93b2cbe0e4b63db4ae09a5",
+          "species": "cacodemon",
+          "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+          "count": 1,
+          "label": "uac_hq_caco",
+          "spawner": "uac_hq_target_spawn_caco_4",
+          "members": [
+            {
+              "spawner": "uac_hq_target_spawn_caco_4",
+              "ai": "uac_hq_ai_heavy_cacodemon_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 7,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        }
+      ],
+      "source_slice": {
+        "first_event_index": 4,
+        "last_event_index": 7
+      }
+    },
+    {
+      "id": "portal_secondary_imps",
+      "manager": "portal_encounter_manager_p_enc01",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "secondary_pair_after_precombat_transition",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "portal_encounter_trigger_commit_post_uac_hq"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "portal_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": [
+            {
+              "entity": "portal_encounter_trigger_user_flag_1",
+              "label": "portal_ai_aware"
+            },
+            {
+              "entity": "portal_encounter_trigger_user_flag_4",
+              "label": "portal_entrance_aware_timer"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 21,
+            "event_def": "waitAIRemaining",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_IMP ENCOUNTER_SPAWN_HELL_SOLDIER"
+              },
+              {
+                "int": 1
+              },
+              {
+                "string": ""
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "required_phase": "selected_pair_population_zero",
+        "phase_anchor": {
+          "event_index": 25,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "60fe4f1b216bfc86c26021fb0a3966dbe75acf30d396fd4e5ef3ca45b91f5070"
+        },
+        "gaps": [
+          "renewable_precombat_cohorts_and_their_infighting_are_outside_this_slice"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 22,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "39f1c648f820813efa60d9c83849a6d151d48fa730c85e11109712776de1a577",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "portal_enc_01_secondary_demons_a",
+          "spawner": "target_spawn_195",
+          "members": [
+            {
+              "spawner": "target_spawn_195",
+              "ai": "ai_fodder_imp_5"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 21,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            },
+            {
+              "event_index": 25,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 24,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "dcfbf0481642d078997a78cf315a2baed11ae081e23f1dd98d96f44624b7a60b",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "portal_enc_01_secondary_demons_a",
+          "spawner": "target_spawn_194",
+          "members": [
+            {
+              "spawner": "target_spawn_194",
+              "ai": "ai_fodder_imp_9_charge"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 21,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            },
+            {
+              "event_index": 25,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        }
+      ],
+      "source_slice": {
+        "first_event_index": 21,
+        "last_event_index": 25
+      }
+    },
+    {
+      "id": "chainsaw_tutorial",
+      "manager": "encounter_manager_2",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "scripted_chainsaw_tutorial_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "encounter_trigger_commit_2"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 1,
+            "event_def": "waitForEventFlag",
+            "args": [
+              {
+                "eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_COMMIT"
+              },
+              {
+                "string": ""
+              },
+              {
+                "bool": false
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "optional_tutorial_context": true,
+        "gaps": [
+          "mandatory_tutorial_route_and_physical_clip_activation_unqualified"
+        ],
+        "native_body_selection": {
+          "producer": "0x140bba950",
+          "population_filter": "0x140b99ec0",
+          "definition_index": "0x140ba7130",
+          "index_setter": "0x140d87540",
+          "spawn": "0x140d87de0",
+          "qualification": "ANY selects among matching authored spawner definitions; all three definitions are the same ZombieTier1 template"
+        }
+      },
+      "creations": [
+        {
+          "event_index": 2,
+          "event_def": "spawnAI",
+          "event_sha256": "f5d437325b24eb0834417755c6cb622f003b5d3b06637dad3ba4779bc8c45eb0",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 3,
+          "label": "",
+          "spawner": "encounter_spawn_group_zone_2",
+          "members": [
+            {
+              "spawner": "target_spawn_chainsaw_1",
+              "ai": "ai_fodder_zombie_tier_1_10"
+            },
+            {
+              "spawner": "target_spawn_chainsaw_2",
+              "ai": "ai_fodder_zombie_tier_1_10"
+            },
+            {
+              "spawner": "target_spawn_chainsaw_3",
+              "ai": "ai_fodder_zombie_tier_1_10"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified",
+          "protected_reason": "scripted_chainsaw_tutorial"
+        }
+      ]
+    },
+    {
+      "id": "corner_street_lower_combat",
+      "manager": "corner_street_encounter_manager_1",
+      "script_index": 0,
+      "segment_N": 7,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "commit_and_conditional_combat_role_release",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "corner_street_encounter_trigger_commit_enc02"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "corner_street_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            },
+            {
+              "entity": "corner_street_encounter_trigger_exit_2",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": [
+            {
+              "entity": "corner_street_encounter_trigger_user_flag_3",
+              "label": "c_street_enc02_imps_release"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 8,
+            "event_def": "waitMulitpleConditions",
+            "args": [
+              {
+                "int": 2
+              },
+              {
+                "encounterLogicOperator_t": "ENCOUNTER_LOGICAL_OP_OR"
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 9,
+            "event_def": "waitAIHealthLevel",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_HELL_SOLDIER"
+              },
+              {
+                "float": 0.75
+              },
+              {
+                "string": "c_street_enc02_soldiers"
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 10,
+            "event_def": "waitForEventFlag",
+            "args": [
+              {
+                "eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_USER_EVENT"
+              },
+              {
+                "string": "c_street_enc02_imps_release"
+              },
+              {
+                "bool": false
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 12,
+            "event_def": "waitAIRemaining",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"
+              },
+              {
+                "int": 3
+              },
+              {
+                "string": ""
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "release_anchor": {
+          "event_index": 11,
+          "event_def": "activateCombatGrouping",
+          "event_sha256": "6917cbe7aaeb0421dd3f36290d0766d9c86d806332d94b40b0749ea836979563"
+        },
+        "required_phase": "combat_role_release",
+        "combat_groupings": [
+          {
+            "event_index": 3,
+            "grouping": "corner_street_encounter_combat_role_enc02_imp_defend",
+            "role": "ROLE_DEFEND"
+          },
+          {
+            "event_index": 11,
+            "grouping": "corner_street_encounter_combat_role_enc02_imp_release",
+            "role": "ROLE_NONE"
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "c88a4b5e1f3f53eaeaa5ff1f57041f6b620469efefb54a7d173f6cb07613bfdc",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "lower_street_initial_imp",
+          "spawner": "corner_street_target_spawn_7",
+          "members": [
+            {
+              "spawner": "corner_street_target_spawn_7",
+              "ai": "corner_street_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnAI",
+          "event_sha256": "f0357d19cb019b9988edebf190f17729a6966804b0672edbd6c1b3cff7915ad8",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 3,
+          "label": "c_street_enc02_soldiers",
+          "spawner": "corner_street_encounter_spawn_group_enc02_soldiers",
+          "members": [
+            {
+              "spawner": "corner_street_target_spawn_1",
+              "ai": "corner_street_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "corner_street_target_spawn_2",
+              "ai": "corner_street_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "corner_street_target_spawn_3",
+              "ai": "corner_street_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 9,
+              "event_def": "waitAIHealthLevel",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "dbcbb7dd4f30eeaa4dc3580983f8bcb9701604c9664d2eb845b452b3c3aba779",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "c_street_enc02_imps",
+          "spawner": "corner_street_target_spawn_6",
+          "members": [
+            {
+              "spawner": "corner_street_target_spawn_6",
+              "ai": "corner_street_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "protected_reason": "authored_combat_role_assignment",
+          "replacement_qualification": "preserve_source_actor_until_combat_role_is_qualified"
+        },
+        {
+          "event_index": 5,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "2e28af89010c4822b8aafbc58b21d06a3510b2936c16c6788e5f7a7dd7e9638b",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "c_street_enc02_imps",
+          "spawner": "corner_street_target_spawn_5",
+          "members": [
+            {
+              "spawner": "corner_street_target_spawn_5",
+              "ai": "corner_street_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "protected_reason": "authored_combat_role_assignment",
+          "replacement_qualification": "preserve_source_actor_until_combat_role_is_qualified"
+        },
+        {
+          "event_index": 7,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "0751c3a1b63cf22d82ef98e25dd699ff3d7826576540763fe86a3be85aa5c7b8",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "c_street_enc02_imps",
+          "spawner": "corner_street_target_spawn_4",
+          "members": [
+            {
+              "spawner": "corner_street_target_spawn_4",
+              "ai": "corner_street_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "protected_reason": "authored_combat_role_assignment",
+          "replacement_qualification": "preserve_source_actor_until_combat_role_is_qualified"
+        }
+      ]
+    },
+    {
+      "id": "cracked_building_post_kickoff",
+      "manager": "crack_building_encounter_manager_crack_e01",
+      "script_index": 0,
+      "segment_N": 14,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "post_kickoff_phase_with_exhausted_finite_maintenance",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_commit_1"
+            }
+          ],
+          "userFlagTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_user_flag_combat_kickoff",
+              "label": "crack_b_combat_kickoff"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 10,
+            "event_def": "waitAIHealthLevel",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_CACODEMON"
+              },
+              {
+                "float": 0.150000006
+              },
+              {
+                "string": "crack_b_caco"
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 14,
+            "event_def": "waitMulitpleConditions",
+            "args": [
+              {
+                "int": 2
+              },
+              {
+                "encounterLogicOperator_t": "ENCOUNTER_LOGICAL_OP_AND"
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 20,
+            "event_def": "waitAIRemaining",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"
+              },
+              {
+                "int": 2
+              },
+              {
+                "string": ""
+              },
+              {
+                "bool": false
+              }
+            ]
+          },
+          {
+            "event_index": 22,
+            "event_def": "waitMulitpleConditions",
+            "args": [
+              {
+                "int": 2
+              },
+              {
+                "encounterLogicOperator_t": "ENCOUNTER_LOGICAL_OP_AND"
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "required_phase": "post_kickoff_maintenance_exhaustion_and_population_zero",
+        "finite_maintenance_completion": {
+          "condition_group_event_index": 22,
+          "maintain_wait_event_index": 23,
+          "population_wait_event_index": 24,
+          "maintenance_event_indices": [
+            13
+          ]
+        },
+        "native_functions": {
+          "maintenance_constructor": "0x140b91ce0",
+          "maintenance_tick": "0x140bbe1a0",
+          "wait_maintain_handler": "0x140ba42b0",
+          "wait_maintain_predicate": "0x140ba8ac0"
+        },
+        "gaps": [
+          "precombat_infighting_three_lives_are_outside_this_slice"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 9,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "bc397aeb885f80048e9acb9ef5c179418d23532e45f94aea02c01c82c0afc168",
+          "species": "cacodemon",
+          "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+          "count": 1,
+          "label": "crack_b_caco",
+          "spawner": "target_spawn_205",
+          "members": [
+            {
+              "spawner": "target_spawn_205",
+              "ai": "crack_building_ai_heavy_cacodemon_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 10,
+              "event_def": "waitAIHealthLevel",
+              "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 11,
+          "event_def": "spawnAI",
+          "event_sha256": "f03037eb47d43d49215e9648af925dc5276986194ecf7825ab435984a032cf51",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 4,
+          "label": "crack_b_imps",
+          "spawner": "crack_building_encounter_spawn_crack_e01_imps",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_1_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_2_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_3_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_4_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_5_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_6_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_9_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_52",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_3_2072334495",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_50",
+              "ai": "crack_building_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 15,
+              "event_def": "waitKillCount",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            },
+            {
+              "event_index": 23,
+              "event_def": "waitMaintainComplete",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 12,
+          "event_def": "spawnAI",
+          "event_sha256": "52b69579aa1f5b55aaad5be3f740867e201a57b3814fc26d5d5e307e098a8abf",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 3,
+          "label": "crack_b_soldiers",
+          "spawner": "crack_building_encounter_spawn_crack_enc01_soldiers",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_8_2072334494",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_11_2072334494",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_7_2072334494",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_7_2072334495",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_27",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_7_2072334496",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 16,
+              "event_def": "waitKillCount",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 13,
+          "event_def": "maintainAICount",
+          "event_sha256": "23603ad2bb594cc1bae65448c5135ad8a4cf6ac1c83093e133a57f6a037cc49a",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 4,
+          "label": "crack_b_imps",
+          "spawner": "crack_building_encounter_spawn_crack_e01_imps",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_1_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_2_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_3_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_4_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_5_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_6_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_9_2072334494",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_52",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_3_2072334495",
+              "ai": "crack_building_ai_fodder_imp_1"
+            },
+            {
+              "spawner": "crack_building_target_spawn_50",
+              "ai": "crack_building_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 15,
+              "event_def": "waitKillCount",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            },
+            {
+              "event_index": 23,
+              "event_def": "waitMaintainComplete",
+              "spawn_type": "ENCOUNTER_SPAWN_IMP",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ],
+          "desired_count": 2,
+          "count_kind": "successful_new_maintenance_emissions",
+          "existing_cohort_creation_indices": [
+            11
+          ],
+          "replacement_qualification": "preserve_source_producer_until_maintenance_materialization_is_qualified",
+          "protected_reason": "finite_maintenance_completion_gate"
+        },
+        {
+          "event_index": 17,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "a71e377be94df4f028ebdcaeb1f03e70172fe3c6800dde2ba134f51d08d5313a",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "crack_b_soldiers",
+          "spawner": "crack_building_target_spawn_27",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_27",
+              "ai": "crack_building_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 16,
+              "event_def": "waitKillCount",
+              "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 19,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "582335be0923bc509109b829803628864b9f6661eab23aeab3cc3201707edc05",
+          "species": "arachnotron",
+          "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+          "count": 1,
+          "label": "crack_b_arachno",
+          "spawner": "crack_building_target_spawn_1",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_1",
+              "ai": "crack_building_ai_heavy_arachnotron_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ],
+      "source_slice": {
+        "first_event_index": 9,
+        "last_event_index": 24
+      }
+    },
+    {
+      "id": "cracked_building_wallbreak_arachnotron",
+      "manager": "crack_building_encounter_manager_wallbreak_arachno",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "wallbreak_actor_health_threshold",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_commit_final_arachno"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_exit_2",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_user_flag_1",
+              "label": "final_crack_arach_state"
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 7,
+            "event_def": "waitAIHealthLevel",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ARACHNOTRON"
+              },
+              {
+                "float": 0.150000006
+              },
+              {
+                "string": "wallbreak_arachno"
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "required_phase": "wallbreak_arachnotron_health_threshold",
+        "phase_anchor": {
+          "event_index": 7,
+          "event_def": "waitAIHealthLevel",
+          "event_sha256": "b1524dec93f508243b89921fcdc4e79d3886b34556e266818ffe4ca737ef62eb"
+        },
+        "gaps": [
+          "external_renewable_zombie_cohort_and_following_stop_are_outside_this_slice"
+        ],
+        "control_events": [
+          {
+            "event_index": 2,
+            "event_def": "activateTarget",
+            "target": "crack_building_wall_break"
+          },
+          {
+            "event_index": 8,
+            "event_def": "activateTarget",
+            "target": "crack_building_target_relay_stop_zombie_maintain"
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "4c72e8a577ad1a3f76486acbb9d57f41cf6ee1b71178b4f49402a2f47b29dd4e",
+          "species": "arachnotron",
+          "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+          "count": 1,
+          "label": "wallbreak_arachno",
+          "spawner": "crack_building_target_spawn_final_arachno",
+          "members": [
+            {
+              "spawner": "crack_building_target_spawn_final_arachno",
+              "ai": "crack_building_ai_heavy_arachnotron_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 7,
+              "event_def": "waitAIHealthLevel",
+              "spawn_type": "ENCOUNTER_SPAWN_ARACHNOTRON",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ],
+          "protected_reason": "typed_health_gate_controls_external_renewable_cohort",
+          "replacement_qualification": "preserve_source_actor_until_cross_cohort_control_is_qualified"
+        }
+      ],
+      "source_slice": {
+        "first_event_index": 4,
+        "last_event_index": 7
+      }
+    },
+    {
+      "id": "basement_tentacles_and_hall",
+      "manager": "uac_basement_encounter_base_02",
+      "script_index": 0,
+      "segment_N": 6,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit_with_tentacle_population_gate",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "uac_basement_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "uac_basement_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 2,
+            "event_def": "waitAIRemaining",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_TENTACLE"
+              },
+              {
+                "int": 1
+              },
+              {
+                "string": "basement_hall_tentacle"
+              },
+              {
+                "bool": true
+              }
+            ]
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "6311c36a5101550a2b1046918850ffda025d8d1cfc4ac4bcd4d2e3483f09ea6d",
+          "species": "tentacle",
+          "spawn_type": "ENCOUNTER_SPAWN_TENTACLE",
+          "count": 1,
+          "label": "basement_hall_tentacle",
+          "spawner": "uac_basement_target_spawn_1",
+          "members": [
+            {
+              "spawner": "uac_basement_target_spawn_1",
+              "ai": "uac_basement_ai_ambient_tentacle_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 2,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_TENTACLE",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "dc7097493247edc069dd34c0a85df624a0bb7f58ccec29a354f42fd3c6aeaf57",
+          "species": "tentacle",
+          "spawn_type": "ENCOUNTER_SPAWN_TENTACLE",
+          "count": 1,
+          "label": "basement_hall_tentacle",
+          "spawner": "uac_basement_target_spawn_2",
+          "members": [
+            {
+              "spawner": "uac_basement_target_spawn_2",
+              "ai": "uac_basement_ai_ambient_tentacle_1"
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 2,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_TENTACLE",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnAI",
+          "event_sha256": "9278416a575e2519947858054010d6eb7c12ad45969da48c6fd779c932565421",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 3,
+          "label": "basement_hall_zombies",
+          "spawner": "uac_basement_encounter_spawn_base_02_zombies",
+          "members": [
+            {
+              "spawner": "target_spawn_141",
+              "ai": "ai_fodder_zombie_tier_1_7"
+            },
+            {
+              "spawner": "target_spawn_142",
+              "ai": "ai_fodder_zombie_tier_1_7"
+            },
+            {
+              "spawner": "target_spawn_140",
+              "ai": "ai_fodder_zombie_tier_1_7"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 5,
+          "event_def": "spawnAI",
+          "event_sha256": "112f36d0f44b65075c515381eefde0355f18916317e3dfd94b150c049897212e",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "basement_bottom_soldier",
+          "spawner": "uac_basement_encounter_spawn_base_02_soldiers",
+          "members": [
+            {
+              "spawner": "target_spawn_157",
+              "ai": "ai_fodder_soldier_blaster_7"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "mech_hand_imp",
+      "manager": "mech_street_enc_building_hand_solo",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit_with_conditional_logic_activation",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "mech_street_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "cathedral_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "logic_entity": "mech_street_info_logic_hand_imp_condition",
+        "logic_activation_when": {
+          "any_of": [
+            {
+              "console_variable": "g_setting_tutorials",
+              "equals": false
+            },
+            {
+              "player_has_codex": "codex/tutorials/weak_point_arachnotron"
+            }
+          ]
+        },
+        "logic_activation_scope": "qualified typed patch1 route; physical Commit activation is not excluded",
+        "gaps": [
+          "legacy_get_console_variable_native_conversion_unqualified",
+          "physical_commit_clip_and_mandatory_route_unqualified"
+        ],
+        "native_functions": {
+          "branch_initializer": "0x1418a0300",
+          "compare_initializer": "0x141e01900",
+          "compare_execution": "0x141e0b860",
+          "bool_constructor": "0x1418b2730",
+          "cvar_v2_initializer": "0x1418af1a0"
+        }
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "8f1a0e7517a41ff5f1faf0a8edd77c9d9e7b8365c3044797932e414ede2041a7",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "mech_hand_imp",
+          "spawner": "target_spawn_173",
+          "members": [
+            {
+              "spawner": "target_spawn_173",
+              "ai": "ai_fodder_imp_8"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "cracked_building_cacodemon",
+      "manager": "crack_building_encounter_manager_caco_intro",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "crack_building_encounter_trigger_exit_3",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "6a33187b8ca833b2b0b1253c467025047df5fe40f0d47a159dcaf1f09de42d0e",
+          "species": "cacodemon",
+          "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+          "count": 1,
+          "label": "crack_b_caco",
+          "spawner": "target_spawn_64",
+          "members": [
+            {
+              "spawner": "target_spawn_64",
+              "ai": "crack_building_ai_heavy_cacodemon_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "post_yellow_key",
+      "manager": "encounter_manager_post_yellow_key",
+      "script_index": 0,
+      "segment_N": 4,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit_or_target",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "corner_street_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "corner_street_encounter_trigger_exit_3",
+              "force_ai_to_flee": true
+            },
+            {
+              "entity": "corner_street_encounter_trigger_exit_2",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [
+          {
+            "entity": "target_relay_post_key_combat",
+            "path": "targets.item[0]"
+          }
+        ],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "1af822edf38e7ec2e048b86603e823fbb05d81e862556752470bc82d8933e68c",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "billboard_break_soldier",
+          "spawner": "target_spawn_201",
+          "members": [
+            {
+              "spawner": "target_spawn_201",
+              "ai": "corner_street_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnAI",
+          "event_sha256": "ddc56ad8a786136d088e90d547fbcc0ea60c2a088bd4b1df41ae0bda0ddafeeb",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 2,
+          "label": "post_key_imps",
+          "spawner": "encounter_spawn_group_breakkeygroup_imps",
+          "members": [
+            {
+              "spawner": "target_spawn_10",
+              "ai": "corner_street_ai_fodder_imp_charge"
+            },
+            {
+              "spawner": "target_spawn_18",
+              "ai": "corner_street_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "3811db029c1589552cb9d60abb227ee5c240ccf7ac2777e16e0d20beb58987c3",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+          "count": 1,
+          "label": "subway_door_soldier",
+          "spawner": "target_spawn_202",
+          "members": [
+            {
+              "spawner": "target_spawn_202",
+              "ai": "corner_street_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "cathedral_upper_deck",
+      "manager": "cathedral_encounter_manager_upper_deck",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "cathedral_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "cathedral_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "6c13fecc0d1834a70163605b48e215cbf895a9b6ff1577ed3a8bf3779442ff64",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "cathedral_target_spawn_168",
+          "members": [
+            {
+              "spawner": "cathedral_target_spawn_168",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "eed1b2b7196617e2445c6cb50747c6e53860e07e52aff45b185280fb1d3ac49a",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "cathedral_target_spawn_169",
+          "members": [
+            {
+              "spawner": "cathedral_target_spawn_169",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "cathedral_initial_zombies",
+      "manager": "cathedral_encounter_manager_initial_zombie",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "cathedral_encounter_trigger_commit_cathedral_3"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "cathedral_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "a8af014a7da0763564156574b1bdf8b8a8c4f2b1b9380752ae2cb41f477271a7",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 3,
+          "label": "cathedral_zombies",
+          "spawner": "cathedral_encounter_spawn_group_zombie",
+          "members": [
+            {
+              "spawner": "target_spawn_52",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_53",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_54",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_58",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_51",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_56",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_181",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_182",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_183",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_185",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            },
+            {
+              "spawner": "target_spawn_186",
+              "ai": "ai_fodder_zombie_tier_1_2"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "mech_building_pit_zombies",
+      "manager": "mech_building_enc_manager_pit",
+      "script_index": 0,
+      "segment_N": 8,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "main_level_commit",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "mech_street_encounter_trigger_commit_4"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "mech_street_encounter_trigger_exit_2",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": []
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "873e05e08ae158f8c795b09af99e8342db89653865ab26e2591648ddb6d613da",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 8,
+          "label": "mech_building_zombies",
+          "spawner": "mech_building_enc_spawn_group_pit_zombies",
+          "members": [
+            {
+              "spawner": "target_spawn_63",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_129",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_130",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_174",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_61",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_131",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_62",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            },
+            {
+              "spawner": "target_spawn_59",
+              "ai": "mech_street_ai_fodder_zombie_tier_1_wander"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "barge_lower_level",
+      "manager": "barge_encounter_manager_lower_level",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "normal_or_checkpoint_routes_share_occurrence",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "barge_encounter_trigger_commit_3"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "barge_encounter_trigger_exit_3",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "routes_share_occurrence": true,
+        "routes": [
+          {
+            "id": "normal",
+            "edges": [
+              {
+                "source": "barge_trigger_facing_first_door",
+                "path": "targets.item[1]",
+                "target": "barge_encounter_trigger_commit_3"
+              }
+            ]
+          },
+          {
+            "id": "checkpoint_post_glory_kill_tutorial",
+            "edges": [
+              {
+                "source": "checkpoint_target_level_activate_cp_01_post_gk_tutorial",
+                "path": "targets.item[0]",
+                "target": "barge_trigger_facing_first_door"
+              },
+              {
+                "source": "barge_trigger_facing_first_door",
+                "path": "targets.item[1]",
+                "target": "barge_encounter_trigger_commit_3"
+              }
+            ]
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "8d15782e116706cbda40a55a0bd538b7183e1df6aff458a7806570b35d48a972",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 3,
+          "label": "barge_lower_zombies",
+          "spawner": "barge_encounter_spawn_group_lower_level",
+          "members": [
+            {
+              "spawner": "barge_target_spawn_11_1700466721",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "barge_target_spawn_6_1700466721",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "barge_target_spawn_11_1700466722",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "barge_chainsaw_hall",
+      "manager": "barge_encounter_manager_chainsaw_hall",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "activation": {
+        "kind": "normal_checkpoint_or_mission_select_routes_share_occurrence",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "barge_encounter_trigger_commit_chainsaw_hall"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "barge_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            },
+            {
+              "entity": "barge_encounter_trigger_exit_2",
+              "force_ai_to_flee": true
+            }
+          ]
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "routes_share_occurrence": true,
+        "routes": [
+          {
+            "id": "normal_modbot_or_door_failsafe",
+            "edges": [
+              {
+                "source": "barge_progress_mod_bot_1_e1m1",
+                "path": "targets.item[0]",
+                "target": "barge_target_relay_activate_cp_02"
+              },
+              {
+                "source": "barge_trigger_open_modbot_door_failsafe",
+                "path": "targets.item[0]",
+                "target": "barge_target_relay_activate_cp_02"
+              },
+              {
+                "source": "barge_target_relay_activate_cp_02",
+                "path": "targets.item[2]",
+                "target": "barge_encounter_trigger_commit_chainsaw_hall"
+              }
+            ]
+          },
+          {
+            "id": "checkpoint_cp_02",
+            "edges": [
+              {
+                "source": "checkpoint_target_level_activate_cp_02",
+                "path": "targets.item[0]",
+                "target": "barge_target_timeline_cp_02"
+              },
+              {
+                "source": "barge_target_timeline_cp_02",
+                "path": "componentTimeLine.entityEvents.item[2].entity",
+                "target": "barge_encounter_trigger_commit_chainsaw_hall"
+              }
+            ]
+          },
+          {
+            "id": "mission_select",
+            "edges": [
+              {
+                "source": "barge_trigger_trigger_mission_select_open_door",
+                "path": "targets.item[0]",
+                "target": "barge_target_relay_mission_select_open"
+              },
+              {
+                "source": "barge_target_relay_mission_select_open",
+                "path": "targets.item[2]",
+                "target": "barge_encounter_trigger_commit_chainsaw_hall"
+              }
+            ]
+          }
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "153cfaa6773cef4aead5765129fed0d8db9887983656c1acc104ff2264a7e1e9",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 3,
+          "label": "barge_chainsaw_zombies",
+          "spawner": "barge_encounter_spawn_chainsaw_hall_zombies",
+          "members": [
+            {
+              "spawner": "barge_target_spawn_7_1700466723",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "barge_target_spawn_7_1700466722",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            },
+            {
+              "spawner": "barge_target_spawn_7_1700466724",
+              "ai": "barge_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "ai_fodder_imp_5": {
+      "sha256": "dfe9ae92d6de0c28a63655769bc6bf1153defd30133f68552aecb532032c479b",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "ai_fodder_imp_8": {
+      "sha256": "a024191152bb074e109725e7acfc1d9eb3eedfb5305b03f095980807ad207896",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "ai_fodder_imp_9_charge": {
+      "sha256": "13eb81d80a4c2f7ee8fb4eb596105644c15e25dbe4e7d3d718558bcd5d8924bf",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "ai_fodder_soldier_blaster_6": {
+      "sha256": "3382d1f88276664f07ead1a881f6f621f011252c0fbf691ec8459738c098ac4c",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "ai_fodder_soldier_blaster_7": {
+      "sha256": "93ecb6896a2ec780a26b2af60b5aefc7bd05cf130026779e39fa32ef85680ce2",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "ai_fodder_zombie_tier_1_10": {
+      "sha256": "940d0be79c7da396e68570008e4c88835cf2fc8719a635accea221c8feda5c44",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 30
+    },
+    "ai_fodder_zombie_tier_1_2": {
+      "sha256": "192644050e53487b2e7a3d34607d00ea0c933029f5d815b6ab62dacd40604ca3",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "ai_fodder_zombie_tier_1_7": {
+      "sha256": "8ed6f8f14e9d21662779f15cf354b1076853f1aff9ed5bb914c3833841c28268",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "ai_fodder_zombie_tier_1_9": {
+      "sha256": "546adf4f346068867a1a59d6abafd7ebd4c9060f8da767fe74bec5924f5bacba",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "barge_ai_fodder_zombie_tier_1_1": {
+      "sha256": "36f44aa537d81c75845d664c02132502e866e142a3af6f72d157d091075e3ad3",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "barge_encounter_manager_chainsaw_hall": {
+      "sha256": "4d2cf555bef476d371480ed63ec21d08934097488a7131a5a8a672578c9e194a",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_encounter_manager_lower_level": {
+      "sha256": "757fa391254c079fecfb652dff0498552dfd85e76295564786cc7dfd8850070a",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "barge_encounter_spawn_chainsaw_hall_zombies": {
+      "sha256": "08bd7535906ba2d12320db3c23ec0c8c624ee03e4eed7928f1e854f0ec51c618",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_encounter_spawn_group_lower_level": {
+      "sha256": "f15effb4f0a6be3a285c0e2f51e9b20712bde1ab8032c1370f8f89ffd2360909",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "barge_encounter_trigger_commit_3": {
+      "sha256": "aa31277ab51c11e664fc45b65c57c537f9571013be87fa94ea8047cedb4362c3",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "barge_encounter_trigger_commit_chainsaw_hall": {
+      "sha256": "3bce9b30320a0ba3873d97452ad01720377b67e1eb02a8acffdb5b63cfd03443",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_encounter_trigger_exit_1": {
+      "sha256": "fcab4719e3abad21e930f948577ccd48589ccfdd908d2d901086f644d882c2f3",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_encounter_trigger_exit_2": {
+      "sha256": "701d1fd95e7dd0e164645f8cd60d794a29afbeb7972fc10a5dfdda03c9851ba4",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_encounter_trigger_exit_3": {
+      "sha256": "53767db2649ed1a29830c995ad3168c47326bbbf73659d57580769d73ba1b8b3",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "barge_progress_mod_bot_1_e1m1": {
+      "sha256": "b225d721c7f3a57f52746c6a56d8f158c2cf0dc43d47af93b338f9a65b5c4fb3",
+      "class_name": "idInteractable_WeaponModBot",
+      "layers": [
+        "game/sp/e1m1_intro/visibility/vis_barge"
+      ]
+    },
+    "barge_target_relay_activate_cp_02": {
+      "sha256": "4e2d7d70da53a66312800b07942ddeb36b8e48ab9f08bc27ec9a5fd7f5af2dbe",
+      "class_name": "idTarget_Count",
+      "layers": []
+    },
+    "barge_target_relay_mission_select_open": {
+      "sha256": "f8dd5ec09a4ada0e296a7221a2d07545e679d8dcfeb93a886c0775941a4905ae",
+      "class_name": "idTarget_Count",
+      "layers": [
+        "game/sp/e1m1_intro/cp_01_mission_select"
+      ]
+    },
+    "barge_target_spawn_11_1700466721": {
+      "sha256": "799b6e8bf264c5720fa6ac45c1014f9576697bea4c5b4a38ad8cc399c6b5a7bb",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 26.0000744,
+        "y": -1579.99915,
+        "z": 16
+      }
+    },
+    "barge_target_spawn_11_1700466722": {
+      "sha256": "74491fad37c9d444e700b69e987ee56a5042dd74fd09b126546b1ab07115eccf",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 42.4998894,
+        "y": -1580.00098,
+        "z": 16
+      }
+    },
+    "barge_target_spawn_6_1700466721": {
+      "sha256": "348460c7bba583943dc0e6a4c92a8fb6b816b354fc2d0ee5a7ee191cfdf3375b",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 28.969923,
+        "y": -1565.90955,
+        "z": 13.000001
+      }
+    },
+    "barge_target_spawn_7_1700466722": {
+      "sha256": "d8fba038944e05c01257cba34a95596a8cc0a742c28bbd079c16b30e566d30fc",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 33.0000763,
+        "y": -1525.99963,
+        "z": 17
+      }
+    },
+    "barge_target_spawn_7_1700466723": {
+      "sha256": "92bb364063a57c6c7c082ff08ecf27a016425d7157630db14d4f01c477bf90a0",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 39.0005684,
+        "y": -1532.49976,
+        "z": 17
+      }
+    },
+    "barge_target_spawn_7_1700466724": {
+      "sha256": "9bf6837a32d8f03346a1f2901939a70966e7e82dc3eaa71464c1480f96d5253b",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 35.8998718,
+        "y": -1539.00098,
+        "z": 17
+      }
+    },
+    "barge_target_timeline_cp_02": {
+      "sha256": "1eebdacbda7a14baf9bccdc4f01f5ea8f7e65b02ff90e804df5f8324820b618d",
+      "class_name": "idTarget_Timeline",
+      "layers": []
+    },
+    "barge_trigger_facing_first_door": {
+      "sha256": "d8b17b2a62180d22c47e35e137f8eed437566f3e1781be96de022c318bb20586",
+      "class_name": "idTrigger_Facing",
+      "layers": []
+    },
+    "barge_trigger_open_modbot_door_failsafe": {
+      "sha256": "d4685de13867b2aef555b2348c9a586fb7820e2aada86aaaaf843eb29fd15c82",
+      "class_name": "idTrigger",
+      "layers": [
+        "game/sp/e1m1_intro/cp_01"
+      ]
+    },
+    "barge_trigger_trigger_mission_select_open_door": {
+      "sha256": "3845020b999823fd41499f9be4943d236ad3d6bbb656cfe417c014b5e7221836",
+      "class_name": "idTrigger",
+      "layers": [
+        "game/sp/e1m1_intro/cp_01_mission_select"
+      ]
+    },
+    "cathedral_encounter_manager_initial_zombie": {
+      "sha256": "f4bec0723818fd4bde162f175ce59ea9c26618b3ce81a1aaac0e485923635d3a",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "cathedral_encounter_manager_upper_deck": {
+      "sha256": "d1231aa19029d91be7ba3c836d9ee70b1431868645d66f2175e86b46a22792e3",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "cathedral_encounter_spawn_group_zombie": {
+      "sha256": "867cfd35f07e2da600d636e380e96a200552a6e0a0ffa93a31d15dd8b11e0a12",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "cathedral_encounter_trigger_commit_1": {
+      "sha256": "7104e049e7ae5ab0c2bfbaa2fcba789d6e4d0ef040d6e43bebef5a535850cc25",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "cathedral_encounter_trigger_commit_cathedral_3": {
+      "sha256": "0459549299a28bef231d472fb56d24d2f21dfc49beb262e7bbbbd8d3167fa855",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "cathedral_encounter_trigger_exit_1": {
+      "sha256": "b8f60125e3d20afda3dbe11c0585585423489ff6d4206b5acf5ac96c6cc043c0",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "cathedral_target_spawn_168": {
+      "sha256": "fe691492b299938f516d7ef40dd4fa1544ca9cae6fceccf106d0012444c97abc",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 191.499969,
+        "y": -711.999878,
+        "z": -183.699997
+      }
+    },
+    "cathedral_target_spawn_169": {
+      "sha256": "04d977da838a9435225d8b1d0bdc417f68abb530e71525443372d416dd90420d",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 187.78035,
+        "y": -709.621277,
+        "z": -181.37001
+      }
+    },
+    "checkpoint_target_level_activate_cp_01_post_gk_tutorial": {
+      "sha256": "ee32dfda9e06b40535562415298ea5bd1267e52e7915f4aa10e7bfa9bca75759",
+      "class_name": "idTarget_FirstThinkActivate",
+      "layers": [
+        "game/sp/e1m1_intro/cp_01_post_gk_tutorial"
+      ]
+    },
+    "checkpoint_target_level_activate_cp_02": {
+      "sha256": "f06a6d05320e1f4ad255f7e748b3041f6c5dcf99ce1908a5e741089b2d843189",
+      "class_name": "idTarget_FirstThinkActivate",
+      "layers": [
+        "game/sp/e1m1_intro/cp_02"
+      ]
+    },
+    "corner_street_ai_fodder_imp_1": {
+      "sha256": "c967bac73e5c0327f398c54372e6dc1ec00b0b67f13b4c3b963cf29615a32b86",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "corner_street_ai_fodder_imp_charge": {
+      "sha256": "5acdd6b502726711e05d21b2b76c18d5fb36dab575256e08a1ed0477fd041d29",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "corner_street_ai_fodder_soldier_blaster_1": {
+      "sha256": "6c3c927b67d2ef3dadee366d9dbaba99d0ebd5e28a286d7fbbb65a76182dc1a4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "corner_street_encounter_combat_role_enc02_imp_defend": {
+      "sha256": "7d6efb82d5c5566cc92a8d2ff52c365d7710f206181c821bdbb3e17826214030",
+      "class_name": "idCombatGrouping",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_combat_role_enc02_imp_release": {
+      "sha256": "351e77bb0e9db0269736dd8d993b54612517210145b7bc7086b71c34b5147cd0",
+      "class_name": "idCombatGrouping",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_combat_role_point_1": {
+      "sha256": "b6ae5c7bdc4b74ec9a12e16e50e0fcafd6d492ee7553c0aaa612c09808f82970",
+      "class_name": "idAICombatHint",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_combat_role_point_2": {
+      "sha256": "f936a501edd79368855faee21192af506e9d5e480982a6e3ce653e3ae0388603",
+      "class_name": "idAICombatHint",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_combat_role_point_3": {
+      "sha256": "c77d97e7e2d0bf670101081819142400c17b676b7f074a8484fc9780fd5a6a01",
+      "class_name": "idAICombatHint",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_manager_1": {
+      "sha256": "41a91611e546a66cc27f3d38f1350a1c2c42013bec268d3d4666b54a4ae64bde",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_spawn_group_enc02_soldiers": {
+      "sha256": "4d423e7163ec0494d645e5d85fcd60aaf2467d8c61b20088a8bce44e9ab8591e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_commit_1": {
+      "sha256": "9b55bd949ef5bafa7b5eece5d1136261d73f279d8337f8667d8edf8b8278f596",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_commit_enc02": {
+      "sha256": "17d0aa32ed4159f31ac64a42f21c99f6e2fe6e437fdac1257cced530b691fbdf",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_exit_1": {
+      "sha256": "ae6135f821e878363bf7d50f0f3d92e7e4442eeaad8178794900e0362d3830fa",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_exit_2": {
+      "sha256": "eaa2c366cb5069dc4ed1bc8f65604daa12e6ebfe34f9e864079ad79676b9f783",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_exit_3": {
+      "sha256": "592d1d374ad46d8dcff1d2b0fe9a0912958e5efa3934e0cc042bcaf6214ded81",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_encounter_trigger_user_flag_3": {
+      "sha256": "8ce12889051638ec235fd8f48e312f301e929ed577aa0075c07e07cea1dad8c7",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "corner_street_target_spawn_1": {
+      "sha256": "f814f8675e100bf9ed806c2f19c143e39828ee80df7eddbb9a0ef86dfac09c8a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 193,
+        "y": -561,
+        "z": -205.008545
+      }
+    },
+    "corner_street_target_spawn_2": {
+      "sha256": "dd98475bbcf87df23b8825327095a07cb94f4610953aa909423b285ec3696d86",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 140.904785,
+        "y": -585.030579,
+        "z": -192.14418
+      }
+    },
+    "corner_street_target_spawn_3": {
+      "sha256": "faa3bc14b57a6f9de12712e12e1ca06e022772e279e645b94363fc4856850031",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 190,
+        "y": -547.5,
+        "z": -205.199661
+      }
+    },
+    "corner_street_target_spawn_4": {
+      "sha256": "6d5455e15053d180a2e956bf1b98d1ab9d7edde530d74f2bd51e20ffbbe74dc7",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 140,
+        "y": -567,
+        "z": -184.999954
+      }
+    },
+    "corner_street_target_spawn_5": {
+      "sha256": "df08ae7fe215de8d0d72c2ff9452b1d15138a59861844e6cc6ca4e34c7d1dd08",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 130.5,
+        "y": -584,
+        "z": -193.999924
+      }
+    },
+    "corner_street_target_spawn_6": {
+      "sha256": "4fa70a1fdc93ef6da17b37f6253a4373b05084b22f4a4772a635be5125a2e10c",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 131.5,
+        "y": -599.699951,
+        "z": -190
+      }
+    },
+    "corner_street_target_spawn_7": {
+      "sha256": "ac75b8df3a0a52455471e219a99f78a2043bf0b685a74d833b581fa06520c5a3",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 172.949982,
+        "y": -596.25,
+        "z": -198.725143
+      }
+    },
+    "crack_building_ai_fodder_imp_1": {
+      "sha256": "3ce8810b62968a509133562ea664b4d22d7e854a8fdfd4e794a6ef2292ef24f9",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "crack_building_ai_fodder_soldier_blaster_1": {
+      "sha256": "ee60ab77b3d8471b7c14c31e939849e6e5095292b8bffe817e906015ffcded68",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "crack_building_ai_heavy_arachnotron_1": {
+      "sha256": "8263d2d922ee2f3d997ee8f1d358a356211cd934c25296c7306a0e5ce51e1941",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron",
+      "starting_health": 3000
+    },
+    "crack_building_ai_heavy_cacodemon_1": {
+      "sha256": "3cd6ea18ec55623a08041c431c8d71927e90b64dd4a1b3843c50572047a747e2",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon",
+      "starting_health": 2500
+    },
+    "crack_building_encounter_manager_caco_intro": {
+      "sha256": "7d9d1b15c4723e61b245914bfdcc87d8a4cbed861efd06735813e811b54a6c93",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_manager_crack_e01": {
+      "sha256": "2aa00ae638952821fbc03b2f82e4688648964db9ba39749539b4f2727baebea6",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_manager_wallbreak_arachno": {
+      "sha256": "433a96552d5ce036be6bc2ff79753a33bbfe0b474d6500d1c789dc7ae50f5cac",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_spawn_crack_e01_imps": {
+      "sha256": "2a1ccc5cd1db5664714cda61be7902392ffda69f442e563f994454181aac9bd7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_spawn_crack_enc01_soldiers": {
+      "sha256": "2ce931f1bc1727a61b32beb503b09e7ffd9ca44656fd55b0e74f87609c5690de",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_commit_1": {
+      "sha256": "890b28af70e6d7ba8fb2e024d349c6089b1bbdd126cf6a5c6c8a4f5cc15f22f2",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_commit_2": {
+      "sha256": "82d45644f1d84ab4fc5d97d468ab38fff929ffc8558d0e532e9a404cf2267c55",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_commit_final_arachno": {
+      "sha256": "a96f6537e04b66f2f5255af96f7fc94ff878c57a0c5f1d3f2c3026915e28d773",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_exit_2": {
+      "sha256": "a818edfd91cfd512747ee9fd5f0c863a28cd2b545cf31282cd246ba7337f8131",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_exit_3": {
+      "sha256": "da187d939ea1dd19bf05cee95592b6bb6702c87f2cb823f8cf1147527df195fe",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_user_flag_1": {
+      "sha256": "d275d26a179a49fdf01babc5673ca56b06994a3ccddea2d230fc88b43dd58bb3",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_encounter_trigger_user_flag_combat_kickoff": {
+      "sha256": "0a9b1bacbbcf98c6ad0285b3bbc90b08d85827179909f099e2db84cc77920e59",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_target_relay_stop_zombie_maintain": {
+      "sha256": "a1fa9ec32f4b463110c54917632ed004a10ef79dc4ad658111cb34993f7e8017",
+      "class_name": "idTarget_Count",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "crack_building_target_spawn_1": {
+      "sha256": "16fa483f298d89dcddbda8f6cdde456ec334b6930f231dcafafdf8dae644a388",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 77.2601929,
+        "y": -447.719452,
+        "z": -218.26738
+      }
+    },
+    "crack_building_target_spawn_11_2072334494": {
+      "sha256": "5c780200a06ec3cfb0865c67263fdd22268b6b71e0491d639c06f4abc00ee397",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 89.9146957,
+        "y": -479.971161,
+        "z": -227.526108
+      }
+    },
+    "crack_building_target_spawn_1_2072334494": {
+      "sha256": "f8feba7bf69d854fb9c306788010c001e4739e6f11d8f33d6f995c0e62e9acdc",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 102.748421,
+        "y": -468.143646,
+        "z": -220.294968
+      }
+    },
+    "crack_building_target_spawn_27": {
+      "sha256": "a3ea0c20a8b52202ed3d47158ea8c36ef0876850f46aad5e4b4927bd4e5a6153",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 86.9553146,
+        "y": -459.306274,
+        "z": -219.192642
+      }
+    },
+    "crack_building_target_spawn_2_2072334494": {
+      "sha256": "12ec4be453c9b1495a15b9282a7e9b54cede2efb42598778d7081492dec352ec",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 90.9113464,
+        "y": -443.612518,
+        "z": -226.232819
+      }
+    },
+    "crack_building_target_spawn_3_2072334494": {
+      "sha256": "f60f00862626cad23d895da0ad9cd01b083c5b7593cba862f2f001459f3a9860",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 95.6674042,
+        "y": -442.742035,
+        "z": -233.757004
+      }
+    },
+    "crack_building_target_spawn_3_2072334495": {
+      "sha256": "be28dfc1e4c99f52ea23ba49655b6305bdb73fd368e77a92b24bb587f3d3bfae",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 89.3219757,
+        "y": -443.546814,
+        "z": -233.483017
+      }
+    },
+    "crack_building_target_spawn_4_2072334494": {
+      "sha256": "13601bd07b790c2f26a56eb5083a7b6757630821c15cd68e34c9baaf6a38c1f6",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 79.9001389,
+        "y": -471.952881,
+        "z": -226.755051
+      }
+    },
+    "crack_building_target_spawn_50": {
+      "sha256": "39b93c5d7accb4d6693e618a52efb219bed944f32285eac66dd15c031c04101a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 81.5244751,
+        "y": -456.373383,
+        "z": -218.751328
+      }
+    },
+    "crack_building_target_spawn_52": {
+      "sha256": "6d79204f980ee0dc8949a63287647a67fa462c14c0bfd57a0765caf229e58ce2",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 75.2890091,
+        "y": -444.408508,
+        "z": -218.11705
+      }
+    },
+    "crack_building_target_spawn_5_2072334494": {
+      "sha256": "9e176c016d82d49babf036af36e1c2c17057f49e2e266ed40a09b18f9b256e66",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 76.5895309,
+        "y": -444.296997,
+        "z": -225.588623
+      }
+    },
+    "crack_building_target_spawn_6_2072334494": {
+      "sha256": "05414618e71f6b62bee5cd59d7434a95d690244dad25f58524360a20c4b97db1",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 68.762207,
+        "y": -471.802643,
+        "z": -224.488663
+      }
+    },
+    "crack_building_target_spawn_7_2072334494": {
+      "sha256": "b85de721f8e584568d7e9e5e9749b775e931f75d99eb8112e4505bbdb8c79349",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 97.1402817,
+        "y": -442.620667,
+        "z": -226.415405
+      }
+    },
+    "crack_building_target_spawn_7_2072334495": {
+      "sha256": "0aecde7ca96ee9a21285002748a3d9ba5566702fcba9d7af0380195f4ed8d8c9",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 102.090202,
+        "y": -444.440857,
+        "z": -234.125977
+      }
+    },
+    "crack_building_target_spawn_7_2072334496": {
+      "sha256": "79827e3c03792bed691d5e3c88c850afb36dd4c6edb27f87e7f070812a48a64a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 95.6402206,
+        "y": -468.321259,
+        "z": -219.961655
+      }
+    },
+    "crack_building_target_spawn_8_2072334494": {
+      "sha256": "59e915d894cc9e71946086e077665775be8bbd1dcf4c72d8a7095100ee716749",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 106.730499,
+        "y": -447.952515,
+        "z": -234.475815
+      }
+    },
+    "crack_building_target_spawn_9_2072334494": {
+      "sha256": "ff179fe15e0dbb95a4e561e24b1d3b22318ba859fed35524efd4ef9d16c69ad4",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 105.527611,
+        "y": -475.137482,
+        "z": -227.996231
+      }
+    },
+    "crack_building_target_spawn_final_arachno": {
+      "sha256": "596c2045ae7d6d86dcd9663074e5aa35b2e3e907d99b96135edc5c79dd421d00",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 117.108055,
+        "y": -443.047852,
+        "z": -227.105988
+      }
+    },
+    "crack_building_wall_break": {
+      "sha256": "34ecc6cb5496fb3a788f3f811c6c06ab82ae44456490ccd081ed9edeb8169cfa",
+      "class_name": "idTarget_Count",
+      "layers": []
+    },
+    "encounter_manager_2": {
+      "sha256": "74b7e6679de2d331bc8c90f82ac1ffd331d6d26f98f2feee257687294fd09892",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "encounter_manager_post_yellow_key": {
+      "sha256": "becabcfbdf7b59194a6de2a2e386dc71f224820ccd6cb4691c50190e359877a1",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "encounter_spawn_group_breakkeygroup_imps": {
+      "sha256": "6b5f53698654f252ddc1dfd58d4ed9bba2da23590193543d50e47427a619aa1e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "encounter_spawn_group_zone_2": {
+      "sha256": "fd859532dbc3b1d62a09458cc319a5219c81e9a05031453b095fb1f798a2e2b8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "encounter_trigger_commit_2": {
+      "sha256": "be1399eb07fdc32f4e8c60f037b2d351e20af24d84f8d10febb1ce7cdb940d63",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "mech_building_enc_manager_pit": {
+      "sha256": "c4eb852ee2f4a1fcff592aa1cd53022cf0c8bdaddaef88adc0563fe9cb9efe85",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "mech_building_enc_spawn_group_pit_zombies": {
+      "sha256": "bd3829c3dd4861682967928bda9e22bd9f3e3cf935c679e6fcb636f40cd91b0b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "mech_street_ai_fodder_zombie_tier_1_wander": {
+      "sha256": "02e0a3bdddfbd7d015e93f61380db1a7d4aa99a05c62151d149c29252c2d9b2b",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "mech_street_enc_building_hand_solo": {
+      "sha256": "20b82faa336ffa9c01794779b913ecc395e240a4e65f273352b638f1673885b2",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "mech_street_encounter_trigger_commit_1": {
+      "sha256": "f7735d56fa07311a94ff67c665dfbaf97bee72a72ad3816900689ca067d775a4",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "mech_street_encounter_trigger_commit_4": {
+      "sha256": "bc2f2610be4bca6366e63befefb52174d60001349e39c0ef7136904013d5e48f",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "mech_street_encounter_trigger_exit_2": {
+      "sha256": "5930aa37741dc8289cff24c80dc873a4f5f0d3544719bb88b0f32c9810da5b3a",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "mech_street_info_logic_hand_imp_condition": {
+      "sha256": "ea2b0dc38ee4c2dadd5d0f56490eeb8d82c4b4dfaae603684ac5e570392b3845",
+      "class_name": "idLogicEntity",
+      "layers": []
+    },
+    "portal_encounter_manager_p_enc01": {
+      "sha256": "feca08a1835ed111980cb10d6114350b2596ca0df716f6ebb1ee2bddd301c3f1",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "portal_encounter_trigger_commit_post_uac_hq": {
+      "sha256": "ea7aceaf2d3e406ea1d1a5d7ce05f8f5c159d1578d1e37754aa7616ca4528540",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "portal_encounter_trigger_exit_1": {
+      "sha256": "d4d2a92dc56462eb4f1e69cb21a78b07ccef63b56586e3a855956f2e6c66344a",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "portal_encounter_trigger_user_flag_1": {
+      "sha256": "3e91863a844a4ec5d082b59a81359497455c73ba8b01edcde19f4db2d2440c07",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "portal_encounter_trigger_user_flag_4": {
+      "sha256": "291a1218ab6848908c62469241cec9f3f046a4ca12628abe3a2570ae7feebd46",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_ai_fodder_zombie_tier_1_1": {
+      "sha256": "b145771bcaa8e395f2b318217b85d7cd11c2dfb15357ed6116b691e44dcec696",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "subway_ai_heavy_arachnotron_1": {
+      "sha256": "c7f73d2db6b2dab683f377c1b31cb8f492153dab022ac9371739560616239ab7",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron",
+      "starting_health": 3000
+    },
+    "subway_encounter_manager_subway_entrance": {
+      "sha256": "efd3540c6783c737d82b7fcf4ad11b175c85e1be9d9f64c8fa076e4185fc6d22",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_manager_subway_hall": {
+      "sha256": "401d25d4ecb3595f93cb79e11984afc7ca7e727145d3294db62ff6c82fec1f86",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_spawn_subway_hall_zombies": {
+      "sha256": "7ac9504c5e8f9e690471d016688043a0534415451cb2760578440816b68529e2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_trigger_commit_1": {
+      "sha256": "1db55ad632d31864c9982b501262407e39eaf0f0cb2c2296ffd0b655954e5b3f",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_trigger_commit_2": {
+      "sha256": "f4a3fc2cbe2f4aa5558a6111b549e3b025d71994a10393c75242eafa5d8aa716",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_trigger_exit_1": {
+      "sha256": "131d437d1d83fd0fd6ebaa18320848836e580a70f1448aa1479ae0a40548bd8d",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_trigger_user_flag_1": {
+      "sha256": "aa68b7e8e71f727065c7a6584487361673b18c324b00ce36e38361c32b121484",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "subway_encounter_trigger_user_flag_2": {
+      "sha256": "baa0c8ecb4e386e73d1c580aeca387cdddbaa2b4cf84a36f8fd058219763a448",
+      "class_name": "idEncounterTrigger_RaiseUserFlag",
+      "layers": []
+    },
+    "target_relay_post_key_combat": {
+      "sha256": "c6032c91394443b00cdf3431abc7932b0b1b1532b63e61db33a54d4e3cfcd435",
+      "class_name": "idTarget_Count",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "target_spawn_10": {
+      "sha256": "bb031a6dbd064b17553f38538d6ca04ea8dc2cab7446710807e52af6e0248018",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 143.828079,
+        "y": -572.704834,
+        "z": -193.999985
+      }
+    },
+    "target_spawn_11": {
+      "sha256": "daef0e7141602319ffead76d521f3bd15af40d227d59df17231cbf80d2c95226",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 110.440002,
+        "y": -567.790039,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_111": {
+      "sha256": "7dd6f3e13f1ee8a40c684c48fafe3b828642e8d147ff5aa8128b460ed448732e",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 5.72999716,
+        "y": -280.379822,
+        "z": -196.032532
+      }
+    },
+    "target_spawn_112": {
+      "sha256": "4f98e0106590081cc6bf0463582fbf69341410019b286d0795e5e2c61dbe9f47",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 7.15034771,
+        "y": -307.380219,
+        "z": -187.913666
+      }
+    },
+    "target_spawn_114": {
+      "sha256": "6cf3b6270f50ab2c06216f885bda04115dace0e288cdcbce516c73b3c763d2b2",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 29.1339741,
+        "y": -310.173645,
+        "z": -196.330444
+      }
+    },
+    "target_spawn_12": {
+      "sha256": "005720f5e8b23c5758788833d4aab3897cf19ae6a8899ceea6528bdbf1207afa",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 126.779907,
+        "y": -556.518127,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_129": {
+      "sha256": "f7d52586c725154e12c0f183d27def75a6bd2b1c855515041713ca4cdcc25a7a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 264.420593,
+        "y": -855.750854,
+        "z": -149.738937
+      }
+    },
+    "target_spawn_13": {
+      "sha256": "4df1dbfa1daad3324b2f08d409b8a4600e0b52a0a085c53c14dd207e33130f0b",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 121.649391,
+        "y": -558.671448,
+        "z": -210.903641
+      }
+    },
+    "target_spawn_130": {
+      "sha256": "b172f969fb511525e2b4a26bc82e6653e9881c9a8603d4be231a3b557ec2f268",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 266.014526,
+        "y": -861.889587,
+        "z": -149.415726
+      }
+    },
+    "target_spawn_131": {
+      "sha256": "cccafe08a017d8bfcdb5c7c48e31eba3dc93c61d594b27d1993b82e389dabef9",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 262.420654,
+        "y": -813,
+        "z": -181.777618
+      }
+    },
+    "target_spawn_134": {
+      "sha256": "38d11ba657983f4029cbfa1d841f2f33565f1f2a15a7889152e841605e8abc87",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 119.387146,
+        "y": -564.094116,
+        "z": -210.929993
+      }
+    },
+    "target_spawn_136": {
+      "sha256": "5fae444fc9934858201a73ae39040ce53f88f238990a3182fc575c9358de2f35",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 75.2499619,
+        "y": -594.103638,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_137": {
+      "sha256": "4ff9058a4f7bd83b681fa853e4d86702c56bd7a42bdcd680c82fa3f115a7a2fb",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 81.9499435,
+        "y": -592.003479,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_138": {
+      "sha256": "b894c34ea15f0c9d8bb7a22cbb0caf12e64a7f00aebecdb17273e31d6107d71a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 85.9499283,
+        "y": -595.103699,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_139": {
+      "sha256": "3e9c8c1060285e47dbf05cb715926d31c10e9808246936ca6f77ccf872aa9575",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 70.3998108,
+        "y": -594.553406,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_14": {
+      "sha256": "b5e44bd5b2c5443df48a8999b17d9447b1b4c6de2fa78d367bf2b9c37038857a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 97.5,
+        "y": -579.5,
+        "z": -211
+      }
+    },
+    "target_spawn_140": {
+      "sha256": "b22810bc376cdd9b74b018dd7ddb4d3fe8b3a59bde7038b61f6782f26ad0d0ca",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 43.1995697,
+        "y": -281.070282,
+        "z": -213.917465
+      }
+    },
+    "target_spawn_141": {
+      "sha256": "95b568c3688aa420789158329cab8e658f07074db496327890bec2fe53317502",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 42.3805389,
+        "y": -275.540558,
+        "z": -213.780014
+      }
+    },
+    "target_spawn_142": {
+      "sha256": "982c21a2a3246cb62e1f10d6df1154506e598cee5b7e1ab99322a15edab3622e",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 36.7117577,
+        "y": -273.65979,
+        "z": -213.780014
+      }
+    },
+    "target_spawn_151": {
+      "sha256": "3b135032ef8a2e1e4aa81bd00732c8dfe26ca80ccb2f47375e2bc00de33f2737",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 68.8198395,
+        "y": -592.885559,
+        "z": -210.629974
+      }
+    },
+    "target_spawn_157": {
+      "sha256": "ac9bbb2c19a7e4e801434dc338fdc9121d6bb96eb8143b951c67339818e312d1",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 43.0416107,
+        "y": -284.000183,
+        "z": -213.943802
+      }
+    },
+    "target_spawn_173": {
+      "sha256": "9e285bb89124906297b9553fa006bc885a3c65d95b96691e978926563d3e5e38",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 252.510132,
+        "y": -782.679077,
+        "z": -185.580078
+      }
+    },
+    "target_spawn_174": {
+      "sha256": "81f220b3f192c7103e7aafb2a3f254f1deebd99089966ed1e32d0548db3a3b3e",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 253.590393,
+        "y": -865.740234,
+        "z": -149.289948
+      }
+    },
+    "target_spawn_18": {
+      "sha256": "479bac47fb0532d0470f1617fe6651b967e782db58c956e848ed3a594cb1aba0",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 157.30719,
+        "y": -540.535645,
+        "z": -215.205704
+      }
+    },
+    "target_spawn_180": {
+      "sha256": "4717d56982a1bfc746eb9790aca81c5fc29496661733b998304b959c2c30899e",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 17.650013,
+        "y": -262.439972,
+        "z": -197.76683
+      }
+    },
+    "target_spawn_181": {
+      "sha256": "48c61b77e22ac4c150734f35102546805daf3865eebc07ec39e014b90df49638",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 234.44928,
+        "y": -760.049377,
+        "z": -202.865189
+      }
+    },
+    "target_spawn_182": {
+      "sha256": "dbbaa2b02ceb959a02a6cd724f704f5994cd7de2629b8cf1e2f5973763fedf33",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 227.020264,
+        "y": -725.749207,
+        "z": -197.491837
+      }
+    },
+    "target_spawn_183": {
+      "sha256": "2a19652e230b4e3364cdcb99f721efc75f793c0779a9218764db48f128d95c58",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 210.140335,
+        "y": -733.029358,
+        "z": -193.671066
+      }
+    },
+    "target_spawn_185": {
+      "sha256": "c9be3b832a0618309f36e301f127ff53c374dc9c6d0d97f77ab256214875e44b",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 220.609589,
+        "y": -749.52002,
+        "z": -204.089844
+      }
+    },
+    "target_spawn_186": {
+      "sha256": "c50468df2348b9963b19743cd145bb7b3ee44bcffcd018d5d24647b58750e99f",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 244.540329,
+        "y": -756.490295,
+        "z": -201.809891
+      }
+    },
+    "target_spawn_19": {
+      "sha256": "05728d025e67b4ee06beafaf2529099ed883f6a9e2d2ee02e392a7b4dbfd1d83",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 96.6531754,
+        "y": -569.739929,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_194": {
+      "sha256": "d64b0cf370cb33006c5ec8326de35c37d1817912688e9490b30b9ff88ebad78d",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": -60.3300323,
+        "y": -228.090088,
+        "z": -195.169922
+      }
+    },
+    "target_spawn_195": {
+      "sha256": "73b01cbd02529fc0d411843744fdc4e1531c74d4d261ce6e4023841ff485b96c",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": -39.2941513,
+        "y": -234.768829,
+        "z": -198.584381
+      }
+    },
+    "target_spawn_20": {
+      "sha256": "95612cb5a6d89fb317af379af1b6fb07cf2d3a834415a8d06387f26a3e837c56",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 109.350014,
+        "y": -559.103638,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_201": {
+      "sha256": "78be4cf13c0ffbe38d45e07800bdc17e21941fad3a1492ddcc8aba52daa8ea1b",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 179.923462,
+        "y": -565.083618,
+        "z": -207.399979
+      }
+    },
+    "target_spawn_202": {
+      "sha256": "14179d103df2110ece440b649dedbcee85711b63c929d10d3cc1e477ef63e639",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 154.677902,
+        "y": -559.465027,
+        "z": -204.000076
+      }
+    },
+    "target_spawn_205": {
+      "sha256": "c2912574553b7078a6853a625f608da48bde34e8848f6c3abee42d0acb228aeb",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 73.3135681,
+        "y": -459.860229,
+        "z": -214.000015
+      }
+    },
+    "target_spawn_206": {
+      "sha256": "8e327776b3e0db727bc5428801c44f52b28eeb421c08202596f8d231db0b8ad3",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 82.2728729,
+        "y": -584.308716,
+        "z": -210.87999
+      }
+    },
+    "target_spawn_207": {
+      "sha256": "36964ea4ab1d818d2f1f73447d949aa325ed8dc370230d65fa1129a9ea9d6bb0",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 106.839828,
+        "y": -571.545654,
+        "z": -210.90033
+      }
+    },
+    "target_spawn_208": {
+      "sha256": "95ad6b5fa48a7913a67a4de81e30b96e893406a21d0dc51fb1d29c73e78b827d",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 116.491478,
+        "y": -570.20697,
+        "z": -210.90033
+      }
+    },
+    "target_spawn_209": {
+      "sha256": "9c36ef37fbaf5047b76fb2dbe375eb53ebf33eb392380297e3e94cf5109a22f5",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 96.592659,
+        "y": -574.558411,
+        "z": -210.90033
+      }
+    },
+    "target_spawn_210": {
+      "sha256": "92346fcdf03b192e9d4e121953faf338678eab1e25836124f5b63cb72bb91e79",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 14.6201725,
+        "y": -279.429993,
+        "z": -196.732574
+      }
+    },
+    "target_spawn_211": {
+      "sha256": "fd66c6fbbb66022ea467584af6b2d663abbff3cbfd013209d4633c55b4e4cede",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 30.8201694,
+        "y": -284.830017,
+        "z": -197.632584
+      }
+    },
+    "target_spawn_212": {
+      "sha256": "10014f7e1e705f922cefc321bc3fdeee8b55c72b5c2a8d88439204d2829b3661",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 22.2201729,
+        "y": -305.8302,
+        "z": -196.832565
+      }
+    },
+    "target_spawn_51": {
+      "sha256": "a780f6d947c6523875fa12a2f63b1dc695003d7ec24ba3cc837bfa06591db482",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 238.449188,
+        "y": -763.927246,
+        "z": -197.539459
+      }
+    },
+    "target_spawn_52": {
+      "sha256": "e02a25909973507ddf95b79fb23a4e5bf8f8af52ba345a1ed777e62acd22e119",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 219.939362,
+        "y": -740.758606,
+        "z": -203.208069
+      }
+    },
+    "target_spawn_53": {
+      "sha256": "133057b8519032c4c0a7b82e9d20200e51f02460f8396f47e420faf6d6d483ba",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 225.849152,
+        "y": -760.47937,
+        "z": -196.640152
+      }
+    },
+    "target_spawn_54": {
+      "sha256": "38e70f2c7bbb33142cf6f15391bb7732d1f7a4f3a069e64a0f9831768a3f13e8",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 246.310577,
+        "y": -730.679382,
+        "z": -197.302185
+      }
+    },
+    "target_spawn_56": {
+      "sha256": "a25de45aecef9fa97509526f633da302fc2795a279cf4110bfbd343c34f4eeab",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 220.095276,
+        "y": -761.949768,
+        "z": -204.059799
+      }
+    },
+    "target_spawn_58": {
+      "sha256": "e1cec3325fea29c7efdcb9e82da702067bf141a05e59f32a6b64fa1de624c7f1",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 236.392349,
+        "y": -738.727356,
+        "z": -197.017914
+      }
+    },
+    "target_spawn_59": {
+      "sha256": "6af3068e455cc0f2806c2ee73a3a4ce94fb36022bef33a35407acd333bbafe28",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 256.200043,
+        "y": -823.299683,
+        "z": -183.302917
+      }
+    },
+    "target_spawn_61": {
+      "sha256": "473903a86c610540421588138a0327bdee3fae9e603295a3cb3c89fe96971ce5",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 257.415283,
+        "y": -839.963501,
+        "z": -181.341385
+      }
+    },
+    "target_spawn_62": {
+      "sha256": "66da049d9a6fe8e0979b292446006d3515a6ccc45afd884aa1cdc71900aea0e1",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 253.590591,
+        "y": -839.270447,
+        "z": -180.889938
+      }
+    },
+    "target_spawn_63": {
+      "sha256": "de5615b62170434550a7bf22acfed049e62c086c08cba0ba38a0b67b7e872358",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 260.600647,
+        "y": -867.002869,
+        "z": -149.299973
+      }
+    },
+    "target_spawn_64": {
+      "sha256": "0068fc9c0a77df0cb88881ea917f77ba8bea4cb924c758f79ca15473e328ba8d",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": 80.9000931,
+        "y": -381.241089,
+        "z": -224.899994
+      }
+    },
+    "target_spawn_68": {
+      "sha256": "dbbc66563bee843f8bdcbe6603496cffaccab63f76ba548964c09e129481d477",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 60.7000275,
+        "y": -591.103638,
+        "z": -210.979996
+      }
+    },
+    "target_spawn_69": {
+      "sha256": "82fde5676e1b83155c00adca220c0710d7db5b732d6545648df5a7c163335552",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 60.8468323,
+        "y": -582.199707,
+        "z": -214
+      }
+    },
+    "target_spawn_70": {
+      "sha256": "7fc97e165456a10a737ac50567e2498bacbef8f213e1f371e7c2d1bf8ab7781a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 60.5499458,
+        "y": -568.104065,
+        "z": -217.970657
+      }
+    },
+    "target_spawn_71": {
+      "sha256": "8af6f18e68df3c29f8077a1bd36ea58f5df36ed63e98e8ea5d076b241b12c754",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 61.1236916,
+        "y": -578.520935,
+        "z": -214
+      }
+    },
+    "target_spawn_chainsaw_1": {
+      "sha256": "35b742a53cfb31287afc3b4bbb24efaab1db9e82a3cdd9116e6b0d19d0df9536",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 71,
+        "y": -1611,
+        "z": 7.00000048
+      }
+    },
+    "target_spawn_chainsaw_2": {
+      "sha256": "ca3641fe387345c1a5164ec3e2f6b5dbe3ef179d1da56335d4ed7bdcdd3894db",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 79,
+        "y": -1611,
+        "z": 7.00000048
+      }
+    },
+    "target_spawn_chainsaw_3": {
+      "sha256": "197f766659c39cfff229ad2f700fa9cd5839aa097521a58ee570c847028f6b7f",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 87,
+        "y": -1611,
+        "z": 7.00000048
+      }
+    },
+    "uac_basement_ai_ambient_tentacle_1": {
+      "sha256": "7baa3f449a787a716218fed13a38b654e53aa11710d1f2756942f459cc5f7da7",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/tentacle",
+      "starting_health": 150
+    },
+    "uac_basement_encounter_base_02": {
+      "sha256": "7be824e2b028fbe4f8eecb9556da267036335d0bd4b5399776465e7f8a2d46d3",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_basement_encounter_spawn_base_02_soldiers": {
+      "sha256": "ee7cb585816ba46473239ae96c02e18aa99b2438284ab7d31d036f9a62a1ff95",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_basement_encounter_spawn_base_02_zombies": {
+      "sha256": "944aeb0ef03f37139df4becad54d5803b813a585507b795a7a70a2d0d6993d93",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_basement_encounter_trigger_commit_2": {
+      "sha256": "6cf9887f2034d57e3f2a81b58f0eb7a51dc4e92ae785f85807aa042b4d647d82",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_basement_encounter_trigger_exit_1": {
+      "sha256": "b980ed4c982d55139559b0b99f8b9a282900143f5223ccf6ba2b7f425d0247c6",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_basement_target_spawn_1": {
+      "sha256": "e16d7adcce417f6a9a3871c8c141b6c4f51df882c20ff89ac11a0d88b36cc176",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 43.4999962,
+        "y": -297.799988,
+        "z": -213.449997
+      }
+    },
+    "uac_basement_target_spawn_2": {
+      "sha256": "31d3b52bda3b6430fd8e19661dea36d11a7935f58520f09a3129a2482a68381a",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_DEFAULT",
+      "spawn_position": {
+        "x": 32.3597069,
+        "y": -263.529907,
+        "z": -213.949966
+      }
+    },
+    "uac_hq_ai_fodder_soldier_blaster_1": {
+      "sha256": "853a94bd793bfc7c3aa98619284119ec6d675ee67798710ff05eaafccf0689ca",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "uac_hq_ai_heavy_arachnotron_1": {
+      "sha256": "4c6df618b9e4270c78e2c94dedb6567b78b44376636d4c6e0812d7a185b07e14",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron",
+      "starting_health": 3000
+    },
+    "uac_hq_ai_heavy_cacodemon_1": {
+      "sha256": "67628fc38196f41a4988a2d02610756165a52b52720a9baa129d6b2c908b1dde",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon",
+      "starting_health": 2500
+    },
+    "uac_hq_encounter_spawn_uac_hq_enc01_zombies": {
+      "sha256": "1e14aa3ae845d7929179989a42bc6ec23d109d50737bacd33ad250ac61ece179",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_trigger_commit_1": {
+      "sha256": "5a5300523fe1924dbb272d1ed1c47ea990cfeb0ffb0aff2e483d3d47f1174b5b",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_trigger_commit_6": {
+      "sha256": "f476d84e82afc306e68ed3dd8ee8549402adae347313b1e6a5b736e7beba22e1",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_trigger_commit_7": {
+      "sha256": "111b7d0b30d3b4ce902c87de5c0b303a3d7738119f21dd5fb8af3c2ff74799a2",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_trigger_exit_1": {
+      "sha256": "dff52b8f480dabe1c55b196493003fe87d368d15f122703f991b87dbd8e90a46",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_uac_hq_enc01": {
+      "sha256": "93432ee83e9a6f3402749d7e74d91bf67a8e30942ccb381f042c90918a60b400",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_uac_hq_enc03": {
+      "sha256": "1be3470d4d5b3df132f528bf25851a0989233b2c6a2312050e0de135f934349e",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_encounter_uac_hq_enc04": {
+      "sha256": "b78e0704df4521a9c3f0b2c81c7190f73e7d340d7d81e08f333bda2073720185",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m1_intro/main_level"
+      ]
+    },
+    "uac_hq_target_spawn_210": {
+      "sha256": "d37df29b6c851e2ed8f190d2e7f70fd3f4b657d9e13380e9f19b496327f07c49",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": -14.8500185,
+        "y": -272.799988,
+        "z": -198.950027
+      }
+    },
+    "uac_hq_target_spawn_7": {
+      "sha256": "73bfd19522edf627f2ad66b637f5a9b8aa34647a53eceaa5ec7ca531637b4901",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified",
+      "protected_reason": "authored_entrance_animation",
+      "spawn_position": {
+        "x": -14.2999992,
+        "y": -267.100128,
+        "z": -199.399963
+      }
+    },
+    "uac_hq_target_spawn_arach_1": {
+      "sha256": "68f98b18cb3b6210d681de0137f4d65499ac01a72335b5515e8e9fd31c62e4ec",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 28.4000015,
+        "y": -268.300171,
+        "z": -198.170181
+      }
+    },
+    "uac_hq_target_spawn_caco_4": {
+      "sha256": "9b4063679b18e015af113a063c7950caf1ef4abc74c0dd94a939dab16b4b5416",
+      "class_name": "idTarget_Spawn",
+      "spawn_override": "AIOVERRIDE_TELEPORT",
+      "spawn_position": {
+        "x": 21.3999996,
+        "y": -310.09903,
+        "z": -179.799789
+      }
+    }
+  },
+  "gaps": [
+    {
+      "manager": "master_level_encounter_manager_1",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_2",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_3",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_5",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_6",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_7",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_8",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_9",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_10",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_11",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_12",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_13",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_14",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_15",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_16",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_17",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_18",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_19",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_20",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_21",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "master_level_encounter_manager_22",
+      "context": "master_level_alternative",
+      "reasons": [
+        "master_level_context"
+      ]
+    },
+    {
+      "manager": "secret_encounter_encounter_manager_1",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "temporary_infighting_player_opportunity_and_optional_activation_review_pending"
+      ]
+    },
+    {
+      "manager": "citadel_encounter_manager_chanting",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "portal_encounter_manager_p_enc01",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "portal_encounter_manager_p_enc02",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "portal_encounter_manager_telemetry_only",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "uac_hq_encounter_uac_hq_enc02",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "infighting_and_health_or_user_flag_gates_with_live_cohort_migration_to_enc04"
+      ]
+    },
+    {
+      "manager": "uac_hq_encounter_uac_hq_enc04",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "migration_reuses_existing_cohort",
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "uac_hq_encounter_manager_telemetry_only",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "uac_basement_encounter_subway_zombies",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "infighting_and_user_flag_awareness_transition"
+      ]
+    },
+    {
+      "manager": "uac_basement_encounter_base_03",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "uac_basement_encounter_manager_telemetry_only",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "crack_building_encounter_manager_crack_e01",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "precombat_infighting_player_opportunity_unqualified;post_kickoff_slice_is_qualified_separately"
+      ]
+    },
+    {
+      "manager": "crack_building_encounter_manager_wallbreak_arachno",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "health_threshold_stops_external_renewable_zombie_cohort"
+      ]
+    },
+    {
+      "manager": "crack_building_encounter_manager_1",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "scripted_cleanup_is_not_a_death"
+      ]
+    },
+    {
+      "manager": "crack_building_encounter_manager_crack_e01_zombies",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "subway_encounter_manager_telemetry_only",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "corner_street_encounter_manager_zombies",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "mutual_infighting_with_health_or_user_flag_transition"
+      ]
+    },
+    {
+      "manager": "corner_street_encounter_manager_back_building_zombies",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "imp_infighting_health_or_timer_and_two_user_flags"
+      ]
+    },
+    {
+      "manager": "corner_street_encounter_manager_set_ambient_music",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "corner_street_encounter_manager_c_street_arachnatron",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "mutual_infighting_and_typed_health_or_user_flag_transition"
+      ]
+    },
+    {
+      "manager": "corner_street_encounter_manager_telemetry_only",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "no_authored_population_commands"
+      ]
+    },
+    {
+      "manager": "cathedral_encounter_manager_combat",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "cathedral_encounter_manager_zombie",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "mech_street_encounter_manager_amb_caco",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "scripted_cleanup_is_not_a_death"
+      ]
+    },
+    {
+      "manager": "mech_building_enc_manager_caco_flyer",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "forced_flight_spline_combat_opportunity_unqualified"
+      ]
+    },
+    {
+      "manager": "mech_building_enc_manager_pit_b",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "barge_encounter_manager_priest_room_no_gk",
+      "context": "checkpoint_alternative",
+      "reasons": [
+        "checkpoint_alternative_requires_path_selection"
+      ]
+    },
+    {
+      "manager": "barge_encounter_manager_barge_arena",
+      "context": "ordinary_candidate",
+      "reasons": [
+        "renewable_or_survivor_dependent_maintenance"
+      ]
+    },
+    {
+      "manager": "barge_encounter_manager_glory_kill_tutorial",
+      "context": "checkpoint_alternative",
+      "reasons": [
+        "checkpoint_alternative_requires_path_selection"
+      ]
+    },
+    {
+      "manager": "barge_encounter_manager_priest_room_after_cp",
+      "context": "checkpoint_alternative",
+      "reasons": [
+        "checkpoint_alternative_requires_path_selection"
+      ]
+    }
+  ],
+  "review_source": {
+    "path": "content/catalog/encounter_opportunity_segments.json",
+    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+  }
+}

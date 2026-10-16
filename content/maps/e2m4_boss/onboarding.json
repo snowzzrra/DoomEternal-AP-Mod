@@ -10,5 +10,29 @@
   "owner": {
     "resource": "game/sp/e2m4_boss/e2m4_boss_patch2.resources",
     "priority": 76
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "game_objects_interact_automap_pod_automap_pod_1_e2m4": {
+        "location_id": 7770501,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -21.4799786,
+          "y": -32.5899963,
+          "z": 269.913544
+        },
+        "region": "Sentinel Prime - Training Hall",
+        "qualification": "Native fast_travel_info_fast_travel_3 sortOrder 2 and the training-hall exit corridor precede Dungeons.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e2m4_boss/e2m4_boss.decl",
+          "sha256": "cc9eede942c99a8d65a163aa7c6c8f7d8dc50854d897364950eb9cd366debc6e",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
   }
 }

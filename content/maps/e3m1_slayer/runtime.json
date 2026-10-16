@@ -111,7 +111,8 @@
           7770335
         ],
         "required_count": 3,
-        "authority": "server_checked_locations"
+        "authority": "server_checked_locations",
+        "mission_complete_location_id": 7770337
       },
       "order": 44
     },

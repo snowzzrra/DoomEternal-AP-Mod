@@ -11,7 +11,8 @@
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770471,
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3": 7770472,
     "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770473,
-    "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE": 7770474
+    "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE": 7770474,
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_E5M2_EARTH": 7770511
   },
   "names": {
     "7770466": "Reclaimed Earth - Codex - City Entrance Streetlight",
@@ -22,10 +23,14 @@
     "7770471": "Reclaimed Earth - Extra Life - Upper Offices Side Room",
     "7770472": "Reclaimed Earth - Extra Life - Lockdown Red Door",
     "7770473": "Reclaimed Earth - Escalation Encounter Wave 1",
-    "7770474": "Reclaimed Earth - Escalation Encounter Wave 2"
+    "7770474": "Reclaimed Earth - Escalation Encounter Wave 2",
+    "7770511": "Reclaimed Earth - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_E5M2_EARTH": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
     "game_progress_codex_1": {
@@ -85,6 +90,20 @@
           "whenToSave = \"SGT_NORMAL\";"
         ]
       }
+    },
+    "game_interact_automap_e5m2_earth": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
     }
   }
 }

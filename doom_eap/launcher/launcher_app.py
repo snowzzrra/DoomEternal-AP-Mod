@@ -34,7 +34,8 @@ def _run_self_test(arguments: list[str]) -> int:
             manifest = Path(arguments[arguments.index("--core-runtime") + 1])
             value, _ = verify_runtime(manifest, bootstrap_from_archive=True)
             print(json.dumps({"product": value["product"], "version": value["version"],
-                              "build_id": value["build_id"], "mod_versions": value["mod_versions"],
+                              "build_id": value["build_id"], "mod_versions": value.get("mod_versions"),
+                              "mod_version_range": value.get("mod_version_range"),
                               "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))
             return 0
         except Exception as error:

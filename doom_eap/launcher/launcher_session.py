@@ -59,7 +59,7 @@ def archive_prelaunch(path, state_dir, *, explicit=False):
         return None
     with path.open("rb") as stream:
         raw = stream.read(65537)
-    match = re.match(rb"sentinel-run-v1\nrun=[0-9a-f]{32}\nprotection=[0-9a-f]{64}\nowner=([1-9][0-9]*)\ncreated=([1-9][0-9]*)\nsentinel-test-session-v2\n", raw)
+    match = re.match(rb"sentinel-run-v1\nrun=[0-9a-f]{32}\nprotection=[0-9a-f]{64}\nowner=([1-9][0-9]*)\ncreated=([1-9][0-9]*)\nsentinel-test-session-v3\n", raw)
     recognized = match and len(raw) <= 65536 and int(match[1]) <= 0xffffffff and int(match[2]) <= 0xffffffffffffffff
     state = prelaunch_owner_state(int(match[1]), int(match[2])) if recognized else "legacy"
     if state == "alive":
@@ -359,6 +359,8 @@ class APSessionOwner:
             logging.getLogger(__name__).exception("AP_ADMISSION_DIAGNOSTIC_WRITE_FAILED diagnostic=%s", document)
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
+        from .launcher_core import _normalize_slot_data
+        _normalize_slot_data(snapshot.slot_data)
         try:
             if os.name != "nt" or not (config.get("game_root") or config.get("doom_base_dir")):
                 return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
@@ -471,8 +473,9 @@ class APSessionOwner:
             difficulty = snapshot.slot_data["campaign_plan"].get("difficulty")
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError("Room campaign difficulty is unsupported")
-            descriptor = (f"sentinel-test-session-v2\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
+            descriptor = (f"sentinel-test-session-v3\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
                           f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
+                          "slot_data_revision=0.7.0\nsession_mod_contract_revision=2\n"
                           f"provenance=synthetic-fixture\nroot={campaign_root}\ncampaign=unified\nstarting_stage=hub\n"
                           f"difficulty={difficulty}\nintent={intent}\n")
             if intent in {"resume", "recover"}:
@@ -508,7 +511,7 @@ class APSessionOwner:
                 protection = module.protect(SimpleNamespace(action="prepare", steam_account=account,
                     steam_app_root=str(remote.parent), local_provider_root=str(local), backup_directory=str(backup),
                     ap_root=str(campaign_root), uninstall_root=[str(self.state_dir)], reference_directory=None,
-                    run_backup_parent=None))
+                    run_backup_parent=None, slot_data_revision="0.7.0", mod_contract_revision=2))
             except (module.Refused, OSError, ValueError) as error:
                 refused = RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}")
                 refused.stage = getattr(error, "stage", "vanilla_protection")

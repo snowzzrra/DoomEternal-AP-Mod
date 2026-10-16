@@ -103,9 +103,7 @@
         ],
         "required_count": 3,
         "authority": "server_checked_locations",
-        "conditional_children": [
-          7770358
-        ]
+        "mission_complete_location_id": 7770362
       },
       "order": 49
     },

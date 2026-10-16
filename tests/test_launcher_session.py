@@ -41,6 +41,31 @@ def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
     assert all(path.read_bytes() == contents for path, contents in before.items())
     (directory / "campaign.contract").write_bytes(b"invalid metadata")
     assert owner.inspect_campaign(snapshot, config)["status"] == "metadata_invalid"
+def test_counter_preference_persists_and_updates_running_bridge(tmp_path):
+    from doom_eap.launcher.launcher_controller import LauncherController
+    from doom_eap.launcher.launcher_core import LaunchWorkflow
+    controller = LauncherController.__new__(LauncherController)
+    controller.config = {"server_address": "fixture:1234"}
+    controller.client_dir = tmp_path / "client"
+    controller._persist_config = Mock()
+    controller.emit = Mock()
+    controller.supervisor = Mock(running=True)
+    controller.set_killsanity_counter_visible(False)
+    path = LaunchWorkflow.client_config_path(controller.client_dir)
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["killsanity_counter_visible"] is False and saved["server_address"] == "fixture:1234"
+    command = controller.supervisor.send_command.call_args.args[0]
+    assert json.loads(command.removeprefix("AP_CONTROL ")) == {"type": "killsanity_counter_visibility", "visible": False}
+    controller.supervisor.send_command.side_effect = OSError("bridge stopped")
+    controller.set_killsanity_counter_visible(True)
+    assert json.loads(path.read_text(encoding="utf-8"))["killsanity_counter_visible"] is True
+    assert controller.emit.call_args.args[0] == "killsanity_counter_status"
+    controller._persist_config.side_effect = OSError("disk full")
+    with pytest.raises(OSError):
+        controller.set_killsanity_counter_visible(False)
+    assert controller.config["killsanity_counter_visible"] is True
+    with pytest.raises(ValueError):
+        controller.set_killsanity_counter_visible(1)
 
 
 def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
@@ -62,7 +87,9 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
             raise failure from cause
     with patch.object(owner, "_prepare", side_effect=refuse):
         with pytest.raises(RuntimeError) as refused:
-            owner.prepare(None, {})
+            from pathlib import Path
+            slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+            owner.prepare(SimpleNamespace(slot_data=slot_data), {})
     assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
     assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
     diagnostic = json.loads((tmp_path / "session_prepare_failure.json").read_text())
@@ -79,6 +106,20 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
     assert support["source"] == "last_preparation_failure"
     assert "fixture-user" not in json.dumps(support)
     assert "game.details" in json.dumps(support)
+
+
+def test_old_room_refusal_preserves_saves_before_preparation(tmp_path):
+    from doom_eap.launcher.launcher_core import RoomSnapshot
+    old_save = tmp_path / "game.details"
+    old_save.write_bytes(b"old campaign data")
+    owner = APSessionOwner(tmp_path, tmp_path, tmp_path / "state")
+    snapshot = RoomSnapshot("old-room", 0, 1, {"slot_data_revision": "0.6.0"}, (), (), ())
+    with patch.object(owner, "_prepare") as prepare:
+        with pytest.raises(ValueError, match="requires a new 0.7 room"):
+            owner.prepare(snapshot, {"game_root": str(tmp_path)})
+    prepare.assert_not_called()
+    assert old_save.read_bytes() == b"old campaign data"
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["game.details"]
 
 
 def test_proton_supervisor_preserves_structured_preparation_failure(tmp_path):
@@ -261,10 +302,13 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         installed = install_meathook(game, DependencyManager(state / "deps"), state_dir=state,
                                     consent=lambda _: True, local_artifact=runtime / "distribution.json")
         assert installed.state == "installed"
-        snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data={
+        slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+        slot_data.update({
+            "slot_data_revision": "0.7.0", "slot_data_schema_version": 6,
             "native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 1},
             "starting_inventory": {"Frag Grenade": 1}, "starting_weapon": "Combat Shotgun",
         })
+        snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data=slot_data)
         owner = APSessionOwner(root, data, state)
         config = {"game_root": str(game), "save_games_dir": str(local),
                   "client_state_file": str(data / "client_state.json"),

@@ -53,7 +53,7 @@ class SentinelWeaponPoints:
                     return {key: (item not in (0, "0", None) if key == "event_gap_count" else semantic(item)) for key, item in value.items()
                             if key not in {"sequence", "timestamp_ms", "at_monotonic", "sampled_at_ms",
                                 "event_sequence", "callback_sequence", "callback_at_ms", "context_sampled_at_ms",
-                                "history_oldest", "history_overwritten", "events", "at_ms"}}
+                                "history_oldest", "history_overwritten", "events", "qualified_kills", "at_ms"}}
                 if isinstance(value, list):
                     return [semantic(item) for item in value]
                 return value
@@ -170,11 +170,83 @@ class SentinelWeaponPoints:
             if result["state"] == 3:
                 return result
             if result["state"] not in (1, 2) or time.monotonic() >= deadline:
-                # Never resubmit on an uncertain result. A future pass observes
-                # saved/native gained against the already durable receipt intent.
+                # Uncertain results must be checked against the persisted receipt before resubmission.
                 raise WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
             operation = result_operation
             time.sleep(0.025)
+
+    def observe_combat(self, mission_maps):
+        if not re.fullmatch(r"[0-9a-f]{64}", self.namespace):
+            raise WeaponPointsBlocked("Invalid combat namespace")
+        if (not isinstance(mission_maps, (list, tuple, set, frozenset)) or not 1 <= len(mission_maps) <= 64
+                or any(not isinstance(name, str) or not 1 <= len(name) <= 255
+                       or not name.isascii() or "\0" in name for name in mission_maps)):
+            raise WeaponPointsBlocked("Invalid combat mission maps")
+        maps = sorted(set(mission_maps))
+        body = struct.pack("<QIIH", 4194304, 2, self.pid, 64) + self.namespace.encode("ascii")
+        body += struct.pack("<I", len(maps))
+        for name in maps:
+            encoded = name.encode("ascii")
+            body += struct.pack("<H", len(encoded)) + encoded
+        reply = self._run(["--combat"], struct.pack("<4sHHII", b"SCIP", 1, 50, len(body), 0) + body)
+        try:
+            def uint(value, bits=64):
+                if type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value)):
+                    raise ValueError("invalid integer")
+                number = int(value)
+                if not 0 <= number < 2**bits:
+                    raise ValueError("integer outside wire range")
+                return number
+
+            if uint(reply["combat_abi"], 32) != 2 or uint(reply["pid"], 32) != self.pid:
+                raise ValueError("combat ABI or process mismatch")
+            created = uint(reply["process_created"])
+            instance = reply["instance_id"]
+            build = reply["build_id"]
+            if (not created or not isinstance(instance, str) or not re.fullmatch(r"[0-9a-f]{32}", instance)
+                    or not isinstance(build, str) or not build or len(build) > 128):
+                raise ValueError("invalid producer identity")
+            if reply["namespace_id"] != self.namespace:
+                raise ValueError("combat namespace mismatch")
+            return {"producer": [str(self.pid), str(created), instance, build], "namespace_id": self.namespace,
+                    "qualified_kills": uint(reply["qualified_kills"]),
+                    "observation_gaps": uint(reply["observation_gaps"])}
+        except (KeyError, TypeError, ValueError) as error:
+            raise WeaponPointsBlocked(f"Invalid native combat observation: {error}") from error
+
+    def publish_combat_progress(self, total, target, first_milestone=0, milestone=0,
+                                milestone_step=0, visible=True):
+        values = (total, target, first_milestone, milestone, milestone_step)
+        if any(type(value) is not int or not 0 <= value < 2**64 for value in values) or type(visible) is not bool:
+            raise WeaponPointsBlocked("Invalid combat presentation values")
+        notices = (first_milestone, milestone, milestone_step)
+        if (target and target <= total or any(notices) and not (
+                0 < first_milestone <= milestone <= total and milestone_step > 0
+                and (milestone - first_milestone) % milestone_step == 0)):
+            raise WeaponPointsBlocked("Invalid combat presentation targets")
+        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
+        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
+            raise WeaponPointsBlocked("Native gameplay context is not active")
+        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
+        try:
+            payload = struct.pack("<QIQ16sQQ16sI", 8388608, self.pid,
+                                  int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
+                                  int(scope["lifecycle_generation"]), request_id, nonce, 1000)
+            payload += struct.pack("<I65sQQQQQI", 1, self.namespace.encode("ascii"), *values, int(visible))
+            message = struct.pack("<4sHHII", b"SCIP", 1, 51, len(payload), 0) + payload
+            result = self._run(["--combat-presentation"], message)
+            expected = (self.pid, int(scope["process_created"]), scope["instance_id"],
+                        int(scope["lifecycle_generation"]), scope["build_id"], request_id, nonce.hex())
+            actual = (int(result["pid"]), int(result["process_created"]), result["instance_id"],
+                      int(result["lifecycle_generation"]), result["build_id"],
+                      int(result["request_id"]), result["nonce"])
+            if (actual != expected or result["combat_presentation_abi"] != 1 or result["status"] != 0
+                    or tuple(int(result[key]) for key in ("total", "target", "milestone", "visible"))
+                    != (total, target, milestone, int(visible))):
+                raise ValueError("native acknowledgement does not match presentation")
+        except (KeyError, TypeError, ValueError, OverflowError, struct.error) as error:
+            raise WeaponPointsBlocked(f"Native combat presentation refused: {error}") from error
+        return result
 
     def deathlink_request(self, kind, *, enabled=False, mode="soft", event_id=0,
                           event_hash=bytes(16), ack_sequence=0):

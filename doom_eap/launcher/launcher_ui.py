@@ -10,11 +10,12 @@ import re
 import sys
 import time
 import webbrowser
+import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QIODevice, QPointF, QPropertyAnimation, QSaveFile, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QKeyEvent, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -47,7 +48,9 @@ from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
 )
 
-from doom_eap.content.options_foundation import load_player_yaml, load_start_inventory_catalog, suggested_yaml_filename
+from doom_eap.content.enemy_options import enemy_options_for_editing, normalize_enemy_options
+from doom_eap.content.enemy_species import enemy_speed_capabilities, speed_capability_notice
+from doom_eap.content.options_foundation import GAME_NAME, load_player_yaml, load_start_inventory_catalog, player_yaml_document, suggested_yaml_filename
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .connection_errors import enrich_connection_failure
@@ -244,7 +247,7 @@ class AmmoRefillKeyControl(QWidget):
 class _OptionCategory(QFrame):
     """Keyboard-accessible category with a short, interruptible reveal."""
 
-    def __init__(self, title: str):
+    def __init__(self, title: str, *, expanded: bool = True):
         super().__init__()
         self.setObjectName("card")
         layout = QVBoxLayout(self)
@@ -252,9 +255,9 @@ class _OptionCategory(QFrame):
         self.toggle = QToolButton()
         self.toggle.setText(title.replace("&", "&&"))
         self.toggle.setCheckable(True)
-        self.toggle.setChecked(True)
+        self.toggle.setChecked(expanded)
         self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.toggle.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
         self.toggle.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.toggle.setStyleSheet("QToolButton { color: #e9a64b; font-weight: 800; padding: 7px; text-align: left; } QToolButton:focus { border: 1px solid #e9a64b; }")
         layout.addWidget(self.toggle)
@@ -263,6 +266,7 @@ class _OptionCategory(QFrame):
         self.contents.setContentsMargins(0, 8, 0, 0)
         self.contents.setSpacing(9)
         layout.addWidget(self.body)
+        self.body.setVisible(expanded)
         self.animation = QPropertyAnimation(self.body, b"maximumHeight", self)
         self.animation.setDuration(160)
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -286,6 +290,8 @@ class _OptionCategory(QFrame):
 
 class NamedRangeControl(QWidget):
     """Numeric named-range input."""
+
+    valueChanged = Signal()
 
     def __init__(self, option: dict[str, object]):
         super().__init__()
@@ -312,7 +318,9 @@ class NamedRangeControl(QWidget):
         layout.addWidget(self.numeric_row)
         self.slider.valueChanged.connect(self.spin.setValue)
         self.spin.valueChanged.connect(self.slider.setValue)
+        self.spin.valueChanged.connect(self.valueChanged)
         self.special.currentIndexChanged.connect(self._special_changed)
+        self.special.currentIndexChanged.connect(self.valueChanged)
         self.setValue(option["default"])
 
     def _special_changed(self, _index: int) -> None:
@@ -340,6 +348,97 @@ class NamedRangeControl(QWidget):
         else:
             self.special.setCurrentIndex(0)
             self.spin.setValue(cast(int, value))
+
+
+class DictionaryControl(QWidget):
+    """Edit explicit catalog values; absent entries use Auto."""
+
+    valueChanged = Signal()
+
+    def __init__(self, option: dict[str, object]):
+        super().__init__()
+        self.entries = {entry["key"]: entry for entry in option["entries"]}
+        self.range_bounds = {"minimum", "maximum", "early_minimum", "early_maximum", "late_minimum", "late_maximum"}
+        self.is_attribute = self.range_bounds <= self.entries.keys()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        controls = QHBoxLayout()
+        self.picker = QComboBox()
+        for key, entry in self.entries.items():
+            self.picker.addItem(str(entry["label"]), key)
+        self.amount = QSpinBox()
+        self.picker.currentIndexChanged.connect(self._select_entry)
+        apply = QPushButton("SET OVERRIDE")
+        apply.clicked.connect(self._set_entry)
+        controls.addWidget(self.picker, 1)
+        controls.addWidget(self.amount)
+        controls.addWidget(apply)
+        layout.addLayout(controls)
+        self.table = QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels(["ITEM", "VALUE"])
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.verticalHeader().hide()
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setFixedHeight(150)
+        layout.addWidget(self.table)
+        remove = QPushButton("USE AUTO FOR SELECTED")
+        remove.clicked.connect(self._remove_entry)
+        layout.addWidget(remove)
+        self.setValue(option["default"])
+
+    def _select_entry(self, _index: int = 0) -> None:
+        key = self.picker.currentData()
+        entry = self.entries[key]
+        self.amount.setRange(entry["minimum"], entry["maximum"])
+        self.amount.setValue(self.value().get(key, entry["minimum"]))
+
+    def _set_entry(self) -> None:
+        values = self.value()
+        key = self.picker.currentData()
+        if self.is_attribute:
+            species, separator, bound = key.rpartition(".")
+            prefix = f"{species}." if separator else ""
+            bound = bound if separator else key
+            active = {"minimum", "maximum"} if bound in {"minimum", "maximum"} else self.range_bounds - {"minimum", "maximum"}
+            for other in self.range_bounds - active:
+                values.pop(prefix + other, None)
+            for other in active:
+                values.setdefault(prefix + other, self.amount.value())
+        values[key] = self.amount.value()
+        self.setValue(values)
+        self.valueChanged.emit()
+
+    def _remove_entry(self) -> None:
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        values = self.value()
+        key = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        if self.is_attribute:
+            species, separator, _bound = key.rpartition(".")
+            prefix = f"{species}." if separator else ""
+            for bound in self.range_bounds:
+                values.pop(prefix + bound, None)
+        else:
+            values.pop(key)
+        self.setValue(values)
+        self.valueChanged.emit()
+
+    def value(self) -> dict[str, int]:
+        return {self.table.item(row, 0).data(Qt.ItemDataRole.UserRole): int(self.table.item(row, 1).text())
+                for row in range(self.table.rowCount())}
+
+    def setValue(self, values: dict[str, int]) -> None:
+        self.table.setRowCount(0)
+        for key, value in values.items():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            item = QTableWidgetItem(str(self.entries[key]["label"]))
+            item.setData(Qt.ItemDataRole.UserRole, key)
+            self.table.setItem(row, 0, item)
+            self.table.setItem(row, 1, QTableWidgetItem(str(value)))
+        self._select_entry()
 
 
 class OptionSetControl(QWidget):
@@ -776,6 +875,9 @@ class LauncherUI(QMainWindow):
         self.ammo_refill_keybind.changed.connect(self._save_ammo_refill_keybind)
         self.special_toggle_keybind = AmmoRefillKeyControl(str(self.controller.config.get("special_toggle_keybind", "F10")), default="F10")
         self.special_toggle_keybind.changed.connect(self._save_special_toggle_keybind)
+        self.killsanity_counter_visible = QCheckBox("Show Killsanity counter")
+        self.killsanity_counter_visible.setChecked(self.controller.config.get("killsanity_counter_visible", True) is True)
+        self.killsanity_counter_visible.toggled.connect(self._save_killsanity_counter_visible)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.detected_paths = self._label("Checking for DOOM Eternal…", "muted")
@@ -804,13 +906,14 @@ class LauncherUI(QMainWindow):
         self._entry_row(layout, row + 2, "PASSWORD", self.password)
         self._entry_row(layout, row + 3, "AMMO REFILL KEY", self.ammo_refill_keybind)
         self._entry_row(layout, row + 4, "SPECIAL TOGGLE KEY", self.special_toggle_keybind)
+        layout.addWidget(self.killsanity_counter_visible, row + 5, 1, 1, 2)
         self.join_button = _ScanlineButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, row + 5, 1, 1, 2)
+        layout.addWidget(self.join_button, row + 6, 1, 1, 2)
         self.join_error = self._label("", "warning")
         self.join_error.hide()
-        layout.addWidget(self.join_error, row + 6, 0, 1, 3)
+        layout.addWidget(self.join_error, row + 7, 0, 1, 3)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -1100,8 +1203,11 @@ class LauncherUI(QMainWindow):
         groups = (
             ("GOAL & CAMPAIGN", ("mission_pool", "custom_missions", "custom_dark_lord", "mission_order", "mission_count", "starting_missions", "full_saga_final_boss", "goal", "goal_mission_as_item", "use_dlc_content", "additional_victory_requirements")),
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
-            ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "include_weapon_mastery_challenges", "include_slayer_gates", "include_secret_encounters", "praetor_suit_upgrades_in_pool")),
-            ("COMBAT & QoL", ("campaign_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
+            ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "include_weapon_mastery_challenges", "mastery_requirements", "include_slayer_gates", "include_secret_encounters")),
+            ("RESOURCES", ("resource_profile", "praetor_suit_upgrades_in_pool", "item_pool_counts", "filler_weights", "trap_weights")),
+            ("ENEMIES", ("enemy_randomizer", "enemy_preset", "enemy_intensity_early", "enemy_intensity_late", "enemy_density", "enemy_variety", "progressive_difficulty", "easier_secret_encounters")),
+            ("KILLSANITY", ("killsanity", "kills_per_check", "killsanity_maximum_milestones")),
+            ("COMBAT & QoL", ("campaign_difficulty", "logic_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
             ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link", "death_link_mode")),
         )
         self.option_categories = []
@@ -1110,13 +1216,54 @@ class LauncherUI(QMainWindow):
             card = _OptionCategory(group)
             self.option_categories.append(card)
             group_layout = card.contents
+            advanced_layout = None
+            if group == "RESOURCES":
+                advanced = QWidget()
+                advanced_layout = QVBoxLayout(advanced)
+                advanced_layout.setContentsMargins(0, 0, 0, 0)
+                advanced.hide()
+                expand = QPushButton("ADVANCED RESOURCES")
+                expand.setCheckable(True)
+                expand.toggled.connect(advanced.setVisible)
+                group_layout.addWidget(expand)
+                group_layout.addWidget(advanced)
             if group == "STARTING LOADOUT":
                 group_layout.addWidget(self._start_inventory_widget())
             for key in keys:
                 option = options_by_key.get(key)
                 if option is not None:
-                    group_layout.addWidget(self._option_widget(option))
+                    target = advanced_layout if group == "RESOURCES" and key != "resource_profile" else group_layout
+                    widget = self._option_widget(option)
+                    if group == "RESOURCES" and key == "resource_profile":
+                        target.insertWidget(0, widget)
+                    else:
+                        target.addWidget(widget)
                     displayed.add(key)
+            sections = ()
+            if group == "ENEMIES":
+                self.enemy_preview = self._label("", "muted")
+                self.enemy_preview.setWordWrap(True)
+                group_layout.addWidget(self.enemy_preview)
+                category_actions = QHBoxLayout()
+                for title, callback in (("IMPORT ENEMIES YAML…", self._import_enemy_options),
+                                        ("EXPORT ENEMIES YAML…", self._export_enemy_options)):
+                    button = QPushButton(title)
+                    button.clicked.connect(callback)
+                    category_actions.addWidget(button)
+                group_layout.addLayout(category_actions)
+                sections = (
+                    ("BESTIARY", ("enemy_weights",)),
+                    ("ATTRIBUTES", ("enemy_health", "enemy_damage")),
+                    ("SPECIAL ENEMY LIMITS", ("enemy_special_limits",)),
+                    ("ADVANCED", ("enemy_count_mode", "enemy_count_multiplier", "enemy_speed", "enemy_size", "enemy_size_variation_chance")),
+                )
+            for title, section_keys in sections:
+                section = _OptionCategory(title, expanded=False)
+                group_layout.addWidget(section)
+                for key in section_keys:
+                    if key in options_by_key:
+                        section.contents.addWidget(self._option_widget(options_by_key[key]))
+                        displayed.add(key)
             layout.addWidget(card)
         remaining = set(options_by_key) - displayed
         if remaining:
@@ -1126,6 +1273,9 @@ class LauncherUI(QMainWindow):
                 if key in remaining:
                     card.contents.addWidget(self._option_widget(options_by_key[key]))
             layout.addWidget(card)
+        self.enemy_option_keys = tuple(key for key in self.option_controls
+                                       if key.startswith("enemy_") or key in ("progressive_difficulty", "easier_secret_encounters"))
+        self._set_option_values(enemy_options_for_editing(self.option_defaults))
         self._wire_create_dependencies()
         self._refresh_create_dependencies()
         actions = QHBoxLayout()
@@ -1151,7 +1301,7 @@ class LauncherUI(QMainWindow):
         layout.setSpacing(3)
         layout.addWidget(self._label("EFFECTIVE CONFIGURATION", "eyebrow"), 0, 0, 1, 3)
         self.effective_config_values: dict[str, QLabel] = {}
-        cells = (("goal", "GOAL"), ("campaign", "CAMPAIGN"), ("dlc", "DLC CONTENT"), ("special", "SPECIAL WEAPON"), ("starting", "STARTING WEAPON"), ("victory", "VICTORY"))
+        cells = (("goal", "GOAL"), ("campaign", "CAMPAIGN"), ("logic", "LOGIC DIFFICULTY"), ("special", "SPECIAL WEAPON"), ("starting", "STARTING WEAPON"), ("victory", "VICTORY"))
         for index, (key, label) in enumerate(cells):
             cell = QWidget()
             cell_layout = QVBoxLayout(cell)
@@ -1170,7 +1320,7 @@ class LauncherUI(QMainWindow):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
-        for key in ("goal", "special_weapon", "starting_weapon", "mission_pool", "mission_order", "full_saga_final_boss", "campaign_difficulty"):
+        for key in ("goal", "special_weapon", "starting_weapon", "logic_difficulty", "mission_pool", "mission_order", "full_saga_final_boss", "campaign_difficulty"):
             control = self.option_controls.get(key)
             if isinstance(control, QComboBox):
                 cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
@@ -1184,6 +1334,78 @@ class LauncherUI(QMainWindow):
                 checkbox = cast(QCheckBox, control)
                 self._warning_state[key] = checkbox.isChecked()
                 checkbox.toggled.connect(lambda checked, option_key=key: self._confirm_randomization(option_key, checked))
+        for key in (*self.enemy_option_keys, "killsanity"):
+            control = self.option_controls[key]
+            if key == "enemy_preset":
+                control.currentIndexChanged.connect(self._apply_enemy_preset)
+                continue
+            callback = self._refresh_create_dependencies if key in ("enemy_randomizer", "easier_secret_encounters", "killsanity") else self._enemy_option_changed
+            if isinstance(control, QCheckBox):
+                control.toggled.connect(callback)
+            elif isinstance(control, QComboBox):
+                control.currentIndexChanged.connect(callback)
+            else:
+                control.valueChanged.connect(callback)
+
+    def _apply_enemy_preset(self) -> None:
+        if self._syncing_create_dependencies:
+            return
+        preset = self._choice_value("enemy_preset")
+        if preset != "custom":
+            self._set_option_values(enemy_options_for_editing({
+                "enemy_preset": preset,
+                "enemy_randomizer": self._choice_value("enemy_randomizer"),
+                "progressive_difficulty": self._choice_value("progressive_difficulty"),
+            }))
+        self._refresh_create_dependencies()
+
+    def _enemy_option_changed(self) -> None:
+        if self._syncing_create_dependencies:
+            return
+        self._set_option_values({"enemy_preset": "custom"})
+        self._refresh_create_dependencies()
+
+    def _refresh_enemy_dependencies(self) -> None:
+        enabled = self._choice_value("enemy_randomizer") is True
+        progressive = self._choice_value("progressive_difficulty") is True
+        multiplier = self._choice_value("enemy_count_mode") == "multiplier"
+        speed_qualified = any(status == "qualified" for status in enemy_speed_capabilities().values())
+        for key in self.enemy_option_keys:
+            active = enabled
+            if key in ("enemy_randomizer", "easier_secret_encounters"):
+                active = True
+            elif key in ("enemy_intensity_early", "enemy_density"):
+                active = enabled and not multiplier
+            elif key == "enemy_intensity_late":
+                active = enabled and progressive and not multiplier
+            elif key == "enemy_count_multiplier":
+                active = enabled and multiplier
+            elif key == "enemy_speed":
+                active = enabled and speed_qualified
+            self.option_rows[key].setEnabled(active)
+        for key in ("kills_per_check", "killsanity_maximum_milestones"):
+            self.option_rows[key].setEnabled(self._choice_value("killsanity") is True)
+        try:
+            values = normalize_enemy_options(self._option_values())
+        except ValueError as error:
+            self.enemy_preview.setText(str(error))
+            return
+        weights = values["weights"]
+        total = sum(weights.values())
+        names = self.option_controls["enemy_weights"].entries
+        ranked = sorted(((key, weight) for key, weight in weights.items() if weight), key=lambda pair: (-pair[1], pair[0]))
+        shown = ranked[:2]
+        parts = [f"{names[key]['label']} {100 * weight / total:.1f}%" for key, weight in shown]
+        other = sum(weight for _, weight in ranked[2:])
+        if other:
+            parts.append(f"Other {100 * other / total:.1f}%")
+        mode = f"Multiplier {values['count_multiplier']}%" if multiplier else f"Auto · Intensity {values['intensity'][0]}% → {values['intensity'][1]}% · Density {values['density']}%"
+        pool = "Base game enemies" if self._choice_value("use_dlc_content") is False else "Base game and DLC enemies"
+        self.enemy_preview.setText(
+            f"{mode} · Variety {values['variety']}% · Size variation {values['size_variation_chance']}%.\n"
+            f"{pool} · Enemy mix: {', '.join(parts) or 'none'}.\n"
+            + speed_capability_notice({key: value["label"] for key, value in names.items()})
+        )
 
     def _refresh_difficulty_skull(self) -> None:
         key = str(self._choice_value("campaign_difficulty"))
@@ -1280,13 +1502,14 @@ class LauncherUI(QMainWindow):
             values = {
                 "goal": goal_label,
                 "campaign": self._selected_label("mission_pool") + " · " + self._selected_label("mission_order"),
-                "dlc": "Enabled" if dlc_enabled else "Disabled",
+                "logic": self._selected_label("logic_difficulty"),
                 "special": special_label,
                 "starting": self._selected_label("starting_weapon"),
                 "victory": victory_summary,
             }
             for key, value in values.items():
                 self.effective_config_values[key].setText(value)
+            self._refresh_enemy_dependencies()
         finally:
             self._syncing_create_dependencies = False
 
@@ -1459,6 +1682,15 @@ class LauncherUI(QMainWindow):
         except (ValueError, OSError) as error:
             self.special_toggle_keybind.set_value(str(self.controller.config.get("special_toggle_keybind", "F10")))
             QMessageBox.warning(self, "AP shortcut", str(error))
+
+    def _save_killsanity_counter_visible(self, visible: bool) -> None:
+        try:
+            self.controller.set_killsanity_counter_visible(visible)
+        except (ValueError, OSError) as error:
+            self.killsanity_counter_visible.blockSignals(True)
+            self.killsanity_counter_visible.setChecked(self.controller.config.get("killsanity_counter_visible", True) is True)
+            self.killsanity_counter_visible.blockSignals(False)
+            self._append_log(f"Killsanity counter preference could not be saved: {error}")
 
     def _set_ammo_refill_indicator(self, value: object) -> None:
         """Render Ammo Refill availability in three fixed indicator slots."""
@@ -2193,13 +2425,14 @@ class LauncherUI(QMainWindow):
         goal = self._room_option_value(slot_data, "goal", "Not supplied")
         dlc_enabled = slot_data.get("use_dlc_content") is True
         campaign = "Full Saga" if dlc_enabled else "Base Campaign"
+        logic = self._room_option_value(slot_data, "logic_difficulty", "Not supplied")
         fields = (
             ("Seed", seed),
             ("Player", f"{player} · Team {team} · Slot {slot}"),
             ("Server", endpoint),
             ("Goal", goal),
             ("Campaign", campaign),
-            ("DLC Content", "Enabled" if dlc_enabled else "Disabled"),
+            ("Logic Difficulty", logic),
         )
         self.room_summary.setText("<br>".join(
             f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}"
@@ -2358,8 +2591,6 @@ class LauncherUI(QMainWindow):
         layout.addWidget(title, 0, 0)
         kind = str(option["ui_type"])
         description = option["description"]
-        if kind == "choice":
-            description = self._choice_purpose(key, description)
         layout.addWidget(self._label(self._format_markdown(description), "muted", rich=True), 1, 0)
         if kind == "toggle":
             control: QWidget = QCheckBox("Enabled")
@@ -2367,30 +2598,27 @@ class LauncherUI(QMainWindow):
         elif kind == "choice":
             control = QComboBox()
             for choice in cast(list[dict[str, object]], option["choices"]):
+                if key == "enemy_count_mode" and choice["key"] == "preset":
+                    continue
                 control.addItem(str(choice.get("label", choice["key"])), choice["key"])
             control.setCurrentIndex(max(0, control.findData(default)))
-            selected_description = self._label("", "muted")
-            selected_description.setStyleSheet(f"color:{self.COLORS['good']}; font-size:9pt;")
-            selected_description.setText(
-                self._choice_description(key, control.currentData(), control.currentText())
-            )
-            control.currentIndexChanged.connect(
-                lambda _index, combo=control, target=selected_description, option_key=key:
-                target.setText(self._choice_description(option_key, combo.currentData(), combo.currentText()))
-            )
-            layout.addWidget(selected_description, 2, 0)
         elif kind == "range":
             control = QSpinBox()
             control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
             control.setValue(cast(int, default))
         elif kind == "option_set":
             control = OptionSetControl(option)
+        elif kind == "option_dict":
+            control = DictionaryControl(option)
         else:
             control = NamedRangeControl(option)
         control.setMinimumWidth(200)
         self.option_controls[key] = control
         self.option_rows[key] = row
-        layout.addWidget(control, 0, 1, 3 if kind == "choice" else 2, 1, Qt.AlignmentFlag.AlignVCenter)
+        if kind == "option_dict":
+            layout.addWidget(control, 2, 0, 1, 2)
+        else:
+            layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
         return row
 
     def _start_inventory_widget(self) -> QWidget:
@@ -2484,7 +2712,7 @@ class LauncherUI(QMainWindow):
             if isinstance(control, QCheckBox): values[key] = control.isChecked()
             elif isinstance(control, QComboBox): values[key] = control.currentData()
             elif isinstance(control, QSpinBox): values[key] = control.value()
-            elif isinstance(control, (NamedRangeControl, OptionSetControl)): values[key] = control.value()
+            elif isinstance(control, (NamedRangeControl, OptionSetControl, DictionaryControl)): values[key] = control.value()
         inventory: dict[str, int] = {}
         for row in range(self.inventory.rowCount()):
             item, amount = self.inventory.item(row, 0), self.inventory.item(row, 1)
@@ -2497,19 +2725,30 @@ class LauncherUI(QMainWindow):
         self._imported_player = None
         self._apply_player_values(self.option_defaults)
 
-    def _apply_player_values(self, values: dict[str, object]) -> None:
+    def _set_option_values(self, values: dict[str, object]) -> None:
+        syncing = self._syncing_create_dependencies
         self._syncing_create_dependencies = True
-        for key, control in self.option_controls.items():
-            value = values[key]
-            control.blockSignals(True)
-            if isinstance(control, QCheckBox): control.setChecked(bool(value))
-            elif isinstance(control, QComboBox): control.setCurrentIndex(max(0, control.findData(value)))
-            elif isinstance(control, QSpinBox): control.setValue(cast(int, value))
-            elif isinstance(control, (NamedRangeControl, OptionSetControl)): control.setValue(value)
-            control.blockSignals(False)
-            if key in self._warning_state:
-                self._warning_state[key] = bool(value)
-        self._syncing_create_dependencies = False
+        try:
+            for key, value in values.items():
+                if key not in self.option_controls:
+                    continue
+                control = self.option_controls[key]
+                blocked = control.blockSignals(True)
+                try:
+                    if isinstance(control, QCheckBox): control.setChecked(bool(value))
+                    elif isinstance(control, QComboBox):
+                        control.setCurrentIndex(max(0, control.findData(value)))
+                    elif isinstance(control, QSpinBox): control.setValue(cast(int, value))
+                    elif isinstance(control, (NamedRangeControl, OptionSetControl, DictionaryControl)): control.setValue(value)
+                finally:
+                    control.blockSignals(blocked)
+                if key in self._warning_state:
+                    self._warning_state[key] = bool(value)
+        finally:
+            self._syncing_create_dependencies = syncing
+
+    def _apply_player_values(self, values: dict[str, object]) -> None:
+        self._set_option_values({**values, **enemy_options_for_editing(values)})
         self.inventory.setRowCount(0)
         self._refresh_create_dependencies()
         for name, quantity in cast(dict[str, int], values.get("start_inventory", {})).items():
@@ -2519,6 +2758,42 @@ class LauncherUI(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, name)
             self.inventory.setItem(row, 0, item)
             self.inventory.setItem(row, 1, QTableWidgetItem(str(quantity)))
+
+    def _apply_enemy_category_values(self, values: dict[str, object]) -> None:
+        category = enemy_options_for_editing(values)
+        category["easier_secret_encounters"] = values["easier_secret_encounters"]
+        self._set_option_values(category)
+        self._refresh_create_dependencies()
+
+    def _import_enemy_options(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(self, "Import Enemies YAML", "", "YAML files (*.yaml *.yml)")
+        if not filename:
+            return
+        try:
+            _name, values, _document = load_player_yaml(Path(filename), self.controller.options_schema)
+            self._apply_enemy_category_values(values)
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(self, "Could not import Enemies YAML", str(error))
+
+    def _export_enemy_options(self) -> None:
+        filename, _ = QFileDialog.getSaveFileName(self, "Export Enemies YAML", "Enemies.yaml", "YAML files (*.yaml)")
+        if not filename:
+            return
+        try:
+            document = player_yaml_document(self.controller.options_schema, self.player_name.text(), self._option_values())
+            document[GAME_NAME] = {key: document[GAME_NAME][key] for key in self.enemy_option_keys}
+            path = Path(filename)
+            if path.suffix.lower() not in {".yaml", ".yml"}:
+                path = path.with_suffix(".yaml")
+            payload = ("# " + speed_capability_notice() + "\n"
+                       + yaml.safe_dump(document, allow_unicode=True, sort_keys=False)).encode("utf-8")
+            destination = QSaveFile(str(path))
+            if not destination.open(QIODevice.OpenModeFlag.WriteOnly):
+                raise OSError(destination.errorString())
+            if destination.write(payload) != len(payload) or not destination.commit():
+                raise OSError(destination.errorString())
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(self, "Could not export Enemies YAML", str(error))
 
     def _import_player_options(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(self, "Import Player YAML", "", "YAML files (*.yaml *.yml)")

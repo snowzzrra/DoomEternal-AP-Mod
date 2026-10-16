@@ -99,13 +99,14 @@ def aggregate_ready(signal: dict, checked_locations: set[int], server_locations:
         raise ValueError("aggregate authority must be server_checked_locations")
     children = set(signal.get("children", []))
     required_count = signal.get("required_count")
-    if not children or not isinstance(required_count, int):
-        raise ValueError("aggregate requires children and required_count")
+    if not children or type(required_count) is not int or required_count != len(children):
+        raise ValueError("aggregate requires every authored child")
     if server_locations is not None:
-        inactive = set(signal.get("conditional_children", ())) & children - set(server_locations)
-        children -= inactive
-        required_count -= len(inactive)
-    return len(children & set(checked_locations)) >= required_count
+        children &= server_locations
+        if not children:
+            complete = signal["mission_complete_location_id"]
+            return complete in server_locations and complete in checked_locations
+    return children <= checked_locations
 
 
 def _mission_key(entry: dict) -> str | None:
@@ -191,6 +192,11 @@ def validate_challenge_registry(registry: dict) -> None:
             raise ValueError(f"{entry['name']}: aggregate required_count drift")
         if signal.get("authority") != "server_checked_locations":
             raise ValueError(f"{entry['name']}: aggregate authority must be server_checked_locations")
+        completion_name = entry["name"].removesuffix(" - All Mission Challenges Completed") + " - Mission Complete"
+        complete = next((row["location_id"] for row in registry.get("mission_complete", [])
+                         if row["name"] == completion_name), None)
+        if complete is None or type(signal.get("mission_complete_location_id")) is not int or signal["mission_complete_location_id"] != complete:
+            raise ValueError(f"{entry['name']}: aggregate requires its mission completion Location")
         for child in children:
             if child not in {item["location_id"] for item in registry.get("mission_challenges", [])}:
                 raise ValueError(f"{entry['name']}: aggregate child is missing or from another mission")
@@ -218,6 +224,11 @@ def validate_challenge_registry(registry: dict) -> None:
             raise ValueError(f"{entry['name']}: invalid mastery record")
         if not signal.get("unlockable") or not signal.get("manager"):
             raise ValueError(f"{entry['name']}: incomplete mastery signal")
+        requirement = entry.get("requirement", {})
+        count = requirement.get("original_count")
+        if (requirement.get("kind") not in {"repetitions", "damage"}
+                or type(count) is not int or count < 1 or count != signal.get("rule_0_statCount")):
+            raise ValueError(f"{entry['name']}: invalid original mastery requirement")
     strategies = {entry.get("signal", {}).get("kind") for entry in entries}
     if not strategies <= RUNTIME_STRATEGIES:
         raise ValueError(f"unknown runtime strategies: {sorted(strategies - RUNTIME_STRATEGIES)}")

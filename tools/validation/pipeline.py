@@ -108,6 +108,8 @@ CORE_MAP_INPUTS = (
     "doom_eap/contracts/publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
+    "doom_eap/content/secret_encounter_timers.py",
+    "doom_eap/content/mastery_requirements.py",
     "doom_eap/contracts/save_observation.py",
     "doom_eap/runtime/save_files.py",
     "doom_eap/runtime/save_records.py",
@@ -1011,6 +1013,8 @@ class Pipeline:
             if path.is_file() and "__pycache__" not in path.parts
         }
         for relative in (
+            "doom_eap/content/secret_encounter_timers.py",
+            "doom_eap/content/mastery_requirements.py",
             "doom_eap/contracts/tag_prerequisites.py",
             "doom_eap/contracts/runtime_context.py",
             "doom_eap/contracts/save_observation.py",

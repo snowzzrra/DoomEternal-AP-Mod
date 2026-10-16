@@ -133,7 +133,29 @@
       ],
       "unlock_target": "fast_travel_target_fast_travel_unlock_1"
     },
-    "terminal": "crystal_target_level_transition_1"
+    "terminal": "crystal_target_level_transition_1",
+    "physical_pickup_sources": {
+      "mountain_pass_interact_automap_1": {
+        "location_id": 7770510,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -104.400024,
+          "y": 1134.60034,
+          "z": 172.619034
+        },
+        "region": "The World Spear - Sentinel Mountain - Mountain Forest",
+        "qualification": "Cyber Mancubus ledge after Meathook traversal; before the cave that begins Mountain Cliffs.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/7",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc2/e5m1_spear/e5m1_spear.decl",
+          "sha256": "fbe438d486693e0c3505ea9d46e6fa3187b2a2def04c574f9b4a273ebe3933aa",
+          "station_groups": [
+            "AUTOMAP_GROUP_B"
+          ]
+        }
+      }
+    }
   },
   "locations": [
     {

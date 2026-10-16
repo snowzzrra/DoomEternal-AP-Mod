@@ -1,0 +1,1769 @@
+{
+  "schema_version": 1,
+  "map_key": "e4m2_swamp",
+  "source": {
+    "path": "id Software",
+    "sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690"
+  },
+  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "logic_sources": {},
+  "counting": {
+    "unit": "finite_authored_combat_opportunity",
+    "scope": "one_initial_pass_of_each_selected_segment",
+    "identity_fields": [
+      "map_key",
+      "manager",
+      "script_index",
+      "event_index",
+      "ordinal"
+    ],
+    "replays_add_to_N": false,
+    "requires_forced_deaths": false,
+    "map_N": null,
+    "campaign_N": null
+  },
+  "qualification": {
+    "source": "reviewed_finite_scripts_and_concrete_source_templates",
+    "runtime": false,
+    "replacement_feasibility": "qualified_separately_from_original_opportunity_count"
+  },
+  "segments": [
+    {
+      "id": "ai_encounter_manager_dlc1_5",
+      "manager": "ai_encounter_manager_dlc1_5",
+      "script_index": 0,
+      "segment_N": 6,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_20"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_13",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "ai_encounter_trigger_exit_14",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 6,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "426cb500e42b7fa148e6461a25a9e058026bab8392ed21b541ca230695ca18e6",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_360",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_360",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "2a9056b769840b280728d96c2fe64c2e235b64f23402e2d28f141747b12c53af",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_361",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_361",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "934855d9139181b8135fc6f4eb944e8cbdcf3c7000202fcc3858f29f1aa5edb1",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_362",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_362",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 3,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "eec066f8b88beb3ec38a15d4829d45f18aad5dc0b25dc6fb4b3b61926f9f2c48",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_363",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_363",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "ef7f32ce593b468d682b362147149b85ccfecaea58ef20ecf649c07f12ba9af0",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_364",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_364",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 5,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "3c55fe370c557c56a834b244d30f77b6d504542bb69f8285dc4200fecf828df6",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_365",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_365",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_dlc1_6",
+      "manager": "ai_encounter_manager_dlc1_6",
+      "script_index": 0,
+      "segment_N": 5,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_21"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_15",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 5,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "f43b636f3aac0a68ff1e271dff91c21a9d49194bf713c32b6915bc7b85c77759",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp59",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp59",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "08272cc55658bc2da29e9ac8cf1e7e16af1c49edf0df2557f4af734de76d2b82",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp60",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp60",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "0c892f9fec4f7454614a22cddfc49109625ba316d7d5ffa821d4210a68bf7244",
+          "species": "zombie_tier_3",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_3",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp61",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp61",
+              "ai": "ai_ai_fodder_zombie_tier_3_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 3,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "ebc2780c006781222d5b403078395963bcf93473d1ede098364fb6b13faeb320",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp68",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp68",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "716390c1bd23b30a0f2de3cf052a7e1d86d9a31cf458dd4fcbc0af10648808be",
+          "species": "zombie_tier_3",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_3",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp67",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp67",
+              "ai": "ai_ai_fodder_zombie_tier_3_3"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_sunken_ruins_10",
+      "manager": "ai_encounter_manager_sunken_ruins_10",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_23"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 5,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "cd1c405abb9bbba63ac1466d9a87af04c7d271d81e11f3e92031d93aab9f414d",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp63",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp63",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "f1ae374128af334fbe3ca5ae3eafa1a24e2c7ab8720847dc7db4b74c469d5b93",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp62",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp62",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "3db34862a25eb205aa067ad9137c289e0960fd26b9aa24fb82075e3ba33a365e",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_imp64",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_imp64",
+              "ai": "ai_ai_fodder_zombie_tier_1_3"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_2015883833",
+      "manager": "ai_encounter_manager_1_2015883833",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_2015883833"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "6b14fc38f2743065a9be042d38c27fd837ab0c592f4f3aa4ccfdf42ed54e0ba8",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_tentacle_18",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_tentacle_18",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_2015883832",
+      "manager": "ai_encounter_manager_1_2015883832",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_2015883832"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "bbd0646183e36419eecbcac4ad3b28ce5a7ae59c8bd56b2b8ab89cf28b51fc8a",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_tentacle_14",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_tentacle_14",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_2015883831",
+      "manager": "ai_encounter_manager_1_2015883831",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_2015883831"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "a14900a10294b85d5aa364986c32d44d8d272f289cdc82651bb6f1fea8ed2faa",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_tentacle_16",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_tentacle_16",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_2015883830",
+      "manager": "ai_encounter_manager_1_2015883830",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_2015883830"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "50627e8e0f7a289d6bda482722332f9383e2a0e703eeef08ac94a601b88c46f6",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_tentacle_12",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_tentacle_12",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_2015883829",
+      "manager": "ai_encounter_manager_1_2015883829",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_2015883829"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "aac344be0fdc0ebb36270ea5f5daceb26cd7e20a1368873941a80e406a116d25",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_tentacle_9",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_tentacle_9",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "ai_encounter_manager_1_1995188878",
+      "manager": "ai_encounter_manager_1_1995188878",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_commit_1_1995188878"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "ai_encounter_trigger_exit_area_1",
+              "force_ai_to_flee": false
+            },
+            {
+              "entity": "boss_encounter_trigger_exit_all_combat_failsafe",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "abd852b674c04e254fab7236cc64cbc2e156181fa690065ef58bd805ccd3f85d",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "ai_target_spawn_zombie_1",
+          "members": [
+            {
+              "spawner": "ai_target_spawn_zombie_1",
+              "ai": "ai_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "ai_ai_ambient_buffpod_4": {
+      "sha256": "2bd9775c3987e47ee64937cac538f4c6a878871218243b4ba9c7780d8d1f3914",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/buffpod"
+    },
+    "ai_ai_ambient_spirit_1": {
+      "sha256": "d073a40a204f909eaf49a004c44cbc78edc6d5ff89e9bbb896e4088107b1c7dc",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/spirit"
+    },
+    "ai_ai_ambient_spirit_2": {
+      "sha256": "6df7c91ca1843e42908dca389154928b20dcbab928f1255462a6186d64fa0cc5",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/spirit"
+    },
+    "ai_ai_ambient_spirit_samuel_1": {
+      "sha256": "20ed87e67c8186d99334f6416dd695e1d0a17b4ce482051de7e4ddefcf26238b",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/spirit_samuel"
+    },
+    "ai_ai_ambient_super_tentacle_3": {
+      "sha256": "43696f53e5f3506a1087d6a30634a82d0c8d4cb42b1b47858cbfe07c6a48b6f2",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/super_tentacle"
+    },
+    "ai_ai_ambient_super_tentacle_4": {
+      "sha256": "a2a59659ffcb223f54f8ca07b510cce15005e56bfc1f748a23ec8fb9f3b3b6c9",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/super_tentacle"
+    },
+    "ai_ai_ambient_tentacle_liquid_12": {
+      "sha256": "d0def9122872dd7370e379fc75dd5935dbb99d9757f18197df6ebd8a0e8a7501",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/tentacle_liquid"
+    },
+    "ai_ai_ambient_tentacle_liquid_7": {
+      "sha256": "da8968df04406797789ea2612a19c68170f19ed9ad08f8de1b83fdf41436e50a",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/tentacle_liquid"
+    },
+    "ai_ai_ambient_turret_1": {
+      "sha256": "cdddff98896b1657855b98a83f57d2e55d6c5e6940a99ce1b0ae754e786c300e",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/turret"
+    },
+    "ai_ai_ambient_turret_2": {
+      "sha256": "67cec5544a8c12f13293a6ee456aad0206cb24da15a23241c4926573477cde4a",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/turret"
+    },
+    "ai_ai_ambient_zombie_cueball_3": {
+      "sha256": "5829242e026fa73928110f6bf80b9fd81001969e14f7c1c91871a58d21103056",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/zombie_cueball"
+    },
+    "ai_ai_fodder_carcass_3": {
+      "sha256": "5a21c0552e1ea4179632c5bfebce58576b88a72b678ada3b531c2ed2609ac026",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/carcass"
+    },
+    "ai_ai_fodder_gargoyle_2": {
+      "sha256": "e78b6a91289118fb1ef0cfb07a2572728b824e535b5785205f487488d2cf14e0",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/gargoyle"
+    },
+    "ai_ai_fodder_gargoyle_7": {
+      "sha256": "01e443f40d596103d7699552afb62d05cff48e6c8ca2fb089fb5ea4b3d0d8f00",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/gargoyle"
+    },
+    "ai_ai_fodder_imp_2": {
+      "sha256": "351fd8f0ae62061f368c78e480b8758f5bfa143787878f0e142b8a3c7529c4b8",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp"
+    },
+    "ai_ai_fodder_imp_7": {
+      "sha256": "bd69526ea243dbb4a19090143c73f841e53127d9508fffa1cc89eceb97dbd852",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp"
+    },
+    "ai_ai_fodder_lostsoul_2": {
+      "sha256": "5f03c76bc4c0a37060e13e65b453fc6214e0c4a452eadc1f86e3a5687eac8a83",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/lostsoul"
+    },
+    "ai_ai_fodder_lostsoul_7": {
+      "sha256": "9bb5f6c2e00630634c2ad843f938c39a84195b1c8860e8b42f8025f69dce8c24",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/lostsoul"
+    },
+    "ai_ai_fodder_prowler_2": {
+      "sha256": "6089ff3bebd169a3ede4e36a048867291b8f0647a25816a5d998f61891a930e6",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/prowler"
+    },
+    "ai_ai_fodder_prowler_5": {
+      "sha256": "d5cca30ca95e866f3cff681e1bd9f8c0019b04c4eda743e07f5696e7bc38a025",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/prowler"
+    },
+    "ai_ai_fodder_soldier_blaster_3": {
+      "sha256": "20d8aedca74f5cb061054007bcf420eea3a279b8bcac2a4bda93f0819c6ab5e7",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster"
+    },
+    "ai_ai_fodder_soldier_blaster_6": {
+      "sha256": "bddfa30c4de08baf98620abb331c970add0def7504a949b3f96a1104408e137c",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster"
+    },
+    "ai_ai_fodder_soldier_shield_4": {
+      "sha256": "3c391ab5a541b15f6bef2a4efc6432be0d993e6e3a7a3e8e78907ce1edea2004",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_shield"
+    },
+    "ai_ai_fodder_zombie_maykr_3": {
+      "sha256": "3f0a42c389b4f2041cbeddec182cd605964899213cab8798d2904cacc4b8697e",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_maykr"
+    },
+    "ai_ai_fodder_zombie_t1_hell_1": {
+      "sha256": "9862471898a9b8d1325e7c6535d23cec74269e532f53c53bc87bb18686a6b996",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "starting_health": 200
+    },
+    "ai_ai_fodder_zombie_tier_1_3": {
+      "sha256": "f03fafb2baf5ec7b797ed29d8c872dae12b36472cabeb679ffe67cdaff5ff3cc",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_1",
+      "starting_health": 200
+    },
+    "ai_ai_fodder_zombie_tier_3_3": {
+      "sha256": "39f3773a7597e98bf204ce322e3b08ad19841bb93a893c7dac33479664c13573",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_3"
+    },
+    "ai_ai_heavy_arachnotron_1": {
+      "sha256": "0c710c789721c01a6f94d0d7b923778b792ce974c9b8d22c12bb2e48e6976ef8",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron"
+    },
+    "ai_ai_heavy_arachnotron_4": {
+      "sha256": "9565def00572f770c4e5698ef84476e1bab8e7c80b8bb24a9b39313ae3b5e94c",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron"
+    },
+    "ai_ai_heavy_cacodemon_1": {
+      "sha256": "162917de6f2a7df1dcacd5f6721b6f5cf852ef2664f2c497ad480e820ad3e56e",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon"
+    },
+    "ai_ai_heavy_cacodemon_8": {
+      "sha256": "750512db0c2b89a6ae599ecf9283a2786e418073c12d5107cbc9c52a6e6ece95",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon"
+    },
+    "ai_ai_heavy_dreadknight_3": {
+      "sha256": "5ec942109624b9b70b48244c147af70c1e228640739601ed3af1b0967847d036",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/dreadknight"
+    },
+    "ai_ai_heavy_hellknight_3": {
+      "sha256": "2db9e71ad2a84f6fd52036db30b0b8385713a9bce09353549ac023d4ab82c2ab",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/hellknight"
+    },
+    "ai_ai_heavy_hellknight_6": {
+      "sha256": "7d0d6cf4bcf311ed0db5e49a7d89dfa62c12dd30da1b6447fca645a632ab2d72",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/hellknight"
+    },
+    "ai_ai_heavy_mancubus_fire_3": {
+      "sha256": "e6b55fd043acb1c4d9efbe75cdd770f11da277c08661acc338b37bbf4df7edc4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/mancubus_fire"
+    },
+    "ai_ai_heavy_mancubus_fire_6": {
+      "sha256": "df96ad84207476cc96f05bd7e0dd9467825ba734b326e5e4700a5752186f94c1",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/mancubus_fire"
+    },
+    "ai_ai_heavy_mancubus_goo_2": {
+      "sha256": "a531d232b830bd973cd80df0b49b7cfd9a5a4d56cf60dace53e500b016313ee3",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/mancubus_goo"
+    },
+    "ai_ai_heavy_mancubus_goo_6": {
+      "sha256": "c6ac4cd898cdcf1db9c99c1d03214f828d589f56e2d77a37c4bd41d6029beec5",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/mancubus_goo"
+    },
+    "ai_ai_heavy_painelemental_4": {
+      "sha256": "48fa4a1a68994a7165b4df7a9004eeb7cd30775b71a202ab9d4d2b553973aaa4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/painelemental"
+    },
+    "ai_ai_heavy_pinky_1": {
+      "sha256": "c6f359d80707a0acf46622b2cc6f46b1021fd00834f9f490d5f8cc4f29e3a6c6",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky"
+    },
+    "ai_ai_heavy_pinky_5": {
+      "sha256": "43b7918d3e064d4dc469ec708cc159d7fdc5c22f7b17c959856bd3ea8a1562e4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky"
+    },
+    "ai_ai_heavy_pinky_spectre_1": {
+      "sha256": "08c196461da396d5687ef62e3d955ce3b35529e2d306c0af6ffcf793a00da4de",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky_spectre"
+    },
+    "ai_ai_heavy_pinky_spectre_5": {
+      "sha256": "9a86bde1b1943ea2ece59e6d27ed8e2dd2d8443970943d4421914038dc2d0b61",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky_spectre"
+    },
+    "ai_ai_heavy_revenant_1": {
+      "sha256": "164f28bd86884fe2864189b9eabc2488c65bde7c4f1a8d595cd814a25662d2f0",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/revenant"
+    },
+    "ai_ai_heavy_revenant_4": {
+      "sha256": "8c1dfe204122ae4d72b5b36415aae8f4efd25ba4b75b62f2ecaff74de839c3b9",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/revenant"
+    },
+    "ai_ai_heavy_whiplash_5": {
+      "sha256": "e55a6615b584bc23d6fb2994b1d65dee7ebc0d8e30db5a00e285a2ef95d29c06",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/whiplash"
+    },
+    "ai_ai_heavy_whiplash_spectre_2": {
+      "sha256": "7fb09c6a6820c03732ce37a2f6fed1fe7cae846d02024a743af5bad9713e5b67",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/whiplash_spectre"
+    },
+    "ai_ai_superheavy_archvile_5": {
+      "sha256": "d6030e1fea45f03520065b6ee9d46fa17e17370119b798ca84ac568412f704b3",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/archvile"
+    },
+    "ai_ai_superheavy_baron_3": {
+      "sha256": "215659597d219e6b919e804e47a39c27bc145722c39d4009d852c7b23d5cf5c3",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/baron"
+    },
+    "ai_ai_superheavy_baron_7": {
+      "sha256": "40f724b001c4ed280fb23913540edad92b5e18166f858814b6ebf8a5a9e8f4e0",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/baron"
+    },
+    "ai_ai_superheavy_baron_8": {
+      "sha256": "c1d5b5ecd313104147cbd6843701369316fdb0d4cff5ca1c2256f36bdb505a2b",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/baron"
+    },
+    "ai_ai_superheavy_doom_hunter_3": {
+      "sha256": "da8cd6631c0a6251c8db5adbd0f4476733dbf84f61a2385f0cca3b8c10c0b56f",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/doom_hunter"
+    },
+    "ai_ai_superheavy_marauder_3": {
+      "sha256": "27e0de72a14110c124d019dadef7901a4f092657c536672bb9671631495134eb",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/marauder"
+    },
+    "ai_ai_superheavy_marauder_6": {
+      "sha256": "c2913fb8bb4593a16231258e2d585c5e894b41aef0a0bcd1c2d287448ddfb4de",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/marauder"
+    },
+    "ai_ai_superheavy_tyrant_3": {
+      "sha256": "441414c914671dd988662f4ce15131e5bd17223a7a24b017b64e78102df40a9e",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/tyrant"
+    },
+    "ai_encounter_manager_1_1995188878": {
+      "sha256": "b83a893da8b8f148d95cf27803b4489740f35e7935e3f8fbe0f4b7e34711fb4c",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_1_2015883829": {
+      "sha256": "ca2b7aef5da99ffa6fd70702c194f266f26ab8f1d455d04a2de6e352aecc34f0",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_1_2015883830": {
+      "sha256": "4d2c88ea2897ed29ddbb1a7eb414ff59f469ab4f8588ee619bf0bcbb979e3574",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_1_2015883831": {
+      "sha256": "3e14b27a061770a123af148b955932348efca34cb18b8794bc350810954097a2",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_1_2015883832": {
+      "sha256": "5d245cb18b4bb6d896f6465112669c41800893ee2eec54e0f2b923129bd4d3d7",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_1_2015883833": {
+      "sha256": "c83682cb791ab2caf6620dd1f70c5900aa95fc068d77595b2ecc79153745f2be",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_dlc1_5": {
+      "sha256": "409b31dedf3a349c9a9be6572644c2f5d46626d68d89bd32339714541ff3895f",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_dlc1_6": {
+      "sha256": "71e86ae969195408f938937941c0567c393c40ddb33e460a58c317d108761111",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_manager_sunken_ruins_10": {
+      "sha256": "7ef1fdd2fe4f3a3900b9471f7cdd5979d3d1ccc11805578f2c91a6b56b70eeaf",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "ai_encounter_spawn_group_master_parent_everyone2": {
+      "sha256": "febb6475ab034adb5701232315be32a41c7701c89c03e832792190fa077dd113",
+      "class_name": "idTarget_Spawn_Parent",
+      "layers": []
+    },
+    "ai_encounter_spawn_group_parent_area_1": {
+      "sha256": "b904ad81dda30e6251c50fa9264fc57f268f7f3fbb8b6b2961650bf17ac07232",
+      "class_name": "idTarget_Spawn_Parent",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_1995188878": {
+      "sha256": "4d28b994f4f5b23ec61e2e006fe13cb06912ec932d5a4b919d3ada0cab956170",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_2015883829": {
+      "sha256": "c81e45658b07ef19be0a1b7ae22a3024db6dd049ef6f2c9b7ebf785187acfebd",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_2015883830": {
+      "sha256": "805c8ae841624f7058092db67049c4502740440407b95024feb848c7deaf1f5e",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_2015883831": {
+      "sha256": "b34ca0db8cae29b30d5e66ba18c42e59ea9920ae386669e90d533f3dde292e22",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_2015883832": {
+      "sha256": "42de570f07728dca7e952f6d9ee45e1c06930b18a79dcdd56bfac556ed1ad76b",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_1_2015883833": {
+      "sha256": "2affcdf9032f1b2b3bd657c1c09449125b7aed8a6f0e9ba5ac783dd94ee1a2b2",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_20": {
+      "sha256": "9f1c999b1aafcf42c86457a6b1cf122960d49e91551f6f860a9d37b25f412a76",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_21": {
+      "sha256": "311a92962ce3b0a895f09cc1b93ce957b8902ccc5ae5008978ef2765e8369551",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_commit_23": {
+      "sha256": "0109ff457594a079ef438dc53071e4c0fcc09ac8d50ba97fa0c9042b9730aaa4",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "ai_encounter_trigger_exit_13": {
+      "sha256": "d700d0f8777e70892951a204de9ebd00a9a9d4ca0d5ebc188cc7b61a87bdbe03",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "ai_encounter_trigger_exit_14": {
+      "sha256": "6e392c1831c2ed35473cfa26a38375f6df597dabd29f53946f6a1a0a8f297887",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "ai_encounter_trigger_exit_15": {
+      "sha256": "b6bce96919d736860f7b62bfebc0f873b69fc2a4b1819b0adc6c81ca711f64cf",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "ai_encounter_trigger_exit_area_1": {
+      "sha256": "774a5b54b7e3a4924eb700fc6c7183da00f10394f51cbe72528aba22b3989142",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "ai_target_spawn_360": {
+      "sha256": "d70b7c019d7027a60ddb28ec9b3753348e1ef4183dd5940156469f2952a1e688",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -39.4255562,
+        "y": 306.182922,
+        "z": 7.25000906
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_361": {
+      "sha256": "243aaf5a134697c5d898e5193c2f6525522b6b261b8ad301d0d7f8d3fd784979",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -22.1496525,
+        "y": 299.385132,
+        "z": 7.05002213
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_362": {
+      "sha256": "4a6cd939b1c746ea8854a509b01371fe66aa6ad6e9b9d11c7cf79f46472322ea",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -19.3604355,
+        "y": 276.712402,
+        "z": 7.15001678
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_363": {
+      "sha256": "131af10bd9acd3eae938ce60e75a6a5bfa1342670a040812cfdcb476ef681ed2",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -55.0789642,
+        "y": 279.799225,
+        "z": 7.15001678
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_364": {
+      "sha256": "0356f559efe77d9559639f9d98e29fab7a953bea7d3ed93891f7d3a854174df4",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -26.3847961,
+        "y": 257.95108,
+        "z": 7.15001678
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_365": {
+      "sha256": "ff6fdcc137e65cce2b4a3fef6e60cf15fc33292369b9c1e151503adb09910ea7",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -58.2469711,
+        "y": 288.457031,
+        "z": 7.15001678
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp59": {
+      "sha256": "52f9d5a5d34a7a004e134d4f63008d3d7054f5e8a8174d07958e23b81ac89fc0",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -49.1004333,
+        "y": 575.74176,
+        "z": 13.199995
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp60": {
+      "sha256": "b0df1ec61dbbafc5ca2939e92ae7e714a0888a4d80cd71bea5e427d01b39a78d",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -39.7274628,
+        "y": 579.567383,
+        "z": 13.3999949
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp61": {
+      "sha256": "38b2202a4b7e4b61c4b2d22f97363a937b33f012ee756ff24dc47906b2053154",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -52.8086472,
+        "y": 560.587036,
+        "z": 13.199995
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "ai_target_spawn_imp62": {
+      "sha256": "8563c9a0d5590007673d91e0bed82a870ab5a2da24e0af0bd5ab99c7846235e0",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -108.007607,
+        "y": 553.944336,
+        "z": 12.199996
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp63": {
+      "sha256": "71dad65959baf3557b63122a0fd578728979c3d9d844e11edf7d3fe5ea3aef06",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -100.616165,
+        "y": 567.120605,
+        "z": 12.3499975
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp64": {
+      "sha256": "5defb44422ba132ba8913735e308408f45c6743fe4f714adb69de9820c1baf98",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -91.3016663,
+        "y": 514.066895,
+        "z": 16.0499954
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp67": {
+      "sha256": "baa26b5591e24319702690a1e06b9f381f9c3f7e8769f4503ed875c1b4ee1aa2",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -54.3742714,
+        "y": 578.294312,
+        "z": 13.199995
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_imp68": {
+      "sha256": "edfe46fa1ff1df01ba75c765c0957cb49166ad2757148583a365da184d551382",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -42.3123093,
+        "y": 588.426575,
+        "z": 13.199995
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "ai_target_spawn_tentacle_12": {
+      "sha256": "08e51106167224be1df5734c87bfe5694bdeac1d5ac1a77a928edafff35325ac",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -275.300079,
+        "y": 287.799805,
+        "z": 30.6000023
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "ai_target_spawn_tentacle_14": {
+      "sha256": "6be1ae00dd005c99153593c3e5a25f06f5a6d7afd60cd037b99d4b1218a6b8a9",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -244.552963,
+        "y": 297.447052,
+        "z": 30.7000027
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "ai_target_spawn_tentacle_16": {
+      "sha256": "18875b7f720869f2c2c6368bba1ae0c28d755d3603c4e270b953c02295b30aa8",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -253.59967,
+        "y": 274.849854,
+        "z": 30.6000023
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "ai_target_spawn_tentacle_18": {
+      "sha256": "770f4e0c5d2289118d3be4c7d69bdc7e6a4dd38a5669fadc3c0763184c8721a1",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -262.468597,
+        "y": 278.343109,
+        "z": 30.6000023
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "ai_target_spawn_tentacle_9": {
+      "sha256": "ebad8e009be3d8b69d7e697f1349e4cc53d68f9cd479bd56a12b28547928f9ff",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -276.650085,
+        "y": 311.950134,
+        "z": 30.6000023
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "ai_target_spawn_zombie_1": {
+      "sha256": "003305d044cbfcc912f342fd0db98baa77aa770474c5b667c395eff11a40a0ff",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -285.399902,
+        "y": 295.149994,
+        "z": 30.5000019
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "boss_encounter_trigger_exit_all_combat_failsafe": {
+      "sha256": "0bbb5a2e4f09a7cf8cfaac4997661171d315ad57abb52309ccc2d3be557b4c2a",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    }
+  },
+  "gaps": [
+    {
+      "manager": "ai_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_10",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_11",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883828",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883834",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883835",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883836",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883837",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_1_2015883838",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_9",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_dlc1_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_dlc1_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_dlc1_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_dlc1_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_dlc1_7",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_end_area_incidental_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_11",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_12",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_13",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_14",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_8",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_9",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_sunken_ruins_dh_only",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_tentacle_pit_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_torch_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_torch_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_torch_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_torch_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "ai_encounter_manager_torch_5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "arena_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "arena_encounter_manager_arena3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "boss_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "boss_encounter_manager_forest_arena_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "precombat_encounter_manager_dlc1_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "precombat_encounter_manager_dlc1_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    }
+  ],
+  "definition_ancestry_sha256": "9c01e82f0abfd48ff9d236adb3e51a24de95a5e29298dab7632bc4a5decca081",
+  "source_snapshot": {
+    "member": "sources/e4m2_swamp.entities",
+    "sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+    "size": 14864619
+  },
+  "review_source": {
+    "path": "content/catalog/encounter_opportunity_segments.json",
+    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+  }
+}

@@ -125,6 +125,22 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     lines.append(f"FORTRESS_POLICY = {fortress!r}")
     lines.append("FORTRESS_SPEND_GROUPS = tuple(FORTRESS_POLICY['spend_groups'])")
     lines.append("")
+    from doom_eap.content.mastery_requirements import MASTERY_REQUIREMENT_DIVISORS, mastery_entries_for_profile
+    from doom_eap.contracts.challenge_registry import challenge_registry_document
+    masteries = challenge_registry_document(catalog)["weapon_masteries"]
+    counts = {profile: {entry["signal"]["unlockable"]: entry["signal"]["rule_0_statCount"]
+                        for entry in mastery_entries_for_profile(masteries, profile)}
+              for profile in MASTERY_REQUIREMENT_DIVISORS}
+    lines.append(f"MASTERY_REQUIREMENT_COUNTS = {counts!r}")
+    lines.append("")
+    neutral = {item.name for item in catalog.physical_locations
+               if item.policy.get("permanent_resource_budget") is False
+               and (selected_map is None or item.map_key == selected_map)}
+    neutral.update(item.name for item in catalog.runtime_locations
+                   if item.data.get("permanent_resource_budget") is False
+                   and (selected_map is None or item.mission_key == selected_map))
+    lines.append(f"RESOURCE_NEUTRAL_LOCATION_NAMES = frozenset({tuple(sorted(neutral))!r})")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -163,8 +179,20 @@ def _compile_catalog(
             changed_paths.append(path)
 
     write_artifact(output, rendered)
+    write_bytes_artifact(output.with_name("enemy_options.py"),
+                         (catalog.root / "doom_eap/content/enemy_options.py").read_bytes())
+    write_bytes_artifact(output.with_name("enemy_plan.py"),
+                         (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("enemy_species.py"),
+                         (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
+    write_bytes_artifact(output.with_name("enemy_species.json"),
+                         (catalog.root / "content/catalog/enemy_species.json").read_bytes())
+    write_bytes_artifact(output.with_name("killsanity_plan.py"),
+                         (catalog.root / "doom_eap/content/killsanity_plan.py").read_bytes())
     write_artifact(catalog.root / "data" / "campaign_stages.json",
                    json.dumps(campaign_stages(catalog), indent=2) + "\n")
+    write_bytes_artifact(catalog.root / "data/secret_encounter_timers.json",
+                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
     from tools.validation.validate_data import extract_item_classifications, extract_namedtuple_table
     item_source = MOD_ROOT.parent / "Archipelago/worlds/doometernal/items.py"
     item_ids = extract_namedtuple_table(item_source, "item_data_table")
@@ -221,7 +249,6 @@ def _compile_catalog(
         "challenge_location_registry.json": challenge_registry_document(catalog),
         "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
         "campaign_goal_contract.json": dict(catalog.campaign_goal),
-        "checked_location_visuals.json": build_authorial_registry(catalog.root),
     }
     for name, value in generated_data.items():
         rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"
@@ -240,6 +267,10 @@ def _compile_catalog(
             catalog.root / "manifests" / f"{spec.key}.json",
             json.dumps(manifest, indent=4) + "\n",
         )
+
+    visuals_rendered = json.dumps(build_authorial_registry(catalog.root), indent=2, sort_keys=True) + "\n"
+    for path in (catalog.root / "data" / "checked_location_visuals.json", output_root / "checked_location_visuals.json"):
+        write_artifact(path, visuals_rendered)
 
     from doom_eap.contracts.foundation import load_foundation_contracts
 

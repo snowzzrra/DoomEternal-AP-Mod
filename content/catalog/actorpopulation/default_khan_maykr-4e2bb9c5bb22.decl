@@ -1,0 +1,16 @@
+{
+	inherit = "actorpopulation/default/default_no_bosses";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 30;
+			item[29] = {
+				entityDef = "ai/boss/khan_maykr";
+				aiType = "POPULATION_TYPE_MAYKR_ANGEL";
+				pointValue = 200;
+				spawnWeight = 0.00200000009;
+				factionName = "khan_maykr";
+				defaultSensorySettings = "boss";
+			}
+		}
+	}
+	}

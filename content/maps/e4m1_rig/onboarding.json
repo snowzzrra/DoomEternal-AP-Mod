@@ -10,5 +10,47 @@
   "owner": {
     "resource": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
     "priority": 14
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "pickups_interact_automap_1": {
+        "location_id": 7770507,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -462.899872,
+          "y": -1743.34973,
+          "z": 45.2339287
+        },
+        "region": "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab",
+        "qualification": "After the Tyrant corridor beside the Slayer Gate; before the crate/monkey-bar route to its key.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/6",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc/e4m1_rig/e4m1_rig.decl",
+          "sha256": "42ad236a6873b8d7028cf51e5548658484fcbd732bd8a77eb3e66c96a3ff9ca0",
+          "station_groups": [
+            "AUTOMAP_GROUP_B"
+          ]
+        }
+      },
+      "pickups_pickup_mega_health_2": {
+        "entity": "pickups_pickup_mega_health_2",
+        "location_id": 7770516,
+        "inherit": "pickup/mega_health",
+        "class": "idProp2",
+        "position": {
+          "z": -2035.30029,
+          "x": 453.000031,
+          "y": 1171.90002
+        },
+        "region": "UAC Atlantica Facility - Underwater Facility",
+        "qualification": "The sphere and Secret12 trigger share the underwater tower alcove (x453, y1171.9; trigger 2.5m above pickup). Both lie inside the native UNDERWATER group, which has one fast-travel region.",
+        "source_entities": [
+          "pickups_trigger_trigger_12",
+          "pickups_target_secret_12"
+        ],
+        "reference": "vanillamaps/e4m1_rig.map"
+      }
+    }
   }
 }

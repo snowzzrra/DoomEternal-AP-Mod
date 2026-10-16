@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from doom_eap import __version__
+
 from tools.release.source_bytes import SOURCE_BYTE_CONTRACT, compiler_source_bytes
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -93,25 +95,23 @@ def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tu
     return fingerprint, files_to_hash
 
 
-def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = "v0.6.0") -> Path:
+def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = __version__) -> Path:
     root = (repo_root or REPO_ROOT).resolve()
     version_dir = version if version.startswith("v") else f"v{version}"
     return root / "packaging" / "room_resources" / version_dir
 
 
-def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = "0.6.0") -> dict[str, Any]:
+def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = __version__) -> dict[str, Any]:
     """Verify exact emitted bytes against immutable sums/provenance, without a cache claim."""
     bundle_path = bundle_dir.resolve()
     if not bundle_path.is_dir():
         raise ValueError(f"Prebuilt room resources bundle directory missing: {bundle_path}")
 
-    # check that the resource files and metadata exist
     for filename in (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES):
         target = bundle_path / filename
         if not target.is_file():
             raise ValueError(f"Required file missing from room resources bundle: {filename} at {target}")
 
-    # check sha256sums.txt
     sums_path = bundle_path / "SHA256SUMS.txt"
     sums_lines = sums_path.read_text(encoding="utf-8").splitlines()
     recorded_sums: dict[str, str] = {}
@@ -132,7 +132,6 @@ def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = "
                 f"Checksum mismatch for {filename}: expected {recorded_sums[filename]}, got {actual_hash}"
             )
 
-    # 3. Parse and validate ROOM_RESOURCES_PROVENANCE.json
     prov_path = bundle_path / "ROOM_RESOURCES_PROVENANCE.json"
     try:
         provenance = json.loads(prov_path.read_text(encoding="utf-8"))
@@ -169,7 +168,7 @@ def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = "
 def validate_prebuilt_room_resources(
     bundle_dir: Path,
     repo_root: Path | None = None,
-    expected_version: str = "0.6.0",
+    expected_version: str = __version__,
 ) -> dict[str, Any]:
     """Validate emitted bytes, current compiler fingerprint and resource contracts."""
     root = (repo_root or REPO_ROOT).resolve()
@@ -224,7 +223,7 @@ def export_prebuilt_room_resources(
     bundle_dir: Path,
     target_dir: Path,
     repo_root: Path | None = None,
-    expected_version: str = "0.6.0",
+    expected_version: str = __version__,
 ) -> dict[str, Any]:
     """Validate frozen room resources and export them to target directory."""
     from tools.release.room_resource_checkout import stage_room_resource_files
@@ -304,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="Validate frozen room resources bundle")
     parser.add_argument("--export-dir", type=Path, default=None, help="Export validated room resources to directory")
     parser.add_argument("--bundle-dir", type=Path, default=None, help="Path to frozen room resources bundle")
-    parser.add_argument("--version", type=str, default="0.6.0", help="Expected release version")
+    parser.add_argument("--version", type=str, default=__version__, help="Expected release version")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Repository root path")
     parser.add_argument("--publish-from", type=Path, help="Publish compiler outputs into the canonical bundle")
     parser.add_argument("--mod-commit")

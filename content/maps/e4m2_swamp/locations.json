@@ -10,7 +10,8 @@
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_SWAMP_1": 7770438,
     "AP_CHECK_DESOLATE_CAVERN_PROGRESS_SUPPORT_RUNE_1": 7770439,
     "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_7": 7770441,
-    "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770442
+    "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770442,
+    "AP_CHECK_AUTOMAP_INTERACT_AUTOMAP_1": 7770508
   },
   "secret_encounters": [
     {
@@ -38,9 +39,29 @@
     "7770439": "The Blood Swamps - Support Rune - Desolate Cavern",
     "7770440": "The Blood Swamps - Secret Encounter - Toxic Mire Tree",
     "7770441": "The Blood Swamps - Book of the Seraphs - Part IV Codex",
-    "7770442": "The Blood Swamps - Extra Life - Castle Keep Catacombs"
+    "7770442": "The Blood Swamps - Extra Life - Castle Keep Catacombs",
+    "7770508": "The Blood Swamps - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_AUTOMAP_INTERACT_AUTOMAP_1": {
+      "policy": "ap_only"
+    }
+  },
+  "target_policies": {
+    "automap_interact_automap_1": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
+    }
   }
 }

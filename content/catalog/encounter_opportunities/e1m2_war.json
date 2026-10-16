@@ -1,0 +1,646 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m2_war",
+  "source": {
+    "path": "vanillamaps/e1m2_war.map",
+    "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65"
+  },
+  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "logic_sources": {},
+  "counting": {
+    "unit": "finite_authored_combat_opportunity",
+    "scope": "one_initial_pass_of_each_selected_segment",
+    "identity_fields": [
+      "map_key",
+      "manager",
+      "script_index",
+      "event_index",
+      "ordinal"
+    ],
+    "replays_add_to_N": false,
+    "requires_forced_deaths": false,
+    "map_N": null,
+    "campaign_N": null
+  },
+  "qualification": {
+    "source": "reviewed_finite_scripts_and_concrete_source_templates",
+    "runtime": false,
+    "replacement_feasibility": "qualified_separately_from_original_opportunity_count"
+  },
+  "segments": [
+    {
+      "id": "capitol_encounter_manager_5",
+      "manager": "capitol_encounter_manager_5",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "capitol_encounter_trigger_commit_7"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "capitol_encounter_trigger_exit_7",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 3,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "489216b325ec336fe459bee4f12d04c62b777cd6264c1cfeab4b1a4eae83ce4c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "304ea0f5d972b81a5495330abf79be9ff32d5ab7f295f96ac35c04ca48e74313",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "capitol_target_spawn_177",
+          "members": [
+            {
+              "spawner": "capitol_target_spawn_177",
+              "ai": "capitol_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "0d89ce5430d97adde3dac2ecac06ac32ea7fef7b65e95eba2d22f2f8217d6436",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "capitol_target_spawn_178",
+          "members": [
+            {
+              "spawner": "capitol_target_spawn_178",
+              "ai": "capitol_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "3a9b54c06fbc5fbfcafe8c820914845b5bd1354fb898b4a89387ce7e3df69df5",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "capitol_target_spawn_179",
+          "members": [
+            {
+              "spawner": "capitol_target_spawn_179",
+              "ai": "capitol_ai_fodder_zombie_t1_hell_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "survivor_encounter_manager_2",
+      "manager": "survivor_encounter_manager_2",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "survivor_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "survivor_encounter_trigger_exit_2",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 3,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "e37c8b08eb6b4db4565d23bbb8b2aa4fb0d6ff7ebb7d2ec4804b5768c6e70c64",
+          "species": "cacodemon",
+          "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+          "count": 1,
+          "label": "",
+          "spawner": "survivor_target_spawn_12",
+          "members": [
+            {
+              "spawner": "survivor_target_spawn_12",
+              "ai": "survivor_ai_heavy_cacodemon_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "f89e7772d1f618b70b80ca04a734cb7cd976a376c40ce1f3e687b4c92e452796",
+          "species": "cacodemon",
+          "spawn_type": "ENCOUNTER_SPAWN_CACODEMON",
+          "count": 1,
+          "label": "",
+          "spawner": "survivor_target_spawn_13",
+          "members": [
+            {
+              "spawner": "survivor_target_spawn_13",
+              "ai": "survivor_ai_heavy_cacodemon_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "slaughterpit_encounter_manager_1",
+      "manager": "slaughterpit_encounter_manager_1",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "slaughterpit_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "slaughterpit_encounter_trigger_exit_2",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "489216b325ec336fe459bee4f12d04c62b777cd6264c1cfeab4b1a4eae83ce4c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "4519d191a988c7cb1a5b9e9f5488b85eefbff68ece45983b6069e29fe05daac3",
+          "species": "tentacle",
+          "spawn_type": "ENCOUNTER_SPAWN_TENTACLE",
+          "count": 1,
+          "label": "",
+          "spawner": "slaughterpit_target_spawn_142",
+          "members": [
+            {
+              "spawner": "slaughterpit_target_spawn_142",
+              "ai": "slaughterpit_ai_ambient_tentacle_liquid_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "capitol_ai_fodder_zombie_t1_hell_1": {
+      "sha256": "f0b11d53cedd851245c8f6a459abef4d36d6eee59f26570b7519de8764c93fec",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "starting_health": 200
+    },
+    "capitol_encounter_manager_5": {
+      "sha256": "c0dd1cfc0a0b861b127c5b167abf7980124fa63a4da61ea98bf9a235174f7a20",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "capitol_encounter_trigger_commit_7": {
+      "sha256": "2a1d8085c201a59c7625e49a067efb52be58a598f56744b4d8e777bd8669399a",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "capitol_encounter_trigger_exit_7": {
+      "sha256": "51213b9a5822cbdcd984679a8ad771d16f934b545b83e72b70370a6cffaa8cfa",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "capitol_target_spawn_177": {
+      "sha256": "c3863affc92ff6e4a146f7179efcde383ff82ec8bbd7f6ac1a2abf5b60db24ec",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -109.500008,
+        "y": 335.799866,
+        "z": 12.9999971
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "capitol_target_spawn_178": {
+      "sha256": "57da8615b3034c08ad6d08bf72e4361865bb092953582693193497cc4a7ef336",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -117.199989,
+        "y": 336.299896,
+        "z": 13.6000013
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "capitol_target_spawn_179": {
+      "sha256": "43ec2ff6a72f52d6989e4202e0467c1b4258257832b045fab92ff2156ef21948",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -115.899773,
+        "y": 342.800415,
+        "z": 13.6000032
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "slaughterpit_ai_ambient_tentacle_liquid_1": {
+      "sha256": "a7f15e83abade27b3cc24ce3851763b141fb83a01cda8362db03858a701d5c77",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/tentacle_liquid",
+      "starting_health": 150
+    },
+    "slaughterpit_encounter_manager_1": {
+      "sha256": "e3393a0ea2e80362ba4929e3a4ea76d84d3c1ab2a1993792443eb434047bb8d3",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "slaughterpit_encounter_trigger_commit_2": {
+      "sha256": "1be53098a47b1213b76b17eddfdedb940465746ff22f55f6041e78aeb01910a0",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "slaughterpit_encounter_trigger_exit_2": {
+      "sha256": "bf1fc10f80b7ec6adccfa19d10596ca56a97a002b5f17951f0372965c32d58cb",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m2_battle/e1m2_main_level"
+      ]
+    },
+    "slaughterpit_target_spawn_142": {
+      "sha256": "e9f4408ed6c9489352dc8c03eb8af9c3e387e4feed31597dbc4ae499813ece63",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 7.52241182,
+        "y": -873.922485,
+        "z": -42.5285645
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "survivor_ai_heavy_cacodemon_1": {
+      "sha256": "17bb3356102945f3300defd20614ee831c89f2d0e0ed179ac405368817c8b058",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon",
+      "starting_health": 2500
+    },
+    "survivor_encounter_manager_2": {
+      "sha256": "e8b64f74277837bbde1daa483ff43fdb7b25771948575fa91c393967dcc540db",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "survivor_encounter_trigger_commit_2": {
+      "sha256": "e3fa7344e7e6fb1685af9d8ae4ae50e7304c99b4adf704c1ed02623ed7385403",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "survivor_encounter_trigger_exit_2": {
+      "sha256": "21969850854d4b5bbf824d8bca4bdaabb01c158300f22be5d938767585719194",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "survivor_target_spawn_12": {
+      "sha256": "c47d9ce2f5f48cf503ce58ff210e0e3bc71071ae26a3a76f84318887d6cedf23",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -94.9000244,
+        "y": -807.100342,
+        "z": -57.3999672
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "survivor_target_spawn_13": {
+      "sha256": "ee2a8150b5619b0cdb478f3c0f2af705af1d82a005b20721ff9d9e427a1b50fa",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -109.199989,
+        "y": -806.900208,
+        "z": -58.1999741
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    }
+  },
+  "gaps": [
+    {
+      "manager": "battle_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "battle_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "battle_encounter_manager_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_7",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_8",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_capitol_start1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "capitol_encounter_manager_capitol_start5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "extraction_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "extraction_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "gameplay_slayergate_ds_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_11",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_13",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_14",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_8",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_a",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_b",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_capitol_start5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_capitol_start6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_d",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_e",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_f",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_h",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_hell_goldenroad_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_hell_goldenroad_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_i",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_j",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_k",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_finale_e1m2_encounter_manager",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "slaughterpit_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "slaughterpit_encounter_manager_hell_goldenroad_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "survivor_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "trenches_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "trenches_encounter_manager_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "trenches_encounter_manager_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "tutorial_encounter_manager_blood_punch_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "tutorial_encounter_manager_blood_punch_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    }
+  ],
+  "source_snapshot": {
+    "member": "sources/e1m2_war.entities",
+    "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+    "size": 11567962
+  },
+  "review_source": {
+    "path": "content/catalog/encounter_opportunity_segments.json",
+    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+  }
+}

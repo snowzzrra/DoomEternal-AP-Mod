@@ -1,0 +1,33 @@
+{
+	inherit = "actorpopulation/default/dlc1";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 39;
+			item[34] = {
+				entityDef = "ai/superheavy/baron_armored";
+				aiType = "POPULATION_TYPE_ARMORED_BARON";
+				defaultSensorySettings = "common";
+			}
+			item[35] = {
+				entityDef = "ai/fodder/imp_stone";
+				aiType = "POPULATION_TYPE_STONE_IMP";
+				defaultSensorySettings = "common";
+			}
+			item[36] = {
+				entityDef = "ai/fodder/soldier_chaingun";
+				aiType = "POPULATION_TYPE_CHAINGUN_SOLDIER";
+				defaultSensorySettings = "common";
+			}
+			item[37] = {
+				entityDef = "ai/fodder/prowler_cursed";
+				aiType = "POPULATION_TYPE_CURSED_PROWLER";
+				defaultSensorySettings = "ai/prowler";
+			}
+			item[38] = {
+				entityDef = "ai/fodder/zombie_t1_screecher";
+				aiType = "POPULATION_TYPE_ZOMBIE_T1_SCREECHER";
+				defaultSensorySettings = "ai/zombie_t1";
+			}
+		}
+	}
+}

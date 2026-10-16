@@ -619,7 +619,7 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe the MOD 0.6.0 game, Core and client prerequisites."""
+    """Probe the game, Core and client prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
     # game installation check

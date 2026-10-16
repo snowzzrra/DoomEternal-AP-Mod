@@ -1,2 +1,2 @@
 """DOOM Eternal Archipelago runtime packages."""
-__version__ = "0.6.7"
+__version__ = "0.7.0"

@@ -14,9 +14,9 @@ name: DOOM Eternal AP Cross-Platform Build
         default: 'doom_eternal'
         type: string
       version_label:
-        description: 'Release version label (e.g. v0.6.7)'
+        description: 'Release version label (e.g. v0.7.0)'
         required: true
-        default: 'v0.6.7'
+        default: 'v0.7.0'
         type: string
       core_repo:
         description: 'Repository containing Sentinel Core source (owner/repository)'
@@ -475,6 +475,12 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: native-support-artifact
+          path: DoomEAP-build-handoff/shared/client
+
+      - name: Download Qualified Core Runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: core-runtime-artifact
           path: DoomEAP-build-handoff/shared/client
 
       - name: Download Linux Launcher Artifact

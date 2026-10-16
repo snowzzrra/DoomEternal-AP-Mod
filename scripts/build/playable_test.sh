@@ -1070,6 +1070,7 @@ assembled, _ = assemble_room_files(
         "randomize_chainsaw": True,
         "randomize_dash": True,
         "randomize_first_battery": True,
+        "mastery_requirements": "Half",
     },
 )
 for member, content in assembled.items():

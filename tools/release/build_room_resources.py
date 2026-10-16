@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.enemy_resources import embed_enemy_resource_payloads
 from doom_eap.content.physical_options import PHYSICAL_OPTION_KEYS, map_physical_option_keys
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
 from doom_eap.runtime.context_registry import dlc_contexts
@@ -20,8 +21,10 @@ from tools.release.room_payloads import (
     BASE_RESOURCE_NAME,
     ROOM_PAYLOAD_MANIFEST_NAME,
     ROOM_PAYLOAD_RESOURCE_NAME,
+    ROOM_PAYLOAD_SCHEMA_VERSION,
     canonical_json,
     plan_map_local_states,
+    read_zip,
     validate_room_payload_manifest,
     write_deterministic_zip,
     zip_directory,
@@ -83,7 +86,8 @@ class StateCache:
 
 
 def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
-                         map_sources_path: Path, output: Path, cache_root: Path) -> None:
+                         map_sources_path: Path, output: Path, cache_root: Path,
+                         enemy_resource_payloads: dict[str, Path] | None = None) -> None:
     root, staged, work, compressor, map_sources_path, output = (
         path.resolve() for path in (root, staged, work, compressor, map_sources_path, output)
     )
@@ -101,6 +105,15 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
     }
     if set(maps) != set(release_keys):
         raise ValueError("room payload map set does not match the content catalog")
+    source_snapshots, source_files = {}, {}
+    for key, (_, _, vanilla) in maps.items():
+        data = vanilla.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != catalog.maps[key].source_sha256:
+            raise ValueError(f"room source snapshot differs from its descriptor: {key}")
+        member = f"sources/{key}.entities"
+        source_snapshots[key] = {"member": member, "sha256": digest, "size": len(data)}
+        source_files[member] = data
 
     compiler_identity, _ = compute_room_resource_input_fingerprint(root)
     # A caller may supply a registry outside the default source tree.
@@ -166,7 +179,7 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
             subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
 
     base_members = zip_directory(staged, output / BASE_RESOURCE_NAME)
-    payload_files: dict[str, bytes] = {}
+    payload_files: dict[str, bytes] = source_files
     records: dict[str, object] = {}
     for key, (resource_path, relative, vanilla) in maps.items():
         plan = plans[key]
@@ -186,11 +199,15 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         records[key] = {"option_keys": list(plan.option_keys), "target_member": target_member,
                         "states": states, "state_policy": plan.state_policy}
     manifest = {
-        "schema_version": 1, "model": "dependent_map_payloads",
+        "schema_version": ROOM_PAYLOAD_SCHEMA_VERSION, "model": "dependent_map_payloads",
         "physical_option_keys": list(PHYSICAL_OPTION_KEYS), "base_members": sorted(base_members), "maps": records,
+        "source_snapshots": source_snapshots,
         "context_targets": {context.identity: f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
                             for context in dlc_contexts()},
     }
+    embed_enemy_resource_payloads(payload_files, manifest, {
+        species_id: read_zip(path) for species_id, path in (enemy_resource_payloads or {}).items()
+    })
     validate_room_payload_manifest(manifest, known_maps={key: value["target_member"] for key, value in records.items()})
     write_deterministic_zip(payload_files, output / ROOM_PAYLOAD_RESOURCE_NAME)
     (output / ROOM_PAYLOAD_MANIFEST_NAME).write_bytes(canonical_json(manifest))
@@ -206,9 +223,16 @@ def main() -> int:
     parser.add_argument("--map-sources", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)
+    parser.add_argument("--enemy-resource-payload", action="append", default=[], metavar="SPECIES=ZIP")
     args = parser.parse_args()
+    enemy_resource_payloads = {}
+    for value in args.enemy_resource_payload:
+        species_id, separator, filename = value.partition("=")
+        if not separator or not species_id or not filename or species_id in enemy_resource_payloads:
+            parser.error("--enemy-resource-payload requires a unique SPECIES=ZIP")
+        enemy_resource_payloads[species_id] = Path(filename)
     build_room_resources(args.repo_root, args.staged_mod, args.work_dir, args.compressor,
-                         args.map_sources, args.output_dir, args.cache_root)
+                         args.map_sources, args.output_dir, args.cache_root, enemy_resource_payloads)
     return 0
 
 

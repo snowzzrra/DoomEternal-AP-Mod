@@ -1,0 +1,329 @@
+{
+	edit = {
+		versionNumber = 21;
+		mainGraph = {
+			className = "idLogicGraphAssetEntityMain";
+			object = {
+				id = 3228629994;
+				pos = {
+					x = 91.6666718;
+					y = -17.5000019;
+				}
+				zoom = 120;
+				nodes = {
+					num = 10;
+					item[0] = {
+						id = 1002679142;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Check to determine if Tutorials are ON in the menu";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.941177011;
+									g = 0.847059011;
+									b = 0;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = -600;
+							y = 180;
+						}
+						size = {
+							x = 500;
+							y = 260;
+						}
+					}
+					item[1] = {
+						id = 3563334661;
+						model = {
+							className = "idLogicNodeModelGetConsoleVariable_v2";
+							object = {
+								variable = "g_setting_tutorials";
+							}
+						}
+						pos = {
+							x = -580;
+							y = 320;
+						}
+						size = {
+							x = 280;
+							y = 80;
+						}
+					}
+					item[2] = {
+						id = 3668593315;
+						model = {
+							className = "idLogicNodeModelCompareBool";
+						}
+						pos = {
+							x = -240;
+							y = 240;
+						}
+						size = {
+							x = 120;
+							y = 100;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+							item[1] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[3] = {
+						id = 3955851615;
+						model = {
+							className = "idLogicNodeModelBranch";
+						}
+						size = {
+							x = 100;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelBool";
+								}
+							}
+						}
+					}
+					item[4] = {
+						id = 1711363818;
+						model = {
+							className = "idLogicNodeModelEntityOnActivated";
+						}
+						pos = {
+							x = -360;
+							y = -120;
+						}
+						size = {
+							x = 160;
+							y = 120;
+						}
+						pinVariables = {
+							num = 2;
+							item[0] = {
+								id = 5;
+								model = {
+									className = "idLogicVariableModelBool";
+									object = {
+										value = true;
+									}
+								}
+							}
+							item[1] = {
+								id = 1;
+								model = {
+									className = "idLogicVariableModelEntity";
+								}
+							}
+						}
+					}
+					item[5] = {
+						id = 2538696214;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = -600;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "mech_street_target_relay_hand_imp";
+									}
+								}
+							}
+						}
+					}
+					item[6] = {
+						id = 333515018;
+						model = {
+							className = "idLogicNodeModelEntityActivate";
+						}
+						pos = {
+							x = 660;
+						}
+						size = {
+							x = 80;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 2;
+								model = {
+									className = "idLogicVariableModelEntityList";
+								}
+							}
+						}
+					}
+					item[7] = {
+						id = 319462619;
+						model = {
+							className = "idLogicNodeModelVariableInline";
+							object = {
+								typeName = "Entity";
+							}
+						}
+						pos = {
+							x = 420;
+							y = 120;
+						}
+						size = {
+							x = 180;
+							y = 80;
+						}
+						pinVariables = {
+							num = 1;
+							item[0] = {
+								id = 0;
+								model = {
+									className = "idLogicVariableModelEntity";
+									object = {
+										value = "mech_street_encounter_trigger_commit_1";
+									}
+								}
+							}
+						}
+					}
+					item[8] = {
+						id = 3371508660;
+						model = {
+							className = "idLogicNodeModelComment";
+							object = {
+								headerTitle = "Hand Imp if tutorials are set to off OR already has the codex";
+								headerFillColor = {
+									r = 0.0784314051;
+									g = 0.0784314051;
+									b = 0.0784314051;
+									a = 0.784313977;
+								}
+								bodyFillColor = {
+									r = 0.486274958;
+									g = 0.941177011;
+									b = 0.141175985;
+									a = 0.184313998;
+								}
+							}
+						}
+						pos = {
+							x = 400;
+							y = -60;
+						}
+						size = {
+							x = 360;
+							y = 340;
+						}
+					}
+					item[9] = {
+						id = 2410645647;
+						model = {
+							className = "idLogicNodeModelPlayerCheckCodex";
+							object = {
+								codexDecl = "codex/tutorials/weak_point_arachnotron";
+							}
+						}
+						pos = {
+							x = 160;
+							y = 100;
+						}
+						size = {
+							x = 160;
+							y = 100;
+						}
+					}
+				}
+				links = {
+					num = 8;
+					item[0] = {
+						id = 3940007616;
+						fromNodeId = 3955851615;
+						fromPinId = 2;
+						toNodeId = 333515018;
+						toPinId = 0;
+					}
+					item[1] = {
+						id = 780347717;
+						fromNodeId = 3668593315;
+						fromPinId = 2;
+						toNodeId = 3955851615;
+						toPinId = 1;
+					}
+					item[2] = {
+						id = 4238843899;
+						fromNodeId = 2538696214;
+						fromPinId = 0;
+						toNodeId = 1711363818;
+						toPinId = 1;
+					}
+					item[3] = {
+						id = 4034808896;
+						fromNodeId = 1711363818;
+						fromPinId = 3;
+						toNodeId = 3955851615;
+						toPinId = 0;
+					}
+					item[4] = {
+						id = 3819389435;
+						fromNodeId = 319462619;
+						fromPinId = 0;
+						toNodeId = 333515018;
+						toPinId = 2;
+					}
+					item[5] = {
+						id = 4068089480;
+						fromNodeId = 3563334661;
+						fromPinId = 0;
+						toNodeId = 3668593315;
+						toPinId = 0;
+					}
+					item[6] = {
+						id = 4014253663;
+						fromNodeId = 3955851615;
+						fromPinId = 3;
+						toNodeId = 2410645647;
+						toPinId = 0;
+					}
+					item[7] = {
+						id = 1475630266;
+						fromNodeId = 2410645647;
+						fromPinId = 2;
+						toNodeId = 333515018;
+						toPinId = 0;
+					}
+				}
+			}
+		}
+	}
+}

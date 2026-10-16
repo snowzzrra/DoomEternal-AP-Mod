@@ -1,10 +1,12 @@
 import asyncio
 import logging
+from copy import deepcopy
 from dataclasses import replace
 
 import pytest
 
 from doom_eap.contracts.check_observation import CheckObservation
+from doom_eap.contracts.challenge_registry import load_challenge_registry, validate_challenge_registry
 from doom_eap.runtime.check_publication import CheckPublication
 from doom_eap.runtime.save_checks import SaveChecks, SaveCheckReadiness
 from doom_eap.runtime.save_check_observation import SaveCheckBinding, SaveCheckObservations
@@ -17,7 +19,8 @@ MASTERY = {"location_id": 101, "signal": dict(SIGNAL, unlockable="mastery")}
 PHYSICAL = {"location_id": 201, "signal": dict(kind="physical_event_equivalent", unlockable="physical",
                                             physical_location_ids=[101], required_count=1)}
 AGGREGATE = {"location_id": 301, "signal": dict(authority="server_checked_locations",
-                                             children=[101, 201], required_count=2)}
+                                             children=[101, 201], required_count=2,
+                                             mission_complete_location_id=401)}
 
 
 def owner():
@@ -86,11 +89,49 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
     assert packets == []
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}), publication))
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}, submitted={201}), publication))
-    assert len(packets) == 2 and submitted == set()  # existing retry-until-server-ack behavior
+    assert len(packets) == 2 and submitted == set()
     asyncio.run(service.check_aggregates(readiness, facts(checked={101}, submitted={201}), publication))
     assert len(packets) == 2
     asyncio.run(service.check_aggregates(readiness, facts(checked={101, 201}), publication))
     assert packets[-1] == {"cmd": "LocationChecks", "locations": [301]}
+
+
+def test_aggregate_requires_active_children_or_its_mission_completion():
+    service, packets = owner(), []
+
+    async def send(messages):
+        packets.extend(messages)
+
+    publication = CheckPublication(send, lambda _: None, 30)
+    readiness = SaveCheckReadiness(True, False, None)
+
+    async def run():
+        current = replace(facts(checked={101}), server_locations=frozenset({101, 301, 401}))
+        await service.check_aggregates(readiness, current, publication)
+        assert packets == [{"cmd": "LocationChecks", "locations": [301]}]
+        packets.clear()
+        for checked, active in (((), {301, 401}), ({101, 201}, {301, 401}), ({999}, {301, 401}),
+                                ({401}, {301}), ({401}, {201, 301, 401})):
+            current = replace(facts(checked=checked), server_locations=frozenset(active))
+            await service.check_aggregates(readiness, current, publication)
+            assert packets == []
+        current = replace(facts(checked={401}), server_locations=frozenset({301, 401}))
+        await service.check_aggregates(readiness, current, publication)
+        assert packets == [{"cmd": "LocationChecks", "locations": [301]}]
+
+    asyncio.run(run())
+
+
+def test_aggregate_registry_rejects_another_mission_or_invalid_completion_identity():
+    registry = load_challenge_registry()
+    aggregate = registry["all_mission_challenges"][0]
+    complete = aggregate["signal"]["mission_complete_location_id"]
+    another = next(entry["location_id"] for entry in registry["mission_complete"] if entry["location_id"] != complete)
+    for replacement in (None, another, float(complete)):
+        invalid = deepcopy(registry)
+        invalid["all_mission_challenges"][0]["signal"]["mission_complete_location_id"] = replacement
+        with pytest.raises(ValueError, match="mission completion"):
+            validate_challenge_registry(invalid)
 
 
 @pytest.mark.parametrize("kind", ["mastery", "challenge", "aggregate"])

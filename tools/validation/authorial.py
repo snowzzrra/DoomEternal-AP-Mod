@@ -65,11 +65,11 @@ def check_authorial() -> dict[str, int]:
             raise ValueError(f"data/content_identity.json: {field} must be positive")
     if identity["game"] != "DOOM Eternal":
         raise ValueError("data/content_identity.json: invalid game identity")
-    if identity["apworld_revision"] != "0.5.0":
+    if identity["apworld_revision"] != "0.7.0":
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
-    if identity["content_revision"] != "0.5.0":
+    if identity["content_revision"] != "0.7.0":
         raise ValueError("data/content_identity.json: invalid content revision")
-    if identity["release_version"] != "0.6.0":
+    if identity["release_version"] != "0.7.0":
         raise ValueError("data/content_identity.json: invalid release revision")
     if not identity["slot_data_revision"]:
         raise ValueError("data/content_identity.json: slot_data_revision must not be empty")

@@ -13,7 +13,9 @@
     "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY": 7770452,
     "AP_CHECK_GAME_PROGRESS_CODEX_4": 7770453,
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770454,
-    "AP_CHECK_GAME_PROGRESS_CODEX_5": 7770456
+    "AP_CHECK_GAME_PROGRESS_CODEX_5": 7770456,
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_E4M3_MCITY": 7770509,
+    "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_2": 7770515
   },
   "secret_encounters": [
     {
@@ -44,15 +46,25 @@
     "7770453": "The Holt - Book of the Seraphs - Part VII Codex",
     "7770454": "The Holt - Extra Life - Ivory Colonnade Crypt",
     "7770455": "The Holt - Secret Encounter - Ivory Bridge Alcove",
-    "7770456": "The Holt - Book of the Seraphs - Part VIII Codex"
+    "7770456": "The Holt - Book of the Seraphs - Part VIII Codex",
+    "7770509": "The Holt - Automap Station",
+    "7770515": "The Holt - Soulsphere - Crimson Forest Secret Wall"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_E4M3_MCITY": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_2": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
     "slayergate_progress_support_rune_mcity": {
       "native_entity_contract": {
-        "original_targets": ["slayergate_target_changelayer_slayergate_4"],
+        "original_targets": [
+          "slayergate_target_changelayer_slayergate_4"
+        ],
         "required_snippets": [
           "inherit = \"progress/support_rune\";",
           "class = \"idInteractable_Rune\";",
@@ -64,6 +76,23 @@
       },
       "duplicate_policy": "native_only",
       "no_auto_automap_helper": true
+    },
+    "game_interact_automap_e4m3_mcity": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
+    },
+    "game_pickup_mega_health_2": {
+      "permanent_resource_budget": false
     }
   }
 }
