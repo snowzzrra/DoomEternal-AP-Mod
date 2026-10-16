@@ -1,4 +1,3 @@
-"""Entity-level guard for the only Hub changes admitted after v0.3.0."""
 
 from __future__ import annotations
 

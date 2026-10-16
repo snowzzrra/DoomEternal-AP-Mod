@@ -126,7 +126,6 @@ def compile_materialization_plan(
             else:
                 if observation.is_proven_missing(item_id) and (item_id != 7770006 or cmd.stage == 0):
                     diff_commands.append(cmd)
-                # if owned or unknown: omit from repair diff!
         plan_commands = diff_commands
     # Special ownership is one physical state: materialize highest selected intent.
     special_candidates = []
@@ -284,7 +283,8 @@ def compile_materialization_plan(
         skipped_manual_replay=plan.skipped_manual_replay,
     )
     if not commands and any(observation.get_state(item_id) == UNKNOWN for item_id in selected_ids):
-        raise MaterializationPlanError("empty plan has unresolved native observations")
+        unresolved = sorted(item_id for item_id in selected_ids if observation.get_state(item_id) == UNKNOWN)
+        raise MaterializationPlanError("empty plan has unresolved native observations: " + ", ".join(map(str, unresolved)))
     return MaterializationPlan(
         scope, plan, len(raw_commands), len(support_commands), selected_special_stage,
         special_diagnostic,

@@ -2688,7 +2688,12 @@ class SentinelInventoryObservation:
                 if map_key in runtime_context.map_keys:
                     items[item_id] = ItemObservation(item_id, OWNED if key else MISSING,
                                                      source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, frag, ice, dash, key)
+        capacity_tiers = tuple(result.get(f"{family}_tier_after", 255) for family in ("health", "armor", "ammo"))
+        for item_id, tier in zip((7770017, 7770088, 7770092), capacity_tiers):
+            if type(tier) is int and 0 <= tier <= 4:
+                items[item_id] = ItemObservation(item_id, OWNED if tier else MISSING,
+                                                 observed_stage=tier, source="sentinel_inventory")
+        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, frag, ice, dash, key, capacity_tiers)
         if signature != self.last_logged:
             log_item_event(
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
@@ -2701,6 +2706,7 @@ class SentinelInventoryObservation:
                 dash=items.get(7770015, ItemObservation(7770015)).state,
                 weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
                 slayer_key_owned=key,
+                capacity_tiers=capacity_tiers,
                 gate_keys={str(item_id): item.state for item_id, item in items.items()
                            if item_id in GATE_KEY_TO_MAP},
             )

@@ -309,7 +309,7 @@ def _run_self_test(arguments: list[str]) -> int:
 def _run_ui() -> int:
     if sys.platform.startswith("linux"):
         import faulthandler
-        from .launcher_platform import launcher_user_paths
+        from doom_eap.launcher.launcher_platform import launcher_user_paths
         state = launcher_user_paths().state_dir
         state.mkdir(parents=True, exist_ok=True)
         with (state / "launcher-boot.log").open("w", encoding="utf-8") as boot:

@@ -4,6 +4,7 @@ import time
 from typing import Callable, Protocol
 
 from doom_eap.contracts.inventory_domain import (
+    CAPACITY_ITEM_IDS,
     DISPATCHED,
     OBSERVED,
     WEAPON_ITEM_IDS,
@@ -156,8 +157,7 @@ class MaterializationCoordinator:
             str(materialization_lease or "deferred"),
         ))
         materialization_key = f"{dispatch_key}:{ownership_fingerprint}"
-        # TAG DevInv clears physical inventory on every load. Persistent
-        # ownership therefore needs one reconciliation per accepted lease.
+        # TAG DevInv clears physical inventory on each load; reconcile per accepted lease.
         persistent_reconciliation_key = materialization_key
         received = set(ownership.reconciliation_item_ids)
         active_gate_keys = [
@@ -274,7 +274,7 @@ class MaterializationCoordinator:
             dispatched_key=dispatch_key,
             dispatched_item_ids=sorted(attempted_items | {
                 command.item_id for command in commands
-                if command.item_id in WEAPON_ITEM_IDS | {7770011, 7770013, 7770015}
+                if command.item_id in WEAPON_ITEM_IDS | CAPACITY_ITEM_IDS | {7770011, 7770013, 7770015}
             }),
         )
         persist()

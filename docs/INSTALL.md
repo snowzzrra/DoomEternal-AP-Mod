@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.6.2
+# Install DOOM Eternal Archipelago 0.6.4
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.6.2** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.4** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -65,7 +65,7 @@ from the server.
 
 ## Prepare and Install
 
-Core 1.0.4 supplies the v0.6.2 Slayer Gate indicators in Mission Select and the
+Core 1.0.6 supplies the Slayer Gate indicators in Mission Select and the
 gameplay HUD correction. The key uses its native on/off icon. The gate icon is
 white while unchecked and green after server confirmation. Hidden missions do
 not reveal these states.
@@ -74,7 +74,7 @@ Update/rebuild the existing room package for the global original DeathLink
 damage declaration, Elena Richardson AP pickups and Taras completion hook.
 Keep the same seed, slot and AP save.
 
-New v0.6.2 seeds classify capacities as progression and promote at least one
+Generated seeds classify capacities as progression and promote at least one
 pooled Progressive Blood Punch. In Random Mission Order, the three missions
 after the starting mission use CR 63 or lower when the pool permits; restricted
 pools use their lowest remaining CR instead. Taras/Urdak require the existing
@@ -201,7 +201,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-The launcher version is **0.6.2**. APWorld and room content use revision **0.6.0**. Update with DOOM closed and reconnect to the same room to retain its seed, placements and AP save. Rebuild the room package when the launcher requests a content update.
+The launcher version is **0.6.4**. APWorld and room content use revision **0.6.0**. Update with DOOM closed and reconnect to the same room to retain its seed, placements and AP save. Rebuild the room package when the launcher requests a content update.
 
 **Game Setup** provides **REPAIR CORE**, **REPAIR SESSION** and **RESTORE PREVIOUS CORE**. Automatic compatible Core updates default to enabled; the checkbox preserves your choice. **LOCAL CORE** selects a complete development distribution's `distribution.json`; **USE RELEASES** restores official release selection. The launcher and its session helper use Core from the persistent user cache. A verified cached distribution supports offline preparation.
 

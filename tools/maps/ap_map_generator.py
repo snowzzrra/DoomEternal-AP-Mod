@@ -536,6 +536,13 @@ def apply_native_entity_contract(block, contract):
                 f"{contract['remove_block']}"
             )
         block = remove_property_blocks(block, contract["remove_block"])
+    for property_name, value in contract.get("add_properties", {}).items():
+        if not isinstance(value, bool) or re.search(rf'\b{re.escape(property_name)}\s*=', block):
+            raise ValueError(f"Native entity contract property drift: {property_name}")
+        block, replacements = re.subn(r'(\bedit\s*=\s*\{)',
+            lambda match: match.group(1) + f'\n\t\t\t{property_name} = {str(value).lower()};', block, count=1)
+        if replacements != 1:
+            raise ValueError("Native entity contract edit block missing")
     for property_name, value in contract.get("set_properties", {}).items():
         if isinstance(value, bool):
             rendered = str(value).lower()
@@ -592,7 +599,7 @@ TARGET_POLICY_CONSUMERS = {
 
 NATIVE_ENTITY_CONTRACT_KEYS = {
     "remove_block", "original_targets", "required_snippets",
-    "set_properties", "retain_pickup_stat",
+    "set_properties", "add_properties", "retain_pickup_stat",
 }
 
 DUPLICATE_POLICIES = {"native_only"}
@@ -1871,7 +1878,7 @@ def generate_check_event(location_id):
 		networkReplicated = false;
 		disableAIPooling = false;
 		edit = {{
-			commandText = "echo AP_CHECK_EVENT_{location_id}; condump {event_name}.txt";
+			commandText = "echo AP_CHECK_EVENT_{location_id}; condump {event_name}.txt;";
 		}}
 	}}
 }}
@@ -2413,7 +2420,7 @@ entity {{
 		networkReplicated = false;
 		disableAIPooling = false;
 		edit = {{
-			commandText = "{cmd_text}";
+			commandText = "{cmd_text};";
 		}}
 	}}
 }}

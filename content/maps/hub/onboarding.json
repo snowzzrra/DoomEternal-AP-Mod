@@ -483,6 +483,7 @@
       ],
       "acquisition_state": "interactables/progress/unmaykr_case/unnmaykr_acquired",
       "acquisition_transition": "unmaykr_unlocked_To_unnmaykr_acquired",
+      "activation": "activateTargetsOnUse=false; activateTargetsOnEndInteraction=true",
       "hidden_mesh_on_acquire": "unmaykr_weapon",
       "physical_collectible": "collectibles_weapons_unmaykr_1",
       "preserved_native_behavior": [
